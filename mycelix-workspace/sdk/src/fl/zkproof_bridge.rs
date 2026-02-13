@@ -47,13 +47,11 @@
 #[cfg(any(feature = "simulation", feature = "risc0"))]
 use crate::zkproof::{GradientProofReceipt, GradientProver};
 
-#[cfg(not(any(feature = "simulation", feature = "risc0")))]
-use crate::zkproof::GradientProofReceipt;
-
 use super::aggregation::{fedavg, trimmed_mean};
 use super::types::{AggregatedGradient, GradientUpdate};
 
 /// A gradient update bundled with its ZK proof
+#[cfg(any(feature = "simulation", feature = "risc0"))]
 #[derive(Debug, Clone)]
 pub struct ProvenGradientUpdate {
     /// The gradient update
@@ -64,6 +62,7 @@ pub struct ProvenGradientUpdate {
     pub verified: bool,
 }
 
+#[cfg(any(feature = "simulation", feature = "risc0"))]
 impl ProvenGradientUpdate {
     /// Create a new proven update (unverified)
     pub fn new(update: GradientUpdate, proof: GradientProofReceipt) -> Self {

@@ -4,6 +4,17 @@
 use food_production_integrity::*;
 use hdk::prelude::*;
 
+// ============================================================================
+// BRIDGE SIGNAL (for cross-domain UI notification)
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BridgeEventSignal {
+    pub event_type: String,
+    pub source_zome: String,
+    pub payload: String,
+}
+
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
@@ -90,8 +101,18 @@ pub fn record_harvest(yr: YieldRecord) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest("Crop not found".into())))?;
 
     let action_hash = create_entry(&EntryTypes::YieldRecord(yr.clone()))?;
-    create_link(yr.crop_hash, action_hash.clone(), LinkTypes::CropToYield, ())?;
+    create_link(yr.crop_hash.clone(), action_hash.clone(), LinkTypes::CropToYield, ())?;
     create_link(agent, action_hash.clone(), LinkTypes::AgentToYield, ())?;
+
+    // Emit bridge signal so the UI can update with new harvest data
+    let _ = emit_signal(&BridgeEventSignal {
+        event_type: "harvest_recorded".to_string(),
+        source_zome: "food_production".to_string(),
+        payload: format!(
+            r#"{{"yield_hash":"{}","crop_hash":"{}","quantity_kg":{}}}"#,
+            action_hash, yr.crop_hash, yr.quantity_kg,
+        ),
+    });
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created yield record".into())))

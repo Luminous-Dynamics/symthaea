@@ -1095,7 +1095,7 @@ fn build_kvector_from_activity(
     // k_topo (Topology): Not tracked in DKG, use neutral
     let k_topo = 0.5;
 
-    KVector::new(k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo)
+    KVector::new_legacy(k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo)
 }
 
 /// Compute governance tier from trust score
@@ -1143,4 +1143,248 @@ pub fn get_agent_governance_tier(agent: AgentPubKey) -> ExternResult<String> {
 
     let tier = compute_governance_tier(kvector.trust_score());
     Ok(format!("{:?}", tier))
+}
+
+// ============================================================================
+// Unit Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // build_kvector_from_activity tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_build_kvector_no_activity() {
+        // No claims, no feedback -> neutral/low values
+        let kv = build_kvector_from_activity(0, 0, 0);
+
+        // k_r: no feedback -> neutral 0.5
+        assert!((kv.k_r - 0.5).abs() < 0.001, "k_r should be 0.5 (neutral), got {}", kv.k_r);
+
+        // k_a: ln(1)/ln(101) = 0.0
+        assert!(kv.k_a < 0.01, "k_a should be ~0.0 for zero claims, got {}", kv.k_a);
+
+        // k_i: no feedback -> neutral 0.5
+        assert!((kv.k_i - 0.5).abs() < 0.001, "k_i should be 0.5 (neutral), got {}", kv.k_i);
+
+        // k_p: total_feedback <= 5 -> 0.5
+        assert!((kv.k_p - 0.5).abs() < 0.001, "k_p should be 0.5, got {}", kv.k_p);
+
+        // k_m: claim_count == 0 -> 0.2
+        assert!((kv.k_m - 0.2).abs() < 0.001, "k_m should be 0.2, got {}", kv.k_m);
+
+        // k_s: always 0.5 in DKG
+        assert!((kv.k_s - 0.5).abs() < 0.001, "k_s should be 0.5, got {}", kv.k_s);
+
+        // k_h: endorsements=0, challenges=0, neither condition met -> 0.3
+        assert!((kv.k_h - 0.3).abs() < 0.001, "k_h should be 0.3, got {}", kv.k_h);
+
+        // k_topo: always 0.5 in DKG
+        assert!((kv.k_topo - 0.5).abs() < 0.001, "k_topo should be 0.5, got {}", kv.k_topo);
+
+        // Trust score should be moderate-low (around 0.36)
+        let score = kv.trust_score();
+        assert!(score > 0.2 && score < 0.5,
+            "No-activity trust score should be moderate-low, got {}", score);
+    }
+
+    #[test]
+    fn test_build_kvector_high_endorsements() {
+        // Many claims, high endorsements, low challenges -> high reputation
+        let kv = build_kvector_from_activity(50, 100, 5);
+
+        // k_r: 100/105 ~ 0.952
+        assert!(kv.k_r > 0.9, "k_r should be high with strong endorsements, got {}", kv.k_r);
+
+        // k_a: ln(51)/ln(101) ~ 0.852
+        assert!(kv.k_a > 0.8, "k_a should be high for 50 claims, got {}", kv.k_a);
+
+        // k_i: 1.0 - (5/105)*2.0 ~ 0.905
+        assert!(kv.k_i > 0.85, "k_i should be high with few challenges, got {}", kv.k_i);
+
+        // k_p: total_feedback > 5, k_r * 1.1 clamped to 1.0
+        assert!((kv.k_p - 1.0).abs() < 0.001, "k_p should be 1.0 (clamped), got {}", kv.k_p);
+
+        // k_m: claim_count > 10 -> 0.8
+        assert!((kv.k_m - 0.8).abs() < 0.001, "k_m should be 0.8, got {}", kv.k_m);
+
+        // k_h: endorsements > 10 && challenges < endorsements/5 (5 < 20) -> 0.9
+        assert!((kv.k_h - 0.9).abs() < 0.001, "k_h should be 0.9, got {}", kv.k_h);
+
+        // Trust score should be high (Constitutional tier)
+        let score = kv.trust_score();
+        assert!(score >= 0.6,
+            "High-endorsement trust score should be Constitutional (>= 0.6), got {}", score);
+    }
+
+    #[test]
+    fn test_build_kvector_mixed_feedback() {
+        // Equal endorsements and challenges -> moderate reputation
+        let kv = build_kvector_from_activity(10, 10, 10);
+
+        // k_r: 10/20 = 0.5
+        assert!((kv.k_r - 0.5).abs() < 0.001, "k_r should be 0.5 for equal feedback, got {}", kv.k_r);
+
+        // k_i: 1.0 - (10/20)*2.0 = 0.0
+        assert!(kv.k_i < 0.01, "k_i should be ~0.0 with equal challenges, got {}", kv.k_i);
+
+        // k_p: total_feedback > 5, k_r * 1.1 = 0.55
+        assert!((kv.k_p - 0.55).abs() < 0.01, "k_p should be ~0.55, got {}", kv.k_p);
+
+        // k_m: claim_count=10, 10 > 10 is false, 10 > 0 -> 0.5
+        assert!((kv.k_m - 0.5).abs() < 0.001, "k_m should be 0.5, got {}", kv.k_m);
+
+        // k_h: endorsements=10, not > 10. endorsements > challenges: 10 > 10 is false -> 0.3
+        assert!((kv.k_h - 0.3).abs() < 0.001, "k_h should be 0.3, got {}", kv.k_h);
+
+        // Trust score should be in Basic range
+        let score = kv.trust_score();
+        assert!(score >= 0.3 && score < 0.4,
+            "Mixed-feedback trust score should be Basic tier (0.3-0.4), got {}", score);
+    }
+
+    #[test]
+    fn test_build_kvector_all_challenges() {
+        // Only challenges, no endorsements -> low reputation
+        let kv = build_kvector_from_activity(5, 0, 20);
+
+        // k_r: 0/20 = 0.0
+        assert!(kv.k_r < 0.01, "k_r should be ~0.0 with no endorsements, got {}", kv.k_r);
+
+        // k_i: 1.0 - (20/20)*2.0 = -1.0 clamped to 0.0
+        assert!(kv.k_i < 0.01, "k_i should be 0.0 (clamped), got {}", kv.k_i);
+
+        // k_p: total_feedback > 5, k_r * 1.1 = 0.0
+        assert!(kv.k_p < 0.01, "k_p should be ~0.0, got {}", kv.k_p);
+
+        // k_h: endorsements=0 -> falls through to 0.3
+        assert!((kv.k_h - 0.3).abs() < 0.001, "k_h should be 0.3, got {}", kv.k_h);
+
+        // Trust score should be low (Observer tier)
+        let score = kv.trust_score();
+        assert!(score < 0.3,
+            "All-challenges trust score should be Observer (< 0.3), got {}", score);
+    }
+
+    // -----------------------------------------------------------------------
+    // compute_governance_tier tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_governance_tier_constitutional() {
+        let tier = compute_governance_tier(0.8);
+        assert_eq!(tier, GovernanceTier::Constitutional,
+            "Trust score 0.8 should be Constitutional");
+    }
+
+    #[test]
+    fn test_governance_tier_major() {
+        let tier = compute_governance_tier(0.5);
+        assert_eq!(tier, GovernanceTier::Major,
+            "Trust score 0.5 should be Major");
+    }
+
+    #[test]
+    fn test_governance_tier_basic() {
+        let tier = compute_governance_tier(0.35);
+        assert_eq!(tier, GovernanceTier::Basic,
+            "Trust score 0.35 should be Basic");
+    }
+
+    #[test]
+    fn test_governance_tier_observer() {
+        let tier = compute_governance_tier(0.1);
+        assert_eq!(tier, GovernanceTier::Observer,
+            "Trust score 0.1 should be Observer");
+    }
+
+    #[test]
+    fn test_governance_tier_boundary_values() {
+        // Exact boundary: 0.6 -> Constitutional
+        assert_eq!(compute_governance_tier(0.6), GovernanceTier::Constitutional,
+            "0.6 is the Constitutional boundary (inclusive)");
+
+        // Exact boundary: 0.4 -> Major
+        assert_eq!(compute_governance_tier(0.4), GovernanceTier::Major,
+            "0.4 is the Major boundary (inclusive)");
+
+        // Exact boundary: 0.3 -> Basic
+        assert_eq!(compute_governance_tier(0.3), GovernanceTier::Basic,
+            "0.3 is the Basic boundary (inclusive)");
+
+        // Just below each boundary
+        assert_eq!(compute_governance_tier(0.5999), GovernanceTier::Major,
+            "Just below 0.6 should be Major");
+        assert_eq!(compute_governance_tier(0.3999), GovernanceTier::Basic,
+            "Just below 0.4 should be Basic");
+        assert_eq!(compute_governance_tier(0.2999), GovernanceTier::Observer,
+            "Just below 0.3 should be Observer");
+
+        // Zero trust score
+        assert_eq!(compute_governance_tier(0.0), GovernanceTier::Observer,
+            "Zero trust score should be Observer");
+
+        // Maximum trust score
+        assert_eq!(compute_governance_tier(1.0), GovernanceTier::Constitutional,
+            "Maximum trust score should be Constitutional");
+    }
+
+    // -----------------------------------------------------------------------
+    // Integration: kvector -> tier
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_kvector_to_tier_integration() {
+        // No activity -> Observer or Basic (moderate-low trust)
+        let kv_none = build_kvector_from_activity(0, 0, 0);
+        let tier_none = compute_governance_tier(kv_none.trust_score());
+        assert!(tier_none == GovernanceTier::Basic || tier_none == GovernanceTier::Observer,
+            "No-activity agent should be Observer or Basic, got {:?} (score={})",
+            tier_none, kv_none.trust_score());
+
+        // High endorsements -> Constitutional
+        let kv_high = build_kvector_from_activity(50, 100, 5);
+        let tier_high = compute_governance_tier(kv_high.trust_score());
+        assert_eq!(tier_high, GovernanceTier::Constitutional,
+            "Highly endorsed agent should be Constitutional (score={})", kv_high.trust_score());
+
+        // Mixed feedback -> Basic
+        let kv_mixed = build_kvector_from_activity(10, 10, 10);
+        let tier_mixed = compute_governance_tier(kv_mixed.trust_score());
+        assert_eq!(tier_mixed, GovernanceTier::Basic,
+            "Mixed-feedback agent should be Basic (score={})", kv_mixed.trust_score());
+
+        // All challenges -> Observer
+        let kv_bad = build_kvector_from_activity(5, 0, 20);
+        let tier_bad = compute_governance_tier(kv_bad.trust_score());
+        assert_eq!(tier_bad, GovernanceTier::Observer,
+            "All-challenges agent should be Observer (score={})", kv_bad.trust_score());
+
+        // Moderate good standing -> Major
+        let kv_moderate = build_kvector_from_activity(15, 20, 3);
+        let tier_moderate = compute_governance_tier(kv_moderate.trust_score());
+        assert!(tier_moderate == GovernanceTier::Major || tier_moderate == GovernanceTier::Constitutional,
+            "Moderate good-standing agent should be Major or Constitutional, got {:?} (score={})",
+            tier_moderate, kv_moderate.trust_score());
+    }
+
+    // -----------------------------------------------------------------------
+    // Constants verification
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_consensus_constants() {
+        assert_eq!(MIN_ENDORSEMENTS, 3, "Quorum requires minimum 3 endorsements");
+        assert!((MIN_AGGREGATE_TRUST - 2.0).abs() < f64::EPSILON,
+            "Quorum requires minimum 2.0 aggregate trust");
+        assert!((MAX_CHALLENGE_RATIO - 0.3).abs() < f64::EPSILON,
+            "Maximum challenge ratio is 0.3");
+        assert_eq!(DECAY_START_DAYS, 90, "Temporal decay starts after 90 days");
+        assert!((DECAY_PER_PERIOD - 0.10).abs() < f64::EPSILON,
+            "Decay rate is 10% per 30-day period");
+    }
 }

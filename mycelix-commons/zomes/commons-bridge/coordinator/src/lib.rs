@@ -17,6 +17,7 @@ use mycelix_bridge_common::{
     ResolveQueryInput, EventTypeQuery, BridgeHealth,
     PropertyOwnershipQuery, PropertyOwnershipResult,
     CareAvailabilityQuery, CareAvailabilityResult,
+    AuditTrailQuery, AuditTrailEntry, AuditTrailResult,
     RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
 };
 
@@ -583,6 +584,84 @@ pub fn check_justice_disputes_for_property(input: CheckJusticeDisputesInput) -> 
 }
 
 // ============================================================================
+// Audit Trail Queries
+// ============================================================================
+
+/// Query bridge events within a time range, optionally filtered by domain and type.
+///
+/// Retrieves all events from the DHT, then filters by timestamp and optional
+/// domain/event_type criteria. Returns lightweight summaries with payload previews.
+#[hdk_extern]
+pub fn query_audit_trail(query: AuditTrailQuery) -> ExternResult<AuditTrailResult> {
+    let from = Timestamp::from_micros(query.from_us);
+    let to = Timestamp::from_micros(query.to_us);
+
+    // Get events — if domain+event_type are both specified, use the type anchor;
+    // if only domain, use the domain anchor; otherwise get all.
+    let records = if let (Some(ref domain), Some(ref event_type)) = (&query.domain, &query.event_type) {
+        let type_anchor = anchor_hash(&format!("event_type:{}:{}", domain, event_type))?;
+        let links = get_links(
+            LinkQuery::try_new(type_anchor, LinkTypes::EventTypeToEvent)?,
+            GetStrategy::default(),
+        )?;
+        bridge::records_from_links(links)?
+    } else if let Some(ref domain) = query.domain {
+        let domain_anchor = anchor_hash(&format!("domain_events:{}", domain))?;
+        let links = get_links(
+            LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
+            GetStrategy::default(),
+        )?;
+        bridge::records_from_links(links)?
+    } else {
+        get_all_events(())?
+    };
+
+    let mut entries = Vec::new();
+    for record in &records {
+        // Filter by timestamp
+        let action = record.action();
+        let ts = action.timestamp();
+        if ts < from || ts > to {
+            continue;
+        }
+
+        // Extract entry fields
+        if let Some(entry) = record.entry().as_option() {
+            let bytes: SerializedBytes = SerializedBytes::try_from(entry.clone())
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Serialize: {:?}", e))))?;
+            if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes.bytes()) {
+                let domain = value.get("domain").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+                let event_type = value.get("event_type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+                let source = value.get("source_agent").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+                let payload = value.get("payload").and_then(|v| v.as_str()).unwrap_or("{}");
+                let preview = if payload.len() > 120 {
+                    format!("{}...", &payload[..120])
+                } else {
+                    payload.to_string()
+                };
+
+                entries.push(AuditTrailEntry {
+                    domain,
+                    event_type,
+                    source_agent: source,
+                    payload_preview: preview,
+                    created_at_us: ts.as_micros(),
+                    action_hash: record.action_address().clone(),
+                });
+            }
+        }
+    }
+
+    let total = entries.len() as u32;
+    Ok(AuditTrailResult {
+        entries,
+        total_matched: total,
+        query_from_us: query.from_us,
+        query_to_us: query.to_us,
+    })
+}
+
+// ============================================================================
 // Health Check
 // ============================================================================
 
@@ -955,6 +1034,68 @@ mod tests {
         assert_eq!(s2.domain, "property");
         assert_eq!(s2.event_type, "ownership_transferred");
         assert!(s2.payload.contains("PROP-001"));
+    }
+
+    // ---- Audit trail type serde ----
+
+    #[test]
+    fn audit_trail_query_full_filters_serde() {
+        let q = AuditTrailQuery {
+            from_us: 1_700_000_000_000_000,
+            to_us: 1_700_001_000_000_000,
+            domain: Some("property".into()),
+            event_type: Some("ownership_transferred".into()),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: AuditTrailQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.from_us, 1_700_000_000_000_000);
+        assert_eq!(q2.domain.as_deref(), Some("property"));
+        assert_eq!(q2.event_type.as_deref(), Some("ownership_transferred"));
+    }
+
+    #[test]
+    fn audit_trail_query_no_filters_serde() {
+        let q = AuditTrailQuery {
+            from_us: 0,
+            to_us: i64::MAX,
+            domain: None,
+            event_type: None,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: AuditTrailQuery = serde_json::from_str(&json).unwrap();
+        assert!(q2.domain.is_none());
+        assert!(q2.event_type.is_none());
+    }
+
+    #[test]
+    fn audit_trail_entry_serde_roundtrip() {
+        let e = AuditTrailEntry {
+            domain: "housing".into(),
+            event_type: "lease_created".into(),
+            source_agent: "uhCAk_test".into(),
+            payload_preview: r#"{"lease_id":"L-1"}"#.into(),
+            created_at_us: 1_700_000_500_000_000,
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&e).unwrap();
+        let e2: AuditTrailEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(e2.domain, "housing");
+        assert_eq!(e2.event_type, "lease_created");
+        assert!(e2.payload_preview.contains("L-1"));
+    }
+
+    #[test]
+    fn audit_trail_result_empty_serde() {
+        let r = AuditTrailResult {
+            entries: vec![],
+            total_matched: 0,
+            query_from_us: 0,
+            query_to_us: 1_000_000,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: AuditTrailResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.entries.is_empty());
+        assert_eq!(r2.total_matched, 0);
     }
 
     #[test]

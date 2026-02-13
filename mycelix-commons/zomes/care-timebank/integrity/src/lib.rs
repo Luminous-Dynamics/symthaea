@@ -462,3 +462,924 @@ fn validate_update_exchange(exchange: TimeExchange) -> ExternResult<ValidateCall
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    fn fake_create() -> Create {
+        Create {
+            author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            timestamp: Timestamp::from_micros(0),
+            action_seq: 0,
+            prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                EntryDefIndex(0),
+                ZomeIndex(0),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
+            weight: EntryRateWeight::default(),
+        }
+    }
+
+    fn agent_a() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    fn agent_b() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![2u8; 36])
+    }
+
+    fn valid_offer() -> ServiceOffer {
+        ServiceOffer {
+            provider: agent_a(),
+            category: ServiceCategory::Childcare,
+            title: "Babysitting".to_string(),
+            description: "I can watch your kids.".to_string(),
+            hours_available: 10.0,
+            availability: "Weekday mornings".to_string(),
+            location: "Downtown".to_string(),
+            skills_required: vec!["CPR certified".to_string()],
+            active: true,
+            created_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+        }
+    }
+
+    fn valid_request() -> ServiceRequest {
+        ServiceRequest {
+            requester: agent_a(),
+            category: ServiceCategory::Eldercare,
+            title: "Need help with grandma".to_string(),
+            description: "Looking for afternoon companionship.".to_string(),
+            hours_needed: 4.0,
+            preferred_schedule: "Afternoons".to_string(),
+            location: "East side".to_string(),
+            urgency: UrgencyLevel::Medium,
+            open: true,
+            created_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+        }
+    }
+
+    fn valid_exchange() -> TimeExchange {
+        TimeExchange {
+            offer_id: ActionHash::from_raw_36(vec![10u8; 36]),
+            request_id: ActionHash::from_raw_36(vec![11u8; 36]),
+            provider: agent_a(),
+            recipient: agent_b(),
+            hours: 2.0,
+            category: ServiceCategory::Tutoring,
+            completed_at: Timestamp::from_micros(1000),
+            rating_provider: Some(5),
+            rating_recipient: Some(4),
+            notes: "Great session".to_string(),
+        }
+    }
+
+    fn valid_credit() -> TimeCredit {
+        TimeCredit {
+            agent: agent_a(),
+            balance: 10.0,
+            total_earned: 12.0,
+            total_spent: 2.0,
+            updated_at: Timestamp::from_micros(0),
+        }
+    }
+
+    fn assert_valid(result: ExternResult<ValidateCallbackResult>) {
+        match result {
+            Ok(ValidateCallbackResult::Valid) => {}
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                panic!("Expected Valid, got Invalid: {msg}")
+            }
+            other => panic!("Expected Valid, got {other:?}"),
+        }
+    }
+
+    fn assert_invalid(result: ExternResult<ValidateCallbackResult>, expected_substr: &str) {
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                assert!(
+                    msg.contains(expected_substr),
+                    "Expected Invalid message containing '{expected_substr}', got: '{msg}'"
+                );
+            }
+            Ok(ValidateCallbackResult::Valid) => {
+                panic!(
+                    "Expected Invalid containing '{expected_substr}', got Valid"
+                )
+            }
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
+    }
+
+    // ── Serde roundtrip tests ───────────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_service_category() {
+        let cats = vec![
+            ServiceCategory::Childcare,
+            ServiceCategory::Eldercare,
+            ServiceCategory::PetCare,
+            ServiceCategory::Cooking,
+            ServiceCategory::Cleaning,
+            ServiceCategory::Gardening,
+            ServiceCategory::Tutoring,
+            ServiceCategory::TechSupport,
+            ServiceCategory::Transportation,
+            ServiceCategory::Companionship,
+            ServiceCategory::HealthSupport,
+            ServiceCategory::HomeRepair,
+            ServiceCategory::LegalAdvice,
+            ServiceCategory::Counseling,
+            ServiceCategory::ArtMusic,
+            ServiceCategory::LanguageHelp,
+            ServiceCategory::Administrative,
+            ServiceCategory::Other("Custom Thing".to_string()),
+        ];
+        for cat in &cats {
+            let json = serde_json::to_string(cat).unwrap();
+            let back: ServiceCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, cat);
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_urgency_level() {
+        let levels = vec![
+            UrgencyLevel::Low,
+            UrgencyLevel::Medium,
+            UrgencyLevel::High,
+            UrgencyLevel::Critical,
+        ];
+        for level in &levels {
+            let json = serde_json::to_string(level).unwrap();
+            let back: UrgencyLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, level);
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_service_offer() {
+        let offer = valid_offer();
+        let json = serde_json::to_string(&offer).unwrap();
+        let back: ServiceOffer = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, offer);
+    }
+
+    #[test]
+    fn serde_roundtrip_service_request() {
+        let req = valid_request();
+        let json = serde_json::to_string(&req).unwrap();
+        let back: ServiceRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, req);
+    }
+
+    #[test]
+    fn serde_roundtrip_time_exchange() {
+        let ex = valid_exchange();
+        let json = serde_json::to_string(&ex).unwrap();
+        let back: TimeExchange = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, ex);
+    }
+
+    #[test]
+    fn serde_roundtrip_time_credit() {
+        let credit = valid_credit();
+        let json = serde_json::to_string(&credit).unwrap();
+        let back: TimeCredit = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, credit);
+    }
+
+    // ── ServiceCategory::anchor_key tests ───────────────────────────────
+
+    #[test]
+    fn anchor_key_known_categories() {
+        assert_eq!(ServiceCategory::Childcare.anchor_key(), "childcare");
+        assert_eq!(ServiceCategory::Eldercare.anchor_key(), "eldercare");
+        assert_eq!(ServiceCategory::PetCare.anchor_key(), "petcare");
+        assert_eq!(ServiceCategory::Cooking.anchor_key(), "cooking");
+        assert_eq!(ServiceCategory::Cleaning.anchor_key(), "cleaning");
+        assert_eq!(ServiceCategory::Gardening.anchor_key(), "gardening");
+        assert_eq!(ServiceCategory::Tutoring.anchor_key(), "tutoring");
+        assert_eq!(ServiceCategory::TechSupport.anchor_key(), "techsupport");
+        assert_eq!(ServiceCategory::Transportation.anchor_key(), "transportation");
+        assert_eq!(ServiceCategory::Companionship.anchor_key(), "companionship");
+        assert_eq!(ServiceCategory::HealthSupport.anchor_key(), "healthsupport");
+        assert_eq!(ServiceCategory::HomeRepair.anchor_key(), "homerepair");
+        assert_eq!(ServiceCategory::LegalAdvice.anchor_key(), "legaladvice");
+        assert_eq!(ServiceCategory::Counseling.anchor_key(), "counseling");
+        assert_eq!(ServiceCategory::ArtMusic.anchor_key(), "artmusic");
+        assert_eq!(ServiceCategory::LanguageHelp.anchor_key(), "languagehelp");
+        assert_eq!(ServiceCategory::Administrative.anchor_key(), "administrative");
+    }
+
+    #[test]
+    fn anchor_key_other_lowercases_and_replaces_spaces() {
+        let cat = ServiceCategory::Other("Dog Walking Service".to_string());
+        assert_eq!(cat.anchor_key(), "other_dog_walking_service");
+    }
+
+    #[test]
+    fn anchor_key_other_empty_string() {
+        let cat = ServiceCategory::Other(String::new());
+        assert_eq!(cat.anchor_key(), "other_");
+    }
+
+    // ── validate_create_offer tests ─────────────────────────────────────
+
+    #[test]
+    fn create_offer_valid() {
+        assert_valid(validate_create_offer(fake_create(), valid_offer()));
+    }
+
+    #[test]
+    fn create_offer_empty_title() {
+        let mut o = valid_offer();
+        o.title = String::new();
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Offer title cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_offer_title_too_long() {
+        let mut o = valid_offer();
+        o.title = "a".repeat(257);
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Offer title must be 256 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_offer_title_at_boundary() {
+        let mut o = valid_offer();
+        o.title = "a".repeat(256);
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    #[test]
+    fn create_offer_empty_description() {
+        let mut o = valid_offer();
+        o.description = String::new();
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Offer description cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_offer_description_too_long() {
+        let mut o = valid_offer();
+        o.description = "b".repeat(4097);
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Offer description must be 4096 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_offer_description_at_boundary() {
+        let mut o = valid_offer();
+        o.description = "b".repeat(4096);
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    #[test]
+    fn create_offer_zero_hours() {
+        let mut o = valid_offer();
+        o.hours_available = 0.0;
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Hours available must be positive",
+        );
+    }
+
+    #[test]
+    fn create_offer_negative_hours() {
+        let mut o = valid_offer();
+        o.hours_available = -1.0;
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Hours available must be positive",
+        );
+    }
+
+    #[test]
+    fn create_offer_hours_exceed_week() {
+        let mut o = valid_offer();
+        o.hours_available = 168.1;
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Hours available cannot exceed 168 per week",
+        );
+    }
+
+    #[test]
+    fn create_offer_hours_at_max_boundary() {
+        let mut o = valid_offer();
+        o.hours_available = 168.0;
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    #[test]
+    fn create_offer_hours_just_above_zero() {
+        let mut o = valid_offer();
+        o.hours_available = 0.01;
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    #[test]
+    fn create_offer_empty_location() {
+        let mut o = valid_offer();
+        o.location = String::new();
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Location cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_offer_location_too_long() {
+        let mut o = valid_offer();
+        o.location = "x".repeat(513);
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Location must be 512 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_offer_location_at_boundary() {
+        let mut o = valid_offer();
+        o.location = "x".repeat(512);
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    #[test]
+    fn create_offer_availability_too_long() {
+        let mut o = valid_offer();
+        o.availability = "y".repeat(513);
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Availability must be 512 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_offer_availability_at_boundary() {
+        let mut o = valid_offer();
+        o.availability = "y".repeat(512);
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    #[test]
+    fn create_offer_too_many_skills() {
+        let mut o = valid_offer();
+        o.skills_required = (0..21).map(|i| format!("skill_{i}")).collect();
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Cannot list more than 20 skills",
+        );
+    }
+
+    #[test]
+    fn create_offer_skills_at_max_count() {
+        let mut o = valid_offer();
+        o.skills_required = (0..20).map(|i| format!("skill_{i}")).collect();
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    #[test]
+    fn create_offer_skill_too_long() {
+        let mut o = valid_offer();
+        o.skills_required = vec!["z".repeat(129)];
+        assert_invalid(
+            validate_create_offer(fake_create(), o),
+            "Each skill must be 128 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_offer_skill_at_boundary() {
+        let mut o = valid_offer();
+        o.skills_required = vec!["z".repeat(128)];
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    #[test]
+    fn create_offer_empty_skills_list() {
+        let mut o = valid_offer();
+        o.skills_required = vec![];
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    #[test]
+    fn create_offer_empty_availability_ok() {
+        let mut o = valid_offer();
+        o.availability = String::new();
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    #[test]
+    fn create_offer_with_other_category() {
+        let mut o = valid_offer();
+        o.category = ServiceCategory::Other("Custom".to_string());
+        assert_valid(validate_create_offer(fake_create(), o));
+    }
+
+    // ── validate_create_request tests ───────────────────────────────────
+
+    #[test]
+    fn create_request_valid() {
+        assert_valid(validate_create_request(fake_create(), valid_request()));
+    }
+
+    #[test]
+    fn create_request_empty_title() {
+        let mut r = valid_request();
+        r.title = String::new();
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Request title cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_request_title_too_long() {
+        let mut r = valid_request();
+        r.title = "t".repeat(257);
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Request title must be 256 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_request_title_at_boundary() {
+        let mut r = valid_request();
+        r.title = "t".repeat(256);
+        assert_valid(validate_create_request(fake_create(), r));
+    }
+
+    #[test]
+    fn create_request_empty_description() {
+        let mut r = valid_request();
+        r.description = String::new();
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Request description cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_request_description_too_long() {
+        let mut r = valid_request();
+        r.description = "d".repeat(4097);
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Request description must be 4096 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_request_description_at_boundary() {
+        let mut r = valid_request();
+        r.description = "d".repeat(4096);
+        assert_valid(validate_create_request(fake_create(), r));
+    }
+
+    #[test]
+    fn create_request_zero_hours() {
+        let mut r = valid_request();
+        r.hours_needed = 0.0;
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Hours needed must be positive",
+        );
+    }
+
+    #[test]
+    fn create_request_negative_hours() {
+        let mut r = valid_request();
+        r.hours_needed = -5.0;
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Hours needed must be positive",
+        );
+    }
+
+    #[test]
+    fn create_request_hours_exceed_168() {
+        let mut r = valid_request();
+        r.hours_needed = 169.0;
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Hours needed cannot exceed 168",
+        );
+    }
+
+    #[test]
+    fn create_request_hours_at_max_boundary() {
+        let mut r = valid_request();
+        r.hours_needed = 168.0;
+        assert_valid(validate_create_request(fake_create(), r));
+    }
+
+    #[test]
+    fn create_request_hours_just_above_zero() {
+        let mut r = valid_request();
+        r.hours_needed = 0.001;
+        assert_valid(validate_create_request(fake_create(), r));
+    }
+
+    #[test]
+    fn create_request_empty_location() {
+        let mut r = valid_request();
+        r.location = String::new();
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Location cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_request_all_urgency_levels_valid() {
+        for urgency in [
+            UrgencyLevel::Low,
+            UrgencyLevel::Medium,
+            UrgencyLevel::High,
+            UrgencyLevel::Critical,
+        ] {
+            let mut r = valid_request();
+            r.urgency = urgency;
+            assert_valid(validate_create_request(fake_create(), r));
+        }
+    }
+
+    // ── validate_create_exchange tests ──────────────────────────────────
+
+    #[test]
+    fn create_exchange_valid() {
+        assert_valid(validate_create_exchange(fake_create(), valid_exchange()));
+    }
+
+    #[test]
+    fn create_exchange_valid_no_ratings() {
+        let mut e = valid_exchange();
+        e.rating_provider = None;
+        e.rating_recipient = None;
+        assert_valid(validate_create_exchange(fake_create(), e));
+    }
+
+    #[test]
+    fn create_exchange_zero_hours() {
+        let mut e = valid_exchange();
+        e.hours = 0.0;
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Exchange hours must be positive",
+        );
+    }
+
+    #[test]
+    fn create_exchange_negative_hours() {
+        let mut e = valid_exchange();
+        e.hours = -2.0;
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Exchange hours must be positive",
+        );
+    }
+
+    #[test]
+    fn create_exchange_hours_exceed_168() {
+        let mut e = valid_exchange();
+        e.hours = 168.5;
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Exchange hours cannot exceed 168",
+        );
+    }
+
+    #[test]
+    fn create_exchange_hours_at_max_boundary() {
+        let mut e = valid_exchange();
+        e.hours = 168.0;
+        assert_valid(validate_create_exchange(fake_create(), e));
+    }
+
+    #[test]
+    fn create_exchange_same_provider_and_recipient() {
+        let mut e = valid_exchange();
+        e.recipient = e.provider.clone();
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Provider and recipient cannot be the same agent",
+        );
+    }
+
+    #[test]
+    fn create_exchange_provider_rating_zero() {
+        let mut e = valid_exchange();
+        e.rating_provider = Some(0);
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Provider rating must be 1-5",
+        );
+    }
+
+    #[test]
+    fn create_exchange_provider_rating_six() {
+        let mut e = valid_exchange();
+        e.rating_provider = Some(6);
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Provider rating must be 1-5",
+        );
+    }
+
+    #[test]
+    fn create_exchange_provider_rating_u8_max() {
+        let mut e = valid_exchange();
+        e.rating_provider = Some(255);
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Provider rating must be 1-5",
+        );
+    }
+
+    #[test]
+    fn create_exchange_provider_rating_boundary_1() {
+        let mut e = valid_exchange();
+        e.rating_provider = Some(1);
+        assert_valid(validate_create_exchange(fake_create(), e));
+    }
+
+    #[test]
+    fn create_exchange_provider_rating_boundary_5() {
+        let mut e = valid_exchange();
+        e.rating_provider = Some(5);
+        assert_valid(validate_create_exchange(fake_create(), e));
+    }
+
+    #[test]
+    fn create_exchange_recipient_rating_zero() {
+        let mut e = valid_exchange();
+        e.rating_recipient = Some(0);
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Recipient rating must be 1-5",
+        );
+    }
+
+    #[test]
+    fn create_exchange_recipient_rating_six() {
+        let mut e = valid_exchange();
+        e.rating_recipient = Some(6);
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Recipient rating must be 1-5",
+        );
+    }
+
+    #[test]
+    fn create_exchange_recipient_rating_boundary_1() {
+        let mut e = valid_exchange();
+        e.rating_recipient = Some(1);
+        assert_valid(validate_create_exchange(fake_create(), e));
+    }
+
+    #[test]
+    fn create_exchange_recipient_rating_boundary_5() {
+        let mut e = valid_exchange();
+        e.rating_recipient = Some(5);
+        assert_valid(validate_create_exchange(fake_create(), e));
+    }
+
+    #[test]
+    fn create_exchange_empty_notes_ok() {
+        let mut e = valid_exchange();
+        e.notes = String::new();
+        assert_valid(validate_create_exchange(fake_create(), e));
+    }
+
+    // ── validate_create_credit tests ────────────────────────────────────
+
+    #[test]
+    fn create_credit_valid() {
+        assert_valid(validate_create_credit(fake_create(), valid_credit()));
+    }
+
+    #[test]
+    fn create_credit_zero_balances() {
+        let c = TimeCredit {
+            agent: agent_a(),
+            balance: 0.0,
+            total_earned: 0.0,
+            total_spent: 0.0,
+            updated_at: Timestamp::from_micros(0),
+        };
+        assert_valid(validate_create_credit(fake_create(), c));
+    }
+
+    #[test]
+    fn create_credit_negative_earned() {
+        let mut c = valid_credit();
+        c.total_earned = -0.01;
+        assert_invalid(
+            validate_create_credit(fake_create(), c),
+            "Total earned cannot be negative",
+        );
+    }
+
+    #[test]
+    fn create_credit_negative_spent() {
+        let mut c = valid_credit();
+        c.total_spent = -1.0;
+        assert_invalid(
+            validate_create_credit(fake_create(), c),
+            "Total spent cannot be negative",
+        );
+    }
+
+    #[test]
+    fn create_credit_negative_balance_ok() {
+        // The validator does NOT reject negative balance (debt is allowed)
+        let mut c = valid_credit();
+        c.balance = -5.0;
+        assert_valid(validate_create_credit(fake_create(), c));
+    }
+
+    #[test]
+    fn create_credit_large_values_ok() {
+        let c = TimeCredit {
+            agent: agent_a(),
+            balance: 999999.0,
+            total_earned: 999999.0,
+            total_spent: 0.0,
+            updated_at: Timestamp::from_micros(0),
+        };
+        assert_valid(validate_create_credit(fake_create(), c));
+    }
+
+    // ── validate_update_offer tests ─────────────────────────────────────
+
+    #[test]
+    fn update_offer_valid() {
+        assert_valid(validate_update_offer(valid_offer()));
+    }
+
+    #[test]
+    fn update_offer_empty_title() {
+        let mut o = valid_offer();
+        o.title = String::new();
+        assert_invalid(
+            validate_update_offer(o),
+            "Offer title cannot be empty",
+        );
+    }
+
+    #[test]
+    fn update_offer_negative_hours() {
+        let mut o = valid_offer();
+        o.hours_available = -0.1;
+        assert_invalid(
+            validate_update_offer(o),
+            "Hours available cannot be negative",
+        );
+    }
+
+    #[test]
+    fn update_offer_zero_hours_ok() {
+        // update allows zero (deactivation), unlike create which requires positive
+        let mut o = valid_offer();
+        o.hours_available = 0.0;
+        assert_valid(validate_update_offer(o));
+    }
+
+    #[test]
+    fn update_offer_inactive_ok() {
+        let mut o = valid_offer();
+        o.active = false;
+        assert_valid(validate_update_offer(o));
+    }
+
+    // ── validate_update_request tests ───────────────────────────────────
+
+    #[test]
+    fn update_request_valid() {
+        assert_valid(validate_update_request(valid_request()));
+    }
+
+    #[test]
+    fn update_request_empty_title() {
+        let mut r = valid_request();
+        r.title = String::new();
+        assert_invalid(
+            validate_update_request(r),
+            "Request title cannot be empty",
+        );
+    }
+
+    #[test]
+    fn update_request_closed_ok() {
+        let mut r = valid_request();
+        r.open = false;
+        assert_valid(validate_update_request(r));
+    }
+
+    // ── validate_update_exchange tests ──────────────────────────────────
+
+    #[test]
+    fn update_exchange_valid() {
+        assert_valid(validate_update_exchange(valid_exchange()));
+    }
+
+    #[test]
+    fn update_exchange_no_ratings() {
+        let mut e = valid_exchange();
+        e.rating_provider = None;
+        e.rating_recipient = None;
+        assert_valid(validate_update_exchange(e));
+    }
+
+    #[test]
+    fn update_exchange_provider_rating_zero() {
+        let mut e = valid_exchange();
+        e.rating_provider = Some(0);
+        assert_invalid(
+            validate_update_exchange(e),
+            "Provider rating must be 1-5",
+        );
+    }
+
+    #[test]
+    fn update_exchange_provider_rating_six() {
+        let mut e = valid_exchange();
+        e.rating_provider = Some(6);
+        assert_invalid(
+            validate_update_exchange(e),
+            "Provider rating must be 1-5",
+        );
+    }
+
+    #[test]
+    fn update_exchange_recipient_rating_zero() {
+        let mut e = valid_exchange();
+        e.rating_recipient = Some(0);
+        assert_invalid(
+            validate_update_exchange(e),
+            "Recipient rating must be 1-5",
+        );
+    }
+
+    #[test]
+    fn update_exchange_recipient_rating_six() {
+        let mut e = valid_exchange();
+        e.rating_recipient = Some(6);
+        assert_invalid(
+            validate_update_exchange(e),
+            "Recipient rating must be 1-5",
+        );
+    }
+
+    #[test]
+    fn update_exchange_both_ratings_valid_boundaries() {
+        for r in 1u8..=5 {
+            let mut e = valid_exchange();
+            e.rating_provider = Some(r);
+            e.rating_recipient = Some(r);
+            assert_valid(validate_update_exchange(e));
+        }
+    }
+
+    #[test]
+    fn update_exchange_provider_rating_valid_recipient_invalid() {
+        let mut e = valid_exchange();
+        e.rating_provider = Some(3);
+        e.rating_recipient = Some(0);
+        assert_invalid(
+            validate_update_exchange(e),
+            "Recipient rating must be 1-5",
+        );
+    }
+
+    #[test]
+    fn update_exchange_provider_rating_invalid_recipient_valid() {
+        let mut e = valid_exchange();
+        e.rating_provider = Some(255);
+        e.rating_recipient = Some(3);
+        // Provider check comes first
+        assert_invalid(
+            validate_update_exchange(e),
+            "Provider rating must be 1-5",
+        );
+    }
+}

@@ -170,6 +170,36 @@ export interface FactcheckStatusResult {
   error?: string;
 }
 
+/** Input for querying the bridge audit trail */
+export interface AuditTrailQuery {
+  /** Start of time range (inclusive), microseconds since epoch */
+  from_us: number;
+  /** End of time range (inclusive), microseconds since epoch */
+  to_us: number;
+  /** Optional domain filter */
+  domain?: string;
+  /** Optional event type filter */
+  event_type?: string;
+}
+
+/** A single audit trail entry */
+export interface AuditTrailEntry {
+  domain: string;
+  event_type: string;
+  source_agent: string;
+  payload_preview: string;
+  created_at_us: number;
+  action_hash: Uint8Array;
+}
+
+/** Result of an audit trail query */
+export interface AuditTrailResult {
+  entries: AuditTrailEntry[];
+  total_matched: number;
+  query_from_us: number;
+  query_to_us: number;
+}
+
 /** Holochain ZomeCallable interface (minimal) */
 interface ZomeCallable {
   callZome<T>(params: {
@@ -382,6 +412,23 @@ export class CivicBridgeClient {
       zome_name: BRIDGE_ZOME,
       fn_name: 'check_factcheck_status',
       payload: input,
+    });
+  }
+
+  // --- Audit Trail ---
+
+  /** Query the bridge audit trail with time range and optional domain/type filters */
+  async queryAuditTrail(query: AuditTrailQuery): Promise<AuditTrailResult> {
+    return this.client.callZome({
+      role_name: CIVIC_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'query_audit_trail',
+      payload: {
+        from_us: query.from_us,
+        to_us: query.to_us,
+        domain: query.domain ?? null,
+        event_type: query.event_type ?? null,
+      },
     });
   }
 

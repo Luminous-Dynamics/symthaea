@@ -4,6 +4,17 @@
 use food_distribution_integrity::*;
 use hdk::prelude::*;
 
+// ============================================================================
+// BRIDGE SIGNAL (for cross-domain UI notification)
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BridgeEventSignal {
+    pub event_type: String,
+    pub source_zome: String,
+    pub payload: String,
+}
+
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
@@ -87,15 +98,64 @@ pub fn get_producer_listings(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn place_order(order: Order) -> ExternResult<Record> {
-    let _listing = get(order.listing_hash.clone(), GetOptions::default())?
+    let listing_record = get(order.listing_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Listing not found".into())))?;
 
     let action_hash = create_entry(&EntryTypes::Order(order.clone()))?;
-    create_link(order.listing_hash, action_hash.clone(), LinkTypes::ListingToOrder, ())?;
+    create_link(order.listing_hash.clone(), action_hash.clone(), LinkTypes::ListingToOrder, ())?;
     create_link(order.buyer, action_hash.clone(), LinkTypes::BuyerToOrder, ())?;
+
+    // Cross-domain: if the listing's market is a FoodBank, notify mutualaid
+    let listing: Option<Listing> = listing_record.entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+    if let Some(listing) = listing {
+        if let Some(market_record) = get(listing.market_hash, GetOptions::default())? {
+            let market: Option<Market> = market_record.entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+            if let Some(market) = market {
+                if market.market_type == MarketType::FoodBank {
+                    // Best-effort: check mutualaid for matching needs
+                    let _ = check_mutualaid_matching_needs();
+
+                    // Emit bridge signal so UI can show the food bank order
+                    let _ = emit_signal(&BridgeEventSignal {
+                        event_type: "food_bank_order_placed".to_string(),
+                        source_zome: "food_distribution".to_string(),
+                        payload: format!(
+                            r#"{{"order_hash":"{}","market_id":"{}","quantity_kg":{}}}"#,
+                            action_hash, market.id, order.quantity_kg,
+                        ),
+                    });
+                }
+            }
+        }
+    }
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created order".into())))
+}
+
+/// Best-effort cross-domain call to mutualaid_needs to check for matching needs.
+///
+/// Uses `call(CallTargetCell::Local, ...)` since mutualaid_needs is in the same
+/// Commons cluster DNA. Failures are silently ignored -- the primary order
+/// operation must not fail because the mutualaid zome is unavailable.
+fn check_mutualaid_matching_needs() -> Option<Vec<Record>> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("mutualaid_needs"),
+        FunctionName::from("get_all_needs"),
+        None,
+        (),
+    );
+    match response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            extern_io.decode::<Vec<Record>>().ok()
+        }
+        _ => None,
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

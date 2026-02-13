@@ -947,3 +947,457 @@ fn validate_restorative(circle: &RestorativeCircle) -> ExternResult<ValidateCall
 
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // RESULT HELPERS
+    // ========================================================================
+
+    fn is_valid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Valid))
+    }
+
+    fn is_invalid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Invalid(_)))
+    }
+
+    // ========================================================================
+    // DATA CONSTRUCTION HELPERS
+    // ========================================================================
+
+    fn ts() -> Timestamp {
+        Timestamp::from_micros(0)
+    }
+
+    fn make_case_context() -> CaseContext {
+        CaseContext {
+            happ: None,
+            reference_id: None,
+            community: None,
+            jurisdiction: None,
+        }
+    }
+
+    fn make_case() -> Case {
+        Case {
+            id: "case-1".into(),
+            title: "Contract breach".into(),
+            description: "Respondent failed to deliver".into(),
+            case_type: CaseType::ContractDispute,
+            complainant: "did:example:alice".into(),
+            respondent: "did:example:bob".into(),
+            parties: vec![],
+            phase: CasePhase::Filed,
+            status: CaseStatus::Active,
+            severity: CaseSeverity::Moderate,
+            context: make_case_context(),
+            created_at: ts(),
+            updated_at: ts(),
+            phase_deadline: None,
+        }
+    }
+
+    fn make_evidence_content() -> EvidenceContent {
+        EvidenceContent {
+            hash: "sha256:abc123".into(),
+            reference: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi".into(),
+            mime_type: "application/pdf".into(),
+            size: 1024,
+            encrypted: false,
+            key_reference: None,
+        }
+    }
+
+    fn make_evidence_verification() -> EvidenceVerification {
+        EvidenceVerification {
+            status: VerificationStatus::Unverified,
+            verifier: None,
+            method: None,
+            verified_at: None,
+            notes: None,
+        }
+    }
+
+    fn make_evidence() -> Evidence {
+        Evidence {
+            id: "ev-1".into(),
+            case_id: "case-1".into(),
+            submitter: "did:example:alice".into(),
+            evidence_type: EvidenceType::Document,
+            content: make_evidence_content(),
+            description: "Contract document".into(),
+            custody: vec![],
+            verification: make_evidence_verification(),
+            visibility: EvidenceVisibility::AllParties,
+            created_at: ts(),
+            sealed: false,
+        }
+    }
+
+    fn make_mediation() -> Mediation {
+        Mediation {
+            id: "med-1".into(),
+            case_id: "case-1".into(),
+            mediator: "did:example:mediator".into(),
+            status: MediationStatus::Scheduled,
+            sessions: vec![],
+            proposals: vec![],
+            created_at: ts(),
+            deadline: None,
+        }
+    }
+
+    fn make_arbitrator(did: &str) -> Arbitrator {
+        Arbitrator {
+            did: did.into(),
+            role: ArbitratorRole::PanelMember,
+            selected_at: ts(),
+            accepted: true,
+            recused: false,
+            recusal_reason: None,
+        }
+    }
+
+    fn make_arbitration(arbitrators: Vec<Arbitrator>) -> Arbitration {
+        Arbitration {
+            id: "arb-1".into(),
+            case_id: "case-1".into(),
+            arbitrators,
+            selection_method: ArbitratorSelection::Random,
+            status: ArbitrationStatus::PanelFormation,
+            deliberation_deadline: None,
+            created_at: ts(),
+        }
+    }
+
+    fn make_vote(arbitrator: &str) -> ArbitratorVote {
+        ArbitratorVote {
+            arbitrator: arbitrator.into(),
+            vote: VoteChoice::ForComplainant,
+            timestamp: ts(),
+        }
+    }
+
+    fn make_decision() -> Decision {
+        Decision {
+            id: "dec-1".into(),
+            case_id: "case-1".into(),
+            arbitration_id: "arb-1".into(),
+            decision_type: DecisionType::MeritsDecision,
+            outcome: DecisionOutcome::ForComplainant,
+            reasoning: "Evidence clearly supports the complainant".into(),
+            remedies: vec![],
+            votes: vec![make_vote("did:example:arb1")],
+            dissents: vec![],
+            rendered_at: ts(),
+            appeal_deadline: ts(),
+            finalized: false,
+        }
+    }
+
+    fn make_appeal() -> Appeal {
+        Appeal {
+            id: "appeal-1".into(),
+            case_id: "case-1".into(),
+            decision_id: "dec-1".into(),
+            appellant: "did:example:bob".into(),
+            grounds: vec![AppealGround::ProceduralError],
+            argument: "The panel did not consider key evidence".into(),
+            status: AppealStatus::Filed,
+            appeal_number: 1,
+            created_at: ts(),
+        }
+    }
+
+    fn make_enforcement() -> Enforcement {
+        Enforcement {
+            id: "enf-1".into(),
+            decision_id: "dec-1".into(),
+            remedy_index: 0,
+            enforcer: "did:example:system".into(),
+            status: EnforcementStatus::Pending,
+            actions: vec![],
+            created_at: ts(),
+            completed_at: None,
+        }
+    }
+
+    fn make_circle_participant(did: &str) -> CircleParticipant {
+        CircleParticipant {
+            did: did.into(),
+            role: CircleRole::CommunityMember,
+            consented: true,
+            attended_sessions: vec![],
+        }
+    }
+
+    fn make_restorative_circle() -> RestorativeCircle {
+        RestorativeCircle {
+            id: "circle-1".into(),
+            case_id: "case-1".into(),
+            facilitator: "did:example:facilitator".into(),
+            participants: vec![
+                make_circle_participant("did:example:alice"),
+                make_circle_participant("did:example:bob"),
+            ],
+            status: CircleStatus::Forming,
+            sessions: vec![],
+            agreements: vec![],
+            created_at: ts(),
+        }
+    }
+
+    // ========================================================================
+    // CASE VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_case_passes() {
+        let result = validate_case(&make_case());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_empty_title_rejected() {
+        let mut case = make_case();
+        case.title = "".into();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_whitespace_only_title_rejected() {
+        let mut case = make_case();
+        case.title = "   \t\n  ".into();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_empty_description_rejected() {
+        let mut case = make_case();
+        case.description = "".into();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_complainant_not_did_rejected() {
+        let mut case = make_case();
+        case.complainant = "alice".into();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_respondent_not_did_rejected() {
+        let mut case = make_case();
+        case.respondent = "bob".into();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_against_self_rejected() {
+        let mut case = make_case();
+        case.complainant = "did:example:same".into();
+        case.respondent = "did:example:same".into();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    // ========================================================================
+    // EVIDENCE VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_evidence_passes() {
+        let result = validate_evidence(&make_evidence());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_submitter_not_did_rejected() {
+        let mut ev = make_evidence();
+        ev.submitter = "alice".into();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_empty_description_rejected() {
+        let mut ev = make_evidence();
+        ev.description = "".into();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_empty_content_hash_rejected() {
+        let mut ev = make_evidence();
+        ev.content.hash = "".into();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    // ========================================================================
+    // MEDIATION VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_mediation_passes() {
+        let result = validate_mediation(&make_mediation());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn mediation_mediator_not_did_rejected() {
+        let mut med = make_mediation();
+        med.mediator = "mediator-person".into();
+        let result = validate_mediation(&med);
+        assert!(is_invalid(&result));
+    }
+
+    // ========================================================================
+    // ARBITRATION VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_arbitration_three_arbitrators_passes() {
+        let arb = make_arbitration(vec![
+            make_arbitrator("did:example:arb1"),
+            make_arbitrator("did:example:arb2"),
+            make_arbitrator("did:example:arb3"),
+        ]);
+        let result = validate_arbitration(&arb);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn arbitration_even_number_rejected() {
+        let arb = make_arbitration(vec![
+            make_arbitrator("did:example:arb1"),
+            make_arbitrator("did:example:arb2"),
+        ]);
+        let result = validate_arbitration(&arb);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn arbitration_non_did_arbitrator_rejected() {
+        let arb = make_arbitration(vec![
+            make_arbitrator("did:example:arb1"),
+            make_arbitrator("not-a-did"),
+            make_arbitrator("did:example:arb3"),
+        ]);
+        let result = validate_arbitration(&arb);
+        assert!(is_invalid(&result));
+    }
+
+    // ========================================================================
+    // DECISION VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_decision_passes() {
+        let result = validate_decision(&make_decision());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_empty_reasoning_rejected() {
+        let mut dec = make_decision();
+        dec.reasoning = "".into();
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_no_votes_rejected() {
+        let mut dec = make_decision();
+        dec.votes = vec![];
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    // ========================================================================
+    // APPEAL VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_appeal_passes() {
+        let result = validate_appeal(&make_appeal());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn appeal_appellant_not_did_rejected() {
+        let mut appeal = make_appeal();
+        appeal.appellant = "bob".into();
+        let result = validate_appeal(&appeal);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn appeal_no_grounds_rejected() {
+        let mut appeal = make_appeal();
+        appeal.grounds = vec![];
+        let result = validate_appeal(&appeal);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn appeal_empty_argument_rejected() {
+        let mut appeal = make_appeal();
+        appeal.argument = "".into();
+        let result = validate_appeal(&appeal);
+        assert!(is_invalid(&result));
+    }
+
+    // ========================================================================
+    // ENFORCEMENT VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_enforcement_passes() {
+        let result = validate_enforcement(&make_enforcement());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn enforcement_enforcer_not_did_rejected() {
+        let mut enf = make_enforcement();
+        enf.enforcer = "system".into();
+        let result = validate_enforcement(&enf);
+        assert!(is_invalid(&result));
+    }
+
+    // ========================================================================
+    // RESTORATIVE CIRCLE VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_restorative_circle_passes() {
+        let result = validate_restorative(&make_restorative_circle());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn restorative_no_participants_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.participants = vec![];
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_facilitator_not_did_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.facilitator = "facilitator".into();
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+}

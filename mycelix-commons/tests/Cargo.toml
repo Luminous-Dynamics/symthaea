@@ -22,3 +22,7 @@ rmp-serde = "1"
 [[test]]
 name = "sweettest_integration"
 path = "sweettest_integration.rs"
+
+[[test]]
+name = "cross_domain_sweettest"
+path = "cross_domain_sweettest.rs"

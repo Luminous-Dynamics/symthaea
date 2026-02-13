@@ -79,12 +79,14 @@ async fn test_bridge_health_check() {
         .await;
 
     assert!(health.healthy);
-    assert_eq!(health.domains.len(), 5);
+    assert_eq!(health.domains.len(), 7);
     assert!(health.domains.contains(&"property".to_string()));
     assert!(health.domains.contains(&"housing".to_string()));
     assert!(health.domains.contains(&"care".to_string()));
     assert!(health.domains.contains(&"mutualaid".to_string()));
     assert!(health.domains.contains(&"water".to_string()));
+    assert!(health.domains.contains(&"food".to_string()));
+    assert!(health.domains.contains(&"transport".to_string()));
 }
 
 /// Test: Cross-domain dispatch from bridge to property-registry

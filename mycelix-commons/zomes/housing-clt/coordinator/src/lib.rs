@@ -4,6 +4,7 @@
 
 use housing_clt_integrity::*;
 use hdk::prelude::*;
+use commons_types::cross_domain::{VerifyPropertyForLeaseInput, PropertyVerificationResult};
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -37,24 +38,6 @@ pub fn create_land_trust(trust: LandTrust) -> ExternResult<Record> {
 // ============================================================================
 // Cross-domain: Property ownership verification via bridge dispatch
 // ============================================================================
-
-/// Input for verifying property ownership before lease issuance.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VerifyPropertyForLeaseInput {
-    /// Property ID to verify in the property registry.
-    pub property_id: String,
-    /// Expected owner DID (must match the trust).
-    pub expected_owner_did: Option<String>,
-}
-
-/// Result of property ownership verification.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PropertyVerificationResult {
-    pub verified: bool,
-    pub owner_did: Option<String>,
-    pub has_clear_title: bool,
-    pub error: Option<String>,
-}
 
 /// Verify property ownership by calling property_registry within the same DNA.
 ///

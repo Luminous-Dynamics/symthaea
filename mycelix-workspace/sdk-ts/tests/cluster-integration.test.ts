@@ -48,6 +48,9 @@ import type {
   JusticeAreaResult,
   FactcheckStatusQuery,
   FactcheckStatusResult,
+  AuditTrailQuery,
+  AuditTrailEntry,
+  AuditTrailResult,
 } from '../src/integrations/index.js';
 
 // ============================================================================
@@ -367,6 +370,76 @@ describe('CommonsBridgeClient', () => {
     });
   });
 
+  describe('audit trail', () => {
+    it('should query audit trail with time range only', async () => {
+      const mockResult: AuditTrailResult = {
+        entries: [
+          {
+            domain: 'property',
+            event_type: 'ownership_transferred',
+            source_agent: 'uhCAk...',
+            payload_preview: '{"property_id":"P-1"}',
+            created_at_us: 1700000000000000,
+            action_hash: new Uint8Array([1, 2, 3]),
+          },
+        ],
+        total_matched: 1,
+        query_from_us: 1700000000000000,
+        query_to_us: 1700001000000000,
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.queryAuditTrail({
+        from_us: 1700000000000000,
+        to_us: 1700001000000000,
+      });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'commons',
+        zome_name: 'commons_bridge',
+        fn_name: 'query_audit_trail',
+        payload: {
+          from_us: 1700000000000000,
+          to_us: 1700001000000000,
+          domain: null,
+          event_type: null,
+        },
+      });
+      expect(result.entries).toHaveLength(1);
+      expect(result.entries[0].domain).toBe('property');
+      expect(result.total_matched).toBe(1);
+    });
+
+    it('should query audit trail with domain and event_type filters', async () => {
+      const mockResult: AuditTrailResult = {
+        entries: [],
+        total_matched: 0,
+        query_from_us: 1700000000000000,
+        query_to_us: 1700001000000000,
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      await bridge.queryAuditTrail({
+        from_us: 1700000000000000,
+        to_us: 1700001000000000,
+        domain: 'care',
+        event_type: 'match_completed',
+      });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'commons',
+        zome_name: 'commons_bridge',
+        fn_name: 'query_audit_trail',
+        payload: {
+          from_us: 1700000000000000,
+          to_us: 1700001000000000,
+          domain: 'care',
+          event_type: 'match_completed',
+        },
+      });
+    });
+  });
+
   describe('health', () => {
     it('should perform health check', async () => {
       const mockHealth: BridgeHealth = {
@@ -637,6 +710,74 @@ describe('CivicBridgeClient', () => {
       });
       expect(result.has_factcheck).toBe(true);
       expect(result.verdict).toBe('verified');
+    });
+  });
+
+  describe('audit trail', () => {
+    it('should query audit trail with time range only', async () => {
+      const mockResult: AuditTrailResult = {
+        entries: [
+          {
+            domain: 'justice',
+            event_type: 'case_filed',
+            source_agent: 'uhCAk...',
+            payload_preview: '{"case_id":"C-1"}',
+            created_at_us: 1700000500000000,
+            action_hash: new Uint8Array([4, 5, 6]),
+          },
+        ],
+        total_matched: 1,
+        query_from_us: 1700000000000000,
+        query_to_us: 1700001000000000,
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.queryAuditTrail({
+        from_us: 1700000000000000,
+        to_us: 1700001000000000,
+      });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'civic',
+        zome_name: 'civic_bridge',
+        fn_name: 'query_audit_trail',
+        payload: {
+          from_us: 1700000000000000,
+          to_us: 1700001000000000,
+          domain: null,
+          event_type: null,
+        },
+      });
+      expect(result.entries).toHaveLength(1);
+      expect(result.entries[0].event_type).toBe('case_filed');
+    });
+
+    it('should query audit trail with domain filter', async () => {
+      const mockResult: AuditTrailResult = {
+        entries: [],
+        total_matched: 0,
+        query_from_us: 1700000000000000,
+        query_to_us: 1700001000000000,
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      await bridge.queryAuditTrail({
+        from_us: 1700000000000000,
+        to_us: 1700001000000000,
+        domain: 'emergency',
+      });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'civic',
+        zome_name: 'civic_bridge',
+        fn_name: 'query_audit_trail',
+        payload: {
+          from_us: 1700000000000000,
+          to_us: 1700001000000000,
+          domain: 'emergency',
+          event_type: null,
+        },
+      });
     });
   });
 

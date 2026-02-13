@@ -91,8 +91,11 @@ pub use gradient_proof::{
     GradientProofInput, GradientProofOutput, GradientQualityResult, Risc0ProofConfig,
 };
 pub use risc0_prover::{
-    BatchGradientProver, GradientProofReceipt, GradientProver, ProverError, SimulationProofMarker,
+    BatchGradientProver, GradientProver, ProverError, SimulationProofMarker,
 };
+
+#[cfg(any(feature = "simulation", feature = "risc0"))]
+pub use risc0_prover::GradientProofReceipt;
 pub use types::{GradientProof, ProofMetadata, PublicInputs};
 
 // Export prover mode only when features are enabled

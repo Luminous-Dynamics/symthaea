@@ -6,6 +6,7 @@
 use hdk::prelude::*;
 use mutualaid_common::*;
 use mutualaid_resources_integrity::*;
+use commons_types::cross_domain::TimebankCreditResult;
 
 // =============================================================================
 // INPUT TYPES
@@ -600,14 +601,6 @@ pub fn complete_usage(input: CompleteUsageInput) -> ExternResult<Record> {
 // =============================================================================
 // CROSS-DOMAIN: mutualaid-resources → mutualaid-timebank
 // =============================================================================
-
-/// Result of recording a time credit for resource usage
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TimebankCreditResult {
-    pub credited: bool,
-    pub hours: f64,
-    pub error: Option<String>,
-}
 
 /// Input for completing usage and recording time credit
 #[derive(Serialize, Deserialize, Debug)]

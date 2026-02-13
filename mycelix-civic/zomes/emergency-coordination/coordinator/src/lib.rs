@@ -3,6 +3,7 @@
 
 use emergency_coordination_integrity::*;
 use hdk::prelude::*;
+use civic_types::cross_domain::{DisasterContextResult, DisasterSummary};
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -307,24 +308,6 @@ pub fn get_zone_teams(zone_hash: ActionHash) -> ExternResult<Vec<Record>> {
 // =============================================================================
 // CROSS-DOMAIN: emergency-coordination → emergency-incidents
 // =============================================================================
-
-/// Context about active disasters for a zone assignment
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DisasterContextResult {
-    pub active_disaster_count: u32,
-    pub disasters: Vec<DisasterSummary>,
-    pub highest_severity: Option<String>,
-    pub error: Option<String>,
-}
-
-/// Summary of an active disaster
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DisasterSummary {
-    pub id: String,
-    pub title: String,
-    pub severity: String,
-    pub disaster_type: String,
-}
 
 /// Get disaster context for zone assignment.
 ///

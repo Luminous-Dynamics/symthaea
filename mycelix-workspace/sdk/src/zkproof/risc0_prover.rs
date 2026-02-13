@@ -154,7 +154,7 @@ impl Default for ProverMode {
     }
 }
 
-#[cfg(all(feature = "simulation", not(feature = "risc0")))]
+#[cfg(any(feature = "simulation", feature = "risc0"))]
 /// Proof receipt containing the proof and public output
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GradientProofReceipt {
@@ -168,6 +168,7 @@ pub struct GradientProofReceipt {
     pub generation_time_ms: u64,
 }
 
+#[cfg(any(feature = "simulation", feature = "risc0"))]
 impl GradientProofReceipt {
     /// Check if the proof indicates valid gradient quality
     pub fn is_valid(&self) -> bool {

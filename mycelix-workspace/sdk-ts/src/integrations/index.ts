@@ -65,6 +65,9 @@ export type {
   JusticeAreaResult,
   FactcheckStatusQuery,
   FactcheckStatusResult,
+  AuditTrailQuery,
+  AuditTrailEntry,
+  AuditTrailResult,
 } from './civic/index.js';
 
 // ============================================================================

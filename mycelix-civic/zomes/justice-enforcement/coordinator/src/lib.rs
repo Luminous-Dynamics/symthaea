@@ -5,6 +5,7 @@
 
 use hdk::prelude::*;
 use justice_enforcement_integrity::*;
+use civic_types::cross_domain::{CaseVerificationResult, VerifyCaseForEnforcementInput};
 
 /// Create an enforcement action
 #[hdk_extern]
@@ -292,22 +293,6 @@ pub struct CrossHappActionInput {
 // =============================================================================
 // CROSS-DOMAIN: justice-enforcement → justice-cases
 // =============================================================================
-
-/// Result of verifying a case before enforcement
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CaseVerificationResult {
-    pub case_found: bool,
-    pub case_id: Option<String>,
-    pub phase: Option<String>,
-    pub status: Option<String>,
-    pub error: Option<String>,
-}
-
-/// Input for verifying a case before enforcement
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VerifyCaseForEnforcementInput {
-    pub case_id: String,
-}
 
 /// Verify that a case exists and has a decision before creating enforcement.
 ///

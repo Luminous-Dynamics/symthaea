@@ -4,6 +4,17 @@
 use transport_impact_integrity::*;
 use hdk::prelude::*;
 
+// ============================================================================
+// BRIDGE SIGNAL (for cross-domain UI notification)
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BridgeEventSignal {
+    pub event_type: String,
+    pub source_zome: String,
+    pub payload: String,
+}
+
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
@@ -77,6 +88,16 @@ pub fn log_trip(mut trip: TripLog) -> ExternResult<Record> {
         };
         let credit_hash = create_entry(&EntryTypes::CarbonCredit(credit))?;
         create_link(agent, credit_hash, LinkTypes::AgentToCredit, ())?;
+
+        // Emit bridge signal so UI can show the carbon credit award
+        let _ = emit_signal(&BridgeEventSignal {
+            event_type: "carbon_credits_awarded".to_string(),
+            source_zome: "transport_impact".to_string(),
+            payload: format!(
+                r#"{{"trip_hash":"{}","distance_km":{},"mode":"{:?}","credits_kg_co2":{}}}"#,
+                action_hash, trip.distance_km, trip.mode, saved,
+            ),
+        });
     }
 
     get(action_hash, GetOptions::default())?

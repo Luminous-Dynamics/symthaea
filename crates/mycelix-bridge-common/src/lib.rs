@@ -308,6 +308,43 @@ pub struct FactcheckStatusResult {
 }
 
 // ============================================================================
+// Audit trail query types
+// ============================================================================
+
+/// Input for querying events within a time range, optionally filtered by domain and type.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AuditTrailQuery {
+    /// Start of the time range (inclusive), as microseconds since epoch.
+    pub from_us: i64,
+    /// End of the time range (inclusive), as microseconds since epoch.
+    pub to_us: i64,
+    /// Optional domain filter (e.g., "property", "justice").
+    pub domain: Option<String>,
+    /// Optional event type filter (e.g., "ownership_transferred").
+    pub event_type: Option<String>,
+}
+
+/// Summary of a single audit trail entry (lightweight, no full record).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AuditTrailEntry {
+    pub domain: String,
+    pub event_type: String,
+    pub source_agent: String,
+    pub payload_preview: String,
+    pub created_at_us: i64,
+    pub action_hash: ActionHash,
+}
+
+/// Result of an audit trail query.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AuditTrailResult {
+    pub entries: Vec<AuditTrailEntry>,
+    pub total_matched: u32,
+    pub query_from_us: i64,
+    pub query_to_us: i64,
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
@@ -639,5 +676,66 @@ mod tests {
         let r2: FactcheckStatusResult = serde_json::from_str(&json).unwrap();
         assert!(r2.has_factcheck);
         assert_eq!(r2.verdict, Some("verified".into()));
+    }
+
+    // Audit trail type serde tests
+
+    #[test]
+    fn audit_trail_query_full_serde() {
+        let q = AuditTrailQuery {
+            from_us: 1_700_000_000_000_000,
+            to_us: 1_700_001_000_000_000,
+            domain: Some("property".into()),
+            event_type: Some("ownership_transferred".into()),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: AuditTrailQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.from_us, 1_700_000_000_000_000);
+        assert_eq!(q2.domain.as_deref(), Some("property"));
+        assert_eq!(q2.event_type.as_deref(), Some("ownership_transferred"));
+    }
+
+    #[test]
+    fn audit_trail_query_no_filters() {
+        let q = AuditTrailQuery {
+            from_us: 0,
+            to_us: i64::MAX,
+            domain: None,
+            event_type: None,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: AuditTrailQuery = serde_json::from_str(&json).unwrap();
+        assert!(q2.domain.is_none());
+        assert!(q2.event_type.is_none());
+    }
+
+    #[test]
+    fn audit_trail_entry_serde() {
+        let e = AuditTrailEntry {
+            domain: "justice".into(),
+            event_type: "case_filed".into(),
+            source_agent: "uhCAk_agent1".into(),
+            payload_preview: "{\"case_id\":\"CASE-1\"}".into(),
+            created_at_us: 1_700_000_500_000_000,
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&e).unwrap();
+        let e2: AuditTrailEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(e2.domain, "justice");
+        assert_eq!(e2.event_type, "case_filed");
+    }
+
+    #[test]
+    fn audit_trail_result_serde() {
+        let r = AuditTrailResult {
+            entries: vec![],
+            total_matched: 0,
+            query_from_us: 0,
+            query_to_us: 1_000_000,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: AuditTrailResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.entries.is_empty());
+        assert_eq!(r2.total_matched, 0);
     }
 }

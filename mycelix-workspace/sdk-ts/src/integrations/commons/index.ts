@@ -2,8 +2,8 @@
  * @mycelix/sdk Commons Cluster Integration
  *
  * Cluster-level client for the mycelix-commons DNA which unifies
- * property, housing, care, mutual-aid, and water domains into a
- * single Holochain DNA with cross-domain dispatch.
+ * property, housing, care, mutual-aid, water, food, and transport
+ * domains into a single Holochain DNA with cross-domain dispatch.
  *
  * ## Architecture
  *
@@ -66,14 +66,14 @@ export interface DispatchResult {
 
 /** Input for an audited cross-domain query */
 export interface CommonsQueryInput {
-  domain: 'property' | 'housing' | 'care' | 'mutualaid' | 'water';
+  domain: 'property' | 'housing' | 'care' | 'mutualaid' | 'water' | 'food' | 'transport';
   query_type: string;
   params: string;
 }
 
 /** Input for broadcasting a cross-domain event */
 export interface CommonsEventInput {
-  domain: 'property' | 'housing' | 'care' | 'mutualaid' | 'water';
+  domain: 'property' | 'housing' | 'care' | 'mutualaid' | 'water' | 'food' | 'transport';
   event_type: string;
   payload: string;
   related_hashes?: string[];
@@ -158,6 +158,36 @@ export interface CareAvailabilityResult {
   error?: string;
 }
 
+/** Input for querying the bridge audit trail */
+export interface AuditTrailQuery {
+  /** Start of time range (inclusive), microseconds since epoch */
+  from_us: number;
+  /** End of time range (inclusive), microseconds since epoch */
+  to_us: number;
+  /** Optional domain filter */
+  domain?: string;
+  /** Optional event type filter */
+  event_type?: string;
+}
+
+/** A single audit trail entry */
+export interface AuditTrailEntry {
+  domain: string;
+  event_type: string;
+  source_agent: string;
+  payload_preview: string;
+  created_at_us: number;
+  action_hash: Uint8Array;
+}
+
+/** Result of an audit trail query */
+export interface AuditTrailResult {
+  entries: AuditTrailEntry[];
+  total_matched: number;
+  query_from_us: number;
+  query_to_us: number;
+}
+
 /** Holochain ZomeCallable interface (minimal) */
 interface ZomeCallable {
   callZome<T>(params: {
@@ -176,7 +206,7 @@ const COMMONS_ROLE = 'commons';
 const BRIDGE_ZOME = 'commons_bridge';
 
 /** All domain zomes available in the commons cluster */
-export const COMMONS_DOMAINS = ['property', 'housing', 'care', 'mutualaid', 'water'] as const;
+export const COMMONS_DOMAINS = ['property', 'housing', 'care', 'mutualaid', 'water', 'food', 'transport'] as const;
 
 export const COMMONS_ZOMES = [
   'property_registry', 'property_transfer', 'property_disputes', 'property_commons',
@@ -184,6 +214,8 @@ export const COMMONS_ZOMES = [
   'care_timebank', 'care_circles', 'care_matching', 'care_plans', 'care_credentials',
   'mutualaid_needs', 'mutualaid_circles', 'mutualaid_governance', 'mutualaid_pools', 'mutualaid_requests', 'mutualaid_resources', 'mutualaid_timebank',
   'water_flow', 'water_purity', 'water_capture', 'water_steward', 'water_wisdom',
+  'food_production', 'food_distribution', 'food_preservation', 'food_knowledge',
+  'transport_routes', 'transport_sharing', 'transport_impact',
 ] as const;
 
 // ============================================================================
@@ -375,9 +407,26 @@ export class CommonsBridgeClient {
     });
   }
 
+  // --- Audit Trail ---
+
+  /** Query the bridge audit trail with time range and optional domain/type filters */
+  async queryAuditTrail(query: AuditTrailQuery): Promise<AuditTrailResult> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'query_audit_trail',
+      payload: {
+        from_us: query.from_us,
+        to_us: query.to_us,
+        domain: query.domain ?? null,
+        event_type: query.event_type ?? null,
+      },
+    });
+  }
+
   // --- Health ---
 
-  /** Health check across all 5 commons domains */
+  /** Health check across all 7 commons domains */
   async healthCheck(): Promise<BridgeHealth> {
     return this.client.callZome({
       role_name: COMMONS_ROLE,
@@ -429,3 +478,5 @@ export function createCommonsBridgeClient(client: ZomeCallable): CommonsBridgeCl
 
 export { PropertyBridgeClient, getPropertyBridgeClient } from '../property/index.js';
 export { MutualAidService, getMutualAidService } from '../mutualaid/index.js';
+export { FoodClient, createFoodClient } from '../food/index.js';
+export { TransportClient, createTransportClient } from '../transport/index.js';
