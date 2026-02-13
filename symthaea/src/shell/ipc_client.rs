@@ -28,6 +28,9 @@ use tokio::sync::watch;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 use anyhow::{Result, Context};
 
+const IPC_PROTOCOL_VERSION: u32 = 1;
+const IPC_MAX_FRAME_BYTES: usize = 2 * 1024 * 1024;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONNECTION STATE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -155,6 +158,8 @@ impl Default for MetricsSnapshot {
 /// Request from shell to service
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IpcRequest {
+    /// Protocol version handshake
+    Hello { version: u32 },
     /// Subscribe to metrics stream
     SubscribeMetrics,
     /// Unsubscribe from metrics
@@ -182,6 +187,8 @@ pub enum IpcRequest {
 /// Response from service to shell
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IpcResponse {
+    /// Protocol version acknowledgment
+    HelloAck { server_version: u32 },
     /// Metrics update (pushed periodically)
     Metrics(MetricsSnapshot),
     /// Completion suggestions
@@ -669,6 +676,9 @@ impl ShellIpcClient {
         self.reader = Some(BufReader::new(read_half));
         self.writer = Some(BufWriter::new(write_half));
 
+        self.handshake().await
+            .context("IPC handshake failed")?;
+
         self.state = ConnectionState::Connected;
         self.reconnect_attempts = 0;
         self.last_ping = Some(Instant::now());
@@ -842,8 +852,6 @@ impl ShellIpcClient {
         request: IpcRequest,
         accept_metrics: bool,
     ) -> Result<IpcResponse> {
-        const MAX_FRAME_BYTES: usize = 2 * 1024 * 1024;
-
         // Write phase: borrow writer, send request, then drop the borrow
         {
             let writer = self.writer.as_mut()
@@ -864,7 +872,11 @@ impl ShellIpcClient {
         loop {
             let reader = self.reader.as_mut()
                 .context("Not connected to service")?;
-            let response = Self::read_ipc_response(reader, MAX_FRAME_BYTES).await?;
+            let response = tokio::time::timeout(
+                self.config.request_timeout,
+                Self::read_ipc_response(reader, IPC_MAX_FRAME_BYTES),
+            ).await
+                .context("IPC response timeout")??;
             match response {
                 IpcResponse::Metrics(metrics) => {
                     self.update_metrics(metrics.clone());
@@ -874,6 +886,19 @@ impl ShellIpcClient {
                 }
                 other => return Ok(other),
             }
+        }
+    }
+
+    async fn handshake(&mut self) -> Result<()> {
+        let response = self.send_ipc_request(
+            IpcRequest::Hello { version: IPC_PROTOCOL_VERSION },
+            false,
+        ).await?;
+
+        match response {
+            IpcResponse::HelloAck { server_version } if server_version == IPC_PROTOCOL_VERSION => Ok(()),
+            IpcResponse::Error(message) => anyhow::bail!("Handshake rejected: {}", message),
+            other => anyhow::bail!("Unexpected handshake response: {:?}", other),
         }
     }
 
@@ -952,6 +977,10 @@ impl ShellIpcClient {
             }
             (Request::SubscribeMetrics, IpcResponse::Subscribed)
             | (Request::UnsubscribeMetrics, IpcResponse::Subscribed) => Response::Subscribed,
+            (_, IpcResponse::HelloAck { server_version }) => Response::Error {
+                code: 2,
+                message: format!("Unexpected hello ack (server version {})", server_version),
+            },
             (_, IpcResponse::Metrics(metrics)) => {
                 Response::Status {
                     phi: metrics.phi,
@@ -1101,6 +1130,7 @@ impl ShellIpcClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::io::AsyncWriteExt;
 
     #[test]
     fn test_connection_state_default() {
@@ -1145,5 +1175,39 @@ mod tests {
             }
             _ => panic!("Wrong variant"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_send_ipc_request_hello() {
+        let (client_stream, mut server_stream) = UnixStream::pair().unwrap();
+        let (read_half, write_half) = client_stream.into_split();
+
+        let mut client = ShellIpcClient::with_defaults();
+        client.reader = Some(BufReader::new(read_half));
+        client.writer = Some(BufWriter::new(write_half));
+
+        let server_task = tokio::spawn(async move {
+            let mut len_buf = [0u8; 4];
+            server_stream.read_exact(&mut len_buf).await.unwrap();
+            let len = u32::from_le_bytes(len_buf) as usize;
+            let mut buf = vec![0u8; len];
+            server_stream.read_exact(&mut buf).await.unwrap();
+            let request: IpcRequest = rmp_serde::from_slice(&buf).unwrap();
+            assert!(matches!(request, IpcRequest::Hello { version } if version == IPC_PROTOCOL_VERSION));
+
+            let response = IpcResponse::HelloAck { server_version: IPC_PROTOCOL_VERSION };
+            let data = rmp_serde::to_vec(&response).unwrap();
+            let len = (data.len() as u32).to_le_bytes();
+            server_stream.write_all(&len).await.unwrap();
+            server_stream.write_all(&data).await.unwrap();
+        });
+
+        let response = client.send_ipc_request(
+            IpcRequest::Hello { version: IPC_PROTOCOL_VERSION },
+            false,
+        ).await.unwrap();
+        assert!(matches!(response, IpcResponse::HelloAck { server_version } if server_version == IPC_PROTOCOL_VERSION));
+
+        server_task.await.unwrap();
     }
 }

@@ -229,3 +229,546 @@ fn validate_update_fact_check_dispute(
 ) -> ExternResult<ValidateCallbackResult> {
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // RESULT HELPERS
+    // ========================================================================
+
+    fn is_valid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Valid))
+    }
+
+    fn is_invalid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Invalid(_)))
+    }
+
+    fn invalid_msg(result: &ExternResult<ValidateCallbackResult>) -> String {
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => msg.clone(),
+            _ => panic!("Expected Invalid, got {:?}", result),
+        }
+    }
+
+    // ========================================================================
+    // CONSTRUCTION HELPERS
+    // ========================================================================
+
+    fn fake_create() -> Create {
+        Create {
+            author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            timestamp: Timestamp::from_micros(0),
+            action_seq: 0,
+            prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                EntryDefIndex(0),
+                ZomeIndex(0),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
+            weight: EntryRateWeight::default(),
+        }
+    }
+
+    fn fake_entry_creation_action() -> EntryCreationAction {
+        EntryCreationAction::Create(fake_create())
+    }
+
+    fn fake_update() -> Update {
+        Update {
+            author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            timestamp: Timestamp::from_micros(0),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+            original_action_address: ActionHash::from_raw_36(vec![0u8; 36]),
+            original_entry_address: EntryHash::from_raw_36(vec![0u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                EntryDefIndex(0),
+                ZomeIndex(0),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
+            weight: EntryRateWeight::default(),
+        }
+    }
+
+    fn ts() -> Timestamp {
+        Timestamp::from_micros(0)
+    }
+
+    fn make_epistemic_position() -> EpistemicPosition {
+        EpistemicPosition {
+            empirical: 0.8,
+            normative: 0.5,
+            mythic: 0.1,
+        }
+    }
+
+    fn make_evidence_item() -> EvidenceItem {
+        EvidenceItem {
+            source_type: SourceType::PrimarySource,
+            source_url: Some("https://example.com/source".into()),
+            source_did: Some("did:example:source".into()),
+            description: "Primary evidence".into(),
+            supports_claim: true,
+        }
+    }
+
+    fn make_fact_check() -> FactCheck {
+        FactCheck {
+            id: "fc-1".into(),
+            publication_id: "pub-1".into(),
+            claim_text: "The earth revolves around the sun".into(),
+            claim_location: "paragraph 3".into(),
+            epistemic_position: make_epistemic_position(),
+            verdict: FactCheckVerdict::True,
+            evidence: vec![make_evidence_item()],
+            checker_did: "did:example:checker".into(),
+            checked: ts(),
+        }
+    }
+
+    fn make_source_credibility() -> SourceCredibility {
+        SourceCredibility {
+            source_id: "src-1".into(),
+            source_type: SourceType::ScientificStudy,
+            credibility_score: 0.85,
+            verification_count: 10,
+            dispute_count: 1,
+            last_assessed: ts(),
+        }
+    }
+
+    fn make_dispute() -> FactCheckDispute {
+        FactCheckDispute {
+            id: "dispute-1".into(),
+            fact_check_id: "fc-1".into(),
+            disputer_did: "did:example:disputer".into(),
+            reason: "The evidence cited is outdated".into(),
+            counter_evidence: vec![make_evidence_item()],
+            status: DisputeStatus::Pending,
+            created: ts(),
+            resolved: None,
+        }
+    }
+
+    // ========================================================================
+    // FACT CHECK VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_fact_check_passes() {
+        let result = validate_create_fact_check(fake_entry_creation_action(), make_fact_check());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fact_check_checker_did_not_did_rejected() {
+        let mut fc = make_fact_check();
+        fc.checker_did = "not-a-did".into();
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Checker must be a valid DID");
+    }
+
+    #[test]
+    fn fact_check_checker_did_empty_rejected() {
+        let mut fc = make_fact_check();
+        fc.checker_did = "".into();
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Checker must be a valid DID");
+    }
+
+    #[test]
+    fn fact_check_checker_did_prefix_only_passes() {
+        // "did:" alone passes the starts_with check
+        let mut fc = make_fact_check();
+        fc.checker_did = "did:".into();
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fact_check_claim_text_empty_rejected() {
+        let mut fc = make_fact_check();
+        fc.claim_text = "".into();
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Claim text required");
+    }
+
+    #[test]
+    fn fact_check_claim_text_whitespace_passes() {
+        // Validation uses is_empty(), not trim().is_empty()
+        let mut fc = make_fact_check();
+        fc.claim_text = "   ".into();
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fact_check_epistemic_empirical_below_zero_rejected() {
+        let mut fc = make_fact_check();
+        fc.epistemic_position.empirical = -0.01;
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Epistemic values must be 0-1");
+    }
+
+    #[test]
+    fn fact_check_epistemic_empirical_above_one_rejected() {
+        let mut fc = make_fact_check();
+        fc.epistemic_position.empirical = 1.01;
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Epistemic values must be 0-1");
+    }
+
+    #[test]
+    fn fact_check_epistemic_normative_below_zero_rejected() {
+        let mut fc = make_fact_check();
+        fc.epistemic_position.normative = -0.5;
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Epistemic values must be 0-1");
+    }
+
+    #[test]
+    fn fact_check_epistemic_normative_above_one_rejected() {
+        let mut fc = make_fact_check();
+        fc.epistemic_position.normative = 1.5;
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Epistemic values must be 0-1");
+    }
+
+    #[test]
+    fn fact_check_epistemic_mythic_below_zero_rejected() {
+        let mut fc = make_fact_check();
+        fc.epistemic_position.mythic = -100.0;
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Epistemic values must be 0-1");
+    }
+
+    #[test]
+    fn fact_check_epistemic_mythic_above_one_rejected() {
+        let mut fc = make_fact_check();
+        fc.epistemic_position.mythic = 100.0;
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Epistemic values must be 0-1");
+    }
+
+    #[test]
+    fn fact_check_epistemic_all_zero_passes() {
+        let mut fc = make_fact_check();
+        fc.epistemic_position = EpistemicPosition {
+            empirical: 0.0,
+            normative: 0.0,
+            mythic: 0.0,
+        };
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fact_check_epistemic_all_one_passes() {
+        let mut fc = make_fact_check();
+        fc.epistemic_position = EpistemicPosition {
+            empirical: 1.0,
+            normative: 1.0,
+            mythic: 1.0,
+        };
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fact_check_multiple_failures_first_wins() {
+        // Both checker_did and claim_text are invalid; checker_did check comes first
+        let mut fc = make_fact_check();
+        fc.checker_did = "not-a-did".into();
+        fc.claim_text = "".into();
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Checker must be a valid DID");
+    }
+
+    #[test]
+    fn fact_check_every_verdict_variant_passes() {
+        let variants = vec![
+            FactCheckVerdict::True,
+            FactCheckVerdict::MostlyTrue,
+            FactCheckVerdict::HalfTrue,
+            FactCheckVerdict::MostlyFalse,
+            FactCheckVerdict::False,
+            FactCheckVerdict::Unverifiable,
+            FactCheckVerdict::OutOfContext,
+            FactCheckVerdict::Satire,
+            FactCheckVerdict::Opinion,
+            FactCheckVerdict::PartiallyTrue,
+            FactCheckVerdict::Misleading,
+        ];
+        for variant in variants {
+            let mut fc = make_fact_check();
+            fc.verdict = variant;
+            let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+            assert!(is_valid(&result));
+        }
+    }
+
+    #[test]
+    fn fact_check_empty_evidence_list_passes() {
+        let mut fc = make_fact_check();
+        fc.evidence = vec![];
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // SOURCE CREDIBILITY VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_source_credibility_passes() {
+        let result = validate_create_source_credibility(
+            fake_entry_creation_action(),
+            make_source_credibility(),
+        );
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn source_credibility_below_zero_rejected() {
+        let mut sc = make_source_credibility();
+        sc.credibility_score = -0.01;
+        let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Credibility must be 0-1");
+    }
+
+    #[test]
+    fn source_credibility_above_one_rejected() {
+        let mut sc = make_source_credibility();
+        sc.credibility_score = 1.01;
+        let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Credibility must be 0-1");
+    }
+
+    #[test]
+    fn source_credibility_exactly_zero_passes() {
+        let mut sc = make_source_credibility();
+        sc.credibility_score = 0.0;
+        let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn source_credibility_exactly_one_passes() {
+        let mut sc = make_source_credibility();
+        sc.credibility_score = 1.0;
+        let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn source_credibility_negative_large_rejected() {
+        let mut sc = make_source_credibility();
+        sc.credibility_score = -999.0;
+        let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn source_credibility_large_positive_rejected() {
+        let mut sc = make_source_credibility();
+        sc.credibility_score = 999.0;
+        let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn source_credibility_midpoint_passes() {
+        let mut sc = make_source_credibility();
+        sc.credibility_score = 0.5;
+        let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // SOURCE CREDIBILITY UPDATE VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn update_source_credibility_valid_passes() {
+        let result = validate_update_source_credibility(fake_update(), make_source_credibility());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn update_source_credibility_below_zero_rejected() {
+        let mut sc = make_source_credibility();
+        sc.credibility_score = -0.01;
+        let result = validate_update_source_credibility(fake_update(), sc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Credibility must be 0-1");
+    }
+
+    #[test]
+    fn update_source_credibility_above_one_rejected() {
+        let mut sc = make_source_credibility();
+        sc.credibility_score = 1.01;
+        let result = validate_update_source_credibility(fake_update(), sc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Credibility must be 0-1");
+    }
+
+    #[test]
+    fn update_source_credibility_boundary_zero_passes() {
+        let mut sc = make_source_credibility();
+        sc.credibility_score = 0.0;
+        let result = validate_update_source_credibility(fake_update(), sc);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn update_source_credibility_boundary_one_passes() {
+        let mut sc = make_source_credibility();
+        sc.credibility_score = 1.0;
+        let result = validate_update_source_credibility(fake_update(), sc);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // FACT CHECK DISPUTE VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_dispute_passes() {
+        let result =
+            validate_create_fact_check_dispute(fake_entry_creation_action(), make_dispute());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn dispute_disputer_did_not_did_rejected() {
+        let mut dispute = make_dispute();
+        dispute.disputer_did = "not-a-did".into();
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Disputer must be a valid DID");
+    }
+
+    #[test]
+    fn dispute_disputer_did_empty_rejected() {
+        let mut dispute = make_dispute();
+        dispute.disputer_did = "".into();
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Disputer must be a valid DID");
+    }
+
+    #[test]
+    fn dispute_disputer_did_prefix_only_passes() {
+        let mut dispute = make_dispute();
+        dispute.disputer_did = "did:".into();
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn dispute_reason_empty_rejected() {
+        let mut dispute = make_dispute();
+        dispute.reason = "".into();
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Dispute reason required");
+    }
+
+    #[test]
+    fn dispute_reason_whitespace_passes() {
+        // Validation uses is_empty(), not trim().is_empty()
+        let mut dispute = make_dispute();
+        dispute.reason = "   ".into();
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn dispute_multiple_failures_first_wins() {
+        // Both disputer_did and reason invalid; DID check comes first
+        let mut dispute = make_dispute();
+        dispute.disputer_did = "bad".into();
+        dispute.reason = "".into();
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Disputer must be a valid DID");
+    }
+
+    #[test]
+    fn dispute_empty_counter_evidence_passes() {
+        let mut dispute = make_dispute();
+        dispute.counter_evidence = vec![];
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn dispute_every_status_variant_passes() {
+        let variants = vec![
+            DisputeStatus::Pending,
+            DisputeStatus::Upheld,
+            DisputeStatus::Rejected,
+            DisputeStatus::PartiallyUpheld,
+        ];
+        for variant in variants {
+            let mut dispute = make_dispute();
+            dispute.status = variant;
+            let result =
+                validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+            assert!(is_valid(&result));
+        }
+    }
+
+    #[test]
+    fn dispute_with_resolved_timestamp_passes() {
+        let mut dispute = make_dispute();
+        dispute.resolved = Some(ts());
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // FACT CHECK DISPUTE UPDATE VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn update_dispute_always_passes() {
+        let result = validate_update_fact_check_dispute(fake_update(), make_dispute());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn update_dispute_with_empty_reason_passes() {
+        // Update validation has no checks; it always returns Valid
+        let mut dispute = make_dispute();
+        dispute.reason = "".into();
+        let result = validate_update_fact_check_dispute(fake_update(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn update_dispute_with_bad_did_passes() {
+        // Update validation has no checks
+        let mut dispute = make_dispute();
+        dispute.disputer_did = "not-a-did".into();
+        let result = validate_update_fact_check_dispute(fake_update(), dispute);
+        assert!(is_valid(&result));
+    }
+}

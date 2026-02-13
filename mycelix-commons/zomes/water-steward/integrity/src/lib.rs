@@ -422,3 +422,401 @@ fn validate_create_water_dispute(
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // HELPERS
+    // ========================================================================
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_agent_2() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_entry_hash() -> EntryHash {
+        EntryHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_create() -> Create {
+        Create {
+            author: fake_agent(),
+            timestamp: Timestamp::from_micros(0),
+            action_seq: 0,
+            prev_action: fake_action_hash(),
+            entry_type: EntryType::App(AppEntryDef::new(
+                EntryDefIndex(0),
+                ZomeIndex(0),
+                EntryVisibility::Public,
+            )),
+            entry_hash: fake_entry_hash(),
+            weight: EntryRateWeight::default(),
+        }
+    }
+
+    fn is_valid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Valid))
+    }
+
+    fn is_invalid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Invalid(_)))
+    }
+
+    fn make_watershed() -> Watershed {
+        Watershed {
+            id: "ws-001".into(),
+            name: "Cedar Creek Watershed".into(),
+            huc_code: Some("17110006".into()),
+            boundary: vec![
+                (45.5, -122.6),
+                (45.6, -122.5),
+                (45.4, -122.4),
+            ],
+            area_sq_km: 150.0,
+            stewardship_type: StewardshipType::Commons,
+            governing_body: None,
+            primary_source_type: WaterSourceType::River,
+        }
+    }
+
+    fn make_water_right() -> WaterRight {
+        WaterRight {
+            watershed_hash: fake_action_hash(),
+            holder: fake_agent(),
+            right_type: RightType::Commons,
+            volume_authorized_liters: 10_000,
+            priority_date: None,
+            conditions: vec!["No irrigation during drought".into()],
+            status: RightStatus::Active,
+            transferable: true,
+        }
+    }
+
+    fn make_right_transfer() -> RightTransfer {
+        RightTransfer {
+            right_hash: fake_action_hash(),
+            from_holder: fake_agent(),
+            to_holder: fake_agent_2(),
+            volume_liters: 5_000,
+            transfer_type: TransferType::Lease,
+            approved_by: None,
+            transferred_at: Timestamp::from_micros(0),
+        }
+    }
+
+    fn make_dispute() -> WaterDispute {
+        WaterDispute {
+            watershed_hash: fake_action_hash(),
+            complainant: fake_agent(),
+            respondent: fake_agent_2(),
+            dispute_type: DisputeType::Allocation,
+            description: "Excessive water withdrawal upstream".into(),
+            evidence: vec![],
+            status: DisputeStatus::Filed,
+            resolution: None,
+        }
+    }
+
+    // ========================================================================
+    // WATERSHED VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_watershed_passes() {
+        let result = validate_create_watershed(fake_create(), make_watershed());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn watershed_empty_id_rejected() {
+        let mut ws = make_watershed();
+        ws.id = "".into();
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn watershed_empty_name_rejected() {
+        let mut ws = make_watershed();
+        ws.name = "".into();
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn watershed_two_points_rejected() {
+        let mut ws = make_watershed();
+        ws.boundary = vec![(45.5, -122.6), (45.6, -122.5)];
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn watershed_zero_points_rejected() {
+        let mut ws = make_watershed();
+        ws.boundary = vec![];
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn watershed_three_points_accepted() {
+        let ws = make_watershed(); // Already has 3 points
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn watershed_zero_area_rejected() {
+        let mut ws = make_watershed();
+        ws.area_sq_km = 0.0;
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn watershed_negative_area_rejected() {
+        let mut ws = make_watershed();
+        ws.area_sq_km = -1.0;
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn watershed_tiny_area_accepted() {
+        let mut ws = make_watershed();
+        ws.area_sq_km = 0.001;
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn watershed_lat_over_90_rejected() {
+        let mut ws = make_watershed();
+        ws.boundary = vec![(91.0, 0.0), (45.0, 0.0), (44.0, 0.0)];
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn watershed_lat_under_neg90_rejected() {
+        let mut ws = make_watershed();
+        ws.boundary = vec![(-91.0, 0.0), (45.0, 0.0), (44.0, 0.0)];
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn watershed_lon_over_180_rejected() {
+        let mut ws = make_watershed();
+        ws.boundary = vec![(45.0, 181.0), (45.0, 0.0), (44.0, 0.0)];
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn watershed_lon_under_neg180_rejected() {
+        let mut ws = make_watershed();
+        ws.boundary = vec![(45.0, -181.0), (45.0, 0.0), (44.0, 0.0)];
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn watershed_boundary_lat_90_accepted() {
+        let mut ws = make_watershed();
+        ws.boundary = vec![(90.0, 0.0), (-90.0, 0.0), (0.0, 180.0)];
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn watershed_boundary_lon_180_accepted() {
+        let mut ws = make_watershed();
+        ws.boundary = vec![(0.0, 180.0), (0.0, -180.0), (0.0, 0.0)];
+        let result = validate_create_watershed(fake_create(), ws);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // WATER RIGHT VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_water_right_passes() {
+        let result = validate_create_water_right(fake_create(), make_water_right());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn water_right_zero_volume_rejected() {
+        let mut right = make_water_right();
+        right.volume_authorized_liters = 0;
+        let result = validate_create_water_right(fake_create(), right);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn water_right_one_liter_accepted() {
+        let mut right = make_water_right();
+        right.volume_authorized_liters = 1;
+        let result = validate_create_water_right(fake_create(), right);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn water_right_50_conditions_accepted() {
+        let mut right = make_water_right();
+        right.conditions = (0..50).map(|i| format!("Condition {}", i)).collect();
+        let result = validate_create_water_right(fake_create(), right);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn water_right_51_conditions_rejected() {
+        let mut right = make_water_right();
+        right.conditions = (0..51).map(|i| format!("Condition {}", i)).collect();
+        let result = validate_create_water_right(fake_create(), right);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn water_right_empty_condition_rejected() {
+        let mut right = make_water_right();
+        right.conditions = vec!["Valid condition".into(), "".into()];
+        let result = validate_create_water_right(fake_create(), right);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn water_right_condition_over_1024_rejected() {
+        let mut right = make_water_right();
+        right.conditions = vec!["x".repeat(1025)];
+        let result = validate_create_water_right(fake_create(), right);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn water_right_condition_at_1024_accepted() {
+        let mut right = make_water_right();
+        right.conditions = vec!["x".repeat(1024)];
+        let result = validate_create_water_right(fake_create(), right);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn water_right_no_conditions_accepted() {
+        let mut right = make_water_right();
+        right.conditions = vec![];
+        let result = validate_create_water_right(fake_create(), right);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // RIGHT TRANSFER VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_right_transfer_passes() {
+        let result = validate_create_right_transfer(fake_create(), make_right_transfer());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn right_transfer_zero_volume_rejected() {
+        let mut transfer = make_right_transfer();
+        transfer.volume_liters = 0;
+        let result = validate_create_right_transfer(fake_create(), transfer);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn right_transfer_one_liter_accepted() {
+        let mut transfer = make_right_transfer();
+        transfer.volume_liters = 1;
+        let result = validate_create_right_transfer(fake_create(), transfer);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn right_transfer_same_holder_rejected() {
+        let mut transfer = make_right_transfer();
+        transfer.to_holder = transfer.from_holder.clone();
+        let result = validate_create_right_transfer(fake_create(), transfer);
+        assert!(is_invalid(&result));
+    }
+
+    // ========================================================================
+    // WATER DISPUTE VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_water_dispute_passes() {
+        let result = validate_create_water_dispute(fake_create(), make_dispute());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn water_dispute_empty_description_rejected() {
+        let mut dispute = make_dispute();
+        dispute.description = "".into();
+        let result = validate_create_water_dispute(fake_create(), dispute);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn water_dispute_description_at_limit_accepted() {
+        let mut dispute = make_dispute();
+        dispute.description = "x".repeat(8192);
+        let result = validate_create_water_dispute(fake_create(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn water_dispute_description_over_limit_rejected() {
+        let mut dispute = make_dispute();
+        dispute.description = "x".repeat(8193);
+        let result = validate_create_water_dispute(fake_create(), dispute);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn water_dispute_same_parties_rejected() {
+        let mut dispute = make_dispute();
+        dispute.respondent = dispute.complainant.clone();
+        let result = validate_create_water_dispute(fake_create(), dispute);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn water_dispute_100_evidence_accepted() {
+        let mut dispute = make_dispute();
+        dispute.evidence = (0..100).map(|_| fake_action_hash()).collect();
+        let result = validate_create_water_dispute(fake_create(), dispute);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn water_dispute_101_evidence_rejected() {
+        let mut dispute = make_dispute();
+        dispute.evidence = (0..101).map(|_| fake_action_hash()).collect();
+        let result = validate_create_water_dispute(fake_create(), dispute);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn water_dispute_no_evidence_accepted() {
+        let dispute = make_dispute(); // Default has empty evidence
+        let result = validate_create_water_dispute(fake_create(), dispute);
+        assert!(is_valid(&result));
+    }
+}

@@ -313,3 +313,142 @@ pub fn get_resource_requests(disaster_hash: ActionHash) -> ExternResult<Vec<Reco
 
     Ok(requests)
 }
+
+// ============================================================================
+// Cross-domain: Find nearby shelters for resource deployment
+// ============================================================================
+
+/// Wire-compatible copy of emergency_shelters Shelter for deserialization.
+#[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
+struct LocalShelter {
+    pub id: String,
+    pub name: String,
+    pub location_lat: f64,
+    pub location_lon: f64,
+    pub address: String,
+    pub capacity: u32,
+    pub current_occupancy: u32,
+    pub shelter_type: LocalShelterType,
+    pub amenities: Vec<LocalAmenity>,
+    pub status: LocalShelterStatus,
+    pub contact: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum LocalShelterType { GeneralPopulation, SpecialNeeds, Medical, Pet, Evacuation }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum LocalAmenity { Beds, Kitchen, Showers, Laundry, MedicalBay, PetArea, ChildArea, Generator, WheelchairAccess, Wifi }
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+enum LocalShelterStatus { Open, Full, Closed, Evacuating }
+
+/// Wire-compatible copy of emergency_shelters FindNearbySheltersInput.
+#[derive(Serialize, Deserialize, Debug)]
+struct LocalFindNearbySheltersInput {
+    pub lat: f64,
+    pub lon: f64,
+    pub radius_km: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FindSheltersForResourceInput {
+    /// Latitude of the resource depot or deployment point.
+    pub lat: f64,
+    /// Longitude of the resource depot or deployment point.
+    pub lon: f64,
+    /// Search radius in kilometers.
+    pub radius_km: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ShelterInfo {
+    pub name: String,
+    pub address: String,
+    pub capacity: u32,
+    pub current_occupancy: u32,
+    pub available_capacity: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NearbySheltersResult {
+    pub shelters_found: u32,
+    pub total_available_capacity: u32,
+    pub shelters: Vec<ShelterInfo>,
+    pub error: Option<String>,
+}
+
+/// Find nearby shelters that could receive deployed resources.
+///
+/// Cross-domain call: emergency-resources queries emergency_shelters
+/// via `call(CallTargetCell::Local, ...)` to find open shelters near
+/// a resource depot. This enables smart resource routing to where
+/// shelter occupants need them most.
+#[hdk_extern]
+pub fn find_shelters_needing_resources(input: FindSheltersForResourceInput) -> ExternResult<NearbySheltersResult> {
+    let search = LocalFindNearbySheltersInput {
+        lat: input.lat,
+        lon: input.lon,
+        radius_km: input.radius_km,
+    };
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("emergency_shelters"),
+        FunctionName::from("find_nearby_shelters"),
+        None,
+        search,
+    );
+
+    match &response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            let records: Vec<Record> = extern_io.decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+
+            let mut shelters = Vec::new();
+            let mut total_available = 0u32;
+
+            for record in &records {
+                if let Some(shelter) = record
+                    .entry()
+                    .to_app_option::<LocalShelter>()
+                    .ok()
+                    .flatten()
+                {
+                    let available = shelter.capacity.saturating_sub(shelter.current_occupancy);
+                    total_available += available;
+
+                    shelters.push(ShelterInfo {
+                        name: shelter.name,
+                        address: shelter.address,
+                        capacity: shelter.capacity,
+                        current_occupancy: shelter.current_occupancy,
+                        available_capacity: available,
+                    });
+                }
+            }
+
+            // Sort by most occupied first (highest need)
+            shelters.sort_by(|a, b| b.current_occupancy.cmp(&a.current_occupancy));
+
+            Ok(NearbySheltersResult {
+                shelters_found: shelters.len() as u32,
+                total_available_capacity: total_available,
+                shelters,
+                error: None,
+            })
+        }
+        Ok(ZomeCallResponse::NetworkError(err)) => Ok(NearbySheltersResult {
+            shelters_found: 0,
+            total_available_capacity: 0,
+            shelters: vec![],
+            error: Some(format!("Network error: {}", err)),
+        }),
+        _ => Ok(NearbySheltersResult {
+            shelters_found: 0,
+            total_available_capacity: 0,
+            shelters: vec![],
+            error: Some("Failed to query emergency shelters zome".into()),
+        }),
+    }
+}

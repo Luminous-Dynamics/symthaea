@@ -376,3 +376,105 @@ pub struct RemoveAttributionInput {
     pub attribution_id: String,
     pub requester_did: String,
 }
+
+// ============================================================================
+// Cross-domain: Check evidence disputes before attribution
+// ============================================================================
+
+/// Wire-compatible copy of justice EvidenceDispute for deserialization.
+#[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
+struct LocalEvidenceDispute {
+    pub id: String,
+    pub evidence_id: String,
+    pub disputant: String,
+    pub reason: String,
+    pub created_at: Timestamp,
+    pub resolved: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckEvidenceDisputesInput {
+    /// The evidence ID to check in the justice system.
+    pub evidence_id: String,
+    /// Publication being attributed (for context in result).
+    pub publication_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EvidenceDisputeCheckResult {
+    pub has_disputes: bool,
+    pub dispute_count: u32,
+    pub unresolved_count: u32,
+    pub warning: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Check if evidence cited in a publication has been disputed in the
+/// justice system.
+///
+/// Cross-domain call: media-attribution queries justice_evidence via
+/// `call(CallTargetCell::Local, ...)` to check whether cited evidence
+/// has open disputes. A publication citing disputed evidence should
+/// carry a credibility warning.
+#[hdk_extern]
+pub fn check_evidence_disputes_for_publication(input: CheckEvidenceDisputesInput) -> ExternResult<EvidenceDisputeCheckResult> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("justice_evidence"),
+        FunctionName::from("get_evidence_disputes"),
+        None,
+        input.evidence_id.clone(),
+    );
+
+    match &response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            let records: Vec<Record> = extern_io.decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+
+            let total = records.len() as u32;
+            let mut unresolved = 0u32;
+
+            for record in &records {
+                if let Some(dispute) = record
+                    .entry()
+                    .to_app_option::<LocalEvidenceDispute>()
+                    .ok()
+                    .flatten()
+                {
+                    if !dispute.resolved {
+                        unresolved += 1;
+                    }
+                }
+            }
+
+            Ok(EvidenceDisputeCheckResult {
+                has_disputes: total > 0,
+                dispute_count: total,
+                unresolved_count: unresolved,
+                warning: if unresolved > 0 {
+                    Some(format!(
+                        "Evidence '{}' cited in publication '{}' has {} unresolved dispute(s) in the justice system",
+                        input.evidence_id, input.publication_id, unresolved
+                    ))
+                } else {
+                    None
+                },
+                error: None,
+            })
+        }
+        Ok(ZomeCallResponse::NetworkError(err)) => Ok(EvidenceDisputeCheckResult {
+            has_disputes: false,
+            dispute_count: 0,
+            unresolved_count: 0,
+            warning: None,
+            error: Some(format!("Network error: {}", err)),
+        }),
+        _ => Ok(EvidenceDisputeCheckResult {
+            has_disputes: false,
+            dispute_count: 0,
+            unresolved_count: 0,
+            warning: None,
+            error: Some("Failed to query justice evidence zome".into()),
+        }),
+    }
+}

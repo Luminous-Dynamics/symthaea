@@ -258,3 +258,412 @@ fn validate_create_budget(_action: Create, budget: Budget) -> ExternResult<Valid
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // HELPERS
+    // ========================================================================
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_entry_hash() -> EntryHash {
+        EntryHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_create() -> Create {
+        Create {
+            author: fake_agent(),
+            timestamp: Timestamp::from_micros(0),
+            action_seq: 0,
+            prev_action: fake_action_hash(),
+            entry_type: EntryType::App(AppEntryDef::new(
+                EntryDefIndex(0),
+                ZomeIndex(0),
+                EntryVisibility::Public,
+            )),
+            entry_hash: fake_entry_hash(),
+            weight: EntryRateWeight::default(),
+        }
+    }
+
+    fn is_valid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Valid))
+    }
+
+    fn is_invalid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Invalid(_)))
+    }
+
+    fn make_charge() -> MonthlyCharge {
+        MonthlyCharge {
+            member: fake_agent(),
+            unit_hash: fake_action_hash(),
+            period_year: 2025,
+            period_month: 6,
+            base_rent_cents: 100_000,
+            maintenance_fee_cents: 20_000,
+            utilities_cents: 15_000,
+            reserve_contribution_cents: 5_000,
+            total_cents: 140_000,
+        }
+    }
+
+    fn make_payment() -> Payment {
+        Payment {
+            member: fake_agent(),
+            charge_hash: Some(fake_action_hash()),
+            amount_cents: 140_000,
+            payment_method: PaymentMethod::BankTransfer,
+            paid_at: Timestamp::from_micros(0),
+            reference: None,
+        }
+    }
+
+    fn make_fund() -> ReserveFund {
+        ReserveFund {
+            name: "Capital Reserve".into(),
+            fund_type: FundType::CapitalReserve,
+            balance_cents: 50_000,
+            target_cents: 500_000,
+            description: "Long-term capital improvements".into(),
+        }
+    }
+
+    fn make_budget() -> Budget {
+        Budget {
+            fiscal_year: 2025,
+            income_projected_cents: 1_000_000,
+            expenses_projected_cents: 900_000,
+            categories: vec![
+                BudgetCategory {
+                    name: "Maintenance".into(),
+                    allocated_cents: 400_000,
+                    spent_cents: 0,
+                },
+                BudgetCategory {
+                    name: "Utilities".into(),
+                    allocated_cents: 300_000,
+                    spent_cents: 0,
+                },
+                BudgetCategory {
+                    name: "Insurance".into(),
+                    allocated_cents: 200_000,
+                    spent_cents: 0,
+                },
+            ],
+            approved: false,
+            approved_at: None,
+        }
+    }
+
+    // ========================================================================
+    // CHARGE VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_charge_passes() {
+        let result = validate_create_charge(fake_create(), make_charge());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn charge_month_zero_rejected() {
+        let mut charge = make_charge();
+        charge.period_month = 0;
+        let result = validate_create_charge(fake_create(), charge);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn charge_month_13_rejected() {
+        let mut charge = make_charge();
+        charge.period_month = 13;
+        let result = validate_create_charge(fake_create(), charge);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn charge_month_1_accepted() {
+        let mut charge = make_charge();
+        charge.period_month = 1;
+        let result = validate_create_charge(fake_create(), charge);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn charge_month_12_accepted() {
+        let mut charge = make_charge();
+        charge.period_month = 12;
+        let result = validate_create_charge(fake_create(), charge);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn charge_year_2019_rejected() {
+        let mut charge = make_charge();
+        charge.period_year = 2019;
+        let result = validate_create_charge(fake_create(), charge);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn charge_year_2101_rejected() {
+        let mut charge = make_charge();
+        charge.period_year = 2101;
+        let result = validate_create_charge(fake_create(), charge);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn charge_year_2020_accepted() {
+        let mut charge = make_charge();
+        charge.period_year = 2020;
+        let result = validate_create_charge(fake_create(), charge);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn charge_year_2100_accepted() {
+        let mut charge = make_charge();
+        charge.period_year = 2100;
+        let result = validate_create_charge(fake_create(), charge);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn charge_total_mismatch_rejected() {
+        let mut charge = make_charge();
+        charge.total_cents = 999_999; // Wrong total
+        let result = validate_create_charge(fake_create(), charge);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn charge_total_off_by_one_rejected() {
+        let mut charge = make_charge();
+        charge.total_cents = 140_001; // Off by 1
+        let result = validate_create_charge(fake_create(), charge);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn charge_all_zeros_valid() {
+        let mut charge = make_charge();
+        charge.base_rent_cents = 0;
+        charge.maintenance_fee_cents = 0;
+        charge.utilities_cents = 0;
+        charge.reserve_contribution_cents = 0;
+        charge.total_cents = 0;
+        let result = validate_create_charge(fake_create(), charge);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // PAYMENT VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_payment_passes() {
+        let result = validate_create_payment(fake_create(), make_payment());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn payment_zero_amount_rejected() {
+        let mut payment = make_payment();
+        payment.amount_cents = 0;
+        let result = validate_create_payment(fake_create(), payment);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn payment_one_cent_accepted() {
+        let mut payment = make_payment();
+        payment.amount_cents = 1;
+        let result = validate_create_payment(fake_create(), payment);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn payment_no_reference_accepted() {
+        let payment = make_payment(); // reference is None by default
+        let result = validate_create_payment(fake_create(), payment);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn payment_short_reference_accepted() {
+        let mut payment = make_payment();
+        payment.reference = Some("TXN-12345".into());
+        let result = validate_create_payment(fake_create(), payment);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn payment_reference_at_limit_accepted() {
+        let mut payment = make_payment();
+        payment.reference = Some("x".repeat(256));
+        let result = validate_create_payment(fake_create(), payment);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn payment_reference_over_limit_rejected() {
+        let mut payment = make_payment();
+        payment.reference = Some("x".repeat(257));
+        let result = validate_create_payment(fake_create(), payment);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn payment_no_charge_hash_accepted() {
+        let mut payment = make_payment();
+        payment.charge_hash = None;
+        let result = validate_create_payment(fake_create(), payment);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // FUND VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_fund_passes() {
+        let result = validate_create_fund(fake_create(), make_fund());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fund_empty_name_rejected() {
+        let mut fund = make_fund();
+        fund.name = "".into();
+        let result = validate_create_fund(fake_create(), fund);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn fund_zero_target_rejected() {
+        let mut fund = make_fund();
+        fund.target_cents = 0;
+        let result = validate_create_fund(fake_create(), fund);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn fund_one_cent_target_accepted() {
+        let mut fund = make_fund();
+        fund.target_cents = 1;
+        let result = validate_create_fund(fake_create(), fund);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn fund_zero_balance_accepted() {
+        let mut fund = make_fund();
+        fund.balance_cents = 0;
+        let result = validate_create_fund(fake_create(), fund);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // BUDGET VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_budget_passes() {
+        let result = validate_create_budget(fake_create(), make_budget());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn budget_year_2019_rejected() {
+        let mut budget = make_budget();
+        budget.fiscal_year = 2019;
+        let result = validate_create_budget(fake_create(), budget);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn budget_year_2101_rejected() {
+        let mut budget = make_budget();
+        budget.fiscal_year = 2101;
+        let result = validate_create_budget(fake_create(), budget);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn budget_year_2020_accepted() {
+        let mut budget = make_budget();
+        budget.fiscal_year = 2020;
+        let result = validate_create_budget(fake_create(), budget);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn budget_year_2100_accepted() {
+        let mut budget = make_budget();
+        budget.fiscal_year = 2100;
+        let result = validate_create_budget(fake_create(), budget);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn budget_no_categories_rejected() {
+        let mut budget = make_budget();
+        budget.categories = vec![];
+        let result = validate_create_budget(fake_create(), budget);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn budget_empty_category_name_rejected() {
+        let mut budget = make_budget();
+        budget.categories[1].name = "".into();
+        let result = validate_create_budget(fake_create(), budget);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn budget_allocation_mismatch_rejected() {
+        let mut budget = make_budget();
+        budget.expenses_projected_cents = 1_000_000; // Doesn't match 900k allocated
+        let result = validate_create_budget(fake_create(), budget);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn budget_single_category_matching_accepted() {
+        let budget = Budget {
+            fiscal_year: 2025,
+            income_projected_cents: 500_000,
+            expenses_projected_cents: 200_000,
+            categories: vec![BudgetCategory {
+                name: "Operations".into(),
+                allocated_cents: 200_000,
+                spent_cents: 0,
+            }],
+            approved: true,
+            approved_at: Some(Timestamp::from_micros(1_000_000)),
+        };
+        let result = validate_create_budget(fake_create(), budget);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn budget_approved_with_timestamp_accepted() {
+        let mut budget = make_budget();
+        budget.approved = true;
+        budget.approved_at = Some(Timestamp::from_micros(1_000_000));
+        let result = validate_create_budget(fake_create(), budget);
+        assert!(is_valid(&result));
+    }
+}

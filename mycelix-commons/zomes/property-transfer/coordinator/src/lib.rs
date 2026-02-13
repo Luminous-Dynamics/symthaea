@@ -517,3 +517,97 @@ pub fn get_transfers_by_status(status: TransferStatus) -> ExternResult<Vec<Recor
     }
     Ok(results)
 }
+
+// ============================================================================
+// Cross-domain: Check water rights before completing property transfer
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckWaterRightsInput {
+    /// The property being transferred.
+    pub property_id: String,
+    /// Watershed ActionHash to check — caller provides the relevant watershed.
+    pub watershed_hash: ActionHash,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WaterRightsCheckResult {
+    pub has_water_rights: bool,
+    pub water_rights_count: u32,
+    pub warning: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Wire-compatible copy of water steward WaterRight for deserialization.
+#[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
+struct LocalWaterRight {
+    pub watershed_hash: ActionHash,
+    pub holder: AgentPubKey,
+    pub right_type: LocalRightType,
+    pub volume_authorized_liters: u64,
+    pub priority_date: Timestamp,
+    pub conditions: Vec<String>,
+    pub status: LocalRightStatus,
+    pub transferable: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum LocalRightType { Riparian, Appropriative, Prescriptive, Groundwater, Recycled }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum LocalRightStatus { Active, Suspended, Revoked, Transferred, Expired }
+
+/// Check if a property's watershed has associated water rights before
+/// completing a transfer.
+///
+/// Cross-domain call: property-transfer queries water_steward via
+/// `call(CallTargetCell::Local, ...)` to check for water rights in
+/// the watershed. If water rights exist, the buyer should be informed
+/// that rights may need separate transfer.
+#[hdk_extern]
+pub fn check_water_rights_before_transfer(input: CheckWaterRightsInput) -> ExternResult<WaterRightsCheckResult> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("water_steward"),
+        FunctionName::from("get_watershed_rights"),
+        None,
+        input.watershed_hash,
+    );
+
+    match &response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            let records: Vec<Record> = extern_io.decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+
+            let count = records.len() as u32;
+            let has_rights = count > 0;
+
+            Ok(WaterRightsCheckResult {
+                has_water_rights: has_rights,
+                water_rights_count: count,
+                warning: if has_rights {
+                    Some(format!(
+                        "Property '{}' has {} water right(s) in this watershed. \
+                         Water rights may need separate transfer.",
+                        input.property_id, count
+                    ))
+                } else {
+                    None
+                },
+                error: None,
+            })
+        }
+        Ok(ZomeCallResponse::NetworkError(err)) => Ok(WaterRightsCheckResult {
+            has_water_rights: false,
+            water_rights_count: 0,
+            warning: None,
+            error: Some(format!("Network error querying water rights: {}", err)),
+        }),
+        _ => Ok(WaterRightsCheckResult {
+            has_water_rights: false,
+            water_rights_count: 0,
+            warning: None,
+            error: Some("Failed to query water steward zome".into()),
+        }),
+    }
+}

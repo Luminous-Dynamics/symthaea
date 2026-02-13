@@ -147,3 +147,139 @@ pub fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     }
     Ok(records)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // dispatch_call_checked: the disallowed-zome path returns before
+    // touching HDK, so we can test it without a running conductor.
+
+    #[test]
+    fn dispatch_rejects_disallowed_zome() {
+        let input = DispatchInput {
+            zome: "evil_zome".into(),
+            fn_name: "steal_data".into(),
+            payload: vec![],
+        };
+        let allowed = &["property_registry", "housing_units"];
+        let result = dispatch_call_checked(&input, allowed).unwrap();
+        assert!(!result.success);
+        assert!(result.response.is_none());
+        let err = result.error.unwrap();
+        assert!(err.contains("not in the allowed dispatch list"));
+        assert!(err.contains("evil_zome"));
+    }
+
+    #[test]
+    fn dispatch_rejects_empty_allowlist() {
+        let input = DispatchInput {
+            zome: "property_registry".into(),
+            fn_name: "get_property".into(),
+            payload: vec![],
+        };
+        let result = dispatch_call_checked(&input, &[]).unwrap();
+        assert!(!result.success);
+        assert!(result.error.is_some());
+    }
+
+    #[test]
+    fn dispatch_rejects_similar_zome_name() {
+        let input = DispatchInput {
+            zome: "property_registry_evil".into(),
+            fn_name: "get_property".into(),
+            payload: vec![],
+        };
+        let allowed = &["property_registry"];
+        let result = dispatch_call_checked(&input, allowed).unwrap();
+        assert!(!result.success);
+    }
+
+    #[test]
+    fn dispatch_error_lists_valid_zomes() {
+        let input = DispatchInput {
+            zome: "bad".into(),
+            fn_name: "fn".into(),
+            payload: vec![],
+        };
+        let allowed = &["alpha", "beta", "gamma"];
+        let result = dispatch_call_checked(&input, allowed).unwrap();
+        let err = result.error.unwrap();
+        assert!(err.contains("alpha"));
+        assert!(err.contains("beta"));
+        assert!(err.contains("gamma"));
+    }
+
+    // Type serde roundtrips
+
+    #[test]
+    fn dispatch_input_serde_roundtrip() {
+        let input = DispatchInput {
+            zome: "property_registry".into(),
+            fn_name: "get_property".into(),
+            payload: vec![1, 2, 3, 4],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: DispatchInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input.zome, input2.zome);
+        assert_eq!(input.fn_name, input2.fn_name);
+        assert_eq!(input.payload, input2.payload);
+    }
+
+    #[test]
+    fn dispatch_result_success_serde_roundtrip() {
+        let result = DispatchResult {
+            success: true,
+            response: Some(vec![10, 20, 30]),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let r2: DispatchResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.success);
+        assert_eq!(r2.response, Some(vec![10, 20, 30]));
+        assert!(r2.error.is_none());
+    }
+
+    #[test]
+    fn dispatch_result_error_serde_roundtrip() {
+        let result = DispatchResult {
+            success: false,
+            response: None,
+            error: Some("something failed".into()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let r2: DispatchResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.success);
+        assert!(r2.response.is_none());
+        assert_eq!(r2.error.as_deref(), Some("something failed"));
+    }
+
+    #[test]
+    fn event_type_query_serde_roundtrip() {
+        let q = EventTypeQuery {
+            domain: "housing".into(),
+            event_type: "lease_created".into(),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: EventTypeQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q.domain, q2.domain);
+        assert_eq!(q.event_type, q2.event_type);
+    }
+
+    #[test]
+    fn bridge_health_serde_roundtrip() {
+        let h = BridgeHealth {
+            healthy: true,
+            agent: "uhCAk_test_agent".into(),
+            total_events: 42,
+            total_queries: 7,
+            domains: vec!["property".into(), "housing".into()],
+        };
+        let json = serde_json::to_string(&h).unwrap();
+        let h2: BridgeHealth = serde_json::from_str(&json).unwrap();
+        assert!(h2.healthy);
+        assert_eq!(h2.total_events, 42);
+        assert_eq!(h2.total_queries, 7);
+        assert_eq!(h2.domains.len(), 2);
+    }
+}

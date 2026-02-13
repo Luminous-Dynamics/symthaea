@@ -378,6 +378,11 @@ pub fn deactivate_did(reason: String) -> ExternResult<Record> {
         (),
     )?;
 
+    // Cascade: revoke all credentials issued by this DID
+    if let Err(e) = cascade_revoke_credentials_for_did(&current_did.id, &reason, now) {
+        warn!("Failed to cascade-revoke credentials for deactivated DID: {:?}", e);
+    }
+
     // Notify bridge of deactivation for ecosystem-wide awareness
     if let Err(e) = notify_bridge_of_deactivation(&current_did.id, &reason, now) {
         debug!("Failed to notify bridge of DID deactivation: {:?}", e);
@@ -425,6 +430,73 @@ fn notify_bridge_of_deactivation(did: &str, reason: &str, deactivated_at: Timest
         }
         ZomeCallResponse::CountersigningSession(err) => {
             debug!("Countersigning error notifying bridge: {}", err);
+            Ok(())
+        }
+    }
+}
+
+/// Cascade-revoke all credentials issued by a deactivated DID via cross-zome call
+fn cascade_revoke_credentials_for_did(did: &str, reason: &str, _deactivated_at: Timestamp) -> ExternResult<()> {
+    #[derive(Serialize, Deserialize, Debug)]
+    struct BatchRevokeInput {
+        credential_ids: Vec<String>,
+        issuer_did: String,
+        reason: String,
+        effective_from: Option<Timestamp>,
+        revocation_list_id: Option<String>,
+    }
+
+    // First, get all credentials issued by this DID
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("verifiable_credential"),
+        FunctionName::new("get_credentials_issued_by"),
+        None,
+        did.to_string(),
+    )?;
+
+    let credential_ids: Vec<String> = match response {
+        ZomeCallResponse::Ok(result) => {
+            // Returns Vec<Record>, extract credential IDs from each
+            let records: Vec<Record> = result.decode().unwrap_or_default();
+            records.iter().filter_map(|r| {
+                r.action().entry_hash().map(|h| h.to_string())
+            }).collect()
+        }
+        _ => {
+            debug!("Could not query credentials for DID cascade revocation");
+            return Ok(());
+        }
+    };
+
+    if credential_ids.is_empty() {
+        return Ok(());
+    }
+
+    // Batch-revoke all credentials via the revocation zome
+    let input = BatchRevokeInput {
+        credential_ids,
+        issuer_did: did.to_string(),
+        reason: format!("DID deactivated: {}", reason),
+        effective_from: None,
+        revocation_list_id: None,
+    };
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("revocation"),
+        FunctionName::new("batch_revoke_credentials"),
+        None,
+        input,
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(_) => {
+            debug!("Successfully cascade-revoked credentials for deactivated DID: {}", did);
+            Ok(())
+        }
+        _ => {
+            warn!("Failed to cascade-revoke credentials for DID: {}", did);
             Ok(())
         }
     }

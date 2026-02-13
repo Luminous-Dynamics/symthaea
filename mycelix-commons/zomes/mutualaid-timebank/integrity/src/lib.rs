@@ -303,3 +303,362 @@ fn validate_create_link(
         LinkTypes::AgentToCredits => Ok(ValidateCallbackResult::Valid),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn agent_a() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xAA; 36])
+    }
+    fn agent_b() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xBB; 36])
+    }
+
+    fn is_valid(r: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(r, Ok(ValidateCallbackResult::Valid))
+    }
+    fn is_invalid(r: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(r, Ok(ValidateCallbackResult::Invalid(_)))
+    }
+
+    fn valid_offer() -> ServiceOffer {
+        ServiceOffer {
+            id: "offer-1".into(),
+            provider: agent_a(),
+            category: ServiceCategory::Tutoring,
+            title: "Math tutoring".into(),
+            description: "Help with calculus".into(),
+            qualifications: vec!["BS Mathematics".into()],
+            availability: Availability::default(),
+            location: LocationConstraint::Remote,
+            min_duration_hours: 1.0,
+            max_duration_hours: Some(3.0),
+            active: true,
+            created_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+        }
+    }
+
+    fn valid_request() -> ServiceRequest {
+        ServiceRequest {
+            id: "req-1".into(),
+            requester: agent_a(),
+            category: ServiceCategory::HomeRepair,
+            title: "Fix leaky faucet".into(),
+            description: "Kitchen faucet dripping".into(),
+            urgency: UrgencyLevel::Medium,
+            needed_by: None,
+            estimated_hours: 2.0,
+            location: LocationConstraint::Remote,
+            status: RequestStatus::Open,
+            created_at: Timestamp::from_micros(0),
+        }
+    }
+
+    fn valid_exchange() -> TimeExchange {
+        TimeExchange {
+            id: "exch-1".into(),
+            offer_hash: None,
+            request_hash: None,
+            provider: agent_a(),
+            recipient: agent_b(),
+            hours: 2.0,
+            category: ServiceCategory::Tutoring,
+            description: "Helped with homework".into(),
+            completed_at: Timestamp::from_micros(0),
+            provider_rating: None,
+            recipient_rating: None,
+            confirmed: true,
+        }
+    }
+
+    fn valid_credit() -> TimeCredit {
+        TimeCredit {
+            hours: 2.0,
+            earner: agent_a(),
+            debtor: agent_b(),
+            service_category: ServiceCategory::Tutoring,
+            description: "Tutored math for 2 hours".into(),
+            performed_at: Timestamp::from_micros(0),
+            expires_at: None,
+        }
+    }
+
+    // ---- ServiceOffer validation ----
+
+    #[test]
+    fn offer_valid() {
+        assert!(is_valid(&validate_service_offer(valid_offer())));
+    }
+
+    #[test]
+    fn offer_empty_id_rejected() {
+        let mut o = valid_offer();
+        o.id = "".into();
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn offer_empty_title_rejected() {
+        let mut o = valid_offer();
+        o.title = "".into();
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn offer_title_over_200_rejected() {
+        let mut o = valid_offer();
+        o.title = "x".repeat(201);
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn offer_title_at_200_accepted() {
+        let mut o = valid_offer();
+        o.title = "x".repeat(200);
+        assert!(is_valid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn offer_description_over_5000_rejected() {
+        let mut o = valid_offer();
+        o.description = "x".repeat(5001);
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn offer_zero_min_duration_rejected() {
+        let mut o = valid_offer();
+        o.min_duration_hours = 0.0;
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn offer_negative_min_duration_rejected() {
+        let mut o = valid_offer();
+        o.min_duration_hours = -1.0;
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn offer_max_less_than_min_rejected() {
+        let mut o = valid_offer();
+        o.min_duration_hours = 2.0;
+        o.max_duration_hours = Some(1.0);
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn offer_max_equal_min_accepted() {
+        let mut o = valid_offer();
+        o.min_duration_hours = 2.0;
+        o.max_duration_hours = Some(2.0);
+        assert!(is_valid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn offer_no_max_duration_accepted() {
+        let mut o = valid_offer();
+        o.max_duration_hours = None;
+        assert!(is_valid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn offer_too_many_qualifications_rejected() {
+        let mut o = valid_offer();
+        o.qualifications = (0..21).map(|i| format!("qual_{}", i)).collect();
+        assert!(is_invalid(&validate_service_offer(o)));
+    }
+
+    #[test]
+    fn offer_20_qualifications_accepted() {
+        let mut o = valid_offer();
+        o.qualifications = (0..20).map(|i| format!("qual_{}", i)).collect();
+        assert!(is_valid(&validate_service_offer(o)));
+    }
+
+    // ---- ServiceRequest validation ----
+
+    #[test]
+    fn request_valid() {
+        assert!(is_valid(&validate_service_request(valid_request())));
+    }
+
+    #[test]
+    fn request_empty_id_rejected() {
+        let mut r = valid_request();
+        r.id = "".into();
+        assert!(is_invalid(&validate_service_request(r)));
+    }
+
+    #[test]
+    fn request_empty_title_rejected() {
+        let mut r = valid_request();
+        r.title = "".into();
+        assert!(is_invalid(&validate_service_request(r)));
+    }
+
+    #[test]
+    fn request_title_over_200_rejected() {
+        let mut r = valid_request();
+        r.title = "x".repeat(201);
+        assert!(is_invalid(&validate_service_request(r)));
+    }
+
+    #[test]
+    fn request_description_over_5000_rejected() {
+        let mut r = valid_request();
+        r.description = "x".repeat(5001);
+        assert!(is_invalid(&validate_service_request(r)));
+    }
+
+    #[test]
+    fn request_zero_hours_rejected() {
+        let mut r = valid_request();
+        r.estimated_hours = 0.0;
+        assert!(is_invalid(&validate_service_request(r)));
+    }
+
+    #[test]
+    fn request_negative_hours_rejected() {
+        let mut r = valid_request();
+        r.estimated_hours = -1.0;
+        assert!(is_invalid(&validate_service_request(r)));
+    }
+
+    #[test]
+    fn request_over_168_hours_rejected() {
+        let mut r = valid_request();
+        r.estimated_hours = 168.1;
+        assert!(is_invalid(&validate_service_request(r)));
+    }
+
+    #[test]
+    fn request_exactly_168_hours_accepted() {
+        let mut r = valid_request();
+        r.estimated_hours = 168.0;
+        assert!(is_valid(&validate_service_request(r)));
+    }
+
+    // ---- TimeExchange validation ----
+
+    #[test]
+    fn exchange_valid() {
+        assert!(is_valid(&validate_time_exchange(valid_exchange())));
+    }
+
+    #[test]
+    fn exchange_empty_id_rejected() {
+        let mut e = valid_exchange();
+        e.id = "".into();
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn exchange_zero_hours_rejected() {
+        let mut e = valid_exchange();
+        e.hours = 0.0;
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn exchange_over_168_hours_rejected() {
+        let mut e = valid_exchange();
+        e.hours = 169.0;
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn exchange_same_provider_recipient_rejected() {
+        let mut e = valid_exchange();
+        e.recipient = agent_a(); // same as provider
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn exchange_empty_description_rejected() {
+        let mut e = valid_exchange();
+        e.description = "".into();
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn exchange_rating_score_0_rejected() {
+        let mut e = valid_exchange();
+        e.provider_rating = Some(Rating {
+            score: 0,
+            comment: None,
+            rated_at: Timestamp::from_micros(0),
+        });
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn exchange_rating_score_6_rejected() {
+        let mut e = valid_exchange();
+        e.recipient_rating = Some(Rating {
+            score: 6,
+            comment: None,
+            rated_at: Timestamp::from_micros(0),
+        });
+        assert!(is_invalid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn exchange_rating_score_1_accepted() {
+        let mut e = valid_exchange();
+        e.provider_rating = Some(Rating {
+            score: 1,
+            comment: None,
+            rated_at: Timestamp::from_micros(0),
+        });
+        assert!(is_valid(&validate_time_exchange(e)));
+    }
+
+    #[test]
+    fn exchange_rating_score_5_accepted() {
+        let mut e = valid_exchange();
+        e.recipient_rating = Some(Rating {
+            score: 5,
+            comment: Some("Excellent!".into()),
+            rated_at: Timestamp::from_micros(0),
+        });
+        assert!(is_valid(&validate_time_exchange(e)));
+    }
+
+    // ---- TimeCredit validation ----
+
+    #[test]
+    fn credit_valid() {
+        assert!(is_valid(&validate_time_credit(valid_credit())));
+    }
+
+    #[test]
+    fn credit_zero_hours_rejected() {
+        let mut c = valid_credit();
+        c.hours = 0.0;
+        assert!(is_invalid(&validate_time_credit(c)));
+    }
+
+    #[test]
+    fn credit_over_168_hours_rejected() {
+        let mut c = valid_credit();
+        c.hours = 200.0;
+        assert!(is_invalid(&validate_time_credit(c)));
+    }
+
+    #[test]
+    fn credit_same_earner_debtor_rejected() {
+        let mut c = valid_credit();
+        c.debtor = agent_a(); // same as earner
+        assert!(is_invalid(&validate_time_credit(c)));
+    }
+
+    #[test]
+    fn credit_empty_description_rejected() {
+        let mut c = valid_credit();
+        c.description = "".into();
+        assert!(is_invalid(&validate_time_credit(c)));
+    }
+}

@@ -277,3 +277,535 @@ fn validate_create_checkpoint(
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // RESULT HELPERS
+    // ========================================================================
+
+    fn is_valid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Valid))
+    }
+
+    fn is_invalid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Invalid(_)))
+    }
+
+    fn invalid_msg(result: &ExternResult<ValidateCallbackResult>) -> String {
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => msg.clone(),
+            _ => panic!("Expected Invalid, got {:?}", result),
+        }
+    }
+
+    // ========================================================================
+    // CONSTRUCTION HELPERS
+    // ========================================================================
+
+    fn fake_create() -> Create {
+        Create {
+            author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            timestamp: Timestamp::from_micros(0),
+            action_seq: 0,
+            prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                EntryDefIndex(0),
+                ZomeIndex(0),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
+            weight: EntryRateWeight::default(),
+        }
+    }
+
+    fn agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    fn agent2() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![2u8; 36])
+    }
+
+    fn agent3() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![3u8; 36])
+    }
+
+    fn ts() -> Timestamp {
+        Timestamp::from_micros(0)
+    }
+
+    fn ah() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn make_team() -> Team {
+        let lead = agent();
+        Team {
+            id: "team-1".into(),
+            name: "Search & Rescue Alpha".into(),
+            team_type: TeamType::SearchAndRescue,
+            members: vec![lead.clone(), agent2()],
+            lead,
+            assigned_zone: None,
+            status: TeamStatus::Active,
+        }
+    }
+
+    fn make_assignment() -> Assignment {
+        Assignment {
+            team_hash: ah(),
+            zone_hash: ah(),
+            objective: "Clear sector 7 for survivors".into(),
+            assigned_at: ts(),
+            assigned_by: agent(),
+            status: AssignmentStatus::Active,
+        }
+    }
+
+    fn make_sitrep() -> SituationReport {
+        SituationReport {
+            team_hash: ah(),
+            zone_hash: ah(),
+            timestamp: ts(),
+            conditions: "Heavy flooding, partial building collapse".into(),
+            casualties_found: 3,
+            resources_needed: vec!["medical supplies".into(), "boats".into()],
+            hazards: vec!["downed power lines".into()],
+            access_status: AccessStatus::Restricted,
+            synced: false,
+        }
+    }
+
+    fn make_checkpoint() -> Checkpoint {
+        Checkpoint {
+            agent: agent(),
+            lat: 32.9483,
+            lon: -96.7299,
+            timestamp: ts(),
+            status: AgentStatus::Active,
+            battery_level: Some(85),
+            connectivity: ConnectivityStatus::Online,
+        }
+    }
+
+    // ========================================================================
+    // TEAM VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_team_passes() {
+        let result = validate_create_team(fake_create(), make_team());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn team_empty_id_rejected() {
+        let mut team = make_team();
+        team.id = "".into();
+        let result = validate_create_team(fake_create(), team);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Team ID cannot be empty");
+    }
+
+    #[test]
+    fn team_empty_name_rejected() {
+        let mut team = make_team();
+        team.name = "".into();
+        let result = validate_create_team(fake_create(), team);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Team name cannot be empty");
+    }
+
+    #[test]
+    fn team_empty_members_rejected() {
+        let mut team = make_team();
+        team.members = vec![];
+        let result = validate_create_team(fake_create(), team);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Team must have at least one member"
+        );
+    }
+
+    #[test]
+    fn team_lead_not_in_members_rejected() {
+        let mut team = make_team();
+        team.lead = agent3();
+        // members still contains agent() and agent2(), not agent3()
+        let result = validate_create_team(fake_create(), team);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Team lead must be a member");
+    }
+
+    #[test]
+    fn team_lead_is_sole_member_passes() {
+        let sole = agent();
+        let team = Team {
+            id: "team-solo".into(),
+            name: "Solo Recon".into(),
+            team_type: TeamType::Assessment,
+            members: vec![sole.clone()],
+            lead: sole,
+            assigned_zone: None,
+            status: TeamStatus::Forming,
+        };
+        let result = validate_create_team(fake_create(), team);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn team_all_fields_valid_with_assigned_zone_passes() {
+        let mut team = make_team();
+        team.assigned_zone = Some(ah());
+        let result = validate_create_team(fake_create(), team);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn team_every_type_variant_passes() {
+        let variants = vec![
+            TeamType::SearchAndRescue,
+            TeamType::Medical,
+            TeamType::Logistics,
+            TeamType::Communications,
+            TeamType::Shelter,
+            TeamType::Assessment,
+            TeamType::HazMat,
+            TeamType::Volunteer,
+        ];
+        for variant in variants {
+            let mut team = make_team();
+            team.team_type = variant;
+            let result = validate_create_team(fake_create(), team);
+            assert!(is_valid(&result));
+        }
+    }
+
+    #[test]
+    fn team_every_status_variant_passes() {
+        let variants = vec![
+            TeamStatus::Forming,
+            TeamStatus::Active,
+            TeamStatus::OnBreak,
+            TeamStatus::Disbanded,
+        ];
+        for variant in variants {
+            let mut team = make_team();
+            team.status = variant;
+            let result = validate_create_team(fake_create(), team);
+            assert!(is_valid(&result));
+        }
+    }
+
+    // ========================================================================
+    // ASSIGNMENT VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_assignment_passes() {
+        let result = validate_create_assignment(fake_create(), make_assignment());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn assignment_empty_objective_rejected() {
+        let mut assignment = make_assignment();
+        assignment.objective = "".into();
+        let result = validate_create_assignment(fake_create(), assignment);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Assignment objective cannot be empty"
+        );
+    }
+
+    #[test]
+    fn assignment_whitespace_only_objective_passes() {
+        // The validation uses is_empty(), not trim().is_empty()
+        let mut assignment = make_assignment();
+        assignment.objective = "   ".into();
+        let result = validate_create_assignment(fake_create(), assignment);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn assignment_every_status_variant_passes() {
+        let variants = vec![
+            AssignmentStatus::Active,
+            AssignmentStatus::Completed,
+            AssignmentStatus::Cancelled,
+            AssignmentStatus::Reassigned,
+        ];
+        for variant in variants {
+            let mut assignment = make_assignment();
+            assignment.status = variant;
+            let result = validate_create_assignment(fake_create(), assignment);
+            assert!(is_valid(&result));
+        }
+    }
+
+    // ========================================================================
+    // SITREP VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_sitrep_passes() {
+        let result = validate_create_sitrep(fake_create(), make_sitrep());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn sitrep_empty_conditions_rejected() {
+        let mut sitrep = make_sitrep();
+        sitrep.conditions = "".into();
+        let result = validate_create_sitrep(fake_create(), sitrep);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "SITREP conditions cannot be empty"
+        );
+    }
+
+    #[test]
+    fn sitrep_whitespace_only_conditions_passes() {
+        // The validation uses is_empty(), not trim().is_empty()
+        let mut sitrep = make_sitrep();
+        sitrep.conditions = "  \t  ".into();
+        let result = validate_create_sitrep(fake_create(), sitrep);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn sitrep_zero_casualties_passes() {
+        let mut sitrep = make_sitrep();
+        sitrep.casualties_found = 0;
+        let result = validate_create_sitrep(fake_create(), sitrep);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn sitrep_empty_resources_and_hazards_passes() {
+        let mut sitrep = make_sitrep();
+        sitrep.resources_needed = vec![];
+        sitrep.hazards = vec![];
+        let result = validate_create_sitrep(fake_create(), sitrep);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn sitrep_every_access_status_passes() {
+        let variants = vec![
+            AccessStatus::Open,
+            AccessStatus::Restricted,
+            AccessStatus::Blocked,
+            AccessStatus::Hazardous,
+            AccessStatus::Flooded,
+            AccessStatus::Collapsed,
+        ];
+        for variant in variants {
+            let mut sitrep = make_sitrep();
+            sitrep.access_status = variant;
+            let result = validate_create_sitrep(fake_create(), sitrep);
+            assert!(is_valid(&result));
+        }
+    }
+
+    // ========================================================================
+    // CHECKPOINT VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_checkpoint_passes() {
+        let result = validate_create_checkpoint(fake_create(), make_checkpoint());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn checkpoint_lat_too_low_rejected() {
+        let mut cp = make_checkpoint();
+        cp.lat = -90.1;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Latitude must be between -90 and 90"
+        );
+    }
+
+    #[test]
+    fn checkpoint_lat_too_high_rejected() {
+        let mut cp = make_checkpoint();
+        cp.lat = 90.1;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Latitude must be between -90 and 90"
+        );
+    }
+
+    #[test]
+    fn checkpoint_lat_exactly_negative_90_passes() {
+        let mut cp = make_checkpoint();
+        cp.lat = -90.0;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn checkpoint_lat_exactly_90_passes() {
+        let mut cp = make_checkpoint();
+        cp.lat = 90.0;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn checkpoint_lat_zero_passes() {
+        let mut cp = make_checkpoint();
+        cp.lat = 0.0;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn checkpoint_lon_too_low_rejected() {
+        let mut cp = make_checkpoint();
+        cp.lon = -180.1;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Longitude must be between -180 and 180"
+        );
+    }
+
+    #[test]
+    fn checkpoint_lon_too_high_rejected() {
+        let mut cp = make_checkpoint();
+        cp.lon = 180.1;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Longitude must be between -180 and 180"
+        );
+    }
+
+    #[test]
+    fn checkpoint_lon_exactly_negative_180_passes() {
+        let mut cp = make_checkpoint();
+        cp.lon = -180.0;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn checkpoint_lon_exactly_180_passes() {
+        let mut cp = make_checkpoint();
+        cp.lon = 180.0;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn checkpoint_lon_zero_passes() {
+        let mut cp = make_checkpoint();
+        cp.lon = 0.0;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn checkpoint_battery_over_100_rejected() {
+        let mut cp = make_checkpoint();
+        cp.battery_level = Some(101);
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Battery level cannot exceed 100"
+        );
+    }
+
+    #[test]
+    fn checkpoint_battery_exactly_100_passes() {
+        let mut cp = make_checkpoint();
+        cp.battery_level = Some(100);
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn checkpoint_battery_zero_passes() {
+        let mut cp = make_checkpoint();
+        cp.battery_level = Some(0);
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn checkpoint_battery_none_passes() {
+        let mut cp = make_checkpoint();
+        cp.battery_level = None;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn checkpoint_battery_max_u8_rejected() {
+        let mut cp = make_checkpoint();
+        cp.battery_level = Some(u8::MAX); // 255
+        let result = validate_create_checkpoint(fake_create(), cp);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn checkpoint_extreme_lat_lon_both_out_of_range() {
+        let mut cp = make_checkpoint();
+        cp.lat = 999.0;
+        cp.lon = 999.0;
+        let result = validate_create_checkpoint(fake_create(), cp);
+        // Lat check comes first
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Latitude must be between -90 and 90"
+        );
+    }
+
+    #[test]
+    fn checkpoint_every_agent_status_passes() {
+        let variants = vec![
+            AgentStatus::Active,
+            AgentStatus::NeedsRelief,
+            AgentStatus::Injured,
+            AgentStatus::Evacuating,
+        ];
+        for variant in variants {
+            let mut cp = make_checkpoint();
+            cp.status = variant;
+            let result = validate_create_checkpoint(fake_create(), cp);
+            assert!(is_valid(&result));
+        }
+    }
+
+    #[test]
+    fn checkpoint_every_connectivity_status_passes() {
+        let variants = vec![
+            ConnectivityStatus::Online,
+            ConnectivityStatus::Intermittent,
+            ConnectivityStatus::Offline,
+        ];
+        for variant in variants {
+            let mut cp = make_checkpoint();
+            cp.connectivity = variant;
+            let result = validate_create_checkpoint(fake_create(), cp);
+            assert!(is_valid(&result));
+        }
+    }
+}
