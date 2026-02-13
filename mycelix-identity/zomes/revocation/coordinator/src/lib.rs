@@ -31,6 +31,15 @@ pub fn revoke_credential(input: RevokeInput) -> ExternResult<Record> {
         return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
     }
 
+    // Verify caller is the issuer
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.issuer_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the credential issuer can revoke it".into()
+        )));
+    }
+
     let now = sys_time()?;
 
     let entry = RevocationEntry {
@@ -92,6 +101,15 @@ pub fn suspend_credential(input: SuspendInput) -> ExternResult<Record> {
         return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
     }
 
+    // Verify caller is the issuer
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.issuer_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the credential issuer can suspend it".into()
+        )));
+    }
+
     let now = sys_time()?;
 
     let entry = RevocationEntry {
@@ -142,6 +160,15 @@ pub fn reinstate_credential(input: ReinstateInput) -> ExternResult<Record> {
     }
     if input.reason.is_empty() || input.reason.len() > 4096 {
         return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
+    }
+
+    // Verify caller is the issuer
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.issuer_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the credential issuer can reinstate it".into()
+        )));
     }
 
     // Find the current revocation entry

@@ -4602,3 +4602,259 @@ async fn test_bridge_did_deactivation_propagates_to_events() {
         "Event payload should contain the deactivation reason"
     );
 }
+
+// ============================================================================
+// Multi-Agent Tests
+// ============================================================================
+
+#[cfg(test)]
+mod multi_agent_tests {
+    use super::*;
+
+    /// Two agents: Alice issues a trust credential for Bob, Bob queries it.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_two_agent_trust_credential_issuance() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        let alice_app = conductor.setup_app("alice", &[dna.clone()]).await.unwrap();
+        let alice_cell = alice_app.cells()[0].clone();
+        let alice_key = alice_app.agent().clone();
+
+        let bob_app = conductor.setup_app("bob", &[dna]).await.unwrap();
+        let bob_cell = bob_app.cells()[0].clone();
+        let bob_key = bob_app.agent().clone();
+
+        // Alice creates her DID
+        let _alice_did_record: Record = conductor
+            .call(&alice_cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        // Bob creates his DID
+        let bob_did_record: Record = conductor
+            .call(&bob_cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        let bob_did: DidDocument =
+            decode_entry(&bob_did_record).expect("decode Bob's DID");
+
+        let alice_did_str = format!("did:mycelix:{}", alice_key);
+        let bob_did_str = format!("did:mycelix:{}", bob_key);
+
+        // Alice issues a trust credential for Bob
+        let issue_input = IssueTrustCredentialInput {
+            subject_did: bob_did_str.clone(),
+            issuer_did: alice_did_str.clone(),
+            kvector_commitment: vec![0xAA; 32],
+            range_proof: vec![0xBB; 64],
+            trust_score_lower: 0.6,
+            trust_score_upper: 0.8,
+            expires_at: None,
+            supersedes: None,
+        };
+
+        let cred_record: Record = conductor
+            .call(
+                &alice_cell.zome("trust_credential"),
+                "issue_trust_credential",
+                issue_input,
+            )
+            .await;
+
+        let cred: TrustCredential =
+            decode_entry(&cred_record).expect("decode trust credential");
+
+        assert_eq!(cred.issuer_did, alice_did_str, "Issuer should be Alice");
+        assert_eq!(cred.subject_did, bob_did_str, "Subject should be Bob");
+        assert!(!cred.revoked, "Credential should not be revoked");
+
+        // Bob queries credentials for his DID
+        let creds: Vec<Record> = conductor
+            .call(
+                &bob_cell.zome("trust_credential"),
+                "get_credentials_for_subject",
+                bob_did_str.clone(),
+            )
+            .await;
+
+        assert!(
+            !creds.is_empty(),
+            "Bob should see the credential issued by Alice"
+        );
+    }
+
+    /// Bob tries to revoke Alice's credential — should fail with capability guard.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_cross_agent_revocation_rejected() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        let alice_app = conductor.setup_app("alice", &[dna.clone()]).await.unwrap();
+        let alice_cell = alice_app.cells()[0].clone();
+        let alice_key = alice_app.agent().clone();
+
+        let bob_app = conductor.setup_app("bob", &[dna]).await.unwrap();
+        let bob_cell = bob_app.cells()[0].clone();
+
+        // Alice creates DID and issues a credential to herself (self-attestation)
+        let _: Record = conductor
+            .call(&alice_cell.zome("did_registry"), "create_did", ())
+            .await;
+        let _: Record = conductor
+            .call(&bob_cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        let alice_did = format!("did:mycelix:{}", alice_key);
+
+        // Alice issues a revocation entry
+        let revoke_input = RevokeInput {
+            credential_id: "test-cred-1".to_string(),
+            issuer_did: alice_did.clone(),
+            reason: "Testing revocation".to_string(),
+            effective_from: None,
+        };
+
+        let _: Record = conductor
+            .call(
+                &alice_cell.zome("revocation"),
+                "revoke_credential",
+                revoke_input,
+            )
+            .await;
+
+        // Bob tries to revoke with Alice's DID — should fail
+        let bob_revoke = RevokeInput {
+            credential_id: "test-cred-2".to_string(),
+            issuer_did: alice_did.clone(),
+            reason: "Bob trying to impersonate Alice".to_string(),
+            effective_from: None,
+        };
+
+        let result: Result<Record, _> = conductor
+            .call_fallible(
+                &bob_cell.zome("revocation"),
+                "revoke_credential",
+                bob_revoke,
+            )
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Bob should NOT be able to revoke credentials as Alice"
+        );
+    }
+
+    /// Unauthorized agent tries to create academic credential — should fail.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_unauthorized_academic_credential_rejected() {
+        // Mirror types needed only for this test
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        enum DegreeType { Bachelor, Master, Doctorate, Associate, Certificate, Diploma }
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct InstitutionalIssuer {
+            id: String, name: String, issuer_type: Vec<String>,
+            image: Option<String>, location: Option<String>, accreditation: Option<String>,
+        }
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct AcademicSubject {
+            id: String, name: String, student_id: Option<String>,
+        }
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct AcademicProof {
+            #[serde(rename = "type")]
+            type_: String, created: String, verification_method: String, proof_value: String,
+        }
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct AchievementMetadata {
+            name: String, description: String, degree_type: DegreeType,
+            field_of_study: String, credits_earned: Option<u32>, gpa: Option<String>,
+        }
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct DnsDid {
+            domain: String, did_document_url: String,
+        }
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct CreateAcademicCredentialInput {
+            issuer: InstitutionalIssuer, subject: AcademicSubject,
+            achievement: AchievementMetadata, dns_did: DnsDid,
+            revocation_registry_id: String, valid_from: String,
+            valid_until: Option<String>, proof: AcademicProof,
+        }
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct CreateAcademicCredentialOutput { credential_id: String }
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        let alice_app = conductor.setup_app("alice", &[dna.clone()]).await.unwrap();
+        let alice_cell = alice_app.cells()[0].clone();
+        let alice_key = alice_app.agent().clone();
+
+        let bob_app = conductor.setup_app("bob", &[dna]).await.unwrap();
+        let bob_cell = bob_app.cells()[0].clone();
+
+        // Both create DIDs
+        let _: Record = conductor
+            .call(&alice_cell.zome("did_registry"), "create_did", ())
+            .await;
+        let _: Record = conductor
+            .call(&bob_cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        // Bob tries to create a credential claiming to be Alice's institution
+        let alice_did = format!("did:mycelix:{}", alice_key);
+
+        let bad_input = CreateAcademicCredentialInput {
+            issuer: InstitutionalIssuer {
+                id: alice_did.clone(),
+                name: "Fake University".to_string(),
+                issuer_type: vec!["University".to_string()],
+                image: None,
+                location: None,
+                accreditation: None,
+            },
+            subject: AcademicSubject {
+                id: "did:mycelix:mallory".to_string(),
+                name: "Mallory".to_string(),
+                student_id: Some("S999".to_string()),
+            },
+            achievement: AchievementMetadata {
+                name: "Fake Degree".to_string(),
+                description: "Not real".to_string(),
+                degree_type: DegreeType::Bachelor,
+                field_of_study: "Deception".to_string(),
+                credits_earned: Some(120),
+                gpa: Some("4.0".to_string()),
+            },
+            dns_did: DnsDid {
+                domain: "fake.edu".to_string(),
+                did_document_url: "https://fake.edu/.well-known/did.json".to_string(),
+            },
+            revocation_registry_id: "rev-reg-1".to_string(),
+            valid_from: "2026-01-01T00:00:00Z".to_string(),
+            valid_until: None,
+            proof: AcademicProof {
+                type_: "Ed25519Signature2020".to_string(),
+                created: "2026-01-01T00:00:00Z".to_string(),
+                verification_method: format!("{}#key-1", alice_did),
+                proof_value: "fake-proof".to_string(),
+            },
+        };
+
+        let result: Result<CreateAcademicCredentialOutput, _> = conductor
+            .call_fallible(
+                &bob_cell.zome("education"),
+                "create_academic_credential",
+                bad_input,
+            )
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Bob should NOT be able to issue credentials as Alice's institution"
+        );
+    }
+}

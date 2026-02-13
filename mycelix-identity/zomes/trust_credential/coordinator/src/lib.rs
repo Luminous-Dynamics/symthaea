@@ -35,7 +35,15 @@ pub fn issue_trust_credential(input: IssueTrustCredentialInput) -> ExternResult<
     }
     let now = sys_time()?;
     let cred_id = format!("trust-cred:{}:{}", input.subject_did, now.as_micros());
-    let _caller = agent_info()?.agent_initial_pubkey;
+    let caller = agent_info()?.agent_initial_pubkey;
+
+    // Verify caller is the issuer
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.issuer_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the issuer can issue trust credentials".into()
+        )));
+    }
 
     // Determine trust tier from the proven range
     let mid_score = (input.trust_score_lower + input.trust_score_upper) / 2.0;
@@ -203,6 +211,15 @@ pub fn revoke_credential(input: RevokeCredentialInput) -> ExternResult<Record> {
             "Active credential not found".into()
         ))),
     };
+
+    // Verify caller is the issuer of this credential
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if credential.issuer_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the credential issuer can revoke it".into()
+        )));
+    }
 
     // Update credential as revoked
     credential.revoked = true;

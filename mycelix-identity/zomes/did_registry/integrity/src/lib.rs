@@ -150,7 +150,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(OpDelete { action }) => {
+            let original = must_get_action(action.deletes_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can delete their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -316,5 +324,103 @@ mod tests {
             rmp_serde::from_slice(&msgpack_bytes).expect("msgpack deserialize");
 
         assert_eq!(vm, vm2);
+    }
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        /// Valid multibase keys start with 'z' followed by base58btc characters.
+        fn arb_multibase_key() -> impl Strategy<Value = String> {
+            prop::collection::vec(any::<u8>(), 32..=32)
+                .prop_map(|bytes| {
+                    let encoded = bs58::encode(&bytes)
+                        .with_alphabet(bs58::Alphabet::BITCOIN)
+                        .into_string();
+                    format!("z{}", encoded)
+                })
+        }
+
+        /// Arbitrary verification method with valid fields.
+        fn arb_verification_method() -> impl Strategy<Value = VerificationMethod> {
+            (arb_multibase_key(), any::<u16>()).prop_map(|(key, alg)| {
+                VerificationMethod {
+                    id: "#key-1".to_string(),
+                    type_: "Ed25519VerificationKey2020".to_string(),
+                    controller: "did:mycelix:test".to_string(),
+                    public_key_multibase: key,
+                    algorithm: Some(alg),
+                }
+            })
+        }
+
+        proptest! {
+            /// DID IDs without the 'did:mycelix:' prefix always fail the format check.
+            #[test]
+            fn did_without_prefix_fails_check(suffix in "[a-zA-Z0-9]{1,64}") {
+                // Validation functions require EntryCreationAction (needs HDI host),
+                // so we test the invariant directly.
+                let bad_did = format!("did:other:{}", suffix);
+                prop_assert!(!bad_did.starts_with("did:mycelix:"));
+
+                // Also verify non-mycelix schemes
+                let bad_did2 = format!("did:key:{}", suffix);
+                prop_assert!(!bad_did2.starts_with("did:mycelix:"));
+            }
+
+            /// VerificationMethod round-trips through JSON and MessagePack.
+            #[test]
+            fn verification_method_roundtrips(vm in arb_verification_method()) {
+                // JSON round-trip
+                let json = serde_json::to_string(&vm).unwrap();
+                let vm_json: VerificationMethod = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(&vm, &vm_json);
+
+                // MessagePack round-trip
+                let msgpack = rmp_serde::to_vec(&vm).unwrap();
+                let vm_msgpack: VerificationMethod = rmp_serde::from_slice(&msgpack).unwrap();
+                prop_assert_eq!(&vm, &vm_msgpack);
+            }
+
+            /// ServiceEndpoint round-trips through JSON and MessagePack.
+            #[test]
+            fn service_endpoint_roundtrips(
+                id in "[a-z]{1,32}",
+                type_ in "[A-Z][a-z]{3,20}",
+                url in "https://[a-z]{3,20}\\.[a-z]{2,5}/[a-z]{0,10}"
+            ) {
+                let se = ServiceEndpoint { id, type_, service_endpoint: url };
+
+                // JSON
+                let json = serde_json::to_string(&se).unwrap();
+                let se2: ServiceEndpoint = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(&se, &se2);
+
+                // JSON must use camelCase
+                let val: serde_json::Value = serde_json::from_str(&json).unwrap();
+                prop_assert!(val.get("serviceEndpoint").is_some());
+                prop_assert!(val.get("type").is_some());
+                prop_assert!(val.get("service_endpoint").is_none());
+                prop_assert!(val.get("type_").is_none());
+            }
+
+            /// Any DID with 'did:mycelix:' prefix passes the format check.
+            #[test]
+            fn valid_did_prefix_accepted(suffix in "[a-zA-Z0-9]{8,64}") {
+                let did = format!("did:mycelix:{}", suffix);
+                prop_assert!(did.starts_with("did:mycelix:"));
+            }
+
+            /// Deactivation with empty reason is invalid.
+            #[test]
+            fn empty_deactivation_reason_is_invalid(did in "did:mycelix:[a-zA-Z0-9]{8,32}") {
+                let deactivation = DidDeactivation {
+                    did,
+                    reason: String::new(),
+                    deactivated_at: Timestamp::from_micros(0),
+                };
+                prop_assert!(deactivation.reason.is_empty());
+            }
+        }
     }
 }

@@ -402,6 +402,15 @@ pub fn vote_on_recovery(input: VoteOnRecoveryInput) -> ExternResult<Record> {
         }
     }
 
+    // Verify caller is the claimed trustee
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.trustee_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Caller must be the claimed trustee".into()
+        )));
+    }
+
     // Verify voter has sufficient MFA assurance
     if !verify_mfa_assurance_for_recovery(&input.trustee_did)? {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -730,6 +739,15 @@ pub fn execute_recovery(request_id: String) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Invalid recovery request".into()
         )))?;
+
+    // Verify caller is the designated new agent or the recovery initiator
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if caller != current_request.new_agent && caller_did != current_request.initiated_by {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the designated new agent or recovery initiator can execute recovery".into()
+        )));
+    }
 
     // Verify status allows execution
     if current_request.status != RecoveryStatus::Approved
