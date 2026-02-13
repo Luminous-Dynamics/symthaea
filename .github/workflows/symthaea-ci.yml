@@ -96,6 +96,8 @@ jobs:
         run: cargo test --workspace --lib
         env:
           RUST_BACKTRACE: 1
+      - name: Run doc tests
+        run: cargo test --workspace --doc
 
   features:
     name: Feature Matrix
