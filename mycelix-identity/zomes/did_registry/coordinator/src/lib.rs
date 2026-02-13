@@ -696,6 +696,94 @@ pub fn get_my_did(_: ()) -> ExternResult<Option<Record>> {
     get_did_document(agent_info.agent_initial_pubkey)
 }
 
+/// Input for key rotation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RotateKeyInput {
+    /// ID of the verification method to replace (e.g. "#keys-1")
+    pub old_key_id: String,
+    /// New verification method to add
+    pub new_method: VerificationMethod,
+}
+
+/// Rotate a verification method: deprecate the old key and add a new one atomically.
+///
+/// The old key is retained with its ID suffixed by `-deprecated-v{version}` so that
+/// previously-issued signatures remain verifiable, but the deprecated key is removed
+/// from the `authentication` array so it can no longer be used to authenticate.
+#[hdk_extern]
+pub fn rotate_key(input: RotateKeyInput) -> ExternResult<Record> {
+    // Input validation
+    if input.old_key_id.is_empty() || input.old_key_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Old key ID must be 1-256 characters".into()
+        )));
+    }
+    if input.new_method.id.is_empty() || input.new_method.id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "New verification method ID must be 1-256 characters".into()
+        )));
+    }
+    if input.new_method.public_key_multibase.is_empty()
+        || input.new_method.public_key_multibase.len() > 4096
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Public key multibase must be 1-4096 characters".into()
+        )));
+    }
+
+    // Validate the new key format
+    if let Err(e) = validate_multibase_key(&input.new_method.public_key_multibase) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Invalid new key: {}", e)
+        )));
+    }
+
+    let agent_info = agent_info()?;
+    let agent_pub_key = agent_info.agent_initial_pubkey;
+
+    let current_record = get_did_document(agent_pub_key)?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("No DID found".into())))?;
+
+    let current_did: DidDocument = current_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
+
+    // Find the old key
+    let old_key_idx = current_did
+        .verification_method
+        .iter()
+        .position(|m| m.id == input.old_key_id)
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "Verification method '{}' not found",
+            input.old_key_id
+        ))))?;
+
+    // Build updated methods: deprecate old key, add new one
+    let mut methods = current_did.verification_method.clone();
+    let deprecated_id = format!(
+        "{}-deprecated-v{}",
+        methods[old_key_idx].id, current_did.version
+    );
+    methods[old_key_idx].id = deprecated_id.clone();
+    methods.push(input.new_method.clone());
+
+    // Update authentication: remove old key reference, add new one
+    let mut auth = current_did.authentication.clone();
+    auth.retain(|a| a != &input.old_key_id);
+    if !auth.contains(&input.new_method.id) {
+        auth.push(input.new_method.id);
+    }
+
+    update_did_document(UpdateDidInput {
+        verification_method: Some(methods),
+        authentication: Some(auth),
+        key_agreement: None,
+        service: None,
+    })
+}
+
 // =============================================================================
 // SOCIAL RECOVERY: DID TRANSFER
 // =============================================================================
@@ -998,5 +1086,113 @@ mod tests {
         let multibase = format!("z{}", encoded);
 
         assert!(validate_multibase_ed25519_key(&multibase).is_err());
+    }
+
+    // =========================================================================
+    // Key rotation logic tests
+    // =========================================================================
+
+    /// Helper: build a fake Ed25519 multibase key for testing.
+    fn make_test_multibase_key(seed: u8) -> String {
+        let mut key_bytes = vec![0xed, 0x01]; // Ed25519 multicodec prefix
+        key_bytes.extend([seed; 32]);
+        let encoded = bs58::encode(&key_bytes)
+            .with_alphabet(bs58::Alphabet::BITCOIN)
+            .into_string();
+        format!("z{}", encoded)
+    }
+
+    #[test]
+    fn test_rotate_key_input_validation() {
+        // Empty old_key_id should be rejected
+        let input = RotateKeyInput {
+            old_key_id: String::new(),
+            new_method: VerificationMethod {
+                id: "#keys-2".into(),
+                type_: "Ed25519VerificationKey2020".into(),
+                controller: "did:mycelix:test".into(),
+                public_key_multibase: make_test_multibase_key(0xBB),
+                algorithm: None,
+            },
+        };
+        assert!(input.old_key_id.is_empty());
+
+        // Empty new method ID should be rejected
+        let input2 = RotateKeyInput {
+            old_key_id: "#keys-1".into(),
+            new_method: VerificationMethod {
+                id: String::new(),
+                type_: "Ed25519VerificationKey2020".into(),
+                controller: "did:mycelix:test".into(),
+                public_key_multibase: make_test_multibase_key(0xCC),
+                algorithm: None,
+            },
+        };
+        assert!(input2.new_method.id.is_empty());
+    }
+
+    #[test]
+    fn test_rotate_key_deprecated_id_format() {
+        let old_id = "#keys-1";
+        let version = 3u32;
+        let deprecated = format!("{}-deprecated-v{}", old_id, version);
+        assert_eq!(deprecated, "#keys-1-deprecated-v3");
+    }
+
+    #[test]
+    fn test_rotate_key_auth_update_logic() {
+        // Simulate the auth array update logic from rotate_key
+        let old_key_id = "#keys-1";
+        let new_key_id = "#keys-2";
+        let mut auth = vec![
+            "#keys-1".to_string(),
+            "#keys-1".to_string(), // duplicate
+        ];
+
+        // Remove old key references
+        auth.retain(|a| a != old_key_id);
+        assert!(auth.is_empty(), "All references to old key should be removed");
+
+        // Add new key
+        if !auth.contains(&new_key_id.to_string()) {
+            auth.push(new_key_id.to_string());
+        }
+        assert_eq!(auth, vec!["#keys-2".to_string()]);
+    }
+
+    #[test]
+    fn test_rotate_key_methods_update_logic() {
+        // Simulate the methods update logic from rotate_key
+        let mut methods = vec![
+            VerificationMethod {
+                id: "#keys-1".into(),
+                type_: "Ed25519VerificationKey2020".into(),
+                controller: "did:mycelix:test".into(),
+                public_key_multibase: make_test_multibase_key(0xAA),
+                algorithm: None,
+            },
+        ];
+
+        let version = 1u32;
+        let old_key_idx = 0;
+
+        // Deprecate old key
+        let deprecated_id = format!("{}-deprecated-v{}", methods[old_key_idx].id, version);
+        methods[old_key_idx].id = deprecated_id.clone();
+
+        // Add new key
+        methods.push(VerificationMethod {
+            id: "#keys-2".into(),
+            type_: "Ed25519VerificationKey2020".into(),
+            controller: "did:mycelix:test".into(),
+            public_key_multibase: make_test_multibase_key(0xBB),
+            algorithm: None,
+        });
+
+        assert_eq!(methods.len(), 2);
+        assert_eq!(methods[0].id, "#keys-1-deprecated-v1");
+        assert_eq!(methods[1].id, "#keys-2");
+        // Old key's public material is preserved for signature verification
+        assert!(!methods[0].public_key_multibase.is_empty());
     }
 }

@@ -14,11 +14,12 @@ use crate::traits::Encryptor;
 use chacha20poly1305::aead::{Aead, KeyInit, OsRng};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
 use chacha20poly1305::aead::AeadCore;
+use zeroize::Zeroizing;
 
 /// XChaCha20-Poly1305 encryptor with a pre-shared key.
 pub struct XChaCha20Encryptor {
-    /// 32-byte symmetric key (typically derived from KEM shared secret)
-    key: Vec<u8>,
+    /// 32-byte symmetric key (typically derived from KEM shared secret). Zeroized on drop.
+    key: Zeroizing<Vec<u8>>,
     /// KEM algorithm used to derive the key (for EncryptedEnvelope metadata)
     kem_algorithm: AlgorithmId,
     /// KEM ciphertext to include in envelope
@@ -42,7 +43,7 @@ impl XChaCha20Encryptor {
             )));
         }
         Ok(Self {
-            key: shared_secret[..32].to_vec(),
+            key: Zeroizing::new(shared_secret[..32].to_vec()),
             kem_algorithm,
             encapsulated_key,
         })
@@ -51,7 +52,7 @@ impl XChaCha20Encryptor {
     /// Create from a raw 32-byte symmetric key (for self-encryption without KEM).
     pub fn from_raw_key(key: &[u8; 32]) -> Self {
         Self {
-            key: key.to_vec(),
+            key: Zeroizing::new(key.to_vec()),
             kem_algorithm: AlgorithmId::XChaCha20Poly1305,
             encapsulated_key: Vec::new(),
         }

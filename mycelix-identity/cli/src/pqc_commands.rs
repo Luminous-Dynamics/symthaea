@@ -15,6 +15,7 @@ use mycelix_crypto::pqc::sphincs::{SlhDsaSha2128sSigner, SlhDsaSha2128sVerifier}
 use mycelix_crypto::traits::{Signer, Verifier};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Serialized key file format.
 #[derive(Debug, Serialize, Deserialize)]
@@ -70,7 +71,7 @@ fn parse_algorithm(name: &str) -> Result<AlgorithmId> {
 pub fn keygen(algorithm: &str, output: &Path) -> Result<()> {
     let alg = parse_algorithm(algorithm)?;
 
-    let (pub_key, pub_key_bytes, secret_bytes): (TaggedPublicKey, Vec<u8>, Vec<u8>) = match alg {
+    let (pub_key, pub_key_bytes, secret_bytes): (TaggedPublicKey, Vec<u8>, Zeroizing<Vec<u8>>) = match alg {
         AlgorithmId::Ed25519 => {
             let s = Ed25519Signer::generate();
             let pk = s.public_key();
@@ -114,12 +115,20 @@ pub fn keygen(algorithm: &str, output: &Path) -> Result<()> {
         algorithm_id: alg.as_u16(),
         public_key: pub_key.to_multibase(),
         public_key_bytes: BASE64.encode(&pub_key_bytes),
-        secret_key_bytes: BASE64.encode(&secret_bytes),
+        secret_key_bytes: BASE64.encode(secret_bytes.as_slice()),
         created_at: Utc::now().to_rfc3339(),
     };
 
-    let json = serde_json::to_string_pretty(&key_file)?;
-    std::fs::write(output, &json).context("Failed to write key file")?;
+    let json = Zeroizing::new(serde_json::to_string_pretty(&key_file)?);
+    std::fs::write(output, json.as_bytes()).context("Failed to write key file")?;
+
+    // Set key file permissions to owner-only (0600)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(output, std::fs::Permissions::from_mode(0o600))
+            .context("Failed to set key file permissions to 0600")?;
+    }
 
     println!("Generated {} keypair", key_file.algorithm);
     println!("  Public key: {}", key_file.public_key);
@@ -137,20 +146,24 @@ fn load_signer(key_path: &Path) -> Result<Box<dyn Signer>> {
     let alg = AlgorithmId::from_u16(key_file.algorithm_id)
         .with_context(|| format!("Unknown algorithm_id: {}", key_file.algorithm_id))?;
 
-    let sk_bytes = BASE64
-        .decode(&key_file.secret_key_bytes)
-        .context("Failed to decode secret_key_bytes")?;
+    let sk_bytes = Zeroizing::new(
+        BASE64
+            .decode(&key_file.secret_key_bytes)
+            .context("Failed to decode secret_key_bytes")?,
+    );
     let pk_bytes = BASE64
         .decode(&key_file.public_key_bytes)
         .context("Failed to decode public_key_bytes")?;
 
     match alg {
         AlgorithmId::Ed25519 => {
-            let sk: [u8; 32] = sk_bytes
+            let mut sk: [u8; 32] = sk_bytes
                 .as_slice()
                 .try_into()
                 .context("Ed25519 secret key must be 32 bytes")?;
-            Ok(Box::new(Ed25519Signer::from_bytes(&sk)))
+            let signer = Ed25519Signer::from_bytes(&sk);
+            sk.zeroize();
+            Ok(Box::new(signer))
         }
         AlgorithmId::MlDsa65 => {
             Ok(Box::new(MlDsa65Signer::from_bytes(&pk_bytes, &sk_bytes)?))

@@ -587,7 +587,7 @@ jobs:
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity/crates/mycelix-crypto && cargo check --target wasm32-unknown-unknown --features wasm"
 
-      - name: Identity unit tests (250+ tests)
+      - name: Identity unit tests (261 tests)
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo test --lib -- --test-threads=1"
 
@@ -1029,6 +1029,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Suite | Tests | Description |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|-------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Identity unit tests | 261 | DID registry, VC lifecycle, revocation, MFA, bridge, education, trust, crypto types |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Identity | 4 | DID registration, profile updates, trust attestations |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest Identity PQC** | 6 | Hybrid signatures, ML-KEM key agreement, PQC verification methods |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest MFA Identity** | 7 | MFA state, factor enrollment, assurance levels, FL eligibility |" >> $GITHUB_STEP_SUMMARY

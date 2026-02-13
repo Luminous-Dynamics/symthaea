@@ -748,4 +748,93 @@ mod tests {
         let restored: CreateRevocationListInput = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "list:issuer:2026");
     }
+
+    // --- Credential lifecycle: suspension → revocation precedence ---
+
+    #[test]
+    fn revoked_is_terminal_ignores_suspension_end() {
+        // Once revoked, even if suspension_end exists, status stays Revoked
+        let result = resolve_suspension_status(
+            &RevocationStatus::Revoked,
+            Some(0), // long expired end time
+            999_999_999_999,
+        );
+        assert_eq!(result, RevocationStatus::Revoked);
+    }
+
+    #[test]
+    fn active_ignores_suspension_end() {
+        // Active status is not affected by suspension_end
+        let result = resolve_suspension_status(
+            &RevocationStatus::Active,
+            Some(500_000_000_000),
+            1_000_000_000_000,
+        );
+        assert_eq!(result, RevocationStatus::Active);
+    }
+
+    #[test]
+    fn suspended_just_before_end_stays_suspended() {
+        let end = 1_000_000_000_000i64;
+        let result = resolve_suspension_status(
+            &RevocationStatus::Suspended,
+            Some(end),
+            end - 1, // 1 microsecond before end
+        );
+        assert_eq!(result, RevocationStatus::Suspended);
+    }
+
+    // --- Batch input type serde ---
+
+    #[test]
+    fn batch_suspend_input_serde() {
+        let input = BatchSuspendInput {
+            credential_ids: vec!["cred:1".into(), "cred:2".into()],
+            issuer_did: "did:mycelix:issuer".into(),
+            reason: "Under investigation".into(),
+            suspension_end: Timestamp::from_micros(2_000_000_000_000_000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let restored: BatchSuspendInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.credential_ids.len(), 2);
+        assert_eq!(restored.reason, "Under investigation");
+    }
+
+    #[test]
+    fn suspend_input_serde() {
+        let input = SuspendInput {
+            credential_id: "cred:abc".into(),
+            issuer_did: "did:mycelix:uni".into(),
+            reason: "Degree audit".into(),
+            suspension_end: Timestamp::from_micros(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let restored: SuspendInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.credential_id, "cred:abc");
+    }
+
+    #[test]
+    fn reinstate_input_serde() {
+        let input = ReinstateInput {
+            credential_id: "cred:abc".into(),
+            issuer_did: "did:mycelix:uni".into(),
+            reason: "Audit cleared".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let restored: ReinstateInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.credential_id, "cred:abc");
+        assert_eq!(restored.reason, "Audit cleared");
+    }
+
+    #[test]
+    fn batch_item_error_serde() {
+        let error = BatchItemError {
+            credential_id: "cred:fail".into(),
+            error: "Not found in DHT".into(),
+        };
+        let json = serde_json::to_string(&error).unwrap();
+        let restored: BatchItemError = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.credential_id, "cred:fail");
+        assert_eq!(restored.error, "Not found in DHT");
+    }
 }

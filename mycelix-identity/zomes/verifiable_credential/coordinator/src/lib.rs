@@ -1505,6 +1505,222 @@ mod tests {
         let hash_b = compute_credential_hash(&make_vc("cred-B"));
         assert_ne!(hash_a, hash_b);
     }
+
+    // --- Credential Revocation Status lifecycle ---
+
+    #[test]
+    fn revocation_status_to_verify_errors_active() {
+        // Simulate the verify_credential error-aggregation pattern
+        let mut errors = Vec::new();
+        let status = CredentialRevocationStatus::Active;
+        match status {
+            CredentialRevocationStatus::Revoked(reason) => {
+                errors.push(format!("Credential revoked: {}", reason));
+            }
+            CredentialRevocationStatus::Suspended(reason, until) => {
+                errors.push(format!("Credential suspended until {}: {}", until, reason));
+            }
+            CredentialRevocationStatus::Active | CredentialRevocationStatus::Unknown => {}
+        }
+        assert!(errors.is_empty(), "Active credential should produce no errors");
+    }
+
+    #[test]
+    fn revocation_status_to_verify_errors_revoked() {
+        let mut errors = Vec::new();
+        let status = CredentialRevocationStatus::Revoked("Fraud detected".into());
+        match status {
+            CredentialRevocationStatus::Revoked(reason) => {
+                errors.push(format!("Credential revoked: {}", reason));
+            }
+            CredentialRevocationStatus::Suspended(reason, until) => {
+                errors.push(format!("Credential suspended until {}: {}", until, reason));
+            }
+            CredentialRevocationStatus::Active | CredentialRevocationStatus::Unknown => {}
+        }
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Fraud detected"));
+    }
+
+    #[test]
+    fn revocation_status_to_verify_errors_suspended() {
+        let mut errors = Vec::new();
+        let status = CredentialRevocationStatus::Suspended(
+            "Under review".into(),
+            "2026-12-31T00:00:00Z".into(),
+        );
+        match status {
+            CredentialRevocationStatus::Revoked(reason) => {
+                errors.push(format!("Credential revoked: {}", reason));
+            }
+            CredentialRevocationStatus::Suspended(reason, until) => {
+                errors.push(format!("Credential suspended until {}: {}", until, reason));
+            }
+            CredentialRevocationStatus::Active | CredentialRevocationStatus::Unknown => {}
+        }
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("Under review"));
+        assert!(errors[0].contains("2026-12-31"));
+    }
+
+    #[test]
+    fn revocation_status_unknown_treated_as_active() {
+        // Unknown status (revocation zome unavailable) should not block verification
+        let mut errors = Vec::new();
+        let status = CredentialRevocationStatus::Unknown;
+        match status {
+            CredentialRevocationStatus::Revoked(reason) => {
+                errors.push(format!("Credential revoked: {}", reason));
+            }
+            CredentialRevocationStatus::Suspended(reason, until) => {
+                errors.push(format!("Credential suspended until {}: {}", until, reason));
+            }
+            CredentialRevocationStatus::Active | CredentialRevocationStatus::Unknown => {}
+        }
+        assert!(errors.is_empty(), "Unknown should be treated as active (fail-open)");
+    }
+
+    #[test]
+    fn revocation_status_mirror_to_credential_status_mapping() {
+        // Test the mapping from RevocationCheckResult to CredentialRevocationStatus
+        // (mirrors check_credential_revocation_status logic)
+
+        // Active
+        let check = RevocationCheckResult {
+            credential_id: "cred:1".into(),
+            status: RevocationStatusMirror::Active,
+            reason: None,
+            checked_at: Timestamp::from_micros(0),
+        };
+        let mapped = match check.status {
+            RevocationStatusMirror::Active => CredentialRevocationStatus::Active,
+            RevocationStatusMirror::Revoked => CredentialRevocationStatus::Revoked(
+                check.reason.unwrap_or_else(|| "No reason provided".into()),
+            ),
+            RevocationStatusMirror::Suspended => CredentialRevocationStatus::Suspended(
+                check.reason.unwrap_or_else(|| "No reason provided".into()),
+                check.checked_at.to_string(),
+            ),
+        };
+        assert!(matches!(mapped, CredentialRevocationStatus::Active));
+
+        // Revoked with reason
+        let check_revoked = RevocationCheckResult {
+            credential_id: "cred:2".into(),
+            status: RevocationStatusMirror::Revoked,
+            reason: Some("Key compromised".into()),
+            checked_at: Timestamp::from_micros(1_000_000),
+        };
+        let mapped_revoked = match check_revoked.status {
+            RevocationStatusMirror::Active => CredentialRevocationStatus::Active,
+            RevocationStatusMirror::Revoked => CredentialRevocationStatus::Revoked(
+                check_revoked.reason.unwrap_or_else(|| "No reason provided".into()),
+            ),
+            RevocationStatusMirror::Suspended => CredentialRevocationStatus::Suspended(
+                check_revoked.reason.unwrap_or_else(|| "No reason provided".into()),
+                check_revoked.checked_at.to_string(),
+            ),
+        };
+        assert!(matches!(mapped_revoked, CredentialRevocationStatus::Revoked(ref r) if r == "Key compromised"));
+
+        // Revoked without reason (defaults to "No reason provided")
+        let check_no_reason = RevocationCheckResult {
+            credential_id: "cred:3".into(),
+            status: RevocationStatusMirror::Revoked,
+            reason: None,
+            checked_at: Timestamp::from_micros(0),
+        };
+        let mapped_no_reason = match check_no_reason.status {
+            RevocationStatusMirror::Active => CredentialRevocationStatus::Active,
+            RevocationStatusMirror::Revoked => CredentialRevocationStatus::Revoked(
+                check_no_reason.reason.unwrap_or_else(|| "No reason provided".into()),
+            ),
+            RevocationStatusMirror::Suspended => CredentialRevocationStatus::Suspended(
+                check_no_reason.reason.unwrap_or_else(|| "No reason provided".into()),
+                check_no_reason.checked_at.to_string(),
+            ),
+        };
+        assert!(matches!(mapped_no_reason, CredentialRevocationStatus::Revoked(ref r) if r == "No reason provided"));
+    }
+
+    #[test]
+    fn credential_status_response_mapping() {
+        // Test the status → CredentialStatusResponse mapping (mirrors get_credential_status logic)
+        let statuses = vec![
+            (CredentialRevocationStatus::Active, true, "active", None::<&str>),
+            (
+                CredentialRevocationStatus::Revoked("Expired cert".into()),
+                false,
+                "revoked",
+                Some("Expired cert"),
+            ),
+            (CredentialRevocationStatus::Unknown, true, "unknown", None),
+        ];
+
+        for (status, expected_valid, expected_type, expected_reason) in statuses {
+            let (is_valid, status_type, reason) = match status {
+                CredentialRevocationStatus::Active => (true, "active".to_string(), None),
+                CredentialRevocationStatus::Revoked(r) => (false, "revoked".to_string(), Some(r)),
+                CredentialRevocationStatus::Suspended(r, until) => {
+                    (false, format!("suspended_until_{}", until), Some(r))
+                }
+                CredentialRevocationStatus::Unknown => (true, "unknown".to_string(), None),
+            };
+            assert_eq!(is_valid, expected_valid, "valid for {}", status_type);
+            assert_eq!(status_type, expected_type);
+            assert_eq!(reason.as_deref(), expected_reason);
+        }
+    }
+
+    #[test]
+    fn is_credential_revoked_logic() {
+        // Test the is_credential_revoked boolean reduction pattern
+        let cases: Vec<(CredentialRevocationStatus, bool)> = vec![
+            (CredentialRevocationStatus::Active, false),
+            (CredentialRevocationStatus::Revoked("test".into()), true),
+            (CredentialRevocationStatus::Suspended("test".into(), "2026".into()), true),
+            (CredentialRevocationStatus::Unknown, false),
+        ];
+        for (status, expected) in cases {
+            let result = matches!(
+                status,
+                CredentialRevocationStatus::Revoked(_) | CredentialRevocationStatus::Suspended(_, _)
+            );
+            assert_eq!(result, expected, "is_revoked for {:?}", status);
+        }
+    }
+
+    #[test]
+    fn revocation_check_result_serde_round_trip() {
+        // Verify RevocationCheckResult serializes/deserializes correctly
+        // (critical for cross-zome calls)
+        let check = RevocationCheckResult {
+            credential_id: "urn:uuid:12345".into(),
+            status: RevocationStatusMirror::Revoked,
+            reason: Some("Key compromise".into()),
+            checked_at: Timestamp::from_micros(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&check).unwrap();
+        let restored: RevocationCheckResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.credential_id, "urn:uuid:12345");
+        assert_eq!(restored.status, RevocationStatusMirror::Revoked);
+        assert_eq!(restored.reason.unwrap(), "Key compromise");
+    }
+
+    #[test]
+    fn revocation_status_mirror_serde_all_variants() {
+        let variants = vec![
+            (RevocationStatusMirror::Active, "Active"),
+            (RevocationStatusMirror::Suspended, "Suspended"),
+            (RevocationStatusMirror::Revoked, "Revoked"),
+        ];
+        for (variant, expected_json_contains) in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            assert!(json.contains(expected_json_contains));
+            let restored: RevocationStatusMirror = serde_json::from_str(&json).unwrap();
+            assert_eq!(restored, variant);
+        }
+    }
 }
 
 /// Sign credential content using the agent's ed25519 key

@@ -11,6 +11,7 @@ use crate::error::CryptoError;
 use crate::traits::{Signer, Verifier};
 use crate::pqc::ed25519_native::{Ed25519Signer, Ed25519Verifier};
 use crate::pqc::dilithium::{MlDsa65Signer, MlDsa65Verifier};
+use zeroize::Zeroizing;
 
 /// Hybrid signer that produces dual Ed25519 + ML-DSA-65 signatures.
 pub struct HybridSigner {
@@ -37,11 +38,11 @@ impl HybridSigner {
         self.mldsa65.public_key()
     }
 
-    /// Concatenated secret key bytes: Ed25519 (32) || ML-DSA-65 secret key.
-    pub fn secret_key_bytes(&self) -> Vec<u8> {
-        let mut buf = self.ed25519.secret_key_bytes();
-        buf.extend(self.mldsa65.secret_key_bytes());
-        buf
+    /// Concatenated secret key bytes: Ed25519 (32) || ML-DSA-65 secret key. Zeroized on drop.
+    pub fn secret_key_bytes(&self) -> Zeroizing<Vec<u8>> {
+        let mut buf = Vec::from(self.ed25519.secret_key_bytes().as_slice());
+        buf.extend(self.mldsa65.secret_key_bytes().as_slice());
+        Zeroizing::new(buf)
     }
 
     /// Create from concatenated secret key bytes + public key bytes.

@@ -10,6 +10,7 @@ use crate::traits::{Signer, Verifier};
 
 use pqcrypto_sphincsplus::sphincssha2128ssimple as sphincs_sha2;
 use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
+use zeroize::Zeroizing;
 
 /// SLH-DSA-SHA2-128s signer (SPHINCS+-SHA2-128s-simple).
 pub struct SlhDsaSha2128sSigner {
@@ -42,9 +43,9 @@ impl SlhDsaSha2128sSigner {
         })
     }
 
-    /// Raw secret key bytes.
-    pub fn secret_key_bytes(&self) -> Vec<u8> {
-        self.secret_key.as_bytes().to_vec()
+    /// Raw secret key bytes. Zeroized on drop.
+    pub fn secret_key_bytes(&self) -> Zeroizing<Vec<u8>> {
+        Zeroizing::new(self.secret_key.as_bytes().to_vec())
     }
 
     /// Raw public key bytes.

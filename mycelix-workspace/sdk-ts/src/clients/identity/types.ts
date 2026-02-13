@@ -130,40 +130,61 @@ export interface CredentialSchemaRef {
 
 /**
  * Credential status for revocation
+ *
+ * Wire format uses W3C VC Data Model camelCase field names.
  */
 export interface CredentialStatus {
   id: string;
-  status_type: string;
-  status_purpose?: string;
-  status_list_index?: string;
-  status_list_credential?: string;
+  /** W3C: "type" */
+  type: string;
+  /** W3C: "statusPurpose" */
+  statusPurpose?: string;
+  /** W3C: "statusListIndex" */
+  statusListIndex?: string;
+  /** W3C: "statusListCredential" */
+  statusListCredential?: string;
 }
 
 /**
  * Cryptographic proof
+ *
+ * Wire format uses W3C VC Data Model camelCase field names.
  */
 export interface CredentialProof {
-  proof_type: string;
+  /** W3C: "type" (was proof_type in Rust) */
+  type: string;
   created: string;
-  verification_method: string;
-  proof_purpose: string;
-  proof_value: string;
+  /** W3C: "verificationMethod" */
+  verificationMethod: string;
+  /** W3C: "proofPurpose" */
+  proofPurpose: string;
+  /** W3C: "proofValue" (multibase encoded) */
+  proofValue: string;
   cryptosuite?: string;
 }
 
 /**
  * W3C Verifiable Credential
+ *
+ * Wire format uses W3C VC Data Model camelCase field names.
  */
 export interface VerifiableCredential {
-  context: string[];
+  /** JSON-LD context */
+  '@context': string[];
   id: string;
-  credential_type: string[];
+  /** W3C: "type" (was credential_type in Rust) */
+  type: string[];
   issuer: CredentialIssuer;
-  valid_from: string;
-  valid_until?: string;
-  credential_subject: CredentialSubject;
-  credential_schema?: CredentialSchemaRef;
-  credential_status?: CredentialStatus;
+  /** W3C: "validFrom" */
+  validFrom: string;
+  /** W3C: "validUntil" */
+  validUntil?: string;
+  /** W3C: "credentialSubject" */
+  credentialSubject: CredentialSubject;
+  /** W3C: "credentialSchema" */
+  credentialSchema?: CredentialSchemaRef;
+  /** W3C: "credentialStatus" */
+  credentialStatus?: CredentialStatus;
   proof: CredentialProof;
   mycelix_schema_id: string;
   mycelix_created: Timestamp;
@@ -171,13 +192,18 @@ export interface VerifiableCredential {
 
 /**
  * Verifiable Presentation
+ *
+ * Wire format uses W3C VC Data Model camelCase field names.
  */
 export interface VerifiablePresentation {
-  context: string[];
+  /** JSON-LD context */
+  '@context': string[];
   id: string;
-  presentation_type: string[];
+  /** W3C: "type" (was presentation_type in Rust) */
+  type: string[];
   holder: string;
-  verifiable_credential: VerifiableCredential[];
+  /** W3C: "verifiableCredential" */
+  verifiableCredential: VerifiableCredential[];
   proof: CredentialProof;
   mycelix_created: Timestamp;
 }
@@ -200,7 +226,8 @@ export interface DerivedCredential {
  * Derivation proof for selective disclosure
  */
 export interface DerivationProof {
-  proof_type: string;
+  /** W3C: "type" (was proof_type in Rust) */
+  type: string;
   original_credential_hash: number[];
   claim_proofs: ClaimProof[];
   holder_signature: number[];
@@ -952,26 +979,39 @@ export interface AchievementMetadata {
 
 /**
  * Academic proof
+ *
+ * Wire format uses W3C VC Data Model camelCase field names.
  */
 export interface AcademicProof {
-  proof_type: string;
+  /** W3C: "type" */
+  type: string;
   created: string;
-  verification_method: string;
-  proof_purpose: string;
-  proof_value: string;
+  /** W3C: "verificationMethod" */
+  verificationMethod: string;
+  /** W3C: "proofPurpose" */
+  proofPurpose: string;
+  /** W3C: "proofValue" */
+  proofValue: string;
 }
 
 /**
  * Academic credential
+ *
+ * Wire format uses W3C VC Data Model camelCase field names.
  */
 export interface AcademicCredential {
-  context: string[];
+  /** JSON-LD context */
+  '@context': string[];
   id: string;
-  credential_type: string[];
+  /** W3C: "type" */
+  type: string[];
   issuer: InstitutionalIssuer;
-  valid_from: string;
-  valid_until?: string;
-  credential_subject: AcademicSubject;
+  /** W3C: "validFrom" */
+  validFrom: string;
+  /** W3C: "validUntil" */
+  validUntil?: string;
+  /** W3C: "credentialSubject" */
+  credentialSubject: AcademicSubject;
   proof: AcademicProof;
   zk_commitment: number[];
   commitment_nonce?: number[];

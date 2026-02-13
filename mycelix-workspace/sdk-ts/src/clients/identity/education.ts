@@ -129,11 +129,11 @@ export interface PublishCredentialAsClaimOutput {
  *   revocation_registry_id: 'university:revocation:2024',
  *   valid_from: '2024-05-15',
  *   proof: {
- *     proof_type: 'DataIntegrityProof',
+ *     type: 'DataIntegrityProof',
  *     created: new Date().toISOString(),
- *     verification_method: 'did:web:university.edu#key-1',
- *     proof_purpose: 'assertionMethod',
- *     proof_value: signatureValue,
+ *     verificationMethod: 'did:web:university.edu#key-1',
+ *     proofPurpose: 'assertionMethod',
+ *     proofValue: signatureValue,
  *   },
  * });
  *

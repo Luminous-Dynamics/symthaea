@@ -10,6 +10,7 @@ use crate::traits::{Signer, Verifier};
 use pqcrypto_dilithium::dilithium3;
 use pqcrypto_dilithium::dilithium5;
 use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
+use zeroize::Zeroizing;
 
 // ==================== ML-DSA-65 (Dilithium3) ====================
 
@@ -44,9 +45,9 @@ impl MlDsa65Signer {
         })
     }
 
-    /// Raw secret key bytes.
-    pub fn secret_key_bytes(&self) -> Vec<u8> {
-        self.secret_key.as_bytes().to_vec()
+    /// Raw secret key bytes. Zeroized on drop.
+    pub fn secret_key_bytes(&self) -> Zeroizing<Vec<u8>> {
+        Zeroizing::new(self.secret_key.as_bytes().to_vec())
     }
 
     /// Raw public key bytes.
@@ -142,9 +143,9 @@ impl MlDsa87Signer {
         })
     }
 
-    /// Raw secret key bytes.
-    pub fn secret_key_bytes(&self) -> Vec<u8> {
-        self.secret_key.as_bytes().to_vec()
+    /// Raw secret key bytes. Zeroized on drop.
+    pub fn secret_key_bytes(&self) -> Zeroizing<Vec<u8>> {
+        Zeroizing::new(self.secret_key.as_bytes().to_vec())
     }
 
     /// Raw public key bytes.

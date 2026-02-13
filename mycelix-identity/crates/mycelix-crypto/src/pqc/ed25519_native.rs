@@ -8,6 +8,7 @@ use crate::traits::{Signer, Verifier};
 use ed25519_dalek::{Signature, SigningKey, VerifyingKey};
 use ed25519_dalek::Signer as DalekSigner;
 use ed25519_dalek::Verifier as DalekVerifier;
+use zeroize::Zeroizing;
 
 /// Ed25519 signer backed by ed25519-dalek.
 pub struct Ed25519Signer {
@@ -30,9 +31,9 @@ impl Ed25519Signer {
         }
     }
 
-    /// Raw secret key bytes (32 bytes).
-    pub fn secret_key_bytes(&self) -> Vec<u8> {
-        self.signing_key.to_bytes().to_vec()
+    /// Raw secret key bytes (32 bytes). Zeroized on drop.
+    pub fn secret_key_bytes(&self) -> Zeroizing<Vec<u8>> {
+        Zeroizing::new(self.signing_key.to_bytes().to_vec())
     }
 }
 
