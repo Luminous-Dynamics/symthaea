@@ -26,6 +26,7 @@ use symthaea::dynamics::{
 };
 
 /// Tolerance for floating-point comparisons
+#[allow(dead_code)]
 const TOLERANCE: f32 = 1e-4;
 
 /// Extended tolerance for accumulated operations

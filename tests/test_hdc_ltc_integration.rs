@@ -11,7 +11,7 @@
 //! 4. **Configuration Tests**: Verify config options work correctly
 
 use symthaea::cognitive_loop::{
-    CognitiveLoopConfig, CognitiveLoopService, TemporalBackend, CycleResult,
+    CognitiveLoopConfig, CognitiveLoopService, TemporalBackend,
 };
 use symthaea::hdc_ltc_bridge::{HdcLtcBridge, HdcLtcBridgeConfig, BridgeActivation};
 use ndarray::Array1;

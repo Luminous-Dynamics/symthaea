@@ -581,9 +581,15 @@ mod tests {
         assert_eq!(backend.name(), "Simulated");
     }
 
+    /// Mutex to serialize tests that mutate environment variables.
+    /// `std::env::set_var` / `remove_var` is process-global and not
+    /// thread-safe, so parallel test threads can race.
+    static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_create_backend_from_env_default() {
-        // Clear all provider env vars
+        let _lock = ENV_MUTEX.lock().unwrap();
+
         let prev_provider = std::env::var("SYMTHAEA_LLM_PROVIDER").ok();
         let prev_openai = std::env::var("OPENAI_API_KEY").ok();
         let prev_anthropic = std::env::var("ANTHROPIC_API_KEY").ok();
@@ -595,7 +601,6 @@ mod tests {
         let backend = create_backend_from_env();
         assert_eq!(backend.name(), "Ollama");
 
-        // Restore
         if let Some(v) = prev_provider { std::env::set_var("SYMTHAEA_LLM_PROVIDER", v); }
         if let Some(v) = prev_openai { std::env::set_var("OPENAI_API_KEY", v); }
         if let Some(v) = prev_anthropic { std::env::set_var("ANTHROPIC_API_KEY", v); }
@@ -603,6 +608,8 @@ mod tests {
 
     #[test]
     fn test_create_backend_from_env_simulated() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+
         let prev = std::env::var("SYMTHAEA_LLM_PROVIDER").ok();
         std::env::set_var("SYMTHAEA_LLM_PROVIDER", "simulated");
 

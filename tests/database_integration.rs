@@ -6,7 +6,7 @@
 mod common;
 
 use common::prelude::*;
-use symthaea::databases::{ConsciousnessDatabase, DbResult, MemoryRecord, MemoryType, SqliteMemory};
+use symthaea::databases::{ConsciousnessDatabase, MemoryRecord, MemoryType, SqliteMemory};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
 // ============================================================================

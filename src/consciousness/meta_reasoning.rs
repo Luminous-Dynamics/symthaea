@@ -707,8 +707,6 @@ impl StrategyAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::primitive_system::PrimitiveTier;
-
     #[test]
     fn test_meta_cognitive_reasoner_creation() {
         let evolution_config = EvolutionConfig::default();

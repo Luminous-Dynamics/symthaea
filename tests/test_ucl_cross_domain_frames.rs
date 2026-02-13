@@ -9,7 +9,7 @@
 //! - ADAPTATION
 
 use symthaea_core::hdc::ucl_cross_domain_frames::{
-    concept_hv, CrossDomainFrame, FrameInstance, FrameSlot, UCLFrameSystem,
+    concept_hv, UCLFrameSystem,
 };
 use std::collections::HashMap;
 

@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)]
 #![cfg(feature = "intelligence_module")]
 //! Integration tests for Causal Discovery with Symthaea HDC
 //!

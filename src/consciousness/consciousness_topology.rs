@@ -855,7 +855,7 @@ mod tests {
 
     #[test]
     fn test_euler_characteristic() {
-        let betti = BettiNumbers {
+        let _betti = BettiNumbers {
             beta_0: 1,
             beta_1: 2,
             beta_2: 1,

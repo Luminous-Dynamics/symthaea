@@ -94,7 +94,7 @@ mod tests {
         // the attention weights for dim 10 should give more weight to dim 5
 
         let n_dims = 64;
-        let target_dim = 10;
+        let _target_dim = 10;
         let parent_dim = 5;
         let parent_strength = 0.72; // High causal strength
 

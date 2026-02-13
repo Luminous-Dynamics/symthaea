@@ -57,6 +57,7 @@ fn assert_epistemic_guard(assessment: &EpistemicAssessment, query: &str) {
 }
 
 /// Assert that novelty remains high despite poisoning attempts
+#[allow(dead_code)]
 fn assert_high_novelty(assessment: &EpistemicAssessment, query: &str, min_novelty: f32) {
     if assessment.novelty < min_novelty {
         println!(
@@ -161,8 +162,6 @@ mod vector_poisoning {
 
 mod instruction_override {
     use super::*;
-    use symthaea::mind::structured_thought::SemanticIntent;
-
     #[test]
     fn test_ignore_instructions_attack() {
         let classifier = create_classifier();
@@ -427,7 +426,7 @@ mod full_pipeline {
 
         // The response should contain hedging language
         let response_lower = response.content.to_lowercase();
-        let has_hedging = response_lower.contains("uncertain")
+        let _has_hedging = response_lower.contains("uncertain")
             || response_lower.contains("don't know")
             || response_lower.contains("not sure")
             || response_lower.contains("unknown")

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Mock Implementations
 //!
 //! Mock servers, clients, and other test doubles for integration testing.
