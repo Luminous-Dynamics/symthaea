@@ -1271,3 +1271,183 @@ pub struct PartnershipState {
     /// Number of trajectory points recorded.
     pub trajectory_points: usize,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_new_valid_dimension() {
+        let s = Symthaea::new(1024, 64).await;
+        assert!(s.is_ok());
+        let s = s.unwrap();
+        assert_eq!(s.dimension(), 1024);
+        assert!(!s.has_neural_bridge());
+        assert!(!s.has_semantic_encoder());
+    }
+
+    #[tokio::test]
+    async fn test_new_zero_dimension_errors() {
+        let result = Symthaea::new(0, 64).await;
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        let msg = format!("{}", err);
+        assert!(msg.contains("hdc_dim"), "Error should mention hdc_dim: {msg}");
+    }
+
+    #[tokio::test]
+    async fn test_introspect_initial_state() {
+        let s = Symthaea::new(1024, 64).await.unwrap();
+        let intro = s.introspect();
+        // Consciousness level starts low but non-negative
+        assert!(intro.consciousness_level >= 0.0);
+        assert!(intro.consciousness_level <= 1.0);
+        // Graph has at least the seeded prototypes
+        assert!(intro.graph_size > 0, "Graph should have seeded items");
+        assert_eq!(intro.memory_stats.long_term_count, 0, "No interactions yet");
+    }
+
+    #[tokio::test]
+    async fn test_partnership_state_initial() {
+        let s = Symthaea::new(1024, 64).await.unwrap();
+        let ps = s.partnership_state();
+        assert_eq!(ps.interactions, 0);
+        assert_eq!(ps.trajectory_points, 0);
+        assert!(ps.trust >= 0.0 && ps.trust <= 1.0);
+        assert_eq!(ps.stage, RelationshipStage::NoRelation);
+    }
+
+    #[tokio::test]
+    async fn test_embed_produces_correct_dimension() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let hv = s.embed("hello world");
+        assert_eq!(hv.values.len(), 1024);
+        // Should be normalized (magnitude ~1.0)
+        let mag: f32 = hv.values.iter().map(|v| v * v).sum::<f32>().sqrt();
+        assert!((mag - 1.0).abs() < 0.01, "Embedding should be normalized, got mag={mag}");
+    }
+
+    #[tokio::test]
+    async fn test_embed_vec_matches_embed() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let hv = s.embed("test input");
+        let vec = s.embed_vec("test input");
+        assert_eq!(hv.values, vec);
+    }
+
+    #[tokio::test]
+    async fn test_embed_batch() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let texts = &["alpha", "beta", "gamma"];
+        let embeddings = s.embed_batch(texts);
+        assert_eq!(embeddings.len(), 3);
+        for e in &embeddings {
+            assert_eq!(e.values.len(), 1024);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_embed_different_texts_differ() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let a = s.embed("quantum physics");
+        let b = s.embed("chocolate cake");
+        // Different texts should produce different embeddings
+        let sim = a.similarity(&b);
+        assert!(sim < 0.95, "Different texts should have sim < 0.95, got {sim}");
+    }
+
+    #[tokio::test]
+    async fn test_pause_and_resume_roundtrip() {
+        let tmp = std::env::temp_dir().join("symthaea_test_pause.json");
+        let path = tmp.to_str().unwrap();
+        {
+            let mut s = Symthaea::new(1024, 64).await.unwrap();
+            // Process a query to bump interaction count
+            let _ = s.process("hello").await;
+            assert!(s.interactions > 0);
+            s.pause(path).unwrap();
+        }
+        // Resume and verify state persisted
+        let s = Symthaea::resume(path).unwrap();
+        assert_eq!(s.dimension(), 1024);
+        assert!(s.interactions > 0, "Interactions should persist through pause/resume");
+        // Cleanup
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn test_resume_invalid_path_errors() {
+        let result = Symthaea::resume("/nonexistent/path/state.json");
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_process_returns_response() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let resp = s.process("What is consciousness?").await;
+        assert!(resp.is_ok());
+        let resp = resp.unwrap();
+        assert!(!resp.content.is_empty(), "Response content should not be empty");
+        assert!(resp.confidence >= 0.0 && resp.confidence <= 1.0);
+        assert!(resp.safe);
+    }
+
+    #[tokio::test]
+    async fn test_sleep_consolidation() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        // Process some inputs to populate working memory
+        let _ = s.process("input one").await;
+        let _ = s.process("input two").await;
+        let report = s.sleep().await;
+        assert!(report.is_ok());
+        let report = report.unwrap();
+        assert!(report.scaled > 0, "Should have some memories after sleep");
+    }
+
+    #[test]
+    fn test_cube_to_epistemic_status() {
+        use crate::mind::structured_thought::MTier;
+
+        // E4 (reproducible) → Certain
+        let cube_e4 = EpistemicCube::new(ETier::E4, NTier::N0, MTier::M0);
+        assert_eq!(Symthaea::cube_to_epistemic_status(&cube_e4), EpistemicStatus::Certain);
+
+        // E3 (peer-verified) → Certain
+        let cube_e3 = EpistemicCube::new(ETier::E3, NTier::N0, MTier::M0);
+        assert_eq!(Symthaea::cube_to_epistemic_status(&cube_e3), EpistemicStatus::Certain);
+
+        // E2 (verifiable) → Probable
+        let cube_e2 = EpistemicCube::new(ETier::E2, NTier::N0, MTier::M0);
+        assert_eq!(Symthaea::cube_to_epistemic_status(&cube_e2), EpistemicStatus::Probable);
+
+        // E1 with N1+ → Probable
+        let cube_e1_n1 = EpistemicCube::new(ETier::E1, NTier::N1, MTier::M0);
+        assert_eq!(Symthaea::cube_to_epistemic_status(&cube_e1_n1), EpistemicStatus::Probable);
+
+        // E1 with N0 → Uncertain
+        let cube_e1_n0 = EpistemicCube::new(ETier::E1, NTier::N0, MTier::M0);
+        assert_eq!(Symthaea::cube_to_epistemic_status(&cube_e1_n0), EpistemicStatus::Uncertain);
+
+        // E0 (opinion) → Uncertain
+        let cube_e0 = EpistemicCube::new(ETier::E0, NTier::N0, MTier::M0);
+        assert_eq!(Symthaea::cube_to_epistemic_status(&cube_e0), EpistemicStatus::Uncertain);
+    }
+
+    #[tokio::test]
+    async fn test_interactions_increment() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        assert_eq!(s.interactions, 0);
+        let _ = s.process("first").await;
+        assert_eq!(s.interactions, 1);
+        let _ = s.process("second").await;
+        assert_eq!(s.interactions, 2);
+    }
+
+    #[tokio::test]
+    async fn test_mind_accessor() {
+        let s = Symthaea::new(1024, 64).await.unwrap();
+        let mind = s.mind();
+        // Mind should be awakened with seeded memory
+        assert!(!mind.working_memory().is_empty(), "Mind should have seeded working memory");
+    }
+}

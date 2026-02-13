@@ -818,7 +818,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Run with `cargo test --ignored` - takes 1-2 minutes
     fn test_run_minimal_validation_quick() {
         // Use ExhaustivePartition (O(2^n)) for correct IIT Phi computation.
         // SpectralConnectivity computes algebraic_connectivity (lambda_2),
@@ -826,7 +825,7 @@ mod tests {
         // ExhaustivePartition searches all bipartitions for the MIP.
         //
         // We use n=4 nodes to keep runtime tractable (2^4 = 16 partitions).
-        let n_samples = 10;
+        let n_samples = 5;
         let n_nodes = 4;
         let dim = crate::hdc::HDC_DIMENSION;
         let mut phi_calc = TieredPhi::new(ApproximationTier::ExhaustivePartition);

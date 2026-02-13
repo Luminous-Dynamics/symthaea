@@ -4070,11 +4070,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // 20s: 10-component heuristic MIP search over 16K-dim vectors. Run with --ignored.
     fn test_true_phi_heuristic_search() {
         let calc = TruePhiCalculator::new();
-        // 10 components triggers heuristic search
-        let components: Vec<ContinuousHV> = create_test_vectors(10);
+        // 9 components triggers heuristic search (threshold is >8)
+        let components: Vec<ContinuousHV> = create_test_vectors(9);
 
         let result = calc.compute_true_phi(&components);
 
@@ -4195,16 +4194,16 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // 162s: 20-component MIP search over 16K-dim vectors. Run with --ignored.
     fn test_large_system_mip_search() {
         let calc = TruePhiCalculator::new();
-        let components: Vec<ContinuousHV> = create_test_vectors(20);
+        // 12 components: large enough to exercise heuristic search, fast enough for CI
+        let components: Vec<ContinuousHV> = create_test_vectors(12);
 
         let result = calc.compute_true_phi(&components);
 
         assert!(result.phi >= 0.0, "Φ should be non-negative");
         assert!(!result.mip.part_a.is_empty() && !result.mip.part_b.is_empty(), "MIP should have non-empty parts");
-        assert_eq!(result.mip.part_a.len() + result.mip.part_b.len(), 20, "All components should be in partition");
+        assert_eq!(result.mip.part_a.len() + result.mip.part_b.len(), 12, "All components should be in partition");
     }
 
     #[test]
