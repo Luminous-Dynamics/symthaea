@@ -62,8 +62,7 @@ pub mod ocr;
 pub mod multi_modal;
 pub mod semantic_encoder;
 pub mod model_hub;
-// NOTE: conscious_perception requires CausalMind from main crate - disabled until architecture fixed
-// pub mod conscious_perception;
+// conscious_perception was removed — requires CausalMind from main crate.
 pub mod resilience;  // NEW: Graceful degradation layer
 pub mod model_loader_actor;  // NEW: Async model loading via actor pattern
 #[cfg(feature = "embeddings")]
