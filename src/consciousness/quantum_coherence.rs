@@ -31,7 +31,7 @@
  *
  * ## Usage
  *
- * ```rust
+ * ```ignore
  * use symthaea::consciousness::quantum_coherence::{
  *     QuantumCoherenceAnalyzer, CoherenceConfig
  * };

@@ -30,7 +30,7 @@
  *
  * ## Architecture
  *
- * ```
+ * ```ignore
  * BodySchema (structure & capabilities)
  *     ↓
  * Proprioception (body position/movement)

@@ -70,7 +70,7 @@ mod types;
 mod hyperfeel;
 mod holochain;
 mod service;
-mod federated_cfc;
+pub mod federated_cfc;
 mod federated_network;
 mod checkpoint;
 #[cfg(feature = "mycelix")]

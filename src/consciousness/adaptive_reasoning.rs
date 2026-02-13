@@ -17,7 +17,7 @@
 //!
 //! ## The RL Framework
 //!
-//! ```
+//! ```ignore
 //! State: Current reasoning chain context
 //!   - Current answer HV
 //!   - Φ gradient history

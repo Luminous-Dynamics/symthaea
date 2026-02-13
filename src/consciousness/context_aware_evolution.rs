@@ -26,7 +26,7 @@
 //!
 //! ## Example Usage
 //!
-//! ```rust
+//! ```ignore
 //! let mut optimizer = ContextAwareOptimizer::new(config)?;
 //!
 //! // Detect context

@@ -43,6 +43,8 @@ use anyhow::{Result, Context};
 use super::ipc_client::{IpcRequest, IpcResponse, MetricsSnapshot, CompletionItem};
 use super::context::{Completion, CompletionKind};
 
+const IPC_PROTOCOL_VERSION: u32 = 1;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // SERVER CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -342,6 +344,8 @@ async fn handle_client(
         }
     });
 
+    let mut negotiated_version: Option<u32> = None;
+
     loop {
         tokio::select! {
             // Check for shutdown
@@ -360,9 +364,43 @@ async fn handle_client(
             }
 
             // Read incoming requests
-            result = read_frame(&mut reader, config.buffer_size) => {
+            result = tokio::time::timeout(config.request_timeout, read_frame(&mut reader, config.buffer_size)) => {
                 match result {
-                    Ok(Some(request)) => {
+                    Ok(Ok(Some(request))) => {
+                        if let IpcRequest::Hello { version } = request {
+                            if version != IPC_PROTOCOL_VERSION {
+                                let response = IpcResponse::Error(format!(
+                                    "Protocol version mismatch (client {}, server {})",
+                                    version,
+                                    IPC_PROTOCOL_VERSION
+                                ));
+                                let data = rmp_serde::to_vec(&response)?;
+                                let len = (data.len() as u32).to_le_bytes();
+                                writer.write_all(&len).await?;
+                                writer.write_all(&data).await?;
+                                writer.flush().await?;
+                                break;
+                            }
+                            negotiated_version = Some(version);
+                            let response = IpcResponse::HelloAck { server_version: IPC_PROTOCOL_VERSION };
+                            let data = rmp_serde::to_vec(&response)?;
+                            let len = (data.len() as u32).to_le_bytes();
+                            writer.write_all(&len).await?;
+                            writer.write_all(&data).await?;
+                            writer.flush().await?;
+                            continue;
+                        }
+
+                        if negotiated_version.is_none() {
+                            let response = IpcResponse::Error("Protocol version not negotiated".to_string());
+                            let data = rmp_serde::to_vec(&response)?;
+                            let len = (data.len() as u32).to_le_bytes();
+                            writer.write_all(&len).await?;
+                            writer.write_all(&data).await?;
+                            writer.flush().await?;
+                            continue;
+                        }
+
                         let response = handle_request(
                             request,
                             &metrics_provider,
@@ -377,12 +415,16 @@ async fn handle_client(
                         writer.write_all(&data).await?;
                         writer.flush().await?;
                     }
-                    Ok(None) => {
+                    Ok(Ok(None)) => {
                         tracing::debug!("Client disconnected");
                         break;
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         tracing::debug!(error = %e, "Read error");
+                        break;
+                    }
+                    Err(_) => {
+                        tracing::debug!("Request timeout");
                         break;
                     }
                 }
@@ -403,6 +445,9 @@ async fn handle_request(
     subscribed: &Arc<RwLock<bool>>,
 ) -> IpcResponse {
     match request {
+        IpcRequest::Hello { .. } => {
+            IpcResponse::Error("Handshake must occur before requests".to_string())
+        }
         IpcRequest::SubscribeMetrics => {
             *subscribed.write().await = true;
             IpcResponse::Subscribed
@@ -633,6 +678,7 @@ impl CommandExecutor for StubCommandExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::io::AsyncWriteExt;
 
     #[test]
     fn test_stub_metrics_provider() {
@@ -683,5 +729,21 @@ mod tests {
         let config = IpcServerConfig::default();
         assert!(config.max_clients > 0);
         assert!(config.metrics_interval.as_millis() > 0);
+    }
+
+    #[tokio::test]
+    async fn test_read_frame_roundtrip() {
+        let (mut client, server) = UnixStream::pair().unwrap();
+        let request = IpcRequest::Ping;
+        let data = rmp_serde::to_vec(&request).unwrap();
+        let len = (data.len() as u32).to_le_bytes();
+
+        client.write_all(&len).await.unwrap();
+        client.write_all(&data).await.unwrap();
+
+        let (read_half, _write_half) = server.into_split();
+        let mut reader = BufReader::new(read_half);
+        let parsed = read_frame(&mut reader, 1024).await.unwrap().unwrap();
+        assert!(matches!(parsed, IpcRequest::Ping));
     }
 }
