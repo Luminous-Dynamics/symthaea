@@ -2135,6 +2135,232 @@ mod tests {
         assert!(format!("{}", err).contains("abc123"));
     }
 
+    #[test]
+    fn test_network_error_timeout_construction_and_format() {
+        let err = NetworkError::Timeout {
+            operation: "gradient_sync".to_string(),
+            timeout_ms: 5000,
+        };
+        let display = format!("{}", err);
+        let debug = format!("{:?}", err);
+
+        assert!(!display.is_empty());
+        assert!(display.contains("5000"));
+        assert!(display.contains("gradient_sync"));
+        assert!(display.contains("Timeout"));
+        assert!(!debug.is_empty());
+        assert!(debug.contains("Timeout"));
+    }
+
+    #[test]
+    fn test_network_error_connection_failed_construction_and_format() {
+        let err = NetworkError::ConnectionFailed {
+            target: "192.168.1.100:8080".to_string(),
+            reason: "connection refused".to_string(),
+        };
+        let display = format!("{}", err);
+        let debug = format!("{:?}", err);
+
+        assert!(!display.is_empty());
+        assert!(display.contains("192.168.1.100:8080"));
+        assert!(display.contains("connection refused"));
+        assert!(!debug.is_empty());
+        assert!(debug.contains("ConnectionFailed"));
+    }
+
+    #[test]
+    fn test_network_error_channel_closed_construction_and_format() {
+        let err = NetworkError::ChannelClosed {
+            reason: "receiver dropped".to_string(),
+        };
+        let display = format!("{}", err);
+        let debug = format!("{:?}", err);
+
+        assert!(!display.is_empty());
+        assert!(display.contains("receiver dropped"));
+        assert!(display.contains("Channel closed"));
+        assert!(!debug.is_empty());
+        assert!(debug.contains("ChannelClosed"));
+    }
+
+    #[test]
+    fn test_network_error_send_failed_construction_and_format() {
+        let err = NetworkError::SendFailed {
+            reason: "broken pipe".to_string(),
+        };
+        let display = format!("{}", err);
+        let debug = format!("{:?}", err);
+
+        assert!(!display.is_empty());
+        assert!(display.contains("broken pipe"));
+        assert!(display.contains("Send failed"));
+        assert!(!debug.is_empty());
+        assert!(debug.contains("SendFailed"));
+    }
+
+    #[test]
+    fn test_network_error_receive_failed_construction_and_format() {
+        let err = NetworkError::ReceiveFailed {
+            reason: "unexpected EOF".to_string(),
+        };
+        let display = format!("{}", err);
+        let debug = format!("{:?}", err);
+
+        assert!(!display.is_empty());
+        assert!(display.contains("unexpected EOF"));
+        assert!(display.contains("Receive failed"));
+        assert!(!debug.is_empty());
+        assert!(debug.contains("ReceiveFailed"));
+    }
+
+    #[test]
+    fn test_network_error_node_not_found_construction_and_format() {
+        let err = NetworkError::NodeNotFound {
+            node_id: "abcdef0123456789".to_string(),
+        };
+        let display = format!("{}", err);
+        let debug = format!("{:?}", err);
+
+        assert!(!display.is_empty());
+        assert!(display.contains("abcdef0123456789"));
+        assert!(display.contains("Node not found"));
+        assert!(!debug.is_empty());
+        assert!(debug.contains("NodeNotFound"));
+    }
+
+    #[test]
+    fn test_network_error_serialization_construction_and_format() {
+        let err = NetworkError::Serialization {
+            reason: "invalid bincode payload".to_string(),
+        };
+        let display = format!("{}", err);
+        let debug = format!("{:?}", err);
+
+        assert!(!display.is_empty());
+        assert!(display.contains("invalid bincode payload"));
+        assert!(display.contains("Serialization error"));
+        assert!(!debug.is_empty());
+        assert!(debug.contains("Serialization"));
+    }
+
+    #[test]
+    fn test_network_error_internal_construction_and_format() {
+        let err = NetworkError::Internal {
+            reason: "failed to bind TCP listener".to_string(),
+        };
+        let display = format!("{}", err);
+        let debug = format!("{:?}", err);
+
+        assert!(!display.is_empty());
+        assert!(display.contains("failed to bind TCP listener"));
+        assert!(display.contains("Internal error"));
+        assert!(!debug.is_empty());
+        assert!(debug.contains("Internal"));
+    }
+
+    #[test]
+    fn test_network_error_implements_std_error() {
+        let err = NetworkError::Timeout {
+            operation: "test".to_string(),
+            timeout_ms: 100,
+        };
+        // Verify the error can be used as a dyn std::error::Error
+        let err_ref: &dyn std::error::Error = &err;
+        assert!(!err_ref.to_string().is_empty());
+        // NetworkError has no source() impl, so source should be None
+        assert!(err_ref.source().is_none());
+    }
+
+    #[test]
+    fn test_all_network_error_variants_have_nonempty_display() {
+        let errors: Vec<NetworkError> = vec![
+            NetworkError::Timeout {
+                operation: "op".to_string(),
+                timeout_ms: 1,
+            },
+            NetworkError::ConnectionFailed {
+                target: "t".to_string(),
+                reason: "r".to_string(),
+            },
+            NetworkError::ChannelClosed {
+                reason: "r".to_string(),
+            },
+            NetworkError::SendFailed {
+                reason: "r".to_string(),
+            },
+            NetworkError::ReceiveFailed {
+                reason: "r".to_string(),
+            },
+            NetworkError::NodeNotFound {
+                node_id: "n".to_string(),
+            },
+            NetworkError::Serialization {
+                reason: "r".to_string(),
+            },
+            NetworkError::Internal {
+                reason: "r".to_string(),
+            },
+        ];
+
+        assert_eq!(errors.len(), 8, "Expected 8 NetworkError variants");
+
+        for (i, err) in errors.iter().enumerate() {
+            let display = format!("{}", err);
+            let debug = format!("{:?}", err);
+            assert!(
+                !display.is_empty(),
+                "Variant {} has empty Display output",
+                i
+            );
+            assert!(!debug.is_empty(), "Variant {} has empty Debug output", i);
+        }
+    }
+
+    #[test]
+    fn test_network_error_display_messages_are_distinct() {
+        let errors: Vec<NetworkError> = vec![
+            NetworkError::Timeout {
+                operation: "op".to_string(),
+                timeout_ms: 1,
+            },
+            NetworkError::ConnectionFailed {
+                target: "t".to_string(),
+                reason: "r".to_string(),
+            },
+            NetworkError::ChannelClosed {
+                reason: "r".to_string(),
+            },
+            NetworkError::SendFailed {
+                reason: "r".to_string(),
+            },
+            NetworkError::ReceiveFailed {
+                reason: "r".to_string(),
+            },
+            NetworkError::NodeNotFound {
+                node_id: "n".to_string(),
+            },
+            NetworkError::Serialization {
+                reason: "r".to_string(),
+            },
+            NetworkError::Internal {
+                reason: "r".to_string(),
+            },
+        ];
+
+        let displays: Vec<String> = errors.iter().map(|e| format!("{}", e)).collect();
+
+        // Each variant should produce a unique prefix (the part before the user-supplied content)
+        for i in 0..displays.len() {
+            for j in (i + 1)..displays.len() {
+                assert_ne!(
+                    displays[i], displays[j],
+                    "Variants {} and {} produce identical Display output: '{}'",
+                    i, j, displays[i]
+                );
+            }
+        }
+    }
+
     // =========================================================================
     // TCP Backend Tests
     // =========================================================================

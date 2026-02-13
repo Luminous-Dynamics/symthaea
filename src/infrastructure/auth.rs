@@ -592,4 +592,149 @@ mod tests {
         assert!(user_auth.permissions.has(Permission::Execute));
         assert!(!user_auth.permissions.has(Permission::Admin));
     }
+
+    // ── AuthError construction and Display/Debug tests ──────────────
+
+    #[test]
+    fn test_auth_error_invalid_token_display() {
+        let err = AuthError::InvalidToken;
+        let msg = format!("{}", err);
+        assert!(!msg.is_empty());
+        assert_eq!(msg, "Invalid authentication token");
+    }
+
+    #[test]
+    fn test_auth_error_token_expired_display() {
+        let err = AuthError::TokenExpired;
+        let msg = format!("{}", err);
+        assert!(!msg.is_empty());
+        assert_eq!(msg, "Token has expired");
+    }
+
+    #[test]
+    fn test_auth_error_disabled_display() {
+        let err = AuthError::Disabled;
+        let msg = format!("{}", err);
+        assert!(!msg.is_empty());
+        assert_eq!(msg, "Authentication is disabled");
+    }
+
+    #[test]
+    fn test_auth_error_local_auth_disabled_display() {
+        let err = AuthError::LocalAuthDisabled;
+        let msg = format!("{}", err);
+        assert!(!msg.is_empty());
+        assert_eq!(msg, "Local authentication not allowed");
+    }
+
+    #[test]
+    fn test_auth_error_insufficient_permissions_display_all_variants() {
+        let cases = [
+            (Permission::Read, "Missing permission: Read"),
+            (Permission::Query, "Missing permission: Query"),
+            (Permission::Execute, "Missing permission: Execute"),
+            (Permission::Configure, "Missing permission: Configure"),
+            (Permission::Admin, "Missing permission: Admin"),
+        ];
+        for (perm, expected) in &cases {
+            let err = AuthError::InsufficientPermissions(*perm);
+            let msg = format!("{}", err);
+            assert!(!msg.is_empty());
+            assert_eq!(&msg, expected);
+        }
+    }
+
+    #[test]
+    fn test_auth_error_io_error_display() {
+        let err = AuthError::IoError("connection refused".to_string());
+        let msg = format!("{}", err);
+        assert!(!msg.is_empty());
+        assert_eq!(msg, "IO error: connection refused");
+    }
+
+    #[test]
+    fn test_auth_error_io_error_empty_inner_message() {
+        let err = AuthError::IoError(String::new());
+        let msg = format!("{}", err);
+        // Even with empty inner string, the prefix is still present
+        assert_eq!(msg, "IO error: ");
+    }
+
+    #[test]
+    fn test_auth_error_debug_format_all_variants() {
+        let variants: Vec<AuthError> = vec![
+            AuthError::InvalidToken,
+            AuthError::TokenExpired,
+            AuthError::Disabled,
+            AuthError::LocalAuthDisabled,
+            AuthError::InsufficientPermissions(Permission::Admin),
+            AuthError::IoError("test".to_string()),
+        ];
+        for err in &variants {
+            let dbg = format!("{:?}", err);
+            assert!(!dbg.is_empty(), "Debug output must be non-empty for {:?}", err);
+        }
+    }
+
+    #[test]
+    fn test_auth_error_clone() {
+        let original = AuthError::InsufficientPermissions(Permission::Execute);
+        let cloned = original.clone();
+        assert_eq!(format!("{}", original), format!("{}", cloned));
+
+        let original_io = AuthError::IoError("disk full".to_string());
+        let cloned_io = original_io.clone();
+        assert_eq!(format!("{}", original_io), format!("{}", cloned_io));
+    }
+
+    #[test]
+    fn test_auth_error_is_std_error() {
+        // Verify that AuthError implements std::error::Error by using it as a trait object
+        let err: Box<dyn std::error::Error> = Box::new(AuthError::InvalidToken);
+        assert!(!err.to_string().is_empty());
+
+        let err: Box<dyn std::error::Error> = Box::new(AuthError::IoError("fail".into()));
+        assert!(!err.to_string().is_empty());
+    }
+
+    #[test]
+    fn test_auth_error_source_is_none() {
+        // AuthError does not wrap an inner error, so source() should be None
+        use std::error::Error;
+        let variants: Vec<AuthError> = vec![
+            AuthError::InvalidToken,
+            AuthError::TokenExpired,
+            AuthError::Disabled,
+            AuthError::LocalAuthDisabled,
+            AuthError::InsufficientPermissions(Permission::Read),
+            AuthError::IoError("x".into()),
+        ];
+        for err in &variants {
+            assert!(err.source().is_none(), "source() should be None for {:?}", err);
+        }
+    }
+
+    // ── AuthError integration with AuthProvider error paths ─────────
+
+    #[test]
+    fn test_authenticate_disabled_returns_disabled_error() {
+        let mut provider = AuthProvider::new().disabled();
+        let result = provider.authenticate("any_token");
+        assert!(matches!(result, Err(AuthError::Disabled)));
+    }
+
+    #[test]
+    fn test_authenticate_bad_token_returns_invalid_token() {
+        let mut provider = AuthProvider::new();
+        let result = provider.authenticate("nonexistent_token_value");
+        assert!(matches!(result, Err(AuthError::InvalidToken)));
+    }
+
+    #[test]
+    fn test_local_auth_disabled_returns_error() {
+        let provider = AuthProvider::new().require_auth_always();
+        // With auth enabled AND allow_local=false, local auth should fail
+        let result = provider.authenticate_local(1000, 1000);
+        assert!(matches!(result, Err(AuthError::LocalAuthDisabled)));
+    }
 }
