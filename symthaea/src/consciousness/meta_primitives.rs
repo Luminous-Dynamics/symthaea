@@ -17,7 +17,7 @@
 //!
 //! ## The Meta-Learning Framework
 //!
-//! ```
+//! ```ignore
 //! Primitive Genome: Sequence of base transformations
 //!   Example: [Bind, Permute, Bundle] = "Rotational Binding"
 //!

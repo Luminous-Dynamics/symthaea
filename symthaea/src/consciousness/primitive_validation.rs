@@ -19,7 +19,7 @@
 //!
 //! ## Example Experiment
 //!
-//! ```rust
+//! ```ignore
 //! // Create an experiment
 //! let experiment = PrimitiveValidationExperiment::new(
 //!     "tier1_mathematical",
