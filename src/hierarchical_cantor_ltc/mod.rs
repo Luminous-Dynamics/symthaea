@@ -32,6 +32,7 @@
 //! ```
 
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
+use std::collections::VecDeque;
 use std::f32::consts::E;
 
 // =============================================================================
@@ -105,7 +106,7 @@ pub struct CantorLtcNode {
     /// Children (left, right) - None for leaf nodes
     pub children: Option<(Box<CantorLtcNode>, Box<CantorLtcNode>)>,
     /// State history for BPTT (backpropagation through time)
-    pub history: Vec<ContinuousHV>,
+    pub history: VecDeque<ContinuousHV>,
     /// Local integrated information (Φ)
     pub local_phi: f64,
     /// Weight vector for HDC binding (learned)
@@ -127,7 +128,7 @@ impl CantorLtcNode {
             level,
             index,
             children: None,
-            history: Vec::with_capacity(100),
+            history: VecDeque::with_capacity(100),
             local_phi: 0.0,
             weight: ContinuousHV::random(dim, seed + 10000),
             bias: ContinuousHV::random(dim, seed + 20000).scale(0.1),
@@ -158,9 +159,9 @@ impl CantorLtcNode {
     /// ```
     fn step_single(&mut self, dt: f32, parent_state: Option<&ContinuousHV>) {
         // Save history for BPTT
-        self.history.push(self.state.clone());
+        self.history.push_back(self.state.clone());
         if self.history.len() > 100 {
-            self.history.remove(0);
+            self.history.pop_front();
         }
 
         // Compute pre-activation: W ⊗ x
