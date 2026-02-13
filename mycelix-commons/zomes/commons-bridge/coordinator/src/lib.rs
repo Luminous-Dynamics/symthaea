@@ -15,6 +15,9 @@ use mycelix_bridge_common::{
     self as bridge,
     DispatchInput, DispatchResult, CrossClusterDispatchInput,
     ResolveQueryInput, EventTypeQuery, BridgeHealth,
+    PropertyOwnershipQuery, PropertyOwnershipResult,
+    CareAvailabilityQuery, CareAvailabilityResult,
+    RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
 };
 
 // ============================================================================
@@ -54,6 +57,15 @@ const ALLOWED_ZOMES: &[&str] = &[
     "water_capture",
     "water_steward",
     "water_wisdom",
+    // Food domain
+    "food_production",
+    "food_distribution",
+    "food_preservation",
+    "food_knowledge",
+    // Transport domain
+    "transport_routes",
+    "transport_sharing",
+    "transport_impact",
 ];
 
 // ============================================================================
@@ -72,12 +84,48 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 }
 
 // ============================================================================
+// Rate Limiting
+// ============================================================================
+
+/// Check rate limit and log the dispatch. Returns error if limit exceeded.
+fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let anchor = ensure_anchor("dispatch_rate_limit")?;
+
+    let links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::DispatchRateLimit)?,
+        GetStrategy::Local,
+    )?;
+
+    let now = sys_time()?;
+    let window_start_micros = now.as_micros() - (RATE_LIMIT_WINDOW_SECS * 1_000_000);
+    let window_start = Timestamp::from_micros(window_start_micros);
+
+    let recent_count = links.iter()
+        .filter(|l| l.timestamp >= window_start)
+        .count();
+
+    check_rate_limit_count(recent_count)
+        .map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
+
+    // Log this dispatch
+    create_link(
+        agent,
+        anchor,
+        LinkTypes::DispatchRateLimit,
+        target_zome.as_bytes().to_vec(),
+    )?;
+
+    Ok(())
+}
+
+// ============================================================================
 // Cross-Domain Dispatch (synchronous RPC)
 // ============================================================================
 
 /// Dispatch a synchronous call to any domain zome within the Commons DNA.
 ///
-/// This is the core cross-domain integration primitive. It validates the target
+/// Rate-limited to 100 calls per 60 seconds per agent. Validates the target
 /// zome against an allowlist, then uses `call(CallTargetCell::Local, ...)` to
 /// invoke the function directly within the same DNA.
 ///
@@ -92,6 +140,7 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// ```
 #[hdk_extern]
 pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&input.zome)?;
     bridge::dispatch_call_checked(&input, ALLOWED_ZOMES)
 }
 
@@ -189,6 +238,17 @@ fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
             s if s.contains("steward") || s.contains("guardian") => "water_steward",
             s if s.contains("wisdom") || s.contains("knowledge") => "water_wisdom",
             _ => "water_flow",
+        },
+        "food" => match query_type {
+            s if s.contains("distribution") || s.contains("market") || s.contains("order") => "food_distribution",
+            s if s.contains("preservation") || s.contains("batch") || s.contains("storage") => "food_preservation",
+            s if s.contains("knowledge") || s.contains("seed") || s.contains("recipe") => "food_knowledge",
+            _ => "food_production",
+        },
+        "transport" => match query_type {
+            s if s.contains("share") || s.contains("ride") || s.contains("cargo") => "transport_sharing",
+            s if s.contains("impact") || s.contains("carbon") || s.contains("emission") => "transport_impact",
+            _ => "transport_routes",
         },
         _ => return None,
     };
@@ -359,6 +419,7 @@ const CIVIC_ROLE: &str = "civic";
 /// - Water stewardship checking justice disputes on watershed rights
 #[hdk_extern]
 pub fn dispatch_civic_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&format!("civic:{}", input.zome))?;
     let dispatch = CrossClusterDispatchInput {
         role: CIVIC_ROLE.to_string(),
         zome: input.zome,
@@ -518,8 +579,84 @@ pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
             "care".to_string(),
             "mutualaid".to_string(),
             "water".to_string(),
+            "food".to_string(),
+            "transport".to_string(),
         ],
     })
+}
+
+// ============================================================================
+// Typed Convenience Functions (intra-cluster)
+// ============================================================================
+
+/// Verify property ownership — housing/care/mutualaid can check before acting.
+///
+/// Dispatches to `property_registry.verify_ownership` with typed input/output.
+#[hdk_extern]
+pub fn verify_property_ownership(input: PropertyOwnershipQuery) -> ExternResult<PropertyOwnershipResult> {
+    enforce_rate_limit("property_registry")?;
+    let payload = ExternIO::encode(&input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Encode error: {:?}", e))))?;
+    let dispatch = DispatchInput {
+        zome: "property_registry".into(),
+        fn_name: "verify_ownership".into(),
+        payload: payload.0,
+    };
+    let result = bridge::dispatch_call_checked(&dispatch, ALLOWED_ZOMES)?;
+    if result.success {
+        if let Some(response) = result.response {
+            let decoded: PropertyOwnershipResult = ExternIO(response).decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            Ok(decoded)
+        } else {
+            Ok(PropertyOwnershipResult {
+                is_owner: false,
+                owner_did: None,
+                error: Some("No response data".into()),
+            })
+        }
+    } else {
+        Ok(PropertyOwnershipResult {
+            is_owner: false,
+            owner_did: None,
+            error: result.error,
+        })
+    }
+}
+
+/// Check care provider availability — mutualaid can find matching caregivers.
+///
+/// Dispatches to `care_matching.check_availability` with typed input/output.
+#[hdk_extern]
+pub fn check_care_availability(input: CareAvailabilityQuery) -> ExternResult<CareAvailabilityResult> {
+    enforce_rate_limit("care_matching")?;
+    let payload = ExternIO::encode(&input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Encode error: {:?}", e))))?;
+    let dispatch = DispatchInput {
+        zome: "care_matching".into(),
+        fn_name: "check_availability".into(),
+        payload: payload.0,
+    };
+    let result = bridge::dispatch_call_checked(&dispatch, ALLOWED_ZOMES)?;
+    if result.success {
+        if let Some(response) = result.response {
+            let decoded: CareAvailabilityResult = ExternIO(response).decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            Ok(decoded)
+        } else {
+            Ok(CareAvailabilityResult {
+                available_count: 0,
+                recommendation: "No response data".into(),
+                error: Some("Empty response".into()),
+            })
+        }
+    } else {
+        Ok(CareAvailabilityResult {
+            available_count: 0,
+            recommendation: "Dispatch failed".into(),
+            error: result.error,
+        })
+    }
 }
 
 // ============================================================================
@@ -534,23 +671,27 @@ mod tests {
 
     #[test]
     fn local_allowlist_covers_all_domains() {
-        // Verify ALLOWED_ZOMES has representatives from all 5 commons domains
+        // Verify ALLOWED_ZOMES has representatives from all 7 commons domains
         let has_property = ALLOWED_ZOMES.iter().any(|z| z.starts_with("property_"));
         let has_housing = ALLOWED_ZOMES.iter().any(|z| z.starts_with("housing_"));
         let has_care = ALLOWED_ZOMES.iter().any(|z| z.starts_with("care_"));
         let has_mutualaid = ALLOWED_ZOMES.iter().any(|z| z.starts_with("mutualaid_"));
         let has_water = ALLOWED_ZOMES.iter().any(|z| z.starts_with("water_"));
+        let has_food = ALLOWED_ZOMES.iter().any(|z| z.starts_with("food_"));
+        let has_transport = ALLOWED_ZOMES.iter().any(|z| z.starts_with("transport_"));
         assert!(has_property, "ALLOWED_ZOMES missing property domain");
         assert!(has_housing, "ALLOWED_ZOMES missing housing domain");
         assert!(has_care, "ALLOWED_ZOMES missing care domain");
         assert!(has_mutualaid, "ALLOWED_ZOMES missing mutualaid domain");
         assert!(has_water, "ALLOWED_ZOMES missing water domain");
+        assert!(has_food, "ALLOWED_ZOMES missing food domain");
+        assert!(has_transport, "ALLOWED_ZOMES missing transport domain");
     }
 
     #[test]
     fn local_allowlist_has_expected_count() {
-        // 4 property + 6 housing + 5 care + 7 mutualaid + 5 water = 27
-        assert_eq!(ALLOWED_ZOMES.len(), 27);
+        // 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food + 3 transport = 34
+        assert_eq!(ALLOWED_ZOMES.len(), 34);
     }
 
     #[test]
@@ -625,6 +766,27 @@ mod tests {
     }
 
     #[test]
+    fn resolve_food_domain() {
+        assert_eq!(resolve_domain_zome("food", "register_plot").unwrap(), "food_production");
+        assert_eq!(resolve_domain_zome("food", "list_market").unwrap(), "food_distribution");
+        assert_eq!(resolve_domain_zome("food", "place_order").unwrap(), "food_distribution");
+        assert_eq!(resolve_domain_zome("food", "start_batch").unwrap(), "food_preservation");
+        assert_eq!(resolve_domain_zome("food", "check_storage").unwrap(), "food_preservation");
+        assert_eq!(resolve_domain_zome("food", "catalog_seed").unwrap(), "food_knowledge");
+        assert_eq!(resolve_domain_zome("food", "share_recipe").unwrap(), "food_knowledge");
+    }
+
+    #[test]
+    fn resolve_transport_domain() {
+        assert_eq!(resolve_domain_zome("transport", "register_vehicle").unwrap(), "transport_routes");
+        assert_eq!(resolve_domain_zome("transport", "create_route").unwrap(), "transport_routes");
+        assert_eq!(resolve_domain_zome("transport", "post_ride_share").unwrap(), "transport_sharing");
+        assert_eq!(resolve_domain_zome("transport", "request_cargo").unwrap(), "transport_sharing");
+        assert_eq!(resolve_domain_zome("transport", "get_carbon_credits").unwrap(), "transport_impact");
+        assert_eq!(resolve_domain_zome("transport", "calculate_emissions").unwrap(), "transport_impact");
+    }
+
+    #[test]
     fn resolve_unknown_domain_returns_none() {
         assert!(resolve_domain_zome("nonexistent", "anything").is_none());
     }
@@ -675,5 +837,79 @@ mod tests {
         assert!(!r2.has_pending_cases);
         assert!(r2.recommendation.is_none());
         assert_eq!(r2.error.as_deref(), Some("Network unreachable"));
+    }
+
+    // ---- Rate limit validation ----
+
+    #[test]
+    fn rate_limit_under_threshold_passes() {
+        assert!(check_rate_limit_count(0).is_ok());
+        assert!(check_rate_limit_count(50).is_ok());
+        assert!(check_rate_limit_count(99).is_ok());
+    }
+
+    #[test]
+    fn rate_limit_at_threshold_rejects() {
+        let err = check_rate_limit_count(100).unwrap_err();
+        assert!(err.contains("Rate limit exceeded"));
+        assert!(err.contains("100"));
+    }
+
+    #[test]
+    fn rate_limit_over_threshold_rejects() {
+        let err = check_rate_limit_count(500).unwrap_err();
+        assert!(err.contains("Rate limit exceeded"));
+    }
+
+    // ---- Typed convenience function serde ----
+
+    #[test]
+    fn property_ownership_query_serde_roundtrip() {
+        let q = PropertyOwnershipQuery {
+            property_id: "PROP-001".into(),
+            requester_did: "did:mycelix:agent_123".into(),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: PropertyOwnershipQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.property_id, "PROP-001");
+        assert_eq!(q2.requester_did, "did:mycelix:agent_123");
+    }
+
+    #[test]
+    fn property_ownership_result_serde_roundtrip() {
+        let r = PropertyOwnershipResult {
+            is_owner: true,
+            owner_did: Some("did:mycelix:owner_456".into()),
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: PropertyOwnershipResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.is_owner);
+        assert_eq!(r2.owner_did.as_deref(), Some("did:mycelix:owner_456"));
+    }
+
+    #[test]
+    fn care_availability_query_serde_roundtrip() {
+        let q = CareAvailabilityQuery {
+            skill_needed: "nursing".into(),
+            location: Some("downtown".into()),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: CareAvailabilityQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.skill_needed, "nursing");
+        assert_eq!(q2.location.as_deref(), Some("downtown"));
+    }
+
+    #[test]
+    fn care_availability_result_serde_roundtrip() {
+        let r = CareAvailabilityResult {
+            available_count: 5,
+            recommendation: "3 providers nearby".into(),
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: CareAvailabilityResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.available_count, 5);
+        assert!(r2.error.is_none());
     }
 }

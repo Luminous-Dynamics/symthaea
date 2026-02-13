@@ -28,6 +28,10 @@ export type {
   EmergencyAreaCheckResult,
   CheckJusticeDisputesInput,
   JusticeDisputeCheckResult,
+  PropertyOwnershipQuery,
+  PropertyOwnershipResult,
+  CareAvailabilityQuery,
+  CareAvailabilityResult,
 } from './commons/index.js';
 
 export {
@@ -51,6 +55,10 @@ export type {
   HousingCapacityResult,
   VerifyCareCredentialsInput,
   CareCredentialVerifyResult,
+  JusticeAreaQuery,
+  JusticeAreaResult,
+  FactcheckStatusQuery,
+  FactcheckStatusResult,
 } from './civic/index.js';
 
 // ============================================================================

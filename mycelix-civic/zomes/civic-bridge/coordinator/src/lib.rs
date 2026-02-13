@@ -14,6 +14,9 @@ use mycelix_bridge_common::{
     self as bridge,
     DispatchInput, DispatchResult, CrossClusterDispatchInput,
     ResolveQueryInput, EventTypeQuery, BridgeHealth,
+    JusticeAreaQuery, JusticeAreaResult,
+    FactcheckStatusQuery, FactcheckStatusResult,
+    RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
 };
 
 // ============================================================================
@@ -57,15 +60,52 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 }
 
 // ============================================================================
+// Rate Limiting
+// ============================================================================
+
+/// Check rate limit and log the dispatch. Returns error if limit exceeded.
+fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let anchor = ensure_anchor("dispatch_rate_limit")?;
+
+    let links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::DispatchRateLimit)?,
+        GetStrategy::Local,
+    )?;
+
+    let now = sys_time()?;
+    let window_start_micros = now.as_micros() - (RATE_LIMIT_WINDOW_SECS * 1_000_000);
+    let window_start = Timestamp::from_micros(window_start_micros);
+
+    let recent_count = links.iter()
+        .filter(|l| l.timestamp >= window_start)
+        .count();
+
+    check_rate_limit_count(recent_count)
+        .map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
+
+    // Log this dispatch
+    create_link(
+        agent,
+        anchor,
+        LinkTypes::DispatchRateLimit,
+        target_zome.as_bytes().to_vec(),
+    )?;
+
+    Ok(())
+}
+
+// ============================================================================
 // Cross-Domain Dispatch (synchronous RPC)
 // ============================================================================
 
 /// Dispatch a synchronous call to any domain zome within the Civic DNA.
 ///
-/// Validates the target zome against an allowlist, then uses
-/// `call(CallTargetCell::Local, ...)` to invoke the function directly.
+/// Rate-limited to 100 calls per 60 seconds per agent. Validates the target
+/// zome against an allowlist, then uses `call(CallTargetCell::Local, ...)`.
 #[hdk_extern]
 pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&input.zome)?;
     bridge::dispatch_call_checked(&input, ALLOWED_ZOMES)
 }
 
@@ -318,6 +358,7 @@ const COMMONS_ROLE: &str = "commons";
 /// - Media fact-checking property ownership claims
 #[hdk_extern]
 pub fn dispatch_commons_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&format!("commons:{}", input.zome))?;
     let dispatch = CrossClusterDispatchInput {
         role: COMMONS_ROLE.to_string(),
         zome: input.zome,
@@ -529,6 +570,80 @@ pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
 }
 
 // ============================================================================
+// Typed Convenience Functions (intra-cluster)
+// ============================================================================
+
+/// Query active justice cases in an area — emergency can check before deploying.
+///
+/// Dispatches to `justice_cases.get_active_cases_for_area` with typed input/output.
+#[hdk_extern]
+pub fn get_active_cases_for_area(input: JusticeAreaQuery) -> ExternResult<JusticeAreaResult> {
+    enforce_rate_limit("justice_cases")?;
+    let payload = ExternIO::encode(&input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Encode error: {:?}", e))))?;
+    let dispatch = DispatchInput {
+        zome: "justice_cases".into(),
+        fn_name: "get_active_cases_for_area".into(),
+        payload: payload.0,
+    };
+    let result = bridge::dispatch_call_checked(&dispatch, ALLOWED_ZOMES)?;
+    if result.success {
+        if let Some(response) = result.response {
+            let decoded: JusticeAreaResult = ExternIO(response).decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            Ok(decoded)
+        } else {
+            Ok(JusticeAreaResult {
+                active_cases: 0,
+                recommendation: "No response data".into(),
+                error: Some("Empty response".into()),
+            })
+        }
+    } else {
+        Ok(JusticeAreaResult {
+            active_cases: 0,
+            recommendation: "Dispatch failed".into(),
+            error: result.error,
+        })
+    }
+}
+
+/// Check factcheck status for a claim — justice can verify media claims.
+///
+/// Dispatches to `media_factcheck.check_status` with typed input/output.
+#[hdk_extern]
+pub fn check_factcheck_status(input: FactcheckStatusQuery) -> ExternResult<FactcheckStatusResult> {
+    enforce_rate_limit("media_factcheck")?;
+    let payload = ExternIO::encode(&input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Encode error: {:?}", e))))?;
+    let dispatch = DispatchInput {
+        zome: "media_factcheck".into(),
+        fn_name: "check_status".into(),
+        payload: payload.0,
+    };
+    let result = bridge::dispatch_call_checked(&dispatch, ALLOWED_ZOMES)?;
+    if result.success {
+        if let Some(response) = result.response {
+            let decoded: FactcheckStatusResult = ExternIO(response).decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            Ok(decoded)
+        } else {
+            Ok(FactcheckStatusResult {
+                has_factcheck: false,
+                verdict: None,
+                error: Some("Empty response".into()),
+            })
+        }
+    } else {
+        Ok(FactcheckStatusResult {
+            has_factcheck: false,
+            verdict: None,
+            error: result.error,
+        })
+    }
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -691,5 +806,77 @@ mod tests {
         assert!(!r2.commons_reachable);
         assert!(r2.recommendation.is_none());
         assert_eq!(r2.error.as_deref(), Some("Connection refused"));
+    }
+
+    // ---- Rate limit validation ----
+
+    #[test]
+    fn rate_limit_under_threshold_passes() {
+        assert!(check_rate_limit_count(0).is_ok());
+        assert!(check_rate_limit_count(50).is_ok());
+        assert!(check_rate_limit_count(99).is_ok());
+    }
+
+    #[test]
+    fn rate_limit_at_threshold_rejects() {
+        let err = check_rate_limit_count(100).unwrap_err();
+        assert!(err.contains("Rate limit exceeded"));
+        assert!(err.contains("100"));
+    }
+
+    #[test]
+    fn rate_limit_over_threshold_rejects() {
+        let err = check_rate_limit_count(500).unwrap_err();
+        assert!(err.contains("Rate limit exceeded"));
+    }
+
+    // ---- Typed convenience function serde ----
+
+    #[test]
+    fn justice_area_query_serde_roundtrip() {
+        let q = JusticeAreaQuery {
+            area: "downtown".into(),
+            case_type: Some("property_dispute".into()),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: JusticeAreaQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.area, "downtown");
+        assert_eq!(q2.case_type.as_deref(), Some("property_dispute"));
+    }
+
+    #[test]
+    fn justice_area_result_serde_roundtrip() {
+        let r = JusticeAreaResult {
+            active_cases: 3,
+            recommendation: "Caution advised".into(),
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: JusticeAreaResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.active_cases, 3);
+        assert!(r2.error.is_none());
+    }
+
+    #[test]
+    fn factcheck_status_query_serde_roundtrip() {
+        let q = FactcheckStatusQuery {
+            claim_id: "CLAIM-001".into(),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: FactcheckStatusQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.claim_id, "CLAIM-001");
+    }
+
+    #[test]
+    fn factcheck_status_result_serde_roundtrip() {
+        let r = FactcheckStatusResult {
+            has_factcheck: true,
+            verdict: Some("verified".into()),
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: FactcheckStatusResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.has_factcheck);
+        assert_eq!(r2.verdict.as_deref(), Some("verified"));
     }
 }

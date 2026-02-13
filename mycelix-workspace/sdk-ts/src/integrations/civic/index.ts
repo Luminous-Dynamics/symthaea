@@ -145,6 +145,31 @@ export interface CareCredentialVerifyResult {
   error?: string;
 }
 
+/** Input for checking active justice cases in an area */
+export interface JusticeAreaQuery {
+  area: string;
+  case_type?: string;
+}
+
+/** Result of an area justice case query */
+export interface JusticeAreaResult {
+  active_cases: number;
+  recommendation: string;
+  error?: string;
+}
+
+/** Input for checking factcheck status of a claim */
+export interface FactcheckStatusQuery {
+  claim_id: string;
+}
+
+/** Result of a factcheck status query */
+export interface FactcheckStatusResult {
+  has_factcheck: boolean;
+  verdict?: string;
+  error?: string;
+}
+
 /** Holochain ZomeCallable interface (minimal) */
 interface ZomeCallable {
   callZome<T>(params: {
@@ -334,6 +359,28 @@ export class CivicBridgeClient {
       role_name: CIVIC_ROLE,
       zome_name: BRIDGE_ZOME,
       fn_name: 'verify_care_credentials_for_evidence',
+      payload: input,
+    });
+  }
+
+  // --- Typed Convenience Functions (intra-cluster) ---
+
+  /** Get active cases for an area — typed wrapper for justice_cases.get_cases_for_area */
+  async getActiveCasesForArea(input: JusticeAreaQuery): Promise<JusticeAreaResult> {
+    return this.client.callZome({
+      role_name: CIVIC_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'get_active_cases_for_area',
+      payload: input,
+    });
+  }
+
+  /** Check factcheck status of a claim — typed wrapper for media_factcheck.check_status */
+  async checkFactcheckStatus(input: FactcheckStatusQuery): Promise<FactcheckStatusResult> {
+    return this.client.callZome({
+      role_name: CIVIC_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'check_factcheck_status',
       payload: input,
     });
   }

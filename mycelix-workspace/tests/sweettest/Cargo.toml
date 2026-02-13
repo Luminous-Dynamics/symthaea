@@ -54,3 +54,7 @@ path = "tests/fl_bridge_e2e.rs"
 [[test]]
 name = "identity_pqc_workflow"
 path = "tests/identity_pqc_workflow.rs"
+
+[[test]]
+name = "cross_cluster_dispatch"
+path = "tests/cross_cluster_dispatch.rs"

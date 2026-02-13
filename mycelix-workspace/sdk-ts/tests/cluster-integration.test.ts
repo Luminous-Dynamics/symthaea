@@ -36,6 +36,14 @@ import type {
   HousingCapacityResult,
   VerifyCareCredentialsInput,
   CareCredentialVerifyResult,
+  PropertyOwnershipQuery,
+  PropertyOwnershipResult,
+  CareAvailabilityQuery,
+  CareAvailabilityResult,
+  JusticeAreaQuery,
+  JusticeAreaResult,
+  FactcheckStatusQuery,
+  FactcheckStatusResult,
 } from '../src/integrations/index.js';
 
 // ============================================================================
@@ -310,6 +318,51 @@ describe('CommonsBridgeClient', () => {
     });
   });
 
+  describe('typed convenience functions (intra-cluster)', () => {
+    it('should verify property ownership', async () => {
+      const mockResult: PropertyOwnershipResult = {
+        is_owner: true,
+        owner_did: 'did:mycelix:owner_abc',
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.verifyPropertyOwnership({
+        property_id: 'PROP-001',
+        requester_did: 'did:mycelix:requester_xyz',
+      });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'commons',
+        zome_name: 'commons_bridge',
+        fn_name: 'verify_property_ownership',
+        payload: { property_id: 'PROP-001', requester_did: 'did:mycelix:requester_xyz' },
+      });
+      expect(result.is_owner).toBe(true);
+      expect(result.owner_did).toBe('did:mycelix:owner_abc');
+    });
+
+    it('should check care availability', async () => {
+      const mockResult: CareAvailabilityResult = {
+        available_count: 5,
+        recommendation: '5 providers available for nursing in downtown',
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.checkCareAvailability({
+        skill_needed: 'nursing',
+        location: 'downtown',
+      });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'commons',
+        zome_name: 'commons_bridge',
+        fn_name: 'check_care_availability',
+        payload: { skill_needed: 'nursing', location: 'downtown' },
+      });
+      expect(result.available_count).toBe(5);
+    });
+  });
+
   describe('health', () => {
     it('should perform health check', async () => {
       const mockHealth: BridgeHealth = {
@@ -536,6 +589,50 @@ describe('CivicBridgeClient', () => {
         payload: { provider_did: 'did:mycelix:care_provider_123', case_id: 'case_456' },
       });
       expect(result.commons_reachable).toBe(true);
+    });
+  });
+
+  describe('typed convenience functions (intra-cluster)', () => {
+    it('should get active cases for area', async () => {
+      const mockResult: JusticeAreaResult = {
+        active_cases: 3,
+        recommendation: '3 active civil cases in north-side',
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.getActiveCasesForArea({
+        area: 'north-side',
+        case_type: 'civil',
+      });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'civic',
+        zome_name: 'civic_bridge',
+        fn_name: 'get_active_cases_for_area',
+        payload: { area: 'north-side', case_type: 'civil' },
+      });
+      expect(result.active_cases).toBe(3);
+    });
+
+    it('should check factcheck status', async () => {
+      const mockResult: FactcheckStatusResult = {
+        has_factcheck: true,
+        verdict: 'verified',
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.checkFactcheckStatus({
+        claim_id: 'CL-42',
+      });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'civic',
+        zome_name: 'civic_bridge',
+        fn_name: 'check_factcheck_status',
+        payload: { claim_id: 'CL-42' },
+      });
+      expect(result.has_factcheck).toBe(true);
+      expect(result.verdict).toBe('verified');
     });
   });
 

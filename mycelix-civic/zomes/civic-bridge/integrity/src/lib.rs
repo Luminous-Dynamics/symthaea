@@ -40,6 +40,8 @@ pub enum LinkTypes {
     EventTypeToEvent,
     AgentToEvent,
     DomainToEvent,
+    /// Rate limit tracking: agent → anchor per dispatch call
+    DispatchRateLimit,
 }
 
 #[hdk_extern]

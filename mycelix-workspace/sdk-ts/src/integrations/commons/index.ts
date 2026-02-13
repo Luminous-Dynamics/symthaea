@@ -132,6 +132,32 @@ export interface JusticeDisputeCheckResult {
   error?: string;
 }
 
+/** Input for verifying property ownership */
+export interface PropertyOwnershipQuery {
+  property_id: string;
+  requester_did: string;
+}
+
+/** Result of a property ownership verification */
+export interface PropertyOwnershipResult {
+  is_owner: boolean;
+  owner_did?: string;
+  error?: string;
+}
+
+/** Input for checking care provider availability */
+export interface CareAvailabilityQuery {
+  skill_needed: string;
+  location?: string;
+}
+
+/** Result of a care availability query */
+export interface CareAvailabilityResult {
+  available_count: number;
+  recommendation: string;
+  error?: string;
+}
+
 /** Holochain ZomeCallable interface (minimal) */
 interface ZomeCallable {
   callZome<T>(params: {
@@ -323,6 +349,28 @@ export class CommonsBridgeClient {
       role_name: COMMONS_ROLE,
       zome_name: BRIDGE_ZOME,
       fn_name: 'check_justice_disputes_for_property',
+      payload: input,
+    });
+  }
+
+  // --- Typed Convenience Functions (intra-cluster) ---
+
+  /** Verify property ownership — typed wrapper for property_registry.verify_ownership */
+  async verifyPropertyOwnership(input: PropertyOwnershipQuery): Promise<PropertyOwnershipResult> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'verify_property_ownership',
+      payload: input,
+    });
+  }
+
+  /** Check care provider availability — typed wrapper for care_matching.check_availability */
+  async checkCareAvailability(input: CareAvailabilityQuery): Promise<CareAvailabilityResult> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'check_care_availability',
       payload: input,
     });
   }

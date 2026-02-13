@@ -218,6 +218,96 @@ pub fn dispatch_call_cross_cluster(
 }
 
 // ============================================================================
+// Rate limiting constants
+// ============================================================================
+
+/// Maximum dispatch calls per agent within the rate limit window.
+pub const RATE_LIMIT_MAX_DISPATCH: usize = 100;
+
+/// Rate limit window in seconds.
+pub const RATE_LIMIT_WINDOW_SECS: i64 = 60;
+
+/// Check whether the number of recent dispatches exceeds the rate limit.
+///
+/// Returns `Ok(())` if within limits, or an error string if exceeded.
+/// This is a pure validation function — the caller is responsible for
+/// counting recent dispatches (via `get_links` on the agent's rate-limit
+/// links) and passing the count here.
+pub fn check_rate_limit_count(recent_count: usize) -> Result<(), String> {
+    if recent_count >= RATE_LIMIT_MAX_DISPATCH {
+        Err(format!(
+            "Rate limit exceeded: {} dispatches in {}s (max {})",
+            recent_count, RATE_LIMIT_WINDOW_SECS, RATE_LIMIT_MAX_DISPATCH
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+// ============================================================================
+// Typed cross-domain dispatch helpers
+// ============================================================================
+
+/// Input for verifying property ownership (commons: housing → property)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PropertyOwnershipQuery {
+    pub property_id: String,
+    pub requester_did: String,
+}
+
+/// Result of a property ownership verification
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PropertyOwnershipResult {
+    pub is_owner: bool,
+    pub owner_did: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Input for querying care provider availability (commons: mutualaid → care)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CareAvailabilityQuery {
+    pub skill_needed: String,
+    pub location: Option<String>,
+}
+
+/// Result of a care availability query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CareAvailabilityResult {
+    pub available_count: u32,
+    pub recommendation: String,
+    pub error: Option<String>,
+}
+
+/// Input for checking active cases in an area (civic: emergency → justice)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct JusticeAreaQuery {
+    pub area: String,
+    pub case_type: Option<String>,
+}
+
+/// Result of an area case query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct JusticeAreaResult {
+    pub active_cases: u32,
+    pub recommendation: String,
+    pub error: Option<String>,
+}
+
+/// Input for checking factcheck status (civic: justice → media)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FactcheckStatusQuery {
+    pub claim_id: String,
+}
+
+/// Result of a factcheck status query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FactcheckStatusResult {
+    pub has_factcheck: bool,
+    pub verdict: Option<String>,
+    pub error: Option<String>,
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
@@ -444,5 +534,110 @@ mod tests {
         assert_eq!(h2.total_events, 42);
         assert_eq!(h2.total_queries, 7);
         assert_eq!(h2.domains.len(), 2);
+    }
+
+    // Rate limit tests
+
+    #[test]
+    fn rate_limit_zero_calls_passes() {
+        assert!(check_rate_limit_count(0).is_ok());
+    }
+
+    #[test]
+    fn rate_limit_under_max_passes() {
+        assert!(check_rate_limit_count(99).is_ok());
+    }
+
+    #[test]
+    fn rate_limit_at_max_rejects() {
+        let err = check_rate_limit_count(RATE_LIMIT_MAX_DISPATCH).unwrap_err();
+        assert!(err.contains("Rate limit exceeded"));
+    }
+
+    #[test]
+    fn rate_limit_over_max_rejects() {
+        let err = check_rate_limit_count(1000).unwrap_err();
+        assert!(err.contains("Rate limit exceeded"));
+        assert!(err.contains("1000"));
+    }
+
+    #[test]
+    fn rate_limit_error_includes_window() {
+        let err = check_rate_limit_count(200).unwrap_err();
+        assert!(err.contains(&format!("{}s", RATE_LIMIT_WINDOW_SECS)));
+    }
+
+    // Typed helper serde tests
+
+    #[test]
+    fn property_ownership_query_serde_roundtrip() {
+        let q = PropertyOwnershipQuery {
+            property_id: "PROP-001".into(),
+            requester_did: "did:mycelix:abc".into(),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: PropertyOwnershipQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q.property_id, q2.property_id);
+        assert_eq!(q.requester_did, q2.requester_did);
+    }
+
+    #[test]
+    fn property_ownership_result_serde_roundtrip() {
+        let r = PropertyOwnershipResult {
+            is_owner: true,
+            owner_did: Some("did:mycelix:owner".into()),
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: PropertyOwnershipResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.is_owner);
+        assert_eq!(r2.owner_did, Some("did:mycelix:owner".into()));
+    }
+
+    #[test]
+    fn care_availability_query_serde_roundtrip() {
+        let q = CareAvailabilityQuery {
+            skill_needed: "nursing".into(),
+            location: None,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: CareAvailabilityQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q.skill_needed, q2.skill_needed);
+        assert!(q2.location.is_none());
+    }
+
+    #[test]
+    fn justice_area_query_serde_roundtrip() {
+        let q = JusticeAreaQuery {
+            area: "north-side".into(),
+            case_type: Some("civil".into()),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: JusticeAreaQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q.area, q2.area);
+        assert_eq!(q.case_type, q2.case_type);
+    }
+
+    #[test]
+    fn factcheck_status_query_serde_roundtrip() {
+        let q = FactcheckStatusQuery {
+            claim_id: "CL-42".into(),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: FactcheckStatusQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q.claim_id, q2.claim_id);
+    }
+
+    #[test]
+    fn factcheck_status_result_serde_roundtrip() {
+        let r = FactcheckStatusResult {
+            has_factcheck: true,
+            verdict: Some("verified".into()),
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: FactcheckStatusResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.has_factcheck);
+        assert_eq!(r2.verdict, Some("verified".into()));
     }
 }

@@ -107,10 +107,12 @@ hc dna pack .
 | Rust SDK | 996 pass (1002 w/ parallel) | Verified 2026-02-04 |
 | TypeScript SDK | 6,316 pass / 15 skip | All pass (libsodium ESM compat fixed) |
 | Identity unit | 23 | Pass (recovery + trust_credential) |
-| Commons cluster unit | 127 | Bridge dispatch + cross-domain + cross-cluster (commons→civic) |
-| Civic cluster unit | 144 | Bridge dispatch + cross-domain + cross-cluster (civic→commons) |
-| Bridge-common | 14 | Shared dispatch types, allowlist validation, serde roundtrips |
-| SDK cluster integration | 33 | CommonsBridgeClient + CivicBridgeClient + cross-cluster methods |
+| Commons cluster unit | 134 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers |
+| Civic cluster unit | 151 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers |
+| Bridge-common | 25 | Shared dispatch types, allowlist validation, rate limiting, typed helpers |
+| SDK cluster integration | 37 | CommonsBridgeClient + CivicBridgeClient + typed convenience + cross-cluster |
+| SDK conductor cluster | 22 | Typed convenience, rate limiting, allowlist, audit trail mock tests |
+| Sweettest cross-cluster | 12 | OtherRole dispatch, allowlist enforcement, typed helpers, bidirectional health |
 | WASM zomes | 66 | Compile to wasm32-unknown-unknown |
 | Sweettest | 15/15 pass | `just test-sweettest` (--release required) |
 | Tryorama | 13 suites | Needs running conductor + hApp bundles |
