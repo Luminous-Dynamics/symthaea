@@ -16,6 +16,7 @@
 export {
   CommonsBridgeClient,
   createCommonsBridgeClient,
+  isCommonsBridgeSignal,
   COMMONS_DOMAINS,
   COMMONS_ZOMES,
 } from './commons/index.js';
@@ -23,6 +24,8 @@ export {
 export type {
   CommonsQueryInput,
   CommonsEventInput,
+  CommonsBridgeEventSignal,
+  BridgeSignalHandler as CommonsBridgeSignalHandler,
   CrossClusterDispatchInput as CommonsCrossClusterInput,
   CheckEmergencyForAreaInput,
   EmergencyAreaCheckResult,
@@ -37,6 +40,7 @@ export type {
 export {
   CivicBridgeClient,
   createCivicBridgeClient,
+  isCivicBridgeSignal,
   CIVIC_DOMAINS,
   CIVIC_ZOMES,
 } from './civic/index.js';
@@ -44,6 +48,8 @@ export {
 export type {
   CivicQueryInput,
   CivicEventInput,
+  CivicBridgeEventSignal,
+  CivicBridgeSignalHandler,
   BridgeHealth,
   DispatchInput,
   DispatchResult,

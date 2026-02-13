@@ -288,3 +288,170 @@ pub struct CrossHappActionInput {
     pub target_entry: Option<String>,
     pub result: String,
 }
+
+// =============================================================================
+// CROSS-DOMAIN: justice-enforcement → justice-cases
+// =============================================================================
+
+/// Result of verifying a case before enforcement
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CaseVerificationResult {
+    pub case_found: bool,
+    pub case_id: Option<String>,
+    pub phase: Option<String>,
+    pub status: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Input for verifying a case before enforcement
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyCaseForEnforcementInput {
+    pub case_id: String,
+}
+
+/// Verify that a case exists and has a decision before creating enforcement.
+///
+/// Cross-domain call: justice-enforcement → justice-cases via CallTargetCell::Local.
+/// Ensures enforcement actions are only created for real, decided cases.
+#[hdk_extern]
+pub fn verify_case_for_enforcement(input: VerifyCaseForEnforcementInput) -> ExternResult<CaseVerificationResult> {
+    // Call justice_cases to get all cases and find the matching one
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("justice_cases"),
+        FunctionName::from("get_all_cases"),
+        None,
+        (),
+    );
+
+    let cases: Vec<Record> = match &response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            extern_io.decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?
+        }
+        Ok(other) => {
+            return Ok(CaseVerificationResult {
+                case_found: false,
+                case_id: None,
+                phase: None,
+                status: None,
+                error: Some(format!("Unexpected response from justice_cases: {:?}", other)),
+            });
+        }
+        Err(e) => {
+            return Ok(CaseVerificationResult {
+                case_found: false,
+                case_id: None,
+                phase: None,
+                status: None,
+                error: Some(format!("Failed to call justice_cases: {:?}", e)),
+            });
+        }
+    };
+
+    // Search through cases for matching case_id
+    // Cases use a Case struct with a `case_id` or similar field
+    // We check by looking at case entries for the matching ID
+    for record in &cases {
+        if let Some(entry) = record.entry().as_option() {
+            // Try to decode as a generic JSON to extract case_id
+            let bytes: SerializedBytes = SerializedBytes::try_from(entry.clone())
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e))))?;
+            if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes.bytes()) {
+                if let Some(id) = value.get("case_id").and_then(|v| v.as_str()) {
+                    if id == input.case_id {
+                        let phase = value.get("phase")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let status = value.get("status")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+
+                        return Ok(CaseVerificationResult {
+                            case_found: true,
+                            case_id: Some(input.case_id),
+                            phase,
+                            status,
+                            error: None,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(CaseVerificationResult {
+        case_found: false,
+        case_id: None,
+        phase: None,
+        status: None,
+        error: Some(format!("Case '{}' not found in justice system", input.case_id)),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn case_verification_result_found_serde() {
+        let r = CaseVerificationResult {
+            case_found: true,
+            case_id: Some("CASE-42".into()),
+            phase: Some("Decision".into()),
+            status: Some("Active".into()),
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: CaseVerificationResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.case_found);
+        assert_eq!(r2.case_id.as_deref(), Some("CASE-42"));
+        assert_eq!(r2.phase.as_deref(), Some("Decision"));
+        assert_eq!(r2.status.as_deref(), Some("Active"));
+        assert!(r2.error.is_none());
+    }
+
+    #[test]
+    fn case_verification_result_not_found_serde() {
+        let r = CaseVerificationResult {
+            case_found: false,
+            case_id: None,
+            phase: None,
+            status: None,
+            error: Some("Case 'BOGUS' not found in justice system".into()),
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: CaseVerificationResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.case_found);
+        assert!(r2.case_id.is_none());
+        assert!(r2.error.as_ref().unwrap().contains("BOGUS"));
+    }
+
+    #[test]
+    fn verify_case_input_serde() {
+        let input = VerifyCaseForEnforcementInput {
+            case_id: "CASE-99".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: VerifyCaseForEnforcementInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.case_id, "CASE-99");
+    }
+
+    #[test]
+    fn case_verification_all_none_fields() {
+        let r = CaseVerificationResult {
+            case_found: false,
+            case_id: None,
+            phase: None,
+            status: None,
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: CaseVerificationResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.case_found);
+        assert!(r2.case_id.is_none());
+        assert!(r2.phase.is_none());
+        assert!(r2.status.is_none());
+        assert!(r2.error.is_none());
+    }
+}

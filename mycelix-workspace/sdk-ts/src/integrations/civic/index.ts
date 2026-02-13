@@ -399,6 +399,32 @@ export class CivicBridgeClient {
 }
 
 // ============================================================================
+// Bridge Event Signals
+// ============================================================================
+
+/** Signal payload emitted by the civic bridge when a cross-domain event is created */
+export interface CivicBridgeEventSignal {
+  signal_type: 'civic_bridge_event';
+  domain: string;
+  event_type: string;
+  payload: string;
+  action_hash: Uint8Array;
+}
+
+/** Type guard for civic bridge event signals */
+export function isCivicBridgeSignal(signal: unknown): signal is CivicBridgeEventSignal {
+  return (
+    typeof signal === 'object' &&
+    signal !== null &&
+    'signal_type' in signal &&
+    (signal as CivicBridgeEventSignal).signal_type === 'civic_bridge_event'
+  );
+}
+
+/** Callback type for signal subscriptions */
+export type CivicBridgeSignalHandler = (signal: CivicBridgeEventSignal) => void;
+
+// ============================================================================
 // Factory
 // ============================================================================
 

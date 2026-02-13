@@ -279,7 +279,22 @@ pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
     )))
 }
 
-/// Broadcast a cross-domain event within the Commons cluster
+/// Signal payload emitted to connected UI clients when a bridge event is created
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BridgeEventSignal {
+    /// Signal type identifier for client-side routing
+    pub signal_type: String,
+    /// The domain that produced the event
+    pub domain: String,
+    /// Type of event within the domain
+    pub event_type: String,
+    /// Serialized event payload
+    pub payload: String,
+    /// Action hash of the created event entry
+    pub action_hash: ActionHash,
+}
+
+/// Broadcast a cross-domain event within the Commons cluster and emit a signal
 #[hdk_extern]
 pub fn broadcast_event(event: CommonsEvent) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Event(event.clone()))?;
@@ -299,6 +314,16 @@ pub fn broadcast_event(event: CommonsEvent) -> ExternResult<Record> {
     // Link domain to event
     let domain_anchor = ensure_anchor(&format!("domain_events:{}", event.domain))?;
     create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToEvent, ())?;
+
+    // Emit signal to connected UI clients
+    let signal = BridgeEventSignal {
+        signal_type: "commons_bridge_event".to_string(),
+        domain: event.domain.clone(),
+        event_type: event.event_type.clone(),
+        payload: event.payload.clone(),
+        action_hash: action_hash.clone(),
+    };
+    emit_signal(&signal)?;
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created event".into()
@@ -911,5 +936,36 @@ mod tests {
         let r2: CareAvailabilityResult = serde_json::from_str(&json).unwrap();
         assert_eq!(r2.available_count, 5);
         assert!(r2.error.is_none());
+    }
+
+    // ---- Bridge event signal serde ----
+
+    #[test]
+    fn bridge_event_signal_serde_roundtrip() {
+        let signal = BridgeEventSignal {
+            signal_type: "commons_bridge_event".to_string(),
+            domain: "property".to_string(),
+            event_type: "ownership_transferred".to_string(),
+            payload: r#"{"property_id":"PROP-001"}"#.to_string(),
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let s2: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(s2.signal_type, "commons_bridge_event");
+        assert_eq!(s2.domain, "property");
+        assert_eq!(s2.event_type, "ownership_transferred");
+        assert!(s2.payload.contains("PROP-001"));
+    }
+
+    #[test]
+    fn bridge_event_signal_type_is_commons() {
+        let signal = BridgeEventSignal {
+            signal_type: "commons_bridge_event".to_string(),
+            domain: "water".to_string(),
+            event_type: "flow_measured".to_string(),
+            payload: "{}".to_string(),
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        assert_eq!(signal.signal_type, "commons_bridge_event");
     }
 }

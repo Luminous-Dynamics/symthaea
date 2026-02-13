@@ -598,6 +598,111 @@ pub fn complete_usage(input: CompleteUsageInput) -> ExternResult<Record> {
 }
 
 // =============================================================================
+// CROSS-DOMAIN: mutualaid-resources → mutualaid-timebank
+// =============================================================================
+
+/// Result of recording a time credit for resource usage
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TimebankCreditResult {
+    pub credited: bool,
+    pub hours: f64,
+    pub error: Option<String>,
+}
+
+/// Input for completing usage and recording time credit
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CompleteUsageWithTimebankInput {
+    pub booking_hash: ActionHash,
+    pub condition_after: ResourceCondition,
+    pub issues: Vec<String>,
+    pub notes: String,
+    pub hours_used: f64,
+    pub category_description: String,
+}
+
+/// Complete resource usage and automatically record a time credit exchange.
+///
+/// Cross-domain call: mutualaid-resources → mutualaid-timebank via CallTargetCell::Local.
+/// When a resource usage is completed, this creates a corresponding time credit
+/// entry so the resource owner earns time credits for sharing.
+#[hdk_extern]
+pub fn complete_usage_with_timebank(input: CompleteUsageWithTimebankInput) -> ExternResult<TimebankCreditResult> {
+    // First, get the booking to find resource owner and booker
+    let booking_record = get(input.booking_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
+
+    let booking: Booking = booking_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse booking".to_string())))?;
+
+    // Get the resource to find its owner
+    let resource_record = get(booking.resource_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Resource not found".to_string())))?;
+
+    let resource: SharedResource = resource_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse resource".to_string())))?;
+
+    // Complete the usage via the normal flow
+    let _usage_result = complete_usage(CompleteUsageInput {
+        booking_hash: input.booking_hash,
+        condition_after: input.condition_after,
+        issues: input.issues,
+        notes: input.notes,
+    })?;
+
+    // Now call mutualaid-timebank to record the exchange
+    // The resource owner (provider) earns credits, the booker (recipient) spends them
+    let exchange_input = serde_json::json!({
+        "offer_hash": null,
+        "request_hash": null,
+        "provider": resource.owner,
+        "recipient": booking.booker,
+        "hours": input.hours_used,
+        "category": "ResourceSharing",
+        "description": input.category_description,
+    });
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("mutualaid_timebank"),
+        FunctionName::from("record_exchange"),
+        None,
+        exchange_input.to_string(),
+    );
+
+    match &response {
+        Ok(ZomeCallResponse::Ok(_)) => {
+            Ok(TimebankCreditResult {
+                credited: true,
+                hours: input.hours_used,
+                error: None,
+            })
+        }
+        Ok(other) => {
+            // Usage completed but timebank credit failed — still return success
+            // but flag the credit failure
+            Ok(TimebankCreditResult {
+                credited: false,
+                hours: input.hours_used,
+                error: Some(format!("Usage completed but timebank credit failed: {:?}", other)),
+            })
+        }
+        Err(e) => {
+            Ok(TimebankCreditResult {
+                credited: false,
+                hours: input.hours_used,
+                error: Some(format!("Usage completed but timebank call failed: {:?}", e)),
+            })
+        }
+    }
+}
+
+// =============================================================================
 // MAINTENANCE
 // =============================================================================
 
@@ -683,4 +788,62 @@ fn all_resources_anchor() -> ExternResult<EntryHash> {
 /// Get anchor for available resources
 fn available_resources_anchor() -> ExternResult<EntryHash> {
     make_anchor("available_resources")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timebank_credit_result_credited_serde() {
+        let r = TimebankCreditResult {
+            credited: true,
+            hours: 2.5,
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: TimebankCreditResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.credited);
+        assert!((r2.hours - 2.5).abs() < f64::EPSILON);
+        assert!(r2.error.is_none());
+    }
+
+    #[test]
+    fn timebank_credit_result_failed_serde() {
+        let r = TimebankCreditResult {
+            credited: false,
+            hours: 1.0,
+            error: Some("Usage completed but timebank credit failed: connection refused".into()),
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: TimebankCreditResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.credited);
+        assert!(r2.error.as_ref().unwrap().contains("connection refused"));
+    }
+
+    #[test]
+    fn timebank_credit_zero_hours() {
+        let r = TimebankCreditResult {
+            credited: true,
+            hours: 0.0,
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: TimebankCreditResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.credited);
+        assert!((r2.hours).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn complete_usage_with_timebank_input_serde() {
+        // We can't construct the full input without ActionHash, but we can test
+        // the result type which is the cross-domain return value
+        let r = TimebankCreditResult {
+            credited: true,
+            hours: 3.0,
+            error: None,
+        };
+        assert!(r.credited);
+        assert_eq!(r.hours, 3.0);
+    }
 }

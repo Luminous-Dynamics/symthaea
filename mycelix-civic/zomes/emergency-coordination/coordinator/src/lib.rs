@@ -304,6 +304,112 @@ pub fn get_zone_teams(zone_hash: ActionHash) -> ExternResult<Vec<Record>> {
     Ok(teams)
 }
 
+// =============================================================================
+// CROSS-DOMAIN: emergency-coordination → emergency-incidents
+// =============================================================================
+
+/// Context about active disasters for a zone assignment
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DisasterContextResult {
+    pub active_disaster_count: u32,
+    pub disasters: Vec<DisasterSummary>,
+    pub highest_severity: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Summary of an active disaster
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DisasterSummary {
+    pub id: String,
+    pub title: String,
+    pub severity: String,
+    pub disaster_type: String,
+}
+
+/// Get disaster context for zone assignment.
+///
+/// Cross-domain call: emergency-coordination → emergency-incidents via CallTargetCell::Local.
+/// Provides active disaster information so teams can be assigned with proper context.
+#[hdk_extern]
+pub fn get_disaster_context(_: ()) -> ExternResult<DisasterContextResult> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("emergency_incidents"),
+        FunctionName::from("get_active_disasters"),
+        None,
+        (),
+    );
+
+    let disaster_records: Vec<Record> = match &response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            extern_io.decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?
+        }
+        Ok(other) => {
+            return Ok(DisasterContextResult {
+                active_disaster_count: 0,
+                disasters: vec![],
+                highest_severity: None,
+                error: Some(format!("Unexpected response from emergency_incidents: {:?}", other)),
+            });
+        }
+        Err(e) => {
+            return Ok(DisasterContextResult {
+                active_disaster_count: 0,
+                disasters: vec![],
+                highest_severity: None,
+                error: Some(format!("Failed to call emergency_incidents: {:?}", e)),
+            });
+        }
+    };
+
+    let mut summaries = Vec::new();
+    let severity_order = ["Critical", "Severe", "Moderate", "Minor"];
+    let mut highest_idx = severity_order.len();
+
+    for record in &disaster_records {
+        if let Some(entry) = record.entry().as_option() {
+            let bytes: SerializedBytes = SerializedBytes::try_from(entry.clone())
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e))))?;
+            if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes.bytes()) {
+                let id = value.get("id").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+                let title = value.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let severity = value.get("severity").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
+                let disaster_type = value.get("disaster_type").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
+
+                // Track highest severity
+                if let Some(idx) = severity_order.iter().position(|s| *s == severity) {
+                    if idx < highest_idx {
+                        highest_idx = idx;
+                    }
+                }
+
+                summaries.push(DisasterSummary {
+                    id,
+                    title,
+                    severity,
+                    disaster_type,
+                });
+            }
+        }
+    }
+
+    let highest_severity = if highest_idx < severity_order.len() {
+        Some(severity_order[highest_idx].to_string())
+    } else if !summaries.is_empty() {
+        Some("Unknown".to_string())
+    } else {
+        None
+    };
+
+    Ok(DisasterContextResult {
+        active_disaster_count: summaries.len() as u32,
+        disasters: summaries,
+        highest_severity,
+        error: None,
+    })
+}
+
 /// Get the latest location for an agent
 #[hdk_extern]
 pub fn get_agent_location(agent: AgentPubKey) -> ExternResult<Option<Record>> {
@@ -328,4 +434,82 @@ pub fn get_agent_location(agent: AgentPubKey) -> ExternResult<Option<Record>> {
     }
 
     Ok(latest)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disaster_context_result_serde_roundtrip() {
+        let r = DisasterContextResult {
+            active_disaster_count: 2,
+            disasters: vec![
+                DisasterSummary {
+                    id: "DIS-1".into(),
+                    title: "Winter Storm".into(),
+                    severity: "Severe".into(),
+                    disaster_type: "Weather".into(),
+                },
+                DisasterSummary {
+                    id: "DIS-2".into(),
+                    title: "Flood".into(),
+                    severity: "Critical".into(),
+                    disaster_type: "Flood".into(),
+                },
+            ],
+            highest_severity: Some("Critical".into()),
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: DisasterContextResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.active_disaster_count, 2);
+        assert_eq!(r2.disasters.len(), 2);
+        assert_eq!(r2.highest_severity.as_deref(), Some("Critical"));
+        assert!(r2.error.is_none());
+    }
+
+    #[test]
+    fn disaster_context_empty_no_disasters() {
+        let r = DisasterContextResult {
+            active_disaster_count: 0,
+            disasters: vec![],
+            highest_severity: None,
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: DisasterContextResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.active_disaster_count, 0);
+        assert!(r2.disasters.is_empty());
+        assert!(r2.highest_severity.is_none());
+    }
+
+    #[test]
+    fn disaster_summary_serde_roundtrip() {
+        let s = DisasterSummary {
+            id: "DIS-5".into(),
+            title: "Earthquake".into(),
+            severity: "Critical".into(),
+            disaster_type: "Seismic".into(),
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let s2: DisasterSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(s2.id, "DIS-5");
+        assert_eq!(s2.title, "Earthquake");
+        assert_eq!(s2.severity, "Critical");
+        assert_eq!(s2.disaster_type, "Seismic");
+    }
+
+    #[test]
+    fn disaster_context_error_state() {
+        let r = DisasterContextResult {
+            active_disaster_count: 0,
+            disasters: vec![],
+            highest_severity: None,
+            error: Some("Failed to call emergency_incidents: timeout".into()),
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: DisasterContextResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.error.as_ref().unwrap().contains("timeout"));
+    }
 }

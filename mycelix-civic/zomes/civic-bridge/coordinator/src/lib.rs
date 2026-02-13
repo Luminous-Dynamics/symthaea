@@ -219,7 +219,22 @@ pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
 // Event Broadcasting
 // ============================================================================
 
-/// Broadcast a cross-domain event
+/// Signal payload emitted to connected UI clients when a bridge event is created
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BridgeEventSignal {
+    /// Signal type identifier for client-side routing
+    pub signal_type: String,
+    /// The domain that produced the event
+    pub domain: String,
+    /// Type of event within the domain
+    pub event_type: String,
+    /// Serialized event payload
+    pub payload: String,
+    /// Action hash of the created event entry
+    pub action_hash: ActionHash,
+}
+
+/// Broadcast a cross-domain event and emit a signal to connected clients
 #[hdk_extern]
 pub fn broadcast_event(event: CivicEventEntry) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Event(event.clone()))?;
@@ -235,6 +250,16 @@ pub fn broadcast_event(event: CivicEventEntry) -> ExternResult<Record> {
 
     let domain_anchor = ensure_anchor(&format!("domain_events:{}", event.domain))?;
     create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToEvent, ())?;
+
+    // Emit signal to connected UI clients
+    let signal = BridgeEventSignal {
+        signal_type: "civic_bridge_event".to_string(),
+        domain: event.domain.clone(),
+        event_type: event.event_type.clone(),
+        payload: event.payload.clone(),
+        action_hash: action_hash.clone(),
+    };
+    emit_signal(&signal)?;
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created event".into()
@@ -878,5 +903,36 @@ mod tests {
         let r2: FactcheckStatusResult = serde_json::from_str(&json).unwrap();
         assert!(r2.has_factcheck);
         assert_eq!(r2.verdict.as_deref(), Some("verified"));
+    }
+
+    // ---- Bridge event signal serde ----
+
+    #[test]
+    fn bridge_event_signal_serde_roundtrip() {
+        let signal = BridgeEventSignal {
+            signal_type: "civic_bridge_event".to_string(),
+            domain: "justice".to_string(),
+            event_type: "case_filed".to_string(),
+            payload: r#"{"case_id":"CASE-42"}"#.to_string(),
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let s2: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(s2.signal_type, "civic_bridge_event");
+        assert_eq!(s2.domain, "justice");
+        assert_eq!(s2.event_type, "case_filed");
+        assert!(s2.payload.contains("CASE-42"));
+    }
+
+    #[test]
+    fn bridge_event_signal_type_is_civic() {
+        let signal = BridgeEventSignal {
+            signal_type: "civic_bridge_event".to_string(),
+            domain: "emergency".to_string(),
+            event_type: "disaster_declared".to_string(),
+            payload: "{}".to_string(),
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        assert_eq!(signal.signal_type, "civic_bridge_event");
     }
 }

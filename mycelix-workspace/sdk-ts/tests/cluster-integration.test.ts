@@ -11,10 +11,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   CommonsBridgeClient,
   createCommonsBridgeClient,
+  isCommonsBridgeSignal,
   COMMONS_DOMAINS,
   COMMONS_ZOMES,
   CivicBridgeClient,
   createCivicBridgeClient,
+  isCivicBridgeSignal,
   CIVIC_DOMAINS,
   CIVIC_ZOMES,
 } from '../src/integrations/index.js';
@@ -22,8 +24,10 @@ import {
 import type {
   CommonsQueryInput,
   CommonsEventInput,
+  CommonsBridgeEventSignal,
   CivicQueryInput,
   CivicEventInput,
+  CivicBridgeEventSignal,
   BridgeHealth,
   DispatchResult,
   CheckEmergencyForAreaInput,
@@ -657,6 +661,82 @@ describe('CivicBridgeClient', () => {
       });
       expect(result.healthy).toBe(true);
       expect(result.domains).toHaveLength(3);
+    });
+  });
+});
+
+// ============================================================================
+// Bridge Event Signal Type Guards
+// ============================================================================
+
+describe('Bridge Event Signals', () => {
+  describe('isCommonsBridgeSignal', () => {
+    it('should return true for valid commons bridge signal', () => {
+      const signal: CommonsBridgeEventSignal = {
+        signal_type: 'commons_bridge_event',
+        domain: 'property',
+        event_type: 'ownership_transferred',
+        payload: '{"property_id":"P-1"}',
+        action_hash: new Uint8Array([1, 2, 3]),
+      };
+      expect(isCommonsBridgeSignal(signal)).toBe(true);
+    });
+
+    it('should return false for civic bridge signal', () => {
+      const signal: CivicBridgeEventSignal = {
+        signal_type: 'civic_bridge_event',
+        domain: 'justice',
+        event_type: 'case_filed',
+        payload: '{}',
+        action_hash: new Uint8Array([4, 5, 6]),
+      };
+      expect(isCommonsBridgeSignal(signal)).toBe(false);
+    });
+
+    it('should return false for null/undefined/primitives', () => {
+      expect(isCommonsBridgeSignal(null)).toBe(false);
+      expect(isCommonsBridgeSignal(undefined)).toBe(false);
+      expect(isCommonsBridgeSignal('string')).toBe(false);
+      expect(isCommonsBridgeSignal(42)).toBe(false);
+    });
+
+    it('should return false for object without signal_type', () => {
+      expect(isCommonsBridgeSignal({ domain: 'property' })).toBe(false);
+    });
+  });
+
+  describe('isCivicBridgeSignal', () => {
+    it('should return true for valid civic bridge signal', () => {
+      const signal: CivicBridgeEventSignal = {
+        signal_type: 'civic_bridge_event',
+        domain: 'emergency',
+        event_type: 'incident_reported',
+        payload: '{"severity":"high"}',
+        action_hash: new Uint8Array([7, 8, 9]),
+      };
+      expect(isCivicBridgeSignal(signal)).toBe(true);
+    });
+
+    it('should return false for commons bridge signal', () => {
+      const signal: CommonsBridgeEventSignal = {
+        signal_type: 'commons_bridge_event',
+        domain: 'water',
+        event_type: 'purity_alert',
+        payload: '{}',
+        action_hash: new Uint8Array([10, 11, 12]),
+      };
+      expect(isCivicBridgeSignal(signal)).toBe(false);
+    });
+
+    it('should return false for null/undefined/primitives', () => {
+      expect(isCivicBridgeSignal(null)).toBe(false);
+      expect(isCivicBridgeSignal(undefined)).toBe(false);
+      expect(isCivicBridgeSignal('string')).toBe(false);
+      expect(isCivicBridgeSignal(42)).toBe(false);
+    });
+
+    it('should return false for wrong signal_type value', () => {
+      expect(isCivicBridgeSignal({ signal_type: 'other_signal' })).toBe(false);
     });
   });
 });

@@ -389,6 +389,32 @@ export class CommonsBridgeClient {
 }
 
 // ============================================================================
+// Bridge Event Signals
+// ============================================================================
+
+/** Signal payload emitted by the commons bridge when a cross-domain event is created */
+export interface CommonsBridgeEventSignal {
+  signal_type: 'commons_bridge_event';
+  domain: string;
+  event_type: string;
+  payload: string;
+  action_hash: Uint8Array;
+}
+
+/** Type guard for commons bridge event signals */
+export function isCommonsBridgeSignal(signal: unknown): signal is CommonsBridgeEventSignal {
+  return (
+    typeof signal === 'object' &&
+    signal !== null &&
+    'signal_type' in signal &&
+    (signal as CommonsBridgeEventSignal).signal_type === 'commons_bridge_event'
+  );
+}
+
+/** Callback type for signal subscriptions */
+export type BridgeSignalHandler = (signal: CommonsBridgeEventSignal) => void;
+
+// ============================================================================
 // Factory
 // ============================================================================
 
