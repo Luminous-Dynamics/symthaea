@@ -16,9 +16,9 @@ members = [
 exclude = ["tests"]
 
 [workspace.dependencies]
-# Holochain 0.7 compatible
-hdi = "0.7"
-hdk = "0.6"
+# Holochain 0.6 compatible
+hdk = "0.6.0"
+hdi = "0.7.0"
 
 # Required by hdk macros
 holochain_serialized_bytes = "0.0.56"
