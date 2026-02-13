@@ -26,6 +26,16 @@ import type {
   CivicEventInput,
   BridgeHealth,
   DispatchResult,
+  CheckEmergencyForAreaInput,
+  EmergencyAreaCheckResult,
+  CheckJusticeDisputesInput,
+  JusticeDisputeCheckResult,
+  QueryPropertyForEnforcementInput,
+  PropertyEnforcementResult,
+  CheckHousingCapacityInput,
+  HousingCapacityResult,
+  VerifyCareCredentialsInput,
+  CareCredentialVerifyResult,
 } from '../src/integrations/index.js';
 
 // ============================================================================
@@ -244,6 +254,62 @@ describe('CommonsBridgeClient', () => {
     });
   });
 
+  describe('cross-cluster dispatch (commons → civic)', () => {
+    it('should dispatch a call to the civic DNA', async () => {
+      const payload = new Uint8Array([7, 8, 9]);
+      const mockResult: DispatchResult = { success: true, response: new Uint8Array([10]) };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.dispatchCivicCall('justice_cases', 'get_case', payload);
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'commons',
+        zome_name: 'commons_bridge',
+        fn_name: 'dispatch_civic_call',
+        payload: { role: 'civic', zome: 'justice_cases', fn_name: 'get_case', payload: [7, 8, 9] },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should check emergency for area', async () => {
+      const mockResult: EmergencyAreaCheckResult = {
+        has_active_emergencies: true,
+        active_count: 2,
+        recommendation: 'Defer transfer until emergencies resolved',
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.checkEmergencyForArea({ lat: 32.9, lon: -96.7 });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'commons',
+        zome_name: 'commons_bridge',
+        fn_name: 'check_emergency_for_area',
+        payload: { lat: 32.9, lon: -96.7 },
+      });
+      expect(result.has_active_emergencies).toBe(true);
+      expect(result.active_count).toBe(2);
+    });
+
+    it('should check justice disputes for property', async () => {
+      const mockResult: JusticeDisputeCheckResult = {
+        has_pending_cases: false,
+        recommendation: 'No pending disputes — transfer may proceed',
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.checkJusticeDisputesForProperty({ resource_id: 'prop_123' });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'commons',
+        zome_name: 'commons_bridge',
+        fn_name: 'check_justice_disputes_for_property',
+        payload: { resource_id: 'prop_123' },
+      });
+      expect(result.has_pending_cases).toBe(false);
+    });
+  });
+
   describe('health', () => {
     it('should perform health check', async () => {
       const mockHealth: BridgeHealth = {
@@ -389,6 +455,87 @@ describe('CivicBridgeClient', () => {
         fn_name: 'get_my_events',
         payload: null,
       });
+    });
+  });
+
+  describe('cross-cluster dispatch (civic → commons)', () => {
+    it('should dispatch a call to the commons DNA', async () => {
+      const payload = new Uint8Array([11, 12]);
+      const mockResult: DispatchResult = { success: true };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.dispatchCommonsCall('property_registry', 'get_asset', payload);
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'civic',
+        zome_name: 'civic_bridge',
+        fn_name: 'dispatch_commons_call',
+        payload: { role: 'commons', zome: 'property_registry', fn_name: 'get_asset', payload: [11, 12] },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should query property for enforcement', async () => {
+      const mockResult: PropertyEnforcementResult = {
+        property_found: true,
+        enforcement_advisory: 'Property verified — enforcement may proceed',
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.queryPropertyForEnforcement({
+        property_id: 'prop_456',
+        case_id: 'case_789',
+      });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'civic',
+        zome_name: 'civic_bridge',
+        fn_name: 'query_property_for_enforcement',
+        payload: { property_id: 'prop_456', case_id: 'case_789' },
+      });
+      expect(result.property_found).toBe(true);
+    });
+
+    it('should check housing capacity for sheltering', async () => {
+      const mockResult: HousingCapacityResult = {
+        commons_reachable: true,
+        recommendation: 'Housing units available — sheltering possible',
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.checkHousingCapacityForSheltering({
+        disaster_id: 'disaster_001',
+        area: 'downtown',
+      });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'civic',
+        zome_name: 'civic_bridge',
+        fn_name: 'check_housing_capacity_for_sheltering',
+        payload: { disaster_id: 'disaster_001', area: 'downtown' },
+      });
+      expect(result.commons_reachable).toBe(true);
+    });
+
+    it('should verify care credentials for evidence', async () => {
+      const mockResult: CareCredentialVerifyResult = {
+        commons_reachable: true,
+        recommendation: 'Credentials verified — evidence admissible',
+      };
+      client.callZome.mockResolvedValue(mockResult);
+
+      const result = await bridge.verifyCareCredentialsForEvidence({
+        provider_did: 'did:mycelix:care_provider_123',
+        case_id: 'case_456',
+      });
+
+      expect(client.callZome).toHaveBeenCalledWith({
+        role_name: 'civic',
+        zome_name: 'civic_bridge',
+        fn_name: 'verify_care_credentials_for_evidence',
+        payload: { provider_did: 'did:mycelix:care_provider_123', case_id: 'case_456' },
+      });
+      expect(result.commons_reachable).toBe(true);
     });
   });
 

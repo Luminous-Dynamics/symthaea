@@ -132,6 +132,92 @@ pub fn dispatch_call_checked(
 }
 
 // ============================================================================
+// Cross-cluster dispatch (inter-DNA within the same hApp)
+// ============================================================================
+
+/// Input for dispatching a call to a zome in another DNA within the same hApp.
+///
+/// Used for commons↔civic cross-cluster communication.  The `role` field
+/// identifies the target DNA by its hApp role name (e.g., `"commons"` or
+/// `"civic"`).  The call is routed via `CallTargetCell::OtherRole`.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CrossClusterDispatchInput {
+    /// hApp role name of the target DNA (e.g., "commons" or "civic").
+    pub role: String,
+    /// Target zome name within the other DNA.
+    pub zome: String,
+    /// Target function name.
+    pub fn_name: String,
+    /// MessagePack-serialized input payload.
+    pub payload: Vec<u8>,
+}
+
+/// Dispatch a synchronous call to a zome in another DNA, with allowlist
+/// validation.
+///
+/// This is the cross-cluster counterpart of [`dispatch_call_checked`].
+/// Instead of `CallTargetCell::Local`, it uses
+/// `CallTargetCell::OtherRole(role)` to reach a different DNA within the
+/// same installed hApp.  The target zome must be in `allowed_zomes`.
+pub fn dispatch_call_cross_cluster(
+    input: &CrossClusterDispatchInput,
+    allowed_zomes: &[&str],
+) -> ExternResult<DispatchResult> {
+    if !allowed_zomes.contains(&input.zome.as_str()) {
+        return Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(format!(
+                "Zome '{}' is not in the allowed cross-cluster dispatch list. Valid zomes: {:?}",
+                input.zome, allowed_zomes
+            )),
+        });
+    }
+
+    let payload = ExternIO(input.payload.clone());
+
+    let result = HDK.with(|h| {
+        h.borrow().call(vec![Call::new(
+            CallTarget::ConductorCell(CallTargetCell::OtherRole(input.role.clone())),
+            ZomeName::from(input.zome.as_str()),
+            FunctionName::from(input.fn_name.as_str()),
+            None,
+            payload,
+        )])
+    });
+
+    match result {
+        Ok(responses) => match responses.into_iter().next() {
+            Some(ZomeCallResponse::Ok(extern_io)) => Ok(DispatchResult {
+                success: true,
+                response: Some(extern_io.0),
+                error: None,
+            }),
+            Some(ZomeCallResponse::NetworkError(err)) => Ok(DispatchResult {
+                success: false,
+                response: None,
+                error: Some(format!("Cross-cluster network error: {}", err)),
+            }),
+            Some(other) => Ok(DispatchResult {
+                success: false,
+                response: None,
+                error: Some(format!("Cross-cluster call rejected: {:?}", other)),
+            }),
+            None => Ok(DispatchResult {
+                success: false,
+                response: None,
+                error: Some("No response from cross-cluster call".into()),
+            }),
+        },
+        Err(e) => Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(format!("Cross-cluster call failed: {:?}", e)),
+        }),
+    }
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
@@ -264,6 +350,83 @@ mod tests {
         let q2: EventTypeQuery = serde_json::from_str(&json).unwrap();
         assert_eq!(q.domain, q2.domain);
         assert_eq!(q.event_type, q2.event_type);
+    }
+
+    // Cross-cluster dispatch validation tests
+
+    #[test]
+    fn cross_cluster_rejects_disallowed_zome() {
+        let input = CrossClusterDispatchInput {
+            role: "civic".into(),
+            zome: "evil_zome".into(),
+            fn_name: "steal_data".into(),
+            payload: vec![],
+        };
+        let allowed = &["justice_cases", "emergency_incidents"];
+        let result = dispatch_call_cross_cluster(&input, allowed).unwrap();
+        assert!(!result.success);
+        assert!(result.response.is_none());
+        let err = result.error.unwrap();
+        assert!(err.contains("not in the allowed cross-cluster dispatch list"));
+        assert!(err.contains("evil_zome"));
+    }
+
+    #[test]
+    fn cross_cluster_rejects_empty_allowlist() {
+        let input = CrossClusterDispatchInput {
+            role: "commons".into(),
+            zome: "property_registry".into(),
+            fn_name: "get_property".into(),
+            payload: vec![],
+        };
+        let result = dispatch_call_cross_cluster(&input, &[]).unwrap();
+        assert!(!result.success);
+        assert!(result.error.is_some());
+    }
+
+    #[test]
+    fn cross_cluster_rejects_similar_zome_name() {
+        let input = CrossClusterDispatchInput {
+            role: "civic".into(),
+            zome: "justice_cases_evil".into(),
+            fn_name: "get_case".into(),
+            payload: vec![],
+        };
+        let allowed = &["justice_cases"];
+        let result = dispatch_call_cross_cluster(&input, allowed).unwrap();
+        assert!(!result.success);
+    }
+
+    #[test]
+    fn cross_cluster_error_lists_valid_zomes() {
+        let input = CrossClusterDispatchInput {
+            role: "civic".into(),
+            zome: "bad".into(),
+            fn_name: "fn".into(),
+            payload: vec![],
+        };
+        let allowed = &["justice_cases", "emergency_incidents", "media_publication"];
+        let result = dispatch_call_cross_cluster(&input, allowed).unwrap();
+        let err = result.error.unwrap();
+        assert!(err.contains("justice_cases"));
+        assert!(err.contains("emergency_incidents"));
+        assert!(err.contains("media_publication"));
+    }
+
+    #[test]
+    fn cross_cluster_dispatch_input_serde_roundtrip() {
+        let input = CrossClusterDispatchInput {
+            role: "civic".into(),
+            zome: "justice_cases".into(),
+            fn_name: "get_case".into(),
+            payload: vec![5, 6, 7],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: CrossClusterDispatchInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input.role, input2.role);
+        assert_eq!(input.zome, input2.zome);
+        assert_eq!(input.fn_name, input2.fn_name);
+        assert_eq!(input.payload, input2.payload);
     }
 
     #[test]

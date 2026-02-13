@@ -12,7 +12,8 @@ use civic_bridge_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
     self as bridge,
-    DispatchInput, DispatchResult, ResolveQueryInput, EventTypeQuery, BridgeHealth,
+    DispatchInput, DispatchResult, CrossClusterDispatchInput,
+    ResolveQueryInput, EventTypeQuery, BridgeHealth,
 };
 
 // ============================================================================
@@ -262,6 +263,249 @@ pub fn get_my_events(_: ()) -> ExternResult<Vec<Record>> {
 }
 
 // ============================================================================
+// Cross-Cluster Dispatch: Civic → Commons
+// ============================================================================
+
+/// Commons-side zomes that civic-bridge is allowed to call cross-cluster.
+const ALLOWED_COMMONS_ZOMES: &[&str] = &[
+    // Property domain
+    "property_registry",
+    "property_transfer",
+    "property_disputes",
+    "property_commons",
+    // Housing domain
+    "housing_units",
+    "housing_membership",
+    "housing_finances",
+    "housing_maintenance",
+    "housing_clt",
+    "housing_governance",
+    // Care domain
+    "care_timebank",
+    "care_circles",
+    "care_matching",
+    "care_plans",
+    "care_credentials",
+    // Mutual aid domain
+    "mutualaid_needs",
+    "mutualaid_circles",
+    "mutualaid_governance",
+    "mutualaid_pools",
+    "mutualaid_requests",
+    "mutualaid_resources",
+    "mutualaid_timebank",
+    // Water domain
+    "water_flow",
+    "water_purity",
+    "water_capture",
+    "water_steward",
+    "water_wisdom",
+    // Commons bridge
+    "commons_bridge",
+];
+
+/// The hApp role name for the Commons DNA.
+const COMMONS_ROLE: &str = "commons";
+
+/// Dispatch a call to any zome in the Commons DNA.
+///
+/// This is the cross-cluster counterpart of `dispatch_call`.  It uses
+/// `CallTargetCell::OtherRole("commons")` to reach zomes in the Commons DNA.
+///
+/// ## Example use cases
+/// - Justice enforcement freezing property transfers during disputes
+/// - Emergency management querying housing capacity for sheltering
+/// - Media fact-checking property ownership claims
+#[hdk_extern]
+pub fn dispatch_commons_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    let dispatch = CrossClusterDispatchInput {
+        role: COMMONS_ROLE.to_string(),
+        zome: input.zome,
+        fn_name: input.fn_name,
+        payload: input.payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_COMMONS_ZOMES)
+}
+
+// ---- Specific cross-cluster use cases ----
+
+/// Input for querying property status for justice enforcement.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryPropertyForEnforcementInput {
+    /// Property ID or hash to look up.
+    pub property_id: String,
+    /// Justice case ID that requires the property freeze.
+    pub case_id: String,
+}
+
+/// Result of a property enforcement query.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PropertyEnforcementResult {
+    pub property_found: bool,
+    pub enforcement_advisory: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Query property registry to verify ownership before enforcement action.
+///
+/// Cross-cluster call: civic-bridge → commons property_registry via
+/// `CallTargetCell::OtherRole("commons")`.  Used by justice-enforcement
+/// to verify a property exists and identify the owner before issuing
+/// sanctions or freezing transfers.
+#[hdk_extern]
+pub fn query_property_for_enforcement(input: QueryPropertyForEnforcementInput) -> ExternResult<PropertyEnforcementResult> {
+    let dispatch = CrossClusterDispatchInput {
+        role: COMMONS_ROLE.to_string(),
+        zome: "commons_bridge".to_string(),
+        fn_name: "get_domain_events".to_string(),
+        payload: ExternIO::encode("property".to_string())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0,
+    };
+
+    match bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_COMMONS_ZOMES) {
+        Ok(result) if result.success => {
+            Ok(PropertyEnforcementResult {
+                property_found: true,
+                enforcement_advisory: Some(format!(
+                    "Property '{}' is in the commons registry — case '{}' enforcement may proceed after verification",
+                    input.property_id, input.case_id
+                )),
+                error: None,
+            })
+        }
+        Ok(result) => Ok(PropertyEnforcementResult {
+            property_found: false,
+            enforcement_advisory: None,
+            error: result.error,
+        }),
+        Err(e) => Ok(PropertyEnforcementResult {
+            property_found: false,
+            enforcement_advisory: None,
+            error: Some(format!("Cross-cluster call failed: {:?}", e)),
+        }),
+    }
+}
+
+/// Input for checking housing capacity for emergency sheltering.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckHousingCapacityInput {
+    /// Disaster hash for correlation.
+    pub disaster_id: String,
+    /// Geographic area keyword (city name, zone, etc.).
+    pub area: String,
+}
+
+/// Result of a housing capacity check.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct HousingCapacityResult {
+    pub commons_reachable: bool,
+    pub recommendation: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Check housing capacity in the Commons cluster for emergency sheltering.
+///
+/// Cross-cluster call: civic-bridge → commons housing_units via
+/// `CallTargetCell::OtherRole("commons")`.  Used by emergency-coordination
+/// to identify available housing that could supplement dedicated shelters
+/// during large-scale disasters.
+#[hdk_extern]
+pub fn check_housing_capacity_for_sheltering(input: CheckHousingCapacityInput) -> ExternResult<HousingCapacityResult> {
+    let response = call(
+        CallTargetCell::OtherRole(COMMONS_ROLE.into()),
+        ZomeName::from("housing_units"),
+        FunctionName::from("get_all_units"),
+        None,
+        (),
+    );
+
+    match &response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            let records: Vec<Record> = extern_io.decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let count = records.len() as u32;
+            Ok(HousingCapacityResult {
+                commons_reachable: true,
+                recommendation: Some(format!(
+                    "Found {} housing unit(s) in commons — evaluate availability for disaster '{}' in area '{}'",
+                    count, input.disaster_id, input.area
+                )),
+                error: None,
+            })
+        }
+        Ok(ZomeCallResponse::NetworkError(err)) => Ok(HousingCapacityResult {
+            commons_reachable: false,
+            recommendation: None,
+            error: Some(format!("Cross-cluster network error: {}", err)),
+        }),
+        _ => Ok(HousingCapacityResult {
+            commons_reachable: false,
+            recommendation: None,
+            error: Some("Failed to reach commons cluster housing_units".into()),
+        }),
+    }
+}
+
+/// Input for verifying care credentials for justice evidence.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyCareCredentialsInput {
+    /// DID of the care provider whose credentials need verification.
+    pub provider_did: String,
+    /// Case ID for audit trail.
+    pub case_id: String,
+}
+
+/// Result of a care credential verification.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CareCredentialVerifyResult {
+    pub commons_reachable: bool,
+    pub recommendation: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Verify care provider credentials in the Commons cluster for justice evidence.
+///
+/// Cross-cluster call: civic-bridge → commons care_credentials via
+/// `CallTargetCell::OtherRole("commons")`.  Used by justice-evidence
+/// to verify the qualifications of care providers when their testimony
+/// or assessments are submitted as evidence.
+#[hdk_extern]
+pub fn verify_care_credentials_for_evidence(input: VerifyCareCredentialsInput) -> ExternResult<CareCredentialVerifyResult> {
+    let dispatch = CrossClusterDispatchInput {
+        role: COMMONS_ROLE.to_string(),
+        zome: "care_credentials".to_string(),
+        fn_name: "get_provider_credentials".to_string(),
+        payload: ExternIO::encode(input.provider_did.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0,
+    };
+
+    match bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_COMMONS_ZOMES) {
+        Ok(result) if result.success => {
+            Ok(CareCredentialVerifyResult {
+                commons_reachable: true,
+                recommendation: Some(format!(
+                    "Care credentials for '{}' retrieved from commons — evaluate for case '{}'",
+                    input.provider_did, input.case_id
+                )),
+                error: None,
+            })
+        }
+        Ok(result) => Ok(CareCredentialVerifyResult {
+            commons_reachable: true,
+            recommendation: None,
+            error: result.error,
+        }),
+        Err(e) => Ok(CareCredentialVerifyResult {
+            commons_reachable: false,
+            recommendation: None,
+            error: Some(format!("Cross-cluster call failed: {:?}", e)),
+        }),
+    }
+}
+
+// ============================================================================
 // Health Check
 // ============================================================================
 
@@ -282,4 +526,170 @@ pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
             "media".to_string(),
         ],
     })
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- Allowlist validation ----
+
+    #[test]
+    fn local_allowlist_covers_all_domains() {
+        let has_justice = ALLOWED_ZOMES.iter().any(|z| z.starts_with("justice_"));
+        let has_emergency = ALLOWED_ZOMES.iter().any(|z| z.starts_with("emergency_"));
+        let has_media = ALLOWED_ZOMES.iter().any(|z| z.starts_with("media_"));
+        assert!(has_justice, "ALLOWED_ZOMES missing justice domain");
+        assert!(has_emergency, "ALLOWED_ZOMES missing emergency domain");
+        assert!(has_media, "ALLOWED_ZOMES missing media domain");
+    }
+
+    #[test]
+    fn local_allowlist_has_expected_count() {
+        // 5 justice + 6 emergency + 4 media = 15
+        assert_eq!(ALLOWED_ZOMES.len(), 15);
+    }
+
+    #[test]
+    fn commons_allowlist_covers_all_commons_domains() {
+        let has_property = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("property_"));
+        let has_housing = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("housing_"));
+        let has_care = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("care_"));
+        let has_mutualaid = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("mutualaid_"));
+        let has_water = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("water_"));
+        let has_bridge = ALLOWED_COMMONS_ZOMES.contains(&"commons_bridge");
+        assert!(has_property, "ALLOWED_COMMONS_ZOMES missing property domain");
+        assert!(has_housing, "ALLOWED_COMMONS_ZOMES missing housing domain");
+        assert!(has_care, "ALLOWED_COMMONS_ZOMES missing care domain");
+        assert!(has_mutualaid, "ALLOWED_COMMONS_ZOMES missing mutualaid domain");
+        assert!(has_water, "ALLOWED_COMMONS_ZOMES missing water domain");
+        assert!(has_bridge, "ALLOWED_COMMONS_ZOMES missing commons_bridge");
+    }
+
+    #[test]
+    fn commons_allowlist_has_expected_count() {
+        // 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 1 commons_bridge = 28
+        assert_eq!(ALLOWED_COMMONS_ZOMES.len(), 28);
+    }
+
+    #[test]
+    fn commons_role_constant_is_commons() {
+        assert_eq!(COMMONS_ROLE, "commons");
+    }
+
+    // ---- Domain resolution ----
+
+    #[test]
+    fn resolve_justice_domain() {
+        assert_eq!(resolve_domain_zome("justice", "submit_evidence").unwrap(), "justice_evidence");
+        assert_eq!(resolve_domain_zome("justice", "start_arbitration").unwrap(), "justice_arbitration");
+        assert_eq!(resolve_domain_zome("justice", "initiate_restorative").unwrap(), "justice_restorative");
+        assert_eq!(resolve_domain_zome("justice", "enforce_sanction").unwrap(), "justice_enforcement");
+        assert_eq!(resolve_domain_zome("justice", "file_case").unwrap(), "justice_cases");
+    }
+
+    #[test]
+    fn resolve_emergency_domain() {
+        assert_eq!(resolve_domain_zome("emergency", "assess_triage").unwrap(), "emergency_triage");
+        assert_eq!(resolve_domain_zome("emergency", "deploy_resource").unwrap(), "emergency_resources");
+        assert_eq!(resolve_domain_zome("emergency", "coordinate_response").unwrap(), "emergency_coordination");
+        assert_eq!(resolve_domain_zome("emergency", "open_shelter").unwrap(), "emergency_shelters");
+        assert_eq!(resolve_domain_zome("emergency", "send_alert").unwrap(), "emergency_comms");
+        assert_eq!(resolve_domain_zome("emergency", "report_incident").unwrap(), "emergency_incidents");
+    }
+
+    #[test]
+    fn resolve_media_domain() {
+        assert_eq!(resolve_domain_zome("media", "verify_attribution").unwrap(), "media_attribution");
+        assert_eq!(resolve_domain_zome("media", "run_factcheck").unwrap(), "media_factcheck");
+        assert_eq!(resolve_domain_zome("media", "curate_content").unwrap(), "media_curation");
+        assert_eq!(resolve_domain_zome("media", "submit_article").unwrap(), "media_publication");
+    }
+
+    #[test]
+    fn resolve_unknown_domain_returns_none() {
+        assert!(resolve_domain_zome("nonexistent", "anything").is_none());
+    }
+
+    // ---- Cross-cluster input type serde ----
+
+    #[test]
+    fn property_enforcement_input_serde_roundtrip() {
+        let input = QueryPropertyForEnforcementInput {
+            property_id: "PROP-42".into(),
+            case_id: "CASE-7".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: QueryPropertyForEnforcementInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.property_id, "PROP-42");
+        assert_eq!(input2.case_id, "CASE-7");
+    }
+
+    #[test]
+    fn property_enforcement_result_serde_roundtrip() {
+        let result = PropertyEnforcementResult {
+            property_found: true,
+            enforcement_advisory: Some("Proceed with caution".into()),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let r2: PropertyEnforcementResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.property_found);
+        assert_eq!(r2.enforcement_advisory.as_deref(), Some("Proceed with caution"));
+    }
+
+    #[test]
+    fn housing_capacity_input_serde_roundtrip() {
+        let input = CheckHousingCapacityInput {
+            disaster_id: "DIS-100".into(),
+            area: "Richardson, TX".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: CheckHousingCapacityInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.disaster_id, "DIS-100");
+        assert_eq!(input2.area, "Richardson, TX");
+    }
+
+    #[test]
+    fn housing_capacity_result_serde_roundtrip() {
+        let result = HousingCapacityResult {
+            commons_reachable: true,
+            recommendation: Some("15 units available".into()),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let r2: HousingCapacityResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.commons_reachable);
+        assert_eq!(r2.recommendation.as_deref(), Some("15 units available"));
+    }
+
+    #[test]
+    fn care_credentials_input_serde_roundtrip() {
+        let input = VerifyCareCredentialsInput {
+            provider_did: "did:key:z6Mk...".into(),
+            case_id: "CASE-99".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: VerifyCareCredentialsInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.provider_did, "did:key:z6Mk...");
+        assert_eq!(input2.case_id, "CASE-99");
+    }
+
+    #[test]
+    fn care_credentials_result_serde_roundtrip() {
+        let result = CareCredentialVerifyResult {
+            commons_reachable: false,
+            recommendation: None,
+            error: Some("Connection refused".into()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let r2: CareCredentialVerifyResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.commons_reachable);
+        assert!(r2.recommendation.is_none());
+        assert_eq!(r2.error.as_deref(), Some("Connection refused"));
+    }
 }

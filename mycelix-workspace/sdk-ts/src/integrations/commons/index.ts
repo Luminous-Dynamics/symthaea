@@ -94,6 +94,44 @@ export interface EventTypeQuery {
   event_type: string;
 }
 
+/** Input for cross-cluster dispatch to the civic DNA */
+export interface CrossClusterDispatchInput {
+  /** hApp role name of the target DNA (always "civic" for commons→civic) */
+  role: string;
+  /** Target zome in the civic DNA */
+  zome: string;
+  /** Target function name */
+  fn_name: string;
+  /** MessagePack-encoded payload */
+  payload: Uint8Array;
+}
+
+/** Input for checking active emergencies near a location */
+export interface CheckEmergencyForAreaInput {
+  lat: number;
+  lon: number;
+}
+
+/** Result of an emergency area check */
+export interface EmergencyAreaCheckResult {
+  has_active_emergencies: boolean;
+  active_count: number;
+  recommendation: string;
+  error?: string;
+}
+
+/** Input for checking justice disputes affecting a property */
+export interface CheckJusticeDisputesInput {
+  resource_id: string;
+}
+
+/** Result of a justice dispute check */
+export interface JusticeDisputeCheckResult {
+  has_pending_cases: boolean;
+  recommendation: string;
+  error?: string;
+}
+
 /** Holochain ZomeCallable interface (minimal) */
 interface ZomeCallable {
   callZome<T>(params: {
@@ -254,6 +292,38 @@ export class CommonsBridgeClient {
       zome_name: BRIDGE_ZOME,
       fn_name: 'get_my_events',
       payload: null,
+    });
+  }
+
+  // --- Cross-Cluster (Commons → Civic) ---
+
+  /** Dispatch a call to any zome in the civic DNA (cross-cluster) */
+  async dispatchCivicCall(zome: string, fn_name: string, payload: Uint8Array): Promise<DispatchResult> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'dispatch_civic_call',
+      payload: { role: 'civic', zome, fn_name, payload: Array.from(payload) },
+    });
+  }
+
+  /** Check if there are active emergencies near a lat/lon (queries civic emergency_incidents) */
+  async checkEmergencyForArea(input: CheckEmergencyForAreaInput): Promise<EmergencyAreaCheckResult> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'check_emergency_for_area',
+      payload: input,
+    });
+  }
+
+  /** Check if there are pending justice disputes affecting a property (queries civic justice_cases) */
+  async checkJusticeDisputesForProperty(input: CheckJusticeDisputesInput): Promise<JusticeDisputeCheckResult> {
+    return this.client.callZome({
+      role_name: COMMONS_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'check_justice_disputes_for_property',
+      payload: input,
     });
   }
 

@@ -24,7 +24,7 @@ just status          # Check status
 |-------|-------|-------|
 | Production | 3 | core (62 tests), mail (12 zomes), desci (141 tests, REST not hApp) |
 | Beta | 9 | marketplace, supplychain, observatory, epistemic-markets, fabrication, edunet, consensus, civic-happ, lucid |
-| **Cluster** | **2** | **commons** (property+housing+care+mutualaid+water, 28 zomes), **civic** (justice+emergency+media, 16 zomes) |
+| **Cluster** | **2** | **commons** (property+housing+care+mutualaid+water, 29 zomes, 127 tests), **civic** (justice+emergency+media, 16 zomes, 144 tests) |
 | Scaffold | 6 | identity, knowledge, governance, finance, energy, health, space |
 | Stub/Other | 3 | bots (Python), music (early), symthaea-bridge |
 | Dormant | 1 | climate |
@@ -107,6 +107,10 @@ hc dna pack .
 | Rust SDK | 996 pass (1002 w/ parallel) | Verified 2026-02-04 |
 | TypeScript SDK | 6,316 pass / 15 skip | All pass (libsodium ESM compat fixed) |
 | Identity unit | 23 | Pass (recovery + trust_credential) |
+| Commons cluster unit | 127 | Bridge dispatch + cross-domain + cross-cluster (commons→civic) |
+| Civic cluster unit | 144 | Bridge dispatch + cross-domain + cross-cluster (civic→commons) |
+| Bridge-common | 14 | Shared dispatch types, allowlist validation, serde roundtrips |
+| SDK cluster integration | 33 | CommonsBridgeClient + CivicBridgeClient + cross-cluster methods |
 | WASM zomes | 66 | Compile to wasm32-unknown-unknown |
 | Sweettest | 15/15 pass | `just test-sweettest` (--release required) |
 | Tryorama | 13 suites | Needs running conductor + hApp bundles |

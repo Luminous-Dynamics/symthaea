@@ -188,6 +188,8 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             mycelix-core/target/
+            mycelix-commons/target/
+            mycelix-civic/target/
           key: ${{ runner.os }}-cargo-holochain-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-holochain-
@@ -204,6 +206,20 @@ jobs:
                 cargo test --all-features --manifest-path "${zome_dir}Cargo.toml"
               fi
             done
+
+            # Test bridge-common crate (shared dispatch types + allowlist validation)
+            echo ""
+            echo "=== Running Bridge-Common Tests ==="
+            cargo test --manifest-path crates/mycelix-bridge-common/Cargo.toml
+
+            # Test cluster unit tests (commons + civic)
+            echo ""
+            echo "=== Running Commons Cluster Unit Tests ==="
+            cargo test --workspace --manifest-path mycelix-commons/Cargo.toml
+
+            echo ""
+            echo "=== Running Civic Cluster Unit Tests ==="
+            cargo test --workspace --manifest-path mycelix-civic/Cargo.toml
 
             # Test SDK (exclude risc0 feature — requires external risc0-zkvm installation)
             echo ""
@@ -599,7 +615,7 @@ jobs:
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity/tests && cargo test --release mfa -- --ignored --test-threads=1 --nocapture"
 
-      - name: Run sweettest - Identity Integration (39 tests)
+      - name: Run sweettest - Identity Integration (41 tests)
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity/tests && cargo test --release sweettest_integration -- --ignored --test-threads=1 --nocapture"
 
@@ -1024,7 +1040,7 @@ jobs:
           echo "| Lint Zomes | $(format_status '${{ needs.lint-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | $(format_status '${{ needs.integration-test.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| SDK Conductor Tests | $(format_status '${{ needs.sdk-conductor-tests.result }}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Sweettest Integration (124 tests)** | $(format_status '${{ needs.sweettest.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Sweettest Integration (139 tests)** | $(format_status '${{ needs.sweettest.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Package DNAs | $(format_status '${{ needs.package-dna.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Package hApps | $(format_status '${{ needs.package-happs.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -1036,9 +1052,9 @@ jobs:
           echo "| Identity unit tests | 267 | DID registry, VC lifecycle, revocation, MFA, bridge, education, trust, crypto types |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Identity | 4 | DID registration, profile updates, trust attestations |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest Identity PQC** | 6 | Hybrid signatures, ML-KEM key agreement, PQC verification methods |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Sweettest Identity Integration** | 39 | DID lifecycle, VC lifecycle, trust attestation, security edge cases, bridge events, social recovery, key rotation, revocation lifecycle, VC rejection, education credentials |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Sweettest Identity Integration** | 41 | DID lifecycle, VC lifecycle, trust attestation, security edge cases, bridge events, social recovery, key rotation, revocation lifecycle, VC rejection, education credentials, recovery cancel/retrieve |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest MFA Identity** | 7 | MFA state, factor enrollment, assurance levels, FL eligibility |" >> $GITHUB_STEP_SUMMARY
-          echo "| mycelix-crypto native | 58 | Ed25519, ML-DSA-65/87, SPHINCS+, hybrid, ML-KEM, XChaCha20, fuzz |" >> $GITHUB_STEP_SUMMARY
+          echo "| mycelix-crypto native | 64 | Ed25519, ML-DSA-65/87, SPHINCS+, hybrid, ML-KEM tamper, XChaCha20 tamper, fuzz |" >> $GITHUB_STEP_SUMMARY
           echo "| MFA Unit Tests | 16 | Decay calculations, factor strength, assurance scores |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Governance | 3 | Proposal lifecycle, voting, execution |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Bridge | 2 | Cross-hApp communication |" >> $GITHUB_STEP_SUMMARY
@@ -1051,7 +1067,10 @@ jobs:
           echo "| **Sweettest FL Bridge** | 6 | PoGQ round-trip, honest accept, Byzantine reject, SDK validation |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest Commons** | 8 | Property, housing-CLT, care-matching, bridge, cross-domain |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest Civic** | 7 | Media, justice, emergency, bridge, cross-domain |" >> $GITHUB_STEP_SUMMARY
-          echo "| Zome Unit Tests | ~50 | Per-zome unit tests |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commons unit tests | 127 | Bridge + domain zome unit tests (includes cross-cluster dispatch) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Civic unit tests | 144 | Bridge + domain zome unit tests (includes cross-cluster dispatch) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Bridge-common unit tests | 14 | Dispatch validation, serde roundtrips, cross-cluster allowlist |" >> $GITHUB_STEP_SUMMARY
+          echo "| SDK cluster integration | 33 | CommonsBridgeClient + CivicBridgeClient + cross-cluster SDK tests |" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | 3+ | Multi-conductor network tests |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 

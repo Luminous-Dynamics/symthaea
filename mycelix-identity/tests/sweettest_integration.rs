@@ -2310,6 +2310,184 @@ mod social_recovery_tests {
             "Trustee should have at least one responsibility"
         );
     }
+
+    /// Owner cancels a pending recovery request before execution
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_cancel_recovery_by_owner() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("test-cancel-recovery", &[dna])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create owner DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+        let owner_did = did_doc.id.clone();
+
+        // Setup recovery with 3 trustees
+        let setup_input = SetupRecoveryInput {
+            did: owner_did.clone(),
+            trustees: vec![
+                "did:mycelix:trustee-cancel-a".to_string(),
+                "did:mycelix:trustee-cancel-b".to_string(),
+                "did:mycelix:trustee-cancel-c".to_string(),
+            ],
+            threshold: 2,
+            time_lock: Some(86400),
+        };
+
+        let _: Record = conductor
+            .call(&cell.zome("recovery"), "setup_recovery", setup_input)
+            .await;
+
+        // Trustee initiates recovery
+        let initiate_input = InitiateRecoveryInput {
+            did: owner_did.clone(),
+            initiator_did: "did:mycelix:trustee-cancel-a".to_string(),
+            new_agent: app.agent().clone(),
+            reason: "Testing cancellation flow".to_string(),
+        };
+
+        let request_record: Record = conductor
+            .call(
+                &cell.zome("recovery"),
+                "initiate_recovery",
+                initiate_input,
+            )
+            .await;
+        let request: RecoveryRequest =
+            decode_entry(&request_record).expect("decode RecoveryRequest");
+
+        // Owner cancels the recovery
+        let cancelled_record: Record = conductor
+            .call(
+                &cell.zome("recovery"),
+                "cancel_recovery",
+                request.id.clone(),
+            )
+            .await;
+        let cancelled: RecoveryRequest =
+            decode_entry(&cancelled_record).expect("decode cancelled request");
+
+        assert_eq!(
+            cancelled.status,
+            RecoveryStatus::Cancelled,
+            "Recovery should be Cancelled after owner cancels, got: {:?}",
+            cancelled.status
+        );
+
+        // Verify retrieval returns cancelled status
+        let retrieved: Option<Record> = conductor
+            .call(
+                &cell.zome("recovery"),
+                "get_recovery_request",
+                request.id.clone(),
+            )
+            .await;
+        assert!(
+            retrieved.is_some(),
+            "Cancelled request should still be retrievable"
+        );
+    }
+
+    /// Retrieve a specific recovery request by ID
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_get_recovery_request_by_id() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("test-get-request", &[dna])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+
+        // Setup recovery
+        let setup_input = SetupRecoveryInput {
+            did: did_doc.id.clone(),
+            trustees: vec![
+                "did:mycelix:trustee-get-a".to_string(),
+                "did:mycelix:trustee-get-b".to_string(),
+                "did:mycelix:trustee-get-c".to_string(),
+            ],
+            threshold: 2,
+            time_lock: Some(86400),
+        };
+
+        let _: Record = conductor
+            .call(&cell.zome("recovery"), "setup_recovery", setup_input)
+            .await;
+
+        // Initiate recovery to create a request
+        let initiate_input = InitiateRecoveryInput {
+            did: did_doc.id.clone(),
+            initiator_did: "did:mycelix:trustee-get-a".to_string(),
+            new_agent: app.agent().clone(),
+            reason: "Testing request retrieval".to_string(),
+        };
+
+        let request_record: Record = conductor
+            .call(
+                &cell.zome("recovery"),
+                "initiate_recovery",
+                initiate_input,
+            )
+            .await;
+        let request: RecoveryRequest =
+            decode_entry(&request_record).expect("decode RecoveryRequest");
+
+        // Retrieve by ID
+        let retrieved: Option<Record> = conductor
+            .call(
+                &cell.zome("recovery"),
+                "get_recovery_request",
+                request.id.clone(),
+            )
+            .await;
+
+        assert!(retrieved.is_some(), "Should retrieve request by ID");
+        let retrieved_request: RecoveryRequest =
+            decode_entry(&retrieved.unwrap()).expect("decode retrieved request");
+
+        assert_eq!(
+            retrieved_request.id, request.id,
+            "Retrieved request ID should match"
+        );
+        assert_eq!(
+            retrieved_request.did, did_doc.id,
+            "Retrieved request DID should match"
+        );
+        assert_eq!(
+            retrieved_request.reason, "Testing request retrieval",
+            "Retrieved request reason should match"
+        );
+
+        // Verify non-existent ID returns None
+        let missing: Option<Record> = conductor
+            .call(
+                &cell.zome("recovery"),
+                "get_recovery_request",
+                "non-existent-request-id-12345".to_string(),
+            )
+            .await;
+
+        assert!(
+            missing.is_none(),
+            "Non-existent request ID should return None"
+        );
+    }
 }
 
 // ============================================================================

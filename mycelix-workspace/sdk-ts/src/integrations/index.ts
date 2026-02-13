@@ -23,6 +23,11 @@ export {
 export type {
   CommonsQueryInput,
   CommonsEventInput,
+  CrossClusterDispatchInput as CommonsCrossClusterInput,
+  CheckEmergencyForAreaInput,
+  EmergencyAreaCheckResult,
+  CheckJusticeDisputesInput,
+  JusticeDisputeCheckResult,
 } from './commons/index.js';
 
 export {
@@ -39,6 +44,13 @@ export type {
   DispatchInput,
   DispatchResult,
   EventTypeQuery,
+  CrossClusterDispatchInput as CivicCrossClusterInput,
+  QueryPropertyForEnforcementInput,
+  PropertyEnforcementResult,
+  CheckHousingCapacityInput,
+  HousingCapacityResult,
+  VerifyCareCredentialsInput,
+  CareCredentialVerifyResult,
 } from './civic/index.js';
 
 // ============================================================================

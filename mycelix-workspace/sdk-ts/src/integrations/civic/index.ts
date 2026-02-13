@@ -94,6 +94,57 @@ export interface EventTypeQuery {
   event_type: string;
 }
 
+/** Input for cross-cluster dispatch to the commons DNA */
+export interface CrossClusterDispatchInput {
+  /** hApp role name of the target DNA (always "commons" for civic→commons) */
+  role: string;
+  /** Target zome in the commons DNA */
+  zome: string;
+  /** Target function name */
+  fn_name: string;
+  /** MessagePack-encoded payload */
+  payload: Uint8Array;
+}
+
+/** Input for querying property registry before enforcement */
+export interface QueryPropertyForEnforcementInput {
+  property_id: string;
+  case_id: string;
+}
+
+/** Result of a property enforcement query */
+export interface PropertyEnforcementResult {
+  property_found: boolean;
+  enforcement_advisory: string;
+  error?: string;
+}
+
+/** Input for checking housing capacity for emergency sheltering */
+export interface CheckHousingCapacityInput {
+  disaster_id: string;
+  area: string;
+}
+
+/** Result of a housing capacity check */
+export interface HousingCapacityResult {
+  commons_reachable: boolean;
+  recommendation: string;
+  error?: string;
+}
+
+/** Input for verifying care credentials for evidence */
+export interface VerifyCareCredentialsInput {
+  provider_did: string;
+  case_id: string;
+}
+
+/** Result of a care credential verification */
+export interface CareCredentialVerifyResult {
+  commons_reachable: boolean;
+  recommendation: string;
+  error?: string;
+}
+
 /** Holochain ZomeCallable interface (minimal) */
 interface ZomeCallable {
   callZome<T>(params: {
@@ -242,6 +293,48 @@ export class CivicBridgeClient {
       zome_name: BRIDGE_ZOME,
       fn_name: 'get_my_events',
       payload: null,
+    });
+  }
+
+  // --- Cross-Cluster (Civic → Commons) ---
+
+  /** Dispatch a call to any zome in the commons DNA (cross-cluster) */
+  async dispatchCommonsCall(zome: string, fn_name: string, payload: Uint8Array): Promise<DispatchResult> {
+    return this.client.callZome({
+      role_name: CIVIC_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'dispatch_commons_call',
+      payload: { role: 'commons', zome, fn_name, payload: Array.from(payload) },
+    });
+  }
+
+  /** Query property registry before enforcement action */
+  async queryPropertyForEnforcement(input: QueryPropertyForEnforcementInput): Promise<PropertyEnforcementResult> {
+    return this.client.callZome({
+      role_name: CIVIC_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'query_property_for_enforcement',
+      payload: input,
+    });
+  }
+
+  /** Check housing capacity for emergency sheltering */
+  async checkHousingCapacityForSheltering(input: CheckHousingCapacityInput): Promise<HousingCapacityResult> {
+    return this.client.callZome({
+      role_name: CIVIC_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'check_housing_capacity_for_sheltering',
+      payload: input,
+    });
+  }
+
+  /** Verify care provider credentials for evidence in justice cases */
+  async verifyCareCredentialsForEvidence(input: VerifyCareCredentialsInput): Promise<CareCredentialVerifyResult> {
+    return this.client.callZome({
+      role_name: CIVIC_ROLE,
+      zome_name: BRIDGE_ZOME,
+      fn_name: 'verify_care_credentials_for_evidence',
+      payload: input,
     });
   }
 
