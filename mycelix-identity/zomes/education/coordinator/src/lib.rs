@@ -372,6 +372,7 @@ pub fn import_credential_from_csv(
             cryptosuite: None,
             domain: None,
             challenge: None,
+            algorithm: None,
         },
     };
 

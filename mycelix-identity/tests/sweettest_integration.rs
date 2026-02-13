@@ -131,6 +131,173 @@ pub struct ReputationSource {
     pub interactions: u64,
 }
 
+/// Mirror of verifiable_credential coordinator::IssueCredentialInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct IssueCredentialInput {
+    pub subject_did: String,
+    pub schema_id: String,
+    pub claims: serde_json::Value,
+    pub credential_types: Vec<String>,
+    pub issuer_name: Option<String>,
+    pub expiration_days: Option<u32>,
+    pub enable_revocation: bool,
+}
+
+/// Mirror of verifiable_credential coordinator::VerificationResult (VC)
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct VcVerificationResult {
+    pub credential_id: String,
+    pub valid: bool,
+    pub checks_passed: Vec<String>,
+    pub errors: Vec<String>,
+    pub verified_at: Timestamp,
+}
+
+/// Mirror of revocation coordinator::RevokeInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RevokeInput {
+    pub credential_id: String,
+    pub issuer_did: String,
+    pub reason: String,
+    pub effective_from: Option<Timestamp>,
+}
+
+/// Mirror of verifiable_credential_integrity::VerifiableCredential (partial)
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct VerifiableCredential {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub credential_type: Vec<String>,
+}
+
+/// Mirror of trust_credential coordinator::IssueTrustCredentialInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct IssueTrustCredentialInput {
+    pub subject_did: String,
+    pub issuer_did: String,
+    pub kvector_commitment: Vec<u8>,
+    pub range_proof: Vec<u8>,
+    pub trust_score_lower: f32,
+    pub trust_score_upper: f32,
+    pub expires_at: Option<Timestamp>,
+    pub supersedes: Option<String>,
+}
+
+/// Mirror of trust_credential_integrity::TrustCredential
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TrustCredential {
+    pub id: String,
+    pub subject_did: String,
+    pub issuer_did: String,
+    pub kvector_commitment: Vec<u8>,
+    pub range_proof: Vec<u8>,
+    pub trust_score_range: TrustScoreRange,
+    pub trust_tier: TrustTier,
+    pub issued_at: Timestamp,
+    pub expires_at: Option<Timestamp>,
+    pub revoked: bool,
+    pub revocation_reason: Option<String>,
+    pub supersedes: Option<String>,
+}
+
+/// Mirror of trust_credential_integrity::TrustScoreRange
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TrustScoreRange {
+    pub lower: f32,
+    pub upper: f32,
+}
+
+/// Mirror of trust_credential_integrity::TrustTier
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum TrustTier {
+    Observer,
+    Basic,
+    Standard,
+    Elevated,
+    Guardian,
+}
+
+/// Mirror of trust_credential_integrity::KVectorComponent
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum KVectorComponent {
+    Reputation,
+    Activity,
+    Integrity,
+    Performance,
+    Membership,
+    Stake,
+    History,
+    Topology,
+}
+
+/// Mirror of trust_credential_integrity::AttestationStatus
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum AttestationStatus {
+    Pending,
+    Fulfilled,
+    Declined,
+    Expired,
+    Cancelled,
+}
+
+/// Mirror of trust_credential_integrity::AttestationRequest
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AttestationRequest {
+    pub id: String,
+    pub requester_did: String,
+    pub subject_did: String,
+    pub components: Vec<KVectorComponent>,
+    pub min_trust_score: Option<f32>,
+    pub min_tier: Option<TrustTier>,
+    pub purpose: String,
+    pub expires_at: Timestamp,
+    pub status: AttestationStatus,
+    pub created_at: Timestamp,
+}
+
+/// Mirror of trust_credential coordinator::RequestAttestationInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RequestAttestationInput {
+    pub requester_did: String,
+    pub subject_did: String,
+    pub components: Vec<KVectorComponent>,
+    pub min_trust_score: Option<f32>,
+    pub min_tier: Option<TrustTier>,
+    pub purpose: String,
+    pub expires_at: Timestamp,
+}
+
+/// Mirror of trust_credential coordinator::FulfillAttestationInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct FulfillAttestationInput {
+    pub request_id: String,
+    pub subject_did: String,
+    pub kvector_commitment: Vec<u8>,
+    pub range_proof: Vec<u8>,
+    pub trust_score_lower: f32,
+    pub trust_score_upper: f32,
+    pub expires_at: Option<Timestamp>,
+}
+
+/// Mirror of trust_credential coordinator::FulfillAttestationResult
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct FulfillAttestationResult {
+    pub credential_record: Record,
+    pub request_id: String,
+}
+
+/// Mirror of trust_credential coordinator::TrustVerificationResult
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TrustVerificationResult {
+    pub credential_id: String,
+    pub commitment_valid: bool,
+    pub tier_consistent: bool,
+    pub not_revoked: bool,
+    pub not_expired: bool,
+    pub proof_format_valid: bool,
+    pub message: String,
+}
+
 // ============================================================================
 // Test Utilities
 // ============================================================================
@@ -1442,4 +1609,346 @@ async fn test_multiple_notifications_retrievable() {
         .await;
 
     assert!(events.len() >= 2, "Should have at least 2 events, got {}", events.len());
+}
+
+// ============================================================================
+// Verifiable Credential Lifecycle Tests
+// ============================================================================
+
+#[cfg(test)]
+mod vc_lifecycle_tests {
+    use super::*;
+
+    /// Full VC lifecycle: issue → verify (valid) → revoke → verify (invalid)
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_vc_issue_verify_revoke_verify() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-vc-lifecycle", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // 1. Create issuer DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
+        let issuer_did = did_doc.id.clone();
+
+        // 2. Create a credential schema
+        let now = Timestamp::now();
+        let schema = CredentialSchema {
+            id: "mycelix:schema:vc-lifecycle-test:v1".to_string(),
+            name: "Lifecycle Test Credential".to_string(),
+            description: "Schema for VC lifecycle integration test".to_string(),
+            version: "1.0.0".to_string(),
+            author: issuer_did.clone(),
+            schema: r#"{"type":"object","properties":{"role":{"type":"string"}}}"#.to_string(),
+            required_fields: vec!["role".to_string()],
+            optional_fields: vec![],
+            credential_type: vec![
+                "VerifiableCredential".to_string(),
+                "TestCredential".to_string(),
+            ],
+            default_expiration: 86400 * 365,
+            revocable: true,
+            active: true,
+            created: now,
+            updated: now,
+        };
+
+        let _: Record = conductor
+            .call(&cell.zome("credential_schema"), "create_schema", schema)
+            .await;
+
+        // 3. Issue a credential
+        let issue_input = IssueCredentialInput {
+            subject_did: format!("did:mycelix:subject-{}", now.as_micros()),
+            schema_id: "mycelix:schema:vc-lifecycle-test:v1".to_string(),
+            claims: serde_json::json!({
+                "role": "developer",
+            }),
+            credential_types: vec!["TestCredential".to_string()],
+            issuer_name: Some("Lifecycle Test Issuer".to_string()),
+            expiration_days: Some(365),
+            enable_revocation: true,
+        };
+
+        let vc_record: Record = conductor
+            .call(
+                &cell.zome("verifiable_credential"),
+                "issue_credential",
+                issue_input,
+            )
+            .await;
+
+        let vc: VerifiableCredential =
+            decode_entry(&vc_record).expect("Failed to decode issued credential");
+        let credential_id = vc.id.clone();
+        assert!(
+            vc.credential_type.contains(&"VerifiableCredential".to_string()),
+            "Must include VerifiableCredential type"
+        );
+
+        // 4. Verify — should be valid
+        let result: VcVerificationResult = conductor
+            .call(
+                &cell.zome("verifiable_credential"),
+                "verify_credential",
+                credential_id.clone(),
+            )
+            .await;
+
+        assert!(
+            result.valid,
+            "Freshly issued credential should verify as valid, but got errors: {:?}",
+            result.errors
+        );
+
+        // 5. Revoke the credential
+        let revoke_input = RevokeInput {
+            credential_id: credential_id.clone(),
+            issuer_did: issuer_did.clone(),
+            reason: "Lifecycle test revocation".to_string(),
+            effective_from: None,
+        };
+
+        let _: Record = conductor
+            .call(&cell.zome("revocation"), "revoke_credential", revoke_input)
+            .await;
+
+        // 6. Verify again — should now fail with revocation error
+        let result_after: VcVerificationResult = conductor
+            .call(
+                &cell.zome("verifiable_credential"),
+                "verify_credential",
+                credential_id.clone(),
+            )
+            .await;
+
+        assert!(
+            !result_after.valid,
+            "Credential should be invalid after revocation"
+        );
+        assert!(
+            result_after.errors.iter().any(|e| e.to_lowercase().contains("revok")),
+            "Errors should mention revocation, got: {:?}",
+            result_after.errors
+        );
+    }
+}
+
+// ============================================================================
+// Trust Credential Attestation Tests
+// ============================================================================
+
+#[cfg(test)]
+mod trust_attestation_tests {
+    use super::*;
+
+    /// Issue a trust credential and verify it on-chain
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_trust_credential_issue_and_verify() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-trust", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create two DIDs (issuer and subject)
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
+        let agent_did = did_doc.id.clone();
+
+        // Issue a trust credential with a valid commitment and proof
+        let commitment = vec![42u8; 32]; // 32-byte commitment
+        let range_proof = vec![1u8, 2, 3, 4, 5]; // non-empty proof
+
+        let issue_input = IssueTrustCredentialInput {
+            subject_did: agent_did.clone(),
+            issuer_did: agent_did.clone(), // self-attestation
+            kvector_commitment: commitment,
+            range_proof: range_proof,
+            trust_score_lower: 0.6,
+            trust_score_upper: 0.75,
+            expires_at: None,
+            supersedes: None,
+        };
+
+        let cred_record: Record = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "issue_trust_credential",
+                issue_input,
+            )
+            .await;
+
+        let cred: TrustCredential =
+            decode_entry(&cred_record).expect("Failed to decode trust credential");
+
+        assert_eq!(cred.subject_did, agent_did, "Subject should match");
+        assert_eq!(cred.trust_tier, TrustTier::Elevated, "Mid-score 0.675 => Elevated");
+        assert!(!cred.revoked, "New credential should not be revoked");
+
+        // Verify the credential on-chain
+        let verify_result: TrustVerificationResult = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "verify_credential",
+                cred.id.clone(),
+            )
+            .await;
+
+        assert!(
+            verify_result.commitment_valid,
+            "Commitment should be valid"
+        );
+        assert!(
+            verify_result.tier_consistent,
+            "Tier should be consistent with score range"
+        );
+        assert!(verify_result.not_revoked, "Should not be revoked");
+        assert!(verify_result.not_expired, "Should not be expired");
+        assert!(
+            verify_result.proof_format_valid,
+            "Proof format should be valid"
+        );
+    }
+
+    /// Request attestation → fulfill → verify the resulting credential
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_attestation_request_fulfill_verify() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-attestation", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create requester DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
+        let requester_did = did_doc.id.clone();
+
+        // The subject DID (in a real scenario, a different agent)
+        let now = Timestamp::now();
+        let subject_did = format!("did:mycelix:subject-attestee-{}", now.as_micros());
+
+        // Set expiration 1 hour from now
+        let one_hour = Timestamp::from_micros(now.as_micros() + 3_600_000_000);
+
+        // 1. Request attestation
+        let request_input = RequestAttestationInput {
+            requester_did: requester_did.clone(),
+            subject_did: subject_did.clone(),
+            components: vec![KVectorComponent::Reputation, KVectorComponent::Integrity],
+            min_trust_score: Some(0.4),
+            min_tier: None,
+            purpose: "Integration test attestation".to_string(),
+            expires_at: one_hour,
+        };
+
+        let request_record: Record = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "request_attestation",
+                request_input,
+            )
+            .await;
+
+        let request: AttestationRequest =
+            decode_entry(&request_record).expect("Failed to decode attestation request");
+
+        assert_eq!(request.status, AttestationStatus::Pending, "Request should be Pending");
+        assert_eq!(request.requester_did, requester_did);
+        assert_eq!(request.subject_did, subject_did);
+
+        // 2. Check pending requests for subject
+        let pending: Vec<Record> = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "get_pending_requests",
+                subject_did.clone(),
+            )
+            .await;
+
+        assert!(
+            !pending.is_empty(),
+            "Subject should have at least one pending request"
+        );
+
+        // 3. Fulfill the attestation
+        let fulfill_input = FulfillAttestationInput {
+            request_id: request.id.clone(),
+            subject_did: subject_did.clone(),
+            kvector_commitment: vec![99u8; 32], // 32-byte commitment
+            range_proof: vec![10, 20, 30],       // non-empty proof
+            trust_score_lower: 0.5,
+            trust_score_upper: 0.7,
+            expires_at: None,
+        };
+
+        let fulfill_result: FulfillAttestationResult = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "fulfill_attestation",
+                fulfill_input,
+            )
+            .await;
+
+        assert_eq!(
+            fulfill_result.request_id, request.id,
+            "Fulfilled request ID should match"
+        );
+
+        // 4. Verify the resulting trust credential
+        let cred: TrustCredential =
+            decode_entry(&fulfill_result.credential_record)
+                .expect("Failed to decode fulfilled credential");
+
+        assert_eq!(cred.subject_did, subject_did);
+        assert_eq!(cred.trust_tier, TrustTier::Elevated, "Mid-score 0.6 => Elevated");
+        assert!(!cred.revoked, "Fulfilled credential should not be revoked");
+
+        // 5. Verify on-chain
+        let verify_result: TrustVerificationResult = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "verify_credential",
+                cred.id.clone(),
+            )
+            .await;
+
+        assert!(
+            verify_result.commitment_valid && verify_result.tier_consistent
+                && verify_result.not_revoked && verify_result.not_expired
+                && verify_result.proof_format_valid,
+            "All verification checks should pass: {}",
+            verify_result.message
+        );
+
+        // 6. Verify the request status was updated to Fulfilled
+        // (get_pending_requests should no longer return it)
+        let pending_after: Vec<Record> = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "get_pending_requests",
+                subject_did.clone(),
+            )
+            .await;
+
+        // The fulfilled request should no longer be in the pending list
+        let still_pending: Vec<_> = pending_after
+            .iter()
+            .filter_map(|r| decode_entry::<AttestationRequest>(r))
+            .filter(|req| req.id == request.id)
+            .collect();
+        assert!(
+            still_pending.is_empty(),
+            "Fulfilled request should no longer be pending"
+        );
+    }
 }

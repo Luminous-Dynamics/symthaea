@@ -257,6 +257,14 @@ pub struct AcademicProof {
     /// Challenge binding (for presentations)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub challenge: Option<String>,
+
+    /// Algorithm identifier (multicodec u16) for PQC signature dispatch.
+    ///
+    /// When present, verifiers can use this to determine the cryptographic
+    /// algorithm (e.g. Ed25519=0xED, ML-DSA-65=0x1206, Hybrid=0xF101)
+    /// without parsing the signature bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub algorithm: Option<u16>,
 }
 
 /// Rich achievement metadata
@@ -1052,6 +1060,7 @@ mod tests {
             cryptosuite: Some("eddsa-rdfc-2022".to_string()),
             domain: None,
             challenge: None,
+            algorithm: None,
         };
 
         let json = serde_json::to_string(&proof).unwrap();
@@ -1061,6 +1070,47 @@ mod tests {
         assert!(json.contains("verificationMethod"));
         assert!(json.contains("proofPurpose"));
         assert!(json.contains("proofValue"));
+        // algorithm: None is skipped in serialization
+        assert!(!json.contains("algorithm"));
+    }
+
+    #[test]
+    fn test_academic_proof_with_pqc_algorithm() {
+        let proof = AcademicProof {
+            proof_type: "DataIntegrityProof".to_string(),
+            created: "2026-01-28T00:00:00Z".to_string(),
+            verification_method: "did:dns:university.edu#keys-2".to_string(),
+            proof_purpose: "assertionMethod".to_string(),
+            proof_value: "zPQCSignatureBase58".to_string(),
+            cryptosuite: Some("dilithium-rdfc-2026".to_string()),
+            domain: None,
+            challenge: None,
+            algorithm: Some(0x1206), // ML-DSA-65
+        };
+
+        let json = serde_json::to_string(&proof).unwrap();
+        assert!(json.contains("\"algorithm\":4614")); // 0x1206 = 4614 decimal
+
+        // Round-trip
+        let restored: AcademicProof = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.algorithm, Some(0x1206));
+    }
+
+    #[test]
+    fn test_academic_proof_backward_compat_no_algorithm() {
+        // Old proofs without algorithm field should still deserialize
+        let json = r#"{
+            "type": "DataIntegrityProof",
+            "created": "2025-06-01T00:00:00Z",
+            "verificationMethod": "did:dns:old-uni.edu#key-1",
+            "proofPurpose": "assertionMethod",
+            "proofValue": "zOldSignature"
+        }"#;
+
+        let proof: AcademicProof = serde_json::from_str(json).unwrap();
+        assert_eq!(proof.proof_type, "DataIntegrityProof");
+        assert!(proof.algorithm.is_none());
+        assert!(proof.cryptosuite.is_none());
     }
 
     #[test]

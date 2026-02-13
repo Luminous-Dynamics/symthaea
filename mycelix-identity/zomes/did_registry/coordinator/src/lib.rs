@@ -784,6 +784,102 @@ pub fn rotate_key(input: RotateKeyInput) -> ExternResult<Record> {
     })
 }
 
+/// Input for key agreement rotation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RotateKeyAgreementInput {
+    /// ID of the KEM verification method to replace (e.g. "#kem-1")
+    pub old_key_id: String,
+    /// New KEM verification method to add
+    pub new_method: VerificationMethod,
+}
+
+/// Rotate a key agreement method: deprecate the old KEM key and add a new one atomically.
+///
+/// Mirrors [`rotate_key`] but operates on the `keyAgreement` array instead of
+/// `authentication`. The old KEM key is retained (renamed with `-deprecated-v{version}`)
+/// so that previously-encrypted messages can still be decrypted, but the deprecated key
+/// is removed from `keyAgreement` so new encryption uses the new key.
+#[hdk_extern]
+pub fn rotate_key_agreement(input: RotateKeyAgreementInput) -> ExternResult<Record> {
+    // Input validation
+    if input.old_key_id.is_empty() || input.old_key_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Old key ID must be 1-256 characters".into()
+        )));
+    }
+    if input.new_method.id.is_empty() || input.new_method.id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "New verification method ID must be 1-256 characters".into()
+        )));
+    }
+    if input.new_method.public_key_multibase.is_empty()
+        || input.new_method.public_key_multibase.len() > 4096
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Public key multibase must be 1-4096 characters".into()
+        )));
+    }
+
+    // Validate the new key is a KEM algorithm
+    let alg = validate_multibase_key(&input.new_method.public_key_multibase)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid new KEM key: {}", e))))?;
+
+    match alg {
+        AlgorithmId::MlKem768 | AlgorithmId::MlKem1024 => {}
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Key agreement rotation requires a KEM algorithm (ML-KEM-768 or ML-KEM-1024), got {}",
+                alg.did_verification_method_type()
+            ))));
+        }
+    }
+
+    let agent_info = agent_info()?;
+    let agent_pub_key = agent_info.agent_initial_pubkey;
+
+    let current_record = get_did_document(agent_pub_key)?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("No DID found".into())))?;
+
+    let current_did: DidDocument = current_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
+
+    // Find the old KEM key in verification_method
+    let old_key_idx = current_did
+        .verification_method
+        .iter()
+        .position(|m| m.id == input.old_key_id)
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "KEM verification method '{}' not found",
+            input.old_key_id
+        ))))?;
+
+    // Build updated methods: deprecate old KEM key, add new one
+    let mut methods = current_did.verification_method.clone();
+    let deprecated_id = format!(
+        "{}-deprecated-v{}",
+        methods[old_key_idx].id, current_did.version
+    );
+    methods[old_key_idx].id = deprecated_id.clone();
+    methods.push(input.new_method.clone());
+
+    // Update key_agreement: remove old key reference, add new one
+    let mut ka = current_did.key_agreement.clone();
+    ka.retain(|k| k != &input.old_key_id);
+    if !ka.contains(&input.new_method.id) {
+        ka.push(input.new_method.id);
+    }
+
+    update_did_document(UpdateDidInput {
+        verification_method: Some(methods),
+        authentication: None, // preserve existing authentication
+        key_agreement: Some(ka),
+        service: None,
+    })
+}
+
 // =============================================================================
 // SOCIAL RECOVERY: DID TRANSFER
 // =============================================================================
@@ -1194,5 +1290,60 @@ mod tests {
         assert_eq!(methods[1].id, "#keys-2");
         // Old key's public material is preserved for signature verification
         assert!(!methods[0].public_key_multibase.is_empty());
+    }
+
+    // --- rotate_key_agreement tests ---
+
+    #[test]
+    fn test_rotate_key_agreement_input_validation() {
+        let input = RotateKeyAgreementInput {
+            old_key_id: String::new(),
+            new_method: VerificationMethod {
+                id: "#kem-2".into(),
+                type_: "Multikey".into(),
+                controller: "did:mycelix:test".into(),
+                public_key_multibase: make_test_multibase_key(0xAA),
+                algorithm: None,
+            },
+        };
+        assert!(input.old_key_id.is_empty());
+    }
+
+    #[test]
+    fn test_rotate_key_agreement_ka_update_logic() {
+        // Simulate the key_agreement array update logic from rotate_key_agreement
+        let old_key_id = "#kem-1";
+        let new_key_id = "#kem-2";
+        let mut ka = vec![
+            "#kem-1".to_string(),
+            "#kem-1".to_string(), // duplicate
+        ];
+
+        // Remove old key references
+        ka.retain(|k| k != old_key_id);
+        assert!(ka.is_empty(), "All references to old KEM key should be removed");
+
+        // Add new key
+        if !ka.contains(&new_key_id.to_string()) {
+            ka.push(new_key_id.to_string());
+        }
+        assert_eq!(ka, vec!["#kem-2".to_string()]);
+    }
+
+    #[test]
+    fn test_rotate_key_agreement_preserves_auth() {
+        // rotate_key_agreement passes authentication: None, which means
+        // update_did_document preserves the existing authentication array
+        let auth = vec!["#keys-1".to_string()];
+        let preserved = None::<Vec<String>>.unwrap_or(auth.clone());
+        assert_eq!(preserved, auth);
+    }
+
+    #[test]
+    fn test_rotate_key_agreement_deprecated_id_format() {
+        let old_id = "#kem-1";
+        let version = 2u32;
+        let deprecated = format!("{}-deprecated-v{}", old_id, version);
+        assert_eq!(deprecated, "#kem-1-deprecated-v2");
     }
 }

@@ -992,6 +992,8 @@ export interface AcademicProof {
   proofPurpose: string;
   /** W3C: "proofValue" */
   proofValue: string;
+  /** Multicodec algorithm ID (e.g. 0xED=Ed25519, 0x1206=ML-DSA-65, 0xF101=Hybrid) */
+  algorithm?: number;
 }
 
 /**
