@@ -128,8 +128,9 @@ fn commons_dna_path() -> PathBuf {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_property_register_and_get() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -177,8 +178,9 @@ async fn test_property_register_and_get() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_bridge_query_and_resolve() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -218,8 +220,9 @@ async fn test_bridge_query_and_resolve() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_bridge_broadcast_event() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -257,8 +260,9 @@ async fn test_bridge_broadcast_event() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_bridge_health_check() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -286,8 +290,9 @@ async fn test_bridge_health_check() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_cross_domain_housing_queries_property() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -352,8 +357,9 @@ async fn test_cross_domain_housing_queries_property() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_cross_domain_care_checks_mutualaid_resources() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -435,8 +441,9 @@ pub struct YieldRecord {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_food_register_plot_and_plant_crop() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -490,8 +497,9 @@ async fn test_food_register_plot_and_plant_crop() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_food_harvest_and_yield_record() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -636,8 +644,9 @@ pub struct CommunityImpactSummary {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_transport_register_vehicle_and_route() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -692,8 +701,9 @@ async fn test_transport_register_vehicle_and_route() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_transport_trip_logging_and_carbon_credits() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -735,8 +745,9 @@ async fn test_transport_trip_logging_and_carbon_credits() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_transport_emissions_calculator() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -762,8 +773,9 @@ async fn test_transport_emissions_calculator() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_transport_community_impact_summary() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -819,8 +831,9 @@ async fn test_transport_community_impact_summary() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_cross_domain_food_event_via_bridge() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
@@ -859,8 +872,9 @@ async fn test_cross_domain_food_event_via_bridge() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_cross_domain_transport_query_via_bridge() {
     let conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[DnaSource::Path(commons_dna_path())])
+        .setup_app("test-app", &[&dna_file])
         .await
         .unwrap()
         .into_tuple();
