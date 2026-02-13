@@ -541,10 +541,58 @@ fn validate_create_credential_request(
 
 /// Validate credential request update
 fn validate_update_credential_request(
-    _action: Update,
-    _req: CredentialRequest,
+    action: Update,
+    req: CredentialRequest,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Request updates are allowed (status changes)
+    // Fetch original to enforce state transitions
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: CredentialRequest = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original credential request not found".into()
+        )))?;
+
+    // Immutable fields
+    if req.id != original.id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request ID cannot be changed".into(),
+        ));
+    }
+    if req.requester_did != original.requester_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Requester DID cannot be changed".into(),
+        ));
+    }
+    if req.issuer_did != original.issuer_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Issuer DID cannot be changed".into(),
+        ));
+    }
+    if req.schema_id != original.schema_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema ID cannot be changed".into(),
+        ));
+    }
+
+    // State machine: valid transitions
+    let valid = match (&original.status, &req.status) {
+        (RequestStatus::Pending, RequestStatus::UnderReview)
+        | (RequestStatus::Pending, RequestStatus::Rejected)
+        | (RequestStatus::UnderReview, RequestStatus::Approved)
+        | (RequestStatus::UnderReview, RequestStatus::Rejected)
+        | (RequestStatus::Approved, RequestStatus::Issued) => true,
+        (a, b) if a == b => true, // No-op allowed
+        _ => false,
+    };
+
+    if !valid {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Invalid credential request status transition".into(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 

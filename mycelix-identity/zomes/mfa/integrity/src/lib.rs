@@ -543,6 +543,47 @@ fn validate_update_mfa_state(
         ));
     }
 
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: MfaState = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original MFA state not found".into()
+        )))?;
+
+    // Immutable fields
+    if state.did != original.did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MFA DID cannot be changed".into(),
+        ));
+    }
+    if state.owner != original.owner {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MFA owner cannot be changed".into(),
+        ));
+    }
+    if state.created != original.created {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MFA created timestamp cannot be changed".into(),
+        ));
+    }
+
+    // Version must increment
+    if state.version <= original.version {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MFA state version must increase on update".into(),
+        ));
+    }
+
+    // Updated timestamp must advance
+    if state.updated <= original.updated {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MFA updated timestamp must advance".into(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 

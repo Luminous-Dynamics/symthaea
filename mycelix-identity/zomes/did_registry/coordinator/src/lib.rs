@@ -98,11 +98,52 @@ fn auto_create_mfa_state(did: &str, agent_pub_key: &AgentPubKey) -> ExternResult
     }
 }
 
+/// Notify bridge of DID creation for ecosystem-wide awareness
+fn notify_bridge_of_did_event(did: &str, event_type: &str, payload: &str) -> ExternResult<()> {
+    #[derive(Serialize, Deserialize, Debug)]
+    struct BroadcastEventInput {
+        event_type: String,
+        subject: String,
+        payload: String,
+        source_happ: String,
+    }
+
+    let input = BroadcastEventInput {
+        event_type: event_type.to_string(),
+        subject: did.to_string(),
+        payload: payload.to_string(),
+        source_happ: "mycelix-identity".to_string(),
+    };
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("identity_bridge"),
+        FunctionName::new("broadcast_event"),
+        None,
+        input,
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(_) => Ok(()),
+        _ => {
+            debug!("Bridge notification failed for {} event on {} - non-critical", event_type, did);
+            Ok(())
+        }
+    }
+}
+
 /// Create a new DID document for the calling agent
 #[hdk_extern]
 pub fn create_did() -> ExternResult<Record> {
     let agent_info = agent_info()?;
     let agent_pub_key = agent_info.agent_initial_pubkey;
+
+    // Rate limit: 1 DID per agent (idempotency guard)
+    if get_did_document(agent_pub_key.clone())?.is_some() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Agent already has a DID document. Use update_did_document to modify it.".into()
+        )));
+    }
 
     // Generate DID identifier
     let did_id = format!("did:mycelix:{}", agent_pub_key);
@@ -144,6 +185,15 @@ pub fn create_did() -> ExternResult<Record> {
     // Errors are logged but don't fail DID creation (MFA is optional)
     if let Err(e) = auto_create_mfa_state(&did_id, &agent_pub_key) {
         debug!("Failed to auto-create MFA state: {:?}", e);
+    }
+
+    // Broadcast DidCreated event to bridge for ecosystem-wide awareness
+    let payload = serde_json::json!({
+        "did": did_id,
+        "event": "did_created",
+    }).to_string();
+    if let Err(e) = notify_bridge_of_did_event(&did_id, "DidCreated", &payload) {
+        debug!("Failed to notify bridge of DID creation: {:?}", e);
     }
 
     let record = get(action_hash.clone(), GetOptions::default())?
@@ -312,6 +362,16 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
         LinkTypes::AgentToDid,
         (),
     )?;
+
+    // Broadcast DidUpdated event (covers key rotation, service changes, etc.)
+    let payload = serde_json::json!({
+        "did": current_did.id,
+        "version": current_did.version + 1,
+        "event": "did_updated",
+    }).to_string();
+    if let Err(e) = notify_bridge_of_did_event(&current_did.id, "DidUpdated", &payload) {
+        debug!("Failed to notify bridge of DID update: {:?}", e);
+    }
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(

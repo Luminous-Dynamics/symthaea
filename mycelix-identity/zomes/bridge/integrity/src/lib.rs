@@ -282,13 +282,34 @@ fn validate_create_happ_registration(
 
 /// Validate hApp registration update
 fn validate_update_happ_registration(
-    _action: Update,
+    action: Update,
     registration: HappRegistration,
 ) -> ExternResult<ValidateCallbackResult> {
-    // MATL score must be valid
     if !(0.0..=1.0).contains(&registration.matl_score) {
         return Ok(ValidateCallbackResult::Invalid(
             "MATL score must be between 0.0 and 1.0".into(),
+        ));
+    }
+
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: HappRegistration = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original hApp registration not found".into()
+        )))?;
+
+    // Immutable fields
+    if registration.happ_id != original.happ_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "hApp ID cannot be changed".into(),
+        ));
+    }
+    if registration.registered_at != original.registered_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Registration timestamp cannot be changed".into(),
         ));
     }
 
@@ -392,13 +413,48 @@ fn validate_create_identity_reputation(
 
 /// Validate identity reputation update
 fn validate_update_identity_reputation(
-    _action: Update,
+    action: Update,
     reputation: IdentityReputation,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Score must be valid
     if !(0.0..=1.0).contains(&reputation.score) {
         return Ok(ValidateCallbackResult::Invalid(
             "Reputation score must be between 0.0 and 1.0".into(),
+        ));
+    }
+
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: IdentityReputation = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original reputation entry not found".into()
+        )))?;
+
+    // Immutable fields
+    if reputation.did != original.did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Reputation DID cannot be changed".into(),
+        ));
+    }
+    if reputation.source_happ != original.source_happ {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Reputation source hApp cannot be changed".into(),
+        ));
+    }
+
+    // Interactions must be monotonically non-decreasing
+    if reputation.interactions < original.interactions {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Interaction count cannot decrease".into(),
+        ));
+    }
+
+    // Timestamp must advance
+    if reputation.last_updated <= original.last_updated {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Reputation last_updated must advance".into(),
         ));
     }
 

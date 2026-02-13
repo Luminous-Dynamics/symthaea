@@ -272,7 +272,7 @@ fn validate_create_recovery_config(
 
 /// Validate recovery config update
 fn validate_update_recovery_config(
-    _action: Update,
+    action: Update,
     config: RecoveryConfig,
 ) -> ExternResult<ValidateCallbackResult> {
     // Validate trustee count (3-7)
@@ -297,6 +297,40 @@ fn validate_update_recovery_config(
             "Threshold must be at least {} (majority)",
             min_threshold
         )));
+    }
+
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: RecoveryConfig = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original recovery config not found".into()
+        )))?;
+
+    // Immutable fields
+    if config.did != original.did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery config DID cannot be changed".into(),
+        ));
+    }
+    if config.owner != original.owner {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery config owner cannot be changed".into(),
+        ));
+    }
+    if config.created != original.created {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery config created timestamp cannot be changed".into(),
+        ));
+    }
+
+    // Updated timestamp must advance
+    if config.updated <= original.updated {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery config updated timestamp must advance".into(),
+        ));
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -340,7 +374,7 @@ fn validate_create_recovery_request(
 
 /// Validate recovery request update (status transitions)
 fn validate_update_recovery_request(
-    _action: Update,
+    action: Update,
     request: RecoveryRequest,
 ) -> ExternResult<ValidateCallbackResult> {
     // Validate DID format
@@ -350,18 +384,78 @@ fn validate_update_recovery_request(
         ));
     }
 
-    // Validate status transitions:
-    // Completed status requires time_lock_expires to be set (timelock was applied)
-    if request.status == RecoveryStatus::Completed && request.time_lock_expires.is_none() {
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: RecoveryRequest = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original recovery request not found".into()
+        )))?;
+
+    // Immutable fields
+    if request.id != original.id {
         return Ok(ValidateCallbackResult::Invalid(
-            "Cannot complete recovery without timelock (time_lock_expires must be set)".into(),
+            "Recovery request ID cannot be changed".into(),
         ));
+    }
+    if request.did != original.did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery request DID cannot be changed".into(),
+        ));
+    }
+    if request.new_agent != original.new_agent {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery request new_agent cannot be changed".into(),
+        ));
+    }
+    if request.initiated_by != original.initiated_by {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery request initiator cannot be changed".into(),
+        ));
+    }
+    if request.created != original.created {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery request created timestamp cannot be changed".into(),
+        ));
+    }
+
+    // Validate status transitions via state machine
+    // Terminal states: Completed, Rejected, Cancelled cannot transition further
+    let valid_transition = match (&original.status, &request.status) {
+        // Pending → Approved (threshold reached), Rejected, or Cancelled
+        (RecoveryStatus::Pending, RecoveryStatus::Approved)
+        | (RecoveryStatus::Pending, RecoveryStatus::Rejected)
+        | (RecoveryStatus::Pending, RecoveryStatus::Cancelled) => true,
+        // Approved → ReadyToExecute (timelock expired) or Cancelled
+        (RecoveryStatus::Approved, RecoveryStatus::ReadyToExecute)
+        | (RecoveryStatus::Approved, RecoveryStatus::Cancelled) => true,
+        // ReadyToExecute → Completed or Cancelled
+        (RecoveryStatus::ReadyToExecute, RecoveryStatus::Completed)
+        | (RecoveryStatus::ReadyToExecute, RecoveryStatus::Cancelled) => true,
+        // Same status (no-op update) is allowed
+        (a, b) if a == b => true,
+        _ => false,
+    };
+    if !valid_transition {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid recovery status transition from {:?} to {:?}",
+            original.status, request.status
+        )));
     }
 
     // Approved status must have time_lock_expires set
     if request.status == RecoveryStatus::Approved && request.time_lock_expires.is_none() {
         return Ok(ValidateCallbackResult::Invalid(
             "Approved recovery must have time_lock_expires set".into(),
+        ));
+    }
+
+    // Completed status requires time_lock_expires to be set
+    if request.status == RecoveryStatus::Completed && request.time_lock_expires.is_none() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot complete recovery without timelock (time_lock_expires must be set)".into(),
         ));
     }
 

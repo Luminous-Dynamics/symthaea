@@ -4857,4 +4857,255 @@ mod multi_agent_tests {
             "Bob should NOT be able to issue credentials as Alice's institution"
         );
     }
+
+    /// Duplicate DID creation should be rejected (rate limiting).
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_duplicate_did_creation_rejected() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        let alice_app = conductor.setup_app("alice", &[dna]).await.unwrap();
+        let alice_cell = alice_app.cells()[0].clone();
+
+        // First DID creation should succeed
+        let _: Record = conductor
+            .call(&alice_cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        // Second DID creation by same agent should fail
+        let result: Result<Record, _> = conductor
+            .call_fallible(&alice_cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Agent should NOT be able to create a second DID"
+        );
+    }
+
+    /// Bob tries to update Alice's credential schema — should fail.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_cross_agent_schema_update_rejected() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        let alice_app = conductor.setup_app("alice", &[dna.clone()]).await.unwrap();
+        let alice_cell = alice_app.cells()[0].clone();
+        let alice_key = alice_app.agent().clone();
+
+        let bob_app = conductor.setup_app("bob", &[dna]).await.unwrap();
+        let bob_cell = bob_app.cells()[0].clone();
+
+        // Both create DIDs
+        let _: Record = conductor
+            .call(&alice_cell.zome("did_registry"), "create_did", ())
+            .await;
+        let _: Record = conductor
+            .call(&bob_cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        let _alice_did = format!("did:mycelix:{}", alice_key);
+
+        // Alice creates a schema
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct CreateSchemaInput {
+            name: String,
+            description: String,
+            version: String,
+            schema: String,
+            required_fields: Vec<String>,
+            optional_fields: Vec<String>,
+            credential_type: Vec<String>,
+            default_expiration: u64,
+            revocable: bool,
+        }
+
+        let schema_input = CreateSchemaInput {
+            name: "Test Schema".to_string(),
+            description: "A test schema".to_string(),
+            version: "1.0.0".to_string(),
+            schema: r#"{"type":"object"}"#.to_string(),
+            required_fields: vec!["name".to_string()],
+            optional_fields: vec![],
+            credential_type: vec!["VerifiableCredential".to_string()],
+            default_expiration: 0,
+            revocable: true,
+        };
+
+        let schema_record: Record = conductor
+            .call(
+                &alice_cell.zome("credential_schema"),
+                "create_schema",
+                schema_input,
+            )
+            .await;
+
+        let schema: CredentialSchema =
+            decode_entry(&schema_record).expect("decode schema");
+
+        // Bob tries to update Alice's schema — should fail capability guard
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct UpdateSchemaInput {
+            schema_id: String,
+            name: Option<String>,
+            description: Option<String>,
+            version: Option<String>,
+            schema: Option<String>,
+            required_fields: Option<Vec<String>>,
+            optional_fields: Option<Vec<String>>,
+            default_expiration: Option<u64>,
+            revocable: Option<bool>,
+            active: Option<bool>,
+        }
+
+        let update_input = UpdateSchemaInput {
+            schema_id: schema.id.clone(),
+            name: Some("Hijacked Schema".to_string()),
+            description: None,
+            version: None,
+            schema: None,
+            required_fields: None,
+            optional_fields: None,
+            default_expiration: None,
+            revocable: None,
+            active: None,
+        };
+
+        let result: Result<Record, _> = conductor
+            .call_fallible(
+                &bob_cell.zome("credential_schema"),
+                "update_schema",
+                update_input,
+            )
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Bob should NOT be able to update Alice's credential schema"
+        );
+    }
+
+    /// Bob tries to issue a trust credential impersonating Alice — should fail.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_cross_agent_trust_credential_impersonation_rejected() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        let alice_app = conductor.setup_app("alice", &[dna.clone()]).await.unwrap();
+        let alice_cell = alice_app.cells()[0].clone();
+        let alice_key = alice_app.agent().clone();
+
+        let bob_app = conductor.setup_app("bob", &[dna]).await.unwrap();
+        let bob_cell = bob_app.cells()[0].clone();
+        let bob_key = bob_app.agent().clone();
+
+        // Both create DIDs
+        let _: Record = conductor
+            .call(&alice_cell.zome("did_registry"), "create_did", ())
+            .await;
+        let _: Record = conductor
+            .call(&bob_cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        let alice_did = format!("did:mycelix:{}", alice_key);
+        let bob_did = format!("did:mycelix:{}", bob_key);
+
+        // Bob tries to issue a trust credential as Alice (impersonation)
+        let issue_input = IssueTrustCredentialInput {
+            subject_did: bob_did.clone(),
+            issuer_did: alice_did.clone(), // claiming to be Alice
+            kvector_commitment: vec![0xAA; 32],
+            range_proof: vec![0xBB; 64],
+            trust_score_lower: 0.9,
+            trust_score_upper: 1.0,
+            expires_at: None,
+            supersedes: None,
+        };
+
+        let result: Result<Record, _> = conductor
+            .call_fallible(
+                &bob_cell.zome("trust_credential"),
+                "issue_trust_credential",
+                issue_input,
+            )
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Bob should NOT be able to issue trust credentials as Alice"
+        );
+    }
+
+    /// Bob tries to revoke Alice's trust credential — should fail.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_cross_agent_trust_revocation_rejected() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        let alice_app = conductor.setup_app("alice", &[dna.clone()]).await.unwrap();
+        let alice_cell = alice_app.cells()[0].clone();
+        let alice_key = alice_app.agent().clone();
+
+        let bob_app = conductor.setup_app("bob", &[dna]).await.unwrap();
+        let bob_cell = bob_app.cells()[0].clone();
+        let bob_key = bob_app.agent().clone();
+
+        // Both create DIDs
+        let _: Record = conductor
+            .call(&alice_cell.zome("did_registry"), "create_did", ())
+            .await;
+        let _: Record = conductor
+            .call(&bob_cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        let alice_did = format!("did:mycelix:{}", alice_key);
+        let bob_did = format!("did:mycelix:{}", bob_key);
+
+        // Alice issues a trust credential for Bob
+        let issue_input = IssueTrustCredentialInput {
+            subject_did: bob_did.clone(),
+            issuer_did: alice_did.clone(),
+            kvector_commitment: vec![0xAA; 32],
+            range_proof: vec![0xBB; 64],
+            trust_score_lower: 0.6,
+            trust_score_upper: 0.8,
+            expires_at: None,
+            supersedes: None,
+        };
+
+        let cred_record: Record = conductor
+            .call(
+                &alice_cell.zome("trust_credential"),
+                "issue_trust_credential",
+                issue_input,
+            )
+            .await;
+
+        let cred: TrustCredential =
+            decode_entry(&cred_record).expect("decode trust credential");
+
+        // Bob tries to revoke it (only Alice the issuer should be able to)
+        let revoke_input = RevokeCredentialInput {
+            credential_id: cred.id.clone(),
+            subject_did: bob_did.clone(),
+            reason: "Bob trying to revoke Alice's credential".to_string(),
+        };
+
+        let result: Result<Record, _> = conductor
+            .call_fallible(
+                &bob_cell.zome("trust_credential"),
+                "revoke_trust_credential",
+                revoke_input,
+            )
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Bob should NOT be able to revoke credentials issued by Alice"
+        );
+    }
 }

@@ -226,8 +226,53 @@ fn validate_update_did_document(
         ));
     }
 
-    // Version validation would require fetching original - skip for now
-    // More complex validation can be added later
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: DidDocument = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original DID document not found".into()
+        )))?;
+
+    // Immutable fields
+    if did_doc.id != original.id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID id cannot be changed".into(),
+        ));
+    }
+    if did_doc.controller != original.controller {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID controller cannot be changed".into(),
+        ));
+    }
+    if did_doc.created != original.created {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID created timestamp cannot be changed".into(),
+        ));
+    }
+
+    // Version must increment
+    if did_doc.version <= original.version {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID version must increase on update".into(),
+        ));
+    }
+
+    // Updated timestamp must advance
+    if did_doc.updated <= original.updated {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID updated timestamp must advance".into(),
+        ));
+    }
+
+    // Must still have at least one verification method
+    if did_doc.verification_method.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID must have at least one verification method".into(),
+        ));
+    }
 
     Ok(ValidateCallbackResult::Valid)
 }
@@ -437,5 +482,85 @@ mod tests {
                 prop_assert!(deactivation.reason.is_empty());
             }
         }
+    }
+
+    // =========================================================================
+    // Backward-compatibility MessagePack round-trip tests
+    // =========================================================================
+
+    /// Old snake_case MessagePack data must deserialize through the new camelCase
+    /// structs, thanks to `serde(alias = "...")` attributes.
+    #[test]
+    fn backward_compat_verification_method_snake_case_msgpack() {
+        // Build a map with old snake_case keys
+        let old_map = serde_json::json!({
+            "id": "#keys-1",
+            "type_": "Ed25519VerificationKey2020",
+            "controller": "did:mycelix:test",
+            "public_key_multibase": "z6Mkabcdef",
+            "algorithm": null
+        });
+
+        // Serialize to MessagePack via serde_json::Value → rmp
+        let msgpack_bytes = rmp_serde::to_vec(&old_map).unwrap();
+
+        // Deserialize into VerificationMethod — the alias attributes should handle
+        // snake_case keys from old entries.
+        let vm: VerificationMethod = rmp_serde::from_slice(&msgpack_bytes).unwrap();
+
+        assert_eq!(vm.id, "#keys-1");
+        assert_eq!(vm.type_, "Ed25519VerificationKey2020");
+        assert_eq!(vm.controller, "did:mycelix:test");
+        assert_eq!(vm.public_key_multibase, "z6Mkabcdef");
+        assert_eq!(vm.algorithm, None);
+    }
+
+    /// Forward direction: serialized VerificationMethod uses camelCase keys.
+    #[test]
+    fn forward_compat_verification_method_camel_case_json() {
+        let vm = VerificationMethod {
+            id: "#keys-1".into(),
+            type_: "Ed25519VerificationKey2020".into(),
+            controller: "did:mycelix:test".into(),
+            public_key_multibase: "z6Mkabcdef".into(),
+            algorithm: Some(0xed01),
+        };
+
+        let json = serde_json::to_string(&vm).unwrap();
+        // Should use camelCase in output
+        assert!(json.contains("\"type\""), "Should serialize as 'type', not 'type_'");
+        assert!(json.contains("\"publicKeyMultibase\""), "Should serialize as camelCase");
+        assert!(!json.contains("\"public_key_multibase\""), "Should NOT use snake_case in output");
+    }
+
+    /// Old snake_case ServiceEndpoint MessagePack round-trip.
+    #[test]
+    fn backward_compat_service_endpoint_snake_case_msgpack() {
+        let old_map = serde_json::json!({
+            "id": "#svc-1",
+            "type_": "LinkedDomains",
+            "service_endpoint": "https://example.com"
+        });
+
+        let msgpack_bytes = rmp_serde::to_vec(&old_map).unwrap();
+        let svc: ServiceEndpoint = rmp_serde::from_slice(&msgpack_bytes).unwrap();
+
+        assert_eq!(svc.id, "#svc-1");
+        assert_eq!(svc.type_, "LinkedDomains");
+        assert_eq!(svc.service_endpoint, "https://example.com");
+    }
+
+    /// Forward direction: serialized ServiceEndpoint uses camelCase keys.
+    #[test]
+    fn forward_compat_service_endpoint_camel_case_json() {
+        let svc = ServiceEndpoint {
+            id: "#svc-1".into(),
+            type_: "LinkedDomains".into(),
+            service_endpoint: "https://example.com".into(),
+        };
+
+        let json = serde_json::to_string(&svc).unwrap();
+        assert!(json.contains("\"serviceEndpoint\""), "Should use camelCase");
+        assert!(!json.contains("\"service_endpoint\""), "Should NOT use snake_case");
     }
 }

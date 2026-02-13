@@ -373,16 +373,56 @@ fn validate_create_credential(
 
 /// Validate trust credential update (for revocation)
 fn validate_update_credential(
-    _action: Update,
+    action: Update,
     cred: TrustCredential,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Can only update to revoke or supersede
-    // Note: Full validation would check original entry
-    // Here we just ensure updated entry is valid
-
     if cred.kvector_commitment.len() != 32 {
         return Ok(ValidateCallbackResult::Invalid(
             "K-Vector commitment must be 32 bytes".into(),
+        ));
+    }
+
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: TrustCredential = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original trust credential not found".into()
+        )))?;
+
+    // Immutable fields
+    if cred.id != original.id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Trust credential ID cannot be changed".into(),
+        ));
+    }
+    if cred.subject_did != original.subject_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Subject DID cannot be changed".into(),
+        ));
+    }
+    if cred.issuer_did != original.issuer_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Issuer DID cannot be changed".into(),
+        ));
+    }
+    if cred.kvector_commitment != original.kvector_commitment {
+        return Ok(ValidateCallbackResult::Invalid(
+            "K-Vector commitment cannot be changed".into(),
+        ));
+    }
+    if cred.issued_at != original.issued_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Issuance timestamp cannot be changed".into(),
+        ));
+    }
+
+    // Revoked is irreversible
+    if original.revoked && !cred.revoked {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Trust credential revocation is irreversible".into(),
         ));
     }
 
@@ -436,13 +476,56 @@ fn validate_create_request(
 
 /// Validate attestation request update
 fn validate_update_request(
-    _action: Update,
+    action: Update,
     req: AttestationRequest,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Basic validation for updated request
     if !req.requester_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
             "Requester must be a valid DID".into(),
+        ));
+    }
+
+    // Fetch original to enforce state transitions
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: AttestationRequest = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original attestation request not found".into()
+        )))?;
+
+    // Immutable fields
+    if req.id != original.id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Attestation request ID cannot be changed".into(),
+        ));
+    }
+    if req.requester_did != original.requester_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Requester DID cannot be changed".into(),
+        ));
+    }
+    if req.subject_did != original.subject_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Subject DID cannot be changed".into(),
+        ));
+    }
+
+    // State machine: Pending → Fulfilled/Declined/Expired/Cancelled
+    // Terminal states (Fulfilled, Declined, Expired, Cancelled) cannot transition further
+    let valid = match (&original.status, &req.status) {
+        (AttestationStatus::Pending, AttestationStatus::Fulfilled)
+        | (AttestationStatus::Pending, AttestationStatus::Declined)
+        | (AttestationStatus::Pending, AttestationStatus::Expired)
+        | (AttestationStatus::Pending, AttestationStatus::Cancelled) => true,
+        (a, b) if a == b => true,
+        _ => false,
+    };
+
+    if !valid {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Invalid attestation request status transition".into(),
         ));
     }
 

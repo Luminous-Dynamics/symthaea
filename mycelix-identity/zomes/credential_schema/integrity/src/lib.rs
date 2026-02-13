@@ -223,14 +223,10 @@ fn validate_create_credential_schema(
 
 /// Validate schema update
 fn validate_update_credential_schema(
-    _action: Update,
+    action: Update,
     schema: CredentialSchema,
     _original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Basic validation - cannot change schema ID or author
-    // Note: Full validation would require fetching original entry
-    // For now, we validate the updated entry is valid
-
     if !schema.id.starts_with("mycelix:schema:") {
         return Ok(ValidateCallbackResult::Invalid(
             "Schema ID must start with 'mycelix:schema:'".into(),
@@ -240,6 +236,45 @@ fn validate_update_credential_schema(
     if serde_json::from_str::<serde_json::Value>(&schema.schema).is_err() {
         return Ok(ValidateCallbackResult::Invalid(
             "Schema must be valid JSON".into(),
+        ));
+    }
+
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: CredentialSchema = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original credential schema not found".into()
+        )))?;
+
+    // Immutable fields
+    if schema.id != original.id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema ID cannot be changed".into(),
+        ));
+    }
+    if schema.author != original.author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema author cannot be changed".into(),
+        ));
+    }
+    if schema.created != original.created {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema created timestamp cannot be changed".into(),
+        ));
+    }
+    if schema.credential_type != original.credential_type {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema credential type cannot be changed".into(),
+        ));
+    }
+
+    // Updated timestamp must advance
+    if schema.updated <= original.updated {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema updated timestamp must advance".into(),
         ));
     }
 

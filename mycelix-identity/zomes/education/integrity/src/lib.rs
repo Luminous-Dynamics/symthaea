@@ -833,13 +833,77 @@ fn validate_create_legacy_import(
 
 /// Validate legacy import update
 fn validate_update_legacy_import(
-    _action: Update,
+    action: Update,
     import: LegacyBridgeImport,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Can only update status and counts
     if !import.institution_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
             "Institution must be a valid DID".into(),
+        ));
+    }
+
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: LegacyBridgeImport = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original import entry not found".into()
+        )))?;
+
+    // Immutable fields
+    if import.batch_id != original.batch_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Import batch ID cannot be changed".into(),
+        ));
+    }
+    if import.institution_did != original.institution_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Institution DID cannot be changed".into(),
+        ));
+    }
+    if import.source_system != original.source_system {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Source system cannot be changed".into(),
+        ));
+    }
+    if import.source_hash != original.source_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Source hash cannot be changed".into(),
+        ));
+    }
+    if import.total_credentials != original.total_credentials {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Total credentials count cannot be changed".into(),
+        ));
+    }
+
+    // Counts must be monotonically non-decreasing
+    if import.imported_count < original.imported_count {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Imported count cannot decrease".into(),
+        ));
+    }
+    if import.failed_count < original.failed_count {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Failed count cannot decrease".into(),
+        ));
+    }
+
+    // State machine: InProgress → Completed/CompletedWithErrors/Failed, Failed → RolledBack
+    let valid = match (&original.status, &import.status) {
+        (ImportStatus::InProgress, ImportStatus::Completed)
+        | (ImportStatus::InProgress, ImportStatus::CompletedWithErrors)
+        | (ImportStatus::InProgress, ImportStatus::Failed)
+        | (ImportStatus::Failed, ImportStatus::RolledBack) => true,
+        (a, b) if a == b => true,
+        _ => false,
+    };
+
+    if !valid {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Invalid import status transition".into(),
         ));
     }
 
@@ -877,10 +941,47 @@ fn validate_create_revocation_request(
 
 /// Validate revocation request update
 fn validate_update_revocation_request(
-    _action: Update,
-    _req: AcademicRevocationRequest,
+    action: Update,
+    req: AcademicRevocationRequest,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Status updates are allowed
+    // Fetch original to enforce state transitions
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: AcademicRevocationRequest = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original revocation request not found".into()
+        )))?;
+
+    // Immutable fields
+    if req.credential_id != original.credential_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Credential ID cannot be changed".into(),
+        ));
+    }
+    if req.requester_did != original.requester_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Requester DID cannot be changed".into(),
+        ));
+    }
+
+    // State machine: Pending → UnderReview → Approved/Rejected, Approved → Executed
+    let valid = match (&original.status, &req.status) {
+        (RevocationRequestStatus::Pending, RevocationRequestStatus::UnderReview)
+        | (RevocationRequestStatus::UnderReview, RevocationRequestStatus::Approved)
+        | (RevocationRequestStatus::UnderReview, RevocationRequestStatus::Rejected)
+        | (RevocationRequestStatus::Approved, RevocationRequestStatus::Executed) => true,
+        (a, b) if a == b => true,
+        _ => false,
+    };
+
+    if !valid {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Invalid revocation request status transition".into(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 

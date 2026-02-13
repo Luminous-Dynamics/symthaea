@@ -195,13 +195,10 @@ fn validate_create_revocation_entry(
 
 /// Validate revocation entry update
 fn validate_update_revocation_entry(
-    _action: Update,
+    action: Update,
     entry: RevocationEntry,
     _original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Basic validation - cannot un-revoke once permanently revoked
-    // Note: Full validation would require fetching original entry
-
     // Validate issuer is a DID
     if !entry.issuer.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
@@ -214,6 +211,49 @@ fn validate_update_revocation_entry(
         return Ok(ValidateCallbackResult::Invalid(
             "Suspended status requires suspension_end date".into(),
         ));
+    }
+
+    // Fetch original to enforce state transitions
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: RevocationEntry = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original revocation entry not found".into()
+        )))?;
+
+    // Immutable fields
+    if entry.credential_id != original.credential_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Credential ID cannot be changed on revocation entry".into(),
+        ));
+    }
+    if entry.issuer != original.issuer {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Issuer cannot be changed on revocation entry".into(),
+        ));
+    }
+
+    // Revoked is terminal — cannot transition away from Revoked
+    if original.status == RevocationStatus::Revoked {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Revoked status is terminal and cannot be changed".into(),
+        ));
+    }
+
+    // Valid transitions: Active → Suspended/Revoked, Suspended → Active/Revoked
+    match (&original.status, &entry.status) {
+        (RevocationStatus::Active, RevocationStatus::Suspended)
+        | (RevocationStatus::Active, RevocationStatus::Revoked)
+        | (RevocationStatus::Suspended, RevocationStatus::Active)
+        | (RevocationStatus::Suspended, RevocationStatus::Revoked) => {}
+        (a, b) if a == b => {} // No-op update allowed
+        _ => {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Invalid revocation status transition".into(),
+            ));
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -243,7 +283,7 @@ fn validate_create_revocation_list(
 
 /// Validate revocation list update
 fn validate_update_revocation_list(
-    _action: Update,
+    action: Update,
     list: RevocationList,
     _original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
@@ -251,6 +291,35 @@ fn validate_update_revocation_list(
     if !list.issuer.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
             "Issuer must be a valid DID".into(),
+        ));
+    }
+
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: RevocationList = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original revocation list not found".into()
+        )))?;
+
+    // Immutable fields
+    if list.id != original.id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Revocation list ID cannot be changed".into(),
+        ));
+    }
+    if list.issuer != original.issuer {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Revocation list issuer cannot be changed".into(),
+        ));
+    }
+
+    // Version must increment
+    if list.version <= original.version {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Revocation list version must increase on update".into(),
         ));
     }
 
