@@ -444,3 +444,768 @@ async fn test_cross_domain_justice_queries_media() {
 
     assert!(resolved.action().author() == alice.agent_pubkey());
 }
+
+// ============================================================================
+// Justice Domain Tests
+// ============================================================================
+
+// --- Mirror types for justice-cases ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CaseInput {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub case_type: CaseType,
+    pub complainant: String,
+    pub respondent: String,
+    pub parties: Vec<CaseParty>,
+    pub phase: CasePhase,
+    pub status: CaseStatus,
+    pub severity: CaseSeverity,
+    pub context: CaseContext,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub phase_deadline: Option<Timestamp>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum CaseType {
+    ContractDispute,
+    ConductViolation,
+    PropertyDispute,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CaseParty {
+    pub did: String,
+    pub role: PartyRole,
+    pub joined_at: Timestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum PartyRole {
+    Complainant,
+    Respondent,
+    Witness,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum CasePhase {
+    Filed,
+    Negotiation,
+    Mediation,
+    Arbitration,
+    Closed,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum CaseStatus {
+    Active,
+    Resolved,
+    Dismissed,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum CaseSeverity {
+    Minor,
+    Moderate,
+    Serious,
+    Critical,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CaseContext {
+    pub happ: Option<String>,
+    pub reference_id: Option<String>,
+    pub community: Option<String>,
+    pub jurisdiction: Option<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct UpdatePhaseInput {
+    pub case_hash: ActionHash,
+    pub new_phase: CasePhase,
+    pub deadline: Option<Timestamp>,
+}
+
+// --- Mirror types for emergency-incidents ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DeclareDisasterInput {
+    pub id: String,
+    pub disaster_type: DisasterType,
+    pub title: String,
+    pub description: String,
+    pub severity: SeverityLevel,
+    pub affected_area: AffectedArea,
+    pub estimated_affected: u32,
+    pub coordination_lead: Option<AgentPubKey>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum DisasterType {
+    Hurricane,
+    Earthquake,
+    Flood,
+    Wildfire,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum SeverityLevel {
+    Level1,
+    Level2,
+    Level3,
+    Level4,
+    Level5,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AffectedArea {
+    pub center_lat: f64,
+    pub center_lon: f64,
+    pub radius_km: f32,
+    pub boundary: Option<Vec<(f64, f64)>>,
+    pub zones: Vec<OperationalZone>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct OperationalZone {
+    pub id: String,
+    pub name: String,
+    pub boundary: Vec<(f64, f64)>,
+    pub priority: ZonePriority,
+    pub status: ZoneStatus,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ZonePriority {
+    Critical,
+    High,
+    Medium,
+    Low,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ZoneStatus {
+    Unassessed,
+    Active,
+    Cleared,
+}
+
+// --- Mirror types for emergency-shelters ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RegisterShelterInput {
+    pub id: String,
+    pub name: String,
+    pub location_lat: f64,
+    pub location_lon: f64,
+    pub address: String,
+    pub capacity: u32,
+    pub shelter_type: ShelterType,
+    pub amenities: Vec<Amenity>,
+    pub contact: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ShelterType {
+    PublicBuilding,
+    School,
+    CommunityCenter,
+    ReligiousFacility,
+    TemporaryStructure,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum Amenity {
+    FoodPrep,
+    MedicalStation,
+    Showers,
+    PetArea,
+    Electricity,
+    WiFi,
+}
+
+// --- Mirror types for emergency-resources ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RegisterResourceInput {
+    pub id: String,
+    pub resource_type: EmergencyResourceType,
+    pub name: String,
+    pub quantity: u32,
+    pub unit: String,
+    pub location: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum EmergencyResourceType {
+    Water,
+    Food,
+    MedicalSupplies,
+    Blankets,
+    Generators,
+    FuelSupplies,
+}
+
+// --- Mirror types for media-curation ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CreateCollectionInput {
+    pub curator_did: String,
+    pub name: String,
+    pub description: String,
+    pub publication_ids: Vec<String>,
+    pub visibility: Visibility,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum Visibility {
+    Public,
+    Private,
+    CommunityOnly,
+}
+
+// --- Mirror types for bridge audit trail ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AuditTrailInput {
+    pub domain: Option<String>,
+    pub limit: Option<u32>,
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_justice_file_case() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let (alice,) = conductor
+        .setup_app("test-app", &[DnaSource::Path(civic_dna_path())])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+    let now = Timestamp::now();
+
+    let case = CaseInput {
+        id: "case-001".to_string(),
+        title: "Property boundary dispute".to_string(),
+        description: "Disagreement over boundary markers between lots".to_string(),
+        case_type: CaseType::PropertyDispute,
+        complainant: format!("did:key:{}", agent),
+        respondent: "did:key:other-party".to_string(),
+        parties: vec![],
+        phase: CasePhase::Filed,
+        status: CaseStatus::Active,
+        severity: CaseSeverity::Moderate,
+        context: CaseContext {
+            happ: Some("mycelix-commons".to_string()),
+            reference_id: Some("property-123".to_string()),
+            community: Some("Oakwood".to_string()),
+            jurisdiction: None,
+        },
+        created_at: now,
+        updated_at: now,
+        phase_deadline: None,
+    };
+
+    let record: Record = conductor
+        .call(&alice.zome("justice_cases"), "file_case", case)
+        .await;
+
+    assert!(record.action().author() == alice.agent_pubkey());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_justice_case_phase_escalation() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let (alice,) = conductor
+        .setup_app("test-app", &[DnaSource::Path(civic_dna_path())])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+    let now = Timestamp::now();
+
+    // 1. File a case
+    let case = CaseInput {
+        id: "case-002".to_string(),
+        title: "Contract breach".to_string(),
+        description: "Service not delivered as agreed".to_string(),
+        case_type: CaseType::ContractDispute,
+        complainant: format!("did:key:{}", agent),
+        respondent: "did:key:contractor-did".to_string(),
+        parties: vec![],
+        phase: CasePhase::Filed,
+        status: CaseStatus::Active,
+        severity: CaseSeverity::Serious,
+        context: CaseContext {
+            happ: None,
+            reference_id: None,
+            community: None,
+            jurisdiction: None,
+        },
+        created_at: now,
+        updated_at: now,
+        phase_deadline: None,
+    };
+
+    let filed_record: Record = conductor
+        .call(&alice.zome("justice_cases"), "file_case", case)
+        .await;
+
+    let case_hash = filed_record.action_address().clone();
+
+    // 2. Escalate from Filed to Mediation
+    let escalate = UpdatePhaseInput {
+        case_hash: case_hash.clone(),
+        new_phase: CasePhase::Mediation,
+        deadline: None,
+    };
+
+    let updated: Record = conductor
+        .call(&alice.zome("justice_cases"), "update_case_phase", escalate)
+        .await;
+
+    assert!(updated.action().author() == alice.agent_pubkey());
+
+    // 3. Escalate to Arbitration
+    let escalate2 = UpdatePhaseInput {
+        case_hash: updated.action_address().clone(),
+        new_phase: CasePhase::Arbitration,
+        deadline: None,
+    };
+
+    let arbitration: Record = conductor
+        .call(
+            &alice.zome("justice_cases"),
+            "update_case_phase",
+            escalate2,
+        )
+        .await;
+
+    assert!(arbitration.action().author() == alice.agent_pubkey());
+}
+
+// ============================================================================
+// Emergency Domain Tests
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_emergency_declare_disaster() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let (alice,) = conductor
+        .setup_app("test-app", &[DnaSource::Path(civic_dna_path())])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let input = DeclareDisasterInput {
+        id: "disaster-001".to_string(),
+        disaster_type: DisasterType::Flood,
+        title: "Gulf Coast Flood".to_string(),
+        description: "Major flooding in coastal areas".to_string(),
+        severity: SeverityLevel::Level4,
+        affected_area: AffectedArea {
+            center_lat: 29.7604,
+            center_lon: -95.3698,
+            radius_km: 50.0,
+            boundary: None,
+            zones: vec![OperationalZone {
+                id: "zone-a".to_string(),
+                name: "Downtown".to_string(),
+                boundary: vec![(29.76, -95.37), (29.77, -95.37), (29.77, -95.36)],
+                priority: ZonePriority::Critical,
+                status: ZoneStatus::Active,
+            }],
+        },
+        estimated_affected: 50000,
+        coordination_lead: None,
+    };
+
+    let record: Record = conductor
+        .call(
+            &alice.zome("emergency_incidents"),
+            "declare_disaster",
+            input,
+        )
+        .await;
+
+    assert!(record.action().author() == alice.agent_pubkey());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_emergency_register_shelter() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let (alice,) = conductor
+        .setup_app("test-app", &[DnaSource::Path(civic_dna_path())])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let input = RegisterShelterInput {
+        id: "shelter-001".to_string(),
+        name: "Community Center Shelter".to_string(),
+        location_lat: 29.7604,
+        location_lon: -95.3698,
+        address: "123 Main St, Houston, TX".to_string(),
+        capacity: 200,
+        shelter_type: ShelterType::CommunityCenter,
+        amenities: vec![
+            Amenity::FoodPrep,
+            Amenity::MedicalStation,
+            Amenity::WiFi,
+        ],
+        contact: "shelter-ops@example.com".to_string(),
+    };
+
+    let record: Record = conductor
+        .call(
+            &alice.zome("emergency_shelters"),
+            "register_shelter",
+            input,
+        )
+        .await;
+
+    assert!(record.action().author() == alice.agent_pubkey());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_emergency_register_resource() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let (alice,) = conductor
+        .setup_app("test-app", &[DnaSource::Path(civic_dna_path())])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let input = RegisterResourceInput {
+        id: "resource-001".to_string(),
+        resource_type: EmergencyResourceType::Water,
+        name: "Bottled Water Supply".to_string(),
+        quantity: 5000,
+        unit: "gallons".to_string(),
+        location: "Warehouse District, Houston".to_string(),
+    };
+
+    let record: Record = conductor
+        .call(
+            &alice.zome("emergency_resources"),
+            "register_resource",
+            input,
+        )
+        .await;
+
+    assert!(record.action().author() == alice.agent_pubkey());
+}
+
+// ============================================================================
+// Cross-Domain: Emergency Multi-Zome Workflow
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_emergency_full_workflow() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let (alice,) = conductor
+        .setup_app("test-app", &[DnaSource::Path(civic_dna_path())])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+
+    // 1. Declare disaster
+    let disaster = DeclareDisasterInput {
+        id: "disaster-wf-001".to_string(),
+        disaster_type: DisasterType::Earthquake,
+        title: "Coastal earthquake".to_string(),
+        description: "6.2 magnitude earthquake affecting coastal region".to_string(),
+        severity: SeverityLevel::Level3,
+        affected_area: AffectedArea {
+            center_lat: 37.7749,
+            center_lon: -122.4194,
+            radius_km: 30.0,
+            boundary: None,
+            zones: vec![],
+        },
+        estimated_affected: 10000,
+        coordination_lead: Some(agent.clone()),
+    };
+
+    let disaster_record: Record = conductor
+        .call(
+            &alice.zome("emergency_incidents"),
+            "declare_disaster",
+            disaster,
+        )
+        .await;
+
+    // 2. Register shelter for evacuees
+    let shelter = RegisterShelterInput {
+        id: "shelter-wf-001".to_string(),
+        name: "Bay Area Evacuation Center".to_string(),
+        location_lat: 37.78,
+        location_lon: -122.42,
+        address: "456 Shelter Way, San Francisco".to_string(),
+        capacity: 500,
+        shelter_type: ShelterType::PublicBuilding,
+        amenities: vec![Amenity::FoodPrep, Amenity::MedicalStation, Amenity::Electricity],
+        contact: "ops@bayarea-emergency.org".to_string(),
+    };
+
+    let shelter_record: Record = conductor
+        .call(
+            &alice.zome("emergency_shelters"),
+            "register_shelter",
+            shelter,
+        )
+        .await;
+
+    // 3. Register emergency supplies
+    let supplies = RegisterResourceInput {
+        id: "resource-wf-001".to_string(),
+        resource_type: EmergencyResourceType::MedicalSupplies,
+        name: "First aid kits".to_string(),
+        quantity: 200,
+        unit: "kits".to_string(),
+        location: "San Francisco warehouse".to_string(),
+    };
+
+    let resource_record: Record = conductor
+        .call(
+            &alice.zome("emergency_resources"),
+            "register_resource",
+            supplies,
+        )
+        .await;
+
+    // 4. Bridge event linking disaster to shelter and resources
+    let coordination_event = CivicEventEntry {
+        domain: "emergency".to_string(),
+        event_type: "disaster_response_coordinated".to_string(),
+        source_agent: agent.clone(),
+        payload: serde_json::to_string(&serde_json::json!({
+            "disaster_hash": disaster_record.action_address().to_string(),
+            "shelter_hash": shelter_record.action_address().to_string(),
+            "resource_hash": resource_record.action_address().to_string(),
+            "action": "resources_deployed_to_shelter",
+        }))
+        .unwrap(),
+        created_at: Timestamp::now(),
+        related_hashes: vec![
+            disaster_record.action_address().to_string(),
+            shelter_record.action_address().to_string(),
+            resource_record.action_address().to_string(),
+        ],
+    };
+
+    let event_record: Record = conductor
+        .call(
+            &alice.zome("civic_bridge"),
+            "broadcast_event",
+            coordination_event,
+        )
+        .await;
+
+    assert!(event_record.action().author() == alice.agent_pubkey());
+
+    // 5. Verify emergency domain has coordination events
+    let events: Vec<Record> = conductor
+        .call(
+            &alice.zome("civic_bridge"),
+            "get_domain_events",
+            "emergency".to_string(),
+        )
+        .await;
+    assert!(!events.is_empty(), "Emergency domain should have coordination events");
+}
+
+// ============================================================================
+// Cross-Domain: Justice + Media Integration
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_justice_case_with_media_evidence() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let (alice,) = conductor
+        .setup_app("test-app", &[DnaSource::Path(civic_dna_path())])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+    let now = Timestamp::now();
+
+    // 1. File a case
+    let case = CaseInput {
+        id: "case-media-001".to_string(),
+        title: "Defamation in published article".to_string(),
+        description: "A published article contains false claims".to_string(),
+        case_type: CaseType::ConductViolation,
+        complainant: format!("did:key:{}", agent),
+        respondent: "did:key:publisher-did".to_string(),
+        parties: vec![],
+        phase: CasePhase::Filed,
+        status: CaseStatus::Active,
+        severity: CaseSeverity::Serious,
+        context: CaseContext {
+            happ: Some("mycelix-civic".to_string()),
+            reference_id: None,
+            community: None,
+            jurisdiction: None,
+        },
+        created_at: now,
+        updated_at: now,
+        phase_deadline: None,
+    };
+
+    let case_record: Record = conductor
+        .call(&alice.zome("justice_cases"), "file_case", case)
+        .await;
+
+    // 2. Publish the disputed article via media-publication
+    let article = PublishInput {
+        title: "Disputed Article About Governance".to_string(),
+        content_hash: "QmDisputedContent".to_string(),
+        content_type: ContentType::Article,
+        author_did: "did:key:publisher-did".to_string(),
+        co_authors: vec![],
+        language: "en".to_string(),
+        tags: vec!["governance".to_string(), "dispute".to_string()],
+        license: License::AllRightsReserved,
+        encrypted: false,
+    };
+
+    let pub_record: Record = conductor
+        .call(&alice.zome("media_publication"), "publish", article)
+        .await;
+
+    // 3. Fact-check the disputed claims
+    let fc = SubmitFactCheckInput {
+        publication_id: pub_record.action_address().to_string(),
+        claim_text: "The governance decision was unanimous".to_string(),
+        claim_location: "paragraph 2".to_string(),
+        epistemic_position: EpistemicPosition::Established,
+        verdict: FactCheckVerdict::False,
+        evidence: vec![EvidenceItem {
+            source_url: "https://governance.example.com/minutes".to_string(),
+            description: "Official meeting minutes show 7-3 vote".to_string(),
+            evidence_type: "official_record".to_string(),
+        }],
+        checker_did: format!("did:key:{}", agent),
+    };
+
+    let fc_record: Record = conductor
+        .call(&alice.zome("media_factcheck"), "submit_fact_check", fc)
+        .await;
+
+    // 4. Bridge event linking justice case to media evidence
+    let link_event = CivicEventEntry {
+        domain: "justice".to_string(),
+        event_type: "evidence_from_media".to_string(),
+        source_agent: agent.clone(),
+        payload: serde_json::to_string(&serde_json::json!({
+            "case_hash": case_record.action_address().to_string(),
+            "publication_hash": pub_record.action_address().to_string(),
+            "factcheck_hash": fc_record.action_address().to_string(),
+            "verdict": "False",
+        }))
+        .unwrap(),
+        created_at: Timestamp::now(),
+        related_hashes: vec![
+            case_record.action_address().to_string(),
+            fc_record.action_address().to_string(),
+        ],
+    };
+
+    let event: Record = conductor
+        .call(&alice.zome("civic_bridge"), "broadcast_event", link_event)
+        .await;
+
+    assert!(event.action().author() == alice.agent_pubkey());
+}
+
+// ============================================================================
+// Bridge Audit Trail Test
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_bridge_audit_trail() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let (alice,) = conductor
+        .setup_app("test-app", &[DnaSource::Path(civic_dna_path())])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+
+    // 1. Create multiple events across domains
+    for (domain, event_type) in [
+        ("justice", "case_filed"),
+        ("emergency", "disaster_declared"),
+        ("media", "article_published"),
+        ("justice", "case_escalated"),
+    ] {
+        let event = CivicEventEntry {
+            domain: domain.to_string(),
+            event_type: event_type.to_string(),
+            source_agent: agent.clone(),
+            payload: "{}".to_string(),
+            created_at: Timestamp::now(),
+            related_hashes: vec![],
+        };
+
+        let _: Record = conductor
+            .call(&alice.zome("civic_bridge"), "broadcast_event", event)
+            .await;
+    }
+
+    // 2. Query all events (no domain filter)
+    let all_events: Vec<Record> = conductor
+        .call(
+            &alice.zome("civic_bridge"),
+            "get_my_events",
+            (),
+        )
+        .await;
+
+    assert!(all_events.len() >= 4, "Should have at least 4 events total");
+
+    // 3. Query justice-specific events
+    let justice_events: Vec<Record> = conductor
+        .call(
+            &alice.zome("civic_bridge"),
+            "get_domain_events",
+            "justice".to_string(),
+        )
+        .await;
+
+    assert!(
+        justice_events.len() >= 2,
+        "Should have at least 2 justice events"
+    );
+
+    // 4. Query emergency-specific events
+    let emergency_events: Vec<Record> = conductor
+        .call(
+            &alice.zome("civic_bridge"),
+            "get_domain_events",
+            "emergency".to_string(),
+        )
+        .await;
+
+    assert!(
+        !emergency_events.is_empty(),
+        "Should have emergency events"
+    );
+}
