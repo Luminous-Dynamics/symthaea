@@ -101,6 +101,30 @@ jobs:
       - name: Run doc tests
         run: cargo test --workspace --doc
 
+  docs:
+    name: Documentation Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-doc-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-doc-
+      - name: Build documentation
+        run: cargo doc --workspace --no-deps --lib
+        env:
+          RUSTDOCFLAGS: -D warnings
+
   features:
     name: Feature Matrix
     runs-on: ubuntu-latest
