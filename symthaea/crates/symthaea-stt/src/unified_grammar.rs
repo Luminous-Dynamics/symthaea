@@ -649,8 +649,7 @@ impl UnifiedGrammar {
     pub fn load<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        let model: SavedModel =
-            serde_json::from_reader(reader).map_err(std::io::Error::other)?;
+        let model: SavedModel = serde_json::from_reader(reader).map_err(std::io::Error::other)?;
 
         let sparsity = match model.sparsity.as_str() {
             "sparse10" => Sparsity::Sparse10,

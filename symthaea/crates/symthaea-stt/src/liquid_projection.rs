@@ -323,8 +323,10 @@ pub struct LiquidProjection {
 impl LiquidProjection {
     /// Create a new untrained encoder
     pub fn new(phonemes: &[String], config: LiquidProjectionConfig) -> Self {
-        let mut ltc_config = LtcConfig::default();
-        ltc_config.hidden_size = config.reservoir_size;
+        let ltc_config = LtcConfig {
+            hidden_size: config.reservoir_size,
+            ..Default::default()
+        };
 
         Self {
             targets: PhonemeTargets::new(phonemes),

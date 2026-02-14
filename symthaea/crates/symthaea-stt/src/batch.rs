@@ -249,9 +249,11 @@ impl BatchProcessor {
             .unwrap_or_else(|arc| arc.lock().unwrap().clone());
 
         // Compute stats
-        let mut stats = BatchStats::default();
-        stats.files_processed = results.len();
-        stats.total_time_sec = total_time;
+        let mut stats = BatchStats {
+            files_processed: results.len(),
+            total_time_sec: total_time,
+            ..Default::default()
+        };
 
         for result in &results {
             match &result.status {
