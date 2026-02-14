@@ -205,26 +205,20 @@ fn main() {
         ("Chain", create_chain(n, DIM, 42)),
         ("Star", create_star(n, DIM, 42)),
         ("Fully Integrated", create_fully_integrated(n, DIM, 42)),
-        (
-            "Ring (topology)",
-            {
-                let topo = ConsciousnessTopology::ring(n, DIM, 42);
-                topo.node_representations
-                    .iter()
-                    .map(|rhv| ContinuousHV::from_vec(rhv.values.clone()))
-                    .collect()
-            },
-        ),
-        (
-            "Dense (topology)",
-            {
-                let topo = ConsciousnessTopology::dense_network(n, DIM, None, 42);
-                topo.node_representations
-                    .iter()
-                    .map(|rhv| ContinuousHV::from_vec(rhv.values.clone()))
-                    .collect()
-            },
-        ),
+        ("Ring (topology)", {
+            let topo = ConsciousnessTopology::ring(n, DIM, 42);
+            topo.node_representations
+                .iter()
+                .map(|rhv| ContinuousHV::from_vec(rhv.values.clone()))
+                .collect()
+        }),
+        ("Dense (topology)", {
+            let topo = ConsciousnessTopology::dense_network(n, DIM, None, 42);
+            topo.node_representations
+                .iter()
+                .map(|rhv| ContinuousHV::from_vec(rhv.values.clone()))
+                .collect()
+        }),
     ];
 
     let mut phi_values: Vec<(&str, f64, f64)> = Vec::new();
@@ -241,7 +235,11 @@ fn main() {
 
         println!(
             "  {:20} │ PhiEngine: {:.6} ({:>8}) │ Algebraic: {:.6} │ {:.1}ms",
-            name, phi_result.phi, phi_result.method, algebraic, phi_time * 1000.0
+            name,
+            phi_result.phi,
+            phi_result.method,
+            algebraic,
+            phi_time * 1000.0
         );
 
         phi_values.push((name, phi_result.phi, algebraic));
@@ -301,7 +299,10 @@ fn main() {
 
         println!(
             "  n={:3} │ Φ = {:.6} │ method: {:15} │ {:.1}ms",
-            n, result.phi, result.method, elapsed * 1000.0
+            n,
+            result.phi,
+            result.method,
+            elapsed * 1000.0
         );
 
         scale_results.push((n, result.phi, elapsed));
@@ -343,12 +344,8 @@ fn main() {
     }
 
     let phi_mean = phis.iter().sum::<f64>() / phis.len() as f64;
-    let phi_std = (phis
-        .iter()
-        .map(|x| (x - phi_mean).powi(2))
-        .sum::<f64>()
-        / (phis.len() - 1) as f64)
-        .sqrt();
+    let phi_std =
+        (phis.iter().map(|x| (x - phi_mean).powi(2)).sum::<f64>() / (phis.len() - 1) as f64).sqrt();
 
     let reproducible = phi_std < 1e-10;
     println!(
@@ -364,23 +361,31 @@ fn main() {
     println!("╠══════════════════════════════════════════════════════════════╣");
 
     let tests = vec![
-        ("Disconnected < Integrated", phi_values.len() >= 4 && phi_values[0].1 < phi_values[3].1),
-        ("All methods give Φ > 0 for integrated network", all_positive),
-        ("Hub removal reduces Φ more than peripheral", hub_test_passed),
+        (
+            "Disconnected < Integrated",
+            phi_values.len() >= 4 && phi_values[0].1 < phi_values[3].1,
+        ),
+        (
+            "All methods give Φ > 0 for integrated network",
+            all_positive,
+        ),
+        (
+            "Hub removal reduces Φ more than peripheral",
+            hub_test_passed,
+        ),
         ("Integration increases Φ", integration_test_passed),
         ("Computation is reproducible", reproducible),
-        ("Φ computable for n=32", scale_results.last().map(|r| r.1 > 0.0).unwrap_or(false)),
+        (
+            "Φ computable for n=32",
+            scale_results.last().map(|r| r.1 > 0.0).unwrap_or(false),
+        ),
     ];
 
     let mut passed = 0;
     let total = tests.len();
 
     for (name, pass) in &tests {
-        println!(
-            "║  {} {:50} ║",
-            if *pass { "PASS" } else { "FAIL" },
-            name
-        );
+        println!("║  {} {:50} ║", if *pass { "PASS" } else { "FAIL" }, name);
         if *pass {
             passed += 1;
         }

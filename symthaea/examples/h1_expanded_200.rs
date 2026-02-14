@@ -6,10 +6,10 @@
 //!
 //! This provides maximum statistical power and subcategory analysis.
 
-use std::time::Instant;
-use std::path::Path;
 use std::fs::File;
 use std::io::{BufReader, Write};
+use std::path::Path;
+use std::time::Instant;
 
 use anyhow::Result;
 use serde::Deserialize;
@@ -44,7 +44,9 @@ fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
     {
         println!("This example requires the 'neural-bridge' feature.");
-        println!("Run with: cargo run --example h1_expanded_200 --features neural-bridge --release");
+        println!(
+            "Run with: cargo run --example h1_expanded_200 --features neural-bridge --release"
+        );
         return Ok(());
     }
 
@@ -69,15 +71,19 @@ fn run_expanded_analysis() -> Result<()> {
         return Ok(());
     }
 
-    let phenomenal_corpus: ConceptCorpus = serde_json::from_reader(
-        BufReader::new(File::open(phenomenal_path)?)
-    )?;
-    let functional_corpus: ConceptCorpus = serde_json::from_reader(
-        BufReader::new(File::open(functional_path)?)
-    )?;
+    let phenomenal_corpus: ConceptCorpus =
+        serde_json::from_reader(BufReader::new(File::open(phenomenal_path)?))?;
+    let functional_corpus: ConceptCorpus =
+        serde_json::from_reader(BufReader::new(File::open(functional_path)?))?;
 
-    println!("Loaded {} phenomenal concepts", phenomenal_corpus.concepts.len());
-    println!("Loaded {} functional concepts\n", functional_corpus.concepts.len());
+    println!(
+        "Loaded {} phenomenal concepts",
+        phenomenal_corpus.concepts.len()
+    );
+    println!(
+        "Loaded {} functional concepts\n",
+        functional_corpus.concepts.len()
+    );
 
     // Load probe
     let probe_path = Path::new("models/neural_bridge/probe_weights_bge_m3.npy");
@@ -124,7 +130,11 @@ fn run_expanded_analysis() -> Result<()> {
             Err(e) => println!("  Error on concept {}: {}", i, e),
         }
         if (i + 1) % 20 == 0 {
-            println!("  Processed {}/{} phenomenal concepts...", i + 1, phenomenal_corpus.concepts.len());
+            println!(
+                "  Processed {}/{} phenomenal concepts...",
+                i + 1,
+                phenomenal_corpus.concepts.len()
+            );
         }
     }
     println!("  Completed in {:.2}s\n", start.elapsed().as_secs_f64());
@@ -142,7 +152,11 @@ fn run_expanded_analysis() -> Result<()> {
             Err(e) => println!("  Error on concept {}: {}", i, e),
         }
         if (i + 1) % 20 == 0 {
-            println!("  Processed {}/{} functional concepts...", i + 1, functional_corpus.concepts.len());
+            println!(
+                "  Processed {}/{} functional concepts...",
+                i + 1,
+                functional_corpus.concepts.len()
+            );
         }
     }
     println!("  Completed in {:.2}s\n", start.elapsed().as_secs_f64());
@@ -159,7 +173,10 @@ fn run_expanded_analysis() -> Result<()> {
 
     // Overall results
     println!("================================================================");
-    println!("   OVERALL RESULTS (N={})", phenomenal_scores.len() + functional_scores.len());
+    println!(
+        "   OVERALL RESULTS (N={})",
+        phenomenal_scores.len() + functional_scores.len()
+    );
     println!("================================================================\n");
 
     let phen_mean = mean(&phenomenal_scores);
@@ -177,7 +194,11 @@ fn run_expanded_analysis() -> Result<()> {
 
     let diff = phen_mean - func_mean;
     let pooled_std = ((phen_std.powi(2) + func_std.powi(2)) / 2.0).sqrt();
-    let cohens_d = if pooled_std > 0.0 { diff / pooled_std } else { 0.0 };
+    let cohens_d = if pooled_std > 0.0 {
+        diff / pooled_std
+    } else {
+        0.0
+    };
 
     println!("\nEffect:");
     println!("  Difference: {:.4}", diff);
@@ -187,7 +208,11 @@ fn run_expanded_analysis() -> Result<()> {
     println!("\nRunning permutation test (n=10000)...");
     use rand::seq::SliceRandom;
     let mut rng = rand::thread_rng();
-    let all_scores: Vec<f64> = phenomenal_scores.iter().chain(functional_scores.iter()).copied().collect();
+    let all_scores: Vec<f64> = phenomenal_scores
+        .iter()
+        .chain(functional_scores.iter())
+        .copied()
+        .collect();
     let n_phen = phenomenal_scores.len();
     let n_perms = 10000;
     let mut extreme_count = 0;
@@ -214,32 +239,52 @@ fn run_expanded_analysis() -> Result<()> {
     println!("   PHENOMENAL SUBCATEGORY ANALYSIS");
     println!("================================================================\n");
 
-    let mut phen_by_category: std::collections::HashMap<String, Vec<f64>> = std::collections::HashMap::new();
+    let mut phen_by_category: std::collections::HashMap<String, Vec<f64>> =
+        std::collections::HashMap::new();
     for (concept, score) in &phenomenal_results {
-        phen_by_category.entry(concept.category.clone()).or_default().push(*score);
+        phen_by_category
+            .entry(concept.category.clone())
+            .or_default()
+            .push(*score);
     }
 
     let mut phen_categories: Vec<_> = phen_by_category.iter().collect();
     phen_categories.sort_by(|a, b| mean(b.1).partial_cmp(&mean(a.1)).unwrap());
 
     for (cat, scores) in &phen_categories {
-        println!("{:20} (n={:2}): {:.4} (+/- {:.4})", cat, scores.len(), mean(scores), std(scores));
+        println!(
+            "{:20} (n={:2}): {:.4} (+/- {:.4})",
+            cat,
+            scores.len(),
+            mean(scores),
+            std(scores)
+        );
     }
 
     println!("\n================================================================");
     println!("   FUNCTIONAL SUBCATEGORY ANALYSIS");
     println!("================================================================\n");
 
-    let mut func_by_category: std::collections::HashMap<String, Vec<f64>> = std::collections::HashMap::new();
+    let mut func_by_category: std::collections::HashMap<String, Vec<f64>> =
+        std::collections::HashMap::new();
     for (concept, score) in &functional_results {
-        func_by_category.entry(concept.category.clone()).or_default().push(*score);
+        func_by_category
+            .entry(concept.category.clone())
+            .or_default()
+            .push(*score);
     }
 
     let mut func_categories: Vec<_> = func_by_category.iter().collect();
     func_categories.sort_by(|a, b| mean(b.1).partial_cmp(&mean(a.1)).unwrap());
 
     for (cat, scores) in &func_categories {
-        println!("{:20} (n={:2}): {:.4} (+/- {:.4})", cat, scores.len(), mean(scores), std(scores));
+        println!(
+            "{:20} (n={:2}): {:.4} (+/- {:.4})",
+            cat,
+            scores.len(),
+            mean(scores),
+            std(scores)
+        );
     }
 
     // Save detailed CSV
@@ -248,21 +293,40 @@ fn run_expanded_analysis() -> Result<()> {
     writeln!(csv_file, "id,text,type,category,subcategory,unity_score")?;
 
     for (concept, score) in &phenomenal_results {
-        writeln!(csv_file, "\"{}\",\"{}\",phenomenal,{},{},{:.4}",
-                 concept.id, concept.text.replace("\"", "\\\""), concept.category, concept.subcategory, score)?;
+        writeln!(
+            csv_file,
+            "\"{}\",\"{}\",phenomenal,{},{},{:.4}",
+            concept.id,
+            concept.text.replace("\"", "\\\""),
+            concept.category,
+            concept.subcategory,
+            score
+        )?;
     }
     for (concept, score) in &functional_results {
-        writeln!(csv_file, "\"{}\",\"{}\",functional,{},{},{:.4}",
-                 concept.id, concept.text.replace("\"", "\\\""), concept.category, concept.subcategory, score)?;
+        writeln!(
+            csv_file,
+            "\"{}\",\"{}\",functional,{},{},{:.4}",
+            concept.id,
+            concept.text.replace("\"", "\\\""),
+            concept.category,
+            concept.subcategory,
+            score
+        )?;
     }
 
     println!("\nSaved detailed results to: {}", csv_path);
 
     // Effect size interpretation
-    let effect_size = if cohens_d.abs() < 0.2 { "negligible" }
-                      else if cohens_d.abs() < 0.5 { "small" }
-                      else if cohens_d.abs() < 0.8 { "medium" }
-                      else { "large" };
+    let effect_size = if cohens_d.abs() < 0.2 {
+        "negligible"
+    } else if cohens_d.abs() < 0.5 {
+        "small"
+    } else if cohens_d.abs() < 0.8 {
+        "medium"
+    } else {
+        "large"
+    };
 
     println!("\n================================================================");
     println!("   SUMMARY");

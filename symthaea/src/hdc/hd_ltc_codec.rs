@@ -626,7 +626,7 @@ mod semantic_preservation_tests {
             // Create B similar to A by flipping only ~20% of bits
             let flip_hv = BinaryHV::random(100);
             // Bundle A with a random HV to get something similar but not identical
-            BinaryHV::bundle(&[hv_a.clone(), flip_hv])
+            BinaryHV::bundle(&[hv_a, flip_hv])
         };
         let hv_c = BinaryHV::random(9999); // Unrelated to A
 

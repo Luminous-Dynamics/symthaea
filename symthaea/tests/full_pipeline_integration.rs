@@ -203,7 +203,7 @@ fn test_full_pipeline_integration() {
     // SIMD cosine similarity
     let cos_sim = similarity_simd(&hv_a.values, &hv_b.values);
     assert!(
-        cos_sim.is_finite() && cos_sim >= -1.001 && cos_sim <= 1.001,
+        cos_sim.is_finite() && (-1.001..=1.001).contains(&cos_sim),
         "SIMD similarity must be in [-1,1], got {}",
         cos_sim
     );
@@ -1253,7 +1253,7 @@ fn test_stage_02_simd_operations() {
     let b = genesis.hv("simd:b", HDC_DIMENSION);
 
     let sim = similarity_simd(&a.values, &b.values);
-    assert!(sim.is_finite() && sim >= -1.001 && sim <= 1.001);
+    assert!(sim.is_finite() && (-1.001..=1.001).contains(&sim));
 
     let bound = bind_simd(&a.values, &b.values);
     assert_eq!(bound.len(), HDC_DIMENSION);

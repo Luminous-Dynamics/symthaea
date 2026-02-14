@@ -426,7 +426,7 @@ fn test_sequence_encoding_pattern() {
 #[test]
 fn test_clone_is_equal() {
     let original = BinaryHV::random(2200);
-    let cloned = original.clone();
+    let cloned = original;
 
     assert_eq!(original, cloned, "Clone should equal original");
 }

@@ -50,7 +50,11 @@ fn test_logistic_map() {
 
     // Training phase (first 1500 samples)
     for i in 0..1500 {
-        let target = if i + 1 < data.len() { Some(data[i + 1]) } else { None };
+        let target = if i + 1 < data.len() {
+            Some(data[i + 1])
+        } else {
+            None
+        };
         esn.observe(data[i], target);
     }
     esn.train(0.001);
@@ -121,7 +125,11 @@ fn test_henon_map() {
     let mut esn = EchoStateNetwork::for_discrete_chaos(123);
 
     for i in 0..1500 {
-        let target = if i + 1 < data.len() { Some(data[i + 1]) } else { None };
+        let target = if i + 1 < data.len() {
+            Some(data[i + 1])
+        } else {
+            None
+        };
         esn.observe(data[i], target);
     }
     esn.train(0.001);
@@ -196,7 +204,11 @@ fn test_lorenz() {
 
     let train_size = (data.len() * 3 / 4).min(1500);
     for i in 0..train_size {
-        let target = if i + 1 < data.len() { Some(data[i + 1]) } else { None };
+        let target = if i + 1 < data.len() {
+            Some(data[i + 1])
+        } else {
+            None
+        };
         esn.observe(data[i], target);
     }
     esn.train(0.0001);

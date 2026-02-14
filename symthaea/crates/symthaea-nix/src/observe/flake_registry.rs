@@ -115,13 +115,11 @@ impl FlakeRegistry {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::other(
-                format!(
-                    "nix flake metadata --json failed for '{}': {}",
-                    path,
-                    String::from_utf8_lossy(&output.stderr)
-                ),
-            ));
+            return Err(std::io::Error::other(format!(
+                "nix flake metadata --json failed for '{}': {}",
+                path,
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -298,8 +296,7 @@ mod tests {
     #[test]
     fn test_parse_flake_metadata_minimal() {
         let minimal = r#"{"path": "/home/user/project"}"#;
-        let info =
-            FlakeRegistry::parse_flake_metadata_json("/home/user/project", minimal).unwrap();
+        let info = FlakeRegistry::parse_flake_metadata_json("/home/user/project", minimal).unwrap();
 
         assert_eq!(info.path, "/home/user/project");
         assert!(info.description.is_none());

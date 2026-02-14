@@ -31,8 +31,7 @@ use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 
 use symthaea::physics::cmod_adapter::{
-    generate_synthetic_data, label_samples, CModShot, DisruptionLabel, LabelConfig,
-    SyntheticConfig,
+    generate_synthetic_data, label_samples, CModShot, DisruptionLabel, LabelConfig, SyntheticConfig,
 };
 use symthaea::physics::plasma_control::{PlasmaControlConfig, StabilityRegime};
 
@@ -88,7 +87,8 @@ impl ThresholdConfig {
     pub fn random(rng: &mut impl Rng) -> Self {
         loop {
             let phi_stable = rng.gen_range(Self::PHI_STABLE_BOUNDS.0..=Self::PHI_STABLE_BOUNDS.1);
-            let phi_warning = rng.gen_range(Self::PHI_WARNING_BOUNDS.0..=Self::PHI_WARNING_BOUNDS.1);
+            let phi_warning =
+                rng.gen_range(Self::PHI_WARNING_BOUNDS.0..=Self::PHI_WARNING_BOUNDS.1);
             let phi_critical =
                 rng.gen_range(Self::PHI_CRITICAL_BOUNDS.0..=Self::PHI_CRITICAL_BOUNDS.1);
             let phi_rate_threshold =
@@ -255,7 +255,11 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
             total_non_disruption_shots += 1;
         }
 
-        let labels = label_samples(shot, label_config.warning_window_ms, label_config.critical_window_ms);
+        let labels = label_samples(
+            shot,
+            label_config.warning_window_ms,
+            label_config.critical_window_ms,
+        );
         let mut first_warning_issued = false;
         let mut warning_issued_at_ttd: Option<f64> = None;
 
@@ -269,7 +273,10 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
             let regime = classify_regime(phi_proxy, config);
 
             // Track predictions vs ground truth
-            let is_warning_or_critical = matches!(regime, StabilityRegime::Warning | StabilityRegime::Critical | StabilityRegime::Emergency);
+            let is_warning_or_critical = matches!(
+                regime,
+                StabilityRegime::Warning | StabilityRegime::Critical | StabilityRegime::Emergency
+            );
 
             match (is_warning_or_critical, label) {
                 // True positive: Predicted warning/critical during actual warning/critical
@@ -360,11 +367,7 @@ fn compute_phi_proxy(sample: &symthaea::physics::cmod_adapter::CModSample) -> f6
     let prad_norm = 1.0 - (sample.prad as f64 / 5.0).clamp(0.0, 1.0);
 
     // Combine with weights
-    let phi = 0.25 * ip_norm
-        + 0.25 * te_norm
-        + 0.2 * ne_norm
-        + 0.15 * q95_norm
-        + 0.15 * prad_norm;
+    let phi = 0.25 * ip_norm + 0.25 * te_norm + 0.2 * ne_norm + 0.15 * q95_norm + 0.15 * prad_norm;
 
     phi.clamp(0.0, 1.0)
 }
@@ -435,7 +438,10 @@ fn grid_search(shots: &[CModShot]) -> SearchResult {
     let mut configs_evaluated = 0;
     let mut objective_history = Vec::new();
 
-    println!("  Running grid search ({} total configurations)...", (levels as u32).pow(5));
+    println!(
+        "  Running grid search ({} total configurations)...",
+        (levels as u32).pow(5)
+    );
 
     for i in 0..levels {
         for j in 0..levels {
@@ -527,7 +533,10 @@ fn bayesian_optimization(shots: &[CModShot], n_iterations: usize, seed: u64) -> 
     let mut best_results = evaluate_config(&best_config, shots);
     let mut objective_history = Vec::new();
 
-    println!("  Running Bayesian-inspired optimization ({} iterations)...", n_iterations);
+    println!(
+        "  Running Bayesian-inspired optimization ({} iterations)...",
+        n_iterations
+    );
 
     // Initial random exploration (20% of budget)
     let explore_budget = n_iterations / 5;
@@ -606,15 +615,14 @@ fn perturb_config(base: &ThresholdConfig, scale: f32, rng: &mut impl Rng) -> Thr
         let phi_warning = perturb(base.phi_warning, ThresholdConfig::PHI_WARNING_BOUNDS);
         let phi_critical = perturb(base.phi_critical, ThresholdConfig::PHI_CRITICAL_BOUNDS);
         let phi_rate = perturb(base.phi_rate_threshold, ThresholdConfig::PHI_RATE_BOUNDS);
-        let volatility = perturb(base.volatility_threshold, ThresholdConfig::VOLATILITY_BOUNDS);
+        let volatility = perturb(
+            base.volatility_threshold,
+            ThresholdConfig::VOLATILITY_BOUNDS,
+        );
 
-        if let Some(config) = ThresholdConfig::new(
-            phi_stable,
-            phi_warning,
-            phi_critical,
-            phi_rate,
-            volatility,
-        ) {
+        if let Some(config) =
+            ThresholdConfig::new(phi_stable, phi_warning, phi_critical, phi_rate, volatility)
+        {
             return config;
         }
     }
@@ -666,7 +674,11 @@ fn train_val_split(shots: &[CModShot], seed: u64) -> (Vec<CModShot>, Vec<CModSho
 fn cross_validate(shots: &[CModShot], seed: u64) -> CrossValidationResults {
     println!("\n  Splitting data (80% train / 20% val)...");
     let (train_shots, val_shots) = train_val_split(shots, seed);
-    println!("    Train: {} shots, Val: {} shots", train_shots.len(), val_shots.len());
+    println!(
+        "    Train: {} shots, Val: {} shots",
+        train_shots.len(),
+        val_shots.len()
+    );
 
     println!("  Optimizing on training set...");
     let search_result = random_search(&train_shots, 300, seed);
@@ -703,7 +715,10 @@ fn compute_pareto_frontier(shots: &[CModShot], n_samples: usize, seed: u64) -> V
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     let mut points: Vec<ParetoPoint> = Vec::new();
 
-    println!("  Sampling {} configurations for Pareto analysis...", n_samples);
+    println!(
+        "  Sampling {} configurations for Pareto analysis...",
+        n_samples
+    );
 
     for _ in 0..n_samples {
         let config = ThresholdConfig::random(&mut rng);
@@ -770,7 +785,10 @@ fn print_learning_curve(history: &[f64], title: &str) {
     }
 
     let min_val = running_bests.iter().copied().fold(f64::INFINITY, f64::min);
-    let max_val = running_bests.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let max_val = running_bests
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
     let range = (max_val - min_val).max(1.0);
 
     let chart_width = 60;
@@ -800,7 +818,11 @@ fn print_learning_curve(history: &[f64], title: &str) {
         println!("|");
     }
     println!("         +{}+", "-".repeat(chart_width));
-    println!("          0{}{} Iterations", " ".repeat(chart_width / 2 - 5), running_bests.len() / 2);
+    println!(
+        "          0{}{} Iterations",
+        " ".repeat(chart_width / 2 - 5),
+        running_bests.len() / 2
+    );
 }
 
 /// Print Pareto frontier as ASCII scatter plot
@@ -813,10 +835,22 @@ fn print_pareto_frontier(pareto: &[ParetoPoint]) {
         return;
     }
 
-    let min_wt = pareto.iter().map(|p| p.warning_time_ms).fold(f64::INFINITY, f64::min);
-    let max_wt = pareto.iter().map(|p| p.warning_time_ms).fold(f64::NEG_INFINITY, f64::max);
-    let min_fpr = pareto.iter().map(|p| p.false_positive_rate).fold(f64::INFINITY, f64::min);
-    let max_fpr = pareto.iter().map(|p| p.false_positive_rate).fold(f64::NEG_INFINITY, f64::max);
+    let min_wt = pareto
+        .iter()
+        .map(|p| p.warning_time_ms)
+        .fold(f64::INFINITY, f64::min);
+    let max_wt = pareto
+        .iter()
+        .map(|p| p.warning_time_ms)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let min_fpr = pareto
+        .iter()
+        .map(|p| p.false_positive_rate)
+        .fold(f64::INFINITY, f64::min);
+    let max_fpr = pareto
+        .iter()
+        .map(|p| p.false_positive_rate)
+        .fold(f64::NEG_INFINITY, f64::max);
 
     let wt_range = (max_wt - min_wt).max(1.0);
     let fpr_range = (max_fpr - min_fpr).max(0.01);
@@ -828,8 +862,13 @@ fn print_pareto_frontier(pareto: &[ParetoPoint]) {
     // Plot points (inverted Y axis: low FPR at top)
     for (i, point) in pareto.iter().enumerate() {
         let x = ((point.warning_time_ms - min_wt) / wt_range * (chart_width - 1) as f64) as usize;
-        let y = ((point.false_positive_rate - min_fpr) / fpr_range * (chart_height - 1) as f64) as usize;
-        let ch = if i < 10 { char::from_digit(i as u32, 10).unwrap() } else { '#' };
+        let y = ((point.false_positive_rate - min_fpr) / fpr_range * (chart_height - 1) as f64)
+            as usize;
+        let ch = if i < 10 {
+            char::from_digit(i as u32, 10).unwrap()
+        } else {
+            '#'
+        };
         chart[y.min(chart_height - 1)][x.min(chart_width - 1)] = ch;
     }
 
@@ -848,11 +887,19 @@ fn print_pareto_frontier(pareto: &[ParetoPoint]) {
         println!("|");
     }
     println!("       +{}+", "-".repeat(chart_width));
-    println!("        {:.0}{}{}ms Warning Time", min_wt, " ".repeat(chart_width - 10), max_wt);
+    println!(
+        "        {:.0}{}{}ms Warning Time",
+        min_wt,
+        " ".repeat(chart_width - 10),
+        max_wt
+    );
 
     // Print point details
     println!("\nPareto-optimal configurations:");
-    println!("{:<4} {:>12} {:>10} {:>10}", "Pt", "Warning(ms)", "FPR", "Recall");
+    println!(
+        "{:<4} {:>12} {:>10} {:>10}",
+        "Pt", "Warning(ms)", "FPR", "Recall"
+    );
     println!("{}", "-".repeat(40));
     for (i, point) in pareto.iter().take(10).enumerate() {
         println!(
@@ -913,8 +960,12 @@ fn main() {
 
     let shots = generate_synthetic_data(&synth_config);
     let disrupted_count = shots.iter().filter(|s| s.disrupted).count();
-    println!("  Generated {} shots ({} disrupted, {} non-disrupted)",
-             shots.len(), disrupted_count, shots.len() - disrupted_count);
+    println!(
+        "  Generated {} shots ({} disrupted, {} non-disrupted)",
+        shots.len(),
+        disrupted_count,
+        shots.len() - disrupted_count
+    );
 
     // =========================================================================
     // Baseline evaluation
@@ -927,12 +978,20 @@ fn main() {
     let baseline_results = evaluate_config(&baseline_config, &shots);
     let baseline_objective = objective(&baseline_config, &shots);
 
-    println!("  Phi thresholds: stable={:.2}, warning={:.2}, critical={:.2}",
-             baseline_config.phi_stable, baseline_config.phi_warning, baseline_config.phi_critical);
+    println!(
+        "  Phi thresholds: stable={:.2}, warning={:.2}, critical={:.2}",
+        baseline_config.phi_stable, baseline_config.phi_warning, baseline_config.phi_critical
+    );
     println!("  Recall:           {:.4}", baseline_results.recall());
     println!("  Precision:        {:.4}", baseline_results.precision());
-    println!("  False Positive Rate: {:.4}", baseline_results.false_positive_rate());
-    println!("  Mean Warning Time: {:.1} ms", baseline_results.mean_warning_time_ms);
+    println!(
+        "  False Positive Rate: {:.4}",
+        baseline_results.false_positive_rate()
+    );
+    println!(
+        "  Mean Warning Time: {:.1} ms",
+        baseline_results.mean_warning_time_ms
+    );
     println!("  Objective:        {:.2}", baseline_objective);
 
     // =========================================================================
@@ -945,15 +1004,39 @@ fn main() {
     let grid_result = grid_search(&shots);
 
     println!("\n  Best configuration found:");
-    println!("    phi_stable:    {:.3}", grid_result.best_config.phi_stable);
-    println!("    phi_warning:   {:.3}", grid_result.best_config.phi_warning);
-    println!("    phi_critical:  {:.3}", grid_result.best_config.phi_critical);
-    println!("    phi_rate:      {:.3}", grid_result.best_config.phi_rate_threshold);
-    println!("    volatility:    {:.3}", grid_result.best_config.volatility_threshold);
+    println!(
+        "    phi_stable:    {:.3}",
+        grid_result.best_config.phi_stable
+    );
+    println!(
+        "    phi_warning:   {:.3}",
+        grid_result.best_config.phi_warning
+    );
+    println!(
+        "    phi_critical:  {:.3}",
+        grid_result.best_config.phi_critical
+    );
+    println!(
+        "    phi_rate:      {:.3}",
+        grid_result.best_config.phi_rate_threshold
+    );
+    println!(
+        "    volatility:    {:.3}",
+        grid_result.best_config.volatility_threshold
+    );
     println!("  Objective:       {:.2}", grid_result.best_objective);
-    println!("  Recall:          {:.4}", grid_result.best_results.recall());
-    println!("  FPR:             {:.4}", grid_result.best_results.false_positive_rate());
-    println!("  Warning Time:    {:.1} ms", grid_result.best_results.mean_warning_time_ms);
+    println!(
+        "  Recall:          {:.4}",
+        grid_result.best_results.recall()
+    );
+    println!(
+        "  FPR:             {:.4}",
+        grid_result.best_results.false_positive_rate()
+    );
+    println!(
+        "  Warning Time:    {:.1} ms",
+        grid_result.best_results.mean_warning_time_ms
+    );
     println!("  Configs evaluated: {}", grid_result.configs_evaluated);
     println!("  Search time:     {} ms", grid_result.search_time_ms);
 
@@ -967,19 +1050,46 @@ fn main() {
     let random_result = random_search(&shots, 500, 12345);
 
     println!("\n  Best configuration found:");
-    println!("    phi_stable:    {:.3}", random_result.best_config.phi_stable);
-    println!("    phi_warning:   {:.3}", random_result.best_config.phi_warning);
-    println!("    phi_critical:  {:.3}", random_result.best_config.phi_critical);
-    println!("    phi_rate:      {:.3}", random_result.best_config.phi_rate_threshold);
-    println!("    volatility:    {:.3}", random_result.best_config.volatility_threshold);
+    println!(
+        "    phi_stable:    {:.3}",
+        random_result.best_config.phi_stable
+    );
+    println!(
+        "    phi_warning:   {:.3}",
+        random_result.best_config.phi_warning
+    );
+    println!(
+        "    phi_critical:  {:.3}",
+        random_result.best_config.phi_critical
+    );
+    println!(
+        "    phi_rate:      {:.3}",
+        random_result.best_config.phi_rate_threshold
+    );
+    println!(
+        "    volatility:    {:.3}",
+        random_result.best_config.volatility_threshold
+    );
     println!("  Objective:       {:.2}", random_result.best_objective);
-    println!("  Recall:          {:.4}", random_result.best_results.recall());
-    println!("  FPR:             {:.4}", random_result.best_results.false_positive_rate());
-    println!("  Warning Time:    {:.1} ms", random_result.best_results.mean_warning_time_ms);
+    println!(
+        "  Recall:          {:.4}",
+        random_result.best_results.recall()
+    );
+    println!(
+        "  FPR:             {:.4}",
+        random_result.best_results.false_positive_rate()
+    );
+    println!(
+        "  Warning Time:    {:.1} ms",
+        random_result.best_results.mean_warning_time_ms
+    );
     println!("  Configs evaluated: {}", random_result.configs_evaluated);
     println!("  Search time:     {} ms", random_result.search_time_ms);
 
-    print_learning_curve(&random_result.objective_history, "Random Search Learning Curve (Running Best)");
+    print_learning_curve(
+        &random_result.objective_history,
+        "Random Search Learning Curve (Running Best)",
+    );
 
     // =========================================================================
     // Bayesian Optimization
@@ -991,19 +1101,46 @@ fn main() {
     let bayesian_result = bayesian_optimization(&shots, 200, 54321);
 
     println!("\n  Best configuration found:");
-    println!("    phi_stable:    {:.3}", bayesian_result.best_config.phi_stable);
-    println!("    phi_warning:   {:.3}", bayesian_result.best_config.phi_warning);
-    println!("    phi_critical:  {:.3}", bayesian_result.best_config.phi_critical);
-    println!("    phi_rate:      {:.3}", bayesian_result.best_config.phi_rate_threshold);
-    println!("    volatility:    {:.3}", bayesian_result.best_config.volatility_threshold);
+    println!(
+        "    phi_stable:    {:.3}",
+        bayesian_result.best_config.phi_stable
+    );
+    println!(
+        "    phi_warning:   {:.3}",
+        bayesian_result.best_config.phi_warning
+    );
+    println!(
+        "    phi_critical:  {:.3}",
+        bayesian_result.best_config.phi_critical
+    );
+    println!(
+        "    phi_rate:      {:.3}",
+        bayesian_result.best_config.phi_rate_threshold
+    );
+    println!(
+        "    volatility:    {:.3}",
+        bayesian_result.best_config.volatility_threshold
+    );
     println!("  Objective:       {:.2}", bayesian_result.best_objective);
-    println!("  Recall:          {:.4}", bayesian_result.best_results.recall());
-    println!("  FPR:             {:.4}", bayesian_result.best_results.false_positive_rate());
-    println!("  Warning Time:    {:.1} ms", bayesian_result.best_results.mean_warning_time_ms);
+    println!(
+        "  Recall:          {:.4}",
+        bayesian_result.best_results.recall()
+    );
+    println!(
+        "  FPR:             {:.4}",
+        bayesian_result.best_results.false_positive_rate()
+    );
+    println!(
+        "  Warning Time:    {:.1} ms",
+        bayesian_result.best_results.mean_warning_time_ms
+    );
     println!("  Configs evaluated: {}", bayesian_result.configs_evaluated);
     println!("  Search time:     {} ms", bayesian_result.search_time_ms);
 
-    print_learning_curve(&bayesian_result.objective_history, "Bayesian Optimization Learning Curve (Running Best)");
+    print_learning_curve(
+        &bayesian_result.objective_history,
+        "Bayesian Optimization Learning Curve (Running Best)",
+    );
 
     // =========================================================================
     // Cross-Validation
@@ -1019,12 +1156,24 @@ fn main() {
     println!("  Generalization Gap: {:.2}", cv_results.generalization_gap);
     println!("\n  Train Metrics:");
     println!("    Recall:       {:.4}", cv_results.train_results.recall());
-    println!("    FPR:          {:.4}", cv_results.train_results.false_positive_rate());
-    println!("    Warning Time: {:.1} ms", cv_results.train_results.mean_warning_time_ms);
+    println!(
+        "    FPR:          {:.4}",
+        cv_results.train_results.false_positive_rate()
+    );
+    println!(
+        "    Warning Time: {:.1} ms",
+        cv_results.train_results.mean_warning_time_ms
+    );
     println!("\n  Validation Metrics:");
     println!("    Recall:       {:.4}", cv_results.val_results.recall());
-    println!("    FPR:          {:.4}", cv_results.val_results.false_positive_rate());
-    println!("    Warning Time: {:.1} ms", cv_results.val_results.mean_warning_time_ms);
+    println!(
+        "    FPR:          {:.4}",
+        cv_results.val_results.false_positive_rate()
+    );
+    println!(
+        "    Warning Time: {:.1} ms",
+        cv_results.val_results.mean_warning_time_ms
+    );
 
     // =========================================================================
     // Pareto Frontier
@@ -1042,21 +1191,43 @@ fn main() {
 
     println!("\n\nSEARCH METHOD COMPARISON");
     println!("{}", "-".repeat(70));
-    println!("{:<25} {:>12} {:>12} {:>12} {:>10}",
-             "Method", "Objective", "Recall", "FPR", "Time(ms)");
+    println!(
+        "{:<25} {:>12} {:>12} {:>12} {:>10}",
+        "Method", "Objective", "Recall", "FPR", "Time(ms)"
+    );
     println!("{}", "-".repeat(70));
-    println!("{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
-             "Baseline (Default)", baseline_objective, baseline_results.recall(),
-             baseline_results.false_positive_rate(), "-");
-    println!("{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
-             "Grid Search", grid_result.best_objective, grid_result.best_results.recall(),
-             grid_result.best_results.false_positive_rate(), grid_result.search_time_ms);
-    println!("{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
-             "Random Search (500)", random_result.best_objective, random_result.best_results.recall(),
-             random_result.best_results.false_positive_rate(), random_result.search_time_ms);
-    println!("{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
-             "Bayesian (200)", bayesian_result.best_objective, bayesian_result.best_results.recall(),
-             bayesian_result.best_results.false_positive_rate(), bayesian_result.search_time_ms);
+    println!(
+        "{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
+        "Baseline (Default)",
+        baseline_objective,
+        baseline_results.recall(),
+        baseline_results.false_positive_rate(),
+        "-"
+    );
+    println!(
+        "{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
+        "Grid Search",
+        grid_result.best_objective,
+        grid_result.best_results.recall(),
+        grid_result.best_results.false_positive_rate(),
+        grid_result.search_time_ms
+    );
+    println!(
+        "{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
+        "Random Search (500)",
+        random_result.best_objective,
+        random_result.best_results.recall(),
+        random_result.best_results.false_positive_rate(),
+        random_result.search_time_ms
+    );
+    println!(
+        "{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
+        "Bayesian (200)",
+        bayesian_result.best_objective,
+        bayesian_result.best_results.recall(),
+        bayesian_result.best_results.false_positive_rate(),
+        bayesian_result.search_time_ms
+    );
 
     // =========================================================================
     // Select Best Overall
@@ -1116,11 +1287,26 @@ fn main() {
 
     let optimized_plasma_config = best_overall.to_plasma_control_config();
     println!("  Created PlasmaControlConfig with optimized thresholds:");
-    println!("    phi_stable_threshold:   {:.3}", optimized_plasma_config.phi_stable_threshold);
-    println!("    phi_warning_threshold:  {:.3}", optimized_plasma_config.phi_warning_threshold);
-    println!("    phi_critical_threshold: {:.3}", optimized_plasma_config.phi_critical_threshold);
-    println!("    rate_of_change_threshold: {:.3}", optimized_plasma_config.rate_of_change_threshold);
-    println!("    volatility_threshold:   {:.3}", optimized_plasma_config.volatility_threshold);
+    println!(
+        "    phi_stable_threshold:   {:.3}",
+        optimized_plasma_config.phi_stable_threshold
+    );
+    println!(
+        "    phi_warning_threshold:  {:.3}",
+        optimized_plasma_config.phi_warning_threshold
+    );
+    println!(
+        "    phi_critical_threshold: {:.3}",
+        optimized_plasma_config.phi_critical_threshold
+    );
+    println!(
+        "    rate_of_change_threshold: {:.3}",
+        optimized_plasma_config.rate_of_change_threshold
+    );
+    println!(
+        "    volatility_threshold:   {:.3}",
+        optimized_plasma_config.volatility_threshold
+    );
 
     // =========================================================================
     // Key Takeaways
@@ -1137,7 +1323,8 @@ fn main() {
         0.0
     };
 
-    println!("
+    println!(
+        "
 1. OPTIMIZATION IMPROVED THRESHOLD SELECTION
    - Baseline objective: {:.2}
    - Best optimized:     {:.2}
@@ -1164,8 +1351,17 @@ fn main() {
    - Use optimized thresholds in PlasmaControlConfig
    - Monitor performance on real data
    - Re-optimize periodically as plasma behavior changes
-", baseline_objective, best_overall_obj, improvement, pct_improvement,
-       if output.grid_search.is_some() { output.grid_search.as_ref().unwrap().configs_evaluated } else { 0 });
+",
+        baseline_objective,
+        best_overall_obj,
+        improvement,
+        pct_improvement,
+        if output.grid_search.is_some() {
+            output.grid_search.as_ref().unwrap().configs_evaluated
+        } else {
+            0
+        }
+    );
 
     println!("{}", "=".repeat(80));
     println!("  Optimization complete!");
@@ -1257,7 +1453,10 @@ mod tests {
         sample.prad = 1.0;
 
         let phi = compute_phi_proxy(&sample);
-        assert!(phi > 0.3 && phi < 0.9, "Stable sample should have moderate-high Phi");
+        assert!(
+            phi > 0.3 && phi < 0.9,
+            "Stable sample should have moderate-high Phi"
+        );
 
         // Disruption-like sample
         sample.ip = 0.2;
@@ -1267,6 +1466,9 @@ mod tests {
         sample.prad = 4.5;
 
         let phi_disruption = compute_phi_proxy(&sample);
-        assert!(phi_disruption < phi, "Disruption sample should have lower Phi");
+        assert!(
+            phi_disruption < phi,
+            "Disruption sample should have lower Phi"
+        );
     }
 }

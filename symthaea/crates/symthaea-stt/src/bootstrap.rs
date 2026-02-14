@@ -5,9 +5,9 @@
 //! - Salience-based forced alignment (no external tools needed)
 //! - Prototype accumulation via HDC bundling
 
-use crate::hdc::{HV16, BundleAccumulator};
-use crate::ltc::{LtcCell, LtcConfig};
+use crate::hdc::{BundleAccumulator, HV16};
 use crate::lexicon::{CmuDictionary, TextToPhonemes};
+use crate::ltc::{LtcCell, LtcConfig};
 use crate::phoneme::PhonemeInventory;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -102,7 +102,8 @@ impl TrainedPrototypes {
 
     /// Get all prototypes as pairs
     pub fn as_pairs(&self) -> Vec<(String, HV16)> {
-        self.prototypes.iter()
+        self.prototypes
+            .iter()
             .map(|(k, v)| (k.clone(), *v))
             .collect()
     }
@@ -156,8 +157,18 @@ impl TrainedPrototypes {
                         let seed_j = hasher_j.finish();
 
                         // Apply repulsion with different seeds
-                        let new_i = contrastive_repel_hv_with_seed(&proto_i, &proto_j, repulsion_strength, seed_i);
-                        let new_j = contrastive_repel_hv_with_seed(&proto_j, &proto_i, repulsion_strength, seed_j);
+                        let new_i = contrastive_repel_hv_with_seed(
+                            &proto_i,
+                            &proto_j,
+                            repulsion_strength,
+                            seed_i,
+                        );
+                        let new_j = contrastive_repel_hv_with_seed(
+                            &proto_j,
+                            &proto_i,
+                            repulsion_strength,
+                            seed_j,
+                        );
 
                         self.prototypes.insert(label_i.clone(), new_i);
                         self.prototypes.insert(label_j.clone(), new_j);
@@ -166,8 +177,10 @@ impl TrainedPrototypes {
             }
 
             if iteration == 0 || iteration % 10 == 0 || pairs_fixed == 0 {
-                eprintln!("  Separation iter {}: {} pairs above {:.2}, max_sim={:.4}",
-                         iteration, pairs_fixed, min_separation, max_sim_seen);
+                eprintln!(
+                    "  Separation iter {}: {} pairs above {:.2}, max_sim={:.4}",
+                    iteration, pairs_fixed, min_separation, max_sim_seen
+                );
             }
 
             // Debug: if still identical pairs, print which ones
@@ -179,7 +192,10 @@ impl TrainedPrototypes {
                         let proto_j = self.prototypes.get(&labels[j]).unwrap();
                         let sim = proto_i.similarity(proto_j);
                         if sim > 0.99 {
-                            eprintln!("    IDENTICAL: {} vs {} (sim={:.4})", labels[i], labels[j], sim);
+                            eprintln!(
+                                "    IDENTICAL: {} vs {} (sim={:.4})",
+                                labels[i], labels[j], sim
+                            );
                         }
                     }
                 }
@@ -237,7 +253,9 @@ fn contrastive_repel_hv_with_seed(proto: &HV16, negative: &HV16, strength: f32, 
         }
     }
 
-    HV16 { words: result_words }
+    HV16 {
+        words: result_words,
+    }
 }
 
 /// Adaptive prototype with allophone clustering
@@ -365,9 +383,7 @@ impl AdaptivePrototype {
             .iter()
             .zip(self.variant_counts.iter())
             .enumerate()
-            .map(|(i, (hv, count))| {
-                (format!("{}_{}", self.label, i), *hv, *count)
-            })
+            .map(|(i, (hv, count))| (format!("{}_{}", self.label, i), *hv, *count))
             .collect()
     }
 
@@ -417,7 +433,9 @@ fn weighted_blend(base: &HV16, new: &HV16, new_weight: f32) -> HV16 {
         result_words[i] = result_word;
     }
 
-    HV16 { words: result_words }
+    HV16 {
+        words: result_words,
+    }
 }
 
 /// Contrastive repulsion: push prototype away from negative example
@@ -462,7 +480,9 @@ fn contrastive_repel(proto: &HV16, negative: &HV16, strength: f32) -> HV16 {
         }
     }
 
-    HV16 { words: result_words }
+    HV16 {
+        words: result_words,
+    }
 }
 
 /// Collection of adaptive prototypes for all phonemes
@@ -498,7 +518,8 @@ impl AdaptivePrototypeSet {
     /// This prevents "grey goo" collapse where all prototypes drift together.
     pub fn train(&mut self, phoneme: &str, observation: &HV16) {
         // First, train the positive prototype (attraction)
-        let proto = self.prototypes
+        let proto = self
+            .prototypes
             .entry(phoneme.to_string())
             .or_insert_with(|| AdaptivePrototype::new(phoneme, self.threshold, self.max_variants));
         proto.train(observation);
@@ -564,8 +585,10 @@ impl AdaptivePrototypeSet {
 
             // Print progress
             if iteration == 0 || pairs_fixed > 0 {
-                eprintln!("  Separation iter {}: {} pairs above {:.2}, max_sim={:.4}",
-                         iteration, pairs_fixed, min_separation, max_sim_seen);
+                eprintln!(
+                    "  Separation iter {}: {} pairs above {:.2}, max_sim={:.4}",
+                    iteration, pairs_fixed, min_separation, max_sim_seen
+                );
             }
 
             // Stop if all pairs are below threshold
@@ -706,9 +729,7 @@ impl PrototypeAccumulator {
     fn finalize(self, min_instances: usize) -> HashMap<String, HV16> {
         self.accumulators
             .into_iter()
-            .filter(|(label, _)| {
-                self.counts.get(label).copied().unwrap_or(0) >= min_instances
-            })
+            .filter(|(label, _)| self.counts.get(label).copied().unwrap_or(0) >= min_instances)
             .map(|(label, acc)| (label, acc.finalize()))
             .collect()
     }
@@ -763,11 +784,7 @@ impl SalienceAligner {
     }
 
     /// Align phoneme sequence to boundaries using DTW
-    pub fn align(
-        &self,
-        phonemes: &[String],
-        saliences: &[f32],
-    ) -> Vec<AlignedSegment> {
+    pub fn align(&self, phonemes: &[String], saliences: &[f32]) -> Vec<AlignedSegment> {
         if phonemes.is_empty() || saliences.is_empty() {
             return Vec::new();
         }
@@ -781,14 +798,16 @@ impl SalienceAligner {
         // Simple uniform distribution if not enough boundaries
         if boundaries.len() - 1 < phonemes.len() {
             let frames_per_phoneme = saliences.len() / phonemes.len().max(1);
-            return phonemes.iter().enumerate().map(|(i, p)| {
-                AlignedSegment {
+            return phonemes
+                .iter()
+                .enumerate()
+                .map(|(i, p)| AlignedSegment {
                     phoneme: p.clone(),
                     start_frame: i * frames_per_phoneme,
                     end_frame: (i + 1) * frames_per_phoneme,
                     confidence: 0.5,
-                }
-            }).collect();
+                })
+                .collect();
         }
 
         // Distribute phonemes across segments
@@ -844,8 +863,7 @@ impl BootstrapPipeline {
     /// Create a new bootstrap pipeline
     pub fn new(config: BootstrapConfig) -> Self {
         let ltc = LtcCell::new(40, config.ltc_config.clone()); // 40 mel bins
-        let text_to_phonemes = TextToPhonemes::empty()
-            .with_silence(config.use_silence);
+        let text_to_phonemes = TextToPhonemes::empty().with_silence(config.use_silence);
         let aligner = SalienceAligner::new(config.salience_threshold);
 
         Self {
@@ -861,15 +879,13 @@ impl BootstrapPipeline {
     /// Load CMU dictionary
     pub fn load_dictionary<P: AsRef<Path>>(&mut self, path: P) -> std::io::Result<()> {
         let dict = CmuDictionary::load(path)?;
-        self.text_to_phonemes = TextToPhonemes::new(dict)
-            .with_silence(self.config.use_silence);
+        self.text_to_phonemes = TextToPhonemes::new(dict).with_silence(self.config.use_silence);
         Ok(())
     }
 
     /// Set dictionary directly
     pub fn set_dictionary(&mut self, dict: CmuDictionary) {
-        self.text_to_phonemes = TextToPhonemes::new(dict)
-            .with_silence(self.config.use_silence);
+        self.text_to_phonemes = TextToPhonemes::new(dict).with_silence(self.config.use_silence);
     }
 
     /// Process a single utterance
@@ -935,9 +951,11 @@ impl BootstrapPipeline {
 
             // Simple energy-based features (placeholder for mel spectrogram)
             let energy = frame.iter().map(|x| x * x).sum::<f32>().sqrt();
-            let zcr = frame.windows(2)
+            let zcr = frame
+                .windows(2)
                 .filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0))
-                .count() as f32 / frame_samples as f32;
+                .count() as f32
+                / frame_samples as f32;
 
             // Create feature vector (would be mel spectrogram in production)
             let mut feature = vec![0.0; 40];
@@ -945,7 +963,10 @@ impl BootstrapPipeline {
             feature[1] = zcr;
 
             // Process through LTC
-            let state = self.ltc.forward(&feature, self.config.frame_duration).to_vec();
+            let state = self
+                .ltc
+                .forward(&feature, self.config.frame_duration)
+                .to_vec();
             let salience = self.ltc.compute_salience(&prev_state);
 
             features.push(state.clone());
@@ -1026,7 +1047,12 @@ impl LibriSpeechParser {
         walkdir::WalkDir::new(&self.root)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map(|ext| ext == "trans.txt").unwrap_or(false))
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .map(|ext| ext == "trans.txt")
+                    .unwrap_or(false)
+            })
             .map(|e| e.path().to_path_buf())
     }
 
@@ -1035,7 +1061,8 @@ impl LibriSpeechParser {
 
         std::fs::read_to_string(path)
             .map(|content| {
-                content.lines()
+                content
+                    .lines()
                     .filter_map(|line| {
                         let parts: Vec<&str> = line.splitn(2, ' ').collect();
                         if parts.len() == 2 {
@@ -1053,8 +1080,8 @@ impl LibriSpeechParser {
 
 // Note: walkdir is not a dependency, this is a placeholder for the actual implementation
 mod walkdir {
-    use std::path::{Path, PathBuf};
     use std::fs;
+    use std::path::{Path, PathBuf};
 
     pub struct WalkDir {
         root: PathBuf,
@@ -1062,7 +1089,9 @@ mod walkdir {
 
     impl WalkDir {
         pub fn new<P: AsRef<Path>>(root: P) -> Self {
-            Self { root: root.as_ref().to_path_buf() }
+            Self {
+                root: root.as_ref().to_path_buf(),
+            }
         }
 
         pub fn into_iter(self) -> impl Iterator<Item = Result<DirEntry, std::io::Error>> {

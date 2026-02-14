@@ -17,12 +17,14 @@
 //! Real Audio Mode:
 //! `cargo run --example ear_of_dionysus --features "hound" -- <path_to_wav>`
 
+use rustfft::{num_complex::Complex, FftPlanner};
 use std::env;
 use std::f32::consts::PI;
-use rustfft::{FftPlanner, num_complex::Complex};
-use symthaea::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig, CantorLtcNode};
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
+use symthaea::hierarchical_cantor_ltc::{
+    CantorLtcConfig, CantorLtcNode, HierarchicalCantorLtcNetwork,
+};
 
 /// Configuration for the Ear
 const WINDOW_SIZE: usize = 1024; // Samples per FFT window
@@ -99,7 +101,8 @@ fn main() {
         window_count += 1;
 
         // A. Compute FFT
-        let mut buffer: Vec<Complex<f32>> = samples.iter()
+        let mut buffer: Vec<Complex<f32>> = samples
+            .iter()
             .map(|&x| Complex { re: x, im: 0.0 })
             .collect();
 
@@ -112,7 +115,11 @@ fn main() {
 
         // B. Extract Band Magnitudes (Logarithmic scaling)
         // Level 0 (Root) gets lowest freqs, Level 7 gets highest
-        let spectrum: Vec<f32> = buffer.iter().take(WINDOW_SIZE/2).map(|c| c.norm()).collect();
+        let spectrum: Vec<f32> = buffer
+            .iter()
+            .take(WINDOW_SIZE / 2)
+            .map(|c| c.norm())
+            .collect();
         let energies = map_spectrum_to_bands(&spectrum, LEVELS);
 
         // C. Inject into Brain Layers
@@ -141,21 +148,27 @@ fn main() {
 
         // Visualization
         print!("\r{:7.2} | ", time / 1000.0);
-        for i in [0, 2, 4, 7] { // Visualize Bass, Low-Mid, Mid-High, High
-             let e = energies[i];
-             let bars = (e * 10.0).clamp(0.0, 8.0) as usize;
-             let bar_str = "█".repeat(bars);
-             print!("{:6} | ", bar_str); // Simple bar graph
+        for i in [0, 2, 4, 7] {
+            // Visualize Bass, Low-Mid, Mid-High, High
+            let e = energies[i];
+            let bars = (e * 10.0).clamp(0.0, 8.0) as usize;
+            let bar_str = "█".repeat(bars);
+            print!("{:6} | ", bar_str); // Simple bar graph
         }
         // Use cached Phi for display smoothness
-        print!("{:.4} |   {:.2}   |   {:.2}   ", last_phi, root_act, leaf_act);
+        print!(
+            "{:.4} |   {:.2}   |   {:.2}   ",
+            last_phi, root_act, leaf_act
+        );
 
         // Flush stdout
         use std::io::Write;
         std::io::stdout().flush().unwrap();
 
         time += dt;
-        if time > 20_000.0 { break; } // Run for 20 seconds
+        if time > 20_000.0 {
+            break;
+        } // Run for 20 seconds
     }
     println!("\n\nDone.");
 }
@@ -197,15 +210,17 @@ impl AudioStream {
                 match hound::WavReader::open(_path) {
                     Ok(reader) => {
                         let spec = reader.spec();
-                        println!("Opened WAV: {} channels, {} Hz, {} bits", spec.channels, spec.sample_rate, spec.bits_per_sample);
+                        println!(
+                            "Opened WAV: {} channels, {} Hz, {} bits",
+                            spec.channels, spec.sample_rate, spec.bits_per_sample
+                        );
                         // We need to move the reader into the struct, but WavReader isn't easily movable
                         // into an iterator without ownership issues in this simple struct.
                         // For this demo, we'll re-open or just read all.
                         // To keep it simple and streaming:
-                        let samples = reader.into_samples::<f32>()
-                            .map(|s| s.unwrap_or(0.0));
+                        let samples = reader.into_samples::<f32>().map(|s| s.unwrap_or(0.0));
                         stream.samples = Some(Box::new(samples));
-                    },
+                    }
                     Err(e) => {
                         println!("Failed to open WAV: {}. Falling back to synthetic.", e);
                         stream.source = AudioSource::Synthetic;
@@ -235,14 +250,26 @@ impl AudioStream {
                     let t_global = (self.t + i) as f32 / SAMPLE_RATE as f32;
 
                     // 1. Bass (50Hz + modulation)
-                    let bass = (t_global * 50.0 * 2.0 * PI).sin() * (t_global * 0.5 * 2.0 * PI).sin().abs();
+                    let bass = (t_global * 50.0 * 2.0 * PI).sin()
+                        * (t_global * 0.5 * 2.0 * PI).sin().abs();
 
                     // 2. Mids (Chord progression: C -> F -> G -> C)
                     let measure = (t_global / 2.0) % 4.0;
-                    let freq = if measure < 1.0 { 261.6 } // C
-                              else if measure < 2.0 { 349.2 } // F
-                              else if measure < 3.0 { 392.0 } // G
-                              else { 261.6 }; // C
+                    let freq = if measure < 1.0 {
+                        261.6
+                    }
+                    // C
+                    else if measure < 2.0 {
+                        349.2
+                    }
+                    // F
+                    else if measure < 3.0 {
+                        392.0
+                    }
+                    // G
+                    else {
+                        261.6
+                    }; // C
 
                     let melody = (t_global * freq * 2.0 * PI).sin() * 0.5;
 
@@ -255,13 +282,17 @@ impl AudioStream {
                 }
                 self.t += size;
                 Some(window)
-            },
+            }
             AudioSource::File(_) => {
                 #[cfg(feature = "hound")]
                 {
                     if let Some(ref mut iter) = self.samples {
                         let window: Vec<f32> = iter.take(size).collect();
-                        if window.len() < size { None } else { Some(window) }
+                        if window.len() < size {
+                            None
+                        } else {
+                            Some(window)
+                        }
                     } else {
                         None // Fallback if init failed
                     }
@@ -285,7 +316,9 @@ fn map_spectrum_to_bands(spectrum: &[f32], bands: usize) -> Vec<f32> {
     // Simple log approach:
 
     for (i, &mag) in spectrum.iter().enumerate() {
-        if i == 0 { continue; } // Skip DC
+        if i == 0 {
+            continue;
+        } // Skip DC
 
         // Normalized freq (0.0 to 1.0)
         let freq_norm = i as f32 / num_bins as f32;
@@ -320,9 +353,11 @@ fn inject_spectral_energy(
     node: &mut CantorLtcNode,
     energies: &[f32],
     vectors: &[ContinuousHV],
-    current_level: usize
+    current_level: usize,
 ) {
-    if current_level >= energies.len() { return; }
+    if current_level >= energies.len() {
+        return;
+    }
 
     let energy = energies[current_level];
     let signal_vector = vectors[current_level].clone();

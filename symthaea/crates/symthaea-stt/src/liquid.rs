@@ -69,38 +69,38 @@ impl CfcCell {
             w_in,
             w_rec,
             bias,
-            tau_min: 0.001,  // 1ms minimum
-            tau_max: 1.0,    // 1s maximum
+            tau_min: 0.001, // 1ms minimum
+            tau_max: 1.0,   // 1s maximum
         }
     }
 
     /// Create a cell optimized for click detection (fast transients)
     pub fn click_detector() -> Self {
         Self::new(
-            -3.0,   // log_tau → τ ≈ 0.05 (50ms, fast)
-            2.0,    // Strong input coupling
-            -0.5,   // Mild self-inhibition
-            -1.0,   // Negative bias (needs strong input to fire)
+            -3.0, // log_tau → τ ≈ 0.05 (50ms, fast)
+            2.0,  // Strong input coupling
+            -0.5, // Mild self-inhibition
+            -1.0, // Negative bias (needs strong input to fire)
         )
     }
 
     /// Create a cell optimized for whistle detection (sustained tones)
     pub fn whistle_detector() -> Self {
         Self::new(
-            0.0,    // log_tau → τ ≈ 1.0 (1s, slow)
-            1.0,    // Moderate input coupling
-            0.3,    // Mild self-excitation (sustain)
-            -0.5,   // Moderate threshold
+            0.0,  // log_tau → τ ≈ 1.0 (1s, slow)
+            1.0,  // Moderate input coupling
+            0.3,  // Mild self-excitation (sustain)
+            -0.5, // Moderate threshold
         )
     }
 
     /// Create a cell for burst/noise detection
     pub fn burst_detector() -> Self {
         Self::new(
-            -1.5,   // log_tau → τ ≈ 0.22 (220ms, medium)
-            1.5,    // Moderate-strong input
-            0.0,    // No recurrence
-            -0.3,   // Low threshold
+            -1.5, // log_tau → τ ≈ 0.22 (220ms, medium)
+            1.5,  // Moderate-strong input
+            0.0,  // No recurrence
+            -0.3, // Low threshold
         )
     }
 
@@ -209,7 +209,9 @@ impl LiquidBank {
         let click_response = self.click_cell.step(tk_energy, dt * samples.len() as f32);
 
         // Whistle cell responds to spectral tilt (harmonic content)
-        let whistle_response = self.whistle_cell.step(spectral_tilt, dt * samples.len() as f32);
+        let whistle_response = self
+            .whistle_cell
+            .step(spectral_tilt, dt * samples.len() as f32);
 
         // Burst cell responds to energy + ZCR (broadband noise)
         let burst_input = rms * zcr;
@@ -245,7 +247,8 @@ impl LiquidBank {
             return 0.0;
         }
 
-        let crossings: usize = samples.windows(2)
+        let crossings: usize = samples
+            .windows(2)
             .filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0))
             .count();
 
@@ -260,7 +263,8 @@ impl LiquidBank {
         }
 
         let low_energy: f32 = samples.iter().map(|s| s * s).sum();
-        let high_energy: f32 = samples.windows(2)
+        let high_energy: f32 = samples
+            .windows(2)
             .map(|w| {
                 let diff = w[1] - w[0];
                 diff * diff
@@ -347,7 +351,8 @@ impl TimeAwareBinder {
 
         // Quantize intensity (linear: 0 to 1)
         let intensity_clamped = intensity.clamp(0.0, 1.0);
-        let intensity_bin = (intensity_clamped * (self.n_intensity_bins - 1) as f32).round() as usize;
+        let intensity_bin =
+            (intensity_clamped * (self.n_intensity_bins - 1) as f32).round() as usize;
         let intensity_bin = intensity_bin.min(self.n_intensity_bins - 1);
 
         // Triple binding: symbol ⊗ duration ⊗ intensity
@@ -475,11 +480,9 @@ impl LiquidEventDetector {
                     let duration = self.current_time - start_time;
 
                     if duration >= self.min_event_duration {
-                        let event_hv = self.binder.bind(
-                            &current_type.basis_hv(),
-                            duration,
-                            *peak_intensity,
-                        );
+                        let event_hv =
+                            self.binder
+                                .bind(&current_type.basis_hv(), duration, *peak_intensity);
 
                         let event = LiquidEvent {
                             event_type: *current_type,
@@ -491,7 +494,8 @@ impl LiquidEventDetector {
 
                         // Start new event
                         if detected_type != LiquidEventType::Silence {
-                            self.current_event = Some((detected_type, self.current_time, features.energy));
+                            self.current_event =
+                                Some((detected_type, self.current_time, features.energy));
                         } else {
                             self.current_event = None;
                         }
@@ -500,7 +504,8 @@ impl LiquidEventDetector {
                     } else {
                         // Event too short, discard and start new
                         if detected_type != LiquidEventType::Silence {
-                            self.current_event = Some((detected_type, self.current_time, features.energy));
+                            self.current_event =
+                                Some((detected_type, self.current_time, features.energy));
                         } else {
                             self.current_event = None;
                         }
@@ -532,9 +537,7 @@ impl LiquidEventDetector {
             && features.click > features.burst
         {
             LiquidEventType::Click
-        } else if features.whistle > self.whistle_threshold
-            && features.whistle > features.burst
-        {
+        } else if features.whistle > self.whistle_threshold && features.whistle > features.burst {
             LiquidEventType::Whistle
         } else if features.burst > self.burst_threshold {
             LiquidEventType::Burst
@@ -550,11 +553,9 @@ impl LiquidEventDetector {
             let duration = self.current_time - start_time;
 
             if duration >= self.min_event_duration {
-                let event_hv = self.binder.bind(
-                    &event_type.basis_hv(),
-                    duration,
-                    peak_intensity,
-                );
+                let event_hv = self
+                    .binder
+                    .bind(&event_type.basis_hv(), duration, peak_intensity);
 
                 return Some(LiquidEvent {
                     event_type,
@@ -587,7 +588,11 @@ mod tests {
             cell.step(1.0, dt);
         }
 
-        assert!(cell.state() > 0.5, "State should increase with input: {}", cell.state());
+        assert!(
+            cell.state() > 0.5,
+            "State should increase with input: {}",
+            cell.state()
+        );
     }
 
     #[test]
@@ -645,7 +650,10 @@ mod tests {
         println!("Short+quiet vs Long+loud similarity: {:.4}", sim);
 
         // Should be somewhat different due to duration/intensity binding
-        assert!(sim < 0.9, "Different temporal properties should produce different HVs");
+        assert!(
+            sim < 0.9,
+            "Different temporal properties should produce different HVs"
+        );
     }
 
     #[test]
@@ -672,8 +680,10 @@ mod tests {
 
         println!("Detected {} events", events.len());
         for event in &events {
-            println!("  {:?}: duration={:.3}s, intensity={:.4}",
-                event.event_type, event.duration, event.intensity);
+            println!(
+                "  {:?}: duration={:.3}s, intensity={:.4}",
+                event.event_type, event.duration, event.intensity
+            );
         }
     }
 
@@ -693,8 +703,17 @@ mod tests {
         println!("  Whistle-Burst: {:.4}", sim_wb);
 
         // Random HVs should be nearly orthogonal (~0.5 similarity for binary)
-        assert!(sim_cw.abs() < 0.2, "Event types should be nearly orthogonal");
-        assert!(sim_cb.abs() < 0.2, "Event types should be nearly orthogonal");
-        assert!(sim_wb.abs() < 0.2, "Event types should be nearly orthogonal");
+        assert!(
+            sim_cw.abs() < 0.2,
+            "Event types should be nearly orthogonal"
+        );
+        assert!(
+            sim_cb.abs() < 0.2,
+            "Event types should be nearly orthogonal"
+        );
+        assert!(
+            sim_wb.abs() < 0.2,
+            "Event types should be nearly orthogonal"
+        );
     }
 }

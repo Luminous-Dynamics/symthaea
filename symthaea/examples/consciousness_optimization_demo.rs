@@ -17,8 +17,7 @@
 //! ```
 
 use symthaea_core::hdc::autodiff_phi::{
-    AutodiffPhiEngine, AutodiffConfig, ConsciousnessOptimizer, OptimizerConfig,
-    topology,
+    topology, AutodiffConfig, AutodiffPhiEngine, ConsciousnessOptimizer, OptimizerConfig,
 };
 
 fn main() {
@@ -61,7 +60,10 @@ fn main() {
 
     for (name, network) in &topologies {
         let result = engine.forward(network);
-        println!("{:<15} {:>10.6} {:>12.6}", name, result.phi, result.whole_integration);
+        println!(
+            "{:<15} {:>10.6} {:>12.6}",
+            name, result.phi, result.whole_integration
+        );
     }
 
     // =========================================================================
@@ -75,7 +77,9 @@ fn main() {
     let result = engine.forward(&network);
     engine.backward(&mut network, &result);
 
-    let grad_norms: Vec<f64> = network.nodes.iter()
+    let grad_norms: Vec<f64> = network
+        .nodes
+        .iter()
         .map(|node| node.grad.iter().map(|g| g * g).sum::<f64>().sqrt())
         .collect();
 
@@ -109,7 +113,10 @@ fn main() {
 
     let n_steps = 100;
     println!("\nRunning {} optimization steps...", n_steps);
-    println!("{:<6} {:>10} {:>12} {:>10} {:>10}", "Step", "Phi", "Grad Norm", "LR", "Temp");
+    println!(
+        "{:<6} {:>10} {:>12} {:>10} {:>10}",
+        "Step", "Phi", "Grad Norm", "LR", "Temp"
+    );
     println!("{}", "-".repeat(55));
 
     let history = optimizer.optimize(&mut engine, &mut network, n_steps);
@@ -130,7 +137,10 @@ fn main() {
     println!("{}", "-".repeat(50));
 
     let min_phi = history.iter().map(|s| s.phi).fold(f64::INFINITY, f64::min);
-    let max_phi = history.iter().map(|s| s.phi).fold(f64::NEG_INFINITY, f64::max);
+    let max_phi = history
+        .iter()
+        .map(|s| s.phi)
+        .fold(f64::NEG_INFINITY, f64::max);
     let range = (max_phi - min_phi).max(0.001);
 
     println!("\nPhi over optimization steps (ASCII chart):\n");
@@ -162,7 +172,11 @@ fn main() {
         println!("|");
     }
     println!("       +{}+", "-".repeat(chart_width));
-    println!("        0{}{}  Step", " ".repeat(chart_width / 2 - 3), n_steps / 2);
+    println!(
+        "        0{}{}  Step",
+        " ".repeat(chart_width / 2 - 3),
+        n_steps / 2
+    );
 
     // =========================================================================
     // Part 5: Results Summary
@@ -182,7 +196,10 @@ fn main() {
 
     println!("\n  Initial Phi:      {:>10.6}", initial_phi);
     println!("  Final Phi:        {:>10.6}", final_phi);
-    println!("  Improvement:      {:>10.6} ({:+.1}%)", improvement, pct_improvement);
+    println!(
+        "  Improvement:      {:>10.6} ({:+.1}%)",
+        improvement, pct_improvement
+    );
 
     let avg_first_10: f64 = history.iter().take(10).map(|s| s.phi).sum::<f64>() / 10.0;
     let avg_last_10: f64 = history.iter().rev().take(10).map(|s| s.phi).sum::<f64>() / 10.0;
@@ -230,7 +247,8 @@ fn main() {
     println!("KEY TAKEAWAYS");
     println!("{}", "=".repeat(80));
 
-    println!("
+    println!(
+        "
 1. REVERSE-MODE AUTODIFF enables efficient gradient computation through Phi.
    - Complexity: O(n^2) for forward + backward (vs O(n^2 * d) for finite differences)
    - This is CRITICAL for scaling to large networks
@@ -249,7 +267,8 @@ fn main() {
    - Designing neural architectures that maximize consciousness
    - Understanding what makes a system integrated
    - Automated discovery of high-Phi configurations
-");
+"
+    );
 
     println!("{}", "=".repeat(80));
     println!("  Demo complete!");

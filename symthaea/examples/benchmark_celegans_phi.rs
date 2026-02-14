@@ -103,10 +103,20 @@ impl Connectome {
         println!("  Connections: {}", connections.len());
 
         // Connection type breakdown
-        let chemical = connections.iter().filter(|c| c.conn_type == "chemical").count();
-        let electrical = connections.iter().filter(|c| c.conn_type.contains("electr") || c.conn_type.contains("gap")).count();
-        println!("  Chemical synapses: {}, Gap junctions: {}, Other: {}",
-            chemical, electrical, connections.len() - chemical - electrical);
+        let chemical = connections
+            .iter()
+            .filter(|c| c.conn_type == "chemical")
+            .count();
+        let electrical = connections
+            .iter()
+            .filter(|c| c.conn_type.contains("electr") || c.conn_type.contains("gap"))
+            .count();
+        println!(
+            "  Chemical synapses: {}, Gap junctions: {}, Other: {}",
+            chemical,
+            electrical,
+            connections.len() - chemical - electrical
+        );
 
         Self {
             neurons,
@@ -186,7 +196,9 @@ fn known_circuits() -> Vec<(&'static str, Vec<&'static str>)> {
         // Locomotion command circuit (high integration expected)
         (
             "Locomotion Command",
-            vec!["AVAL", "AVAR", "AVBL", "AVBR", "AVDL", "AVDR", "AVEL", "AVER"],
+            vec![
+                "AVAL", "AVAR", "AVBL", "AVBR", "AVDL", "AVDR", "AVEL", "AVER",
+            ],
         ),
         // Touch receptor circuit
         (
@@ -206,7 +218,9 @@ fn known_circuits() -> Vec<(&'static str, Vec<&'static str>)> {
         // Hub interneurons (highest integration expected)
         (
             "Hub Interneurons",
-            vec!["AVAL", "AVAR", "AVBL", "AVBR", "RIBL", "RIBR", "AIBL", "AIBR"],
+            vec![
+                "AVAL", "AVAR", "AVBL", "AVBR", "RIBL", "RIBR", "AIBL", "AIBR",
+            ],
         ),
     ]
 }
@@ -254,7 +268,11 @@ fn main() {
             .collect();
 
         if available.len() < 3 {
-            println!("  {}: Skipped (only {} neurons found in data)", name, available.len());
+            println!(
+                "  {}: Skipped (only {} neurons found in data)",
+                name,
+                available.len()
+            );
             continue;
         }
 
@@ -322,7 +340,10 @@ fn main() {
         / (random_phis.len() - 1) as f64)
         .sqrt();
 
-    println!("\n  Random baseline: Φ = {:.6} ± {:.6}", random_mean, random_std);
+    println!(
+        "\n  Random baseline: Φ = {:.6} ± {:.6}",
+        random_mean, random_std
+    );
 
     // Scale analysis
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -351,7 +372,10 @@ fn main() {
 
         println!(
             "  n={:2} │ Φ = {:.6} │ method: {:15} │ {:.1}ms",
-            size, result.phi, result.method, elapsed * 1000.0
+            size,
+            result.phi,
+            result.method,
+            elapsed * 1000.0
         );
 
         scale_results.push((size, result.phi, elapsed));
@@ -368,15 +392,24 @@ fn main() {
         .sum::<f64>()
         / circuit_results.len().max(1) as f64;
 
-    println!("║  Functional circuits Φ (mean): {:.6}                    ║", functional_mean);
-    println!("║  Random subsets Φ (mean):      {:.6} ± {:.6}          ║", random_mean, random_std);
+    println!(
+        "║  Functional circuits Φ (mean): {:.6}                    ║",
+        functional_mean
+    );
+    println!(
+        "║  Random subsets Φ (mean):      {:.6} ± {:.6}          ║",
+        random_mean, random_std
+    );
 
     let functional_over_random = if random_mean > 0.0 {
         functional_mean / random_mean
     } else {
         f64::INFINITY
     };
-    println!("║  Functional/Random ratio:      {:.2}x                       ║", functional_over_random);
+    println!(
+        "║  Functional/Random ratio:      {:.2}x                       ║",
+        functional_over_random
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Validation
@@ -394,7 +427,11 @@ fn main() {
     );
     println!(
         "  Functional > Random (ratio > 1.0):       {} ({:.2}x)",
-        if functional_over_random > 1.0 { "PASS" } else { "FAIL" },
+        if functional_over_random > 1.0 {
+            "PASS"
+        } else {
+            "FAIL"
+        },
         functional_over_random
     );
 

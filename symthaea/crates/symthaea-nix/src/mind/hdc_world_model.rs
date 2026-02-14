@@ -5,9 +5,9 @@
 //! between current and expected state), and predictive inference (project state
 //! change from a proposed action).
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use serde::{Serialize, Deserialize};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Tracks system state as an HDC vector that evolves with observations.
@@ -107,9 +107,10 @@ impl HdcWorldModel {
     ///
     /// The overall state is rebuilt by bundling all facets.
     pub fn observe_facet(&mut self, facet_name: &str, observation: &ContinuousHV) {
-        let entry = self.facets.entry(facet_name.to_string()).or_insert_with(|| {
-            ContinuousHV::zero(self.dim)
-        });
+        let entry = self
+            .facets
+            .entry(facet_name.to_string())
+            .or_insert_with(|| ContinuousHV::zero(self.dim));
 
         // EMA update for the facet
         let refs = [entry as &ContinuousHV, observation];
@@ -129,10 +130,9 @@ impl HdcWorldModel {
         };
 
         let facet_drifts: Vec<(String, f32)> = if let Some(expected) = &self.expected_state {
-            self.facets.iter()
-                .map(|(name, facet_hv)| {
-                    (name.clone(), facet_hv.similarity(expected).max(0.0))
-                })
+            self.facets
+                .iter()
+                .map(|(name, facet_hv)| (name.clone(), facet_hv.similarity(expected).max(0.0)))
                 .collect()
         } else {
             Vec::new()
@@ -203,7 +203,9 @@ impl HdcWorldModel {
             observation_count: self.observation_count,
             state: self.state.as_slice().to_vec(),
             expected_state: self.expected_state.as_ref().map(|s| s.as_slice().to_vec()),
-            facets: self.facets.iter()
+            facets: self
+                .facets
+                .iter()
                 .map(|(name, hv)| (name.clone(), hv.as_slice().to_vec()))
                 .collect(),
         };
@@ -232,8 +234,12 @@ impl HdcWorldModel {
         self.ema_alpha = snapshot.ema_alpha;
         self.observation_count = snapshot.observation_count;
         self.state = ContinuousHV::from_slice(&snapshot.state);
-        self.expected_state = snapshot.expected_state.map(|s| ContinuousHV::from_slice(&s));
-        self.facets = snapshot.facets.into_iter()
+        self.expected_state = snapshot
+            .expected_state
+            .map(|s| ContinuousHV::from_slice(&s));
+        self.facets = snapshot
+            .facets
+            .into_iter()
             .map(|(name, data)| (name, ContinuousHV::from_slice(&data)))
             .collect();
 
@@ -274,7 +280,11 @@ mod tests {
 
         // First observation becomes the state directly
         let sim = wm.state().similarity(&obs);
-        assert!((sim - 1.0).abs() < 1e-5, "First observation should be the state: {}", sim);
+        assert!(
+            (sim - 1.0).abs() < 1e-5,
+            "First observation should be the state: {}",
+            sim
+        );
     }
 
     #[test]
@@ -291,7 +301,12 @@ mod tests {
         // State should be between obs1 and obs2
         let sim1 = wm.state().similarity(&obs1);
         let sim2 = wm.state().similarity(&obs2);
-        assert!(sim1 > 0.0 && sim2 > 0.0, "State should blend: sim1={}, sim2={}", sim1, sim2);
+        assert!(
+            sim1 > 0.0 && sim2 > 0.0,
+            "State should blend: sim1={}, sim2={}",
+            sim1,
+            sim2
+        );
     }
 
     #[test]
@@ -305,7 +320,11 @@ mod tests {
         // Observe the expected state — no drift
         wm.observe(&expected);
         let report = wm.detect_drift(0.8);
-        assert!(!report.drifted, "Should not drift when at expected state: sim={}", report.similarity);
+        assert!(
+            !report.drifted,
+            "Should not drift when at expected state: sim={}",
+            report.similarity
+        );
 
         // Observe something very different — should drift
         let different = ContinuousHV::random(dim, 99);
@@ -313,7 +332,11 @@ mod tests {
         wm2.set_expected_state(expected);
         wm2.observe(&different);
         let report2 = wm2.detect_drift(0.8);
-        assert!(report2.drifted, "Should drift when state diverges: sim={}", report2.similarity);
+        assert!(
+            report2.drifted,
+            "Should drift when state diverges: sim={}",
+            report2.similarity
+        );
     }
 
     #[test]
@@ -343,7 +366,10 @@ mod tests {
         let delta = ContinuousHV::random(dim, 2);
         let projection = wm.project_action(&delta);
 
-        assert!(projection.change_magnitude > 0.0, "Action should change state");
+        assert!(
+            projection.change_magnitude > 0.0,
+            "Action should change state"
+        );
         assert!(projection.change_magnitude <= 1.0);
     }
 
@@ -374,7 +400,11 @@ mod tests {
 
         // State vectors should match
         let sim = wm.state().similarity(wm2.state());
-        assert!((sim - 1.0).abs() < 1e-5, "Loaded state should match: sim={}", sim);
+        assert!(
+            (sim - 1.0).abs() < 1e-5,
+            "Loaded state should match: sim={}",
+            sim
+        );
     }
 
     #[test]

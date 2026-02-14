@@ -287,11 +287,9 @@ fn test_phi_proxy_multi_topology_validation() {
 
     // 1. Chain (3 nodes): A→B→C — minimal integration
     results.push(("chain_3".into(), {
-        let r = validate_phi_proxy(&vec![
-            vec![0.0, 0.8, 0.0],
+        let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.0],
             vec![0.0, 0.0, 0.8],
-            vec![0.0, 0.0, 0.0],
-        ], noise);
+            vec![0.0, 0.0, 0.0]], noise);
         (r.approx_phi, r.exact_phi)
     }.0, results.last().map(|_| 0.0).unwrap_or(0.0)));
 
@@ -299,131 +297,101 @@ fn test_phi_proxy_multi_topology_validation() {
     results.clear();
 
     // 1. Chain 3
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.8, 0.0],
+    let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.0],
         vec![0.0, 0.0, 0.8],
-        vec![0.0, 0.0, 0.0],
-    ], noise);
+        vec![0.0, 0.0, 0.0]], noise);
     results.push(("chain_3".into(), r.approx_phi, r.exact_phi));
 
     // 2. Chain 4
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.8, 0.0, 0.0],
+    let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.0, 0.0],
         vec![0.0, 0.0, 0.8, 0.0],
         vec![0.0, 0.0, 0.0, 0.8],
-        vec![0.0, 0.0, 0.0, 0.0],
-    ], noise);
+        vec![0.0, 0.0, 0.0, 0.0]], noise);
     results.push(("chain_4".into(), r.approx_phi, r.exact_phi));
 
     // 3. Ring 3: A→B→C→A — cycle adds integration
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.8, 0.0],
+    let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.0],
         vec![0.0, 0.0, 0.8],
-        vec![0.8, 0.0, 0.0],
-    ], noise);
+        vec![0.8, 0.0, 0.0]], noise);
     results.push(("ring_3".into(), r.approx_phi, r.exact_phi));
 
     // 4. Ring 4
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.8, 0.0, 0.0],
+    let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.0, 0.0],
         vec![0.0, 0.0, 0.8, 0.0],
         vec![0.0, 0.0, 0.0, 0.8],
-        vec![0.8, 0.0, 0.0, 0.0],
-    ], noise);
+        vec![0.8, 0.0, 0.0, 0.0]], noise);
     results.push(("ring_4".into(), r.approx_phi, r.exact_phi));
 
     // 5. Star 4: center→all, no return
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.8, 0.8, 0.8],
+    let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.8, 0.8],
         vec![0.0, 0.0, 0.0, 0.0],
         vec![0.0, 0.0, 0.0, 0.0],
-        vec![0.0, 0.0, 0.0, 0.0],
-    ], noise);
+        vec![0.0, 0.0, 0.0, 0.0]], noise);
     results.push(("star_4_out".into(), r.approx_phi, r.exact_phi));
 
     // 6. Star 4: all→center — feedforward convergence
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.0, 0.0, 0.0],
+    let r = validate_phi_proxy(&[vec![0.0, 0.0, 0.0, 0.0],
         vec![0.8, 0.0, 0.0, 0.0],
         vec![0.8, 0.0, 0.0, 0.0],
-        vec![0.8, 0.0, 0.0, 0.0],
-    ], noise);
+        vec![0.8, 0.0, 0.0, 0.0]], noise);
     results.push(("star_4_in".into(), r.approx_phi, r.exact_phi));
 
     // 7. Bidirectional ring 3
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.7, 0.7],
+    let r = validate_phi_proxy(&[vec![0.0, 0.7, 0.7],
         vec![0.7, 0.0, 0.7],
-        vec![0.7, 0.7, 0.0],
-    ], noise);
+        vec![0.7, 0.7, 0.0]], noise);
     results.push(("bidir_ring_3".into(), r.approx_phi, r.exact_phi));
 
     // 8. Fully connected 3
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.9, 0.9],
+    let r = validate_phi_proxy(&[vec![0.0, 0.9, 0.9],
         vec![0.9, 0.0, 0.9],
-        vec![0.9, 0.9, 0.0],
-    ], noise);
+        vec![0.9, 0.9, 0.0]], noise);
     results.push(("full_3".into(), r.approx_phi, r.exact_phi));
 
     // 9. Fully connected 4
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.7, 0.6, 0.5],
+    let r = validate_phi_proxy(&[vec![0.0, 0.7, 0.6, 0.5],
         vec![0.7, 0.0, 0.7, 0.6],
         vec![0.6, 0.7, 0.0, 0.7],
-        vec![0.5, 0.6, 0.7, 0.0],
-    ], noise);
+        vec![0.5, 0.6, 0.7, 0.0]], noise);
     results.push(("full_4".into(), r.approx_phi, r.exact_phi));
 
     // 10. Modular 4: two pairs weakly coupled
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.9, 0.1, 0.0],
+    let r = validate_phi_proxy(&[vec![0.0, 0.9, 0.1, 0.0],
         vec![0.9, 0.0, 0.0, 0.1],
         vec![0.1, 0.0, 0.0, 0.9],
-        vec![0.0, 0.1, 0.9, 0.0],
-    ], noise);
+        vec![0.0, 0.1, 0.9, 0.0]], noise);
     results.push(("modular_4".into(), r.approx_phi, r.exact_phi));
 
     // 11. Sparse random 4
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.3, 0.0, 0.5],
+    let r = validate_phi_proxy(&[vec![0.0, 0.3, 0.0, 0.5],
         vec![0.0, 0.0, 0.6, 0.0],
         vec![0.4, 0.0, 0.0, 0.0],
-        vec![0.0, 0.7, 0.0, 0.0],
-    ], noise);
+        vec![0.0, 0.7, 0.0, 0.0]], noise);
     results.push(("sparse_4".into(), r.approx_phi, r.exact_phi));
 
     // 12. Dense random 3
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.5, 0.3],
+    let r = validate_phi_proxy(&[vec![0.0, 0.5, 0.3],
         vec![0.4, 0.0, 0.6],
-        vec![0.7, 0.2, 0.0],
-    ], noise);
+        vec![0.7, 0.2, 0.0]], noise);
     results.push(("dense_random_3".into(), r.approx_phi, r.exact_phi));
 
     // 13. Disconnected 3 (no edges)
-    let r = validate_phi_proxy(&vec![
+    let r = validate_phi_proxy(&[vec![0.0, 0.0, 0.0],
         vec![0.0, 0.0, 0.0],
-        vec![0.0, 0.0, 0.0],
-        vec![0.0, 0.0, 0.0],
-    ], noise);
+        vec![0.0, 0.0, 0.0]], noise);
     results.push(("disconnected_3".into(), r.approx_phi, r.exact_phi));
 
     // 14. Single strong edge 3
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.95, 0.0],
+    let r = validate_phi_proxy(&[vec![0.0, 0.95, 0.0],
         vec![0.0, 0.0, 0.0],
-        vec![0.0, 0.0, 0.0],
-    ], noise);
+        vec![0.0, 0.0, 0.0]], noise);
     results.push(("single_edge_3".into(), r.approx_phi, r.exact_phi));
 
     // 15. Hierarchical 4
-    let r = validate_phi_proxy(&vec![
-        vec![0.0, 0.9, 0.9, 0.0],
+    let r = validate_phi_proxy(&[vec![0.0, 0.9, 0.9, 0.0],
         vec![0.0, 0.0, 0.0, 0.8],
         vec![0.0, 0.0, 0.0, 0.8],
-        vec![0.0, 0.0, 0.0, 0.0],
-    ], noise);
+        vec![0.0, 0.0, 0.0, 0.0]], noise);
     results.push(("hierarchical_4".into(), r.approx_phi, r.exact_phi));
 
     // Print results table

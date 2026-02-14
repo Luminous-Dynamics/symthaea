@@ -21,15 +21,12 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 mod benches {
     use super::*;
     use symthaea::consciousness::epistemic_conflict::{
-        ConflictDetector, TheoryCalibrator, MultiTheoryMetrics,
-        phi_integration::effective_phi,
+        phi_integration::effective_phi, ConflictDetector, MultiTheoryMetrics, TheoryCalibrator,
     };
-    use symthaea::consciousness::tool_gate::types::ToolDescriptor;
-    use symthaea::consciousness::tool_gate::classifier;
-    use symthaea::consciousness::reasoning_engine::{
-        ConsciousReasoningEngine, ReasoningContext,
-    };
+    use symthaea::consciousness::reasoning_engine::{ConsciousReasoningEngine, ReasoningContext};
     use symthaea::consciousness::temporal_planning::types::PlannedAction;
+    use symthaea::consciousness::tool_gate::classifier;
+    use symthaea::consciousness::tool_gate::types::ToolDescriptor;
 
     fn make_metrics(consensus: f64) -> MultiTheoryMetrics {
         MultiTheoryMetrics {
@@ -68,9 +65,7 @@ mod benches {
 
     pub fn bench_effective_phi(c: &mut Criterion) {
         c.bench_function("effective_phi", |b| {
-            b.iter(|| {
-                effective_phi(black_box(0.8), black_box(0.7), black_box(2.0))
-            })
+            b.iter(|| effective_phi(black_box(0.8), black_box(0.7), black_box(2.0)))
         });
     }
 
@@ -81,9 +76,7 @@ mod benches {
             .with_calibration_count(100);
 
         c.bench_function("tool_classification", |b| {
-            b.iter(|| {
-                classifier::gate(black_box(&tool), black_box(0.7), black_box(0.8))
-            })
+            b.iter(|| classifier::gate(black_box(&tool), black_box(0.7), black_box(0.8)))
         });
     }
 
@@ -153,9 +146,7 @@ mod benches {
         use symthaea::consciousness::temporal_planning::mcts::evs;
 
         c.bench_function("evs_calculation", |b| {
-            b.iter(|| {
-                evs(black_box(0.5), black_box(0.7), black_box(5), black_box(0.5))
-            })
+            b.iter(|| evs(black_box(0.5), black_box(0.7), black_box(5), black_box(0.5)))
         });
     }
 

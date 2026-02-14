@@ -9,10 +9,10 @@
 //! - Error distribution across nodes
 //! - ASCII visualization of network growth
 
-use symthaea::hdc::cincinnati_ltc::{CincinnatiLtcEngine, BuddingEvent};
+use std::collections::VecDeque;
+use symthaea::hdc::cincinnati_ltc::{BuddingEvent, CincinnatiLtcEngine};
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
-use std::collections::VecDeque;
 
 /// Track budding events and network dynamics
 #[derive(Debug)]
@@ -52,7 +52,13 @@ impl BuddingAnalyzer {
         }
     }
 
-    fn record_checkpoint(&mut self, node_count: usize, budding_count: usize, error_rate: f64, accuracy: f64) {
+    fn record_checkpoint(
+        &mut self,
+        node_count: usize,
+        budding_count: usize,
+        error_rate: f64,
+        accuracy: f64,
+    ) {
         self.node_counts.push(node_count);
         self.budding_timeline.push(budding_count);
         self.error_rates.push(error_rate);
@@ -91,7 +97,10 @@ impl BuddingAnalyzer {
 
         // Add Y-axis labels
         let mut output = String::new();
-        output.push_str(&format!("Node Count Over Time (min={}, max={})\n", min_nodes, max_nodes));
+        output.push_str(&format!(
+            "Node Count Over Time (min={}, max={})\n",
+            min_nodes, max_nodes
+        ));
         output.push_str(&format!("{:>3} ┤", max_nodes));
         for c in &lines[0] {
             output.push(*c);
@@ -113,7 +122,12 @@ impl BuddingAnalyzer {
         }
         output.push_str("    └");
         output.push_str(&"─".repeat(width));
-        output.push_str(&format!("\n      0{:>width$}{}\n", "time", " ", width = width - 8));
+        output.push_str(&format!(
+            "\n      0{:>width$}{}\n",
+            "time",
+            " ",
+            width = width - 8
+        ));
 
         output
     }
@@ -121,9 +135,13 @@ impl BuddingAnalyzer {
     /// Generate summary statistics
     fn summary(&self) -> String {
         let mut output = String::new();
-        output.push_str("╔══════════════════════════════════════════════════════════════════════╗\n");
-        output.push_str("║                    BUDDING DYNAMICS SUMMARY                          ║\n");
-        output.push_str("╚══════════════════════════════════════════════════════════════════════╝\n\n");
+        output
+            .push_str("╔══════════════════════════════════════════════════════════════════════╗\n");
+        output
+            .push_str("║                    BUDDING DYNAMICS SUMMARY                          ║\n");
+        output.push_str(
+            "╚══════════════════════════════════════════════════════════════════════╝\n\n",
+        );
 
         output.push_str(&format!("  Total Steps:           {}\n", self.step));
         output.push_str(&format!("  Total Budding Events:  {}\n", self.events.len()));
@@ -135,14 +153,24 @@ impl BuddingAnalyzer {
             output.push_str(&format!("  Initial Nodes:         {}\n", initial));
             output.push_str(&format!("  Final Nodes:           {}\n", final_count));
             output.push_str(&format!("  Max Nodes:             {}\n", max_count));
-            output.push_str(&format!("  Net Growth:            {:+}\n", final_count as i32 - initial as i32));
+            output.push_str(&format!(
+                "  Net Growth:            {:+}\n",
+                final_count as i32 - initial as i32
+            ));
         }
 
         if !self.accuracy_rates.is_empty() {
-            let avg_accuracy: f64 = self.accuracy_rates.iter().sum::<f64>() / self.accuracy_rates.len() as f64;
+            let avg_accuracy: f64 =
+                self.accuracy_rates.iter().sum::<f64>() / self.accuracy_rates.len() as f64;
             let final_accuracy = *self.accuracy_rates.last().unwrap();
-            output.push_str(&format!("\n  Average Accuracy:      {:.1}%\n", avg_accuracy * 100.0));
-            output.push_str(&format!("  Final Accuracy:        {:.1}%\n", final_accuracy * 100.0));
+            output.push_str(&format!(
+                "\n  Average Accuracy:      {:.1}%\n",
+                avg_accuracy * 100.0
+            ));
+            output.push_str(&format!(
+                "  Final Accuracy:        {:.1}%\n",
+                final_accuracy * 100.0
+            ));
         }
 
         if !self.events.is_empty() {
@@ -151,7 +179,10 @@ impl BuddingAnalyzer {
                 output.push_str(&format!("    Step {:>5}: {:?}\n", step, event));
             }
             if self.events.len() > 10 {
-                output.push_str(&format!("    ... and {} more events\n", self.events.len() - 10));
+                output.push_str(&format!(
+                    "    ... and {} more events\n",
+                    self.events.len() - 10
+                ));
             }
         }
 
@@ -182,7 +213,9 @@ impl PatternGenerator for LogisticPattern {
         self.x = self.r * self.x * (1.0 - self.x);
         self.x > 0.5
     }
-    fn name(&self) -> &str { "Logistic Map" }
+    fn name(&self) -> &str {
+        "Logistic Map"
+    }
 }
 
 /// Square wave pattern
@@ -193,7 +226,10 @@ struct SquareWave {
 
 impl SquareWave {
     fn new(half_period: usize) -> Self {
-        Self { half_period, step: 0 }
+        Self {
+            half_period,
+            step: 0,
+        }
     }
 }
 
@@ -203,7 +239,9 @@ impl PatternGenerator for SquareWave {
         self.step += 1;
         bit
     }
-    fn name(&self) -> &str { "Square Wave" }
+    fn name(&self) -> &str {
+        "Square Wave"
+    }
 }
 
 /// XOR pattern
@@ -231,7 +269,9 @@ impl PatternGenerator for XorPattern {
         }
         output
     }
-    fn name(&self) -> &str { "XOR Pattern" }
+    fn name(&self) -> &str {
+        "XOR Pattern"
+    }
 }
 
 /// Run analysis for a single pattern
@@ -277,12 +317,17 @@ fn analyze_pattern(
         let node_count = engine.node_count();
         // Ensure node_states matches current node count
         while node_states.len() < node_count {
-            node_states.push(ContinuousHV::random(HDC_DIMENSION, (node_states.len() * 1000 + i) as u64));
+            node_states.push(ContinuousHV::random(
+                HDC_DIMENSION,
+                (node_states.len() * 1000 + i) as u64,
+            ));
         }
 
         for node_id in 0..node_count {
-            let expected = ContinuousHV::random(HDC_DIMENSION, if prediction { 111111 } else { 222222 });
-            let actual = ContinuousHV::random(HDC_DIMENSION, if observation { 111111 } else { 222222 });
+            let expected =
+                ContinuousHV::random(HDC_DIMENSION, if prediction { 111111 } else { 222222 });
+            let actual =
+                ContinuousHV::random(HDC_DIMENSION, if observation { 111111 } else { 222222 });
             engine.update_prediction_error(node_id, &expected, &actual);
         }
 
@@ -295,10 +340,23 @@ fn analyze_pattern(
 
         // Checkpoint
         if (i + 1) % checkpoint_interval == 0 {
-            let accuracy = if total > 0 { correct as f64 / total as f64 } else { 0.5 };
-            let error_rate = if total_budding_events > last_budding_count { 1.0 } else { 0.0 };
+            let accuracy = if total > 0 {
+                correct as f64 / total as f64
+            } else {
+                0.5
+            };
+            let error_rate = if total_budding_events > last_budding_count {
+                1.0
+            } else {
+                0.0
+            };
 
-            analyzer.record_checkpoint(engine.node_count(), total_budding_events, error_rate, accuracy);
+            analyzer.record_checkpoint(
+                engine.node_count(),
+                total_budding_events,
+                error_rate,
+                accuracy,
+            );
             last_budding_count = total_budding_events;
         }
 
@@ -320,8 +378,14 @@ fn main() {
 
     // Analyze different patterns
     let mut patterns: Vec<(&str, Box<dyn PatternGenerator>)> = vec![
-        ("Logistic (r=3.2, predictable)", Box::new(LogisticPattern::new(3.2))),
-        ("Logistic (r=3.8, chaotic)", Box::new(LogisticPattern::new(3.8))),
+        (
+            "Logistic (r=3.2, predictable)",
+            Box::new(LogisticPattern::new(3.2)),
+        ),
+        (
+            "Logistic (r=3.8, chaotic)",
+            Box::new(LogisticPattern::new(3.8)),
+        ),
         ("Square Wave (half=4)", Box::new(SquareWave::new(4))),
         ("XOR Pattern", Box::new(XorPattern::new())),
     ];

@@ -26,7 +26,7 @@
 
 #[cfg(feature = "embeddings")]
 fn main() -> anyhow::Result<()> {
-    use symthaea::embeddings::qwen3::{Qwen3Embedder, Qwen3Config, cosine_similarity};
+    use symthaea::embeddings::qwen3::{cosine_similarity, Qwen3Config, Qwen3Embedder};
 
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║       EMBEDDING MODEL VERIFICATION                          ║");
@@ -59,7 +59,12 @@ fn main() -> anyhow::Result<()> {
     println!("   Truncated: {}", embedding.truncated);
 
     // Check embedding is normalized
-    let norm: f32 = embedding.embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm: f32 = embedding
+        .embedding
+        .iter()
+        .map(|x| x * x)
+        .sum::<f32>()
+        .sqrt();
     println!("   L2 norm: {:.4} (should be ~1.0)", norm);
     println!();
 
@@ -72,7 +77,6 @@ fn main() -> anyhow::Result<()> {
         ("cat", "kitten", "Related"),
         ("happy", "joyful", "Related"),
         ("code", "programming", "Related"),
-
         // Unrelated pairs (should have low similarity)
         ("dog", "mathematics", "Unrelated"),
         ("happy", "triangle", "Unrelated"),
@@ -96,8 +100,10 @@ fn main() -> anyhow::Result<()> {
             unrelated_scores.push(similarity);
         }
 
-        println!("   {:<15} / {:<12} | {:<9} | {:.4}",
-            text_a, text_b, pair_type, similarity);
+        println!(
+            "   {:<15} / {:<12} | {:<9} | {:.4}",
+            text_a, text_b, pair_type, similarity
+        );
     }
 
     println!();
@@ -110,7 +116,10 @@ fn main() -> anyhow::Result<()> {
     println!("📊 Summary Statistics:");
     println!("   Average related pair similarity:   {:.4}", avg_related);
     println!("   Average unrelated pair similarity: {:.4}", avg_unrelated);
-    println!("   Discrimination (related - unrelated): {:.4}", discrimination);
+    println!(
+        "   Discrimination (related - unrelated): {:.4}",
+        discrimination
+    );
     println!();
 
     // Step 5: Verdict

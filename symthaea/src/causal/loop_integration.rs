@@ -829,7 +829,7 @@ mod tests {
 
         if let Some((var, value)) = suggestion {
             assert_eq!(var, 0, "Should suggest intervening on most influential var");
-            assert!(value >= -1.0 && value <= 1.0, "Value should be in range");
+            assert!((-1.0..=1.0).contains(&value), "Value should be in range");
         }
     }
 

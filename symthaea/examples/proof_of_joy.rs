@@ -64,11 +64,11 @@ impl EmotionalState {
 /// Discrete emotion categories
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum EmotionCategory {
-    Excited,   // High valence, high arousal (Joy, Happiness)
-    Relaxed,   // High valence, low arousal (Content, Peaceful)
-    Stressed,  // Low valence, high arousal (Anxious, Angry)
-    Sad,       // Low valence, low arousal (Depressed, Bored)
-    Neutral,   // Center of circumplex
+    Excited,  // High valence, high arousal (Joy, Happiness)
+    Relaxed,  // High valence, low arousal (Content, Peaceful)
+    Stressed, // Low valence, high arousal (Anxious, Angry)
+    Sad,      // Low valence, low arousal (Depressed, Bored)
+    Neutral,  // Center of circumplex
 }
 
 impl EmotionCategory {
@@ -159,7 +159,8 @@ impl FieldElement {
     }
 
     fn to_hex(&self) -> String {
-        self.bytes[0..16].iter()
+        self.bytes[0..16]
+            .iter()
             .map(|b| format!("{:02x}", b))
             .collect()
     }
@@ -357,7 +358,11 @@ impl JoyValidator {
 
     fn validate_and_reward(&mut self, proof: &EmotionProof) -> Result<JoyReward, String> {
         match proof.verify() {
-            ProofVerificationResult::Valid { category, duration_sec, confidence } => {
+            ProofVerificationResult::Valid {
+                category,
+                duration_sec,
+                confidence,
+            } => {
                 let base_rate = *self.reward_rates.get(&category).unwrap_or(&0.0);
 
                 // Calculate reward
@@ -423,11 +428,11 @@ impl EmotionSession {
 
         // Simulate 5 emotional blocks (video clips)
         let blocks = [
-            ("Positive/High", 0.7, 0.6, 60.0),   // Exciting/Happy video
-            ("Neutral", 0.1, 0.0, 60.0),          // Neutral video
-            ("Negative/High", -0.5, 0.7, 60.0),   // Scary/Tense video
-            ("Positive/Low", 0.6, -0.4, 60.0),    // Relaxing/Calm video
-            ("Negative/Low", -0.4, -0.3, 60.0),   // Sad/Boring video
+            ("Positive/High", 0.7, 0.6, 60.0),  // Exciting/Happy video
+            ("Neutral", 0.1, 0.0, 60.0),        // Neutral video
+            ("Negative/High", -0.5, 0.7, 60.0), // Scary/Tense video
+            ("Positive/Low", 0.6, -0.4, 60.0),  // Relaxing/Calm video
+            ("Negative/Low", -0.4, -0.3, 60.0), // Sad/Boring video
         ];
 
         let mut current_time = 0.0;
@@ -505,8 +510,15 @@ fn main() {
 
     let session = EmotionSession::simulate_dens_session();
 
-    println!("   Loaded {} emotional snapshots from simulated DENS session", session.snapshots.len());
-    println!("   Total duration: {:.0} seconds ({:.1} minutes)", session.duration_sec(), session.duration_sec() / 60.0);
+    println!(
+        "   Loaded {} emotional snapshots from simulated DENS session",
+        session.snapshots.len()
+    );
+    println!(
+        "   Total duration: {:.0} seconds ({:.1} minutes)",
+        session.duration_sec(),
+        session.duration_sec() / 60.0
+    );
     println!();
 
     // ========================================================================
@@ -552,7 +564,11 @@ fn main() {
             let avg_a = sum_a / *count as f64;
             println!(
                 "   │ {:16} │ {:>6} │ {:>+9.3} │ {:>+9.3} │ {:8} │",
-                cat.name(), count, avg_v, avg_a, cat.emoji()
+                cat.name(),
+                count,
+                avg_v,
+                avg_a,
+                cat.emoji()
             );
         }
     }
@@ -572,23 +588,32 @@ fn main() {
 
     for (category, (count, _, _)) in &emotion_counts {
         // Find representative snapshot for this category
-        let representative = session.snapshots.iter()
-            .find(|s| {
-                let state = EmotionalState {
-                    valence: s.valence,
-                    arousal: s.arousal,
-                    confidence: 0.85,
-                };
-                state.classify() == *category
-            });
+        let representative = session.snapshots.iter().find(|s| {
+            let state = EmotionalState {
+                valence: s.valence,
+                arousal: s.arousal,
+                confidence: 0.85,
+            };
+            state.classify() == *category
+        });
 
         if let Some(snapshot) = representative {
             let duration = (*count as u32) * 5; // 5 seconds per snapshot
             let proof = EmotionProof::create(snapshot, duration);
 
-            println!("   {} {} Proof Generated:", category.emoji(), category.name());
-            println!("      Valence Commitment: {}", proof.valence_commitment.commitment.to_hex());
-            println!("      Arousal Commitment: {}", proof.arousal_commitment.commitment.to_hex());
+            println!(
+                "   {} {} Proof Generated:",
+                category.emoji(),
+                category.name()
+            );
+            println!(
+                "      Valence Commitment: {}",
+                proof.valence_commitment.commitment.to_hex()
+            );
+            println!(
+                "      Arousal Commitment: {}",
+                proof.arousal_commitment.commitment.to_hex()
+            );
             println!("      Challenge:          {}", proof.challenge.to_hex());
             println!("      Duration:           {} seconds", proof.duration_sec);
             println!();
@@ -614,7 +639,10 @@ fn main() {
         match validator.validate_and_reward(proof) {
             Ok(reward) => {
                 println!("✅ VALID");
-                println!("      Reward: {:.4} JOY tokens ({:?})", reward.amount, reward.reward_type);
+                println!(
+                    "      Reward: {:.4} JOY tokens ({:?})",
+                    reward.amount, reward.reward_type
+                );
                 println!("      Duration: {} seconds verified", reward.duration_sec);
                 println!();
                 rewards.push(reward);
@@ -634,12 +662,14 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!();
 
-    let positive_rewards: f64 = rewards.iter()
+    let positive_rewards: f64 = rewards
+        .iter()
         .filter(|r| r.verified_category.is_positive())
         .map(|r| r.amount)
         .sum();
 
-    let positive_duration: u32 = rewards.iter()
+    let positive_duration: u32 = rewards
+        .iter()
         .filter(|r| r.verified_category.is_positive())
         .map(|r| r.duration_sec)
         .sum();
@@ -647,13 +677,34 @@ fn main() {
     println!("   ┌─────────────────────────────────────────────────────────────────┐");
     println!("   │                    PROOF OF JOY SUMMARY                         │");
     println!("   ├─────────────────────────────────────────────────────────────────┤");
-    println!("   │ Total Snapshots Analyzed:      {:>6}                            │", session.snapshots.len());
-    println!("   │ Session Duration:              {:>6} seconds                    │", session.duration_sec() as u32);
-    println!("   │ Proofs Generated:              {:>6}                            │", proofs.len());
-    println!("   │ Proofs Validated:              {:>6}                            │", validator.proofs_validated);
-    println!("   │ Total JOY Issued:              {:>6.4}                          │", validator.total_issued);
-    println!("   │ Positive State Duration:       {:>6} seconds                    │", positive_duration);
-    println!("   │ Positive State Rewards:        {:>6.4} JOY                      │", positive_rewards);
+    println!(
+        "   │ Total Snapshots Analyzed:      {:>6}                            │",
+        session.snapshots.len()
+    );
+    println!(
+        "   │ Session Duration:              {:>6} seconds                    │",
+        session.duration_sec() as u32
+    );
+    println!(
+        "   │ Proofs Generated:              {:>6}                            │",
+        proofs.len()
+    );
+    println!(
+        "   │ Proofs Validated:              {:>6}                            │",
+        validator.proofs_validated
+    );
+    println!(
+        "   │ Total JOY Issued:              {:>6.4}                          │",
+        validator.total_issued
+    );
+    println!(
+        "   │ Positive State Duration:       {:>6} seconds                    │",
+        positive_duration
+    );
+    println!(
+        "   │ Positive State Rewards:        {:>6.4} JOY                      │",
+        positive_rewards
+    );
     println!("   └─────────────────────────────────────────────────────────────────┘");
     println!();
 
@@ -666,7 +717,11 @@ fn main() {
 
     if let Some((count, sum_v, sum_a)) = excited_stats {
         println!("      🎉 EXCITED/HAPPY State Detected:");
-        println!("         • Count: {} snapshots ({} seconds)", count, count * 5);
+        println!(
+            "         • Count: {} snapshots ({} seconds)",
+            count,
+            count * 5
+        );
         println!("         • Average Valence: {:+.3}", sum_v / *count as f64);
         println!("         • Average Arousal: {:+.3}", sum_a / *count as f64);
         println!();
@@ -674,7 +729,11 @@ fn main() {
 
     if let Some((count, sum_v, sum_a)) = relaxed_stats {
         println!("      😌 RELAXED/CONTENT State Detected:");
-        println!("         • Count: {} snapshots ({} seconds)", count, count * 5);
+        println!(
+            "         • Count: {} snapshots ({} seconds)",
+            count,
+            count * 5
+        );
         println!("         • Average Valence: {:+.3}", sum_v / *count as f64);
         println!("         • Average Arousal: {:+.3}", sum_a / *count as f64);
         println!();

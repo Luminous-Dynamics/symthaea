@@ -81,12 +81,15 @@ impl JournalAnomalyDetector {
         let unit_hv = self.codebook.get_or_create(&entry.unit).clone();
 
         // Encode message tokens
-        let tokens: Vec<&str> = entry.message.split_whitespace()
+        let tokens: Vec<&str> = entry
+            .message
+            .split_whitespace()
             .filter(|t| t.len() > 2)
             .take(20) // Cap token count for performance
             .collect();
 
-        let token_hvs: Vec<ContinuousHV> = tokens.iter()
+        let token_hvs: Vec<ContinuousHV> = tokens
+            .iter()
             .map(|t| self.codebook.get_or_create(t).clone())
             .collect();
 
@@ -188,14 +191,14 @@ impl Default for JournalAnomalyDetector {
 /// Lower priority = higher severity = higher weight.
 fn priority_to_weight(priority: u8) -> f32 {
     match priority {
-        0 => 4.0,     // emerg
-        1 => 3.5,     // alert
-        2 => 3.0,     // crit
-        3 => 2.5,     // err
-        4 => 1.5,     // warning
-        5 => 1.0,     // notice
-        6 => 0.8,     // info
-        7 => 0.5,     // debug
+        0 => 4.0, // emerg
+        1 => 3.5, // alert
+        2 => 3.0, // crit
+        3 => 2.5, // err
+        4 => 1.5, // warning
+        5 => 1.0, // notice
+        6 => 0.8, // info
+        7 => 0.5, // debug
         _ => 1.0,
     }
 }
@@ -205,7 +208,10 @@ fn classify_anomaly(entry: &JournalEntry, similarity: f32) -> String {
     let msg_lower = entry.message.to_lowercase();
 
     if entry.priority <= 3 {
-        format!("Error-level log from {} (priority {})", entry.unit, entry.priority)
+        format!(
+            "Error-level log from {} (priority {})",
+            entry.unit, entry.priority
+        )
     } else if msg_lower.contains("fail") || msg_lower.contains("error") {
         format!("Error keyword in {} log", entry.unit)
     } else if msg_lower.contains("oom") || msg_lower.contains("out of memory") {
@@ -215,9 +221,15 @@ fn classify_anomaly(entry: &JournalEntry, similarity: f32) -> String {
     } else if msg_lower.contains("timeout") || msg_lower.contains("timed out") {
         format!("Timeout in {}", entry.unit)
     } else if similarity < 0.0 {
-        format!("Anti-correlated pattern from {} (sim={:.2})", entry.unit, similarity)
+        format!(
+            "Anti-correlated pattern from {} (sim={:.2})",
+            entry.unit, similarity
+        )
     } else {
-        format!("Unusual pattern from {} (sim={:.2})", entry.unit, similarity)
+        format!(
+            "Unusual pattern from {} (sim={:.2})",
+            entry.unit, similarity
+        )
     }
 }
 
@@ -250,7 +262,11 @@ mod tests {
         let hv1 = det1.encode_entry(&entry);
         let hv2 = det2.encode_entry(&entry);
         let sim = hv1.similarity(&hv2);
-        assert!((sim - 1.0).abs() < 1e-4, "Same entry should produce identical encodings, got {}", sim);
+        assert!(
+            (sim - 1.0).abs() < 1e-4,
+            "Same entry should produce identical encodings, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -262,7 +278,11 @@ mod tests {
         let hv_b = detector.encode_entry(&entry_b);
         let sim = hv_a.similarity(&hv_b);
         // Same message, different unit → should have moderate similarity (not identical)
-        assert!(sim < 0.9, "Different units should differ, got similarity {}", sim);
+        assert!(
+            sim < 0.9,
+            "Different units should differ, got similarity {}",
+            sim
+        );
     }
 
     #[test]
@@ -270,9 +290,9 @@ mod tests {
         let mut detector = JournalAnomalyDetector::new();
         assert!(!detector.is_warmed_up());
 
-        let normal_entries: Vec<JournalEntry> = (0..15).map(|i| {
-            make_entry("nginx", 6, &format!("GET /page/{} 200 OK", i))
-        }).collect();
+        let normal_entries: Vec<JournalEntry> = (0..15)
+            .map(|i| make_entry("nginx", 6, &format!("GET /page/{} 200 OK", i)))
+            .collect();
 
         detector.process_entries(&normal_entries);
         assert!(detector.is_warmed_up());
@@ -281,43 +301,67 @@ mod tests {
 
     #[test]
     fn test_normal_entries_no_anomalies() {
-        let mut detector = JournalAnomalyDetector::new()
-            .with_threshold(0.1); // Low threshold = only flag very unusual
+        let mut detector = JournalAnomalyDetector::new().with_threshold(0.1); // Low threshold = only flag very unusual
 
         // Train on normal entries
-        let normal: Vec<JournalEntry> = (0..20).map(|i| {
-            make_entry("nginx", 6, &format!("GET /page/{} 200 OK processed request", i))
-        }).collect();
+        let normal: Vec<JournalEntry> = (0..20)
+            .map(|i| {
+                make_entry(
+                    "nginx",
+                    6,
+                    &format!("GET /page/{} 200 OK processed request", i),
+                )
+            })
+            .collect();
         let _ = detector.process_entries(&normal);
 
         // Process more of the same — should see few/no anomalies
-        let more_normal: Vec<JournalEntry> = (20..25).map(|i| {
-            make_entry("nginx", 6, &format!("GET /page/{} 200 OK processed request", i))
-        }).collect();
+        let more_normal: Vec<JournalEntry> = (20..25)
+            .map(|i| {
+                make_entry(
+                    "nginx",
+                    6,
+                    &format!("GET /page/{} 200 OK processed request", i),
+                )
+            })
+            .collect();
         let anomalies = detector.process_entries(&more_normal);
         // With similar entries, anomaly count should be low
-        assert!(anomalies.len() <= 2, "Expected few anomalies for normal entries, got {}", anomalies.len());
+        assert!(
+            anomalies.len() <= 2,
+            "Expected few anomalies for normal entries, got {}",
+            anomalies.len()
+        );
     }
 
     #[test]
     fn test_error_entry_flagged() {
-        let mut detector = JournalAnomalyDetector::new()
-            .with_threshold(0.4);
+        let mut detector = JournalAnomalyDetector::new().with_threshold(0.4);
 
         // Train baseline on normal info logs
-        let normal: Vec<JournalEntry> = (0..20).map(|i| {
-            make_entry("nginx", 6, &format!("GET /page/{} 200 OK request processed", i))
-        }).collect();
+        let normal: Vec<JournalEntry> = (0..20)
+            .map(|i| {
+                make_entry(
+                    "nginx",
+                    6,
+                    &format!("GET /page/{} 200 OK request processed", i),
+                )
+            })
+            .collect();
         let _ = detector.process_entries(&normal);
 
         // Now send a very different error entry
         let error_entry = make_entry(
-            "postgresql", 3,
-            "FATAL: could not open relation mapping file global pg_filenode.map: No such file"
+            "postgresql",
+            3,
+            "FATAL: could not open relation mapping file global pg_filenode.map: No such file",
         );
         let anomalies = detector.process_entries(&[error_entry]);
         // This should be flagged because it's error-priority and from a different unit
-        assert!(!anomalies.is_empty(), "Error entry should be flagged as anomaly");
+        assert!(
+            !anomalies.is_empty(),
+            "Error entry should be flagged as anomaly"
+        );
         assert!(anomalies[0].reason.contains("Error"));
     }
 
@@ -353,14 +397,18 @@ mod tests {
         assert!((detector.score_entry(&entry) - 0.5).abs() < 0.01);
 
         // Train baseline
-        let normal: Vec<JournalEntry> = (0..10).map(|i| {
-            make_entry("nginx", 6, &format!("GET /page/{} 200 OK", i))
-        }).collect();
+        let normal: Vec<JournalEntry> = (0..10)
+            .map(|i| make_entry("nginx", 6, &format!("GET /page/{} 200 OK", i)))
+            .collect();
         let _ = detector.process_entries(&normal);
 
         // Score a similar entry — should be positive
         let similar = make_entry("nginx", 6, "GET /page/99 200 OK");
         let score = detector.score_entry(&similar);
-        assert!(score > 0.0, "Similar entry should have positive similarity, got {}", score);
+        assert!(
+            score > 0.0,
+            "Similar entry should have positive similarity, got {}",
+            score
+        );
     }
 }

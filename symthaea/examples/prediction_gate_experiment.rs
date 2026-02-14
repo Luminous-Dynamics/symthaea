@@ -36,8 +36,7 @@
 //! pre-existing world knowledge.
 
 use symthaea::benchmarks::prediction_gate::{
-    PredictionGate, PredictionGateConfig, PatternTask, TaskType,
-    print_prediction_gate_summary,
+    print_prediction_gate_summary, PatternTask, PredictionGate, PredictionGateConfig, TaskType,
 };
 use symthaea::learnable_ltc::LearnableLTCConfig;
 
@@ -51,23 +50,23 @@ fn main() -> anyhow::Result<()> {
 
     // Configure the experiment
     let config = PredictionGateConfig {
-        num_episodes: 15,           // 15 training episodes
-        examples_per_episode: 100,   // 100 examples per episode
-        test_size: 50,              // 50 held-out test examples
-        consolidation_cycles: 5,     // 5 memory consolidation cycles
-        pattern_dim: 64,            // 64-dimensional patterns
-        output_dim: 16,             // 16-dimensional output
+        num_episodes: 15,          // 15 training episodes
+        examples_per_episode: 100, // 100 examples per episode
+        test_size: 50,             // 50 held-out test examples
+        consolidation_cycles: 5,   // 5 memory consolidation cycles
+        pattern_dim: 64,           // 64-dimensional patterns
+        output_dim: 16,            // 16-dimensional output
         ltc_config: LearnableLTCConfig {
-            num_neurons: 256,       // 256 LTC neurons
-            input_dim: 64,          // Match pattern_dim
-            output_dim: 16,         // Match output_dim
-            num_steps: 30,          // 30 integration steps
-            lr_weights: 0.003,      // Weight learning rate
-            lr_tau: 0.0003,         // Time constant learning rate (slower)
-            lr_bias: 0.003,         // Bias learning rate
-            sparsity: 0.15,         // 15% sparse connectivity
-            l2_reg: 0.0001,         // L2 regularization
-            grad_clip: 1.0,         // Gradient clipping
+            num_neurons: 256,  // 256 LTC neurons
+            input_dim: 64,     // Match pattern_dim
+            output_dim: 16,    // Match output_dim
+            num_steps: 30,     // 30 integration steps
+            lr_weights: 0.003, // Weight learning rate
+            lr_tau: 0.0003,    // Time constant learning rate (slower)
+            lr_bias: 0.003,    // Bias learning rate
+            sparsity: 0.15,    // 15% sparse connectivity
+            l2_reg: 0.0001,    // L2 regularization
+            grad_clip: 1.0,    // Gradient clipping
             ..Default::default()
         },
     };
@@ -121,7 +120,10 @@ fn main() -> anyhow::Result<()> {
 
     println!("╔══════════════════════════════════════════════════════════════╗");
     if pass_rate >= 0.6 {
-        println!("║  🎉 PREDICTION-GATE: PASSED ({}/{} tasks)                     ║", passed_count, total);
+        println!(
+            "║  🎉 PREDICTION-GATE: PASSED ({}/{} tasks)                     ║",
+            passed_count, total
+        );
         println!("║                                                              ║");
         println!("║  The system demonstrates genuine learning capability!        ║");
         println!("║  This validates the LearnableLTC + BPTT + Adam architecture  ║");
@@ -131,7 +133,10 @@ fn main() -> anyhow::Result<()> {
         println!("║  2. Test transfer learning between domains                   ║");
         println!("║  3. Integrate with primitive system for concept learning     ║");
     } else {
-        println!("║  ⚠️  PREDICTION-GATE: NOT YET PASSED ({}/{} tasks)            ║", passed_count, total);
+        println!(
+            "║  ⚠️  PREDICTION-GATE: NOT YET PASSED ({}/{} tasks)            ║",
+            passed_count, total
+        );
         println!("║                                                              ║");
         println!("║  Learning needs improvement. Suggestions:                    ║");
         println!("║  1. Increase training episodes                               ║");

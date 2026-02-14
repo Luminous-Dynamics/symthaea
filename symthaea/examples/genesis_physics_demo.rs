@@ -27,11 +27,10 @@
 //! ```
 
 use symthaea_core::genesis::GenesisSeed;
+use symthaea_core::physics::chemistry::{BondType, Chemistry};
 use symthaea_core::physics::{
-    StandardModel, Hadrons, PeriodicTable, NuclearPhysics,
-    PhysicsConsciousnessBridge, EnergyScale,
+    EnergyScale, Hadrons, NuclearPhysics, PeriodicTable, PhysicsConsciousnessBridge, StandardModel,
 };
-use symthaea_core::physics::chemistry::{Chemistry, BondType};
 
 fn main() {
     println!("\n");
@@ -62,8 +61,14 @@ fn main() {
     let positron = model.antiparticle(&model.electron);
     let double = model.antiparticle(&positron);
     println!("Antiparticle Transform:");
-    println!("  Electron → Positron similarity: {:.4}", model.electron.similarity(&positron));
-    println!("  Positron → Electron similarity: {:.4} (recovered!)", model.electron.similarity(&double));
+    println!(
+        "  Electron → Positron similarity: {:.4}",
+        model.electron.similarity(&positron)
+    );
+    println!(
+        "  Positron → Electron similarity: {:.4} (recovered!)",
+        model.electron.similarity(&double)
+    );
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("LAYER 2: HADRONS");
@@ -78,12 +83,18 @@ fn main() {
 
     let p_n_sim = hadrons.proton.similarity(&hadrons.neutron);
     println!("Nucleon Relationship:");
-    println!("  Proton ↔ Neutron: {:.4} (siblings, differ by one quark)", p_n_sim);
+    println!(
+        "  Proton ↔ Neutron: {:.4} (siblings, differ by one quark)",
+        p_n_sim
+    );
 
     // Meson composition
     let pion_plus_minus = hadrons.pion_plus.similarity(&hadrons.pion_minus);
     println!("\nMeson Structure:");
-    println!("  π+ (Up·anti-Down) ↔ π- (Down·anti-Up): {:.4}", pion_plus_minus);
+    println!(
+        "  π+ (Up·anti-Down) ↔ π- (Down·anti-Up): {:.4}",
+        pion_plus_minus
+    );
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("LAYER 3: ELEMENTS");
@@ -109,8 +120,14 @@ fn main() {
     let cl_minus = table.ion(17, -1, &hadrons);
 
     println!("Ion Formation:");
-    println!("  Na ↔ Na⁺: {:.4} (lost 1 electron)", na.vector.similarity(&na_plus));
-    println!("  Cl ↔ Cl⁻: {:.4} (gained 1 electron)", cl.vector.similarity(&cl_minus));
+    println!(
+        "  Na ↔ Na⁺: {:.4} (lost 1 electron)",
+        na.vector.similarity(&na_plus)
+    );
+    println!(
+        "  Cl ↔ Cl⁻: {:.4} (gained 1 electron)",
+        cl.vector.similarity(&cl_minus)
+    );
 
     // Noble gas family
     let he = table.element(2).unwrap();
@@ -121,7 +138,10 @@ fn main() {
     println!("\nNoble Gas Family (Group 18):");
     println!("  He ↔ Ne: {:.4}", he.vector.similarity(&ne.vector));
     println!("  He ↔ Ar: {:.4}", he.vector.similarity(&ar.vector));
-    println!("  He ↔ Li: {:.4} (non-noble for comparison)", he.vector.similarity(&li.vector));
+    println!(
+        "  He ↔ Li: {:.4} (non-noble for comparison)",
+        he.vector.similarity(&li.vector)
+    );
     println!("  → Noble gases share 'full shell' character\n");
 
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -139,8 +159,14 @@ fn main() {
     println!("  H₂O = Bundle(2×H, 1×O) ⊗ covalent_bond\n");
 
     println!("Water Analysis:");
-    println!("  H₂O ↔ H: {:.4} (contains hydrogen)", water.vector.similarity(&h.vector));
-    println!("  H₂O ↔ O: {:.4} (contains oxygen)", water.vector.similarity(&o.vector));
+    println!(
+        "  H₂O ↔ H: {:.4} (contains hydrogen)",
+        water.vector.similarity(&h.vector)
+    );
+    println!(
+        "  H₂O ↔ O: {:.4} (contains oxygen)",
+        water.vector.similarity(&o.vector)
+    );
 
     // Salt formation (ionic) - using compose_molecule
     let salt = chemistry.compose_molecule(
@@ -167,7 +193,10 @@ fn main() {
     );
 
     println!("\nGlucose (C₆H₁₂O₆) - Organic:");
-    println!("  Glucose ↔ Carbon: {:.4}", glucose.vector.similarity(&c12.vector));
+    println!(
+        "  Glucose ↔ Carbon: {:.4}",
+        glucose.vector.similarity(&c12.vector)
+    );
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("NUCLEAR PHYSICS");
@@ -196,20 +225,38 @@ fn main() {
     println!("  U-235 → Ba + Kr: Q = {:.1} MeV (fission)", fission_q);
 
     println!("\nEnergy Scale Comparison:");
-    println!("  Chemical (1 eV):     {:.0}× baseline", EnergyScale::Chemical.density_ratio());
-    println!("  Isomeric (100 keV):  {:.0}× baseline", EnergyScale::Isomeric.density_ratio());
-    println!("  Nuclear (1 MeV):     {:.0}× baseline", EnergyScale::Nuclear.density_ratio());
-    println!("  Relativistic (1 GeV): {:.0}× baseline", EnergyScale::Relativistic.density_ratio());
+    println!(
+        "  Chemical (1 eV):     {:.0}× baseline",
+        EnergyScale::Chemical.density_ratio()
+    );
+    println!(
+        "  Isomeric (100 keV):  {:.0}× baseline",
+        EnergyScale::Isomeric.density_ratio()
+    );
+    println!(
+        "  Nuclear (1 MeV):     {:.0}× baseline",
+        EnergyScale::Nuclear.density_ratio()
+    );
+    println!(
+        "  Relativistic (1 GeV): {:.0}× baseline",
+        EnergyScale::Relativistic.density_ratio()
+    );
 
     // Nuclear isomers
     println!("\nNuclear Isomers (metastable excited states):");
     if let Some(hf) = nuclear.get_isomer(72, 178) {
-        println!("  Hf-178m2: {:.0} keV excitation, {:.1} year half-life",
-                 hf.excitation_kev, hf.half_life_s.unwrap() / (365.25 * 24.0 * 3600.0));
+        println!(
+            "  Hf-178m2: {:.0} keV excitation, {:.1} year half-life",
+            hf.excitation_kev,
+            hf.half_life_s.unwrap() / (365.25 * 24.0 * 3600.0)
+        );
     }
     if let Some(tc) = nuclear.get_isomer(43, 99) {
-        println!("  Tc-99m:   {:.0} keV excitation, {:.1} hour half-life (medical imaging)",
-                 tc.excitation_kev, tc.half_life_s.unwrap() / 3600.0);
+        println!(
+            "  Tc-99m:   {:.0} keV excitation, {:.1} hour half-life (medical imaging)",
+            tc.excitation_kev,
+            tc.half_life_s.unwrap() / 3600.0
+        );
     }
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -235,7 +282,10 @@ fn main() {
     println!("  Level 1 (Hadrons):   {:+.4}", analysis.level_1_hadrons);
     println!("  Level 2 (Atoms):     {:+.4}", analysis.level_2_atoms);
     println!("  Level 3 (Molecules): {:+.4}", analysis.level_3_molecules);
-    println!("  Emergence gradient:  {:+.4}/level", analysis.emergence_gradient());
+    println!(
+        "  Emergence gradient:  {:+.4}/level",
+        analysis.emergence_gradient()
+    );
 
     // Embodied qualia test
     let embodied = bridge.embody_qualia(&model.electron);
@@ -259,7 +309,10 @@ fn main() {
     let c2 = table2.element(6).unwrap();
 
     println!("Same Seed Test:");
-    println!("  Carbon (universe 1) ↔ Carbon (universe 2): {:.6}", c1.vector.similarity(&c2.vector));
+    println!(
+        "  Carbon (universe 1) ↔ Carbon (universe 2): {:.6}",
+        c1.vector.similarity(&c2.vector)
+    );
     println!("  → Identical universes from same genesis!\n");
 
     // Different seed comparison
@@ -270,7 +323,10 @@ fn main() {
     let c3 = table3.element(6).unwrap();
 
     println!("Different Seed Test:");
-    println!("  Carbon (E=mc²) ↔ Carbon (Quantum Universe): {:.4}", c1.vector.similarity(&c3.vector));
+    println!(
+        "  Carbon (E=mc²) ↔ Carbon (Quantum Universe): {:.4}",
+        c1.vector.similarity(&c3.vector)
+    );
     println!("  → Different universes have different physics!\n");
 
     println!("================================================================");

@@ -11,11 +11,11 @@
 //! The hypothesis is that adding explicit cycle detection will improve
 //! periodic pattern recognition from ~50% to 80%+ accuracy.
 
-use symthaea::hdc::cycle_detector::CycleAwareLtcRecognizer;
+use std::collections::VecDeque;
 use symthaea::hdc::cincinnati_ltc::CincinnatiLtcEngine;
+use symthaea::hdc::cycle_detector::CycleAwareLtcRecognizer;
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
-use std::collections::VecDeque;
 
 /// Pattern generator trait
 trait PatternGenerator {
@@ -41,7 +41,11 @@ impl PeriodicPattern {
                 x % 2 == 0
             })
             .collect();
-        Self { period, step: 0, pattern }
+        Self {
+            period,
+            step: 0,
+            pattern,
+        }
     }
 }
 
@@ -69,7 +73,10 @@ struct SquareWavePattern {
 
 impl SquareWavePattern {
     fn new(half_period: usize) -> Self {
-        Self { half_period, step: 0 }
+        Self {
+            half_period,
+            step: 0,
+        }
     }
 }
 
@@ -127,7 +134,11 @@ struct LogisticMapPattern {
 
 impl LogisticMapPattern {
     fn new(r: f64) -> Self {
-        Self { r, x: 0.1, threshold: 0.5 }
+        Self {
+            r,
+            x: 0.1,
+            threshold: 0.5,
+        }
     }
 }
 
@@ -189,7 +200,10 @@ fn run_comparison_experiment(
     let sequence = generate_sequence();
 
     println!("\n{}", "=".repeat(70));
-    println!("Pattern: {} (expected period: {:?})", pattern_name, expected_period);
+    println!(
+        "Pattern: {} (expected period: {:?})",
+        pattern_name, expected_period
+    );
     println!("{}", "=".repeat(70));
 
     // Test 1: Base Cincinnati-LTC (without cycle detection)
@@ -209,12 +223,18 @@ fn run_comparison_experiment(
 
     println!("\n  Results:");
     println!("    Base Cincinnati-LTC:     {:.1}%", base_accuracy * 100.0);
-    println!("    Cycle-Aware LTC:         {:.1}%", cycle_aware_accuracy * 100.0);
+    println!(
+        "    Cycle-Aware LTC:         {:.1}%",
+        cycle_aware_accuracy * 100.0
+    );
     if let Some(period) = detected_period {
         println!("    Detected Period:         {}", period);
     }
-    println!("    Improvement:             {:+.1}% ({:+.1}% relative)",
-             stats.improvement() * 100.0, stats.improvement_pct());
+    println!(
+        "    Improvement:             {:+.1}% ({:+.1}% relative)",
+        stats.improvement() * 100.0,
+        stats.improvement_pct()
+    );
     println!("    Status:                  {}", stats.status());
 
     stats
@@ -405,53 +425,82 @@ fn main() {
         } else {
             format!("{:<27}", stats.name)
         };
-        println!("│ {} │ {:5.1}%   │ {:5.1}%    │ {:+5.1}%      │",
-                 name,
-                 stats.base_accuracy * 100.0,
-                 stats.cycle_aware_accuracy * 100.0,
-                 stats.improvement() * 100.0);
+        println!(
+            "│ {} │ {:5.1}%   │ {:5.1}%    │ {:+5.1}%      │",
+            name,
+            stats.base_accuracy * 100.0,
+            stats.cycle_aware_accuracy * 100.0,
+            stats.improvement() * 100.0
+        );
     }
     println!("└─────────────────────────────┴──────────┴───────────┴─────────────┘");
 
     // Analysis
-    let periodic_results: Vec<_> = results.iter()
+    let periodic_results: Vec<_> = results
+        .iter()
         .filter(|s| s.expected_period.is_some())
         .collect();
-    let chaotic_results: Vec<_> = results.iter()
+    let chaotic_results: Vec<_> = results
+        .iter()
         .filter(|s| s.expected_period.is_none())
         .collect();
 
-    let avg_periodic_base: f64 = periodic_results.iter()
+    let avg_periodic_base: f64 = periodic_results
+        .iter()
         .map(|s| s.base_accuracy)
-        .sum::<f64>() / periodic_results.len() as f64;
-    let avg_periodic_cycle: f64 = periodic_results.iter()
+        .sum::<f64>()
+        / periodic_results.len() as f64;
+    let avg_periodic_cycle: f64 = periodic_results
+        .iter()
         .map(|s| s.cycle_aware_accuracy)
-        .sum::<f64>() / periodic_results.len() as f64;
+        .sum::<f64>()
+        / periodic_results.len() as f64;
 
-    let avg_chaotic_base: f64 = chaotic_results.iter()
-        .map(|s| s.base_accuracy)
-        .sum::<f64>() / chaotic_results.len() as f64;
-    let avg_chaotic_cycle: f64 = chaotic_results.iter()
+    let avg_chaotic_base: f64 =
+        chaotic_results.iter().map(|s| s.base_accuracy).sum::<f64>() / chaotic_results.len() as f64;
+    let avg_chaotic_cycle: f64 = chaotic_results
+        .iter()
         .map(|s| s.cycle_aware_accuracy)
-        .sum::<f64>() / chaotic_results.len() as f64;
+        .sum::<f64>()
+        / chaotic_results.len() as f64;
 
     println!();
     println!("Analysis:");
     println!("  Periodic patterns:");
-    println!("    - Base LTC average:    {:.1}%", avg_periodic_base * 100.0);
-    println!("    - Cycle LTC average:   {:.1}%", avg_periodic_cycle * 100.0);
-    println!("    - Average improvement: {:+.1}%", (avg_periodic_cycle - avg_periodic_base) * 100.0);
+    println!(
+        "    - Base LTC average:    {:.1}%",
+        avg_periodic_base * 100.0
+    );
+    println!(
+        "    - Cycle LTC average:   {:.1}%",
+        avg_periodic_cycle * 100.0
+    );
+    println!(
+        "    - Average improvement: {:+.1}%",
+        (avg_periodic_cycle - avg_periodic_base) * 100.0
+    );
     println!();
     println!("  Chaotic patterns:");
-    println!("    - Base LTC average:    {:.1}%", avg_chaotic_base * 100.0);
-    println!("    - Cycle LTC average:   {:.1}%", avg_chaotic_cycle * 100.0);
-    println!("    - Average improvement: {:+.1}%", (avg_chaotic_cycle - avg_chaotic_base) * 100.0);
+    println!(
+        "    - Base LTC average:    {:.1}%",
+        avg_chaotic_base * 100.0
+    );
+    println!(
+        "    - Cycle LTC average:   {:.1}%",
+        avg_chaotic_cycle * 100.0
+    );
+    println!(
+        "    - Average improvement: {:+.1}%",
+        (avg_chaotic_cycle - avg_chaotic_base) * 100.0
+    );
     println!();
 
     // Verdict
     let periodic_improvement = avg_periodic_cycle - avg_periodic_base;
     if periodic_improvement > 0.10 {
-        println!("VERDICT: STRONG SUCCESS - Cycle detection significantly improves periodic patterns!");
+        println!(
+            "VERDICT: STRONG SUCCESS - Cycle detection significantly improves periodic patterns!"
+        );
     } else if periodic_improvement > 0.05 {
         println!("VERDICT: MODERATE SUCCESS - Cycle detection helps periodic patterns.");
     } else if periodic_improvement > 0.0 {

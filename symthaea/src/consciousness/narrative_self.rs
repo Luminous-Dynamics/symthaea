@@ -944,7 +944,7 @@ mod tests {
         let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
 
         // Clone the future BinaryHV to avoid borrow conflict
-        let future = model.project_future(3600.0).clone(); // 1 hour ahead
+        let future = *model.project_future(3600.0); // 1 hour ahead
 
         // Future self should be different from current
         let sim = model.autobio.self_concept.similarity(&future);

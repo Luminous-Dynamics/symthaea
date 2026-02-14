@@ -4,23 +4,23 @@
 //! Sub-modules produce [`NixOSCommand`] values; the executor checks Φ
 //! thresholds, handles rollback, and records outcomes for episodic memory.
 
-pub mod executor;
-pub mod phi_gate;
 pub mod config_writer;
+pub mod executor;
 pub mod flake_ops;
-pub mod service_manager;
-pub mod generation_manager;
 pub mod gc_manager;
+pub mod generation_manager;
+pub mod phi_gate;
 pub mod plan_executor;
+pub mod service_manager;
 
+pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
 pub use executor::{
-    NixOSCommand, NixOSExecutor, ExecutionResult, ExecutionRecord,
-    SafetyLevel, ChannelOperation, FlakeOperation,
+    ChannelOperation, ExecutionRecord, ExecutionResult, FlakeOperation, NixOSCommand,
+    NixOSExecutor, SafetyLevel,
 };
-pub use phi_gate::{get_nixos_rollback, classify_command_destructiveness};
-pub use config_writer::{ConfigWriter, ConfigPatch, WriteResult};
-pub use flake_ops::{FlakeOps, FlakeMetadata, FlakeCheckResult};
+pub use flake_ops::{FlakeCheckResult, FlakeMetadata, FlakeOps};
+pub use gc_manager::{GcAnalysis, GcManager, GcRecommendation};
+pub use generation_manager::{Generation, GenerationDiff, GenerationManager};
+pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
+pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
 pub use service_manager::{ServiceManager, ServiceStatus};
-pub use generation_manager::{GenerationManager, Generation, GenerationDiff};
-pub use gc_manager::{GcManager, GcAnalysis, GcRecommendation};
-pub use plan_executor::{PlanExecutor, PlanStep, PlanExecutionResult, StepStatus};

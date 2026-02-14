@@ -855,7 +855,7 @@ mod tests {
         let _ = bridge.step(&input, 0.02);
 
         let diversity = bridge.state_diversity();
-        assert!(diversity >= 0.0 && diversity <= 1.0);
+        assert!((0.0..=1.0).contains(&diversity));
     }
 
     #[test]

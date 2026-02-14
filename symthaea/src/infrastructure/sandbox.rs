@@ -701,7 +701,7 @@ mod tests {
         let cleanup = format!("{}", SandboxError::CleanupFailed("x".to_string()));
 
         // All error messages should be unique
-        let messages = vec![&init, &not_allowed, &exec, &disabled, &timeout, &cleanup];
+        let messages = [&init, &not_allowed, &exec, &disabled, &timeout, &cleanup];
         for (i, a) in messages.iter().enumerate() {
             for (j, b) in messages.iter().enumerate() {
                 if i != j {

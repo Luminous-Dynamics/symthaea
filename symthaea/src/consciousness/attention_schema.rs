@@ -1032,7 +1032,7 @@ mod tests {
         let mut schema = AttentionSchema::new();
         let target = BinaryHV::random(42);
 
-        let update = schema.update(target.clone(), 0.8);
+        let update = schema.update(target, 0.8);
 
         // High salience should be captured
         assert!(update.new_intensity > 0.5);
@@ -1060,8 +1060,8 @@ mod tests {
 
         // Same target twice
         let target = BinaryHV::random(42);
-        schema.update(target.clone(), 0.7);
-        let update = schema.update(target.clone(), 0.7);
+        schema.update(target, 0.7);
+        let update = schema.update(target, 0.7);
 
         // Should not be a shift
         assert!(!update.is_shift);
@@ -1085,10 +1085,10 @@ mod tests {
 
         // Focus on a target
         let focus = BinaryHV::random(42);
-        schema.update(focus.clone(), 0.9);
+        schema.update(focus, 0.9);
 
         // Similar content should get positive bias
-        let similar = focus.clone();
+        let similar = focus;
         let bias_similar = schema.get_competition_bias(&similar);
 
         // Different content should get negative or low bias

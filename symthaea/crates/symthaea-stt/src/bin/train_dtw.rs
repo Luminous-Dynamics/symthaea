@@ -26,10 +26,8 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use symthaea_stt::{
-    AudioFrontend, AudioProjector,
-    CmuDictionary, TextToPhonemes,
-    TrainedPrototypes, BootstrapConfig,
-    HV16, DtwTrainer,
+    AudioFrontend, AudioProjector, BootstrapConfig, CmuDictionary, DtwTrainer, TextToPhonemes,
+    TrainedPrototypes, HV16,
 };
 
 #[derive(Parser)]
@@ -80,18 +78,36 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("          DTW-ALIGNED PROTOTYPE TRAINING                   ").bold().cyan());
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("          DTW-ALIGNED PROTOTYPE TRAINING                   ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
     println!();
     println!("  Uses Dynamic Time Warping for precise frame-phoneme alignment");
-    println!("  Iterations: {} (1=uniform, 2+=DTW refinement)", cli.iterations);
+    println!(
+        "  Iterations: {} (1=uniform, 2+=DTW refinement)",
+        cli.iterations
+    );
     println!();
 
     // Check paths
     let subset_path = cli.data_dir.join("LibriSpeech").join(&cli.subset);
     if !subset_path.exists() {
-        eprintln!("{} Subset not found: {:?}", style("ERROR:").red().bold(), subset_path);
+        eprintln!(
+            "{} Subset not found: {:?}",
+            style("ERROR:").red().bold(),
+            subset_path
+        );
         std::process::exit(1);
     }
 
@@ -105,7 +121,11 @@ fn main() {
             match CmuDictionary::load(&alt_path) {
                 Ok(d) => d,
                 Err(_) => {
-                    eprintln!("{} Failed to load dictionary: {}", style("ERROR:").red().bold(), e);
+                    eprintln!(
+                        "{} Failed to load dictionary: {}",
+                        style("ERROR:").red().bold(),
+                        e
+                    );
                     std::process::exit(1);
                 }
             }
@@ -122,7 +142,11 @@ fn main() {
     } else {
         utterances.len()
     };
-    println!("  ✓ Found {} utterances, will process {}", utterances.len(), total);
+    println!(
+        "  ✓ Found {} utterances, will process {}",
+        utterances.len(),
+        total
+    );
 
     // Create audio projector
     let mut projector = AudioProjector::default_config();
@@ -131,13 +155,16 @@ fn main() {
     let mut prototypes: HashMap<String, HV16> = HashMap::new();
 
     for iteration in 0..cli.iterations {
-        println!("\n{}", style(format!("══════════════ ITERATION {} ══════════════", iteration + 1)).yellow());
+        println!(
+            "\n{}",
+            style(format!(
+                "══════════════ ITERATION {} ══════════════",
+                iteration + 1
+            ))
+            .yellow()
+        );
 
-        let alignment_type = if iteration == 0 {
-            "uniform"
-        } else {
-            "DTW"
-        };
+        let alignment_type = if iteration == 0 { "uniform" } else { "DTW" };
         println!("  Alignment: {}", alignment_type);
         println!("  Prototypes: {}", prototypes.len());
 
@@ -150,10 +177,12 @@ fn main() {
 
         // Progress bar
         let pb = ProgressBar::new(total as u64);
-        pb.set_style(ProgressStyle::default_bar()
-            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-            .unwrap()
-            .progress_chars("#>-"));
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+                .unwrap()
+                .progress_chars("#>-"),
+        );
 
         let mut total_frames = 0usize;
         let mut total_phonemes = 0usize;
@@ -206,12 +235,19 @@ fn main() {
 
         // Finalize this iteration
         prototypes = trainer.finalize(cli.min_instances);
-        println!("    Phonemes with ≥{} instances: {}", cli.min_instances, prototypes.len());
+        println!(
+            "    Phonemes with ≥{} instances: {}",
+            cli.min_instances,
+            prototypes.len()
+        );
     }
 
     // Apply contrastive separation
     if cli.min_separation > 0.0 {
-        println!("\n🔧 Applying contrastive separation (target: <{})...", cli.min_separation);
+        println!(
+            "\n🔧 Applying contrastive separation (target: <{})...",
+            cli.min_separation
+        );
 
         let mut trained = TrainedPrototypes {
             prototypes: prototypes.clone(),
@@ -246,9 +282,20 @@ fn main() {
 
     println!("  ✓ Saved {} phonemes", trained.len());
 
-    println!("\n{}", style("═══════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("                    TRAINING COMPLETE                       ").bold().green());
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
+    println!(
+        "\n{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("                    TRAINING COMPLETE                       ")
+            .bold()
+            .green()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
     println!("\n  Next: stt-eval --prototypes {:?}", cli.output);
 }
 
@@ -282,7 +329,8 @@ fn scan_librispeech(path: &Path) -> Vec<(PathBuf, String)> {
                                     for line in reader.lines().filter_map(|l| l.ok()) {
                                         let parts: Vec<&str> = line.splitn(2, ' ').collect();
                                         if parts.len() == 2 {
-                                            let audio_file = chapter_entry.path()
+                                            let audio_file = chapter_entry
+                                                .path()
                                                 .join(format!("{}.flac", parts[0]));
                                             utterances.push((audio_file, parts[1].to_string()));
                                         }

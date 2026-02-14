@@ -289,7 +289,15 @@ mod tests {
 
     #[test]
     fn test_parse_generations_diff() {
-        let cli = Cli::parse_from(["nix-mind", "generations", "--diff", "--from", "42", "--to", "43"]);
+        let cli = Cli::parse_from([
+            "nix-mind",
+            "generations",
+            "--diff",
+            "--from",
+            "42",
+            "--to",
+            "43",
+        ]);
         if let Some(Command::Generations { diff, from, to, .. }) = cli.command {
             assert!(diff);
             assert_eq!(from, Some(42));
@@ -302,7 +310,10 @@ mod tests {
     #[test]
     fn test_parse_service_restart() {
         let cli = Cli::parse_from(["nix-mind", "service", "restart", "nginx"]);
-        if let Some(Command::Service { op: ServiceCommand::Restart { name } }) = cli.command {
+        if let Some(Command::Service {
+            op: ServiceCommand::Restart { name },
+        }) = cli.command
+        {
             assert_eq!(name, "nginx");
         } else {
             panic!("Expected Service Restart command");

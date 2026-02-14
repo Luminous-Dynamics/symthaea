@@ -22,11 +22,8 @@ use ratatui::{
 };
 
 use super::widgets::{
-    ConsciousnessGauge, ConsciousnessState,
-    SystemHealth, HealthSnapshot,
-    GenerationTimeline, TimelineEntry,
-    WorldModelView, WorldModelSnapshot,
-    CausalExplorer, CausalLink,
+    CausalExplorer, CausalLink, ConsciousnessGauge, ConsciousnessState, GenerationTimeline,
+    HealthSnapshot, SystemHealth, TimelineEntry, WorldModelSnapshot, WorldModelView,
 };
 use crate::ipc::{self, DaemonSnapshot};
 use crate::mind::active_inference::NixActiveInference;
@@ -208,7 +205,11 @@ impl App {
             learned_actions: self.engine.world_model().learned_action_count(),
             total_observations: self.engine.world_model().total_observations(),
             is_surprised: hierarchy.is_surprised(),
-            memory_items: self.engine.goal_inference().working_memory().items()
+            memory_items: self
+                .engine
+                .goal_inference()
+                .working_memory()
+                .items()
                 .iter()
                 .map(|item| (item.label.clone(), item.activation))
                 .collect(),
@@ -221,7 +222,8 @@ impl App {
         self.output.push(format!("Goal: {}", plan.goal.description));
 
         if plan.needs_clarification {
-            self.output.push("Needs clarification - please be more specific.".into());
+            self.output
+                .push("Needs clarification - please be more specific.".into());
         } else if let Some(best) = plan.actions.first() {
             self.output.push(format!(
                 "Best: {:?} (EFE={:.3}, pragmatic={:.2}, epistemic={:.2})",
@@ -260,19 +262,25 @@ impl App {
             learned_actions: snap.causal_edge_count,
             total_observations: snap.observation_count as usize,
             is_surprised: snap.is_surprised,
-            memory_items: snap.concerns.iter()
+            memory_items: snap
+                .concerns
+                .iter()
                 .map(|c| (c.label.clone(), c.activation))
                 .collect(),
             ..Default::default()
         };
 
         // Causal links — show recent anomalies as causal concerns
-        self.causal_links = snap.recent_anomalies.iter().map(|a| CausalLink {
-            from: a.unit.clone(),
-            to: a.reason.clone(),
-            confidence: a.score,
-            relationship: "anomaly".to_string(),
-        }).collect();
+        self.causal_links = snap
+            .recent_anomalies
+            .iter()
+            .map(|a| CausalLink {
+                from: a.unit.clone(),
+                to: a.reason.clone(),
+                confidence: a.score,
+                relationship: "anomaly".to_string(),
+            })
+            .collect();
 
         // Health: merge daemon stats with direct service queries
         self.health.services_failed = snap.anomaly_count as usize;
@@ -283,8 +291,10 @@ impl App {
     fn refresh_data_direct(&mut self) {
         if let Ok(units) = crate::observe::systemd::SystemdObserver::list_units() {
             self.health.services_total = units.len();
-            self.health.services_running = units.iter().filter(|u| u.active_state == "active").count();
-            self.health.services_failed = units.iter().filter(|u| u.active_state == "failed").count();
+            self.health.services_running =
+                units.iter().filter(|u| u.active_state == "active").count();
+            self.health.services_failed =
+                units.iter().filter(|u| u.active_state == "failed").count();
         }
         self.refresh_generations();
     }
@@ -294,11 +304,14 @@ impl App {
         if let Ok(gens) = crate::action::generation_manager::GenerationManager::list() {
             self.health.total_generations = gens.len();
             self.health.current_generation = gens.iter().find(|g| g.current).map(|g| g.number);
-            self.generations = gens.iter().map(|g| TimelineEntry {
-                number: g.number,
-                date: g.date.clone(),
-                current: g.current,
-            }).collect();
+            self.generations = gens
+                .iter()
+                .map(|g| TimelineEntry {
+                    number: g.number,
+                    date: g.date.clone(),
+                    current: g.current,
+                })
+                .collect();
         }
     }
 
@@ -309,19 +322,13 @@ impl App {
         // Main layout: top (panels) + bottom (input/output)
         let main_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(10),
-                Constraint::Length(6),
-            ])
+            .constraints([Constraint::Min(10), Constraint::Length(6)])
             .split(size);
 
         // Top: left column (consciousness + health) + right column (world model + causal)
         let top_chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Percentage(40),
-                Constraint::Percentage(60),
-            ])
+            .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
             .split(main_chunks[0]);
 
         // Left column
@@ -361,10 +368,7 @@ impl App {
         // Right column
         let right_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(50),
-                Constraint::Percentage(50),
-            ])
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(top_chunks[1]);
 
         // World model
@@ -388,31 +392,36 @@ impl App {
         // Bottom: input + output
         let bottom_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),
-                Constraint::Min(1),
-            ])
+            .constraints([Constraint::Length(3), Constraint::Min(1)])
             .split(main_chunks[1]);
 
         // Input — show daemon connection status
         let daemon_status = match &self.daemon_snapshot {
-            Some(snap) => format!(" [daemon pid {} | {} obs | {} anomalies]",
-                snap.daemon_pid, snap.observation_count, snap.anomaly_count),
+            Some(snap) => format!(
+                " [daemon pid {} | {} obs | {} anomalies]",
+                snap.daemon_pid, snap.observation_count, snap.anomaly_count
+            ),
             None => " [daemon offline]".to_string(),
         };
         let input_block = Block::default()
             .title(format!(" Input (Tab/Esc){} ", daemon_status))
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Input));
-        let cursor = if self.focus == FocusPanel::Input { "_" } else { "" };
+        let cursor = if self.focus == FocusPanel::Input {
+            "_"
+        } else {
+            ""
+        };
         let input_text = format!("{}{}", self.input, cursor);
         let input_widget = Paragraph::new(input_text).block(input_block);
         frame.render_widget(input_widget, bottom_chunks[0]);
 
         // Output
-        let output_lines: Vec<Line> = self.output.iter().map(|s| {
-            Line::from(Span::raw(s.as_str()))
-        }).collect();
+        let output_lines: Vec<Line> = self
+            .output
+            .iter()
+            .map(|s| Line::from(Span::raw(s.as_str())))
+            .collect();
         let output_block = Block::default().borders(Borders::ALL).title(" Output ");
         let output_widget = Paragraph::new(output_lines).block(output_block);
         frame.render_widget(output_widget, bottom_chunks[1]);
@@ -421,7 +430,9 @@ impl App {
     /// Get border style based on focus.
     fn border_style(&self, panel: FocusPanel) -> Style {
         if self.focus == panel {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
         }

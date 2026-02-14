@@ -3,9 +3,9 @@
 //! Demonstrates how hierarchical clustering solves the bundling saturation problem
 //! when training on large vocabularies (CMU Dict has 135K words).
 
+use std::path::Path;
 use symthaea_stt::hierarchical_scorer::HierarchicalScorer;
 use symthaea_stt::lexicon::CmuDictionary;
-use std::path::Path;
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
@@ -45,13 +45,20 @@ fn main() {
     println!();
 
     // Sample words from different categories
-    let stop_words = ["CAT", "DOG", "BIT", "TOP", "CUP", "BAD", "KID", "PIG", "TAP", "DIP"];
+    let stop_words = [
+        "CAT", "DOG", "BIT", "TOP", "CUP", "BAD", "KID", "PIG", "TAP", "DIP",
+    ];
     let fricative_words = ["SEE", "ZOO", "FISH", "THE", "SHOE", "VISION", "SAFE", "VAN"];
     let nasal_words = ["MAN", "NO", "SING", "NAME", "MOON", "NINE", "AMONG"];
     let vowel_words = ["EAT", "OAT", "ATE", "OUT", "OWL", "EYE", "AWE"];
 
     // Function to train on word category
-    fn train_category(scorer: &mut HierarchicalScorer, dict: &CmuDictionary, words: &[&str], cat_name: &str) -> usize {
+    fn train_category(
+        scorer: &mut HierarchicalScorer,
+        dict: &CmuDictionary,
+        words: &[&str],
+        cat_name: &str,
+    ) -> usize {
         let mut trained = 0;
         for word in words {
             if let Some(entry) = dict.get(&word.to_uppercase()) {
@@ -77,12 +84,12 @@ fn main() {
     } else {
         // Use hardcoded phoneme sequences if no dict
         let patterns: Vec<Vec<&str>> = vec![
-            vec!["K", "AE", "T"],      // cat
-            vec!["D", "AO", "G"],      // dog
-            vec!["S", "IY"],           // see
-            vec!["M", "AE", "N"],      // man
-            vec!["N", "OW"],           // no
-            vec!["IY", "T"],           // eat
+            vec!["K", "AE", "T"], // cat
+            vec!["D", "AO", "G"], // dog
+            vec!["S", "IY"],      // see
+            vec!["M", "AE", "N"], // man
+            vec!["N", "OW"],      // no
+            vec!["IY", "T"],      // eat
         ];
 
         for pattern in &patterns {
@@ -99,11 +106,26 @@ fn main() {
     println!();
     println!("  Training Statistics:");
     println!("    Total patterns:           {}", stats.total_patterns);
-    println!("    Active Manner clusters:   {} / 7", stats.active_manner_clusters);
-    println!("    Active M×P clusters:      {} / 70", stats.active_mp_clusters);
-    println!("    Avg patterns/Manner:      {:.1}", stats.avg_patterns_per_manner);
-    println!("    Avg patterns/M×P:         {:.1}", stats.avg_patterns_per_mp);
-    println!("    Avg Manner memory density: {:.3}", stats.avg_manner_density);
+    println!(
+        "    Active Manner clusters:   {} / 7",
+        stats.active_manner_clusters
+    );
+    println!(
+        "    Active M×P clusters:      {} / 70",
+        stats.active_mp_clusters
+    );
+    println!(
+        "    Avg patterns/Manner:      {:.1}",
+        stats.avg_patterns_per_manner
+    );
+    println!(
+        "    Avg patterns/M×P:         {:.1}",
+        stats.avg_patterns_per_mp
+    );
+    println!(
+        "    Avg Manner memory density: {:.3}",
+        stats.avg_manner_density
+    );
     println!();
 
     // Test discrimination at different levels
@@ -113,9 +135,9 @@ fn main() {
     println!();
 
     // Test patterns
-    let trained_cvc = vec!["K", "AE", "T"];  // cat - trained
-    let similar_cvc = vec!["G", "AH", "T"];  // gut - similar structure
-    let different = vec!["S", "IY", "Z"];    // seize - different manner
+    let trained_cvc = vec!["K", "AE", "T"]; // cat - trained
+    let similar_cvc = vec!["G", "AH", "T"]; // gut - similar structure
+    let different = vec!["S", "IY", "Z"]; // seize - different manner
 
     // Level 2 (Manner×Place - finest granularity)
     scorer.set_level(2);
@@ -126,7 +148,10 @@ fn main() {
     println!("    'CAT' (trained):  {:.4}", l2_trained);
     println!("    'GUT' (similar):  {:.4}", l2_similar);
     println!("    'SEIZE' (diff):   {:.4}", l2_different);
-    println!("    Discrimination (CAT vs SEIZE): {:+.4}", l2_trained - l2_different);
+    println!(
+        "    Discrimination (CAT vs SEIZE): {:+.4}",
+        l2_trained - l2_different
+    );
     println!();
 
     // Level 1 (Manner only - coarser)
@@ -138,7 +163,10 @@ fn main() {
     println!("    'CAT' (trained):  {:.4}", l1_trained);
     println!("    'GUT' (similar):  {:.4}", l1_similar);
     println!("    'SEIZE' (diff):   {:.4}", l1_different);
-    println!("    Discrimination (CAT vs SEIZE): {:+.4}", l1_trained - l1_different);
+    println!(
+        "    Discrimination (CAT vs SEIZE): {:+.4}",
+        l1_trained - l1_different
+    );
     println!();
 
     // Cross-manner discrimination test
@@ -151,10 +179,10 @@ fn main() {
 
     // Train heavily on stop patterns
     let stop_patterns: Vec<Vec<&str>> = vec![
-        vec!["P", "IH", "T"],  // pit
-        vec!["B", "AE", "T"],  // bat
-        vec!["T", "AO", "P"],  // top
-        vec!["K", "AE", "P"],  // cap
+        vec!["P", "IH", "T"], // pit
+        vec!["B", "AE", "T"], // bat
+        vec!["T", "AO", "P"], // top
+        vec!["K", "AE", "P"], // cap
     ];
 
     for pattern in &stop_patterns {
@@ -166,8 +194,8 @@ fn main() {
     println!();
 
     // Test: stop pattern vs fricative pattern
-    let test_stop = vec!["D", "IH", "G"];  // dig (stop-vowel-stop)
-    let test_fric = vec!["S", "AE", "D"];  // sad (fricative-vowel-stop)
+    let test_stop = vec!["D", "IH", "G"]; // dig (stop-vowel-stop)
+    let test_fric = vec!["S", "AE", "D"]; // sad (fricative-vowel-stop)
 
     let stop_score = scorer.score_sequence(&test_stop);
     let fric_score = scorer.score_sequence(&test_fric);
@@ -199,10 +227,16 @@ fn main() {
 
     println!("  With Hierarchical Clustering:");
     println!("    Patterns per cluster:     {:.1}", patterns_per_cluster);
-    println!("    Memory density:           {:.3}", stats.avg_manner_density);
+    println!(
+        "    Memory density:           {:.3}",
+        stats.avg_manner_density
+    );
     println!();
     println!("  Without Clustering (single memory):");
-    println!("    All patterns bundled:     {:.0}", theoretical_single_memory);
+    println!(
+        "    All patterns bundled:     {:.0}",
+        theoretical_single_memory
+    );
     println!("    Expected density:         ~0.500 (saturated)");
     println!();
 

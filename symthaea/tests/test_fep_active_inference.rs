@@ -105,7 +105,7 @@ fn test_belief_updating() {
     // New belief = old belief + learning_rate * gradient
 
     let mut belief = vec![0.5, 0.5, 0.5, 0.5];
-    let observation = vec![0.7, 0.6, 0.8, 0.5];
+    let observation = [0.7, 0.6, 0.8, 0.5];
     let learning_rate = 0.1;
 
     // Compute prediction error
@@ -175,12 +175,10 @@ fn test_generative_model() {
 
     // Simple linear generative model: o = W * s
     let state = vec![0.7, 0.6, 0.8, 0.5];
-    let weights = vec![
-        vec![0.8, 0.1, 0.05, 0.05],
+    let weights = [vec![0.8, 0.1, 0.05, 0.05],
         vec![0.1, 0.8, 0.05, 0.05],
         vec![0.05, 0.1, 0.8, 0.05],
-        vec![0.05, 0.05, 0.1, 0.8],
-    ];
+        vec![0.05, 0.05, 0.1, 0.8]];
 
     // Predict observation
     let mut predicted: Vec<f64> = vec![0.0; 4];
@@ -205,8 +203,8 @@ fn test_loop_convergence() {
     // Active inference should reduce free energy over time
     // when presented with consistent observations
 
-    let mut belief = vec![0.5, 0.5, 0.5, 0.5];
-    let observation = vec![0.7, 0.6, 0.8, 0.5];
+    let mut belief = [0.5, 0.5, 0.5, 0.5];
+    let observation = [0.7, 0.6, 0.8, 0.5];
     let learning_rate = 0.15;
     let prior_mean = 0.5;
     let prior_precision = 1.0;

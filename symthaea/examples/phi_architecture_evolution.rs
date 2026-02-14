@@ -25,9 +25,8 @@
 //! ```
 
 use symthaea::consciousness::phi_architecture_search::{
-    PhiArchitectureSearch, SearchConfig, SearchStrategy,
-    ArchitectureGenome, DecodedArchitecture, PhiGradient,
-    TopologyGene,
+    ArchitectureGenome, DecodedArchitecture, PhiArchitectureSearch, PhiGradient, SearchConfig,
+    SearchStrategy, TopologyGene,
 };
 
 fn main() {
@@ -111,11 +110,26 @@ fn main() {
     let gradient = PhiGradient::compute(&genome, 0.02);
     println!("\nPhi Gradient Components:");
     println!("  dPhi/d(connection_density) = {:+.4}", gradient.d_density);
-    println!("  dPhi/d(modularity)         = {:+.4}", gradient.d_modularity);
-    println!("  dPhi/d(bridge_ratio)       = {:+.4}", gradient.d_bridge_ratio);
-    println!("  dPhi/d(tau_ratio)          = {:+.4}", gradient.d_tau_ratio);
-    println!("  dPhi/d(binding_strength)   = {:+.4}", gradient.d_binding_strength);
-    println!("  dPhi/d(recurrence)         = {:+.4}", gradient.d_recurrence);
+    println!(
+        "  dPhi/d(modularity)         = {:+.4}",
+        gradient.d_modularity
+    );
+    println!(
+        "  dPhi/d(bridge_ratio)       = {:+.4}",
+        gradient.d_bridge_ratio
+    );
+    println!(
+        "  dPhi/d(tau_ratio)          = {:+.4}",
+        gradient.d_tau_ratio
+    );
+    println!(
+        "  dPhi/d(binding_strength)   = {:+.4}",
+        gradient.d_binding_strength
+    );
+    println!(
+        "  dPhi/d(recurrence)         = {:+.4}",
+        gradient.d_recurrence
+    );
     println!("  Gradient magnitude         = {:.4}", gradient.magnitude);
 
     println!("\nInterpretation:");
@@ -163,34 +177,61 @@ fn main() {
     println!("Random Search (50 samples)...");
     let mut random_searcher = PhiArchitectureSearch::new(base_config.clone());
     let random_result = random_searcher.search(SearchStrategy::Random, 0);
-    println!("  Best Phi: {:.4} ({} evaluations)", random_result.best_phi, random_result.evaluations);
+    println!(
+        "  Best Phi: {:.4} ({} evaluations)",
+        random_result.best_phi, random_result.evaluations
+    );
 
     // Evolutionary Search
     println!("\nEvolutionary Search (20 generations)...");
     let mut evo_searcher = PhiArchitectureSearch::new(base_config.clone());
     let evo_result = evo_searcher.search(SearchStrategy::Evolutionary, 20);
-    println!("  Best Phi: {:.4} ({} evaluations)", evo_result.best_phi, evo_result.evaluations);
+    println!(
+        "  Best Phi: {:.4} ({} evaluations)",
+        evo_result.best_phi, evo_result.evaluations
+    );
 
     // Gradient-Guided Search
     println!("\nGradient-Guided Search (50 steps)...");
     let mut grad_searcher = PhiArchitectureSearch::new(base_config.clone());
     let grad_result = grad_searcher.search(SearchStrategy::GradientGuided, 50);
-    println!("  Best Phi: {:.4} ({} evaluations)", grad_result.best_phi, grad_result.evaluations);
+    println!(
+        "  Best Phi: {:.4} ({} evaluations)",
+        grad_result.best_phi, grad_result.evaluations
+    );
 
     // Hybrid Search
     println!("\nHybrid Search (15 generations)...");
     let mut hybrid_searcher = PhiArchitectureSearch::new(base_config.clone());
     let hybrid_result = hybrid_searcher.search(SearchStrategy::Hybrid, 15);
-    println!("  Best Phi: {:.4} ({} evaluations)", hybrid_result.best_phi, hybrid_result.evaluations);
+    println!(
+        "  Best Phi: {:.4} ({} evaluations)",
+        hybrid_result.best_phi, hybrid_result.evaluations
+    );
 
     // Summary
     println!("\n--- STRATEGY COMPARISON SUMMARY ---");
-    println!("| {:20} | {:8} | {:12} |", "Strategy", "Best Phi", "Evaluations");
+    println!(
+        "| {:20} | {:8} | {:12} |",
+        "Strategy", "Best Phi", "Evaluations"
+    );
     println!("|{:-<22}|{:-<10}|{:-<14}|", "", "", "");
-    println!("| {:20} | {:.4}   | {:12} |", "Random", random_result.best_phi, random_result.evaluations);
-    println!("| {:20} | {:.4}   | {:12} |", "Evolutionary", evo_result.best_phi, evo_result.evaluations);
-    println!("| {:20} | {:.4}   | {:12} |", "Gradient-Guided", grad_result.best_phi, grad_result.evaluations);
-    println!("| {:20} | {:.4}   | {:12} |", "Hybrid", hybrid_result.best_phi, hybrid_result.evaluations);
+    println!(
+        "| {:20} | {:.4}   | {:12} |",
+        "Random", random_result.best_phi, random_result.evaluations
+    );
+    println!(
+        "| {:20} | {:.4}   | {:12} |",
+        "Evolutionary", evo_result.best_phi, evo_result.evaluations
+    );
+    println!(
+        "| {:20} | {:.4}   | {:12} |",
+        "Gradient-Guided", grad_result.best_phi, grad_result.evaluations
+    );
+    println!(
+        "| {:20} | {:.4}   | {:12} |",
+        "Hybrid", hybrid_result.best_phi, hybrid_result.evaluations
+    );
 
     // =========================================================================
     // Part 4: Architecture Evolution Visualization
@@ -209,7 +250,7 @@ fn main() {
     });
 
     // Run with detailed output
-    full_evo.search(SearchStrategy::Evolutionary, 1);  // Initialize
+    full_evo.search(SearchStrategy::Evolutionary, 1); // Initialize
     println!("Gen  0: Phi = {:.4} (initial)", full_evo.stats().best_phi);
 
     for gen in 1..=30 {
@@ -223,11 +264,7 @@ fn main() {
 
         println!(
             "Gen {:2}: Phi = {:.4} [{}{}] avg = {:.4}",
-            gen,
-            stats.best_phi,
-            bar,
-            empty,
-            stats.avg_phi
+            gen, stats.best_phi, bar, empty, stats.avg_phi
         );
     }
 
@@ -258,7 +295,10 @@ fn main() {
     println!("  Nodes:              {}", best_genome.num_nodes);
     println!("  Hierarchy depth:    {}", best_genome.hierarchy_depth);
     println!("  Topology:           {:?}", best_genome.topology_type);
-    println!("  Connection density: {:.3}", best_genome.connection_density);
+    println!(
+        "  Connection density: {:.3}",
+        best_genome.connection_density
+    );
     println!("  Modularity:         {:.3}", best_genome.modularity);
     println!("  Num modules:        {}", best_genome.num_modules);
     println!("  Bridge ratio:       {:.3}", best_genome.bridge_ratio);
@@ -267,7 +307,10 @@ fn main() {
     println!("  Binding strength:   {:.3}", best_genome.binding_strength);
     println!("  Bundling mode:      {:?}", best_genome.bundling_mode);
     println!("  Recurrence:         {:.3}", best_genome.recurrence);
-    println!("  Skip connections:   {:.3}", best_genome.skip_connection_prob);
+    println!(
+        "  Skip connections:   {:.3}",
+        best_genome.skip_connection_prob
+    );
     println!("  Use attention:      {}", best_genome.use_attention);
 
     let best_arch = DecodedArchitecture::from_genome(best_genome);
@@ -287,7 +330,10 @@ fn main() {
     println!("===================================================================\n");
 
     println!("1. TOPOLOGY MATTERS: Different network structures have vastly different");
-    println!("   Phi values. The search discovered that {:?} topology", best_genome.topology_type);
+    println!(
+        "   Phi values. The search discovered that {:?} topology",
+        best_genome.topology_type
+    );
     println!("   with the evolved parameters achieves high consciousness.\n");
 
     println!("2. GRADIENT-GUIDED SEARCH: The Phi gradient provides directional");

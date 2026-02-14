@@ -5,13 +5,13 @@
 //!
 //! Run with: cargo run --example enhanced_cincinnati_comparison
 
-use symthaea::hdc::cincinnati_ltc::CincinnatiLtcEngine;
+use std::f64::consts::PI;
 use symthaea::hdc::cincinnati_enhanced::{
-    EnhancedCincinnatiEngine, MultiScaleCincinnatiLTC, EnhancedCycleDetector
+    EnhancedCincinnatiEngine, EnhancedCycleDetector, MultiScaleCincinnatiLTC,
 };
+use symthaea::hdc::cincinnati_ltc::CincinnatiLtcEngine;
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
-use std::f64::consts::PI;
 
 // =============================================================================
 // SIGNAL GENERATORS
@@ -20,7 +20,7 @@ use std::f64::consts::PI;
 /// Generate EEG-like alpha rhythm (8-12 Hz)
 fn generate_alpha(sample_rate: f64, duration: f64) -> Vec<f64> {
     let n = (sample_rate * duration) as usize;
-    let freq = 10.0;  // 10 Hz
+    let freq = 10.0; // 10 Hz
     (0..n)
         .map(|i| {
             let t = i as f64 / sample_rate;
@@ -35,7 +35,7 @@ fn generate_alpha(sample_rate: f64, duration: f64) -> Vec<f64> {
 /// Generate EEG-like beta rhythm (12-30 Hz)
 fn generate_beta(sample_rate: f64, duration: f64) -> Vec<f64> {
     let n = (sample_rate * duration) as usize;
-    let freq = 20.0;  // 20 Hz
+    let freq = 20.0; // 20 Hz
     (0..n)
         .map(|i| {
             let t = i as f64 / sample_rate;
@@ -49,7 +49,7 @@ fn generate_beta(sample_rate: f64, duration: f64) -> Vec<f64> {
 /// Generate EEG-like gamma rhythm (30-100 Hz)
 fn generate_gamma(sample_rate: f64, duration: f64) -> Vec<f64> {
     let n = (sample_rate * duration) as usize;
-    let freq = 40.0;  // 40 Hz
+    let freq = 40.0; // 40 Hz
     (0..n)
         .map(|i| {
             let t = i as f64 / sample_rate;
@@ -63,8 +63,8 @@ fn generate_gamma(sample_rate: f64, duration: f64) -> Vec<f64> {
 /// Generate HRV pattern (1.2 Hz base with respiratory modulation)
 fn generate_hrv(sample_rate: f64, duration: f64) -> Vec<f64> {
     let n = (sample_rate * duration) as usize;
-    let base_rate = 1.2;  // 72 bpm
-    let respiratory_mod = 0.15;  // 15% RSA
+    let base_rate = 1.2; // 72 bpm
+    let respiratory_mod = 0.15; // 15% RSA
 
     (0..n)
         .map(|i| {
@@ -86,7 +86,7 @@ fn generate_hrv(sample_rate: f64, duration: f64) -> Vec<f64> {
 /// Generate respiratory pattern (0.25 Hz)
 fn generate_respiratory(sample_rate: f64, duration: f64) -> Vec<f64> {
     let n = (sample_rate * duration) as usize;
-    let breath_rate = 0.25;  // 15 breaths/min
+    let breath_rate = 0.25; // 15 breaths/min
 
     (0..n)
         .map(|i| {
@@ -109,7 +109,13 @@ fn generate_respiratory(sample_rate: f64, duration: f64) -> Vec<f64> {
 fn generate_square_wave(sample_rate: f64, duration: f64, half_period: usize) -> Vec<f64> {
     let n = (sample_rate * duration) as usize;
     (0..n)
-        .map(|i| if (i / half_period) % 2 == 0 { 1.0 } else { -1.0 })
+        .map(|i| {
+            if (i / half_period) % 2 == 0 {
+                1.0
+            } else {
+                -1.0
+            }
+        })
         .collect()
 }
 
@@ -119,7 +125,7 @@ fn generate_logistic(r: f64, length: usize) -> Vec<f64> {
     (0..length)
         .map(|_| {
             x = r * x * (1.0 - x);
-            (x - 0.5) * 2.0  // Scale to [-1, 1]
+            (x - 0.5) * 2.0 // Scale to [-1, 1]
         })
         .collect()
 }
@@ -161,7 +167,10 @@ fn test_baseline(signal: &[f64], name: &str) -> (f64, usize) {
         // Budding
         let node_count = engine.node_count();
         while node_states.len() < node_count {
-            node_states.push(ContinuousHV::random(1024, (node_states.len() * 1000 + i) as u64));
+            node_states.push(ContinuousHV::random(
+                1024,
+                (node_states.len() * 1000 + i) as u64,
+            ));
         }
 
         for node_id in 0..node_count {
@@ -172,7 +181,11 @@ fn test_baseline(signal: &[f64], name: &str) -> (f64, usize) {
         let _ = engine.process_budding(&node_states[..node_count], i as f64);
     }
 
-    let accuracy = if total > 0 { correct as f64 / total as f64 } else { 0.5 };
+    let accuracy = if total > 0 {
+        correct as f64 / total as f64
+    } else {
+        0.5
+    };
     (accuracy, engine.node_count())
 }
 
@@ -188,7 +201,11 @@ fn test_enhanced(signal: &[f64], sample_rate: f32, name: &str) -> (f64, f32, f32
     }
 
     let stats = engine.stats();
-    (stats.accuracy as f64, stats.cycle_confidence, stats.attention_intensity)
+    (
+        stats.accuracy as f64,
+        stats.cycle_confidence,
+        stats.attention_intensity,
+    )
 }
 
 // =============================================================================
@@ -215,7 +232,11 @@ fn test_multi_scale_only(signal: &[f64]) -> f64 {
         }
     }
 
-    if total > 0 { correct as f64 / total as f64 } else { 0.5 }
+    if total > 0 {
+        correct as f64 / total as f64
+    } else {
+        0.5
+    }
 }
 
 // =============================================================================
@@ -238,8 +259,9 @@ fn test_enhanced_cycle_detector(signal: &[f64], expected_period: usize) -> (usiz
 // =============================================================================
 
 fn main() {
-    println!("{}",
-r#"
+    println!(
+        "{}",
+        r#"
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║            ENHANCED CINCINNATI-LTC COMPARISON                                ║
 ║                                                                              ║
@@ -249,28 +271,54 @@ r#"
 ║    3. Enhanced cycle detection (fixed harmonic filter)                       ║
 ║    4. Attention-modulated learning                                           ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
-"#);
+"#
+    );
 
     let sample_rate = 250.0;
     let duration = 4.0;
 
     // Generate all test signals
     let signals: Vec<(&str, Vec<f64>, f64)> = vec![
-        ("EEG Alpha (10 Hz)", generate_alpha(sample_rate, duration), 10.0),
-        ("EEG Beta (20 Hz)", generate_beta(sample_rate, duration), 20.0),
-        ("EEG Gamma (40 Hz)", generate_gamma(sample_rate, duration), 40.0),
+        (
+            "EEG Alpha (10 Hz)",
+            generate_alpha(sample_rate, duration),
+            10.0,
+        ),
+        (
+            "EEG Beta (20 Hz)",
+            generate_beta(sample_rate, duration),
+            20.0,
+        ),
+        (
+            "EEG Gamma (40 Hz)",
+            generate_gamma(sample_rate, duration),
+            40.0,
+        ),
         ("HRV (1.2 Hz)", generate_hrv(sample_rate, duration), 1.2),
-        ("Respiratory (0.25 Hz)", generate_respiratory(sample_rate, duration), 0.25),
-        ("Square Wave (p=8)", generate_square_wave(sample_rate, duration, 4), 31.25),
+        (
+            "Respiratory (0.25 Hz)",
+            generate_respiratory(sample_rate, duration),
+            0.25,
+        ),
+        (
+            "Square Wave (p=8)",
+            generate_square_wave(sample_rate, duration, 4),
+            31.25,
+        ),
         ("Logistic r=3.2", generate_logistic(3.2, 1000), 0.0),
         ("Logistic r=3.8", generate_logistic(3.8, 1000), 0.0),
     ];
 
     // Header
     println!("\n{:=^80}", " ACCURACY COMPARISON ");
-    println!("\n{:<22} │ {:>10} │ {:>10} │ {:>10} │ {:>10}",
-             "Signal", "Baseline", "Multi-Sc", "Enhanced", "Δ Improv");
-    println!("{:─<22}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}", "", "", "", "", "");
+    println!(
+        "\n{:<22} │ {:>10} │ {:>10} │ {:>10} │ {:>10}",
+        "Signal", "Baseline", "Multi-Sc", "Enhanced", "Δ Improv"
+    );
+    println!(
+        "{:─<22}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}",
+        "", "", "", "", ""
+    );
 
     let mut total_baseline = 0.0;
     let mut total_enhanced = 0.0;
@@ -284,30 +332,42 @@ r#"
         let ms_acc = test_multi_scale_only(signal);
 
         // Test full enhanced
-        let (enhanced_acc, _cycle_conf, _attention) = test_enhanced(signal, sample_rate as f32, name);
+        let (enhanced_acc, _cycle_conf, _attention) =
+            test_enhanced(signal, sample_rate as f32, name);
 
         let improvement = (enhanced_acc - baseline_acc) * 100.0;
 
-        println!("{:<22} │ {:>9.1}% │ {:>9.1}% │ {:>9.1}% │ {:>+9.1}%",
-                 name,
-                 baseline_acc * 100.0,
-                 ms_acc * 100.0,
-                 enhanced_acc * 100.0,
-                 improvement);
+        println!(
+            "{:<22} │ {:>9.1}% │ {:>9.1}% │ {:>9.1}% │ {:>+9.1}%",
+            name,
+            baseline_acc * 100.0,
+            ms_acc * 100.0,
+            enhanced_acc * 100.0,
+            improvement
+        );
 
         total_baseline += baseline_acc;
         total_enhanced += enhanced_acc;
         count += 1;
     }
 
-    println!("{:─<22}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}", "", "", "", "", "");
+    println!(
+        "{:─<22}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}",
+        "", "", "", "", ""
+    );
 
     let avg_baseline = total_baseline / count as f64;
     let avg_enhanced = total_enhanced / count as f64;
     let avg_improvement = (avg_enhanced - avg_baseline) * 100.0;
 
-    println!("{:<22} │ {:>9.1}% │ {:>10} │ {:>9.1}% │ {:>+9.1}%",
-             "AVERAGE", avg_baseline * 100.0, "-", avg_enhanced * 100.0, avg_improvement);
+    println!(
+        "{:<22} │ {:>9.1}% │ {:>10} │ {:>9.1}% │ {:>+9.1}%",
+        "AVERAGE",
+        avg_baseline * 100.0,
+        "-",
+        avg_enhanced * 100.0,
+        avg_improvement
+    );
 
     // Cycle detection comparison
     println!("\n{:=^80}", " CYCLE DETECTION (SQUARE WAVE FIX) ");
@@ -319,15 +379,29 @@ r#"
         ("Square p=10", generate_square_wave(250.0, 2.0, 5), 10),
     ];
 
-    println!("\n{:<20} │ {:>15} │ {:>12} │ {:>10}",
-             "Pattern", "Expected Period", "Detected", "Confidence");
+    println!(
+        "\n{:<20} │ {:>15} │ {:>12} │ {:>10}",
+        "Pattern", "Expected Period", "Detected", "Confidence"
+    );
     println!("{:─<20}─┼─{:─^15}─┼─{:─^12}─┼─{:─^10}", "", "", "", "");
 
     for (name, signal, expected) in square_waves {
         let (detected, confidence) = test_enhanced_cycle_detector(&signal, expected);
-        let status = if detected == expected { "✅" } else if detected == expected / 2 { "⚠️ /2" } else { "❌" };
-        println!("{:<20} │ {:>15} │ {:>10} {} │ {:>9.1}%",
-                 name, expected, detected, status, confidence * 100.0);
+        let status = if detected == expected {
+            "✅"
+        } else if detected == expected / 2 {
+            "⚠️ /2"
+        } else {
+            "❌"
+        };
+        println!(
+            "{:<20} │ {:>15} │ {:>10} {} │ {:>9.1}%",
+            name,
+            expected,
+            detected,
+            status,
+            confidence * 100.0
+        );
     }
 
     // Branch weight analysis
@@ -340,9 +414,14 @@ r#"
         ("Chaotic", generate_logistic(3.8, 1000)),
     ];
 
-    println!("\n{:<20} │ {:>12} │ {:>12} │ {:>12} │ {:>10}",
-             "Signal", "Fast Wt", "Medium Wt", "Slow Wt", "Best");
-    println!("{:─<20}─┼─{:─^12}─┼─{:─^12}─┼─{:─^12}─┼─{:─^10}", "", "", "", "", "");
+    println!(
+        "\n{:<20} │ {:>12} │ {:>12} │ {:>12} │ {:>10}",
+        "Signal", "Fast Wt", "Medium Wt", "Slow Wt", "Best"
+    );
+    println!(
+        "{:─<20}─┼─{:─^12}─┼─{:─^12}─┼─{:─^12}─┼─{:─^10}",
+        "", "", "", "", ""
+    );
 
     for (name, signal) in analysis_signals {
         let mut ms = MultiScaleCincinnatiLTC::new(250.0);
@@ -360,13 +439,20 @@ r#"
             "Slow"
         };
 
-        println!("{:<20} │ {:>11.1}% │ {:>11.1}% │ {:>11.1}% │ {:>10}",
-                 name, weights[0] * 100.0, weights[1] * 100.0, weights[2] * 100.0, best);
+        println!(
+            "{:<20} │ {:>11.1}% │ {:>11.1}% │ {:>11.1}% │ {:>10}",
+            name,
+            weights[0] * 100.0,
+            weights[1] * 100.0,
+            weights[2] * 100.0,
+            best
+        );
     }
 
     // Summary
     println!("\n{:=^80}", " SUMMARY ");
-    println!(r#"
+    println!(
+        r#"
 Key Improvements Achieved:
 
 1. MULTI-SCALE TEMPORAL PROCESSING
@@ -391,11 +477,15 @@ Key Improvements Achieved:
    - Low errors → reduced attention → stable predictions
 
 Expected vs Achieved:
-"#);
+"#
+    );
 
     println!("  │ Signal Type      │ Expected Δ │ Status │");
     println!("  ├──────────────────┼────────────┼────────┤");
-    println!("  │ EEG Accuracy     │ +15-22%    │ {}    │", if avg_improvement > 10.0 { "✅" } else { "⏳" });
+    println!(
+        "  │ EEG Accuracy     │ +15-22%    │ {}    │",
+        if avg_improvement > 10.0 { "✅" } else { "⏳" }
+    );
     println!("  │ Square Wave Fix  │ +12%       │ ✅     │");
     println!("  │ Attention Adapt  │ +5-10%     │ ✅     │");
     println!("  │ Multi-scale      │ +10-15%    │ ✅     │");

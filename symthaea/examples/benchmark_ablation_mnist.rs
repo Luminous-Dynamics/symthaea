@@ -59,7 +59,10 @@ fn main() {
 
     for (dim, levels, retrain_iters, label) in &conditions {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        println!("Dimension: {} (levels={}, retrain={})", label, levels, retrain_iters);
+        println!(
+            "Dimension: {} (levels={}, retrain={})",
+            label, levels, retrain_iters
+        );
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         let total_start = Instant::now();
@@ -73,7 +76,9 @@ fn main() {
         let baseline = classifier.test(&test_images, &test_labels);
         println!(
             "  Baseline accuracy: {:.2}% ({}/{})",
-            baseline.accuracy * 100.0, baseline.correct, baseline.total
+            baseline.accuracy * 100.0,
+            baseline.correct,
+            baseline.total
         );
 
         println!("  Retraining (lr=0.1, {} iters)...", retrain_iters);
@@ -85,7 +90,9 @@ fn main() {
 
         println!(
             "  Final accuracy: {:.2}% ({}/{})",
-            final_result.accuracy * 100.0, final_result.correct, final_result.total
+            final_result.accuracy * 100.0,
+            final_result.correct,
+            final_result.total
         );
         println!("  Total time: {:.1}s\n", total_time);
 
@@ -230,11 +237,7 @@ impl HdcClassifier {
             .map(|p| ContinuousHV::random(dim, 10000 + p as u64))
             .collect();
 
-        println!(
-            "  Init (dim={}): {:.0}ms",
-            dim,
-            t.elapsed().as_millis()
-        );
+        println!("  Init (dim={}): {:.0}ms", dim, t.elapsed().as_millis());
 
         Self {
             dim,

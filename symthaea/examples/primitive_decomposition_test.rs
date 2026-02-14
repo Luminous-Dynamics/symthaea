@@ -15,11 +15,10 @@
 //! ```
 
 use symthaea::consciousness::recursive_improvement::{
-    SemanticBridge, SemanticBridgeConfig, SemanticInput, ActionContext,
-    DreamMode, DreamConfig,
+    ActionContext, DreamConfig, DreamMode, SemanticBridge, SemanticBridgeConfig, SemanticInput,
 };
-use symthaea::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier, Primitive};
 use symthaea::hdc::binary_hv::BinaryHV;
+use symthaea::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
 use symthaea_dynamics::CrystalizedConcept;
 
 /// Decompose a crystallized concept into its constituent primitives
@@ -29,8 +28,11 @@ fn decompose_concept(concept: &CrystalizedConcept) -> Vec<(String, PrimitiveTier
     // Convert concept hypervector to BinaryHV
     // The concept hypervector is 16,384 dimensions in bipolar {-1, +1} format
     if concept.hypervector.len() != BinaryHV::DIM {
-        println!("  Warning: Concept hypervector has {} dims, expected {}",
-            concept.hypervector.len(), BinaryHV::DIM);
+        println!(
+            "  Warning: Concept hypervector has {} dims, expected {}",
+            concept.hypervector.len(),
+            BinaryHV::DIM
+        );
         return Vec::new();
     }
 
@@ -53,19 +55,20 @@ fn decompose_concept(concept: &CrystalizedConcept) -> Vec<(String, PrimitiveTier
 
         // DIAGNOSTIC: Lower threshold to see what we get
         // (Random vectors have ~0.50 similarity due to binary representation)
-        if similarity > 0.505 {  // Just barely above random
-            activations.push((
-                primitive.name.clone(),
-                primitive.tier,
-                similarity,
-            ));
+        if similarity > 0.505 {
+            // Just barely above random
+            activations.push((primitive.name.clone(), primitive.tier, similarity));
         }
     }
 
     // Print diagnostic info
     if count > 0 {
-        println!("    Similarity stats: min={:.4}, max={:.4}, avg={:.4}",
-            min_sim, max_sim, sum_sim / count as f32);
+        println!(
+            "    Similarity stats: min={:.4}, max={:.4}, avg={:.4}",
+            min_sim,
+            max_sim,
+            sum_sim / count as f32
+        );
     }
 
     // Sort by activation strength (descending)
@@ -75,7 +78,9 @@ fn decompose_concept(concept: &CrystalizedConcept) -> Vec<(String, PrimitiveTier
 }
 
 /// Get tier distribution for a concept
-fn tier_distribution(activations: &[(String, PrimitiveTier, f32)]) -> Vec<(PrimitiveTier, usize, f32)> {
+fn tier_distribution(
+    activations: &[(String, PrimitiveTier, f32)],
+) -> Vec<(PrimitiveTier, usize, f32)> {
     use std::collections::HashMap;
 
     let mut tier_counts: HashMap<PrimitiveTier, (usize, f32)> = HashMap::new();
@@ -86,7 +91,8 @@ fn tier_distribution(activations: &[(String, PrimitiveTier, f32)]) -> Vec<(Primi
         entry.1 += strength;
     }
 
-    let mut distribution: Vec<_> = tier_counts.into_iter()
+    let mut distribution: Vec<_> = tier_counts
+        .into_iter()
         .map(|(tier, (count, total_strength))| (tier, count, total_strength / count as f32))
         .collect();
 
@@ -131,7 +137,8 @@ fn main() {
     println!("  Total primitives available: {}", total_primitives);
 
     // Count by tier
-    let mut tier_counts: std::collections::HashMap<PrimitiveTier, usize> = std::collections::HashMap::new();
+    let mut tier_counts: std::collections::HashMap<PrimitiveTier, usize> =
+        std::collections::HashMap::new();
     for prim in primitive_system.all_primitives() {
         *tier_counts.entry(prim.tier).or_insert(0) += 1;
     }
@@ -171,26 +178,27 @@ fn main() {
         SemanticInput::query("How does the compiler optimize code?"),
         SemanticInput::response("The compiler uses type inference and dead code elimination"),
         SemanticInput::thought("Analyzing the optimization pipeline..."),
-
         // Cluster B: Temporal/Strategic (should activate Temporal/Strategic)
         SemanticInput::query("When should I deploy the update?"),
         SemanticInput::response("Deploy after testing, before the deadline"),
         SemanticInput::thought("Planning the deployment timeline..."),
-
         // Cluster C: Emotional/Social (should activate NSM/Consciousness)
         SemanticInput::query("Why do I feel frustrated with this bug?"),
         SemanticInput::response("Frustration comes from unmet expectations"),
-        SemanticInput::new("Goal: Understand my emotional response", ActionContext::Goal).with_emotion(0.7),
-
+        SemanticInput::new(
+            "Goal: Understand my emotional response",
+            ActionContext::Goal,
+        )
+        .with_emotion(0.7),
         // Cluster D: Spatial/Physical (should activate Geometric/Physical)
         SemanticInput::query("How do I structure the file hierarchy?"),
         SemanticInput::response("Organize by domain, with clear boundaries"),
         SemanticInput::thought("Visualizing the folder structure..."),
-
         // Cluster E: Meta-Cognitive (should activate MetaCognitive/Consciousness)
         SemanticInput::query("Am I approaching this problem correctly?"),
         SemanticInput::thought("Reflecting on my problem-solving strategy..."),
-        SemanticInput::new("Goal: Improve my reasoning process", ActionContext::Goal).with_emotion(0.8),
+        SemanticInput::new("Goal: Improve my reasoning process", ActionContext::Goal)
+            .with_emotion(0.8),
     ];
 
     println!("  Processing {} diverse inputs...", inputs.len());
@@ -247,10 +255,12 @@ fn main() {
         // Show top 5 primitives
         println!("  Top primitives:");
         for (name, tier, strength) in activations.iter().take(5) {
-            println!("    [{:>6.2}%] {:20} ({})",
+            println!(
+                "    [{:>6.2}%] {:20} ({})",
                 strength * 100.0,
                 name,
-                tier_name(*tier));
+                tier_name(*tier)
+            );
         }
 
         // Tier distribution
@@ -259,8 +269,12 @@ fn main() {
 
         println!("  Tier profile:");
         for (tier, count, avg_strength) in distribution.iter().take(3) {
-            println!("    {:20}: {} primitives, avg {:.2}%",
-                tier_name(*tier), count, avg_strength * 100.0);
+            println!(
+                "    {:20}: {} primitives, avg {:.2}%",
+                tier_name(*tier),
+                count,
+                avg_strength * 100.0
+            );
         }
 
         all_activations.push(activations);
@@ -286,7 +300,10 @@ fn main() {
         if i == 0 {
             shared_primitives = primitive_names.clone();
         } else {
-            shared_primitives = shared_primitives.intersection(&primitive_names).cloned().collect();
+            shared_primitives = shared_primitives
+                .intersection(&primitive_names)
+                .cloned()
+                .collect();
         }
 
         unique_primitives_per_concept.push(primitive_names.len());
@@ -303,7 +320,10 @@ fn main() {
     println!("  Shared across ALL concepts: {}", shared_primitives.len());
 
     if !shared_primitives.is_empty() && shared_primitives.len() <= 10 {
-        println!("  Common primitives: {:?}", shared_primitives.iter().take(10).collect::<Vec<_>>());
+        println!(
+            "  Common primitives: {:?}",
+            shared_primitives.iter().take(10).collect::<Vec<_>>()
+        );
     }
 
     // Do tier profiles differ?
@@ -328,27 +348,39 @@ fn main() {
 
     let concepts_analyzed = all_activations.len();
     let has_activations = all_activations.iter().any(|a| !a.is_empty());
-    let has_differentiation = concept_tier_profiles.iter()
+    let has_differentiation = concept_tier_profiles
+        .iter()
         .filter_map(|(_, p)| p.first().map(|(t, _, _)| t))
         .collect::<std::collections::HashSet<_>>()
-        .len() > 1;
+        .len()
+        > 1;
 
     println!("  Metric                          | Result");
     println!("  ────────────────────────────────┼─────────────────────────────");
     println!("  Concepts analyzed               | {}", concepts_analyzed);
-    println!("  Concepts with activations       | {}", all_activations.iter().filter(|a| !a.is_empty()).count());
+    println!(
+        "  Concepts with activations       | {}",
+        all_activations.iter().filter(|a| !a.is_empty()).count()
+    );
     println!("  Avg primitives per concept      | {:.1}", avg_primitives);
-    println!("  Shared primitives (all)         | {}", shared_primitives.len());
-    println!("  Distinct dominant tiers         | {}",
-        concept_tier_profiles.iter()
+    println!(
+        "  Shared primitives (all)         | {}",
+        shared_primitives.len()
+    );
+    println!(
+        "  Distinct dominant tiers         | {}",
+        concept_tier_profiles
+            .iter()
             .filter_map(|(_, p)| p.first().map(|(t, _, _)| t))
             .collect::<std::collections::HashSet<_>>()
-            .len());
+            .len()
+    );
     println!();
 
     // Validation
     let decomposition_works = has_activations && avg_primitives > 5.0;
-    let differentiation_exists = has_differentiation || shared_primitives.len() < avg_primitives as usize;
+    let differentiation_exists =
+        has_differentiation || shared_primitives.len() < avg_primitives as usize;
 
     if decomposition_works && differentiation_exists {
         println!("╔════════════════════════════════════════════════════════════════════╗");

@@ -5,8 +5,8 @@
 //! the Φ-gated executor — the service manager itself does NOT
 //! execute commands directly.
 
-use std::process::Command;
 use super::executor::{NixOSCommand, SafetyLevel};
+use std::process::Command;
 
 /// Manages systemd services: start, stop, restart, enable, disable.
 pub struct ServiceManager;
@@ -89,8 +89,12 @@ impl ServiceManager {
         let unit = Self::normalize_name(service);
 
         let output = Command::new("systemctl")
-            .args(["show", &unit, "--no-pager",
-                   "--property=ActiveState,SubState,UnitFileState"])
+            .args([
+                "show",
+                &unit,
+                "--no-pager",
+                "--property=ActiveState,SubState,UnitFileState",
+            ])
             .output()?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -143,7 +147,10 @@ mod tests {
     #[test]
     fn test_normalize_name() {
         assert_eq!(ServiceManager::normalize_name("nginx"), "nginx.service");
-        assert_eq!(ServiceManager::normalize_name("nginx.service"), "nginx.service");
+        assert_eq!(
+            ServiceManager::normalize_name("nginx.service"),
+            "nginx.service"
+        );
         assert_eq!(ServiceManager::normalize_name("foo.socket"), "foo.socket");
     }
 

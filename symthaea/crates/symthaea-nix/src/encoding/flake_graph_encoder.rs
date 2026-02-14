@@ -5,8 +5,8 @@
 //! updates. Each input becomes a bound vector (input_name ⊗ input_type), and
 //! the full graph is a bundled representation of all edges.
 
-use symthaea_core::hdc::ContinuousHV;
 use super::codebook::NixCodebook;
+use symthaea_core::hdc::ContinuousHV;
 
 /// A parsed flake input for encoding.
 #[derive(Debug, Clone)]
@@ -89,17 +89,21 @@ impl<'a> FlakeGraphEncoder<'a> {
         edges: &[FlakeDependencyEdge],
     ) -> EncodedFlakeGraph {
         // Encode individual inputs
-        let input_vectors: Vec<(String, ContinuousHV)> = inputs.iter()
+        let input_vectors: Vec<(String, ContinuousHV)> = inputs
+            .iter()
             .map(|input| (input.name.clone(), self.encode_input(input)))
             .collect();
 
         // Encode edges
-        let edge_vectors: Vec<(String, String, ContinuousHV)> = edges.iter()
+        let edge_vectors: Vec<(String, String, ContinuousHV)> = edges
+            .iter()
             .map(|edge| (edge.from.clone(), edge.to.clone(), self.encode_edge(edge)))
             .collect();
 
         // Bundle everything into a graph vector
-        let all_hvs: Vec<&ContinuousHV> = input_vectors.iter().map(|(_, hv)| hv)
+        let all_hvs: Vec<&ContinuousHV> = input_vectors
+            .iter()
+            .map(|(_, hv)| hv)
             .chain(edge_vectors.iter().map(|(_, _, hv)| hv))
             .collect();
 
@@ -132,12 +136,16 @@ impl<'a> FlakeGraphEncoder<'a> {
         // Use the encoded graph vector for the updated input (if available)
         // rather than the raw basis vector, since graph vectors live in the
         // encoded space that includes binding with roles.
-        let updated_hv = graph.input_vectors.iter()
+        let updated_hv = graph
+            .input_vectors
+            .iter()
             .find(|(name, _)| name == updated_input)
             .map(|(_, hv)| hv.clone())
             .unwrap_or_else(|| self.codebook.get_or_create(updated_input).clone());
 
-        let mut affected: Vec<(String, f32)> = graph.input_vectors.iter()
+        let mut affected: Vec<(String, f32)> = graph
+            .input_vectors
+            .iter()
             .filter(|(name, _)| name != updated_input)
             .map(|(name, hv)| (name.clone(), updated_hv.similarity(hv)))
             .filter(|(_, sim)| *sim > threshold)
@@ -156,7 +164,9 @@ impl<'a> FlakeGraphEncoder<'a> {
             };
 
             if let Some(target_name) = target {
-                if target_name != updated_input && !affected.iter().any(|(name, _)| name == target_name) {
+                if target_name != updated_input
+                    && !affected.iter().any(|(name, _)| name == target_name)
+                {
                     let sim = updated_hv.similarity(edge_hv).abs();
                     let effective_sim = sim.max(threshold + 0.01); // Ensure structurally-connected inputs appear
                     affected.push((target_name.to_string(), effective_sim));
@@ -170,11 +180,14 @@ impl<'a> FlakeGraphEncoder<'a> {
 }
 
 /// Parse a flake.lock JSON into FlakeInput and FlakeDependencyEdge structures.
-pub fn parse_flake_lock(lock_json: &str) -> Result<(Vec<FlakeInput>, Vec<FlakeDependencyEdge>), String> {
+pub fn parse_flake_lock(
+    lock_json: &str,
+) -> Result<(Vec<FlakeInput>, Vec<FlakeDependencyEdge>), String> {
     let value: serde_json::Value = serde_json::from_str(lock_json)
         .map_err(|e| format!("Failed to parse flake.lock: {}", e))?;
 
-    let nodes = value["nodes"].as_object()
+    let nodes = value["nodes"]
+        .as_object()
         .ok_or_else(|| "Missing 'nodes' in flake.lock".to_string())?;
 
     let mut inputs = Vec::new();
@@ -196,13 +209,12 @@ pub fn parse_flake_lock(lock_json: &str) -> Result<(Vec<FlakeInput>, Vec<FlakeDe
             .unwrap_or("unknown")
             .to_string();
 
-        let follows = node["inputs"].as_object()
-            .and_then(|inputs_map| {
-                inputs_map.iter().find_map(|(_, v)| {
-                    // If the value is a string (not an array), it's a "follows" reference
-                    v.as_str().map(|s| s.to_string())
-                })
-            });
+        let follows = node["inputs"].as_object().and_then(|inputs_map| {
+            inputs_map.iter().find_map(|(_, v)| {
+                // If the value is a string (not an array), it's a "follows" reference
+                v.as_str().map(|s| s.to_string())
+            })
+        });
 
         inputs.push(FlakeInput {
             name: name.clone(),
@@ -288,7 +300,9 @@ mod tests {
         // Should have dependency edges from root
         assert!(edges.iter().any(|e| e.from == "root" && e.to == "nixpkgs"));
         // Should have follows edge
-        assert!(edges.iter().any(|e| e.from == "home-manager" && e.relation == "follows"));
+        assert!(edges
+            .iter()
+            .any(|e| e.from == "home-manager" && e.relation == "follows"));
     }
 
     #[test]
@@ -318,7 +332,13 @@ mod tests {
         assert_eq!(graph.input_vectors.len(), 3);
         assert!(!graph.edge_vectors.is_empty());
         // Graph vector should be non-zero
-        let norm: f32 = graph.graph_vector.as_slice().iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm: f32 = graph
+            .graph_vector
+            .as_slice()
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
         assert!(norm > 0.0);
     }
 
@@ -342,7 +362,11 @@ mod tests {
         let hv2 = encoder.encode_input(&hm);
 
         let sim = hv1.similarity(&hv2).abs();
-        assert!(sim < 0.5, "Different inputs should be distinguishable: sim={}", sim);
+        assert!(
+            sim < 0.5,
+            "Different inputs should be distinguishable: sim={}",
+            sim
+        );
     }
 
     #[test]
@@ -355,6 +379,9 @@ mod tests {
 
         // Updating nixpkgs should potentially affect home-manager (which follows nixpkgs)
         let cascade = encoder.predict_cascade("nixpkgs", &graph, 0.0);
-        assert!(!cascade.is_empty(), "Updating nixpkgs should cascade to dependents");
+        assert!(
+            !cascade.is_empty(),
+            "Updating nixpkgs should cascade to dependents"
+        );
     }
 }

@@ -16,12 +16,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use symthaea_stt::{
-    AudioFrontend, AudioProjector,
-    PhonemeDecoder, TemporalDecoder, TemporalConfig,
-    CmuDictionary, TextToPhonemes,
-    TrainedPrototypes,
-    EvalResult,
-    NgramLM, PhonemeToWordDecoder,
+    AudioFrontend, AudioProjector, CmuDictionary, EvalResult, NgramLM, PhonemeDecoder,
+    PhonemeToWordDecoder, TemporalConfig, TemporalDecoder, TextToPhonemes, TrainedPrototypes,
 };
 
 #[derive(Parser)]
@@ -33,7 +29,11 @@ use symthaea_stt::{
 )]
 struct Cli {
     /// Path to adaptive prototypes file
-    #[arg(short, long, default_value = "data/models/dev-clean_adaptive_prototypes.bin")]
+    #[arg(
+        short,
+        long,
+        default_value = "data/models/dev-clean_adaptive_prototypes.bin"
+    )]
     prototypes: PathBuf,
 
     /// Path to test dataset directory (LibriSpeech format)
@@ -101,26 +101,49 @@ struct EvalReport {
 fn main() {
     let cli = Cli::parse();
 
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("              SYMTHAEA EVALUATION: THE BAR EXAM                   ").bold().cyan());
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("              SYMTHAEA EVALUATION: THE BAR EXAM                   ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
     println!();
 
     // Check required files
     if !cli.prototypes.exists() {
-        eprintln!("{} Prototypes not found: {:?}", style("ERROR:").red().bold(), cli.prototypes);
+        eprintln!(
+            "{} Prototypes not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.prototypes
+        );
         eprintln!("       Run training first: symthaea-librispeech train --adaptive");
         std::process::exit(1);
     }
 
     if !cli.test_dir.exists() {
-        eprintln!("{} Test directory not found: {:?}", style("ERROR:").red().bold(), cli.test_dir);
+        eprintln!(
+            "{} Test directory not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.test_dir
+        );
         eprintln!("       Run: bash scripts/download_librispeech.sh --test-clean");
         std::process::exit(1);
     }
 
     if !cli.dictionary.exists() {
-        eprintln!("{} Dictionary not found: {:?}", style("WARNING:").yellow().bold(), cli.dictionary);
+        eprintln!(
+            "{} Dictionary not found: {:?}",
+            style("WARNING:").yellow().bold(),
+            cli.dictionary
+        );
         eprintln!("       Will use phoneme-level evaluation only");
     }
 
@@ -129,7 +152,11 @@ fn main() {
     let prototypes = match TrainedPrototypes::load(&cli.prototypes) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("{} Failed to load prototypes: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to load prototypes: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -176,7 +203,11 @@ fn main() {
     let utterances = match scan_librispeech_dir(&cli.test_dir) {
         Ok(u) => u,
         Err(e) => {
-            eprintln!("{} Failed to scan test directory: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to scan test directory: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -187,7 +218,11 @@ fn main() {
         utterances.len()
     };
 
-    println!("  Found {} utterances, evaluating {}", utterances.len(), total_utterances);
+    println!(
+        "  Found {} utterances, evaluating {}",
+        utterances.len(),
+        total_utterances
+    );
     println!();
 
     // Create audio projector
@@ -196,10 +231,10 @@ fn main() {
     // Create temporal decoder with hysteresis
     // Note: HDC similarity scores are low (~0.06) but relative ranking works
     // Try: COMPLETELY DISABLED filtering to establish baseline
-    let window_size = 1;           // NO smoothing - take frame directly
+    let window_size = 1; // NO smoothing - take frame directly
     let confidence_threshold = 0.0; // DISABLED
-    let min_duration_frames = 1;   // No duration filter (emit even 1-frame phonemes)
-    let stability_frames = 1;      // Immediate transitions
+    let min_duration_frames = 1; // No duration filter (emit even 1-frame phonemes)
+    let stability_frames = 1; // Immediate transitions
 
     let temporal_config = TemporalConfig {
         window_size,
@@ -209,9 +244,17 @@ fn main() {
     };
     let _temporal_decoder = TemporalDecoder::with_config(temporal_config);
     println!("  Temporal decoder configured:");
-    println!("    - Window size: {} frames ({}ms)", window_size, window_size * 10);
+    println!(
+        "    - Window size: {} frames ({}ms)",
+        window_size,
+        window_size * 10
+    );
     println!("    - Confidence threshold: {}", confidence_threshold);
-    println!("    - Min duration: {} frames ({}ms)", min_duration_frames, min_duration_frames * 10);
+    println!(
+        "    - Min duration: {} frames ({}ms)",
+        min_duration_frames,
+        min_duration_frames * 10
+    );
     println!("    - Stability frames: {}", stability_frames);
 
     // Train simple LM from training transcripts if available
@@ -232,16 +275,29 @@ fn main() {
     };
 
     // Run evaluation
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("                     RUNNING EVALUATION                           ").bold().cyan());
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("                     RUNNING EVALUATION                           ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
     println!();
 
     let pb = ProgressBar::new(total_utterances as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-        .unwrap()
-        .progress_chars("#>-"));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+            .unwrap()
+            .progress_chars("#>-"),
+    );
 
     let mut total_word_result = EvalResult::default();
     let mut total_phoneme_result = EvalResult::default();
@@ -251,7 +307,10 @@ fn main() {
     let text_to_phonemes = dictionary.as_ref().map(|d| TextToPhonemes::new(d.clone()));
 
     for (i, utterance) in utterances.iter().take(total_utterances).enumerate() {
-        pb.set_message(format!("{}_{}", utterance.speaker_id, utterance.utterance_id));
+        pb.set_message(format!(
+            "{}_{}",
+            utterance.speaker_id, utterance.utterance_id
+        ));
 
         // Load audio (supports WAV and FLAC)
         let (audio, sample_rate) = match AudioFrontend::load_audio(&utterance.audio_path) {
@@ -280,17 +339,17 @@ fn main() {
         // - Minimum confidence threshold (low similarity = SILENCE)
         // - Repetition penalty (prevents mode collapse like "W AY1 W AY1...")
         decoder.reset(); // Reset history for each utterance
-        let frame_phonemes: Vec<String> = hvs.iter()
-            .filter_map(|hv| {
-                decoder.decode(hv).map(|(p, _)| p)
-            })
+        let frame_phonemes: Vec<String> = hvs
+            .iter()
+            .filter_map(|hv| decoder.decode(hv).map(|(p, _)| p))
             .collect();
 
         // Window voting: take mode over sliding window
-        let vote_window = 8;  // ~80ms
+        let vote_window = 8; // ~80ms
         let mut smoothed: Vec<String> = Vec::new();
         for chunk in frame_phonemes.chunks(vote_window) {
-            let mut votes: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+            let mut votes: std::collections::HashMap<&str, usize> =
+                std::collections::HashMap::new();
             for p in chunk {
                 *votes.entry(p.as_str()).or_insert(0) += 1;
             }
@@ -315,17 +374,24 @@ fn main() {
             let scores = decoder.decode_all_scores(first_hv);
             if let Some((top_phoneme, top_score)) = scores.first() {
                 let min_score = scores.last().map(|(_, s)| *s).unwrap_or(0.0);
-                println!("\n  DEBUG: Frame similarities - top: {} ({:.3}), min: {:.3}",
-                         top_phoneme, top_score, min_score);
+                println!(
+                    "\n  DEBUG: Frame similarities - top: {} ({:.3}), min: {:.3}",
+                    top_phoneme, top_score, min_score
+                );
             }
             // Show salience stats
             let min_sal = _saliences.iter().cloned().fold(f32::INFINITY, f32::min);
             let max_sal = _saliences.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
             let avg_sal = _saliences.iter().sum::<f32>() / _saliences.len() as f32;
-            println!("  DEBUG: Salience range: {:.3} to {:.3}, avg: {:.3}",
-                     min_sal, max_sal, avg_sal);
-            println!("  DEBUG: {} frames -> {} phonemes (after RLE)",
-                     hvs.len(), hyp_phonemes.len());
+            println!(
+                "  DEBUG: Salience range: {:.3} to {:.3}, avg: {:.3}",
+                min_sal, max_sal, avg_sal
+            );
+            println!(
+                "  DEBUG: {} frames -> {} phonemes (after RLE)",
+                hvs.len(),
+                hyp_phonemes.len()
+            );
         }
 
         let inference_time = start.elapsed().as_secs_f32();
@@ -376,9 +442,20 @@ fn main() {
 
     // Print results
     println!();
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("                     EVALUATION RESULTS                           ").bold().cyan());
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("                     EVALUATION RESULTS                           ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
     println!();
 
     println!("{}:", style("Summary").bold());
@@ -389,8 +466,14 @@ fn main() {
     println!();
 
     println!("{}:", style("Word Error Rate (WER)").bold());
-    println!("  Reference words:    {}", total_word_result.reference_length);
-    println!("  Hypothesis words:   {}", total_word_result.hypothesis_length);
+    println!(
+        "  Reference words:    {}",
+        total_word_result.reference_length
+    );
+    println!(
+        "  Hypothesis words:   {}",
+        total_word_result.hypothesis_length
+    );
     println!("  Correct:            {}", total_word_result.correct);
     println!("  Substitutions:      {}", total_word_result.substitutions);
     println!("  Insertions:         {}", total_word_result.insertions);
@@ -400,10 +483,19 @@ fn main() {
 
     if total_phoneme_result.reference_length > 0 {
         println!("{}:", style("Phoneme Error Rate (PER)").bold());
-        println!("  Reference phonemes: {}", total_phoneme_result.reference_length);
-        println!("  Hypothesis phonemes:{}", total_phoneme_result.hypothesis_length);
+        println!(
+            "  Reference phonemes: {}",
+            total_phoneme_result.reference_length
+        );
+        println!(
+            "  Hypothesis phonemes:{}",
+            total_phoneme_result.hypothesis_length
+        );
         println!("  Correct:            {}", total_phoneme_result.correct);
-        println!("  Substitutions:      {}", total_phoneme_result.substitutions);
+        println!(
+            "  Substitutions:      {}",
+            total_phoneme_result.substitutions
+        );
         println!("  Insertions:         {}", total_phoneme_result.insertions);
         println!("  Deletions:          {}", total_phoneme_result.deletions);
         println!("  {}:               {:.1}%", style("PER").bold(), per);
@@ -411,33 +503,97 @@ fn main() {
     }
 
     // Verdict
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
     println!();
 
     if wer < 20.0 {
-        println!("{}", style("╔═══════════════════════════════════════════════════════════════╗").green());
-        println!("{}", style("║                    BAR EXAM: PASSED                           ║").bold().green());
-        println!("{}", style("╠═══════════════════════════════════════════════════════════════╣").green());
+        println!(
+            "{}",
+            style("╔═══════════════════════════════════════════════════════════════╗").green()
+        );
+        println!(
+            "{}",
+            style("║                    BAR EXAM: PASSED                           ║")
+                .bold()
+                .green()
+        );
+        println!(
+            "{}",
+            style("╠═══════════════════════════════════════════════════════════════╣").green()
+        );
         println!("{}  WER {:.1}% < 20% target", style("║").green(), wer);
-        println!("{}  RTF {:.2}x (real-time capable)", style("║").green(), rtf);
-        println!("{}  Symthaea is production-ready for speech recognition", style("║").green());
-        println!("{}", style("╚═══════════════════════════════════════════════════════════════╝").green());
+        println!(
+            "{}  RTF {:.2}x (real-time capable)",
+            style("║").green(),
+            rtf
+        );
+        println!(
+            "{}  Symthaea is production-ready for speech recognition",
+            style("║").green()
+        );
+        println!(
+            "{}",
+            style("╚═══════════════════════════════════════════════════════════════╝").green()
+        );
     } else if wer < 50.0 {
-        println!("{}", style("╔═══════════════════════════════════════════════════════════════╗").yellow());
-        println!("{}", style("║                 BAR EXAM: PARTIAL PASS                        ║").bold().yellow());
-        println!("{}", style("╠═══════════════════════════════════════════════════════════════╣").yellow());
+        println!(
+            "{}",
+            style("╔═══════════════════════════════════════════════════════════════╗").yellow()
+        );
+        println!(
+            "{}",
+            style("║                 BAR EXAM: PARTIAL PASS                        ║")
+                .bold()
+                .yellow()
+        );
+        println!(
+            "{}",
+            style("╠═══════════════════════════════════════════════════════════════╣").yellow()
+        );
         println!("{}  WER {:.1}% (target: <20%)", style("║").yellow(), wer);
-        println!("{}  System recognizes speech but needs tuning", style("║").yellow());
-        println!("{}  Consider: more training data, LM integration, beam search", style("║").yellow());
-        println!("{}", style("╚═══════════════════════════════════════════════════════════════╝").yellow());
+        println!(
+            "{}  System recognizes speech but needs tuning",
+            style("║").yellow()
+        );
+        println!(
+            "{}  Consider: more training data, LM integration, beam search",
+            style("║").yellow()
+        );
+        println!(
+            "{}",
+            style("╚═══════════════════════════════════════════════════════════════╝").yellow()
+        );
     } else {
-        println!("{}", style("╔═══════════════════════════════════════════════════════════════╗").red());
-        println!("{}", style("║                    BAR EXAM: FAILED                           ║").bold().red());
-        println!("{}", style("╠═══════════════════════════════════════════════════════════════╣").red());
+        println!(
+            "{}",
+            style("╔═══════════════════════════════════════════════════════════════╗").red()
+        );
+        println!(
+            "{}",
+            style("║                    BAR EXAM: FAILED                           ║")
+                .bold()
+                .red()
+        );
+        println!(
+            "{}",
+            style("╠═══════════════════════════════════════════════════════════════╣").red()
+        );
         println!("{}  WER {:.1}% (target: <20%)", style("║").red(), wer);
-        println!("{}  Decoder is guessing - phoneme mapping may be wrong", style("║").red());
-        println!("{}  Check: prototype quality, dictionary alignment, audio processing", style("║").red());
-        println!("{}", style("╚═══════════════════════════════════════════════════════════════╝").red());
+        println!(
+            "{}  Decoder is guessing - phoneme mapping may be wrong",
+            style("║").red()
+        );
+        println!(
+            "{}  Check: prototype quality, dictionary alignment, audio processing",
+            style("║").red()
+        );
+        println!(
+            "{}",
+            style("╚═══════════════════════════════════════════════════════════════╝").red()
+        );
     }
     println!();
 
@@ -480,7 +636,8 @@ fn scan_librispeech_dir(dir: &Path) -> std::io::Result<Vec<Utterance>> {
             continue;
         }
 
-        let speaker_id = speaker_path.file_name()
+        let speaker_id = speaker_path
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("")
             .to_string();
@@ -493,7 +650,8 @@ fn scan_librispeech_dir(dir: &Path) -> std::io::Result<Vec<Utterance>> {
                 continue;
             }
 
-            let chapter_id = chapter_path.file_name()
+            let chapter_id = chapter_path
+                .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("")
                 .to_string();
@@ -561,7 +719,8 @@ fn train_lm_from_transcripts(dir: &Path) -> std::io::Result<NgramLM> {
             if path.is_dir() {
                 scan_transcripts(&path, corpus)?;
             } else if path.extension().map(|e| e == "txt").unwrap_or(false)
-                   && path.to_string_lossy().contains(".trans.") {
+                && path.to_string_lossy().contains(".trans.")
+            {
                 let file = File::open(&path)?;
                 let reader = BufReader::new(file);
 
@@ -588,7 +747,7 @@ fn train_lm_from_transcripts(dir: &Path) -> std::io::Result<NgramLM> {
 
     scan_transcripts(dir, &mut corpus)?;
 
-    let mut lm = NgramLM::new(2);  // Bigram
+    let mut lm = NgramLM::new(2); // Bigram
     lm.train(&corpus);
 
     Ok(lm)

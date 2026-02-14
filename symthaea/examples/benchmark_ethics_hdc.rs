@@ -28,9 +28,9 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::time::Instant;
 
-use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::moral_algebra::{MoralAlgebra, MoralVerdict};
 use symthaea::hdc::moral_parser::MoralParser;
+use symthaea::hdc::unified_hv::ContinuousHV;
 
 const DATA_DIR: &str = "data/benchmarks/ethics";
 
@@ -70,7 +70,10 @@ impl TextHdcEncoder {
         if chars.len() < self.ngram_size {
             // Too short - just use character HVs directly
             for &ch in &chars {
-                for (acc, &val) in accumulator.iter_mut().zip(self.char_hvs[ch as usize].values.iter()) {
+                for (acc, &val) in accumulator
+                    .iter_mut()
+                    .zip(self.char_hvs[ch as usize].values.iter())
+                {
                     *acc += val;
                 }
             }
@@ -147,7 +150,10 @@ impl EthicsClassifier {
         }
 
         // Normalize
-        for (acc, count) in [(&mut pos_acc, self.pos_count), (&mut neg_acc, self.neg_count)] {
+        for (acc, count) in [
+            (&mut pos_acc, self.pos_count),
+            (&mut neg_acc, self.neg_count),
+        ] {
             if count > 0 {
                 let norm: f32 = acc.iter().map(|x| x * x).sum::<f32>().sqrt();
                 if norm > 0.0 {
@@ -295,20 +301,22 @@ impl MoralAlgebraClassifier {
 
         // Build action HV from parsed scenario components
         let action_hv = if let Some(ref action) = parsed.action {
-            let agent_hv = self.algebra.encode_agent(parsed.agent.as_deref().unwrap_or("someone"));
+            let agent_hv = self
+                .algebra
+                .encode_agent(parsed.agent.as_deref().unwrap_or("someone"));
             let action_hv = self.algebra.encode_action(action);
-            let patient_hv = self.algebra.encode_patient(parsed.patient.as_deref().unwrap_or("someone"));
+            let patient_hv = self
+                .algebra
+                .encode_patient(parsed.patient.as_deref().unwrap_or("someone"));
             let intent_hv = self.algebra.encode_intent(parsed.intent);
             Some(agent_hv.bind(&action_hv).bind(&patient_hv).bind(&intent_hv))
         } else {
             None
         };
 
-        let judgment = self.algebra.judge_ensemble(
-            action_hv.as_ref(),
-            parsed.intent,
-            text,
-        );
+        let judgment = self
+            .algebra
+            .judge_ensemble(action_hv.as_ref(), parsed.intent, text);
 
         let is_acceptable = match judgment.final_verdict {
             MoralVerdict::Good => true,
@@ -392,8 +400,18 @@ fn main() {
     // Utilitarianism is a comparison task (no labels), so we skip it
     let categories: Vec<(&str, &str, &str, &str)> = vec![
         ("commonsense", "commonsense", "cm_train.csv", "cm_test.csv"),
-        ("justice", "justice", "justice_train.csv", "justice_test.csv"),
-        ("deontology", "deontology", "deontology_train.csv", "deontology_test.csv"),
+        (
+            "justice",
+            "justice",
+            "justice_train.csv",
+            "justice_test.csv",
+        ),
+        (
+            "deontology",
+            "deontology",
+            "deontology_train.csv",
+            "deontology_test.csv",
+        ),
         ("virtue", "virtue", "virtue_train.csv", "virtue_test.csv"),
     ];
 
@@ -473,7 +491,10 @@ fn main() {
         } else {
             // Fallback: split training data
             let split = train_texts.len() * 4 / 5;
-            (train_texts[split..].to_vec(), train_labels[split..].to_vec())
+            (
+                train_texts[split..].to_vec(),
+                train_labels[split..].to_vec(),
+            )
         };
         println!("  Test samples: {}", test_texts.len());
 
@@ -485,18 +506,19 @@ fn main() {
         let train_time = t.elapsed().as_secs_f64();
         println!(
             "  N-gram baseline:      {:.2}% ({:.1}s)",
-            ngram_acc * 100.0, train_time
+            ngram_acc * 100.0,
+            train_time
         );
         ngram_results.push((*name, ngram_acc, train_time));
 
         // --- N-gram + retrain ---
-        println!("  Retraining n-gram ({} iters, lr={})...", retrain_iters, retrain_lr);
+        println!(
+            "  Retraining n-gram ({} iters, lr={})...",
+            retrain_iters, retrain_lr
+        );
         classifier.retrain(&train_texts, &train_labels, retrain_lr, retrain_iters);
         let ngram_retrain_acc = classifier.test(&test_texts, &test_labels);
-        println!(
-            "  N-gram + retrain:     {:.2}%",
-            ngram_retrain_acc * 100.0
-        );
+        println!("  N-gram + retrain:     {:.2}%", ngram_retrain_acc * 100.0);
         ngram_retrain_results.push((*name, ngram_retrain_acc));
 
         // --- Moral algebra (category-aware, no training needed) ---
@@ -512,11 +534,12 @@ fn main() {
 
         // --- Best-of: take the higher accuracy per category ---
         let best_acc = ngram_retrain_acc.max(moral_acc);
-        let best_method = if moral_acc > ngram_retrain_acc { "moral_algebra" } else { "ngram_retrain" };
-        println!(
-            "  Best ({}): {:.2}%",
-            best_method, best_acc * 100.0
-        );
+        let best_method = if moral_acc > ngram_retrain_acc {
+            "moral_algebra"
+        } else {
+            "ngram_retrain"
+        };
+        println!("  Best ({}): {:.2}%", best_method, best_acc * 100.0);
         best_results.push((*name, best_acc, best_method.to_string()));
     }
 
@@ -548,14 +571,14 @@ fn main() {
             );
         }
 
-        let ngram_mean = ngram_results.iter().map(|(_, a, _)| a).sum::<f64>()
-            / ngram_results.len() as f64;
+        let ngram_mean =
+            ngram_results.iter().map(|(_, a, _)| a).sum::<f64>() / ngram_results.len() as f64;
         let retrain_mean = ngram_retrain_results.iter().map(|(_, a)| a).sum::<f64>()
             / ngram_retrain_results.len() as f64;
-        let moral_mean = moral_results.iter().map(|(_, a)| a).sum::<f64>()
-            / moral_results.len() as f64;
-        let best_mean = best_results.iter().map(|(_, a, _)| a).sum::<f64>()
-            / best_results.len() as f64;
+        let moral_mean =
+            moral_results.iter().map(|(_, a)| a).sum::<f64>() / moral_results.len() as f64;
+        let best_mean =
+            best_results.iter().map(|(_, a, _)| a).sum::<f64>() / best_results.len() as f64;
 
         println!("╟──────────────────────────────────────────────────────────────╢");
         println!(
@@ -574,8 +597,8 @@ fn main() {
     println!("═══════════════════════════════════════════════════════════════");
 
     if !best_results.is_empty() {
-        let best_mean = best_results.iter().map(|(_, a, _)| a).sum::<f64>()
-            / best_results.len() as f64;
+        let best_mean =
+            best_results.iter().map(|(_, a, _)| a).sum::<f64>() / best_results.len() as f64;
         println!(
             "  Above random (>50%):       {}",
             if best_mean > 0.50 { "PASS" } else { "FAIL" }

@@ -17,8 +17,8 @@ use anyhow::Result;
 
 #[cfg(feature = "neural-bridge")]
 use symthaea::perception::{
-    BertLayerExtractor, BertPreset, print_bert_status, bert_extraction_status,
-    BertExtractionStatus, LayerExtractor,
+    bert_extraction_status, print_bert_status, BertExtractionStatus, BertLayerExtractor,
+    BertPreset, LayerExtractor,
 };
 
 fn main() -> Result<()> {
@@ -63,17 +63,31 @@ fn run_example() -> Result<()> {
 
     match LayerExtractor::load_default() {
         Ok(bge_extractor) => {
-            println!("Loaded BGE-M3 ({} layers, {} dim)",
-                     bge_extractor.num_layers(),
-                     bge_extractor.hidden_dim());
-            println!("Phenomenal corridor: Layer {} (92% depth)\n",
-                     (bge_extractor.num_layers() as f64 * 0.92) as usize);
+            println!(
+                "Loaded BGE-M3 ({} layers, {} dim)",
+                bge_extractor.num_layers(),
+                bge_extractor.hidden_dim()
+            );
+            println!(
+                "Phenomenal corridor: Layer {} (92% depth)\n",
+                (bge_extractor.num_layers() as f64 * 0.92) as usize
+            );
 
             for (text, is_phenomenal) in &test_texts {
                 let activation = bge_extractor.extract_layer(text, 22)?; // Layer 22 = peak
-                let norm: f32 = activation.activation.iter().map(|x| x * x).sum::<f32>().sqrt();
+                let norm: f32 = activation
+                    .activation
+                    .iter()
+                    .map(|x| x * x)
+                    .sum::<f32>()
+                    .sqrt();
                 let label = if *is_phenomenal { "P" } else { "F" };
-                println!("[{}] L22 norm={:.4} \"{}\"", label, norm, truncate(text, 40));
+                println!(
+                    "[{}] L22 norm={:.4} \"{}\"",
+                    label,
+                    norm,
+                    truncate(text, 40)
+                );
             }
         }
         Err(e) => {
@@ -101,19 +115,33 @@ fn run_example() -> Result<()> {
 
     match BertLayerExtractor::load_preset(BertPreset::XlmRobertaBase) {
         Ok(xlmr_extractor) => {
-            println!("Loaded XLM-RoBERTa-base ({} layers, {} dim)",
-                     xlmr_extractor.num_layers(),
-                     xlmr_extractor.hidden_dim());
-            println!("Predicted phenomenal corridor: Layer {} (92% depth)\n",
-                     xlmr_extractor.phenomenal_corridor_layer());
+            println!(
+                "Loaded XLM-RoBERTa-base ({} layers, {} dim)",
+                xlmr_extractor.num_layers(),
+                xlmr_extractor.hidden_dim()
+            );
+            println!(
+                "Predicted phenomenal corridor: Layer {} (92% depth)\n",
+                xlmr_extractor.phenomenal_corridor_layer()
+            );
 
             for (text, is_phenomenal) in &test_texts {
                 match xlmr_extractor.extract_final_layer(text) {
                     Ok(activation) => {
-                        let norm: f32 = activation.activation.iter().map(|x| x * x).sum::<f32>().sqrt();
+                        let norm: f32 = activation
+                            .activation
+                            .iter()
+                            .map(|x| x * x)
+                            .sum::<f32>()
+                            .sqrt();
                         let label = if *is_phenomenal { "P" } else { "F" };
-                        println!("[{}] L{} norm={:.4} \"{}\"",
-                                 label, activation.layer_idx, norm, truncate(text, 40));
+                        println!(
+                            "[{}] L{} norm={:.4} \"{}\"",
+                            label,
+                            activation.layer_idx,
+                            norm,
+                            truncate(text, 40)
+                        );
                     }
                     Err(e) => {
                         println!("Error extracting for \"{}\": {}", truncate(text, 30), e);

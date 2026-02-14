@@ -29,8 +29,8 @@
 use std::time::Instant;
 
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::phi_engine::PhiEngine;
+use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 
 const HDC_DIM: usize = 512;
 const N_NEURONS: usize = 16;
@@ -130,12 +130,8 @@ fn main() {
     println!("  Time: {:.1}ms\n", t.elapsed().as_millis());
 
     // Check monotonic ordering
-    let phi_ordered = state_phis
-        .windows(2)
-        .all(|w| w[0].1 >= w[1].1);
-    let algebraic_ordered = state_phis
-        .windows(2)
-        .all(|w| w[0].2 >= w[1].2);
+    let phi_ordered = state_phis.windows(2).all(|w| w[0].1 >= w[1].1);
+    let algebraic_ordered = state_phis.windows(2).all(|w| w[0].2 >= w[1].2);
 
     // ═══════════════════════════════════════════════════════════════
     // Test 2: Continuous Induction Gradient
@@ -202,12 +198,23 @@ fn main() {
     let phi_range = induction_phis.first().unwrap() - induction_phis.last().unwrap();
     let alg_range = induction_algebraic.first().unwrap() - induction_algebraic.last().unwrap();
 
-    println!("\n  Φ range: {:.6} → {:.6} (Δ = {:.6})",
-        induction_phis.first().unwrap(), induction_phis.last().unwrap(), phi_range);
-    println!("  Algebraic range: {:.6} → {:.6} (Δ = {:.6})",
-        induction_algebraic.first().unwrap(), induction_algebraic.last().unwrap(), alg_range);
+    println!(
+        "\n  Φ range: {:.6} → {:.6} (Δ = {:.6})",
+        induction_phis.first().unwrap(),
+        induction_phis.last().unwrap(),
+        phi_range
+    );
+    println!(
+        "  Algebraic range: {:.6} → {:.6} (Δ = {:.6})",
+        induction_algebraic.first().unwrap(),
+        induction_algebraic.last().unwrap(),
+        alg_range
+    );
     println!("  Φ monotonic violations: {}/{}", phi_violations, n_steps);
-    println!("  Algebraic monotonic violations: {}/{}", alg_violations, n_steps);
+    println!(
+        "  Algebraic monotonic violations: {}/{}",
+        alg_violations, n_steps
+    );
     println!("  Time: {:.1}ms\n", t.elapsed().as_millis());
 
     // ═══════════════════════════════════════════════════════════════
@@ -244,7 +251,10 @@ fn main() {
         if step % 5 == 0 {
             println!(
                 "  t={:>2}/{} │ Φ = {:.6} │ recovery={:.0}%",
-                step, n_steps, avg_phi, progress * 100.0
+                step,
+                n_steps,
+                avg_phi,
+                progress * 100.0
             );
         }
     }
@@ -259,11 +269,19 @@ fn main() {
     let induction_mid = induction_phis[n_steps - mid]; // reversed time
     let recovery_mid = recovery_phis[mid];
 
-    println!("\n  Recovery Φ range: {:.6} → {:.6}",
-        recovery_phis.first().unwrap(), recovery_phis.last().unwrap());
-    println!("  Recovery monotonic violations: {}/{}", recovery_violations, n_steps);
-    println!("  Midpoint hysteresis: induction Φ={:.6}, recovery Φ={:.6}",
-        induction_mid, recovery_mid);
+    println!(
+        "\n  Recovery Φ range: {:.6} → {:.6}",
+        recovery_phis.first().unwrap(),
+        recovery_phis.last().unwrap()
+    );
+    println!(
+        "  Recovery monotonic violations: {}/{}",
+        recovery_violations, n_steps
+    );
+    println!(
+        "  Midpoint hysteresis: induction Φ={:.6}, recovery Φ={:.6}",
+        induction_mid, recovery_mid
+    );
     println!("  Time: {:.1}ms\n", t.elapsed().as_millis());
 
     // ═══════════════════════════════════════════════════════════════
@@ -288,9 +306,27 @@ fn main() {
 
     let epsilon = 0.10;
     let params = vec![
-        ("coupling", AnesthesiaState { coupling: base_state.coupling + epsilon, ..base_state.clone() }),
-        ("recurrence", AnesthesiaState { recurrence: base_state.recurrence + epsilon, ..base_state.clone() }),
-        ("noise", AnesthesiaState { noise: base_state.noise + epsilon, ..base_state.clone() }),
+        (
+            "coupling",
+            AnesthesiaState {
+                coupling: base_state.coupling + epsilon,
+                ..base_state.clone()
+            },
+        ),
+        (
+            "recurrence",
+            AnesthesiaState {
+                recurrence: base_state.recurrence + epsilon,
+                ..base_state.clone()
+            },
+        ),
+        (
+            "noise",
+            AnesthesiaState {
+                noise: base_state.noise + epsilon,
+                ..base_state.clone()
+            },
+        ),
     ];
 
     println!("  Baseline Φ: {:.6}", base_phi);
@@ -322,21 +358,42 @@ fn main() {
     println!("╠══════════════════════════════════════════════════════════════╣");
 
     let checks = vec![
-        ("Discrete Φ ordering (alert > deep)", phi_ordered || algebraic_ordered),
-        ("Induction Φ decreases (≤5 violations)", phi_violations <= 5 || alg_violations <= 5),
-        ("Recovery Φ increases (≤5 violations)", recovery_violations <= 5),
-        ("Positive range during induction", phi_range > 0.0 || alg_range > 0.0),
-        ("Coupling ↑ → Φ ↑ (positive sensitivity)", coupling_sens > 0.0),
+        (
+            "Discrete Φ ordering (alert > deep)",
+            phi_ordered || algebraic_ordered,
+        ),
+        (
+            "Induction Φ decreases (≤5 violations)",
+            phi_violations <= 5 || alg_violations <= 5,
+        ),
+        (
+            "Recovery Φ increases (≤5 violations)",
+            recovery_violations <= 5,
+        ),
+        (
+            "Positive range during induction",
+            phi_range > 0.0 || alg_range > 0.0,
+        ),
+        (
+            "Coupling ↑ → Φ ↑ (positive sensitivity)",
+            coupling_sens > 0.0,
+        ),
         ("Noise ↑ → Φ ↓ (negative sensitivity)", noise_sens < 0.0),
     ];
 
     let mut passed = 0;
     for (name, pass) in &checks {
         println!("║  {} {:50}   ║", if *pass { "PASS" } else { "FAIL" }, name);
-        if *pass { passed += 1; }
+        if *pass {
+            passed += 1;
+        }
     }
     println!("╟──────────────────────────────────────────────────────────────╢");
-    println!("║  Result: {}/{} tests passed                                 ║", passed, checks.len());
+    println!(
+        "║  Result: {}/{} tests passed                                 ║",
+        passed,
+        checks.len()
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Save results
@@ -383,7 +440,9 @@ fn simulate_neural_state(
         + (state.noise * 3000.0) as u64
         + state.expected_phi_rank as u64 * 7919; // Include trial seed
     let mut rand_f32 = || -> f32 {
-        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng_state = rng_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (rng_state >> 33) as f32 / (1u64 << 31) as f32 * 2.0 - 1.0
     };
 

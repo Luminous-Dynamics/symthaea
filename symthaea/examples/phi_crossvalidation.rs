@@ -31,10 +31,8 @@
 
 use std::collections::HashMap;
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator,
-    phi_resonant::ResonantPhiCalculator,
-    HDC_DIMENSION,
+    consciousness_topology_generators::ConsciousnessTopology, phi_resonant::ResonantPhiCalculator,
+    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
 
 /// Topology specification for testing
@@ -82,90 +80,124 @@ fn main() {
         TopologySpec {
             name: "Ring",
             category: "uniform",
-            generator: Box::new(move |seed| ConsciousnessTopology::ring(n_nodes, HDC_DIMENSION, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::ring(n_nodes, HDC_DIMENSION, seed)
+            }),
         },
         TopologySpec {
             name: "Star",
             category: "original",
-            generator: Box::new(move |seed| ConsciousnessTopology::star(n_nodes, HDC_DIMENSION, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::star(n_nodes, HDC_DIMENSION, seed)
+            }),
         },
         TopologySpec {
             name: "Dense",
             category: "original",
-            generator: Box::new(move |seed| ConsciousnessTopology::dense_network(n_nodes, HDC_DIMENSION, None, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::dense_network(n_nodes, HDC_DIMENSION, None, seed)
+            }),
         },
         TopologySpec {
             name: "Lattice",
             category: "original",
-            generator: Box::new(move |seed| ConsciousnessTopology::lattice(n_nodes, HDC_DIMENSION, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::lattice(n_nodes, HDC_DIMENSION, seed)
+            }),
         },
         TopologySpec {
             name: "Line",
             category: "original",
-            generator: Box::new(move |seed| ConsciousnessTopology::line(n_nodes, HDC_DIMENSION, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::line(n_nodes, HDC_DIMENSION, seed)
+            }),
         },
         TopologySpec {
             name: "Binary Tree",
             category: "original",
-            generator: Box::new(move |seed| ConsciousnessTopology::binary_tree(n_nodes, HDC_DIMENSION, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::binary_tree(n_nodes, HDC_DIMENSION, seed)
+            }),
         },
         TopologySpec {
             name: "Modular",
             category: "original",
-            generator: Box::new(move |seed| ConsciousnessTopology::modular(n_nodes, HDC_DIMENSION, 3, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::modular(n_nodes, HDC_DIMENSION, 3, seed)
+            }),
         },
         TopologySpec {
             name: "Random",
             category: "baseline",
-            generator: Box::new(move |seed| ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, seed)
+            }),
         },
         // Tier 1 Exotic
         TopologySpec {
             name: "Torus 3×3",
             category: "tier1",
-            generator: Box::new(move |seed| ConsciousnessTopology::torus_square(3, HDC_DIMENSION, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::torus_square(3, HDC_DIMENSION, seed)
+            }),
         },
         TopologySpec {
             name: "Small-World",
             category: "tier1",
-            generator: Box::new(move |seed| ConsciousnessTopology::small_world(n_nodes, HDC_DIMENSION, 4, 0.1, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::small_world(n_nodes, HDC_DIMENSION, 4, 0.1, seed)
+            }),
         },
         TopologySpec {
             name: "Möbius Strip",
             category: "tier1",
-            generator: Box::new(move |seed| ConsciousnessTopology::mobius_strip(n_nodes, HDC_DIMENSION, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::mobius_strip(n_nodes, HDC_DIMENSION, seed)
+            }),
         },
         // Tier 2 Exotic
         TopologySpec {
             name: "Klein Bottle",
             category: "tier2",
-            generator: Box::new(move |seed| ConsciousnessTopology::klein_bottle_square(3, HDC_DIMENSION, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::klein_bottle_square(3, HDC_DIMENSION, seed)
+            }),
         },
         TopologySpec {
             name: "Hyperbolic",
             category: "tier2",
-            generator: Box::new(move |seed| ConsciousnessTopology::hyperbolic(n_nodes, HDC_DIMENSION, 3, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::hyperbolic(n_nodes, HDC_DIMENSION, 3, seed)
+            }),
         },
         TopologySpec {
             name: "Scale-Free",
             category: "tier2",
-            generator: Box::new(move |seed| ConsciousnessTopology::scale_free(n_nodes, HDC_DIMENSION, 2, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::scale_free(n_nodes, HDC_DIMENSION, 2, seed)
+            }),
         },
         // Tier 3 Exotic
         TopologySpec {
             name: "Hypercube 3D",
             category: "tier3",
-            generator: Box::new(move |_seed| ConsciousnessTopology::hypercube(3, HDC_DIMENSION, 42)),
+            generator: Box::new(move |_seed| {
+                ConsciousnessTopology::hypercube(3, HDC_DIMENSION, 42)
+            }),
         },
         TopologySpec {
             name: "Hypercube 4D",
             category: "tier3",
-            generator: Box::new(move |_seed| ConsciousnessTopology::hypercube(4, HDC_DIMENSION, 42)),
+            generator: Box::new(move |_seed| {
+                ConsciousnessTopology::hypercube(4, HDC_DIMENSION, 42)
+            }),
         },
         TopologySpec {
             name: "Fractal 8",
             category: "tier3",
-            generator: Box::new(move |seed| ConsciousnessTopology::fractal(n_nodes, HDC_DIMENSION, seed)),
+            generator: Box::new(move |seed| {
+                ConsciousnessTopology::fractal(n_nodes, HDC_DIMENSION, seed)
+            }),
         },
         TopologySpec {
             name: "Quantum 1:1:1",
@@ -189,8 +221,12 @@ fn main() {
     let real_calc = ConnectivityCalculator::new();
     let resonant_calc = ResonantPhiCalculator::new();
 
-    println!("📊 Computing Φ for {} topologies × {} samples = {} measurements\n",
-             topologies.len(), n_samples, topologies.len() * n_samples);
+    println!(
+        "📊 Computing Φ for {} topologies × {} samples = {} measurements\n",
+        topologies.len(),
+        n_samples,
+        topologies.len() * n_samples
+    );
 
     // Collect results
     let mut results: Vec<ValidationResult> = Vec::new();
@@ -251,9 +287,18 @@ fn main() {
     println!("  Pearson correlation (r):       {:.4}", stats.pearson_r);
     println!("  Spearman rank correlation (ρ): {:.4}", stats.spearman_rho);
     println!("  Kendall tau (τ):               {:.4}", stats.kendall_tau);
-    println!("  Mean absolute error:           {:.4}", stats.mean_absolute_error);
-    println!("  Top-5 rank agreement:          {:.1}%", stats.rank_agreement_top5 * 100.0);
-    println!("  Overall rank agreement:        {:.1}%", stats.rank_agreement_all * 100.0);
+    println!(
+        "  Mean absolute error:           {:.4}",
+        stats.mean_absolute_error
+    );
+    println!(
+        "  Top-5 rank agreement:          {:.1}%",
+        stats.rank_agreement_top5 * 100.0
+    );
+    println!(
+        "  Overall rank agreement:        {:.1}%",
+        stats.rank_agreement_all * 100.0
+    );
     println!();
 
     // Validation thresholds
@@ -263,12 +308,25 @@ fn main() {
 
     println!("🎯 VALIDATION THRESHOLDS");
     println!("═══════════════════════════════════════════════════════════════════");
-    println!("  Pearson r > 0.70:     {} (actual: {:.4})",
-             if pearson_pass { "✅ PASS" } else { "❌ FAIL" }, stats.pearson_r);
-    println!("  Spearman ρ > 0.65:    {} (actual: {:.4})",
-             if spearman_pass { "✅ PASS" } else { "❌ FAIL" }, stats.spearman_rho);
-    println!("  Top-5 agreement ≥60%: {} (actual: {:.1}%)",
-             if top5_pass { "✅ PASS" } else { "❌ FAIL" }, stats.rank_agreement_top5 * 100.0);
+    println!(
+        "  Pearson r > 0.70:     {} (actual: {:.4})",
+        if pearson_pass { "✅ PASS" } else { "❌ FAIL" },
+        stats.pearson_r
+    );
+    println!(
+        "  Spearman ρ > 0.65:    {} (actual: {:.4})",
+        if spearman_pass {
+            "✅ PASS"
+        } else {
+            "❌ FAIL"
+        },
+        stats.spearman_rho
+    );
+    println!(
+        "  Top-5 agreement ≥60%: {} (actual: {:.1}%)",
+        if top5_pass { "✅ PASS" } else { "❌ FAIL" },
+        stats.rank_agreement_top5 * 100.0
+    );
     println!();
 
     // Show rankings comparison
@@ -284,7 +342,11 @@ fn main() {
     println!("  ─────┼────────────────────────┼────────────────────────");
 
     for i in 0..5.min(results.len()) {
-        let match_indicator = if real_ranked[i].name == resonant_ranked[i].name { "✓" } else { "≠" };
+        let match_indicator = if real_ranked[i].name == resonant_ranked[i].name {
+            "✓"
+        } else {
+            "≠"
+        };
         println!(
             "    {} │ {:20} ({:.4}) │ {:20} ({:.4}) {}",
             i + 1,
@@ -321,7 +383,8 @@ fn std_dev(values: &[f64], mean: f64) -> f64 {
     if values.len() < 2 {
         return 0.0;
     }
-    let variance: f64 = values.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
+    let variance: f64 =
+        values.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
     variance.sqrt()
 }
 
@@ -346,10 +409,12 @@ fn compute_crossvalidation_stats(results: &[ValidationResult]) -> CrossValidatio
     let kendall_tau = kendall_tau_b(&real_ranks, &resonant_ranks);
 
     // Mean absolute error
-    let mae: f64 = real_values.iter()
+    let mae: f64 = real_values
+        .iter()
         .zip(resonant_values.iter())
         .map(|(a, b)| (a - b).abs())
-        .sum::<f64>() / results.len() as f64;
+        .sum::<f64>()
+        / results.len() as f64;
 
     // Rank agreement
     let top5_agreement = compute_rank_agreement(&real_ranks, &resonant_ranks, 5);

@@ -759,8 +759,8 @@ mod tests {
         let richness2 = analyzer.estimate_superposition_richness(&state2);
 
         // Richness must be in valid range [0, 1]
-        assert!(richness1 >= 0.0 && richness1 <= 1.0, "richness1 out of range: {}", richness1);
-        assert!(richness2 >= 0.0 && richness2 <= 1.0, "richness2 out of range: {}", richness2);
+        assert!((0.0..=1.0).contains(&richness1), "richness1 out of range: {}", richness1);
+        assert!((0.0..=1.0).contains(&richness2), "richness2 out of range: {}", richness2);
 
         // Different seeds should produce measurable richness (not all zeros or all ones)
         assert!(richness1 > 0.0 || richness2 > 0.0, "At least one state should have non-zero richness");
@@ -843,10 +843,10 @@ mod tests {
 
         // Create correlated components
         let base = BinaryHV::random(700);
-        let correlated = base.clone();
+        let correlated = base;
         let uncorrelated = BinaryHV::random(800);
 
-        let high_entanglement = analyzer.estimate_entanglement(&[base.clone(), correlated]);
+        let high_entanglement = analyzer.estimate_entanglement(&[base, correlated]);
         let low_entanglement = analyzer.estimate_entanglement(&[base, uncorrelated]);
 
         assert!(high_entanglement.correlation > low_entanglement.correlation);
@@ -893,7 +893,7 @@ mod tests {
 
         // Create chaotic sequence
         for i in 0..20 {
-            let state = if i % 2 == 0 { state1.clone() } else { state2.clone() };
+            let state = if i % 2 == 0 { state1 } else { state2 };
             analyzer.observe(&state, 0.5);
         }
 

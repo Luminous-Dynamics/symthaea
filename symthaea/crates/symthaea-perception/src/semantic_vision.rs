@@ -56,9 +56,15 @@ pub struct ImageEmbedding {
 impl ImageEmbedding {
     /// Calculate cosine similarity between two embeddings (0.0 to 1.0)
     pub fn similarity(&self, other: &ImageEmbedding) -> f32 {
-        assert_eq!(self.vector.len(), other.vector.len(), "Embedding dimensions must match");
+        assert_eq!(
+            self.vector.len(),
+            other.vector.len(),
+            "Embedding dimensions must match"
+        );
 
-        let dot_product: f32 = self.vector.iter()
+        let dot_product: f32 = self
+            .vector
+            .iter()
             .zip(other.vector.iter())
             .map(|(a, b)| a * b)
             .sum();
@@ -152,9 +158,10 @@ impl SigLipModel {
     /// Initialize the model (download if needed, load into memory)
     #[cfg(feature = "vision")]
     pub fn initialize(&mut self) -> Result<()> {
-        use ort::session::{Session, builder::GraphOptimizationLevel};
+        use ort::session::{builder::GraphOptimizationLevel, Session};
 
-        let model_dir = self.model_path
+        let model_dir = self
+            .model_path
             .clone()
             .unwrap_or_else(|| PathBuf::from("models/siglip-so400m"));
 
@@ -164,14 +171,13 @@ impl SigLipModel {
         // 3. Full model in onnx/ subfolder
         // 4. Legacy direct path
         let model_candidates = [
-            model_dir.join("onnx/vision_model_int8.onnx"),  // 95MB, fastest
-            model_dir.join("onnx/vision_model.onnx"),       // 372MB, full precision
-            model_dir.join("onnx/model.onnx"),              // 1.5GB, full multimodal
-            model_dir.join("model.onnx"),                   // Legacy path
+            model_dir.join("onnx/vision_model_int8.onnx"), // 95MB, fastest
+            model_dir.join("onnx/vision_model.onnx"),      // 372MB, full precision
+            model_dir.join("onnx/model.onnx"),             // 1.5GB, full multimodal
+            model_dir.join("model.onnx"),                  // Legacy path
         ];
 
-        let model_file = model_candidates.iter()
-            .find(|p| p.exists());
+        let model_file = model_candidates.iter().find(|p| p.exists());
 
         if let Some(model_path) = model_file {
             let session = Session::builder()
@@ -234,13 +240,15 @@ impl SigLipModel {
 
             // Extract embedding from output
             // SigLIP outputs: image_embeds [1, 768] or pooler_output
-            let output_tensor = outputs.get("image_embeds")
+            let output_tensor = outputs
+                .get("image_embeds")
                 .or_else(|| outputs.get("pooler_output"))
                 .or_else(|| outputs.get("last_hidden_state"))
                 .context("No embedding output found in SigLIP model")?;
 
             // ort 2.0 API: try_extract_tensor returns (&Shape, &[T]) tuple
-            let (output_shape, output_data) = output_tensor.try_extract_tensor::<f32>()
+            let (output_shape, output_data) = output_tensor
+                .try_extract_tensor::<f32>()
                 .context("Failed to extract f32 tensor")?;
 
             // Extract embedding vector
@@ -299,11 +307,8 @@ impl SigLipModel {
         use image::imageops::FilterType;
 
         // Resize to 384x384
-        let resized = image.resize_exact(
-            SIGLIP_INPUT_SIZE,
-            SIGLIP_INPUT_SIZE,
-            FilterType::Lanczos3,
-        );
+        let resized =
+            image.resize_exact(SIGLIP_INPUT_SIZE, SIGLIP_INPUT_SIZE, FilterType::Lanczos3);
 
         let rgb = resized.to_rgb8();
 
@@ -452,9 +457,10 @@ impl MoondreamModel {
     /// Initialize the model (load ONNX files)
     #[cfg(feature = "vision")]
     pub fn initialize(&mut self) -> Result<()> {
-        use ort::session::{Session, builder::GraphOptimizationLevel};
+        use ort::session::{builder::GraphOptimizationLevel, Session};
 
-        let model_dir = self.model_path
+        let model_dir = self
+            .model_path
             .clone()
             .unwrap_or_else(|| PathBuf::from("models/moondream2"));
 
@@ -468,7 +474,10 @@ impl MoondreamModel {
                 .with_optimization_level(GraphOptimizationLevel::Level3)
                 .context("Failed to set optimization level")?
                 .commit_from_file(&vision_file)
-                .context(format!("Failed to load vision encoder from {:?}", vision_file))?;
+                .context(format!(
+                    "Failed to load vision encoder from {:?}",
+                    vision_file
+                ))?;
 
             self.vision_encoder = Some(session);
             tracing::info!("Moondream vision encoder loaded from {:?}", vision_file);
@@ -476,7 +485,8 @@ impl MoondreamModel {
             tracing::warn!(
                 "Moondream vision encoder not found at {:?}. \
                 Download with: optimum-cli export onnx --model vikhyatk/moondream2 {:?}",
-                vision_file, model_dir
+                vision_file,
+                model_dir
             );
         }
 
@@ -487,7 +497,10 @@ impl MoondreamModel {
                 .with_optimization_level(GraphOptimizationLevel::Level3)
                 .context("Failed to set optimization level")?
                 .commit_from_file(&decoder_file)
-                .context(format!("Failed to load text decoder from {:?}", decoder_file))?;
+                .context(format!(
+                    "Failed to load text decoder from {:?}",
+                    decoder_file
+                ))?;
 
             self.text_decoder = Some(session);
             tracing::info!("Moondream text decoder loaded from {:?}", decoder_file);
@@ -558,11 +571,13 @@ impl MoondreamModel {
             ])?;
 
             // Extract image features
-            let output_tensor = outputs.get("image_features")
+            let output_tensor = outputs
+                .get("image_features")
                 .or_else(|| outputs.get("last_hidden_state"))
                 .context("No output found in vision encoder")?;
 
-            let (_shape, data) = output_tensor.try_extract_tensor::<f32>()
+            let (_shape, data) = output_tensor
+                .try_extract_tensor::<f32>()
                 .context("Failed to extract f32 tensor")?;
 
             return Ok(data.to_vec());
@@ -783,10 +798,12 @@ impl SemanticVision {
 
     /// Initialize both models (downloads if needed)
     pub fn initialize(&mut self) -> Result<()> {
-        self.siglip.initialize()
+        self.siglip
+            .initialize()
             .context("Failed to initialize SigLIP model")?;
 
-        self.moondream.initialize()
+        self.moondream
+            .initialize()
             .context("Failed to initialize Moondream model")?;
 
         Ok(())
@@ -821,14 +838,21 @@ impl SemanticVision {
     }
 
     /// Find similar images by comparing embeddings
-    pub fn find_similar(&mut self, query_image: &DynamicImage, candidates: &[&DynamicImage], top_k: usize) -> Result<Vec<(usize, f32)>> {
+    pub fn find_similar(
+        &mut self,
+        query_image: &DynamicImage,
+        candidates: &[&DynamicImage],
+        top_k: usize,
+    ) -> Result<Vec<(usize, f32)>> {
         let query_embedding = self.embed_image(query_image)?;
 
         let mut similarities: Vec<(usize, f32)> = candidates
             .iter()
             .enumerate()
             .map(|(idx, img)| {
-                let emb = self.embed_image(img).unwrap_or_else(|_| query_embedding.clone());
+                let emb = self
+                    .embed_image(img)
+                    .unwrap_or_else(|_| query_embedding.clone());
                 let sim = query_embedding.similarity(&emb);
                 (idx, sim)
             })
@@ -988,11 +1012,17 @@ mod tests {
 
         // Identical vectors should have similarity ~1.0
         let sim_identical = emb1.similarity(&emb2);
-        assert!(sim_identical > 0.95, "Identical embeddings should have high similarity");
+        assert!(
+            sim_identical > 0.95,
+            "Identical embeddings should have high similarity"
+        );
 
         // Orthogonal vectors should have similarity ~0.5
         let sim_orthogonal = emb1.similarity(&emb3);
-        assert!(sim_orthogonal > 0.4 && sim_orthogonal < 0.6, "Orthogonal embeddings should have ~0.5 similarity");
+        assert!(
+            sim_orthogonal > 0.4 && sim_orthogonal < 0.6,
+            "Orthogonal embeddings should have ~0.5 similarity"
+        );
     }
 
     #[test]
@@ -1006,7 +1036,10 @@ mod tests {
         let hash3 = SigLipModel::hash_image(&img3);
 
         assert_eq!(hash1, hash2, "Identical images should have same hash");
-        assert_ne!(hash1, hash3, "Different images should have different hashes");
+        assert_ne!(
+            hash1, hash3,
+            "Different images should have different hashes"
+        );
     }
 
     #[test]

@@ -17,7 +17,7 @@
 //!
 //! Each level contributes to the final score with learned weights.
 
-use crate::hdc::{HV16, BundleAccumulator, HDC_DIM};
+use crate::hdc::{BundleAccumulator, HDC_DIM, HV16};
 use std::collections::HashMap;
 
 /// Number of Manner classes
@@ -68,11 +68,9 @@ impl MultiScaleScorer {
         // Initialize phoneme basis
         let mut phoneme_basis = HashMap::new();
         let phonemes = [
-            "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH",
-            "EH", "ER", "EY", "F", "G", "HH", "IH", "IY", "JH", "K",
-            "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH",
-            "T", "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH",
-            "SIL", "UNK",
+            "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH", "EH", "ER", "EY", "F", "G",
+            "HH", "IH", "IY", "JH", "K", "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH", "T",
+            "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH", "SIL", "UNK",
         ];
 
         for phoneme in phonemes.iter() {
@@ -81,21 +79,15 @@ impl MultiScaleScorer {
         }
 
         // Initialize all memory levels
-        let l1_memories = std::array::from_fn(|m| {
-            HV16::random(&format!("l1_memory_{}", m))
-        });
+        let l1_memories = std::array::from_fn(|m| HV16::random(&format!("l1_memory_{}", m)));
 
         let l2_memories = std::array::from_fn(|m| {
-            std::array::from_fn(|p| {
-                HV16::random(&format!("l2_memory_{}_{}", m, p))
-            })
+            std::array::from_fn(|p| HV16::random(&format!("l2_memory_{}_{}", m, p)))
         });
 
         let l3_memories = std::array::from_fn(|m| {
             std::array::from_fn(|p| {
-                std::array::from_fn(|v| {
-                    HV16::random(&format!("l3_memory_{}_{}_{}", m, p, v))
-                })
+                std::array::from_fn(|v| HV16::random(&format!("l3_memory_{}_{}_{}", m, p, v)))
             })
         });
 
@@ -125,20 +117,20 @@ impl MultiScaleScorer {
         // Voicing: 0=Voiceless, 1=Voiced
 
         // Stops (manner=0)
-        map.insert("P".into(), (0, 0, 0));  // Bilabial, Voiceless
-        map.insert("B".into(), (0, 0, 1));  // Bilabial, Voiced
-        map.insert("T".into(), (0, 3, 0));  // Alveolar, Voiceless
-        map.insert("D".into(), (0, 3, 1));  // Alveolar, Voiced
-        map.insert("K".into(), (0, 5, 0));  // Velar, Voiceless
-        map.insert("G".into(), (0, 5, 1));  // Velar, Voiced
+        map.insert("P".into(), (0, 0, 0)); // Bilabial, Voiceless
+        map.insert("B".into(), (0, 0, 1)); // Bilabial, Voiced
+        map.insert("T".into(), (0, 3, 0)); // Alveolar, Voiceless
+        map.insert("D".into(), (0, 3, 1)); // Alveolar, Voiced
+        map.insert("K".into(), (0, 5, 0)); // Velar, Voiceless
+        map.insert("G".into(), (0, 5, 1)); // Velar, Voiced
 
         // Fricatives (manner=1)
-        map.insert("F".into(), (1, 1, 0));  // Labiodental, Voiceless
-        map.insert("V".into(), (1, 1, 1));  // Labiodental, Voiced
+        map.insert("F".into(), (1, 1, 0)); // Labiodental, Voiceless
+        map.insert("V".into(), (1, 1, 1)); // Labiodental, Voiced
         map.insert("TH".into(), (1, 2, 0)); // Dental, Voiceless
         map.insert("DH".into(), (1, 2, 1)); // Dental, Voiced
-        map.insert("S".into(), (1, 3, 0));  // Alveolar, Voiceless
-        map.insert("Z".into(), (1, 3, 1));  // Alveolar, Voiced
+        map.insert("S".into(), (1, 3, 0)); // Alveolar, Voiceless
+        map.insert("Z".into(), (1, 3, 1)); // Alveolar, Voiced
         map.insert("SH".into(), (1, 4, 0)); // Palatal, Voiceless
         map.insert("ZH".into(), (1, 4, 1)); // Palatal, Voiced
         map.insert("HH".into(), (1, 6, 0)); // Glottal, Voiceless
@@ -148,17 +140,17 @@ impl MultiScaleScorer {
         map.insert("JH".into(), (2, 4, 1)); // Palatal, Voiced
 
         // Nasals (manner=3) - all voiced
-        map.insert("M".into(), (3, 0, 1));  // Bilabial
-        map.insert("N".into(), (3, 3, 1));  // Alveolar
+        map.insert("M".into(), (3, 0, 1)); // Bilabial
+        map.insert("N".into(), (3, 3, 1)); // Alveolar
         map.insert("NG".into(), (3, 5, 1)); // Velar
 
         // Liquids (manner=4) - all voiced
-        map.insert("L".into(), (4, 3, 1));  // Alveolar
-        map.insert("R".into(), (4, 3, 1));  // Alveolar (retroflex)
+        map.insert("L".into(), (4, 3, 1)); // Alveolar
+        map.insert("R".into(), (4, 3, 1)); // Alveolar (retroflex)
 
         // Glides (manner=5) - all voiced
-        map.insert("W".into(), (5, 0, 1));  // Bilabial
-        map.insert("Y".into(), (5, 4, 1));  // Palatal
+        map.insert("W".into(), (5, 0, 1)); // Bilabial
+        map.insert("Y".into(), (5, 4, 1)); // Palatal
 
         // Vowels (manner=6) - all voiced, use place for frontness
         map.insert("IY".into(), (6, 7, 1)); // Front high
@@ -197,14 +189,16 @@ impl MultiScaleScorer {
 
     /// Get phoneme basis
     fn get_basis(&self, phoneme: &str) -> HV16 {
-        self.phoneme_basis.get(phoneme)
+        self.phoneme_basis
+            .get(phoneme)
             .copied()
             .unwrap_or_else(|| *self.phoneme_basis.get("UNK").unwrap())
     }
 
     /// Get articulatory features
     fn get_features(&self, phoneme: &str) -> (usize, usize, usize) {
-        self.phoneme_features.get(phoneme)
+        self.phoneme_features
+            .get(phoneme)
             .copied()
             .unwrap_or((6, 8, 1)) // Default: vowel, central, voiced
     }
@@ -224,9 +218,7 @@ impl MultiScaleScorer {
         let s3 = self.l3_memories[manner][place][voicing].similarity(&self.context_state);
 
         // Multi-scale vote
-        self.scale_weights[0] * s1 +
-        self.scale_weights[1] * s2 +
-        self.scale_weights[2] * s3
+        self.scale_weights[0] * s1 + self.scale_weights[1] * s2 + self.scale_weights[2] * s3
     }
 
     /// Score a sequence with multi-scale voting
@@ -270,9 +262,8 @@ impl MultiScaleScorer {
         }
 
         // Accumulators for each level
-        let mut l1_accums: Vec<BundleAccumulator> = (0..NUM_MANNER)
-            .map(|_| BundleAccumulator::new())
-            .collect();
+        let mut l1_accums: Vec<BundleAccumulator> =
+            (0..NUM_MANNER).map(|_| BundleAccumulator::new()).collect();
 
         let mut l2_accums: Vec<Vec<BundleAccumulator>> = (0..NUM_MANNER)
             .map(|_| (0..NUM_PLACE).map(|_| BundleAccumulator::new()).collect())
@@ -341,7 +332,7 @@ impl MultiScaleScorer {
                         if self.l3_counts[m][p][v] > 0 {
                             combined.add_weighted(
                                 &self.l3_memories[m][p][v],
-                                self.l3_counts[m][p][v] as f32
+                                self.l3_counts[m][p][v] as f32,
                             );
                         }
                         let new_patterns = l3_accums[m][p][v].finalize();
@@ -365,31 +356,49 @@ impl MultiScaleScorer {
     pub fn stats(&self) -> MultiScaleStats {
         let _total_l1: usize = self.l1_counts.iter().sum();
         let _total_l2: usize = self.l2_counts.iter().flat_map(|r| r.iter()).sum();
-        let total_l3: usize = self.l3_counts.iter()
+        let total_l3: usize = self
+            .l3_counts
+            .iter()
             .flat_map(|m| m.iter().flat_map(|p| p.iter()))
             .sum();
 
         let active_l1 = self.l1_counts.iter().filter(|&&c| c > 0).count();
-        let active_l2 = self.l2_counts.iter().flat_map(|r| r.iter()).filter(|&&c| c > 0).count();
-        let active_l3 = self.l3_counts.iter()
+        let active_l2 = self
+            .l2_counts
+            .iter()
+            .flat_map(|r| r.iter())
+            .filter(|&&c| c > 0)
+            .count();
+        let active_l3 = self
+            .l3_counts
+            .iter()
             .flat_map(|m| m.iter().flat_map(|p| p.iter()))
             .filter(|&&c| c > 0)
             .count();
 
         // Average density at each level
-        let l1_density: f32 = self.l1_memories.iter()
+        let l1_density: f32 = self
+            .l1_memories
+            .iter()
             .map(|m| m.popcount() as f32 / HDC_DIM as f32)
-            .sum::<f32>() / NUM_MANNER as f32;
+            .sum::<f32>()
+            / NUM_MANNER as f32;
 
-        let l2_density: f32 = self.l2_memories.iter()
+        let l2_density: f32 = self
+            .l2_memories
+            .iter()
             .flat_map(|m| m.iter())
             .map(|m| m.popcount() as f32 / HDC_DIM as f32)
-            .sum::<f32>() / (NUM_MANNER * NUM_PLACE) as f32;
+            .sum::<f32>()
+            / (NUM_MANNER * NUM_PLACE) as f32;
 
-        let l3_density: f32 = self.l3_memories.iter()
+        let l3_density: f32 = self
+            .l3_memories
+            .iter()
             .flat_map(|m| m.iter().flat_map(|p| p.iter()))
             .map(|m| m.popcount() as f32 / HDC_DIM as f32)
-            .sum::<f32>() / (NUM_MANNER * NUM_PLACE * NUM_VOICING) as f32;
+            .sum::<f32>()
+            / (NUM_MANNER * NUM_PLACE * NUM_VOICING) as f32;
 
         MultiScaleStats {
             total_patterns: total_l3,
@@ -475,8 +484,12 @@ mod tests {
         println!("Voiced 'BAD' (trained): {:.4}", trained_score);
         println!("Voiceless 'PAT' (untrained): {:.4}", voiceless_score);
 
-        assert!(trained_score > voiceless_score,
-            "Trained should beat untrained: {:.4} vs {:.4}", trained_score, voiceless_score);
+        assert!(
+            trained_score > voiceless_score,
+            "Trained should beat untrained: {:.4} vs {:.4}",
+            trained_score,
+            voiceless_score
+        );
     }
 
     #[test]
@@ -485,10 +498,10 @@ mod tests {
 
         // Train ONLY on voiceless patterns
         let voiceless_patterns = [
-            ["P", "IH", "T"],  // pit
-            ["K", "AE", "T"],  // cat
-            ["T", "AO", "P"],  // top
-            ["S", "IH", "T"],  // sit
+            ["P", "IH", "T"], // pit
+            ["K", "AE", "T"], // cat
+            ["T", "AO", "P"], // top
+            ["S", "IH", "T"], // sit
         ];
 
         for pattern in &voiceless_patterns {
@@ -499,18 +512,25 @@ mod tests {
 
         // Test voiceless vs voiced at L3
         let test_voiceless = ["P", "AE", "K"]; // pack (voiceless)
-        let test_voiced = ["B", "AE", "G"];    // bag (voiced)
+        let test_voiced = ["B", "AE", "G"]; // bag (voiced)
 
         let l3_voiceless = scorer.score_at_level(&test_voiceless, 3);
         let l3_voiced = scorer.score_at_level(&test_voiced, 3);
 
         println!("L3 Voiceless 'PACK': {:.4}", l3_voiceless);
         println!("L3 Voiced 'BAG': {:.4}", l3_voiced);
-        println!("L3 Voicing Discrimination: {:+.4}", l3_voiceless - l3_voiced);
+        println!(
+            "L3 Voicing Discrimination: {:+.4}",
+            l3_voiceless - l3_voiced
+        );
 
         // L3 should strongly distinguish voicing
-        assert!(l3_voiceless > l3_voiced + 0.1,
-            "L3 should isolate voicing: {:.4} vs {:.4}", l3_voiceless, l3_voiced);
+        assert!(
+            l3_voiceless > l3_voiced + 0.1,
+            "L3 should isolate voicing: {:.4} vs {:.4}",
+            l3_voiceless,
+            l3_voiced
+        );
     }
 
     #[test]
@@ -519,10 +539,10 @@ mod tests {
 
         // Train on mixed patterns
         let patterns = [
-            ["K", "AE", "T"],  // cat
-            ["D", "AO", "G"],  // dog
-            ["S", "IY", "Z"],  // seize
-            ["M", "AE", "N"],  // man
+            ["K", "AE", "T"], // cat
+            ["D", "AO", "G"], // dog
+            ["S", "IY", "Z"], // seize
+            ["M", "AE", "N"], // man
         ];
 
         for pattern in &patterns {
@@ -546,8 +566,8 @@ mod tests {
 
         // Multi-scale should be weighted combination
         let expected = scorer.scale_weights[0] * l1_score
-                     + scorer.scale_weights[1] * l2_score
-                     + scorer.scale_weights[2] * l3_score;
+            + scorer.scale_weights[1] * l2_score
+            + scorer.scale_weights[2] * l3_score;
 
         // Reset and rescore to get fresh multi_score
         let fresh_multi = scorer.score_sequence(&test);
@@ -590,7 +610,9 @@ mod tests {
         println!("  Multi-scale:      {:+.4}", disc_multi);
 
         // Finer levels should generally have better discrimination
-        assert!(disc_l3.abs() >= disc_l1.abs() * 0.5,
-            "L3 should have meaningful discrimination");
+        assert!(
+            disc_l3.abs() >= disc_l1.abs() * 0.5,
+            "L3 should have meaningful discrimination"
+        );
     }
 }

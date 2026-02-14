@@ -8,10 +8,10 @@
 //!
 //! Uses synthetic signals that mimic real biosignal characteristics.
 
+use std::f64::consts::PI;
 use symthaea::hdc::cincinnati_ltc::CincinnatiLtcEngine;
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
-use std::f64::consts::PI;
 
 // Use smaller dimension for faster execution
 const SIGNAL_DIM: usize = 1024;
@@ -56,9 +56,15 @@ impl BiosignalGenerator for AlphaRhythm {
         self.t += self.dt;
         base + harmonic + noise
     }
-    fn name(&self) -> &str { "EEG Alpha" }
-    fn description(&self) -> &str { "8-12 Hz alpha rhythm (relaxed state)" }
-    fn expected_frequency(&self) -> f64 { self.freq }
+    fn name(&self) -> &str {
+        "EEG Alpha"
+    }
+    fn description(&self) -> &str {
+        "8-12 Hz alpha rhythm (relaxed state)"
+    }
+    fn expected_frequency(&self) -> f64 {
+        self.freq
+    }
 }
 
 /// Beta rhythm (12-30 Hz) - active, focused
@@ -85,9 +91,15 @@ impl BiosignalGenerator for BetaRhythm {
         self.t += self.dt;
         base * modulation
     }
-    fn name(&self) -> &str { "EEG Beta" }
-    fn description(&self) -> &str { "12-30 Hz beta rhythm (focused state)" }
-    fn expected_frequency(&self) -> f64 { self.freq }
+    fn name(&self) -> &str {
+        "EEG Beta"
+    }
+    fn description(&self) -> &str {
+        "12-30 Hz beta rhythm (focused state)"
+    }
+    fn expected_frequency(&self) -> f64 {
+        self.freq
+    }
 }
 
 /// Gamma rhythm (30-100 Hz) - cognitive processing
@@ -115,9 +127,15 @@ impl BiosignalGenerator for GammaRhythm {
         self.t += self.dt;
         gamma * (0.3 + 0.7 * theta_envelope)
     }
-    fn name(&self) -> &str { "EEG Gamma" }
-    fn description(&self) -> &str { "30-100 Hz gamma bursts (cognitive processing)" }
-    fn expected_frequency(&self) -> f64 { self.freq }
+    fn name(&self) -> &str {
+        "EEG Gamma"
+    }
+    fn description(&self) -> &str {
+        "30-100 Hz gamma bursts (cognitive processing)"
+    }
+    fn expected_frequency(&self) -> f64 {
+        self.freq
+    }
 }
 
 // =============================================================================
@@ -128,7 +146,7 @@ impl BiosignalGenerator for GammaRhythm {
 struct HeartRateVariability {
     t: f64,
     dt: f64,
-    base_rate: f64,  // ~1 Hz = 60 bpm
+    base_rate: f64, // ~1 Hz = 60 bpm
     respiratory_sinus_arrhythmia: f64,
 }
 
@@ -137,7 +155,7 @@ impl HeartRateVariability {
         Self {
             t: 0.0,
             dt: 1.0 / sample_rate,
-            base_rate: 1.2, // 72 bpm
+            base_rate: 1.2,                     // 72 bpm
             respiratory_sinus_arrhythmia: 0.15, // 15% variation with breathing
         }
     }
@@ -160,9 +178,15 @@ impl BiosignalGenerator for HeartRateVariability {
         self.t += self.dt;
         r_wave
     }
-    fn name(&self) -> &str { "HRV" }
-    fn description(&self) -> &str { "Heart rate variability with respiratory modulation" }
-    fn expected_frequency(&self) -> f64 { self.base_rate }
+    fn name(&self) -> &str {
+        "HRV"
+    }
+    fn description(&self) -> &str {
+        "Heart rate variability with respiratory modulation"
+    }
+    fn expected_frequency(&self) -> f64 {
+        self.base_rate
+    }
 }
 
 // =============================================================================
@@ -204,9 +228,15 @@ impl BiosignalGenerator for RespiratoryPattern {
         self.t += self.dt;
         breath + irregularity
     }
-    fn name(&self) -> &str { "Respiratory" }
-    fn description(&self) -> &str { "Breathing pattern with natural asymmetry" }
-    fn expected_frequency(&self) -> f64 { self.breath_rate }
+    fn name(&self) -> &str {
+        "Respiratory"
+    }
+    fn description(&self) -> &str {
+        "Breathing pattern with natural asymmetry"
+    }
+    fn expected_frequency(&self) -> f64 {
+        self.breath_rate
+    }
 }
 
 // =============================================================================
@@ -217,8 +247,8 @@ impl BiosignalGenerator for RespiratoryPattern {
 struct SpeechFormant {
     t: f64,
     dt: f64,
-    f1: f64,  // First formant
-    f2: f64,  // Second formant
+    f1: f64, // First formant
+    f2: f64, // Second formant
     pitch: f64,
 }
 
@@ -227,8 +257,8 @@ impl SpeechFormant {
         Self {
             t: 0.0,
             dt: 1.0 / sample_rate,
-            f1: 500.0,   // Vowel "a" first formant
-            f2: 1500.0,  // Second formant
+            f1: 500.0,    // Vowel "a" first formant
+            f2: 1500.0,   // Second formant
             pitch: 150.0, // Fundamental frequency
         }
     }
@@ -246,9 +276,15 @@ impl BiosignalGenerator for SpeechFormant {
         self.t += self.dt;
         glottal * (0.5 + formant1 + formant2)
     }
-    fn name(&self) -> &str { "Speech" }
-    fn description(&self) -> &str { "Speech-like formant pattern" }
-    fn expected_frequency(&self) -> f64 { self.pitch }
+    fn name(&self) -> &str {
+        "Speech"
+    }
+    fn description(&self) -> &str {
+        "Speech-like formant pattern"
+    }
+    fn expected_frequency(&self) -> f64 {
+        self.pitch
+    }
 }
 
 /// Music-like harmonic pattern
@@ -284,9 +320,15 @@ impl BiosignalGenerator for MusicHarmonic {
         self.t += self.dt;
         sum * envelope / 2.0
     }
-    fn name(&self) -> &str { "Music" }
-    fn description(&self) -> &str { "Harmonic series (musical tone)" }
-    fn expected_frequency(&self) -> f64 { self.fundamental }
+    fn name(&self) -> &str {
+        "Music"
+    }
+    fn description(&self) -> &str {
+        "Harmonic series (musical tone)"
+    }
+    fn expected_frequency(&self) -> f64 {
+        self.fundamental
+    }
 }
 
 // =============================================================================
@@ -344,12 +386,17 @@ fn analyze_biosignal(
         // Update prediction error for budding
         let node_count = engine.node_count();
         while node_states.len() < node_count {
-            node_states.push(ContinuousHV::random(SIGNAL_DIM, (node_states.len() * 1000 + i) as u64));
+            node_states.push(ContinuousHV::random(
+                SIGNAL_DIM,
+                (node_states.len() * 1000 + i) as u64,
+            ));
         }
 
         for node_id in 0..node_count {
-            let expected = ContinuousHV::random(SIGNAL_DIM, if prediction { 111111 } else { 222222 });
-            let actual = ContinuousHV::random(SIGNAL_DIM, if above_threshold { 111111 } else { 222222 });
+            let expected =
+                ContinuousHV::random(SIGNAL_DIM, if prediction { 111111 } else { 222222 });
+            let actual =
+                ContinuousHV::random(SIGNAL_DIM, if above_threshold { 111111 } else { 222222 });
             engine.update_prediction_error(node_id, &expected, &actual);
         }
 
@@ -357,7 +404,11 @@ fn analyze_biosignal(
         let _ = engine.process_budding(&node_states[..node_count], i as f64 / sample_rate);
     }
 
-    let accuracy = if total > 0 { correct as f64 / total as f64 } else { 0.5 };
+    let accuracy = if total > 0 {
+        correct as f64 / total as f64
+    } else {
+        0.5
+    };
     let estimated_freq = (crossings as f64 / 2.0) / duration_sec;
 
     BiosignalResults {
@@ -383,9 +434,9 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════════════════╝");
     println!();
 
-    let sample_rate = 250.0;  // Hz (common for EEG)
-    let duration = 4.0;       // seconds
-    let threshold = 0.0;      // Zero-crossing threshold
+    let sample_rate = 250.0; // Hz (common for EEG)
+    let duration = 4.0; // seconds
+    let threshold = 0.0; // Zero-crossing threshold
 
     println!("Configuration:");
     println!("  Sample Rate:  {} Hz", sample_rate);
@@ -398,8 +449,14 @@ fn main() {
         ("EEG Alpha (10 Hz)", Box::new(AlphaRhythm::new(sample_rate))),
         ("EEG Beta (20 Hz)", Box::new(BetaRhythm::new(sample_rate))),
         ("EEG Gamma (40 Hz)", Box::new(GammaRhythm::new(sample_rate))),
-        ("Heart Rate Variability", Box::new(HeartRateVariability::new(sample_rate))),
-        ("Respiratory Pattern", Box::new(RespiratoryPattern::new(sample_rate))),
+        (
+            "Heart Rate Variability",
+            Box::new(HeartRateVariability::new(sample_rate)),
+        ),
+        (
+            "Respiratory Pattern",
+            Box::new(RespiratoryPattern::new(sample_rate)),
+        ),
         ("Speech Formant", Box::new(SpeechFormant::new(sample_rate))),
         ("Musical Tone", Box::new(MusicHarmonic::new(sample_rate))),
     ];
@@ -417,12 +474,14 @@ fn main() {
             format!("{:<22}", name)
         };
 
-        println!("│ {} │ {:5.1}%   │ {:>5} │ {:7.1}  │ {:7.1}  │",
-                 name_fmt,
-                 results.accuracy * 100.0,
-                 results.final_nodes,
-                 results.estimated_frequency,
-                 results.expected_frequency);
+        println!(
+            "│ {} │ {:5.1}%   │ {:>5} │ {:7.1}  │ {:7.1}  │",
+            name_fmt,
+            results.accuracy * 100.0,
+            results.final_nodes,
+            results.estimated_frequency,
+            results.expected_frequency
+        );
     }
 
     println!("└────────────────────────┴──────────┴───────┴──────────┴──────────┘");

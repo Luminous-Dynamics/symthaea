@@ -16,11 +16,11 @@
 //! cargo run --example school_coherence_integration --release
 //! ```
 
-use symthaea::school::{
-    School, SchoolConfig, CoherenceBridgedSchool,
-    Curriculum, CurriculumType, LearningObjective, Difficulty, Domain,
-};
 use symthaea::physiology::coherence::CoherenceField;
+use symthaea::school::{
+    CoherenceBridgedSchool, Curriculum, CurriculumType, Difficulty, Domain, LearningObjective,
+    School, SchoolConfig,
+};
 
 fn main() {
     println!("╔════════════════════════════════════════════════════════════════════════════════╗");
@@ -42,7 +42,9 @@ fn main() {
 
     // Add a curriculum
     let curriculum = Curriculum::builtin(CurriculumType::NixOS);
-    bridged.add_curriculum(curriculum).expect("Failed to add curriculum");
+    bridged
+        .add_curriculum(curriculum)
+        .expect("Failed to add curriculum");
 
     println!("═══ Starting State ═══");
     println!("  Coherence: {:.0}%", bridged.coherence_level() * 100.0);
@@ -65,15 +67,32 @@ fn main() {
     // Predict the impact
     let prediction = bridged.predict_learning_impact(&objective, true);
     println!("  Prediction for '{}':", objective.name);
-    println!("    Can learn: {}", if prediction.can_learn { "✓" } else { "✗" });
-    println!("    Current coherence: {:.0}%", prediction.current_coherence * 100.0);
-    println!("    Coherence multiplier: {:.2}x", prediction.coherence_multiplier);
-    println!("    Base Φ prediction: {:.6}", prediction.base_phi_prediction);
-    println!("    Adjusted Φ prediction: {:.6}", prediction.adjusted_phi_prediction);
+    println!(
+        "    Can learn: {}",
+        if prediction.can_learn { "✓" } else { "✗" }
+    );
+    println!(
+        "    Current coherence: {:.0}%",
+        prediction.current_coherence * 100.0
+    );
+    println!(
+        "    Coherence multiplier: {:.2}x",
+        prediction.coherence_multiplier
+    );
+    println!(
+        "    Base Φ prediction: {:.6}",
+        prediction.base_phi_prediction
+    );
+    println!(
+        "    Adjusted Φ prediction: {:.6}",
+        prediction.adjusted_phi_prediction
+    );
     println!();
 
     // Actually learn (connected = with teacher)
-    let result = bridged.learn_with_coherence(&objective, true).expect("Learning failed");
+    let result = bridged
+        .learn_with_coherence(&objective, true)
+        .expect("Learning failed");
     println!("  Result: {}", result.describe());
     println!("  Was successful: {}", result.was_successful());
     println!();
@@ -89,7 +108,10 @@ fn main() {
     bridged.coherence_mut().coherence = 0.5;
     bridged.coherence_mut().relational_resonance = 0.2;
 
-    println!("  [Simulated scatter: coherence dropped to {:.0}%]", bridged.coherence_level() * 100.0);
+    println!(
+        "  [Simulated scatter: coherence dropped to {:.0}%]",
+        bridged.coherence_level() * 100.0
+    );
 
     let objective2 = LearningObjective::new("advanced", "NixOS Advanced Concepts")
         .with_difficulty(Difficulty::Intermediate)
@@ -105,7 +127,11 @@ fn main() {
     // Get recommendation (should suggest centering)
     let rec = bridged.recommend_next_with_coherence().unwrap();
     match rec {
-        symthaea::school::CoherenceRecommendation::NeedsCentering { centering_seconds, message, .. } => {
+        symthaea::school::CoherenceRecommendation::NeedsCentering {
+            centering_seconds,
+            message,
+            ..
+        } => {
             println!("  Recommendation: Need to center!");
             println!("    {}", message);
             println!("    Centering needed: {:.0} seconds", centering_seconds);
@@ -126,7 +152,10 @@ fn main() {
     println!("═══ Demo 3: Centering to Restore Coherence ═══");
     println!();
 
-    println!("  Before centering: coherence = {:.0}%", bridged.coherence_level() * 100.0);
+    println!(
+        "  Before centering: coherence = {:.0}%",
+        bridged.coherence_level() * 100.0
+    );
 
     // Center (passive restoration over time)
     if let Some(centering_time) = bridged.centering_needed_for_learning() {
@@ -134,7 +163,10 @@ fn main() {
         bridged.center(centering_time);
     }
 
-    println!("  After centering: coherence = {:.0}%", bridged.coherence_level() * 100.0);
+    println!(
+        "  After centering: coherence = {:.0}%",
+        bridged.coherence_level() * 100.0
+    );
 
     // Now we should be able to learn
     match bridged.can_learn() {
@@ -152,14 +184,23 @@ fn main() {
 
     // Get scattered again
     bridged.coherence_mut().coherence = 0.4;
-    println!("  Scattered state: coherence = {:.0}%", bridged.coherence_level() * 100.0);
+    println!(
+        "  Scattered state: coherence = {:.0}%",
+        bridged.coherence_level() * 100.0
+    );
 
     // Receive gratitude (synchronization boost)
     bridged.receive_gratitude();
-    println!("  After receiving gratitude: coherence = {:.0}%", bridged.coherence_level() * 100.0);
+    println!(
+        "  After receiving gratitude: coherence = {:.0}%",
+        bridged.coherence_level() * 100.0
+    );
 
     bridged.receive_gratitude();
-    println!("  After more gratitude: coherence = {:.0}%", bridged.coherence_level() * 100.0);
+    println!(
+        "  After more gratitude: coherence = {:.0}%",
+        bridged.coherence_level() * 100.0
+    );
 
     println!();
     println!("  ↳ Gratitude is more effective when scattered!");
@@ -190,16 +231,20 @@ fn main() {
     // Predict connected learning
     let pred_connected = bridged.predict_learning_impact(&obj_connected, true);
     println!("  Connected learning prediction:");
-    println!("    Coherence: {:.0}% -> {:.0}%",
-             pred_connected.current_coherence * 100.0,
-             pred_connected.predicted_coherence * 100.0);
+    println!(
+        "    Coherence: {:.0}% -> {:.0}%",
+        pred_connected.current_coherence * 100.0,
+        pred_connected.predicted_coherence * 100.0
+    );
 
     // Predict solo learning
     let pred_solo = bridged.predict_learning_impact(&obj_solo, false);
     println!("  Solo learning prediction:");
-    println!("    Coherence: {:.0}% -> {:.0}%",
-             pred_solo.current_coherence * 100.0,
-             pred_solo.predicted_coherence * 100.0);
+    println!(
+        "    Coherence: {:.0}% -> {:.0}%",
+        pred_solo.current_coherence * 100.0,
+        pred_solo.predicted_coherence * 100.0
+    );
 
     println!();
     println!("  ↳ Connected work builds coherence, solo work may scatter!");
@@ -213,10 +258,16 @@ fn main() {
     println!();
 
     bridged.coherence_mut().coherence = 0.3;
-    println!("  Before sleep: coherence = {:.0}%", bridged.coherence_level() * 100.0);
+    println!(
+        "  Before sleep: coherence = {:.0}%",
+        bridged.coherence_level() * 100.0
+    );
 
     bridged.sleep_cycle();
-    println!("  After sleep: coherence = {:.0}%", bridged.coherence_level() * 100.0);
+    println!(
+        "  After sleep: coherence = {:.0}%",
+        bridged.coherence_level() * 100.0
+    );
 
     println!();
     println!("  ↳ Sleep fully restores coherence!");
@@ -234,19 +285,40 @@ fn main() {
     println!();
     println!("  School Stats:");
     println!("    Total learned: {}", stats.school_stats.total_learned);
-    println!("    Mastered: {}/{}", stats.school_stats.mastered_objectives, stats.school_stats.total_objectives);
-    println!("    Hallucination rate: {:.1}%", stats.school_stats.hallucination_rate * 100.0);
+    println!(
+        "    Mastered: {}/{}",
+        stats.school_stats.mastered_objectives, stats.school_stats.total_objectives
+    );
+    println!(
+        "    Hallucination rate: {:.1}%",
+        stats.school_stats.hallucination_rate * 100.0
+    );
     println!();
     println!("  Coherence Stats:");
-    println!("    Current coherence: {:.0}%", stats.coherence_stats.coherence * 100.0);
-    println!("    Relational resonance: {:.0}%", stats.coherence_stats.relational_resonance * 100.0);
+    println!(
+        "    Current coherence: {:.0}%",
+        stats.coherence_stats.coherence * 100.0
+    );
+    println!(
+        "    Relational resonance: {:.0}%",
+        stats.coherence_stats.relational_resonance * 100.0
+    );
     println!("    Operations: {}", stats.coherence_stats.operations_count);
-    println!("    Gratitude received: {}", stats.coherence_stats.gratitude_count);
+    println!(
+        "    Gratitude received: {}",
+        stats.coherence_stats.gratitude_count
+    );
     println!();
     println!("  Integration Stats:");
     println!("    Successful learnings: {}", stats.successful_learnings);
-    println!("    Coherence-blocked attempts: {}", stats.coherence_blocked_count);
-    println!("    Total centering suggested: {:.0}s", stats.total_centering_suggested);
+    println!(
+        "    Coherence-blocked attempts: {}",
+        stats.coherence_blocked_count
+    );
+    println!(
+        "    Total centering suggested: {:.0}s",
+        stats.total_centering_suggested
+    );
 
     println!();
     println!("╔════════════════════════════════════════════════════════════════════════════════╗");

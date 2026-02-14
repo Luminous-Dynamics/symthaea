@@ -10,10 +10,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use symthaea_stt::{
-    AudioFrontend, AudioConfig,
-    CrystalReservoir, OnlinePrototypeClassifier,
-    load_alignments, id_to_audio_path,
-    eval::phoneme_error_rate_detailed,
+    eval::phoneme_error_rate_detailed, id_to_audio_path, load_alignments, AudioConfig,
+    AudioFrontend, CrystalReservoir, OnlinePrototypeClassifier,
 };
 
 #[derive(Parser)]
@@ -71,7 +69,11 @@ struct Cli {
 
 /// Stack multiple frames together for temporal context
 fn stack_frames(features: &[Vec<f32>], center: usize, context_frames: usize) -> Vec<f32> {
-    let n_dims = if features.is_empty() { 0 } else { features[0].len() };
+    let n_dims = if features.is_empty() {
+        0
+    } else {
+        features[0].len()
+    };
     let half = context_frames / 2;
     let mut stacked = Vec::with_capacity(n_dims * context_frames);
 
@@ -192,10 +194,24 @@ struct CrystalClassifierState {
 fn main() {
     let cli = Cli::parse();
 
-    println!("{}", style("═══════════════════════════════════════════════════════════").magenta());
-    println!("{}", style("    CRYSTAL RESERVOIR EVALUATION                           ").bold().magenta());
-    println!("{}", style("    Gabor STRFs + Prototype Matching + Viterbi             ").magenta());
-    println!("{}", style("═══════════════════════════════════════════════════════════").magenta());
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").magenta()
+    );
+    println!(
+        "{}",
+        style("    CRYSTAL RESERVOIR EVALUATION                           ")
+            .bold()
+            .magenta()
+    );
+    println!(
+        "{}",
+        style("    Gabor STRFs + Prototype Matching + Viterbi             ").magenta()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").magenta()
+    );
     println!();
 
     // Load classifier
@@ -225,7 +241,11 @@ fn main() {
     let alignments = match load_alignments(&cli.alignments) {
         Ok(a) => a,
         Err(e) => {
-            eprintln!("{} Failed to load alignments: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to load alignments: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -265,10 +285,12 @@ fn main() {
     println!("    Penalty: {}, LM weight: {}", cli.penalty, cli.lm_weight);
 
     let pb = ProgressBar::new(total as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.magenta} [{bar:40.magenta/blue}] {pos}/{len} ({eta})")
-        .unwrap()
-        .progress_chars("◆◇-"));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.magenta} [{bar:40.magenta/blue}] {pos}/{len} ({eta})")
+            .unwrap()
+            .progress_chars("◆◇-"),
+    );
 
     let mut total_per = 0.0;
     let mut evaluated = 0;
@@ -398,9 +420,20 @@ fn main() {
     pb.finish_with_message("done");
 
     // Results
-    println!("\n{}", style("═══════════════════════════════════════════════════════════").magenta());
-    println!("{}", style("                    EVALUATION RESULTS                       ").bold().white());
-    println!("{}", style("═══════════════════════════════════════════════════════════").magenta());
+    println!(
+        "\n{}",
+        style("═══════════════════════════════════════════════════════════").magenta()
+    );
+    println!(
+        "{}",
+        style("                    EVALUATION RESULTS                       ")
+            .bold()
+            .white()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").magenta()
+    );
 
     if evaluated > 0 {
         let _avg_per = total_per / evaluated as f32;
@@ -416,16 +449,28 @@ fn main() {
         println!();
 
         if overall_per < 40.0 {
-            println!("  {}", style(format!("PER: {:.1}%", overall_per)).bold().green());
+            println!(
+                "  {}",
+                style(format!("PER: {:.1}%", overall_per)).bold().green()
+            );
         } else if overall_per < 55.0 {
-            println!("  {}", style(format!("PER: {:.1}%", overall_per)).bold().yellow());
+            println!(
+                "  {}",
+                style(format!("PER: {:.1}%", overall_per)).bold().yellow()
+            );
         } else {
-            println!("  {}", style(format!("PER: {:.1}%", overall_per)).bold().red());
+            println!(
+                "  {}",
+                style(format!("PER: {:.1}%", overall_per)).bold().red()
+            );
         }
     } else {
         println!("\n  No utterances evaluated!");
     }
 
     println!();
-    println!("{}", style("═══════════════════════════════════════════════════════════").magenta());
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").magenta()
+    );
 }

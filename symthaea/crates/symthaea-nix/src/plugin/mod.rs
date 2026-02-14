@@ -7,16 +7,16 @@
 //! - `actor_bridge` — NixOS state → Symthaea actor system messages
 //! - `pipeline_integration` — NixOS cognition → Conscious Pipeline stages
 
-pub mod domain_plugin;
 pub mod actor_bridge;
+pub mod domain_plugin;
 pub mod pipeline_integration;
 
-pub use domain_plugin::NixOsPlugin;
 pub use actor_bridge::{
-    NixActorBridge, NixActorMessage, NixMessageKind, NixActorState,
-    NixActorRoles, HippocampusBridge, CausalMindBridge,
+    CausalMindBridge, HippocampusBridge, NixActorBridge, NixActorMessage, NixActorRoles,
+    NixActorState, NixMessageKind,
 };
+pub use domain_plugin::NixOsPlugin;
 pub use pipeline_integration::{
-    NixPipelineProcessor, NixPipelineResult, NixPipelineStage,
-    NixConsciousnessQuadrant, NixPipelineHook,
+    NixConsciousnessQuadrant, NixPipelineHook, NixPipelineProcessor, NixPipelineResult,
+    NixPipelineStage,
 };

@@ -11,16 +11,17 @@
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use symthaea_nix::encoding::{NixCodebook, SystemStateEncoder, SystemStateSnapshot, ServiceState};
-use symthaea_nix::ipc::{default_snapshot_path, AnomalyEntry, ConcernEntry, DaemonConfig, DaemonSnapshot};
+use symthaea_core::hdc::ContinuousHV;
+use symthaea_nix::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
+use symthaea_nix::ipc::{
+    default_snapshot_path, AnomalyEntry, ConcernEntry, DaemonConfig, DaemonSnapshot,
+};
 use symthaea_nix::mind::causal_graph::{NixCausalGraph, NixOSCausalPatterns};
 use symthaea_nix::mind::episodic_memory::{EpisodeOutcome, NixEpisodicMemory, SystemEpisode};
 use symthaea_nix::mind::working_memory::{MemorySource, WorkingMemory};
 use symthaea_nix::mind::{JournalAnomalyDetector, NixWorldModel};
 use symthaea_nix::observe::journal::JournalObserver;
 use symthaea_nix::observe::SystemObserver;
-use symthaea_core::hdc::ContinuousHV;
-
 
 // DaemonConfig is now imported from symthaea_nix::ipc
 
@@ -90,8 +91,10 @@ impl DaemonState {
 
                 // Add transitions to working memory
                 for transition in &transitions {
-                    let label =
-                        format!("{}: {} → {}", transition.key, transition.from, transition.to);
+                    let label = format!(
+                        "{}: {} → {}",
+                        transition.key, transition.from, transition.to
+                    );
                     self.working_memory.push(
                         state_hv.clone(),
                         MemorySource::SystemObservation,
@@ -292,13 +295,18 @@ fn main() -> ! {
     if let Ok(json) = std::fs::read_to_string(&wm_path) {
         if let Ok(saved) = serde_json::from_str::<symthaea_nix::mind::SavedWorkingMemory>(&json) {
             let item_count = saved.items.len();
-            state.working_memory =
-                WorkingMemory::load(&saved, &mut state.codebook);
-            eprintln!("nix-mind-daemon: restored {} working memory items", item_count);
+            state.working_memory = WorkingMemory::load(&saved, &mut state.codebook);
+            eprintln!(
+                "nix-mind-daemon: restored {} working memory items",
+                item_count
+            );
         }
     }
 
-    eprintln!("nix-mind-daemon: starting continuous awareness (pid {})", std::process::id());
+    eprintln!(
+        "nix-mind-daemon: starting continuous awareness (pid {})",
+        std::process::id()
+    );
     eprintln!(
         "  snapshot every {}s, poll every {}s, surprise threshold {:.2}",
         config.snapshot_interval, config.poll_interval, config.surprise_threshold

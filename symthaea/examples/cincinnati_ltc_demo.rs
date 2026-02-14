@@ -12,8 +12,8 @@
 //! ```
 
 use symthaea::hdc::cincinnati_ltc::{
-    CincinnatiEstimator, CincinnatiLtcEngine, LateralBinder,
-    PredictiveBudding, PoGMetrics, BuddingEvent,
+    BuddingEvent, CincinnatiEstimator, CincinnatiLtcEngine, LateralBinder, PoGMetrics,
+    PredictiveBudding,
 };
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
@@ -54,27 +54,42 @@ fn demo_cincinnati_estimator() {
 
     // Train on biased observations
     for i in 0..100 {
-        let observation = i % 10 < 7;  // 70% true
+        let observation = i % 10 < 7; // 70% true
         estimator.update(observation);
 
         if (i + 1) % 20 == 0 {
             let (pred, conf) = estimator.predict();
             let delta = estimator.delta_signal();
-            println!("  Step {:3}: prediction={}, confidence={:.3}, delta={:.4}, model_len={}",
-                     i + 1, pred, conf, delta, estimator.model.len());
+            println!(
+                "  Step {:3}: prediction={}, confidence={:.3}, delta={:.4}, model_len={}",
+                i + 1,
+                pred,
+                conf,
+                delta,
+                estimator.model.len()
+            );
         }
     }
 
     let (final_pred, final_conf) = estimator.predict();
-    println!("\n📈 Final: prediction={}, confidence={:.4}", final_pred, final_conf);
-    println!("   Model length: {} bits (logarithmic growth)", estimator.model.len());
+    println!(
+        "\n📈 Final: prediction={}, confidence={:.4}",
+        final_pred, final_conf
+    );
+    println!(
+        "   Model length: {} bits (logarithmic growth)",
+        estimator.model.len()
+    );
 
     // Convert to HDC vector
     let hdc_vec = estimator.to_hdc_vector();
     let positive_bits = hdc_vec.iter().filter(|&&b| b > 0).count();
-    println!("   HDC vector: {}/{} positive bits ({:.1}%)",
-             positive_bits, HDC_DIMENSION,
-             100.0 * positive_bits as f32 / HDC_DIMENSION as f32);
+    println!(
+        "   HDC vector: {}/{} positive bits ({:.1}%)",
+        positive_bits,
+        HDC_DIMENSION,
+        100.0 * positive_bits as f32 / HDC_DIMENSION as f32
+    );
     println!();
 }
 
@@ -84,7 +99,7 @@ fn demo_lateral_binding() {
     println!("🔗 Demo 2: Lateral Binding (Circular Convolution)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    let mut binder = LateralBinder::new(1024);  // Smaller dim for speed
+    let mut binder = LateralBinder::new(1024); // Smaller dim for speed
 
     // Create random nodes
     let node_a = ContinuousHV::random(1024, 100);
@@ -130,13 +145,17 @@ fn demo_predictive_budding() {
     // Simulate high prediction error on node 0
     println!("Simulating high prediction error on Node 0...");
     for step in 0..15 {
-        budding.update_error(0, 0.85);  // High error
-        budding.update_error(1, 0.2);   // Normal
-        budding.update_error(2, 0.05);  // Very low (prune candidate)
+        budding.update_error(0, 0.85); // High error
+        budding.update_error(1, 0.2); // Normal
+        budding.update_error(2, 0.05); // Very low (prune candidate)
 
         if (step + 1) % 5 == 0 {
-            println!("  Step {:2}: should_bud(0)={}, should_prune(2)={}",
-                     step + 1, budding.should_bud(0), budding.should_prune(2));
+            println!(
+                "  Step {:2}: should_bud(0)={}, should_prune(2)={}",
+                step + 1,
+                budding.should_bud(0),
+                budding.should_prune(2)
+            );
         }
     }
 
@@ -145,7 +164,10 @@ fn demo_predictive_budding() {
     if let Some(event) = budding.create_budding_event(0, 1.0, &state) {
         println!("\n🌿 Budding Event Created!");
         println!("   Parent ID: {}", event.parent_id);
-        println!("   Child τ: {:.3} (inherited from parent × α)", event.initial_tau);
+        println!(
+            "   Child τ: {:.3} (inherited from parent × α)",
+            event.initial_tau
+        );
         println!("   Trigger error: {:.3}", event.prediction_error);
         println!("   New node count: {}", budding.node_count());
     }
@@ -172,15 +194,17 @@ fn demo_pog_metrics() {
         pog.update_storage(1_000_000 + t as u64 * 50_000);
         pog.update_bandwidth(1000.0 + t as f64 * 10.0);
         pog.update_latency(5.0 + (t as f32 * 0.1));
-        pog.update_accuracy(t % 3 != 0);  // 67% accuracy
+        pog.update_accuracy(t % 3 != 0); // 67% accuracy
 
         if (t + 1) % 5 == 0 {
-            println!("  t={:2}: energy={:.1}J, storage={:.1}MB, latency={:.1}ms, grounding={:.4}",
-                     t + 1,
-                     pog.energy_joules,
-                     pog.storage_bytes as f64 / 1_000_000.0,
-                     pog.latency_ms,
-                     pog.grounding_score());
+            println!(
+                "  t={:2}: energy={:.1}J, storage={:.1}MB, latency={:.1}ms, grounding={:.4}",
+                t + 1,
+                pog.energy_joules,
+                pog.storage_bytes as f64 / 1_000_000.0,
+                pog.latency_ms,
+                pog.grounding_score()
+            );
         }
     }
 
@@ -188,7 +212,10 @@ fn demo_pog_metrics() {
     let hdc_pog = pog.to_hdc_vector();
     println!("\n📐 PoG HDC Vector:");
     println!("   Dimension: {}", hdc_pog.dim());
-    println!("   Mean value: {:.6}", hdc_pog.values.iter().sum::<f32>() / hdc_pog.dim() as f32);
+    println!(
+        "   Mean value: {:.6}",
+        hdc_pog.values.iter().sum::<f32>() / hdc_pog.dim() as f32
+    );
     println!("   Grounding score: {:.4}", pog.grounding_score());
     println!("   → Physical reality embedded in consciousness ✓");
     println!();
@@ -245,8 +272,14 @@ fn demo_full_integration() {
 
         if (t + 1) % 10 == 0 {
             let (pred, conf) = engine.predict();
-            println!("  Step {:2}: pred={}, conf={:.3}, nodes={}, grounding={:.3}",
-                     t + 1, pred, conf, engine.node_count(), engine.pog.grounding_score());
+            println!(
+                "  Step {:2}: pred={}, conf={:.3}, nodes={}, grounding={:.3}",
+                t + 1,
+                pred,
+                conf,
+                engine.node_count(),
+                engine.pog.grounding_score()
+            );
         }
     }
 
@@ -256,11 +289,15 @@ fn demo_full_integration() {
     println!("   Prune candidates: {:?}", engine.prune_candidates());
 
     let (final_pred, final_conf) = engine.predict();
-    println!("   Final prediction: {}, confidence: {:.4}", final_pred, final_conf);
+    println!(
+        "   Final prediction: {}, confidence: {:.4}",
+        final_pred, final_conf
+    );
 
     // Show weight evolution
     let weight = engine.weight();
-    let weight_magnitude = (weight.values.iter().map(|x| x * x).sum::<f32>() / weight.dim() as f32).sqrt();
+    let weight_magnitude =
+        (weight.values.iter().map(|x| x * x).sum::<f32>() / weight.dim() as f32).sqrt();
     println!("   Weight RMS magnitude: {:.6}", weight_magnitude);
 
     // Compare output similarity over time
@@ -268,7 +305,10 @@ fn demo_full_integration() {
         let first = &outputs[0];
         let last = &outputs[outputs.len() - 1];
         let evolution = first.similarity(last);
-        println!("   Output evolution (first→last similarity): {:.4}", evolution);
+        println!(
+            "   Output evolution (first→last similarity): {:.4}",
+            evolution
+        );
     }
 
     println!("\n✨ Cincinnati-LTC Engine demonstrates:");

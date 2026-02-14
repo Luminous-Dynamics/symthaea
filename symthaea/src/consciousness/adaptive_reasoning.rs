@@ -514,7 +514,7 @@ mod tests {
         let mut agent = QLearningAgent::new(0.1, 0.9, 0.3);
 
         let question = BinaryHV::random(42);
-        let chain = crate::consciousness::primitive_reasoning::ReasoningChain::new(question.clone());
+        let chain = crate::consciousness::primitive_reasoning::ReasoningChain::new(question);
 
         let state = ReasoningState::from_chain(&chain);
         let next_state = ReasoningState::from_chain(&chain);

@@ -31,9 +31,9 @@
 //! 4. Phi trajectory over exposure to diverse concepts
 //! 5. Clustering of similar sentences by output activation
 
+use anyhow::Result;
 #[cfg(feature = "neural-bridge")]
 use std::collections::HashMap;
-use anyhow::Result;
 
 /// Semantic categories for our test corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -75,40 +75,89 @@ impl SemanticCategory {
 fn get_test_corpus() -> Vec<(&'static str, SemanticCategory)> {
     vec![
         // Abstract concepts
-        ("Justice requires fairness and equality", SemanticCategory::Abstract),
-        ("Democracy is built on representation and voting", SemanticCategory::Abstract),
-        ("Freedom means the ability to choose without coercion", SemanticCategory::Abstract),
-        ("Truth is correspondence between statement and reality", SemanticCategory::Abstract),
-
+        (
+            "Justice requires fairness and equality",
+            SemanticCategory::Abstract,
+        ),
+        (
+            "Democracy is built on representation and voting",
+            SemanticCategory::Abstract,
+        ),
+        (
+            "Freedom means the ability to choose without coercion",
+            SemanticCategory::Abstract,
+        ),
+        (
+            "Truth is correspondence between statement and reality",
+            SemanticCategory::Abstract,
+        ),
         // Causal relationships
         ("Smoking causes lung cancer", SemanticCategory::Causal),
         ("Rain makes the ground wet", SemanticCategory::Causal),
-        ("Exercise leads to improved health", SemanticCategory::Causal),
+        (
+            "Exercise leads to improved health",
+            SemanticCategory::Causal,
+        ),
         ("Heat causes water to boil", SemanticCategory::Causal),
-
         // Temporal
         ("Yesterday I went to the store", SemanticCategory::Temporal),
         ("Tomorrow the sun will rise", SemanticCategory::Temporal),
-        ("Last week we finished the project", SemanticCategory::Temporal),
-        ("In the future technology will advance", SemanticCategory::Temporal),
-
+        (
+            "Last week we finished the project",
+            SemanticCategory::Temporal,
+        ),
+        (
+            "In the future technology will advance",
+            SemanticCategory::Temporal,
+        ),
         // Emotional
-        ("The news made me feel deeply sad", SemanticCategory::Emotional),
-        ("Joy filled my heart when I saw her", SemanticCategory::Emotional),
-        ("Anger consumed him after the betrayal", SemanticCategory::Emotional),
-        ("Peace washed over me during meditation", SemanticCategory::Emotional),
-
+        (
+            "The news made me feel deeply sad",
+            SemanticCategory::Emotional,
+        ),
+        (
+            "Joy filled my heart when I saw her",
+            SemanticCategory::Emotional,
+        ),
+        (
+            "Anger consumed him after the betrayal",
+            SemanticCategory::Emotional,
+        ),
+        (
+            "Peace washed over me during meditation",
+            SemanticCategory::Emotional,
+        ),
         // Scientific
-        ("Electrons orbit the atomic nucleus", SemanticCategory::Scientific),
-        ("DNA carries genetic information", SemanticCategory::Scientific),
-        ("Gravity attracts massive objects", SemanticCategory::Scientific),
-        ("Photosynthesis converts light to energy", SemanticCategory::Scientific),
-
+        (
+            "Electrons orbit the atomic nucleus",
+            SemanticCategory::Scientific,
+        ),
+        (
+            "DNA carries genetic information",
+            SemanticCategory::Scientific,
+        ),
+        (
+            "Gravity attracts massive objects",
+            SemanticCategory::Scientific,
+        ),
+        (
+            "Photosynthesis converts light to energy",
+            SemanticCategory::Scientific,
+        ),
         // Relational
-        ("Paris is the capital of France", SemanticCategory::Relational),
+        (
+            "Paris is the capital of France",
+            SemanticCategory::Relational,
+        ),
         ("The cat sat on the mat", SemanticCategory::Relational),
-        ("Mount Everest is the tallest mountain", SemanticCategory::Relational),
-        ("Water consists of hydrogen and oxygen", SemanticCategory::Relational),
+        (
+            "Mount Everest is the tallest mountain",
+            SemanticCategory::Relational,
+        ),
+        (
+            "Water consists of hydrogen and oxygen",
+            SemanticCategory::Relational,
+        ),
     ]
 }
 
@@ -118,7 +167,7 @@ struct SentenceResult {
     text: String,
     category: SemanticCategory,
     output_state: Vec<f32>,
-    hdc_direct: Vec<f32>,  // HDC vector BEFORE CfC processing
+    hdc_direct: Vec<f32>, // HDC vector BEFORE CfC processing
     prediction_error: f32,
     learning_occurred: bool,
     cycle_time_us: u64,
@@ -127,8 +176,8 @@ struct SentenceResult {
 /// Generate mock 1024-dim embedding based on category
 /// Similar categories get similar base embeddings; text hash adds uniqueness
 fn generate_mock_embedding(text: &str, category: SemanticCategory) -> Vec<f32> {
-    use std::hash::{Hash, Hasher};
     use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
     let mut embedding = vec![0.0f32; 1024];
 
@@ -226,8 +275,16 @@ fn compute_clustering_score(
         }
     }
 
-    let diag = if diagonal_count > 0 { diagonal_sum / diagonal_count as f32 } else { 0.0 };
-    let off_diag = if off_diagonal_count > 0 { off_diagonal_sum / off_diagonal_count as f32 } else { 0.0 };
+    let diag = if diagonal_count > 0 {
+        diagonal_sum / diagonal_count as f32
+    } else {
+        0.0
+    };
+    let off_diag = if off_diagonal_count > 0 {
+        off_diagonal_sum / off_diagonal_count as f32
+    } else {
+        0.0
+    };
     (diag, off_diag, diag - off_diag)
 }
 
@@ -272,7 +329,11 @@ fn print_similarity_matrix(
                 }
             }
 
-            let avg_sim = if count > 0 { sum_sim / count as f32 } else { 0.0 };
+            let avg_sim = if count > 0 {
+                sum_sim / count as f32
+            } else {
+                0.0
+            };
             print!("{:>10.4} ", avg_sim);
         }
         println!();
@@ -283,7 +344,7 @@ fn print_similarity_matrix(
 /// Main function for mock embedding path (no neural-bridge feature)
 #[cfg(not(feature = "neural-bridge"))]
 fn main() -> Result<()> {
-    use symthaea::cognitive_loop::{CognitiveLoopService, CognitiveLoopConfig};
+    use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
     println!("========================================================================");
     println!("   REAL TEXT TRAINING EXPERIMENT (MOCK EMBEDDINGS)");
@@ -299,9 +360,15 @@ fn main() -> Result<()> {
     println!();
 
     let corpus = get_test_corpus();
-    println!("Test corpus: {} sentences across {} categories",
-             corpus.len(),
-             corpus.iter().map(|(_, c)| *c).collect::<std::collections::HashSet<_>>().len());
+    println!(
+        "Test corpus: {} sentences across {} categories",
+        corpus.len(),
+        corpus
+            .iter()
+            .map(|(_, c)| *c)
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    );
     println!();
 
     // Initialize cognitive loop with HdcLtc backend for HDC-direct comparison
@@ -331,18 +398,28 @@ fn main() -> Result<()> {
     let cycles_per_sentence = 3; // Reduced for faster execution
 
     println!("========================================================================");
-    println!("   PROCESSING CORPUS ({} cycles per sentence)", cycles_per_sentence);
+    println!(
+        "   PROCESSING CORPUS ({} cycles per sentence)",
+        cycles_per_sentence
+    );
     println!("========================================================================");
     println!();
 
     for (i, (text, category)) in corpus.iter().enumerate() {
-        println!("[{:2}/{}] {} :: {}", i + 1, corpus.len(), category.name(), text);
+        println!(
+            "[{:2}/{}] {} :: {}",
+            i + 1,
+            corpus.len(),
+            category.name(),
+            text
+        );
 
         // Generate mock embedding
         let embedding = generate_mock_embedding(text, *category);
 
         // Get HDC-direct projection BEFORE any CfC processing
-        let hdc_direct = service.project_embedding_to_hdc(&embedding)
+        let hdc_direct = service
+            .project_embedding_to_hdc(&embedding)
             .unwrap_or_else(|_| vec![0.0; hdc_dim]);
 
         // Run multiple cognitive cycles per sentence
@@ -362,12 +439,18 @@ fn main() -> Result<()> {
 
         if let Some(result) = last_result {
             println!("        prediction_error: {:.6}", result.prediction_error);
-            println!("        learning: {}, cycle_time: {}us",
-                     result.learning_occurred, result.cycle_time_us);
-            println!("        output_state_norm: {:.4}",
-                     result.output.iter().map(|x| x*x).sum::<f32>().sqrt());
-            println!("        hdc_direct_norm: {:.4}",
-                     hdc_direct.iter().map(|x| x*x).sum::<f32>().sqrt());
+            println!(
+                "        learning: {}, cycle_time: {}us",
+                result.learning_occurred, result.cycle_time_us
+            );
+            println!(
+                "        output_state_norm: {:.4}",
+                result.output.iter().map(|x| x * x).sum::<f32>().sqrt()
+            );
+            println!(
+                "        hdc_direct_norm: {:.4}",
+                hdc_direct.iter().map(|x| x * x).sum::<f32>().sqrt()
+            );
 
             results.push(SentenceResult {
                 text: text.to_string(),
@@ -398,8 +481,12 @@ fn main() -> Result<()> {
     println!();
 
     // 1a. HDC-DIRECT similarity matrix
-    print_similarity_matrix(&results, &categories, true,
-        "1a. HDC-DIRECT SIMILARITY MATRIX (Before CfC temporal processing)");
+    print_similarity_matrix(
+        &results,
+        &categories,
+        true,
+        "1a. HDC-DIRECT SIMILARITY MATRIX (Before CfC temporal processing)",
+    );
 
     let (hdc_diag, hdc_off, hdc_score) = compute_clustering_score(&results, &categories, true);
     println!("    Within-category avg:  {:.4}", hdc_diag);
@@ -408,8 +495,12 @@ fn main() -> Result<()> {
     println!();
 
     // 1b. CfC-OUTPUT similarity matrix
-    print_similarity_matrix(&results, &categories, false,
-        "1b. CfC-OUTPUT SIMILARITY MATRIX (After temporal state accumulation)");
+    print_similarity_matrix(
+        &results,
+        &categories,
+        false,
+        "1b. CfC-OUTPUT SIMILARITY MATRIX (After temporal state accumulation)",
+    );
 
     let (cfc_diag, cfc_off, cfc_score) = compute_clustering_score(&results, &categories, false);
     println!("    Within-category avg:  {:.4}", cfc_diag);
@@ -423,20 +514,38 @@ fn main() -> Result<()> {
     println!();
     println!("   Metric              HDC-Direct    CfC-Output    Difference");
     println!("   ────────────────────────────────────────────────────────────────");
-    println!("   Within-category     {:>10.4}    {:>10.4}    {:>+10.4}",
-             hdc_diag, cfc_diag, hdc_diag - cfc_diag);
-    println!("   Between-category    {:>10.4}    {:>10.4}    {:>+10.4}",
-             hdc_off, cfc_off, hdc_off - cfc_off);
-    println!("   CLUSTERING SCORE    {:>10.4}    {:>10.4}    {:>+10.4}",
-             hdc_score, cfc_score, hdc_score - cfc_score);
+    println!(
+        "   Within-category     {:>10.4}    {:>10.4}    {:>+10.4}",
+        hdc_diag,
+        cfc_diag,
+        hdc_diag - cfc_diag
+    );
+    println!(
+        "   Between-category    {:>10.4}    {:>10.4}    {:>+10.4}",
+        hdc_off,
+        cfc_off,
+        hdc_off - cfc_off
+    );
+    println!(
+        "   CLUSTERING SCORE    {:>10.4}    {:>10.4}    {:>+10.4}",
+        hdc_score,
+        cfc_score,
+        hdc_score - cfc_score
+    );
     println!();
 
     if hdc_score > cfc_score {
         println!("   RESULT: HDC-direct preserves semantic clustering BETTER than CfC output");
-        println!("           (score difference: {:+.4})", hdc_score - cfc_score);
+        println!(
+            "           (score difference: {:+.4})",
+            hdc_score - cfc_score
+        );
     } else if cfc_score > hdc_score {
         println!("   RESULT: CfC output preserves semantic clustering BETTER than HDC-direct");
-        println!("           (score difference: {:+.4})", cfc_score - hdc_score);
+        println!(
+            "           (score difference: {:+.4})",
+            cfc_score - hdc_score
+        );
     } else {
         println!("   RESULT: HDC-direct and CfC output have equal clustering scores");
     }
@@ -450,7 +559,10 @@ fn main() -> Result<()> {
     if !phi_trajectory.is_empty() {
         let first_10: f32 = phi_trajectory.iter().take(10).sum::<f32>() / 10.0;
         let last_10: f32 = phi_trajectory.iter().rev().take(10).sum::<f32>() / 10.0;
-        let max_phi: f32 = phi_trajectory.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max_phi: f32 = phi_trajectory
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         let min_phi: f32 = phi_trajectory.iter().cloned().fold(f32::INFINITY, f32::min);
 
         println!("   First 10 cycles avg Phi: {:.6}", first_10);
@@ -463,11 +575,17 @@ fn main() -> Result<()> {
     // 4. Learning statistics
     println!("4. LEARNING STATISTICS");
     let learning_count = results.iter().filter(|r| r.learning_occurred).count();
-    let avg_error: f32 = results.iter().map(|r| r.prediction_error).sum::<f32>() / results.len() as f32;
-    let avg_time: f32 = results.iter().map(|r| r.cycle_time_us as f32).sum::<f32>() / results.len() as f32;
+    let avg_error: f32 =
+        results.iter().map(|r| r.prediction_error).sum::<f32>() / results.len() as f32;
+    let avg_time: f32 =
+        results.iter().map(|r| r.cycle_time_us as f32).sum::<f32>() / results.len() as f32;
 
     println!("   Sentences processed: {}", results.len());
-    println!("   Learning cycles: {} ({:.1}%)", learning_count, 100.0 * learning_count as f32 / results.len() as f32);
+    println!(
+        "   Learning cycles: {} ({:.1}%)",
+        learning_count,
+        100.0 * learning_count as f32 / results.len() as f32
+    );
     println!("   Avg prediction error: {:.6}", avg_error);
     println!("   Avg cycle time: {:.0}us", avg_time);
     println!();
@@ -476,9 +594,18 @@ fn main() -> Result<()> {
     let stats = service.stats();
     println!("5. COGNITIVE LOOP STATS");
     println!("   Total cycles: {}", stats.total_cycles);
-    println!("   Avg prediction error (EMA): {:.6}", stats.avg_prediction_error);
-    println!("   Error trend: {:.6} (negative = improving)", stats.error_trend);
-    println!("   CfC state diversity: {:.4}", service.cfc_state_diversity());
+    println!(
+        "   Avg prediction error (EMA): {:.6}",
+        stats.avg_prediction_error
+    );
+    println!(
+        "   Error trend: {:.6} (negative = improving)",
+        stats.error_trend
+    );
+    println!(
+        "   CfC state diversity: {:.4}",
+        service.cfc_state_diversity()
+    );
     println!();
 
     println!("========================================================================");
@@ -487,8 +614,10 @@ fn main() -> Result<()> {
     println!();
 
     if hdc_score > 0.01 && hdc_score > cfc_score {
-        println!("HYPOTHESIS CONFIRMED: HDC-direct clustering ({:.4}) > CfC output ({:.4})",
-                 hdc_score, cfc_score);
+        println!(
+            "HYPOTHESIS CONFIRMED: HDC-direct clustering ({:.4}) > CfC output ({:.4})",
+            hdc_score, cfc_score
+        );
         println!();
         println!("The HDC projection preserves semantic structure before CfC temporal");
         println!("dynamics muddy it with recency effects. This suggests using HDC-direct");
@@ -514,7 +643,7 @@ fn main() -> Result<()> {
 /// Main function for real neural-bridge path (with BGE-M3)
 #[cfg(feature = "neural-bridge")]
 fn main() -> Result<()> {
-    use symthaea::cognitive_loop::{CognitiveLoopService, CognitiveLoopConfig};
+    use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
     use symthaea::perception::NeuralBridge;
 
     println!("========================================================================");
@@ -530,9 +659,15 @@ fn main() -> Result<()> {
     println!();
 
     let corpus = get_test_corpus();
-    println!("Test corpus: {} sentences across {} categories",
-             corpus.len(),
-             corpus.iter().map(|(_, c)| *c).collect::<std::collections::HashSet<_>>().len());
+    println!(
+        "Test corpus: {} sentences across {} categories",
+        corpus.len(),
+        corpus
+            .iter()
+            .map(|(_, c)| *c)
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    );
     println!();
 
     // Initialize cognitive loop with HdcLtc backend for HDC-direct comparison
@@ -576,17 +711,27 @@ fn main() -> Result<()> {
     println!();
 
     println!("========================================================================");
-    println!("   PROCESSING CORPUS ({} cycles per sentence)", cycles_per_sentence);
+    println!(
+        "   PROCESSING CORPUS ({} cycles per sentence)",
+        cycles_per_sentence
+    );
     println!("========================================================================");
     println!();
 
     for (i, (text, category)) in corpus.iter().enumerate() {
-        println!("[{:2}/{}] {} :: {}", i + 1, corpus.len(), category.name(), text);
+        println!(
+            "[{:2}/{}] {} :: {}",
+            i + 1,
+            corpus.len(),
+            category.name(),
+            text
+        );
 
         let embedding = embeddings_cache.get(*text).unwrap();
 
         // Get HDC-direct projection BEFORE any CfC processing
-        let hdc_direct = service.project_embedding_to_hdc(embedding)
+        let hdc_direct = service
+            .project_embedding_to_hdc(embedding)
             .unwrap_or_else(|_| vec![0.0; hdc_dim]);
 
         // Run multiple cognitive cycles per sentence
@@ -616,12 +761,18 @@ fn main() -> Result<()> {
 
         if let Some(result) = last_result {
             println!("        prediction_error: {:.6}", result.prediction_error);
-            println!("        learning: {}, cycle_time: {}us",
-                     result.learning_occurred, result.cycle_time_us);
-            println!("        output_state_norm: {:.4}",
-                     result.output.iter().map(|x| x*x).sum::<f32>().sqrt());
-            println!("        hdc_direct_norm: {:.4}",
-                     hdc_direct.iter().map(|x| x*x).sum::<f32>().sqrt());
+            println!(
+                "        learning: {}, cycle_time: {}us",
+                result.learning_occurred, result.cycle_time_us
+            );
+            println!(
+                "        output_state_norm: {:.4}",
+                result.output.iter().map(|x| x * x).sum::<f32>().sqrt()
+            );
+            println!(
+                "        hdc_direct_norm: {:.4}",
+                hdc_direct.iter().map(|x| x * x).sum::<f32>().sqrt()
+            );
 
             results.push(SentenceResult {
                 text: text.to_string(),
@@ -652,8 +803,12 @@ fn main() -> Result<()> {
     println!();
 
     // 1a. HDC-DIRECT similarity matrix
-    print_similarity_matrix(&results, &categories, true,
-        "1a. HDC-DIRECT SIMILARITY MATRIX (Before CfC temporal processing)");
+    print_similarity_matrix(
+        &results,
+        &categories,
+        true,
+        "1a. HDC-DIRECT SIMILARITY MATRIX (Before CfC temporal processing)",
+    );
 
     let (hdc_diag, hdc_off, hdc_score) = compute_clustering_score(&results, &categories, true);
     println!("    Within-category avg:  {:.4}", hdc_diag);
@@ -662,8 +817,12 @@ fn main() -> Result<()> {
     println!();
 
     // 1b. CfC-OUTPUT similarity matrix
-    print_similarity_matrix(&results, &categories, false,
-        "1b. CfC-OUTPUT SIMILARITY MATRIX (After temporal state accumulation)");
+    print_similarity_matrix(
+        &results,
+        &categories,
+        false,
+        "1b. CfC-OUTPUT SIMILARITY MATRIX (After temporal state accumulation)",
+    );
 
     let (cfc_diag, cfc_off, cfc_score) = compute_clustering_score(&results, &categories, false);
     println!("    Within-category avg:  {:.4}", cfc_diag);
@@ -677,20 +836,38 @@ fn main() -> Result<()> {
     println!();
     println!("   Metric              HDC-Direct    CfC-Output    Difference");
     println!("   ────────────────────────────────────────────────────────────────");
-    println!("   Within-category     {:>10.4}    {:>10.4}    {:>+10.4}",
-             hdc_diag, cfc_diag, hdc_diag - cfc_diag);
-    println!("   Between-category    {:>10.4}    {:>10.4}    {:>+10.4}",
-             hdc_off, cfc_off, hdc_off - cfc_off);
-    println!("   CLUSTERING SCORE    {:>10.4}    {:>10.4}    {:>+10.4}",
-             hdc_score, cfc_score, hdc_score - cfc_score);
+    println!(
+        "   Within-category     {:>10.4}    {:>10.4}    {:>+10.4}",
+        hdc_diag,
+        cfc_diag,
+        hdc_diag - cfc_diag
+    );
+    println!(
+        "   Between-category    {:>10.4}    {:>10.4}    {:>+10.4}",
+        hdc_off,
+        cfc_off,
+        hdc_off - cfc_off
+    );
+    println!(
+        "   CLUSTERING SCORE    {:>10.4}    {:>10.4}    {:>+10.4}",
+        hdc_score,
+        cfc_score,
+        hdc_score - cfc_score
+    );
     println!();
 
     if hdc_score > cfc_score {
         println!("   RESULT: HDC-direct preserves semantic clustering BETTER than CfC output");
-        println!("           (score difference: {:+.4})", hdc_score - cfc_score);
+        println!(
+            "           (score difference: {:+.4})",
+            hdc_score - cfc_score
+        );
     } else if cfc_score > hdc_score {
         println!("   RESULT: CfC output preserves semantic clustering BETTER than HDC-direct");
-        println!("           (score difference: {:+.4})", cfc_score - hdc_score);
+        println!(
+            "           (score difference: {:+.4})",
+            cfc_score - hdc_score
+        );
     } else {
         println!("   RESULT: HDC-direct and CfC output have equal clustering scores");
     }
@@ -699,7 +876,10 @@ fn main() -> Result<()> {
     if !phi_trajectory.is_empty() {
         let first_10: f32 = phi_trajectory.iter().take(10).sum::<f32>() / 10.0;
         let last_10: f32 = phi_trajectory.iter().rev().take(10).sum::<f32>() / 10.0;
-        let max_phi: f32 = phi_trajectory.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max_phi: f32 = phi_trajectory
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         let min_phi: f32 = phi_trajectory.iter().cloned().fold(f32::INFINITY, f32::min);
 
         println!("   First 10 cycles avg Phi: {:.6}", first_10);
@@ -708,7 +888,11 @@ fn main() -> Result<()> {
         println!("   Phi change: {:+.6}", last_10 - first_10);
 
         let phi_trend = if (last_10 - first_10).abs() > 0.001 {
-            if last_10 > first_10 { "INCREASING" } else { "DECREASING" }
+            if last_10 > first_10 {
+                "INCREASING"
+            } else {
+                "DECREASING"
+            }
         } else {
             "STABLE"
         };
@@ -719,11 +903,17 @@ fn main() -> Result<()> {
     // 4. Learning statistics
     println!("4. LEARNING STATISTICS");
     let learning_count = results.iter().filter(|r| r.learning_occurred).count();
-    let avg_error: f32 = results.iter().map(|r| r.prediction_error).sum::<f32>() / results.len() as f32;
-    let avg_time: f32 = results.iter().map(|r| r.cycle_time_us as f32).sum::<f32>() / results.len() as f32;
+    let avg_error: f32 =
+        results.iter().map(|r| r.prediction_error).sum::<f32>() / results.len() as f32;
+    let avg_time: f32 =
+        results.iter().map(|r| r.cycle_time_us as f32).sum::<f32>() / results.len() as f32;
 
     println!("   Sentences processed: {}", results.len());
-    println!("   Learning cycles: {} ({:.1}%)", learning_count, 100.0 * learning_count as f32 / results.len() as f32);
+    println!(
+        "   Learning cycles: {} ({:.1}%)",
+        learning_count,
+        100.0 * learning_count as f32 / results.len() as f32
+    );
     println!("   Avg prediction error: {:.6}", avg_error);
     println!("   Avg cycle time: {:.0}us", avg_time);
     println!();
@@ -732,10 +922,16 @@ fn main() -> Result<()> {
     println!("5. PER-CATEGORY PREDICTION ERROR");
     for cat in &categories {
         let cat_results: Vec<_> = results.iter().filter(|r| r.category == *cat).collect();
-        let avg: f32 = cat_results.iter().map(|r| r.prediction_error).sum::<f32>() / cat_results.len() as f32;
+        let avg: f32 =
+            cat_results.iter().map(|r| r.prediction_error).sum::<f32>() / cat_results.len() as f32;
         let learning: usize = cat_results.iter().filter(|r| r.learning_occurred).count();
-        println!("   {:>12}: avg_error={:.6}, learning={}/{}",
-                 cat.name(), avg, learning, cat_results.len());
+        println!(
+            "   {:>12}: avg_error={:.6}, learning={}/{}",
+            cat.name(),
+            avg,
+            learning,
+            cat_results.len()
+        );
     }
     println!();
 
@@ -743,9 +939,18 @@ fn main() -> Result<()> {
     let stats = service.stats();
     println!("6. COGNITIVE LOOP STATS");
     println!("   Total cycles: {}", stats.total_cycles);
-    println!("   Avg prediction error (EMA): {:.6}", stats.avg_prediction_error);
-    println!("   Error trend: {:.6} (negative = improving)", stats.error_trend);
-    println!("   CfC state diversity: {:.4}", service.cfc_state_diversity());
+    println!(
+        "   Avg prediction error (EMA): {:.6}",
+        stats.avg_prediction_error
+    );
+    println!(
+        "   Error trend: {:.6} (negative = improving)",
+        stats.error_trend
+    );
+    println!(
+        "   CfC state diversity: {:.4}",
+        service.cfc_state_diversity()
+    );
     println!();
 
     println!("========================================================================");
@@ -754,8 +959,10 @@ fn main() -> Result<()> {
     println!();
 
     if hdc_score > 0.01 && hdc_score > cfc_score {
-        println!("HYPOTHESIS CONFIRMED: HDC-direct clustering ({:.4}) > CfC output ({:.4})",
-                 hdc_score, cfc_score);
+        println!(
+            "HYPOTHESIS CONFIRMED: HDC-direct clustering ({:.4}) > CfC output ({:.4})",
+            hdc_score, cfc_score
+        );
         println!();
         println!("The HDC projection preserves semantic structure before CfC temporal");
         println!("dynamics muddy it with recency effects. This suggests using HDC-direct");
@@ -802,6 +1009,10 @@ mod tests {
     #[test]
     fn test_corpus_size() {
         let corpus = get_test_corpus();
-        assert_eq!(corpus.len(), 24, "Should have 24 sentences (4 per category)");
+        assert_eq!(
+            corpus.len(),
+            24,
+            "Should have 24 sentences (4 per category)"
+        );
     }
 }

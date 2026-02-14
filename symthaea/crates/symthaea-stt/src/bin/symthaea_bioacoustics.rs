@@ -17,15 +17,11 @@
 use clap::{Parser, Subcommand};
 use console::{style, Emoji};
 use indicatif::{ProgressBar, ProgressStyle};
+use std::f32::consts::PI;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::f32::consts::PI;
-use symthaea_stt::{
-    BatchDiscovery, BatchConfig,
-    DiscoveryConfig,
-    batch::find_audio_files,
-};
+use symthaea_stt::{batch::find_audio_files, BatchConfig, BatchDiscovery, DiscoveryConfig};
 
 #[allow(dead_code)]
 static DOWNLOAD: Emoji<'_, '_> = Emoji("📥 ", "");
@@ -118,19 +114,34 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Download { species, output, count } => {
+        Commands::Download {
+            species,
+            output,
+            count,
+        } => {
             if let Err(e) = download_audio(&species, &output, count) {
                 eprintln!("Download failed: {}", e);
                 std::process::exit(1);
             }
         }
-        Commands::Discover { input, output, threshold, min_instances, workers } => {
+        Commands::Discover {
+            input,
+            output,
+            threshold,
+            min_instances,
+            workers,
+        } => {
             if let Err(e) = run_discovery(&input, &output, threshold, min_instances, workers) {
                 eprintln!("Discovery failed: {}", e);
                 std::process::exit(1);
             }
         }
-        Commands::Generate { vocalization_type, duration, output, sample_rate } => {
+        Commands::Generate {
+            vocalization_type,
+            duration,
+            output,
+            sample_rate,
+        } => {
             if let Err(e) = generate_audio(&vocalization_type, duration, &output, sample_rate) {
                 eprintln!("Generation failed: {}", e);
                 std::process::exit(1);
@@ -195,37 +206,61 @@ const SPECIES: &[SpeciesInfo] = &[
         emoji: "🦇",
         description: "Echolocation calls (requires high sample rate)",
         freq_range: (20000.0, 100000.0),
-        sources: &[
-            "Bat Library (batlib.org)",
-            "ChiroVox database",
-        ],
+        sources: &["Bat Library (batlib.org)", "ChiroVox database"],
     },
 ];
 
 fn list_sources() {
-    println!("\n{}Available Species and Data Sources", style("").bold().cyan());
+    println!(
+        "\n{}Available Species and Data Sources",
+        style("").bold().cyan()
+    );
     println!("{}", "=".repeat(60));
 
     for species in SPECIES {
-        println!("\n{} {} - {}", species.emoji, style(species.name).green().bold(), species.description);
-        println!("   Frequency range: {} - {} Hz", species.freq_range.0, species.freq_range.1);
+        println!(
+            "\n{} {} - {}",
+            species.emoji,
+            style(species.name).green().bold(),
+            species.description
+        );
+        println!(
+            "   Frequency range: {} - {} Hz",
+            species.freq_range.0, species.freq_range.1
+        );
         println!("   Data sources:");
         for source in species.sources {
             println!("     - {}", source);
         }
     }
 
-    println!("\n{}Note: For actual downloads, you may need to manually download", style("").dim());
-    println!("{}from these sources as they require authentication or have", style("").dim());
-    println!("{}usage restrictions. Use 'generate' to create synthetic test audio.", style("").dim());
+    println!(
+        "\n{}Note: For actual downloads, you may need to manually download",
+        style("").dim()
+    );
+    println!(
+        "{}from these sources as they require authentication or have",
+        style("").dim()
+    );
+    println!(
+        "{}usage restrictions. Use 'generate' to create synthetic test audio.",
+        style("").dim()
+    );
 }
 
 fn download_audio(species: &str, output: &Path, count: usize) -> Result<(), String> {
-    let species_info = SPECIES.iter()
-        .find(|s| s.name == species)
-        .ok_or_else(|| format!("Unknown species: {}. Run 'list' for available species.", species))?;
+    let species_info = SPECIES.iter().find(|s| s.name == species).ok_or_else(|| {
+        format!(
+            "Unknown species: {}. Run 'list' for available species.",
+            species
+        )
+    })?;
 
-    println!("\n{}{} Audio Download", style("").bold().cyan(), species_info.emoji);
+    println!(
+        "\n{}{} Audio Download",
+        style("").bold().cyan(),
+        species_info.emoji
+    );
     println!("{}", "=".repeat(50));
     println!("Species: {}", style(species).green());
     println!("Output:  {}", output.display());
@@ -233,18 +268,27 @@ fn download_audio(species: &str, output: &Path, count: usize) -> Result<(), Stri
     println!();
 
     // Create output directory
-    fs::create_dir_all(output)
-        .map_err(|e| format!("Failed to create output directory: {}", e))?;
+    fs::create_dir_all(output).map_err(|e| format!("Failed to create output directory: {}", e))?;
 
-    println!("{}Due to licensing restrictions, automatic downloads are not available.", style("Note: ").yellow());
-    println!("{}Instead, generating {} synthetic {} calls for testing...", style("").dim(), count, species);
+    println!(
+        "{}Due to licensing restrictions, automatic downloads are not available.",
+        style("Note: ").yellow()
+    );
+    println!(
+        "{}Instead, generating {} synthetic {} calls for testing...",
+        style("").dim(),
+        count,
+        species
+    );
     println!();
 
     // Generate synthetic audio as placeholder
     let progress = ProgressBar::new(count as u64);
-    progress.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}")
-        .unwrap());
+    progress.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}")
+            .unwrap(),
+    );
 
     for i in 0..count {
         let filename = output.join(format!("{}_{:03}.wav", species, i + 1));
@@ -258,7 +302,10 @@ fn download_audio(species: &str, output: &Path, count: usize) -> Result<(), Stri
 
     progress.finish_with_message("Done!");
 
-    println!("\n{}Generated {} synthetic {} audio files", SUCCESS, count, species);
+    println!(
+        "\n{}Generated {} synthetic {} audio files",
+        SUCCESS, count, species
+    );
     println!("Location: {}", output.display());
     println!();
     println!("{}For real data, please visit:", style("Tip: ").cyan());
@@ -269,7 +316,12 @@ fn download_audio(species: &str, output: &Path, count: usize) -> Result<(), Stri
     Ok(())
 }
 
-fn generate_audio(vocalization_type: &str, duration: f32, output: &Path, sample_rate: u32) -> Result<(), String> {
+fn generate_audio(
+    vocalization_type: &str,
+    duration: f32,
+    output: &Path,
+    sample_rate: u32,
+) -> Result<(), String> {
     let samples = match vocalization_type {
         "whale" => generate_whale_calls(duration, sample_rate),
         "bird" => generate_bird_song(duration, sample_rate),
@@ -280,8 +332,7 @@ fn generate_audio(vocalization_type: &str, duration: f32, output: &Path, sample_
 
     // Write WAV file
     if let Some(parent) = output.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create directory: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
     }
 
     let spec = hound::WavSpec {
@@ -296,11 +347,13 @@ fn generate_audio(vocalization_type: &str, duration: f32, output: &Path, sample_
 
     for sample in samples {
         let s = (sample * 32767.0).clamp(-32768.0, 32767.0) as i16;
-        writer.write_sample(s)
+        writer
+            .write_sample(s)
             .map_err(|e| format!("Failed to write sample: {}", e))?;
     }
 
-    writer.finalize()
+    writer
+        .finalize()
         .map_err(|e| format!("Failed to finalize WAV: {}", e))?;
 
     Ok(())
@@ -314,7 +367,9 @@ fn generate_whale_calls(duration: f32, sample_rate: u32) -> Vec<f32> {
 
     // Helper for pseudo-random
     let mut rand = || {
-        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng_state = rng_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((rng_state >> 33) as f32) / (u32::MAX as f32)
     };
 
@@ -326,8 +381,8 @@ fn generate_whale_calls(duration: f32, sample_rate: u32) -> Vec<f32> {
         let call_duration = (1.5 + rand() * 2.0) * sample_rate as f32;
 
         // Base frequency sweeps (characteristic of humpback songs)
-        let f_start = 200.0 + rand() * 400.0;  // 200-600 Hz
-        let f_end = f_start * (0.5 + rand() * 1.0);  // Frequency modulation
+        let f_start = 200.0 + rand() * 400.0; // 200-600 Hz
+        let f_end = f_start * (0.5 + rand() * 1.0); // Frequency modulation
 
         for i in 0..(call_duration as usize) {
             let sample_idx = call_start as usize + i;
@@ -344,8 +399,8 @@ fn generate_whale_calls(duration: f32, sample_rate: u32) -> Vec<f32> {
             // Main tone with harmonics
             let phase = 2.0 * PI * freq * i as f32 / sample_rate as f32;
             let mut signal = phase.sin() * 0.6;
-            signal += (phase * 2.0).sin() * 0.2;  // Second harmonic
-            signal += (phase * 3.0).sin() * 0.1;  // Third harmonic
+            signal += (phase * 2.0).sin() * 0.2; // Second harmonic
+            signal += (phase * 3.0).sin() * 0.1; // Third harmonic
 
             // Add frequency modulation (warbling)
             let warble = (2.0 * PI * 2.0 * i as f32 / sample_rate as f32).sin() * 10.0;
@@ -367,7 +422,10 @@ fn generate_whale_calls(duration: f32, sample_rate: u32) -> Vec<f32> {
     }
 
     // Normalize
-    let max_val = samples.iter().map(|s| s.abs()).fold(0.0f32, |a, b| a.max(b));
+    let max_val = samples
+        .iter()
+        .map(|s| s.abs())
+        .fold(0.0f32, |a, b| a.max(b));
     if max_val > 0.0 {
         for s in &mut samples {
             *s /= max_val;
@@ -384,7 +442,9 @@ fn generate_bird_song(duration: f32, sample_rate: u32) -> Vec<f32> {
     let mut rng_state = 123u64;
 
     let mut rand = || {
-        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng_state = rng_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((rng_state >> 33) as f32) / (u32::MAX as f32)
     };
 
@@ -399,8 +459,8 @@ fn generate_bird_song(duration: f32, sample_rate: u32) -> Vec<f32> {
             let note_start = (phrase_start + note_idx as f32 * 0.1) * sample_rate as f32;
             let note_duration = (0.05 + rand() * 0.15) * sample_rate as f32;
 
-            let base_freq = 2000.0 + rand() * 4000.0;  // 2-6 kHz
-            let freq_sweep = (rand() - 0.5) * 2000.0;  // Frequency sweep
+            let base_freq = 2000.0 + rand() * 4000.0; // 2-6 kHz
+            let freq_sweep = (rand() - 0.5) * 2000.0; // Frequency sweep
 
             for i in 0..(note_duration as usize) {
                 let sample_idx = note_start as usize + i;
@@ -429,7 +489,7 @@ fn generate_bird_song(duration: f32, sample_rate: u32) -> Vec<f32> {
         if rand() > 0.5 {
             let trill_start = (phrase_start + 0.5) * sample_rate as f32;
             let trill_freq = 3000.0 + rand() * 2000.0;
-            let trill_rate = 30.0 + rand() * 20.0;  // Modulation rate
+            let trill_rate = 30.0 + rand() * 20.0; // Modulation rate
 
             for i in 0..((0.3 * sample_rate as f32) as usize) {
                 let sample_idx = trill_start as usize + i;
@@ -448,7 +508,10 @@ fn generate_bird_song(duration: f32, sample_rate: u32) -> Vec<f32> {
     }
 
     // Normalize
-    let max_val = samples.iter().map(|s| s.abs()).fold(0.0f32, |a, b| a.max(b));
+    let max_val = samples
+        .iter()
+        .map(|s| s.abs())
+        .fold(0.0f32, |a, b| a.max(b));
     if max_val > 0.0 {
         for s in &mut samples {
             *s /= max_val;
@@ -465,7 +528,9 @@ fn generate_dolphin_clicks(duration: f32, sample_rate: u32) -> Vec<f32> {
     let mut rng_state = 456u64;
 
     let mut rand = || {
-        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng_state = rng_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((rng_state >> 33) as f32) / (u32::MAX as f32)
     };
 
@@ -478,8 +543,9 @@ fn generate_dolphin_clicks(duration: f32, sample_rate: u32) -> Vec<f32> {
         let click_interval = 0.02 + rand() * 0.05;
 
         for click_idx in 0..num_clicks {
-            let click_start = (train_start + click_idx as f32 * click_interval) * sample_rate as f32;
-            let click_duration = 0.001 * sample_rate as f32;  // 1ms click
+            let click_start =
+                (train_start + click_idx as f32 * click_interval) * sample_rate as f32;
+            let click_duration = 0.001 * sample_rate as f32; // 1ms click
 
             for i in 0..(click_duration as usize) {
                 let sample_idx = click_start as usize + i;
@@ -533,7 +599,10 @@ fn generate_dolphin_clicks(duration: f32, sample_rate: u32) -> Vec<f32> {
     }
 
     // Normalize
-    let max_val = samples.iter().map(|s| s.abs()).fold(0.0f32, |a, b| a.max(b));
+    let max_val = samples
+        .iter()
+        .map(|s| s.abs())
+        .fold(0.0f32, |a, b| a.max(b));
     if max_val > 0.0 {
         for s in &mut samples {
             *s /= max_val;
@@ -550,13 +619,15 @@ fn generate_bat_calls(duration: f32, sample_rate: u32) -> Vec<f32> {
     let mut rng_state = 789u64;
 
     let mut rand = || {
-        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng_state = rng_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((rng_state >> 33) as f32) / (u32::MAX as f32)
     };
 
     // Note: Real bat calls are ultrasonic (20-100 kHz)
     // We simulate them at audible frequencies for 16kHz sample rate
-    let freq_scale = 0.25;  // Scale down to audible range
+    let freq_scale = 0.25; // Scale down to audible range
 
     let num_calls = (duration / 0.5).max(1.0) as usize;
 
@@ -586,7 +657,10 @@ fn generate_bat_calls(duration: f32, sample_rate: u32) -> Vec<f32> {
     }
 
     // Normalize
-    let max_val = samples.iter().map(|s| s.abs()).fold(0.0f32, |a, b| a.max(b));
+    let max_val = samples
+        .iter()
+        .map(|s| s.abs())
+        .fold(0.0f32, |a, b| a.max(b));
     if max_val > 0.0 {
         for s in &mut samples {
             *s /= max_val;
@@ -637,9 +711,9 @@ fn run_discovery(
     let discovery_config = DiscoveryConfig {
         similarity_threshold: threshold,
         min_instances,
-        salience_threshold: 0.3,  // Lower for better boundary detection
-        min_segment_ms: 10.0,     // Allow short segments
-        max_segment_ms: 5000.0,   // Allow longer segments for whale calls
+        salience_threshold: 0.3, // Lower for better boundary detection
+        min_segment_ms: 10.0,    // Allow short segments
+        max_segment_ms: 5000.0,  // Allow longer segments for whale calls
         ..Default::default()
     };
 
@@ -647,9 +721,11 @@ fn run_discovery(
     println!("{}Running acoustic unit discovery...", ANALYZE);
 
     let progress = ProgressBar::new(files.len() as u64);
-    progress.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}")
-        .unwrap());
+    progress.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}")
+            .unwrap(),
+    );
 
     let progress_clone = progress.clone();
     let callback = Box::new(move |current: usize, _total: usize, _path: &str| {
@@ -669,8 +745,8 @@ fn run_discovery(
 
     let json = result.to_json();
 
-    let mut file = File::create(output)
-        .map_err(|e| format!("Failed to create output file: {}", e))?;
+    let mut file =
+        File::create(output).map_err(|e| format!("Failed to create output file: {}", e))?;
     file.write_all(json.as_bytes())
         .map_err(|e| format!("Failed to write results: {}", e))?;
 
@@ -691,11 +767,13 @@ fn run_discovery(
     if !result.units.is_empty() {
         println!("\n{}Unit Details:", style("").bold());
         for (i, unit) in result.units.iter().take(10).enumerate() {
-            println!("  {:>3}. {} - {} instances, {:.1}ms avg",
+            println!(
+                "  {:>3}. {} - {} instances, {:.1}ms avg",
                 i + 1,
                 style(&unit.id).cyan(),
                 unit.instance_count,
-                unit.mean_duration_ms);
+                unit.mean_duration_ms
+            );
         }
 
         if result.units.len() > 10 {
@@ -710,12 +788,12 @@ fn run_discovery(
 
 fn show_info(results_path: &Path) -> Result<(), String> {
     // Read the JSON file
-    let content = fs::read_to_string(results_path)
-        .map_err(|e| format!("Failed to read results: {}", e))?;
+    let content =
+        fs::read_to_string(results_path).map_err(|e| format!("Failed to read results: {}", e))?;
 
     // Parse as generic JSON since DiscoveryResult doesn't implement Deserialize
-    let json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse results: {}", e))?;
+    let json: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse results: {}", e))?;
 
     println!("\n{}Discovery Results Info", style("").bold().cyan());
     println!("{}", "=".repeat(50));
@@ -745,25 +823,26 @@ fn show_info(results_path: &Path) -> Result<(), String> {
     if let Some(units) = json.get("units").and_then(|v| v.as_array()) {
         println!("\n{}All Discovered Units:", style("").bold());
         println!("{}", "-".repeat(60));
-        println!("{:>10} {:>12} {:>12}",
-            "ID", "Instances", "Duration");
+        println!("{:>10} {:>12} {:>12}", "ID", "Instances", "Duration");
 
         for unit in units {
             let id = unit.get("id").and_then(|v| v.as_str()).unwrap_or("?");
             let instances = unit.get("instances").and_then(|v| v.as_u64()).unwrap_or(0);
-            let duration = unit.get("mean_duration_ms").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let duration = unit
+                .get("mean_duration_ms")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
 
-            println!("{:>10} {:>12} {:>9.1} ms",
-                id,
-                instances,
-                duration);
+            println!("{:>10} {:>12} {:>9.1} ms", id, instances, duration);
         }
 
         // Calculate summary stats
-        let total_instances: u64 = units.iter()
+        let total_instances: u64 = units
+            .iter()
             .filter_map(|u| u.get("instances").and_then(|v| v.as_u64()))
             .sum();
-        let durations: Vec<f64> = units.iter()
+        let durations: Vec<f64> = units
+            .iter()
             .filter_map(|u| u.get("mean_duration_ms").and_then(|v| v.as_f64()))
             .collect();
 

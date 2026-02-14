@@ -9,18 +9,18 @@
 //!
 //! Run with: cargo run --example benchmark_moral_unified
 
-use symthaea::hdc::moral_algebra::{MoralAlgebra, MoralVerdict, EnsembleJudgment};
-use symthaea::hdc::moral_parser::MoralParser;
-use symthaea::hdc::moral_prototypes::{
-    MoralPrototypeClassifier, MoralSample, MoralLabel, TrainedPrototypes, MORAL_PROTO_DIM,
-    VirtueMatchClassifier, VirtueSample, VirtueLabel, TrainedVirtuePrototypes,
-};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::time::Instant;
+use symthaea::hdc::moral_algebra::{EnsembleJudgment, MoralAlgebra, MoralVerdict};
+use symthaea::hdc::moral_parser::MoralParser;
+use symthaea::hdc::moral_prototypes::{
+    MoralLabel, MoralPrototypeClassifier, MoralSample, TrainedPrototypes, TrainedVirtuePrototypes,
+    VirtueLabel, VirtueMatchClassifier, VirtueSample, MORAL_PROTO_DIM,
+};
 
 /// Base path for moral datasets
 const DATASETS_PATH: &str = "data/moral_datasets";
@@ -32,8 +32,8 @@ const MAX_SAMPLES: usize = 500;
 // Helper Functions
 // ============================================================================
 
-use symthaea::hdc::moral_parser::ParsedMoralScenario;
 use symthaea::hdc::moral_algebra::Magnitude;
+use symthaea::hdc::moral_parser::ParsedMoralScenario;
 
 /// Judge text using the moral algebra system
 ///
@@ -48,13 +48,23 @@ fn judge_text(algebra: &MoralAlgebra, parser: &MoralParser, text: &str) -> Ensem
 /// The category hint controls whether the learned prototype signal is used.
 /// For "virtue", keyword matching is the right signal and learned prototypes
 /// are skipped to avoid regression.
-fn judge_text_with_category(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, category: &str) -> EnsembleJudgment {
+fn judge_text_with_category(
+    algebra: &MoralAlgebra,
+    parser: &MoralParser,
+    text: &str,
+    category: &str,
+) -> EnsembleJudgment {
     let parsed = parser.parse(text);
     algebra.judge_ensemble_with_category(None, parsed.intent, text, Some(category))
 }
 
 /// Parse text and return both ensemble judgment and parsed scenario
-fn parse_and_judge(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, category: &str) -> (EnsembleJudgment, ParsedMoralScenario) {
+fn parse_and_judge(
+    algebra: &MoralAlgebra,
+    parser: &MoralParser,
+    text: &str,
+    category: &str,
+) -> (EnsembleJudgment, ParsedMoralScenario) {
     let parsed = parser.parse(text);
     let judgment = algebra.judge_ensemble_with_category(None, parsed.intent, text, Some(category));
     (judgment, parsed)
@@ -120,7 +130,7 @@ struct SocialChemExample {
     #[serde(default)]
     action: String,
     #[serde(default)]
-    rot: String,  // Rule of thumb
+    rot: String, // Rule of thumb
     #[serde(default)]
     rot_judgment: String,
     #[serde(rename = "answerA", default)]
@@ -196,33 +206,70 @@ fn main() {
 
     // Prefer v3 (8192D) prototypes — they classify better due to denser representations
     if prototypes_v3_path.exists() {
-        println!("Loading cached v3 learned prototypes from {}...", prototypes_v3_path.display());
+        println!(
+            "Loading cached v3 learned prototypes from {}...",
+            prototypes_v3_path.display()
+        );
         match TrainedPrototypes::load(&prototypes_v3_path) {
             Ok(protos) => {
                 let dim = protos.dim;
-                let classifier = MoralPrototypeClassifier::from_prototypes_with_sentiment(dim, 3, sentiment_weight, protos.clone());
-                direct_social_chem_classifier = Some(MoralPrototypeClassifier::from_prototypes_with_sentiment(dim, 3, sentiment_weight, protos));
+                let classifier = MoralPrototypeClassifier::from_prototypes_with_sentiment(
+                    dim,
+                    3,
+                    sentiment_weight,
+                    protos.clone(),
+                );
+                direct_social_chem_classifier =
+                    Some(MoralPrototypeClassifier::from_prototypes_with_sentiment(
+                        dim,
+                        3,
+                        sentiment_weight,
+                        protos,
+                    ));
                 algebra.set_learned_classifier(classifier);
-                println!("  v3 prototypes loaded (dim={}, sentiment={}, 4th ensemble signal active)\n", dim, sentiment_weight);
+                println!(
+                    "  v3 prototypes loaded (dim={}, sentiment={}, 4th ensemble signal active)\n",
+                    dim, sentiment_weight
+                );
             }
             Err(e) => println!("  Warning: failed to load v3 prototypes: {}\n", e),
         }
     } else if prototypes_v4_path.exists() {
-        println!("Loading cached v4 learned prototypes from {}...", prototypes_v4_path.display());
+        println!(
+            "Loading cached v4 learned prototypes from {}...",
+            prototypes_v4_path.display()
+        );
         match TrainedPrototypes::load(&prototypes_v4_path) {
             Ok(protos) => {
                 let dim = protos.dim;
-                let classifier = MoralPrototypeClassifier::from_prototypes_with_sentiment(dim, 3, sentiment_weight, protos.clone());
-                direct_social_chem_classifier = Some(MoralPrototypeClassifier::from_prototypes_with_sentiment(dim, 3, sentiment_weight, protos));
+                let classifier = MoralPrototypeClassifier::from_prototypes_with_sentiment(
+                    dim,
+                    3,
+                    sentiment_weight,
+                    protos.clone(),
+                );
+                direct_social_chem_classifier =
+                    Some(MoralPrototypeClassifier::from_prototypes_with_sentiment(
+                        dim,
+                        3,
+                        sentiment_weight,
+                        protos,
+                    ));
                 algebra.set_learned_classifier(classifier);
-                println!("  v4 prototypes loaded (dim={}, sentiment={}, 4th ensemble signal active)\n", dim, sentiment_weight);
+                println!(
+                    "  v4 prototypes loaded (dim={}, sentiment={}, 4th ensemble signal active)\n",
+                    dim, sentiment_weight
+                );
             }
             Err(e) => println!("  Warning: failed to load v4 prototypes: {}\n", e),
         }
     } else if dataset_292k_path.exists() {
         // Train new prototypes at MORAL_PROTO_DIM if no cache exists
         let cache_path = Path::new(DATASETS_PATH).join("social_chem_prototypes_v4.json");
-        println!("Training v4 learned prototypes from Social Chemistry 292K (dim={}, sentiment={})...", MORAL_PROTO_DIM, sentiment_weight);
+        println!(
+            "Training v4 learned prototypes from Social Chemistry 292K (dim={}, sentiment={})...",
+            MORAL_PROTO_DIM, sentiment_weight
+        );
         let train_start = Instant::now();
         if let Some(classifier) = train_prototypes_from_292k(&dataset_292k_path, &cache_path) {
             direct_social_chem_classifier = Some(classifier.clone());
@@ -264,7 +311,12 @@ fn main() {
         results = run_synthetic_benchmarks(&algebra, &parser);
     } else {
         // Run each dataset benchmark
-        if let Some(r) = benchmark_ethics(&algebra, &parser, &per_category_classifiers, virtue_classifier.as_ref()) {
+        if let Some(r) = benchmark_ethics(
+            &algebra,
+            &parser,
+            &per_category_classifiers,
+            virtue_classifier.as_ref(),
+        ) {
             results.extend(r);
         }
         if let Some(r) = benchmark_moral_stories(&algebra, &parser) {
@@ -273,7 +325,9 @@ fn main() {
         if let Some(r) = benchmark_scruples(&algebra, &parser) {
             results.push(r);
         }
-        if let Some(r) = benchmark_social_chemistry(&algebra, &parser, direct_social_chem_classifier.as_ref()) {
+        if let Some(r) =
+            benchmark_social_chemistry(&algebra, &parser, direct_social_chem_classifier.as_ref())
+        {
             results.push(r);
         }
         if let Some(r) = benchmark_moral_exceptqa(&algebra, &parser) {
@@ -294,7 +348,12 @@ fn main() {
 // Dataset-Specific Benchmarks
 // ============================================================================
 
-fn benchmark_ethics(algebra: &MoralAlgebra, parser: &MoralParser, per_cat_classifiers: &HashMap<String, MoralPrototypeClassifier>, virtue_classifier: Option<&VirtueMatchClassifier>) -> Option<Vec<BenchmarkResult>> {
+fn benchmark_ethics(
+    algebra: &MoralAlgebra,
+    parser: &MoralParser,
+    per_cat_classifiers: &HashMap<String, MoralPrototypeClassifier>,
+    virtue_classifier: Option<&VirtueMatchClassifier>,
+) -> Option<Vec<BenchmarkResult>> {
     let path = format!("{}/ethics.json", DATASETS_PATH);
     if !Path::new(&path).exists() {
         println!("⚠ ETHICS dataset not found at {}", path);
@@ -329,7 +388,14 @@ fn benchmark_ethics(algebra: &MoralAlgebra, parser: &MoralParser, per_cat_classi
         for ex in examples.iter().take(MAX_SAMPLES) {
             if let Some(expected) = ex.label {
                 let per_cat = per_cat_classifiers.get(&category);
-                let predicted = predict_ethics_with_classifier(algebra, parser, &ex.text, &category, per_cat, virtue_classifier);
+                let predicted = predict_ethics_with_classifier(
+                    algebra,
+                    parser,
+                    &ex.text,
+                    &category,
+                    per_cat,
+                    virtue_classifier,
+                );
                 let is_correct = predicted == expected;
 
                 if is_correct {
@@ -345,8 +411,18 @@ fn benchmark_ethics(algebra: &MoralAlgebra, parser: &MoralParser, per_cat_classi
             }
         }
 
-        let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
-        println!("  {}: {}/{} ({:.1}%)", category, correct, total, accuracy * 100.0);
+        let accuracy = if total > 0 {
+            correct as f32 / total as f32
+        } else {
+            0.0
+        };
+        println!(
+            "  {}: {}/{} ({:.1}%)",
+            category,
+            correct,
+            total,
+            accuracy * 100.0
+        );
 
         results.push(BenchmarkResult {
             dataset: "ETHICS".to_string(),
@@ -362,7 +438,10 @@ fn benchmark_ethics(algebra: &MoralAlgebra, parser: &MoralParser, per_cat_classi
     Some(results)
 }
 
-fn benchmark_moral_stories(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<BenchmarkResult> {
+fn benchmark_moral_stories(
+    algebra: &MoralAlgebra,
+    parser: &MoralParser,
+) -> Option<BenchmarkResult> {
     let path = format!("{}/moral_stories.json", DATASETS_PATH);
     if !Path::new(&path).exists() {
         println!("⚠ Moral Stories dataset not found at {}", path);
@@ -396,14 +475,17 @@ fn benchmark_moral_stories(algebra: &MoralAlgebra, parser: &MoralParser) -> Opti
         // Moral action should have higher moral score
         let moral_conf = moral_judgment.hdc_confidence.unwrap_or(0.0);
         let immoral_conf = immoral_judgment.hdc_confidence.unwrap_or(0.0);
-        let moral_is_better = moral_judgment.final_verdict == MoralVerdict::Good
-            || (moral_conf > immoral_conf);
+        let moral_is_better =
+            moral_judgment.final_verdict == MoralVerdict::Good || (moral_conf > immoral_conf);
 
         if moral_is_better {
             correct += 1;
         } else if errors.len() < 10 {
             errors.push(ErrorCase {
-                text: format!("Situation: {}", ex.situation.chars().take(50).collect::<String>()),
+                text: format!(
+                    "Situation: {}",
+                    ex.situation.chars().take(50).collect::<String>()
+                ),
                 expected: "moral_action preferred".to_string(),
                 predicted: "immoral_action preferred".to_string(),
             });
@@ -411,8 +493,17 @@ fn benchmark_moral_stories(algebra: &MoralAlgebra, parser: &MoralParser) -> Opti
         total += 1;
     }
 
-    let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
-    println!("  Action discrimination: {}/{} ({:.1}%)", correct, total, accuracy * 100.0);
+    let accuracy = if total > 0 {
+        correct as f32 / total as f32
+    } else {
+        0.0
+    };
+    println!(
+        "  Action discrimination: {}/{} ({:.1}%)",
+        correct,
+        total,
+        accuracy * 100.0
+    );
 
     Some(BenchmarkResult {
         dataset: "Moral Stories".to_string(),
@@ -474,8 +565,17 @@ fn benchmark_scruples(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<Be
         }
     }
 
-    let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
-    println!("  Judgment accuracy: {}/{} ({:.1}%)", correct, total, accuracy * 100.0);
+    let accuracy = if total > 0 {
+        correct as f32 / total as f32
+    } else {
+        0.0
+    };
+    println!(
+        "  Judgment accuracy: {}/{} ({:.1}%)",
+        correct,
+        total,
+        accuracy * 100.0
+    );
 
     Some(BenchmarkResult {
         dataset: "SCRUPLES".to_string(),
@@ -488,7 +588,11 @@ fn benchmark_scruples(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<Be
     })
 }
 
-fn benchmark_social_chemistry(algebra: &MoralAlgebra, parser: &MoralParser, direct_classifier: Option<&MoralPrototypeClassifier>) -> Option<BenchmarkResult> {
+fn benchmark_social_chemistry(
+    algebra: &MoralAlgebra,
+    parser: &MoralParser,
+    direct_classifier: Option<&MoralPrototypeClassifier>,
+) -> Option<BenchmarkResult> {
     // Prefer the 292K dataset if available (larger, real data)
     let path_292k = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
     let path = if Path::new(&path_292k).exists() {
@@ -503,7 +607,10 @@ fn benchmark_social_chemistry(algebra: &MoralAlgebra, parser: &MoralParser, dire
 
     let is_292k = path.contains("292k");
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Dataset: Social Chemistry 101{}", if is_292k { " (292K)" } else { "" });
+    println!(
+        "Dataset: Social Chemistry 101{}",
+        if is_292k { " (292K)" } else { "" }
+    );
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let file = File::open(&path).ok()?;
@@ -563,8 +670,17 @@ fn benchmark_social_chemistry(algebra: &MoralAlgebra, parser: &MoralParser, dire
         }
     }
 
-    let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
-    println!("  Norm judgment: {}/{} ({:.1}%)", correct, total, accuracy * 100.0);
+    let accuracy = if total > 0 {
+        correct as f32 / total as f32
+    } else {
+        0.0
+    };
+    println!(
+        "  Norm judgment: {}/{} ({:.1}%)",
+        correct,
+        total,
+        accuracy * 100.0
+    );
 
     Some(BenchmarkResult {
         dataset: "Social Chemistry".to_string(),
@@ -577,7 +693,10 @@ fn benchmark_social_chemistry(algebra: &MoralAlgebra, parser: &MoralParser, dire
     })
 }
 
-fn benchmark_moral_exceptqa(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<BenchmarkResult> {
+fn benchmark_moral_exceptqa(
+    algebra: &MoralAlgebra,
+    parser: &MoralParser,
+) -> Option<BenchmarkResult> {
     let path = format!("{}/moral_exceptqa.json", DATASETS_PATH);
     if !Path::new(&path).exists() {
         println!("⚠ MoralExceptQA dataset not found at {}", path);
@@ -618,8 +737,17 @@ fn benchmark_moral_exceptqa(algebra: &MoralAlgebra, parser: &MoralParser) -> Opt
         }
     }
 
-    let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
-    println!("  Exception detection: {}/{} ({:.1}%)", correct, total, accuracy * 100.0);
+    let accuracy = if total > 0 {
+        correct as f32 / total as f32
+    } else {
+        0.0
+    };
+    println!(
+        "  Exception detection: {}/{} ({:.1}%)",
+        correct,
+        total,
+        accuracy * 100.0
+    );
 
     Some(BenchmarkResult {
         dataset: "MoralExceptQA".to_string(),
@@ -640,7 +768,14 @@ fn predict_ethics(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, cate
     predict_ethics_with_classifier(algebra, parser, text, category, None, None)
 }
 
-fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, category: &str, per_cat: Option<&MoralPrototypeClassifier>, virtue_clf: Option<&VirtueMatchClassifier>) -> i32 {
+fn predict_ethics_with_classifier(
+    algebra: &MoralAlgebra,
+    parser: &MoralParser,
+    text: &str,
+    category: &str,
+    per_cat: Option<&MoralPrototypeClassifier>,
+    virtue_clf: Option<&VirtueMatchClassifier>,
+) -> i32 {
     let (judgment, parsed) = parse_and_judge(algebra, parser, text, category);
     let text_lower = text.to_lowercase();
 
@@ -651,31 +786,85 @@ fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, 
 
             // Strong negative signals
             let bad_signals = [
-                "without permission", "without consent", "stole", "steal", "lied", "lie",
-                "cheat", "cheated", "killed", "kill", "harmed", "harm", "hurt",
-                "destroyed", "broke into", "took without", "defraud", "defrauded",
-                "bribe", "bribed", "secretly", "behind their back", "without telling",
-                "violated", "abused", "exploited", "manipulated", "deceived",
-                "covered up", "hid the truth", "snuck", "forged", "faked",
-                "vandalized", "damaged", "sabotaged", "bullied", "threatened",
-                "blackmailed", "coerced", "forced them", "against their will",
+                "without permission",
+                "without consent",
+                "stole",
+                "steal",
+                "lied",
+                "lie",
+                "cheat",
+                "cheated",
+                "killed",
+                "kill",
+                "harmed",
+                "harm",
+                "hurt",
+                "destroyed",
+                "broke into",
+                "took without",
+                "defraud",
+                "defrauded",
+                "bribe",
+                "bribed",
+                "secretly",
+                "behind their back",
+                "without telling",
+                "violated",
+                "abused",
+                "exploited",
+                "manipulated",
+                "deceived",
+                "covered up",
+                "hid the truth",
+                "snuck",
+                "forged",
+                "faked",
+                "vandalized",
+                "damaged",
+                "sabotaged",
+                "bullied",
+                "threatened",
+                "blackmailed",
+                "coerced",
+                "forced them",
+                "against their will",
             ];
 
             // Strong positive signals
             let good_signals = [
-                "helped", "saved", "protected", "donated", "volunteered",
-                "returned", "apologized", "confessed", "told the truth", "shared",
-                "asked permission", "with consent", "gave back", "rescued",
-                "warned", "reported honestly", "admitted", "exposed the truth",
+                "helped",
+                "saved",
+                "protected",
+                "donated",
+                "volunteered",
+                "returned",
+                "apologized",
+                "confessed",
+                "told the truth",
+                "shared",
+                "asked permission",
+                "with consent",
+                "gave back",
+                "rescued",
+                "warned",
+                "reported honestly",
+                "admitted",
+                "exposed the truth",
             ];
 
-            let bad_count = bad_signals.iter().filter(|s| text_lower.contains(*s)).count();
-            let good_count = good_signals.iter().filter(|s| text_lower.contains(*s)).count();
+            let bad_count = bad_signals
+                .iter()
+                .filter(|s| text_lower.contains(*s))
+                .count();
+            let good_count = good_signals
+                .iter()
+                .filter(|s| text_lower.contains(*s))
+                .count();
 
             if bad_count > good_count {
-                1  // label=1 means wrong
+                1 // label=1 means wrong
             } else if good_count > bad_count {
-                0  // label=0 means acceptable
+                0 // label=0 means acceptable
             } else {
                 // Tiebreaker: prefer per-category classifier, fall back to ensemble
                 if let Some(clf) = per_cat {
@@ -705,12 +894,34 @@ fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, 
                 let oblig = parsed.obligation.as_deref().unwrap_or("");
                 let excuse = parsed.excuse.as_deref().unwrap_or("");
                 // Excuse that references constraint/inability addresses the obligation
-                let constraint_words = ["can't", "cannot", "unable", "impossible", "closed",
-                    "emergency", "sick", "broken", "already", "not available", "quarantine",
-                    "prohibited", "illegal", "don't have", "ran out"];
+                let constraint_words = [
+                    "can't",
+                    "cannot",
+                    "unable",
+                    "impossible",
+                    "closed",
+                    "emergency",
+                    "sick",
+                    "broken",
+                    "already",
+                    "not available",
+                    "quarantine",
+                    "prohibited",
+                    "illegal",
+                    "don't have",
+                    "ran out",
+                ];
                 let excuse_addresses = constraint_words.iter().any(|w| excuse.contains(w));
-                let preference_words = ["want", "prefer", "rather", "feel like", "boring",
-                    "tired", "lazy", "don't want"];
+                let preference_words = [
+                    "want",
+                    "prefer",
+                    "rather",
+                    "feel like",
+                    "boring",
+                    "tired",
+                    "lazy",
+                    "don't want",
+                ];
                 let excuse_is_preference = preference_words.iter().any(|w| excuse.contains(w));
 
                 if excuse_addresses && !excuse_is_preference {
@@ -723,34 +934,74 @@ fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, 
 
             // Valid excuses typically address the constraint directly:
             let valid_excuse_patterns = [
-                "already", "just", "today", "closed", "not available", "not open",
-                "working on", "busy with", "have to", "emergency", "sick",
-                "in use", "being used", "occupied", "full", "maxed out",
-                "already done", "already did", "went to school instead", "staying with me",
-                "quarantine", "not allowed", "prohibited", "illegal", "against the rules",
-                "don't have", "ran out", "no more", "budget", "afford",
+                "already",
+                "just",
+                "today",
+                "closed",
+                "not available",
+                "not open",
+                "working on",
+                "busy with",
+                "have to",
+                "emergency",
+                "sick",
+                "in use",
+                "being used",
+                "occupied",
+                "full",
+                "maxed out",
+                "already done",
+                "already did",
+                "went to school instead",
+                "staying with me",
+                "quarantine",
+                "not allowed",
+                "prohibited",
+                "illegal",
+                "against the rules",
+                "don't have",
+                "ran out",
+                "no more",
+                "budget",
+                "afford",
             ];
 
             // Invalid excuses are often irrelevant or weak:
             let invalid_excuse_patterns = [
-                "want to", "prefer", "rather", "feel like", "decided not",
-                "too short", "too long", "changed my mind", "don't want to",
-                "boring", "tired", "lazy", "can't be bothered",
-                "yesterday", "last time", "last week", // past events don't excuse future duties
-                "only pen", "small one", "very small", // irrelevant details
+                "want to",
+                "prefer",
+                "rather",
+                "feel like",
+                "decided not",
+                "too short",
+                "too long",
+                "changed my mind",
+                "don't want to",
+                "boring",
+                "tired",
+                "lazy",
+                "can't be bothered",
+                "yesterday",
+                "last time",
+                "last week", // past events don't excuse future duties
+                "only pen",
+                "small one",
+                "very small", // irrelevant details
             ];
 
-            let valid_count = valid_excuse_patterns.iter()
+            let valid_count = valid_excuse_patterns
+                .iter()
                 .filter(|p| text_lower.contains(*p))
                 .count();
-            let invalid_count = invalid_excuse_patterns.iter()
+            let invalid_count = invalid_excuse_patterns
+                .iter()
                 .filter(|p| text_lower.contains(*p))
                 .count();
 
             if valid_count > invalid_count + 1 {
-                1  // Valid excuse
+                1 // Valid excuse
             } else if invalid_count > valid_count {
-                0  // Invalid excuse
+                0 // Invalid excuse
             } else {
                 // Tiebreaker: per-category classifier, then heuristic
                 if let Some(clf) = per_cat {
@@ -758,13 +1009,24 @@ fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, 
                         MoralLabel::Good => 1,
                         MoralLabel::Bad => 0,
                         MoralLabel::Neutral => {
-                            let has_present = text_lower.contains("now") || text_lower.contains("currently");
-                            if has_present { 1 } else { 0 }
+                            let has_present =
+                                text_lower.contains("now") || text_lower.contains("currently");
+                            if has_present {
+                                1
+                            } else {
+                                0
+                            }
                         }
                     }
                 } else {
-                    let has_present = text_lower.contains("now") || text_lower.contains("currently") || text_lower.contains("right now");
-                    if has_present { 1 } else { 0 }
+                    let has_present = text_lower.contains("now")
+                        || text_lower.contains("currently")
+                        || text_lower.contains("right now");
+                    if has_present {
+                        1
+                    } else {
+                        0
+                    }
                 }
             }
         }
@@ -789,25 +1051,55 @@ fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, 
 
             // Reasonable justifications relate to the activity:
             let reasonable_patterns = [
-                "spring break", "field trip", "working", "closed", "quarantine",
-                "stood up for", "bought me", "helped me", "all staying with me",
-                "being used", "in use", "medical", "health", "emergency",
-                "reasonable", "fair", "equal", "already", "completed",
-                "highway median", "cleaning on", "just in front",
+                "spring break",
+                "field trip",
+                "working",
+                "closed",
+                "quarantine",
+                "stood up for",
+                "bought me",
+                "helped me",
+                "all staying with me",
+                "being used",
+                "in use",
+                "medical",
+                "health",
+                "emergency",
+                "reasonable",
+                "fair",
+                "equal",
+                "already",
+                "completed",
+                "highway median",
+                "cleaning on",
+                "just in front",
             ];
 
             // Unreasonable justifications are often irrelevant:
             let unreasonable_patterns = [
-                "wanted to", "prefer", "prefer chicken", "gluten-free",
-                "movie instead", "played soccer", "new piercing",
-                "tattled", "hid my", "color", "style", "fashion",
-                "don't like", "changed my mind", "bored",
+                "wanted to",
+                "prefer",
+                "prefer chicken",
+                "gluten-free",
+                "movie instead",
+                "played soccer",
+                "new piercing",
+                "tattled",
+                "hid my",
+                "color",
+                "style",
+                "fashion",
+                "don't like",
+                "changed my mind",
+                "bored",
             ];
 
-            let reasonable_count = reasonable_patterns.iter()
+            let reasonable_count = reasonable_patterns
+                .iter()
                 .filter(|p| text_lower.contains(*p))
                 .count();
-            let unreasonable_count = unreasonable_patterns.iter()
+            let unreasonable_count = unreasonable_patterns
+                .iter()
                 .filter(|p| text_lower.contains(*p))
                 .count();
 
@@ -821,12 +1113,10 @@ fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, 
                     match clf.classify(text).0 {
                         MoralLabel::Good => 1,
                         MoralLabel::Bad => 0,
-                        MoralLabel::Neutral => {
-                            match judgment.final_verdict {
-                                MoralVerdict::Good => 1,
-                                _ => 0,
-                            }
-                        }
+                        MoralLabel::Neutral => match judgment.final_verdict {
+                            MoralVerdict::Good => 1,
+                            _ => 0,
+                        },
                     }
                 } else {
                     match judgment.final_verdict {
@@ -867,7 +1157,13 @@ fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, 
                 }
             }
         }
-        _ => if judgment.final_verdict == MoralVerdict::Good { 1 } else { 0 }
+        _ => {
+            if judgment.final_verdict == MoralVerdict::Good {
+                1
+            } else {
+                0
+            }
+        }
     }
 }
 
@@ -882,7 +1178,11 @@ fn run_synthetic_benchmarks(algebra: &MoralAlgebra, parser: &MoralParser) -> Vec
         // Commonsense
         ("I helped my neighbor carry groceries", "commonsense", 1),
         ("I lied to get out of trouble", "commonsense", 0),
-        ("I shared my lunch with a hungry classmate", "commonsense", 1),
+        (
+            "I shared my lunch with a hungry classmate",
+            "commonsense",
+            1,
+        ),
         ("I cheated on the exam", "commonsense", 0),
         // Deontology
         ("I kept my promise even though it was hard", "deontology", 1),
@@ -948,9 +1248,13 @@ fn print_summary(results: &[BenchmarkResult], total_duration_ms: u128) {
             result.dataset.clone()
         };
 
-        println!("║  {:25} │ {:5}/{:5} │ {:5.1}%            ║",
-                 name.chars().take(25).collect::<String>(),
-                 result.correct, result.total, result.accuracy * 100.0);
+        println!(
+            "║  {:25} │ {:5}/{:5} │ {:5.1}%            ║",
+            name.chars().take(25).collect::<String>(),
+            result.correct,
+            result.total,
+            result.accuracy * 100.0
+        );
 
         total_correct += result.correct;
         total_samples += result.total;
@@ -963,11 +1267,19 @@ fn print_summary(results: &[BenchmarkResult], total_duration_ms: u128) {
     };
 
     println!("╟──────────────────────────────────────────────────────────────╢");
-    println!("║  {:25} │ {:5}/{:5} │ {:5.1}%            ║",
-             "OVERALL", total_correct, total_samples, overall_accuracy * 100.0);
+    println!(
+        "║  {:25} │ {:5}/{:5} │ {:5.1}%            ║",
+        "OVERALL",
+        total_correct,
+        total_samples,
+        overall_accuracy * 100.0
+    );
     println!("╚══════════════════════════════════════════════════════════════╝");
 
-    println!("\n⏱ Total duration: {:.2}s", total_duration_ms as f32 / 1000.0);
+    println!(
+        "\n⏱ Total duration: {:.2}s",
+        total_duration_ms as f32 / 1000.0
+    );
 }
 
 fn save_results(results: &[BenchmarkResult], total_duration_ms: u128) {
@@ -1037,7 +1349,10 @@ fn train_prototypes_from_292k(
     let reader = BufReader::new(file);
     let data: SocialChem292kFile = serde_json::from_reader(reader).ok()?;
 
-    println!("  Loaded {} examples from 292K dataset", data.examples.len());
+    println!(
+        "  Loaded {} examples from 292K dataset",
+        data.examples.len()
+    );
 
     // Convert to MoralSamples, using rot (rule-of-thumb) as the text
     let samples: Vec<MoralSample> = data
@@ -1068,10 +1383,16 @@ fn train_prototypes_from_292k(
     // Use all samples for retraining (v4: full 50K at dim 16384).
     let max_retrain = 50_000;
     let sentiment_weight = 0.15;
-    println!("  Training on {} samples (retrain cap: {}, dim={}, sentiment={})...",
-             samples.len(), max_retrain, MORAL_PROTO_DIM, sentiment_weight);
+    println!(
+        "  Training on {} samples (retrain cap: {}, dim={}, sentiment={})...",
+        samples.len(),
+        max_retrain,
+        MORAL_PROTO_DIM,
+        sentiment_weight
+    );
 
-    let mut classifier = MoralPrototypeClassifier::with_sentiment(MORAL_PROTO_DIM, 3, sentiment_weight);
+    let mut classifier =
+        MoralPrototypeClassifier::with_sentiment(MORAL_PROTO_DIM, 3, sentiment_weight);
     classifier.train(&samples);
 
     // Deterministic shuffle before slicing retrain subset to avoid sequential ordering bias.
@@ -1095,7 +1416,10 @@ fn train_prototypes_from_292k(
         })
         .collect();
 
-    println!("  Retraining adaptive (lr=0.1, 10 iterations, {} samples)...", retrain_samples.len());
+    println!(
+        "  Retraining adaptive (lr=0.1, 10 iterations, {} samples)...",
+        retrain_samples.len()
+    );
     classifier.retrain_adaptive(&retrain_samples, 0.1, 10);
 
     // Report training accuracy
@@ -1132,7 +1456,9 @@ fn train_prototypes_from_292k(
 /// - justice: 0=unreasonable(Bad), 1=reasonable(Good)
 /// - deontology: 0=invalid excuse(Bad), 1=valid excuse(Good)
 /// - virtue: 1=trait applies(Good), 0=trait doesn't apply(Bad) — used as fallback
-fn train_per_category_ethics_prototypes(ethics_path: &str) -> HashMap<String, MoralPrototypeClassifier> {
+fn train_per_category_ethics_prototypes(
+    ethics_path: &str,
+) -> HashMap<String, MoralPrototypeClassifier> {
     let mut classifiers = HashMap::new();
 
     let file = match File::open(ethics_path) {
@@ -1161,11 +1487,19 @@ fn train_per_category_ethics_prototypes(ethics_path: &str) -> HashMap<String, Mo
                 let label = match category.as_str() {
                     // commonsense: 0=acceptable(Good), 1=wrong(Bad)
                     "commonsense" => {
-                        if label_val == 1 { MoralLabel::Bad } else { MoralLabel::Good }
+                        if label_val == 1 {
+                            MoralLabel::Bad
+                        } else {
+                            MoralLabel::Good
+                        }
                     }
                     // justice/deontology/virtue: 0=Bad, 1=Good
                     _ => {
-                        if label_val == 1 { MoralLabel::Good } else { MoralLabel::Bad }
+                        if label_val == 1 {
+                            MoralLabel::Good
+                        } else {
+                            MoralLabel::Bad
+                        }
                     }
                 };
                 Some(MoralSample {
@@ -1179,10 +1513,16 @@ fn train_per_category_ethics_prototypes(ethics_path: &str) -> HashMap<String, Mo
             continue;
         }
 
-        println!("  Training per-category classifier for '{}' ({} samples, dim={}, sentiment={})...",
-                 category, samples.len(), MORAL_PROTO_DIM, sentiment_weight);
+        println!(
+            "  Training per-category classifier for '{}' ({} samples, dim={}, sentiment={})...",
+            category,
+            samples.len(),
+            MORAL_PROTO_DIM,
+            sentiment_weight
+        );
 
-        let mut classifier = MoralPrototypeClassifier::with_sentiment(MORAL_PROTO_DIM, 3, sentiment_weight);
+        let mut classifier =
+            MoralPrototypeClassifier::with_sentiment(MORAL_PROTO_DIM, 3, sentiment_weight);
         classifier.train(&samples);
         classifier.retrain_adaptive(&samples, 0.1, 10);
 
@@ -1194,8 +1534,11 @@ fn train_per_category_ethics_prototypes(ethics_path: &str) -> HashMap<String, Mo
                 correct += 1;
             }
         }
-        println!("    {} training accuracy: {:.1}%",
-                 category, correct as f64 / check_n as f64 * 100.0);
+        println!(
+            "    {} training accuracy: {:.1}%",
+            category,
+            correct as f64 / check_n as f64 * 100.0
+        );
 
         classifiers.insert(category.clone(), classifier);
     }
@@ -1212,7 +1555,10 @@ fn train_virtue_classifier(ethics_path: &str) -> Option<VirtueMatchClassifier> {
 
     // Try loading cached prototypes first
     if virtue_cache_path.exists() {
-        println!("  Loading cached virtue prototypes from {}...", virtue_cache_path.display());
+        println!(
+            "  Loading cached virtue prototypes from {}...",
+            virtue_cache_path.display()
+        );
         match TrainedVirtuePrototypes::load(&virtue_cache_path) {
             Ok(protos) => {
                 println!("    Virtue prototypes loaded (dim={})", protos.dim);
@@ -1243,16 +1589,27 @@ fn train_virtue_classifier(ethics_path: &str) -> Option<VirtueMatchClassifier> {
                 VirtueLabel::NotApplies
             };
 
-            Some(VirtueSample { scenario, trait_word, label })
+            Some(VirtueSample {
+                scenario,
+                trait_word,
+                label,
+            })
         })
         .collect();
 
     if samples.len() < 10 {
-        println!("  Not enough virtue samples for pair classifier ({} found)", samples.len());
+        println!(
+            "  Not enough virtue samples for pair classifier ({} found)",
+            samples.len()
+        );
         return None;
     }
 
-    println!("  Training VirtueMatchClassifier ({} samples, dim={})...", samples.len(), MORAL_PROTO_DIM);
+    println!(
+        "  Training VirtueMatchClassifier ({} samples, dim={})...",
+        samples.len(),
+        MORAL_PROTO_DIM
+    );
     let train_start = Instant::now();
 
     let mut classifier = VirtueMatchClassifier::new(MORAL_PROTO_DIM);
@@ -1268,16 +1625,21 @@ fn train_virtue_classifier(ethics_path: &str) -> Option<VirtueMatchClassifier> {
             correct += 1;
         }
     }
-    println!("    Virtue pair training accuracy: {:.1}% ({:.1}s)",
-             correct as f64 / check_n as f64 * 100.0,
-             train_start.elapsed().as_secs_f64());
+    println!(
+        "    Virtue pair training accuracy: {:.1}% ({:.1}s)",
+        correct as f64 / check_n as f64 * 100.0,
+        train_start.elapsed().as_secs_f64()
+    );
 
     // Cache prototypes
     if let Some(protos) = classifier.prototypes() {
         if let Err(e) = protos.save(&virtue_cache_path) {
             println!("    Warning: failed to cache virtue prototypes: {}", e);
         } else {
-            println!("    Virtue prototypes cached to {}", virtue_cache_path.display());
+            println!(
+                "    Virtue prototypes cached to {}",
+                virtue_cache_path.display()
+            );
         }
     }
 

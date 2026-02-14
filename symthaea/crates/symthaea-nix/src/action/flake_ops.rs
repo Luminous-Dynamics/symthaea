@@ -5,9 +5,9 @@
 //! and init new flakes. Produces [`NixOSCommand`] values for
 //! state-modifying operations; read-only queries run directly.
 
+use super::executor::{FlakeOperation, NixOSCommand, SafetyLevel};
 use std::path::Path;
 use std::process::Command;
-use super::executor::{NixOSCommand, FlakeOperation, SafetyLevel};
 
 /// Executes flake-level operations (update inputs, lock, build, check).
 pub struct FlakeOps;
@@ -86,12 +86,10 @@ impl FlakeOps {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::other(
-                format!(
-                    "nix flake metadata failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                ),
-            ));
+            return Err(std::io::Error::other(format!(
+                "nix flake metadata failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -116,10 +114,7 @@ impl FlakeOps {
 
     /// Initialize a new flake in a directory.
     pub fn init(_dir: &Path, template: Option<&str>) -> NixOSCommand {
-        let mut args = vec![
-            "flake".to_string(),
-            "init".to_string(),
-        ];
+        let mut args = vec!["flake".to_string(), "init".to_string()];
         if let Some(tmpl) = template {
             args.push("--template".to_string());
             args.push(tmpl.to_string());
@@ -133,19 +128,16 @@ impl FlakeOps {
 
     /// Parse flake metadata JSON.
     fn parse_metadata_json(json: &str) -> Result<FlakeMetadata, std::io::Error> {
-        let value: serde_json::Value = serde_json::from_str(json).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-        })?;
+        let value: serde_json::Value = serde_json::from_str(json)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
 
         let url = value["url"].as_str().unwrap_or("").to_string();
         let description = value["description"].as_str().unwrap_or("").to_string();
-        let last_modified = value["lastModified"]
-            .as_i64()
-            .map(|ts| {
-                chrono::DateTime::from_timestamp(ts, 0)
-                    .map(|dt| dt.to_string())
-                    .unwrap_or_else(|| ts.to_string())
-            });
+        let last_modified = value["lastModified"].as_i64().map(|ts| {
+            chrono::DateTime::from_timestamp(ts, 0)
+                .map(|dt| dt.to_string())
+                .unwrap_or_else(|| ts.to_string())
+        });
 
         let mut inputs = Vec::new();
         if let Some(locks) = value["locks"]["nodes"].as_object() {
@@ -172,9 +164,8 @@ impl FlakeOps {
 
     /// Parse flake.lock to extract input names and their types.
     fn parse_lock_inputs(lock_content: &str) -> Result<Vec<(String, String)>, std::io::Error> {
-        let value: serde_json::Value = serde_json::from_str(lock_content).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-        })?;
+        let value: serde_json::Value = serde_json::from_str(lock_content)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
 
         let mut inputs = Vec::new();
 

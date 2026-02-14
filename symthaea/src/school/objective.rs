@@ -464,8 +464,8 @@ mod tests {
         let sim_diff = obj1.similarity(&obj3);
 
         // Both should be in [-1, 1]
-        assert!(sim_same >= -1.0 && sim_same <= 1.0);
-        assert!(sim_diff >= -1.0 && sim_diff <= 1.0);
+        assert!((-1.0..=1.0).contains(&sim_same));
+        assert!((-1.0..=1.0).contains(&sim_diff));
     }
 
     #[test]

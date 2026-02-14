@@ -681,7 +681,7 @@ mod tests {
 
         // States should be in [0, 1]
         for &s in network.state.iter() {
-            assert!(s >= 0.0 && s <= 1.0, "State {} out of range", s);
+            assert!((0.0..=1.0).contains(&s), "State {} out of range", s);
         }
     }
 

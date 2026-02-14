@@ -50,9 +50,7 @@ fn main() -> anyhow::Result<()> {
 
         println!(
             "symthaea > Φ={:.3}, meta-Φ={:.3}, self-model confidence={:.3}",
-            meta_state.phi,
-            meta_state.meta_phi,
-            meta_state.self_model.confidence,
+            meta_state.phi, meta_state.meta_phi, meta_state.self_model.confidence,
         );
         println!("           {}", meta_state.explanation);
 

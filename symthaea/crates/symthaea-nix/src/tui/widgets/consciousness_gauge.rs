@@ -28,7 +28,11 @@ pub struct ConsciousnessState {
 
 impl Default for ConsciousnessState {
     fn default() -> Self {
-        Self { phi: 0.5, confidence: 0.5, free_energy: 0.5 }
+        Self {
+            phi: 0.5,
+            confidence: 0.5,
+            free_energy: 0.5,
+        }
     }
 }
 
@@ -72,7 +76,9 @@ impl<'a> ConsciousnessGauge<'a> {
 impl Widget for ConsciousnessGauge<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let block = self.block.unwrap_or_else(|| {
-            Block::default().title(" Consciousness ").borders(Borders::ALL)
+            Block::default()
+                .title(" Consciousness ")
+                .borders(Borders::ALL)
         });
         let inner = block.inner(area);
         block.render(area, buf);
@@ -100,25 +106,52 @@ impl Widget for ConsciousnessGauge<'_> {
         buf.set_string(mid_x, mid_y, "+", Style::default().fg(Color::DarkGray));
 
         // Quadrant labels
-        buf.set_string(inner.x + 2, inner.y, "Cur", Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM));
+        buf.set_string(
+            inner.x + 2,
+            inner.y,
+            "Cur",
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM),
+        );
         let rw = (inner.x + 2 + grid_w).saturating_sub(3);
-        buf.set_string(rw, inner.y, "Con", Style::default().fg(Color::Green).add_modifier(Modifier::DIM));
+        buf.set_string(
+            rw,
+            inner.y,
+            "Con",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::DIM),
+        );
 
         // Plot current state
-        let px = inner.x + 2 + ((self.state.confidence * grid_w as f64) as u16).min(grid_w.saturating_sub(1));
+        let px = inner.x
+            + 2
+            + ((self.state.confidence * grid_w as f64) as u16).min(grid_w.saturating_sub(1));
         let py = inner.y + grid_h.saturating_sub(1)
-            - ((self.state.phi * grid_h.saturating_sub(1) as f64) as u16).min(grid_h.saturating_sub(1));
+            - ((self.state.phi * grid_h.saturating_sub(1) as f64) as u16)
+                .min(grid_h.saturating_sub(1));
         let color = self.state.quadrant_color();
-        buf.set_string(px, py, "@", Style::default().fg(color).add_modifier(Modifier::BOLD));
+        buf.set_string(
+            px,
+            py,
+            "@",
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+        );
 
         // Status line
         let status = format!(
             "P:{:.2} C:{:.2} FE:{:.2} [{}]",
-            self.state.phi, self.state.confidence, self.state.free_energy,
+            self.state.phi,
+            self.state.confidence,
+            self.state.free_energy,
             self.state.quadrant_name(),
         );
         let sy = inner.y + inner.height.saturating_sub(1);
-        buf.set_line(inner.x, sy, &Line::from(Span::styled(status, Style::default().fg(color))), inner.width);
+        buf.set_line(
+            inner.x,
+            sy,
+            &Line::from(Span::styled(status, Style::default().fg(color))),
+            inner.width,
+        );
     }
 }
 
@@ -128,13 +161,29 @@ mod tests {
 
     #[test]
     fn test_quadrant_names() {
-        let s = ConsciousnessState { phi: 0.8, confidence: 0.8, free_energy: 0.1 };
+        let s = ConsciousnessState {
+            phi: 0.8,
+            confidence: 0.8,
+            free_energy: 0.1,
+        };
         assert_eq!(s.quadrant_name(), "Confident");
-        let s = ConsciousnessState { phi: 0.8, confidence: 0.2, free_energy: 0.5 };
+        let s = ConsciousnessState {
+            phi: 0.8,
+            confidence: 0.2,
+            free_energy: 0.5,
+        };
         assert_eq!(s.quadrant_name(), "Curious");
-        let s = ConsciousnessState { phi: 0.2, confidence: 0.8, free_energy: 0.5 };
+        let s = ConsciousnessState {
+            phi: 0.2,
+            confidence: 0.8,
+            free_energy: 0.5,
+        };
         assert_eq!(s.quadrant_name(), "Habitual");
-        let s = ConsciousnessState { phi: 0.2, confidence: 0.2, free_energy: 0.9 };
+        let s = ConsciousnessState {
+            phi: 0.2,
+            confidence: 0.2,
+            free_energy: 0.9,
+        };
         assert_eq!(s.quadrant_name(), "Confused");
     }
 

@@ -13,11 +13,11 @@
 //! cargo run --example robustness_validation --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::binary_hv::BinaryHV;
@@ -48,7 +48,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal = load_corpus("data/consciousness_probe/phenomenal_concepts_expanded.json")?;
     let functional = load_corpus("data/consciousness_probe/functional_concepts_expanded.json")?;
 
-    println!("Full corpus: {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Full corpus: {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     // Load model
     println!("Loading BGE-M3...");
@@ -76,7 +80,9 @@ fn run_experiment() -> Result<()> {
     println!("Extracting phenomenal...");
     let mut phen_hvs: Vec<BinaryHV> = Vec::new();
     for (i, concept) in phenomenal.iter().enumerate() {
-        if i % 20 == 0 { print!("  {}/{}\\r", i, phenomenal.len()); }
+        if i % 20 == 0 {
+            print!("  {}/{}\\r", i, phenomenal.len());
+        }
         let acts = extractor.extract_layers(concept, &[21])?;
         phen_hvs.push(activation_to_hv16(&acts[0].activation));
     }
@@ -85,7 +91,9 @@ fn run_experiment() -> Result<()> {
     println!("Extracting functional...");
     let mut func_hvs: Vec<BinaryHV> = Vec::new();
     for (i, concept) in functional.iter().enumerate() {
-        if i % 20 == 0 { print!("  {}/{}\\r", i, functional.len()); }
+        if i % 20 == 0 {
+            print!("  {}/{}\\r", i, functional.len());
+        }
         let acts = extractor.extract_layers(concept, &[21])?;
         func_hvs.push(activation_to_hv16(&acts[0].activation));
     }
@@ -109,10 +117,12 @@ fn run_experiment() -> Result<()> {
         let phen_indices: Vec<usize> = random_subset(phen_hvs.len(), 50, seed);
         let func_indices: Vec<usize> = random_subset(func_hvs.len(), 50, seed + 1);
 
-        let phen_sample: Vec<f64> = phen_indices.iter()
+        let phen_sample: Vec<f64> = phen_indices
+            .iter()
             .map(|&i| compute_unity(&phen_hvs[i], &topology_config))
             .collect();
-        let func_sample: Vec<f64> = func_indices.iter()
+        let func_sample: Vec<f64> = func_indices
+            .iter()
             .map(|&i| compute_unity(&func_hvs[i], &topology_config))
             .collect();
 
@@ -121,8 +131,15 @@ fn run_experiment() -> Result<()> {
         let diff = phen_mean - func_mean;
         let p = permutation_test(&phen_sample, &func_sample, 2000);
 
-        println!("{:5} │ {:10.4} │ {:10.4} │ {:+6.4} │ {:.4}{}",
-                 trial + 1, phen_mean, func_mean, diff, p, if p < 0.05 { "*" } else { "" });
+        println!(
+            "{:5} │ {:10.4} │ {:10.4} │ {:+6.4} │ {:.4}{}",
+            trial + 1,
+            phen_mean,
+            func_mean,
+            diff,
+            p,
+            if p < 0.05 { "*" } else { "" }
+        );
 
         subset_diffs.push(diff);
         subset_pvalues.push(p);
@@ -133,9 +150,19 @@ fn run_experiment() -> Result<()> {
     let any_significant = subset_pvalues.iter().any(|&p| p < 0.05);
 
     println!("\nSubset Results:");
-    println!("  Consistent positive direction: {}", if consistent_direction { "✓ YES" } else { "✗ NO" });
+    println!(
+        "  Consistent positive direction: {}",
+        if consistent_direction {
+            "✓ YES"
+        } else {
+            "✗ NO"
+        }
+    );
     println!("  Mean difference: {:+.4}", mean(&subset_diffs));
-    println!("  Significant trials: {}/5", subset_pvalues.iter().filter(|&&p| p < 0.05).count());
+    println!(
+        "  Significant trials: {}/5",
+        subset_pvalues.iter().filter(|&&p| p < 0.05).count()
+    );
 
     // Test 2: Bootstrap resampling
     println!("\n================================================================");
@@ -145,7 +172,9 @@ fn run_experiment() -> Result<()> {
     let mut bootstrap_diffs = Vec::new();
 
     for boot in 0..1000 {
-        if boot % 100 == 0 { print!("  Bootstrap {}/1000\\r", boot); }
+        if boot % 100 == 0 {
+            print!("  Bootstrap {}/1000\\r", boot);
+        }
         let seed = boot as u64 * 17;
 
         // Bootstrap resample with replacement
@@ -171,7 +200,14 @@ fn run_experiment() -> Result<()> {
     println!("  Mean difference: {:+.4}", boot_mean);
     println!("  Standard error: {:.4}", boot_std);
     println!("  95% CI: [{:+.4}, {:+.4}]", ci_lower, ci_upper);
-    println!("  CI excludes zero: {}", if ci_lower > 0.0 { "✓ YES (significant)" } else { "✗ NO" });
+    println!(
+        "  CI excludes zero: {}",
+        if ci_lower > 0.0 {
+            "✓ YES (significant)"
+        } else {
+            "✗ NO"
+        }
+    );
 
     // Test 3: Cross-validation folds
     println!("\n================================================================");
@@ -187,27 +223,35 @@ fn run_experiment() -> Result<()> {
         let (train_phen, test_phen) = cross_val_split(&phen_hvs, fold, 5);
         let (train_func, test_func) = cross_val_split(&func_hvs, fold, 5);
 
-        let train_phen_unity: Vec<f64> = train_phen.iter()
+        let train_phen_unity: Vec<f64> = train_phen
+            .iter()
             .map(|hv| compute_unity(hv, &topology_config))
             .collect();
-        let train_func_unity: Vec<f64> = train_func.iter()
+        let train_func_unity: Vec<f64> = train_func
+            .iter()
             .map(|hv| compute_unity(hv, &topology_config))
             .collect();
-        let test_phen_unity: Vec<f64> = test_phen.iter()
+        let test_phen_unity: Vec<f64> = test_phen
+            .iter()
             .map(|hv| compute_unity(hv, &topology_config))
             .collect();
-        let test_func_unity: Vec<f64> = test_func.iter()
+        let test_func_unity: Vec<f64> = test_func
+            .iter()
             .map(|hv| compute_unity(hv, &topology_config))
             .collect();
 
         let test_diff = mean(&test_phen_unity) - mean(&test_func_unity);
         fold_diffs.push(test_diff);
 
-        println!("{:4} │ {:10.4} │ {:10.4} │ {:9.4} │ {:9.4} │ {:+8.4}",
-                 fold + 1,
-                 mean(&train_phen_unity), mean(&train_func_unity),
-                 mean(&test_phen_unity), mean(&test_func_unity),
-                 test_diff);
+        println!(
+            "{:4} │ {:10.4} │ {:10.4} │ {:9.4} │ {:9.4} │ {:+8.4}",
+            fold + 1,
+            mean(&train_phen_unity),
+            mean(&train_func_unity),
+            mean(&test_phen_unity),
+            mean(&test_func_unity),
+            test_diff
+        );
     }
 
     let cv_mean = mean(&fold_diffs);
@@ -216,7 +260,10 @@ fn run_experiment() -> Result<()> {
     println!("\nCross-Validation Results:");
     println!("  Mean test difference: {:+.4}", cv_mean);
     println!("  Standard deviation: {:.4}", cv_std);
-    println!("  Coefficient of variation: {:.2}%", (cv_std / cv_mean.abs()) * 100.0);
+    println!(
+        "  Coefficient of variation: {:.2}%",
+        (cv_std / cv_mean.abs()) * 100.0
+    );
 
     // Summary
     println!("\n================================================================");
@@ -229,7 +276,10 @@ fn run_experiment() -> Result<()> {
         println!("✓ EFFECT IS ROBUST");
         println!("  - Consistent positive direction across all random subsets");
         println!("  - Bootstrap 95% CI excludes zero");
-        println!("  - Cross-validation shows stable effect (CV: {:.1}%)", (cv_std / cv_mean.abs()) * 100.0);
+        println!(
+            "  - Cross-validation shows stable effect (CV: {:.1}%)",
+            (cv_std / cv_mean.abs()) * 100.0
+        );
     } else if consistent_direction {
         println!("◐ EFFECT IS CONSISTENT BUT VARIABLE");
         println!("  - Direction is consistent (+phenomenal) across samples");
@@ -298,13 +348,17 @@ fn compute_unity(hv: &BinaryHV, config: &TopologyConfig) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 
 #[cfg(feature = "neural-bridge")]
 fn std_dev(values: &[f64]) -> f64 {
-    if values.len() < 2 { return 0.0; }
+    if values.len() < 2 {
+        return 0.0;
+    }
     let m = mean(values);
     let variance = values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
     variance.sqrt()
@@ -351,10 +405,15 @@ fn bootstrap_sample<T: Clone>(items: &[T], seed: u64) -> Vec<T> {
 fn cross_val_split<T: Clone>(items: &[T], fold: usize, n_folds: usize) -> (Vec<T>, Vec<T>) {
     let fold_size = items.len() / n_folds;
     let test_start = fold * fold_size;
-    let test_end = if fold == n_folds - 1 { items.len() } else { (fold + 1) * fold_size };
+    let test_end = if fold == n_folds - 1 {
+        items.len()
+    } else {
+        (fold + 1) * fold_size
+    };
 
     let test: Vec<T> = items[test_start..test_end].to_vec();
-    let train: Vec<T> = items[..test_start].iter()
+    let train: Vec<T> = items[..test_start]
+        .iter()
         .chain(items[test_end..].iter())
         .cloned()
         .collect();

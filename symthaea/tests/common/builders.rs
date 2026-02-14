@@ -173,7 +173,7 @@ pub fn create_memory_batch(
     (0..count)
         .map(|i| {
             let id = format!("{}-{}", prefix, i);
-            create_test_memory(&id, start_seed + i as u64, memory_type.clone())
+            create_test_memory(&id, start_seed + i as u64, memory_type)
         })
         .collect()
 }

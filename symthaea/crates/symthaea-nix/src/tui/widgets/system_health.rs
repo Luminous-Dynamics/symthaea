@@ -32,7 +32,10 @@ pub struct SystemHealth<'a> {
 
 impl<'a> SystemHealth<'a> {
     pub fn new(snapshot: HealthSnapshot) -> Self {
-        Self { snapshot, block: None }
+        Self {
+            snapshot,
+            block: None,
+        }
     }
 
     pub fn block(mut self, block: Block<'a>) -> Self {
@@ -44,7 +47,9 @@ impl<'a> SystemHealth<'a> {
 impl Widget for SystemHealth<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let block = self.block.unwrap_or_else(|| {
-            Block::default().title(" System Health ").borders(Borders::ALL)
+            Block::default()
+                .title(" System Health ")
+                .borders(Borders::ALL)
         });
         let inner = block.inner(area);
         block.render(area, buf);
@@ -57,7 +62,11 @@ impl Widget for SystemHealth<'_> {
         let x = inner.x + 1;
 
         // Services line
-        let svc_color = if self.snapshot.services_failed > 0 { Color::Red } else { Color::Green };
+        let svc_color = if self.snapshot.services_failed > 0 {
+            Color::Red
+        } else {
+            Color::Green
+        };
         let svc_line = Line::from(vec![
             Span::raw("Services: "),
             Span::styled(
@@ -78,7 +87,10 @@ impl Widget for SystemHealth<'_> {
         if y < inner.y + inner.height {
             let store_line = Line::from(vec![
                 Span::raw("Store:    "),
-                Span::styled(&self.snapshot.store_size_human, Style::default().fg(Color::Cyan)),
+                Span::styled(
+                    &self.snapshot.store_size_human,
+                    Style::default().fg(Color::Cyan),
+                ),
                 Span::raw(format!(" ({} paths)", self.snapshot.store_paths)),
             ]);
             buf.set_line(x, y, &store_line, inner.width.saturating_sub(1));
@@ -93,7 +105,12 @@ impl Widget for SystemHealth<'_> {
             };
             let gen_line = Line::from(vec![
                 Span::raw("Gen:      "),
-                Span::styled(gen_str, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    gen_str,
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::raw(format!(" ({} total)", self.snapshot.total_generations)),
             ]);
             buf.set_line(x, y, &gen_line, inner.width.saturating_sub(1));
@@ -103,7 +120,13 @@ impl Widget for SystemHealth<'_> {
         // Memory line (optional)
         if y < inner.y + inner.height {
             if let Some(pct) = self.snapshot.memory_used_percent {
-                let mem_color = if pct > 90.0 { Color::Red } else if pct > 70.0 { Color::Yellow } else { Color::Green };
+                let mem_color = if pct > 90.0 {
+                    Color::Red
+                } else if pct > 70.0 {
+                    Color::Yellow
+                } else {
+                    Color::Green
+                };
                 let mem_line = Line::from(vec![
                     Span::raw("Memory:   "),
                     Span::styled(format!("{:.0}%", pct), Style::default().fg(mem_color)),
@@ -130,8 +153,8 @@ mod tests {
             total_generations: 10,
             memory_used_percent: Some(55.0),
         };
-        let widget = SystemHealth::new(snap)
-            .block(Block::default().title("Health").borders(Borders::ALL));
+        let widget =
+            SystemHealth::new(snap).block(Block::default().title("Health").borders(Borders::ALL));
         let area = Rect::new(0, 0, 50, 10);
         let mut buf = Buffer::empty(area);
         widget.render(area, &mut buf);

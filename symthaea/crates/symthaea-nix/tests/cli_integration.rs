@@ -5,7 +5,9 @@
 #![cfg(feature = "cli")]
 
 use clap::Parser;
-use symthaea_nix::cli::commands::{Cli, Command, OutputFormat, RebuildMode, ObserveDomain, ServiceCommand, FlakeCommand};
+use symthaea_nix::cli::commands::{
+    Cli, Command, FlakeCommand, ObserveDomain, OutputFormat, RebuildMode, ServiceCommand,
+};
 
 // === Command Parsing Tests ===
 
@@ -28,7 +30,12 @@ fn test_cli_natural_language_multiword() {
 #[test]
 fn test_cli_search_with_limit() {
     let cli = Cli::parse_from(["nix-mind", "search", "firefox", "-n", "5"]);
-    if let Some(Command::Search { query, limit, options }) = cli.command {
+    if let Some(Command::Search {
+        query,
+        limit,
+        options,
+    }) = cli.command
+    {
         assert_eq!(query, "firefox");
         assert_eq!(limit, 5);
         assert!(!options);
@@ -131,7 +138,12 @@ fn test_cli_doctor() {
 #[test]
 fn test_cli_gc_modes() {
     let cli = Cli::parse_from(["nix-mind", "gc", "--analyze"]);
-    if let Some(Command::Gc { analyze, aggressive, older_than }) = cli.command {
+    if let Some(Command::Gc {
+        analyze,
+        aggressive,
+        older_than,
+    }) = cli.command
+    {
         assert!(analyze);
         assert!(!aggressive);
         assert_eq!(older_than, None);
@@ -140,7 +152,12 @@ fn test_cli_gc_modes() {
     }
 
     let cli = Cli::parse_from(["nix-mind", "gc", "--aggressive", "--older-than", "30"]);
-    if let Some(Command::Gc { analyze, aggressive, older_than }) = cli.command {
+    if let Some(Command::Gc {
+        analyze,
+        aggressive,
+        older_than,
+    }) = cli.command
+    {
         assert!(!analyze);
         assert!(aggressive);
         assert_eq!(older_than, Some(30));
@@ -152,47 +169,79 @@ fn test_cli_gc_modes() {
 #[test]
 fn test_cli_service_subcommands() {
     let cli = Cli::parse_from(["nix-mind", "service", "status", "nginx"]);
-    if let Some(Command::Service { op: ServiceCommand::Status { name } }) = cli.command {
+    if let Some(Command::Service {
+        op: ServiceCommand::Status { name },
+    }) = cli.command
+    {
         assert_eq!(name, "nginx");
     } else {
         panic!("Expected Service Status");
     }
 
     let cli = Cli::parse_from(["nix-mind", "service", "start", "postgresql"]);
-    if let Some(Command::Service { op: ServiceCommand::Start { name } }) = cli.command {
+    if let Some(Command::Service {
+        op: ServiceCommand::Start { name },
+    }) = cli.command
+    {
         assert_eq!(name, "postgresql");
     } else {
         panic!("Expected Service Start");
     }
 
     let cli = Cli::parse_from(["nix-mind", "service", "stop", "docker"]);
-    if let Some(Command::Service { op: ServiceCommand::Stop { name } }) = cli.command {
+    if let Some(Command::Service {
+        op: ServiceCommand::Stop { name },
+    }) = cli.command
+    {
         assert_eq!(name, "docker");
     } else {
         panic!("Expected Service Stop");
     }
 
     let cli = Cli::parse_from(["nix-mind", "service", "failed"]);
-    assert!(matches!(cli.command, Some(Command::Service { op: ServiceCommand::Failed })));
+    assert!(matches!(
+        cli.command,
+        Some(Command::Service {
+            op: ServiceCommand::Failed
+        })
+    ));
 }
 
 #[test]
 fn test_cli_flake_subcommands() {
     let cli = Cli::parse_from(["nix-mind", "flake", "check"]);
-    assert!(matches!(cli.command, Some(Command::Flake { op: FlakeCommand::Check })));
+    assert!(matches!(
+        cli.command,
+        Some(Command::Flake {
+            op: FlakeCommand::Check
+        })
+    ));
 
     let cli = Cli::parse_from(["nix-mind", "flake", "update", "nixpkgs"]);
-    if let Some(Command::Flake { op: FlakeCommand::Update { inputs } }) = cli.command {
+    if let Some(Command::Flake {
+        op: FlakeCommand::Update { inputs },
+    }) = cli.command
+    {
         assert_eq!(inputs, vec!["nixpkgs"]);
     } else {
         panic!("Expected Flake Update");
     }
 
     let cli = Cli::parse_from(["nix-mind", "flake", "show"]);
-    assert!(matches!(cli.command, Some(Command::Flake { op: FlakeCommand::Show })));
+    assert!(matches!(
+        cli.command,
+        Some(Command::Flake {
+            op: FlakeCommand::Show
+        })
+    ));
 
     let cli = Cli::parse_from(["nix-mind", "flake", "info"]);
-    assert!(matches!(cli.command, Some(Command::Flake { op: FlakeCommand::Info })));
+    assert!(matches!(
+        cli.command,
+        Some(Command::Flake {
+            op: FlakeCommand::Info
+        })
+    ));
 }
 
 #[test]
@@ -221,7 +270,16 @@ fn test_cli_output_formats() {
 
 #[test]
 fn test_cli_global_flags_with_subcommand() {
-    let cli = Cli::parse_from(["nix-mind", "--dry-run", "--format", "json", "--phi", "0.5", "rebuild", "test"]);
+    let cli = Cli::parse_from([
+        "nix-mind",
+        "--dry-run",
+        "--format",
+        "json",
+        "--phi",
+        "0.5",
+        "rebuild",
+        "test",
+    ]);
     assert!(cli.dry_run);
     assert_eq!(cli.format, OutputFormat::Json);
     assert_eq!(cli.phi, Some(0.5));
@@ -244,7 +302,10 @@ fn test_causal_graph_bootstrap() {
     for (cause, effect, _) in &patterns {
         graph.add_structural_edge(cause, effect, 0.8);
     }
-    assert!(graph.edge_count() > 0, "Graph should have edges after bootstrap");
+    assert!(
+        graph.edge_count() > 0,
+        "Graph should have edges after bootstrap"
+    );
 }
 
 #[test]
@@ -257,8 +318,8 @@ fn test_active_inference_initialization() {
 
 #[test]
 fn test_hdc_world_model_drift() {
-    use symthaea_nix::mind::HdcWorldModel;
     use symthaea_core::hdc::ContinuousHV;
+    use symthaea_nix::mind::HdcWorldModel;
 
     let mut model = HdcWorldModel::default();
     let state = ContinuousHV::random(256, 42);
@@ -271,8 +332,8 @@ fn test_hdc_world_model_drift() {
 
 #[test]
 fn test_system_state_encoder_roundtrip() {
-    use symthaea_nix::encoding::{NixCodebook, SystemStateEncoder};
     use symthaea_nix::encoding::SystemStateSnapshot;
+    use symthaea_nix::encoding::{NixCodebook, SystemStateEncoder};
 
     let mut codebook = NixCodebook::new();
     let mut encoder = SystemStateEncoder::new(&mut codebook);

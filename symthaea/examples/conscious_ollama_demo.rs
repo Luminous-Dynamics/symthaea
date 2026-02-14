@@ -17,11 +17,11 @@
 //! cargo run --example conscious_ollama_demo
 //! ```
 
-use symthaea::{
-    language::llm_organ::{LlmOrgan, LlmConfig, LlmRequest, LlmProvider, Role, Message},
-    consciousness::phi_attention::PhiAwareScoring,
-};
 use anyhow::Result;
+use symthaea::{
+    consciousness::phi_attention::PhiAwareScoring,
+    language::llm_organ::{LlmConfig, LlmOrgan, LlmProvider, LlmRequest, Message, Role},
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -42,11 +42,14 @@ async fn main() -> Result<()> {
             println!("✅ Ollama is running");
             let json: serde_json::Value = resp.json().await?;
             if let Some(models) = json.get("models").and_then(|m| m.as_array()) {
-                println!("   Available models: {}",
-                    models.iter()
+                println!(
+                    "   Available models: {}",
+                    models
+                        .iter()
                         .filter_map(|m| m.get("name").and_then(|n| n.as_str()))
                         .collect::<Vec<_>>()
-                        .join(", "));
+                        .join(", ")
+                );
             }
         }
         _ => {
@@ -60,14 +63,14 @@ async fn main() -> Result<()> {
     // Configure LLM organ for Ollama
     let config = LlmConfig {
         provider: LlmProvider::Ollama,
-        model: "llama3.2:3b".to_string(),  // Small, fast model
+        model: "llama3.2:3b".to_string(), // Small, fast model
         endpoint: "http://localhost:11434".to_string(),
         api_key: None,
         max_tokens: 256,
         temperature: 0.7,
-        timeout_ms: 60000,  // 60 seconds for slower responses
+        timeout_ms: 60000, // 60 seconds for slower responses
         hallucination_threshold: 0.5,
-        min_phi_for_llm: 0.3,  // Consciousness gate threshold
+        min_phi_for_llm: 0.3, // Consciousness gate threshold
         enable_filtering: true,
     };
 
@@ -111,8 +114,14 @@ async fn main() -> Result<()> {
             println!("\n   📊 Metadata:");
             println!("      Generation time: {}ms", response.generation_time_ms);
             println!("      Tokens used: {}", response.tokens_used.total_tokens);
-            println!("      Coherence score: {:.2}", response.semantic_analysis.coherence_score);
-            println!("      Hallucination prob: {:.2}", response.semantic_analysis.hallucination_probability);
+            println!(
+                "      Coherence score: {:.2}",
+                response.semantic_analysis.coherence_score
+            );
+            println!(
+                "      Hallucination prob: {:.2}",
+                response.semantic_analysis.hallucination_probability
+            );
             println!("      Filtered: {}", response.was_filtered);
         }
         Err(e) => {
@@ -186,8 +195,14 @@ async fn main() -> Result<()> {
         prompt: "How do I make that permanent in my configuration.nix?".to_string(),
         system: Some("You are a NixOS expert. Give brief, practical answers.".to_string()),
         history: vec![
-            Message { role: Role::User, content: request3a.prompt },
-            Message { role: Role::Assistant, content: response3a.content },
+            Message {
+                role: Role::User,
+                content: request3a.prompt,
+            },
+            Message {
+                role: Role::Assistant,
+                content: response3a.content,
+            },
         ],
         context_embedding: None,
         expected_domain: Some("nixos".to_string()),
@@ -212,7 +227,10 @@ async fn main() -> Result<()> {
     println!("   Total requests: {}", stats.total_requests);
     println!("   Successful responses: {}", stats.successful_responses);
     println!("   Fallbacks to primes: {}", stats.fallbacks_to_primes);
-    println!("   Hallucinations detected: {}", stats.hallucinations_detected);
+    println!(
+        "   Hallucinations detected: {}",
+        stats.hallucinations_detected
+    );
     println!("   Responses filtered: {}", stats.responses_filtered);
     println!("   Total tokens: {}", stats.total_tokens);
     println!("   Avg response time: {:.0}ms", stats.avg_response_time_ms);
@@ -232,6 +250,6 @@ fn truncate_line(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len-3])
+        format!("{}...", &s[..max_len - 3])
     }
 }

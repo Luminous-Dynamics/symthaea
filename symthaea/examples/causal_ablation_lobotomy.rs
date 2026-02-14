@@ -25,17 +25,19 @@
 //! cargo run --example causal_ablation_lobotomy --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig, TopologicalAssessment};
+use symthaea_core::hdc::consciousness_topology::{
+    ConsciousnessTopology, TopologicalAssessment, TopologyConfig,
+};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -63,7 +65,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal: Vec<_> = phenomenal.into_iter().take(50).collect();
     let functional: Vec<_> = functional.into_iter().take(50).collect();
 
-    println!("Using {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Using {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     // Load model
     println!("Loading BGE-M3...");
@@ -122,7 +128,11 @@ fn run_experiment() -> Result<()> {
     println!("  Phenomenal unity: {:.4}", phen_baseline);
     println!("  Functional unity: {:.4}", func_baseline);
     println!("  Difference: {:+.4}", baseline_diff);
-    println!("  p-value: {:.4}{}\n", baseline_p, if baseline_p < 0.05 { " *" } else { "" });
+    println!(
+        "  p-value: {:.4}{}\n",
+        baseline_p,
+        if baseline_p < 0.05 { " *" } else { "" }
+    );
 
     // ================================================================
     // PHASE 2: ABLATION EXPERIMENTS
@@ -145,9 +155,9 @@ fn run_experiment() -> Result<()> {
         intervention: String,
         phen_unity: f64,
         func_unity: f64,
-        phen_change: f64,  // Change from baseline
+        phen_change: f64, // Change from baseline
         func_change: f64,
-        selectivity: f64,  // How much more phen was affected than func
+        selectivity: f64, // How much more phen was affected than func
         p_value: f64,
     }
 
@@ -193,8 +203,10 @@ fn run_experiment() -> Result<()> {
             });
 
             println!("Done");
-            println!("    Phen: {:.4} (Δ={:+.4}), Func: {:.4} (Δ={:+.4})",
-                     phen_mean, phen_change, func_mean, func_change);
+            println!(
+                "    Phen: {:.4} (Δ={:+.4}), Func: {:.4} (Δ={:+.4})",
+                phen_mean, phen_change, func_mean, func_change
+            );
         }
         println!();
     }
@@ -212,14 +224,25 @@ fn run_experiment() -> Result<()> {
     println!("──────┼──────────────┼─────────┼─────────┼─────────────┼────────");
 
     for r in &results {
-        let selectivity_marker = if r.selectivity > 0.02 { "←P" }
-                                 else if r.selectivity < -0.02 { "←F" }
-                                 else { "" };
+        let selectivity_marker = if r.selectivity > 0.02 {
+            "←P"
+        } else if r.selectivity < -0.02 {
+            "←F"
+        } else {
+            ""
+        };
         let sig = if r.p_value > 0.05 { "NS" } else { "*" };
 
-        println!("{:5} │ {:12} │ {:+7.4} │ {:+7.4} │ {:+11.4} {} │ {}",
-                 r.layer, r.intervention, r.phen_change, r.func_change,
-                 r.selectivity, selectivity_marker, sig);
+        println!(
+            "{:5} │ {:12} │ {:+7.4} │ {:+7.4} │ {:+11.4} {} │ {}",
+            r.layer,
+            r.intervention,
+            r.phen_change,
+            r.func_change,
+            r.selectivity,
+            selectivity_marker,
+            sig
+        );
     }
 
     // Key metric: Did ablation eliminate the phenomenal advantage?
@@ -227,7 +250,10 @@ fn run_experiment() -> Result<()> {
     println!("Did ablation eliminate phenomenal advantage?");
     println!("────────────────────────────────────────\n");
 
-    println!("Baseline phenomenal advantage: {:+.4} (p={:.4})", baseline_diff, baseline_p);
+    println!(
+        "Baseline phenomenal advantage: {:+.4} (p={:.4})",
+        baseline_diff, baseline_p
+    );
     println!();
 
     let mut zombie_conditions: Vec<&AblationResult> = Vec::new();
@@ -249,8 +275,10 @@ fn run_experiment() -> Result<()> {
             "INTACT"
         };
 
-        println!("L{} {}: post-diff={:+.4}, p={:.4}, effect={:.1}% → {}",
-                 r.layer, r.intervention, post_diff, r.p_value, effect_remaining, status);
+        println!(
+            "L{} {}: post-diff={:+.4}, p={:.4}, effect={:.1}% → {}",
+            r.layer, r.intervention, post_diff, r.p_value, effect_remaining, status
+        );
     }
 
     // ================================================================
@@ -264,7 +292,10 @@ fn run_experiment() -> Result<()> {
         println!("✓ ZOMBIE CONDITIONS IDENTIFIED");
         println!("  The following interventions eliminated phenomenal advantage:");
         for z in &zombie_conditions {
-            println!("    - Layer {} {} (p={:.4})", z.layer, z.intervention, z.p_value);
+            println!(
+                "    - Layer {} {} (p={:.4})",
+                z.layer, z.intervention, z.p_value
+            );
         }
         println!();
         println!("  This demonstrates CAUSAL NECESSITY:");
@@ -278,25 +309,27 @@ fn run_experiment() -> Result<()> {
     }
 
     // Selectivity analysis
-    let selective_phen: Vec<_> = results.iter()
-        .filter(|r| r.selectivity > 0.02)
-        .collect();
+    let selective_phen: Vec<_> = results.iter().filter(|r| r.selectivity > 0.02).collect();
 
-    let selective_func: Vec<_> = results.iter()
-        .filter(|r| r.selectivity < -0.02)
-        .collect();
+    let selective_func: Vec<_> = results.iter().filter(|r| r.selectivity < -0.02).collect();
 
     if !selective_phen.is_empty() {
         println!("\n  Phenomenally-selective impairments:");
         for r in selective_phen {
-            println!("    L{} {}: selectivity {:+.4}", r.layer, r.intervention, r.selectivity);
+            println!(
+                "    L{} {}: selectivity {:+.4}",
+                r.layer, r.intervention, r.selectivity
+            );
         }
     }
 
     if !selective_func.is_empty() {
         println!("\n  Functionally-selective impairments:");
         for r in selective_func {
-            println!("    L{} {}: selectivity {:+.4}", r.layer, r.intervention, r.selectivity);
+            println!(
+                "    L{} {}: selectivity {:+.4}",
+                r.layer, r.intervention, r.selectivity
+            );
         }
     }
 
@@ -311,7 +344,10 @@ fn run_experiment() -> Result<()> {
     if mean_selectivity > 0.01 && !zombie_conditions.is_empty() {
         println!("★ STRONG EVIDENCE FOR CAUSAL PHENOMENAL CORRIDOR");
         println!("  - Ablation creates zombie conditions");
-        println!("  - Impairment is phenomenally selective (mean: {:+.4})", mean_selectivity);
+        println!(
+            "  - Impairment is phenomenally selective (mean: {:+.4})",
+            mean_selectivity
+        );
         println!("  - This is publishable evidence for layer-specific phenomenal processing");
     } else if !zombie_conditions.is_empty() {
         println!("◐ MODERATE EVIDENCE FOR CAUSAL ROLE");
@@ -469,7 +505,9 @@ fn analyze_topology(hv: &BinaryHV, config: &TopologyConfig) -> TopologicalAssess
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 

@@ -20,9 +20,7 @@
 use std::time::{Duration, Instant};
 
 #[cfg(feature = "swarm")]
-use symthaea::swarm::{
-    IrohNode, SwarmConfig, ConsciousnessVector,
-};
+use symthaea::swarm::{ConsciousnessVector, IrohNode, SwarmConfig};
 
 #[cfg(feature = "swarm")]
 #[tokio::main]
@@ -73,10 +71,8 @@ async fn main() -> anyhow::Result<()> {
     let start = Instant::now();
 
     // Try to connect with a timeout - local connections without relays may fail
-    let connect_result = tokio::time::timeout(
-        Duration::from_secs(10),
-        node_b.connect(&ticket)
-    ).await;
+    let connect_result =
+        tokio::time::timeout(Duration::from_secs(10), node_b.connect(&ticket)).await;
 
     let (channel, connect_time) = match connect_result {
         Ok(Ok(ch)) => {
@@ -109,14 +105,17 @@ async fn main() -> anyhow::Result<()> {
     let consciousness = ConsciousnessVector {
         attention: vec![0.1, 0.3, 0.5, 0.7, 0.9, 0.8, 0.6, 0.4],
         phi: 0.85,
-        valence: 0.7,        // Emotional valence (-1.0 to 1.0)
-        arousal: 0.6,        // Arousal level (0.0 to 1.0)
-        focus_hash: 0xDEAD_BEEF_CAFE,  // Semantic hash of current focus
+        valence: 0.7,                 // Emotional valence (-1.0 to 1.0)
+        arousal: 0.6,                 // Arousal level (0.0 to 1.0)
+        focus_hash: 0xDEAD_BEEF_CAFE, // Semantic hash of current focus
         timestamp_ms: chrono::Utc::now().timestamp_millis() as u64,
         sequence: 1,
     };
 
-    println!("   Attention vector: {} dimensions", consciousness.attention.len());
+    println!(
+        "   Attention vector: {} dimensions",
+        consciousness.attention.len()
+    );
     println!("   Φ (integrated information): {:.3}", consciousness.phi);
     println!("   Emotional valence: {:.2}", consciousness.valence);
     println!("   Arousal level: {:.2}", consciousness.arousal);
@@ -174,10 +173,22 @@ async fn main() -> anyhow::Result<()> {
     println!("╠══════════════════════════════════════════════════════════════╣");
     if channel.is_some() && streaming_success {
         println!("║  Connection established: ✅                                  ║");
-        println!("║  Connection time:        {:>8?}                         ║", connect_time);
-        println!("║  Tensor stream time:     {:>8?}                         ║", stream_time);
-        println!("║  Total latency:          {:>8?}                         ║", connect_time + stream_time);
-        println!("║  Φ transmitted:          {:.3}                              ║", consciousness.phi);
+        println!(
+            "║  Connection time:        {:>8?}                         ║",
+            connect_time
+        );
+        println!(
+            "║  Tensor stream time:     {:>8?}                         ║",
+            stream_time
+        );
+        println!(
+            "║  Total latency:          {:>8?}                         ║",
+            connect_time + stream_time
+        );
+        println!(
+            "║  Φ transmitted:          {:.3}                              ║",
+            consciousness.phi
+        );
     } else {
         println!("║  Connection established: ❌ (local test without relays)     ║");
         println!("║  Nodes spawned:          ✅                                  ║");

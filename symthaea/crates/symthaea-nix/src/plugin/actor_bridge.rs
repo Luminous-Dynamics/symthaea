@@ -14,12 +14,10 @@
 use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
 
-use crate::mind::{
-    NixActiveInference, ActionPlan, ActionCategory,
-    SystemEpisode, EpisodeOutcome,
-    CausalEdge,
-};
 use crate::encoding::NixCodebook;
+use crate::mind::{
+    ActionCategory, ActionPlan, CausalEdge, EpisodeOutcome, NixActiveInference, SystemEpisode,
+};
 
 // =============================================================================
 // ACTOR MESSAGE TYPES
@@ -107,8 +105,13 @@ impl NixActorRoles {
     /// All role IDs, for batch spawning.
     pub fn all() -> &'static [&'static str] {
         &[
-            Self::SENSOR, Self::PROCESSOR, Self::DECIDER,
-            Self::EFFECTOR, Self::MEMORY, Self::EVALUATOR, Self::COORDINATOR,
+            Self::SENSOR,
+            Self::PROCESSOR,
+            Self::DECIDER,
+            Self::EFFECTOR,
+            Self::MEMORY,
+            Self::EVALUATOR,
+            Self::COORDINATOR,
         ]
     }
 }
@@ -177,7 +180,8 @@ impl NixActorBridge {
                 content: state_hv,
                 summary: format!(
                     "System snapshot: {} services, gen {:?}",
-                    snapshot.services.len(), snapshot.generation,
+                    snapshot.services.len(),
+                    snapshot.generation,
                 ),
                 from_role: NixActorRoles::SENSOR,
                 to_role: NixActorRoles::PROCESSOR,
@@ -219,7 +223,10 @@ impl NixActorBridge {
         messages.push(NixActorMessage {
             kind: NixMessageKind::GoalUpdate,
             content: goal_hv,
-            summary: format!("Goal: {} (conf={:.2})", plan.goal.description, plan.goal.confidence),
+            summary: format!(
+                "Goal: {} (conf={:.2})",
+                plan.goal.description, plan.goal.confidence
+            ),
             from_role: NixActorRoles::SENSOR,
             to_role: NixActorRoles::PROCESSOR,
             priority: 0.8,
@@ -232,14 +239,19 @@ impl NixActorBridge {
             plan_meta.insert("efe".into(), format!("{:.3}", best.expected_free_energy));
             plan_meta.insert("pragmatic".into(), format!("{:.3}", best.pragmatic_value));
             plan_meta.insert("epistemic".into(), format!("{:.3}", best.epistemic_value));
-            plan_meta.insert("needs_clarification".into(), plan.needs_clarification.to_string());
+            plan_meta.insert(
+                "needs_clarification".into(),
+                plan.needs_clarification.to_string(),
+            );
 
             messages.push(NixActorMessage {
                 kind: NixMessageKind::ActionPlan,
                 content: engine.world_model().system_state().clone(),
                 summary: format!(
                     "Plan: {:?} (EFE={:.3}, {} candidates)",
-                    best.action, best.expected_free_energy, plan.actions.len(),
+                    best.action,
+                    best.expected_free_energy,
+                    plan.actions.len(),
                 ),
                 from_role: NixActorRoles::PROCESSOR,
                 to_role: NixActorRoles::DECIDER,
@@ -272,7 +284,11 @@ impl NixActorBridge {
         let state_before = engine.world_model().system_state().clone();
         let action_cat = ActionCategory::from_command(action);
         engine.learn_from_outcome(
-            &state_before, action_cat, &state_after, outcome.clone(), 0.5,
+            &state_before,
+            action_cat,
+            &state_after,
+            outcome.clone(),
+            0.5,
         );
 
         // Outcome message: Effector → Memory
@@ -373,7 +389,9 @@ pub struct CausalMindBridge;
 impl CausalMindBridge {
     /// Seed a CausalMind with NixOS causal patterns.
     pub fn seed_from_patterns(mind: &mut symthaea_core::hdc::causal_mind::CausalMind) {
-        for (cause, effect, _relationship) in crate::mind::causal_graph::NixOSCausalPatterns::known_patterns() {
+        for (cause, effect, _relationship) in
+            crate::mind::causal_graph::NixOSCausalPatterns::known_patterns()
+        {
             mind.add_causal_link(cause, effect, 0.8);
         }
     }
@@ -402,7 +420,11 @@ impl CausalMindBridge {
             if schema.is_enable_option() {
                 let effects = graph.predict_side_effects(&schema.name);
                 for effect in effects {
-                    mind.add_causal_link(&schema.name, &effect.affected_variable, effect.confidence);
+                    mind.add_causal_link(
+                        &schema.name,
+                        &effect.affected_variable,
+                        effect.confidence,
+                    );
                 }
             }
         }
@@ -474,7 +496,9 @@ mod tests {
         let mut engine = NixActiveInference::new();
 
         let (plan, messages) = bridge.process_input(&mut engine, "install firefox");
-        assert!(messages.iter().any(|m| m.kind == NixMessageKind::GoalUpdate));
+        assert!(messages
+            .iter()
+            .any(|m| m.kind == NixMessageKind::GoalUpdate));
         assert!(!plan.goal.description.is_empty());
     }
 
@@ -486,8 +510,10 @@ mod tests {
         let state_after = ContinuousHV::random(dim, 99);
 
         let messages = bridge.report_outcome(
-            &mut engine, "install firefox",
-            EpisodeOutcome::Success, state_after,
+            &mut engine,
+            "install firefox",
+            EpisodeOutcome::Success,
+            state_after,
         );
 
         assert_eq!(messages.len(), 1);
@@ -498,14 +524,12 @@ mod tests {
     #[test]
     fn test_causal_edge_messages() {
         let bridge = NixActorBridge::new();
-        let edges = vec![
-            CausalEdge {
-                from: "services.xserver.enable".into(),
-                to: "hardware.nvidia.package".into(),
-                direction: CausalDirection::Forward,
-                confidence: 0.85,
-            },
-        ];
+        let edges = vec![CausalEdge {
+            from: "services.xserver.enable".into(),
+            to: "hardware.nvidia.package".into(),
+            direction: CausalDirection::Forward,
+            confidence: 0.85,
+        }];
 
         let messages = bridge.report_causal_edges(&edges);
         assert_eq!(messages.len(), 1);
@@ -529,14 +553,12 @@ mod tests {
     #[test]
     fn test_causal_mind_bridge_sync() {
         let mut mind = symthaea_core::hdc::causal_mind::CausalMind::new();
-        let edges = vec![
-            CausalEdge {
-                from: "boot.loader.grub.enable".into(),
-                to: "boot.loader.systemd-boot.enable".into(),
-                direction: CausalDirection::Forward,
-                confidence: 0.9,
-            },
-        ];
+        let edges = vec![CausalEdge {
+            from: "boot.loader.grub.enable".into(),
+            to: "boot.loader.systemd-boot.enable".into(),
+            direction: CausalDirection::Forward,
+            confidence: 0.9,
+        }];
         CausalMindBridge::sync_edges(&mut mind, &edges);
         assert!(mind.link_count() > 0);
     }

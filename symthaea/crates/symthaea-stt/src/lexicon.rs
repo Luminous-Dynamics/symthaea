@@ -5,11 +5,11 @@
 //! - Text to phoneme sequence conversion
 //! - ARPAbet to IPA conversion
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 
 /// ARPAbet to IPA conversion table
 pub fn arpabet_to_ipa(arpabet: &str) -> Option<&'static str> {
@@ -125,7 +125,10 @@ impl CmuDictionary {
                 if parts.len() != 2 {
                     continue;
                 }
-                (parts[0], parts[1].split_whitespace().map(|s| s.to_string()).collect())
+                (
+                    parts[0],
+                    parts[1].split_whitespace().map(|s| s.to_string()).collect(),
+                )
             } else {
                 // Single-space format (simplified CMU dict)
                 let mut parts = line.split_whitespace();
@@ -148,11 +151,14 @@ impl CmuDictionary {
                 }
             } else {
                 let word = word_part.to_lowercase();
-                dict.entries.insert(word.clone(), PronunciationEntry {
-                    word,
-                    primary: phonemes,
-                    alternates: Vec::new(),
-                });
+                dict.entries.insert(
+                    word.clone(),
+                    PronunciationEntry {
+                        word,
+                        primary: phonemes,
+                        alternates: Vec::new(),
+                    },
+                );
             }
         }
 
@@ -167,7 +173,9 @@ impl CmuDictionary {
     /// Get primary pronunciation as IPA
     pub fn get_ipa(&self, word: &str) -> Option<Vec<String>> {
         self.get(word).map(|entry| {
-            entry.primary.iter()
+            entry
+                .primary
+                .iter()
                 .filter_map(|p| arpabet_to_ipa(p).map(|s| s.to_string()))
                 .collect()
         })
@@ -186,11 +194,14 @@ impl CmuDictionary {
     /// Add a word manually
     pub fn add(&mut self, word: &str, phonemes: Vec<String>) {
         let word_lower = word.to_lowercase();
-        self.entries.insert(word_lower.clone(), PronunciationEntry {
-            word: word_lower,
-            primary: phonemes,
-            alternates: Vec::new(),
-        });
+        self.entries.insert(
+            word_lower.clone(),
+            PronunciationEntry {
+                word: word_lower,
+                primary: phonemes,
+                alternates: Vec::new(),
+            },
+        );
     }
 
     /// Get all words
@@ -400,7 +411,10 @@ mod tests {
     #[test]
     fn test_dictionary_add_get() {
         let mut dict = CmuDictionary::new();
-        dict.add("hello", vec!["HH".into(), "AH0".into(), "L".into(), "OW1".into()]);
+        dict.add(
+            "hello",
+            vec!["HH".into(), "AH0".into(), "L".into(), "OW1".into()],
+        );
 
         let entry = dict.get("hello").unwrap();
         assert_eq!(entry.primary, vec!["HH", "AH0", "L", "OW1"]);
@@ -424,8 +438,14 @@ mod tests {
     #[test]
     fn test_trie_lookup() {
         let mut trie = PronunciationTrie::new();
-        trie.insert("hello", vec!["HH".into(), "EH".into(), "L".into(), "OW".into()]);
-        trie.insert("help", vec!["HH".into(), "EH".into(), "L".into(), "P".into()]);
+        trie.insert(
+            "hello",
+            vec!["HH".into(), "EH".into(), "L".into(), "OW".into()],
+        );
+        trie.insert(
+            "help",
+            vec!["HH".into(), "EH".into(), "L".into(), "P".into()],
+        );
 
         assert!(trie.get("hello").is_some());
         assert!(trie.get("help").is_some());

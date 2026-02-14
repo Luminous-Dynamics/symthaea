@@ -1,15 +1,17 @@
 //! Analyze temporal regularity of test sounds
 
 use symthaea_sentinel::{
-    compute_onset_strength, compute_temporal_regularity,
-    FileAudioPump, FileAudioConfig,
+    compute_onset_strength, compute_temporal_regularity, FileAudioConfig, FileAudioPump,
 };
 
 fn analyze_file(path: &str) {
     let config = FileAudioConfig::default();
     let mut pump = match FileAudioPump::new(path, config) {
         Ok(p) => p,
-        Err(e) => { println!("  Failed: {}", e); return; }
+        Err(e) => {
+            println!("  Failed: {}", e);
+            return;
+        }
     };
 
     let mut prev_spectrum: Vec<f32> = Vec::new();
@@ -18,7 +20,9 @@ fn analyze_file(path: &str) {
     let mut onset_values: Vec<f32> = Vec::new();
 
     while let Some(spectrum) = pump.next_power_spectrum() {
-        let onset_strength = if prev_spectrum.is_empty() { 0.0 } else {
+        let onset_strength = if prev_spectrum.is_empty() {
+            0.0
+        } else {
             compute_onset_strength(&prev_spectrum, &spectrum)
         };
         prev_spectrum = spectrum;
@@ -35,16 +39,21 @@ fn analyze_file(path: &str) {
         }
     }
 
-    if regularity_values.is_empty() { return; }
+    if regularity_values.is_empty() {
+        return;
+    }
 
-    let mean_regularity: f32 = regularity_values.iter().sum::<f32>() / regularity_values.len() as f32;
+    let mean_regularity: f32 =
+        regularity_values.iter().sum::<f32>() / regularity_values.len() as f32;
     let max_regularity: f32 = regularity_values.iter().cloned().fold(0.0f32, f32::max);
     let mean_onset: f32 = onset_values.iter().sum::<f32>() / onset_values.len() as f32;
     let max_onset: f32 = onset_values.iter().cloned().fold(0.0f32, f32::max);
 
     let name = path.rsplit('/').next().unwrap_or(path);
-    println!("{:15} Regularity: mean={:.4} max={:.4}  Onset: mean={:.4} max={:.4}",
-        name, mean_regularity, max_regularity, mean_onset, max_onset);
+    println!(
+        "{:15} Regularity: mean={:.4} max={:.4}  Onset: mean={:.4} max={:.4}",
+        name, mean_regularity, max_regularity, mean_onset, max_onset
+    );
 }
 
 fn main() {

@@ -7,11 +7,8 @@
 //!   cargo run --example primitive_learning_cognitive --release
 
 use symthaea::benchmarks::{
-    CognitivePrimitiveLearning,
-    CognitivePrimitiveLearningConfig,
-    CognitivePrimitiveTask,
-    CognitivePrimitiveLearningResults,
-    print_comparison_results,
+    print_comparison_results, CognitivePrimitiveLearning, CognitivePrimitiveLearningConfig,
+    CognitivePrimitiveLearningResults, CognitivePrimitiveTask,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -34,11 +31,11 @@ fn main() -> anyhow::Result<()> {
     // - Increased attention lr: 0.05 → 0.1 (2x for stronger attention emergence)
     // Note: Random Projection preserves HDC orthogonality (Step 2)
     let config = CognitivePrimitiveLearningConfig {
-        num_episodes: 15,          // Increased from 10
-        cycles_per_episode: 100,   // Increased from 50
+        num_episodes: 15,        // Increased from 10
+        cycles_per_episode: 100, // Increased from 50
         test_size: 20,
-        learning_rate: 0.03,       // 3x base
-        attention_lr: 0.1,         // 2x base
+        learning_rate: 0.03, // 3x base
+        attention_lr: 0.1,   // 2x base
     };
 
     println!("Configuration:");
@@ -61,7 +58,10 @@ fn main() -> anyhow::Result<()> {
     let mut all_cognitive: Vec<CognitivePrimitiveLearningResults> = Vec::new();
     let mut all_original: Vec<CognitivePrimitiveLearningResults> = Vec::new();
 
-    println!("Running {} reasoning tasks with both approaches...\n", tasks.len());
+    println!(
+        "Running {} reasoning tasks with both approaches...\n",
+        tasks.len()
+    );
 
     for task in &tasks {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -99,11 +99,13 @@ fn main() -> anyhow::Result<()> {
             "0.0%".to_string()
         };
 
-        println!("│ {:24} │ {:>13.1}% │ {:>13.1}% │ {:>12} │",
-                 cog.task_name,
-                 orig.final_accuracy * 100.0,
-                 cog.final_accuracy * 100.0,
-                 improvement_str);
+        println!(
+            "│ {:24} │ {:>13.1}% │ {:>13.1}% │ {:>12} │",
+            cog.task_name,
+            orig.final_accuracy * 100.0,
+            cog.final_accuracy * 100.0,
+            improvement_str
+        );
 
         total_original_acc += orig.final_accuracy;
         total_cognitive_acc += cog.final_accuracy;
@@ -123,11 +125,13 @@ fn main() -> anyhow::Result<()> {
         "0.0%".to_string()
     };
 
-    println!("│ {:24} │ {:>13.1}% │ {:>13.1}% │ {:>12} │",
-             "AVERAGE",
-             avg_original * 100.0,
-             avg_cognitive * 100.0,
-             improvement_str);
+    println!(
+        "│ {:24} │ {:>13.1}% │ {:>13.1}% │ {:>12} │",
+        "AVERAGE",
+        avg_original * 100.0,
+        avg_cognitive * 100.0,
+        improvement_str
+    );
     println!("└──────────────────────────┴────────────────┴────────────────┴──────────────┘");
 
     // Summary verdict
@@ -177,11 +181,13 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Attention emergence summary
-    let attention_emerged_count = all_cognitive.iter()
-        .filter(|r| r.attention_emerged)
-        .count();
+    let attention_emerged_count = all_cognitive.iter().filter(|r| r.attention_emerged).count();
 
-    println!("\n📊 Attention Emergence: {}/{} tasks", attention_emerged_count, tasks.len());
+    println!(
+        "\n📊 Attention Emergence: {}/{} tasks",
+        attention_emerged_count,
+        tasks.len()
+    );
 
     // Total time
     let total_time: u64 = all_cognitive.iter().map(|r| r.total_time_ms).sum::<u64>()

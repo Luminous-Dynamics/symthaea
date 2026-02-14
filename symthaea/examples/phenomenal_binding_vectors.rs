@@ -14,8 +14,8 @@
 //! H2 Revised: Binding creates vectors equidistant from inputs (true integration),
 //! while bundling creates vectors closer to one input (superposition).
 
-use std::time::Instant;
 use std::path::Path;
+use std::time::Instant;
 
 use anyhow::Result;
 
@@ -58,37 +58,66 @@ fn run_h2_vectors() -> Result<()> {
 
     // Unified phenomenal pairs
     let unified_pairs = vec![
-        ("red", "apple"), ("blue", "sky"), ("green", "leaf"),
-        ("golden", "sunset"), ("white", "snow"), ("loud", "crash"),
-        ("soft", "whisper"), ("deep", "rumble"), ("crackling", "fire"),
-        ("rushing", "waterfall"), ("warm", "sunlight"), ("soft", "fur"),
-        ("cool", "breeze"), ("smooth", "silk"), ("cold", "ice"),
-        ("sweet", "honey"), ("sour", "lemon"), ("bitter", "coffee"),
-        ("spicy", "chili"), ("rich", "chocolate"),
+        ("red", "apple"),
+        ("blue", "sky"),
+        ("green", "leaf"),
+        ("golden", "sunset"),
+        ("white", "snow"),
+        ("loud", "crash"),
+        ("soft", "whisper"),
+        ("deep", "rumble"),
+        ("crackling", "fire"),
+        ("rushing", "waterfall"),
+        ("warm", "sunlight"),
+        ("soft", "fur"),
+        ("cool", "breeze"),
+        ("smooth", "silk"),
+        ("cold", "ice"),
+        ("sweet", "honey"),
+        ("sour", "lemon"),
+        ("bitter", "coffee"),
+        ("spicy", "chili"),
+        ("rich", "chocolate"),
     ];
 
     // Separate pairs
     let separate_pairs = vec![
-        ("red", "mailbox"), ("blue", "building"), ("green", "fence"),
-        ("yellow", "sign"), ("white", "wall"), ("loud", "background"),
-        ("soft", "environment"), ("deep", "context"), ("quiet", "office"),
-        ("noisy", "street"), ("warm", "room"), ("soft", "carpet"),
-        ("cool", "basement"), ("smooth", "floor"), ("cold", "garage"),
-        ("sweet", "jar"), ("sour", "bottle"), ("bitter", "cup"),
-        ("spicy", "bowl"), ("bland", "dish"),
+        ("red", "mailbox"),
+        ("blue", "building"),
+        ("green", "fence"),
+        ("yellow", "sign"),
+        ("white", "wall"),
+        ("loud", "background"),
+        ("soft", "environment"),
+        ("deep", "context"),
+        ("quiet", "office"),
+        ("noisy", "street"),
+        ("warm", "room"),
+        ("soft", "carpet"),
+        ("cool", "basement"),
+        ("smooth", "floor"),
+        ("cold", "garage"),
+        ("sweet", "jar"),
+        ("sour", "bottle"),
+        ("bitter", "cup"),
+        ("spicy", "bowl"),
+        ("bland", "dish"),
     ];
 
-    println!("Testing {} unified pairs and {} separate pairs\n",
-             unified_pairs.len(), separate_pairs.len());
+    println!(
+        "Testing {} unified pairs and {} separate pairs\n",
+        unified_pairs.len(),
+        separate_pairs.len()
+    );
 
     // Metrics storage
     #[derive(Debug, Clone)]
     struct PairMetrics {
         // Binding metrics
-        bind_dist_to_a: f64,      // Hamming distance from a
-        bind_dist_to_b: f64,      // Hamming distance from b
-        bind_equidistance: f64,   // |dist_a - dist_b| (lower = more equidistant)
-        bind_novelty: f64,        // min(dist_a, dist_b) / HV_DIM (higher = more novel)
+        bind_dist_to_a: f64,    // Hamming distance from a
+        bind_dist_to_b: f64,    // Hamming distance from b
+        bind_equidistance: f64, // |dist_a - dist_b| (lower = more equidistant)
+        bind_novelty: f64,      // min(dist_a, dist_b) / HV_DIM (higher = more novel)
 
         // Bundling metrics
         bundle_dist_to_a: f64,
@@ -153,15 +182,29 @@ fn run_h2_vectors() -> Result<()> {
     };
 
     // Extract metrics
-    let unified_bind_equidist: Vec<f64> = unified_metrics.iter().map(|m| m.bind_equidistance).collect();
-    let unified_bundle_equidist: Vec<f64> = unified_metrics.iter().map(|m| m.bundle_equidistance).collect();
+    let unified_bind_equidist: Vec<f64> = unified_metrics
+        .iter()
+        .map(|m| m.bind_equidistance)
+        .collect();
+    let unified_bundle_equidist: Vec<f64> = unified_metrics
+        .iter()
+        .map(|m| m.bundle_equidistance)
+        .collect();
     let unified_bind_novelty: Vec<f64> = unified_metrics.iter().map(|m| m.bind_novelty).collect();
-    let unified_bundle_novelty: Vec<f64> = unified_metrics.iter().map(|m| m.bundle_novelty).collect();
+    let unified_bundle_novelty: Vec<f64> =
+        unified_metrics.iter().map(|m| m.bundle_novelty).collect();
 
-    let separate_bind_equidist: Vec<f64> = separate_metrics.iter().map(|m| m.bind_equidistance).collect();
-    let separate_bundle_equidist: Vec<f64> = separate_metrics.iter().map(|m| m.bundle_equidistance).collect();
+    let separate_bind_equidist: Vec<f64> = separate_metrics
+        .iter()
+        .map(|m| m.bind_equidistance)
+        .collect();
+    let separate_bundle_equidist: Vec<f64> = separate_metrics
+        .iter()
+        .map(|m| m.bundle_equidistance)
+        .collect();
     let separate_bind_novelty: Vec<f64> = separate_metrics.iter().map(|m| m.bind_novelty).collect();
-    let separate_bundle_novelty: Vec<f64> = separate_metrics.iter().map(|m| m.bundle_novelty).collect();
+    let separate_bundle_novelty: Vec<f64> =
+        separate_metrics.iter().map(|m| m.bundle_novelty).collect();
 
     println!("================================================================");
     println!("   RESULTS: EQUIDISTANCE ANALYSIS");
@@ -170,12 +213,20 @@ fn run_h2_vectors() -> Result<()> {
 
     println!("                      BIND (XOR)       BUNDLE (MAJ)");
     println!("                    -------------     -------------");
-    println!("UNIFIED PAIRS        {:.4} (+/-{:.4})   {:.4} (+/-{:.4})",
-             mean(&unified_bind_equidist), std(&unified_bind_equidist),
-             mean(&unified_bundle_equidist), std(&unified_bundle_equidist));
-    println!("SEPARATE PAIRS       {:.4} (+/-{:.4})   {:.4} (+/-{:.4})\n",
-             mean(&separate_bind_equidist), std(&separate_bind_equidist),
-             mean(&separate_bundle_equidist), std(&separate_bundle_equidist));
+    println!(
+        "UNIFIED PAIRS        {:.4} (+/-{:.4})   {:.4} (+/-{:.4})",
+        mean(&unified_bind_equidist),
+        std(&unified_bind_equidist),
+        mean(&unified_bundle_equidist),
+        std(&unified_bundle_equidist)
+    );
+    println!(
+        "SEPARATE PAIRS       {:.4} (+/-{:.4})   {:.4} (+/-{:.4})\n",
+        mean(&separate_bind_equidist),
+        std(&separate_bind_equidist),
+        mean(&separate_bundle_equidist),
+        std(&separate_bundle_equidist)
+    );
 
     println!("================================================================");
     println!("   RESULTS: NOVELTY ANALYSIS");
@@ -184,12 +235,20 @@ fn run_h2_vectors() -> Result<()> {
 
     println!("                      BIND (XOR)       BUNDLE (MAJ)");
     println!("                    -------------     -------------");
-    println!("UNIFIED PAIRS        {:.4} (+/-{:.4})   {:.4} (+/-{:.4})",
-             mean(&unified_bind_novelty), std(&unified_bind_novelty),
-             mean(&unified_bundle_novelty), std(&unified_bundle_novelty));
-    println!("SEPARATE PAIRS       {:.4} (+/-{:.4})   {:.4} (+/-{:.4})\n",
-             mean(&separate_bind_novelty), std(&separate_bind_novelty),
-             mean(&separate_bundle_novelty), std(&separate_bundle_novelty));
+    println!(
+        "UNIFIED PAIRS        {:.4} (+/-{:.4})   {:.4} (+/-{:.4})",
+        mean(&unified_bind_novelty),
+        std(&unified_bind_novelty),
+        mean(&unified_bundle_novelty),
+        std(&unified_bundle_novelty)
+    );
+    println!(
+        "SEPARATE PAIRS       {:.4} (+/-{:.4})   {:.4} (+/-{:.4})\n",
+        mean(&separate_bind_novelty),
+        std(&separate_bind_novelty),
+        mean(&separate_bundle_novelty),
+        std(&separate_bundle_novelty)
+    );
 
     // Key comparisons
     println!("================================================================");
@@ -200,14 +259,28 @@ fn run_h2_vectors() -> Result<()> {
     let bind_more_novel = mean(&unified_bind_novelty) > mean(&unified_bundle_novelty);
 
     println!("1. Is binding more equidistant than bundling?");
-    println!("   Unified:  Bind={:.4} vs Bundle={:.4} -> {}",
-             mean(&unified_bind_equidist), mean(&unified_bundle_equidist),
-             if bind_more_equidistant { "YES - Binding more equidistant" } else { "NO" });
+    println!(
+        "   Unified:  Bind={:.4} vs Bundle={:.4} -> {}",
+        mean(&unified_bind_equidist),
+        mean(&unified_bundle_equidist),
+        if bind_more_equidistant {
+            "YES - Binding more equidistant"
+        } else {
+            "NO"
+        }
+    );
 
     println!("\n2. Is binding more novel (different from inputs)?");
-    println!("   Unified:  Bind={:.4} vs Bundle={:.4} -> {}",
-             mean(&unified_bind_novelty), mean(&unified_bundle_novelty),
-             if bind_more_novel { "YES - Binding creates more novel vectors" } else { "NO" });
+    println!(
+        "   Unified:  Bind={:.4} vs Bundle={:.4} -> {}",
+        mean(&unified_bind_novelty),
+        mean(&unified_bundle_novelty),
+        if bind_more_novel {
+            "YES - Binding creates more novel vectors"
+        } else {
+            "NO"
+        }
+    );
 
     // Interaction effect for equidistance
     let bind_equidist_diff = mean(&unified_bind_equidist) - mean(&separate_bind_equidist);
@@ -224,12 +297,16 @@ fn run_h2_vectors() -> Result<()> {
     use rand::seq::SliceRandom;
     let mut rng = rand::thread_rng();
 
-    let all_bind_equidist: Vec<f64> = unified_bind_equidist.iter()
+    let all_bind_equidist: Vec<f64> = unified_bind_equidist
+        .iter()
         .chain(separate_bind_equidist.iter())
-        .copied().collect();
-    let all_bundle_equidist: Vec<f64> = unified_bundle_equidist.iter()
+        .copied()
+        .collect();
+    let all_bundle_equidist: Vec<f64> = unified_bundle_equidist
+        .iter()
         .chain(separate_bundle_equidist.iter())
-        .copied().collect();
+        .copied()
+        .collect();
     let n_unified = unified_pairs.len();
 
     let mut extreme_count = 0;
@@ -237,10 +314,22 @@ fn run_h2_vectors() -> Result<()> {
         let mut indices: Vec<usize> = (0..all_bind_equidist.len()).collect();
         indices.shuffle(&mut rng);
 
-        let perm_unified_bind: Vec<f64> = indices[..n_unified].iter().map(|&i| all_bind_equidist[i]).collect();
-        let perm_unified_bundle: Vec<f64> = indices[..n_unified].iter().map(|&i| all_bundle_equidist[i]).collect();
-        let perm_separate_bind: Vec<f64> = indices[n_unified..].iter().map(|&i| all_bind_equidist[i]).collect();
-        let perm_separate_bundle: Vec<f64> = indices[n_unified..].iter().map(|&i| all_bundle_equidist[i]).collect();
+        let perm_unified_bind: Vec<f64> = indices[..n_unified]
+            .iter()
+            .map(|&i| all_bind_equidist[i])
+            .collect();
+        let perm_unified_bundle: Vec<f64> = indices[..n_unified]
+            .iter()
+            .map(|&i| all_bundle_equidist[i])
+            .collect();
+        let perm_separate_bind: Vec<f64> = indices[n_unified..]
+            .iter()
+            .map(|&i| all_bind_equidist[i])
+            .collect();
+        let perm_separate_bundle: Vec<f64> = indices[n_unified..]
+            .iter()
+            .map(|&i| all_bundle_equidist[i])
+            .collect();
 
         let perm_bind_diff = mean(&perm_unified_bind) - mean(&perm_separate_bind);
         let perm_bundle_diff = mean(&perm_unified_bundle) - mean(&perm_separate_bundle);
@@ -261,27 +350,47 @@ fn run_h2_vectors() -> Result<()> {
     println!("================================================================\n");
 
     println!("Unified Pairs (first 5):");
-    println!("  {:20} | Bind equidist | Bundle equidist | Bind novelty | Bundle novelty", "Pair");
-    println!("  {:20} | ------------- | --------------- | ------------ | --------------", "----");
+    println!(
+        "  {:20} | Bind equidist | Bundle equidist | Bind novelty | Bundle novelty",
+        "Pair"
+    );
+    println!(
+        "  {:20} | ------------- | --------------- | ------------ | --------------",
+        "----"
+    );
     for i in 0..5.min(unified_pairs.len()) {
         let (a, b) = unified_pairs[i];
         let m = &unified_metrics[i];
-        println!("  {:20} | {:.4}        | {:.4}          | {:.4}       | {:.4}",
-                 format!("({}, {})", a, b),
-                 m.bind_equidistance, m.bundle_equidistance,
-                 m.bind_novelty, m.bundle_novelty);
+        println!(
+            "  {:20} | {:.4}        | {:.4}          | {:.4}       | {:.4}",
+            format!("({}, {})", a, b),
+            m.bind_equidistance,
+            m.bundle_equidistance,
+            m.bind_novelty,
+            m.bundle_novelty
+        );
     }
 
     println!("\nSeparate Pairs (first 5):");
-    println!("  {:20} | Bind equidist | Bundle equidist | Bind novelty | Bundle novelty", "Pair");
-    println!("  {:20} | ------------- | --------------- | ------------ | --------------", "----");
+    println!(
+        "  {:20} | Bind equidist | Bundle equidist | Bind novelty | Bundle novelty",
+        "Pair"
+    );
+    println!(
+        "  {:20} | ------------- | --------------- | ------------ | --------------",
+        "----"
+    );
     for i in 0..5.min(separate_pairs.len()) {
         let (a, b) = separate_pairs[i];
         let m = &separate_metrics[i];
-        println!("  {:20} | {:.4}        | {:.4}          | {:.4}       | {:.4}",
-                 format!("({}, {})", a, b),
-                 m.bind_equidistance, m.bundle_equidistance,
-                 m.bind_novelty, m.bundle_novelty);
+        println!(
+            "  {:20} | {:.4}        | {:.4}          | {:.4}       | {:.4}",
+            format!("({}, {})", a, b),
+            m.bind_equidistance,
+            m.bundle_equidistance,
+            m.bind_novelty,
+            m.bundle_novelty
+        );
     }
 
     println!("\n================================================================");

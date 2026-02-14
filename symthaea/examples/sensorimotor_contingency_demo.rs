@@ -13,13 +13,9 @@
 //! ```
 
 use symthaea::hdc::sensorimotor_contingencies::{
-    ActionDescriptor, ActionType,
-    ContextDescriptor, SensoryModality,
-    SensoryChange,
-    ContingencyLearner,
-    EnactivistPerception,
-    AffordanceDetector,
-    ContingencyConsciousnessContribution,
+    ActionDescriptor, ActionType, AffordanceDetector, ContextDescriptor,
+    ContingencyConsciousnessContribution, ContingencyLearner, EnactivistPerception, SensoryChange,
+    SensoryModality,
 };
 
 fn main() {
@@ -66,7 +62,7 @@ fn demo_basic_learning() {
 
     // Define the typical outcome: tactile contact
     let contact_outcome = SensoryChange::new(SensoryModality::Tactile)
-        .with_vector(vec![0.8, 0.5, 0.2, 0.0])  // pressure, temperature, texture, pain
+        .with_vector(vec![0.8, 0.5, 0.2, 0.0]) // pressure, temperature, texture, pain
         .with_description("contact with smooth surface");
 
     // Train the system with repeated experiences
@@ -76,11 +72,12 @@ fn demo_basic_learning() {
         let result = learner.learn(
             reach_action.clone(),
             context.clone(),
-            contact_outcome.clone()
+            contact_outcome.clone(),
         );
 
         if i == 1 || i == 5 || i == 10 {
-            println!("  Experience {}: surprise = {:.3}, contingency: {}",
+            println!(
+                "  Experience {}: surprise = {:.3}, contingency: {}",
                 i,
                 result.surprise,
                 result.contingency_id.as_deref().unwrap_or("none")
@@ -92,7 +89,10 @@ fn demo_basic_learning() {
     println!("\nLearning Results:");
     println!("  Total experiences: {}", learner.stats().total_experiences);
     println!("  Contingencies learned: {}", learner.contingency_count());
-    println!("  Prediction accuracy: {:.1}%", learner.prediction_accuracy() * 100.0);
+    println!(
+        "  Prediction accuracy: {:.1}%",
+        learner.prediction_accuracy() * 100.0
+    );
 
     // Make a prediction
     if let Some(prediction) = learner.predict(&reach_action, &context) {
@@ -110,8 +110,7 @@ fn demo_prediction_and_surprise() {
     let mut learner = ContingencyLearner::new();
 
     // Learn a reliable contingency
-    let push_action = ActionDescriptor::new(ActionType::Push)
-        .with_parameter("force", 0.5);
+    let push_action = ActionDescriptor::new(ActionType::Push).with_parameter("force", 0.5);
 
     let context = ContextDescriptor::new("ball_on_surface", SensoryModality::Visual)
         .with_feature("object_mass", 0.3)
@@ -119,7 +118,7 @@ fn demo_prediction_and_surprise() {
 
     // Normal outcome: ball moves forward
     let normal_outcome = SensoryChange::new(SensoryModality::Visual)
-        .with_vector(vec![0.5, 0.0, 0.0, 0.0])  // motion in x direction
+        .with_vector(vec![0.5, 0.0, 0.0, 0.0]) // motion in x direction
         .with_description("ball rolls forward");
 
     println!("Phase 1: Learning normal contingency (push -> ball rolls)\n");
@@ -128,14 +127,16 @@ fn demo_prediction_and_surprise() {
         learner.learn(push_action.clone(), context.clone(), normal_outcome.clone());
     }
 
-    println!("  After 10 experiences, prediction accuracy: {:.1}%\n",
-        learner.prediction_accuracy() * 100.0);
+    println!(
+        "  After 10 experiences, prediction accuracy: {:.1}%\n",
+        learner.prediction_accuracy() * 100.0
+    );
 
     // Now introduce a surprising outcome!
     println!("Phase 2: Encountering surprising outcome\n");
 
     let surprising_outcome = SensoryChange::new(SensoryModality::Visual)
-        .with_vector(vec![-0.3, 0.8, 0.0, 0.0])  // ball moves backwards and up!
+        .with_vector(vec![-0.3, 0.8, 0.0, 0.0]) // ball moves backwards and up!
         .with_description("ball bounces back unexpectedly");
 
     let result = learner.learn(push_action.clone(), context.clone(), surprising_outcome);
@@ -143,7 +144,10 @@ fn demo_prediction_and_surprise() {
     println!("  Surprising event occurred!");
     println!("  Surprise level: {:.3}", result.surprise);
     println!("  Is violation: {}", result.is_violation);
-    println!("  Prediction error: {:.3}", result.prediction_error.unwrap_or(0.0));
+    println!(
+        "  Prediction error: {:.3}",
+        result.prediction_error.unwrap_or(0.0)
+    );
 
     println!("\n  This surprise signal would feed into:");
     println!("    - Free energy minimization");
@@ -166,10 +170,10 @@ fn demo_enactivist_perception() {
     let mut perception = EnactivistPerception::new();
 
     // Simulate visual exploration of a scene
-    let saccade_left = ActionDescriptor::new(ActionType::SaccadeLeft)
-        .with_parameter("magnitude", 10.0);
-    let saccade_right = ActionDescriptor::new(ActionType::SaccadeRight)
-        .with_parameter("magnitude", 10.0);
+    let saccade_left =
+        ActionDescriptor::new(ActionType::SaccadeLeft).with_parameter("magnitude", 10.0);
+    let saccade_right =
+        ActionDescriptor::new(ActionType::SaccadeRight).with_parameter("magnitude", 10.0);
 
     let visual_scene = ContextDescriptor::new("office_scene", SensoryModality::Visual)
         .with_feature("complexity", 0.7)
@@ -179,7 +183,7 @@ fn demo_enactivist_perception() {
 
     // Visual outcome: scene shifts as expected
     let scene_shift_right = SensoryChange::new(SensoryModality::Visual)
-        .with_vector(vec![0.3, 0.0, 0.0, 0.0])  // retinal image shifts right
+        .with_vector(vec![0.3, 0.0, 0.0, 0.0]) // retinal image shifts right
         .with_description("scene shifts rightward");
 
     let scene_shift_left = SensoryChange::new(SensoryModality::Visual)
@@ -196,21 +200,24 @@ fn demo_enactivist_perception() {
             (saccade_right.clone(), scene_shift_left.clone())
         };
 
-        let result = perception.perceive_through_action(
-            action,
-            visual_scene.clone(),
-            outcome
-        );
+        let result = perception.perceive_through_action(action, visual_scene.clone(), outcome);
 
         if i == 0 || i == 9 || i == 19 {
-            println!("  Cycle {}: clarity = {:.3}, surprise = {:.3}",
-                i + 1, result.clarity, result.surprise);
+            println!(
+                "  Cycle {}: clarity = {:.3}, surprise = {:.3}",
+                i + 1,
+                result.clarity,
+                result.surprise
+            );
         }
     }
 
     println!("\nPerception Results:");
     println!("  Perceptual mastery: {:.1}%", perception.mastery() * 100.0);
-    println!("  Active contingencies: {}", perception.stats().avg_active_contingencies as usize);
+    println!(
+        "  Active contingencies: {}",
+        perception.stats().avg_active_contingencies as usize
+    );
 
     let ready_actions = perception.get_ready_actions();
     println!("\n  Motor readiness (actions primed for execution):");
@@ -220,8 +227,7 @@ fn demo_enactivist_perception() {
 
     // Imagination: predict what would happen
     println!("\n  Imagination (predicting unexecuted action):");
-    let imagined = ActionDescriptor::new(ActionType::HeadTurnLeft)
-        .with_parameter("angle", 30.0);
+    let imagined = ActionDescriptor::new(ActionType::HeadTurnLeft).with_parameter("angle", 30.0);
 
     if let Some(prediction) = perception.imagine_action(&imagined, &visual_scene) {
         println!("    If I turn my head left, I predict:");
@@ -247,12 +253,12 @@ fn demo_affordance_detection() {
         .with_effector("hand");
 
     let graspable_context = ContextDescriptor::new("small_object", SensoryModality::Visual)
-        .with_feature("size", 0.1)  // small
+        .with_feature("size", 0.1) // small
         .with_feature("graspable", 1.0)
         .with_object("apple");
 
     let grasp_outcome = SensoryChange::new(SensoryModality::Tactile)
-        .with_vector(vec![0.9, 0.3, 0.5, 0.0])  // firm grip
+        .with_vector(vec![0.9, 0.3, 0.5, 0.0]) // firm grip
         .with_description("successful grasp");
 
     println!("Phase 1: Learning grasp contingency...\n");
@@ -261,13 +267,12 @@ fn demo_affordance_detection() {
         detector.process_action(
             grasp_action.clone(),
             graspable_context.clone(),
-            grasp_outcome.clone()
+            grasp_outcome.clone(),
         );
     }
 
     // Train on pushing actions
-    let push_action = ActionDescriptor::new(ActionType::Push)
-        .with_parameter("force", 0.3);
+    let push_action = ActionDescriptor::new(ActionType::Push).with_parameter("force", 0.3);
 
     let push_outcome = SensoryChange::new(SensoryModality::Visual)
         .with_vector(vec![0.4, 0.0, 0.0, 0.0])
@@ -277,7 +282,7 @@ fn demo_affordance_detection() {
         detector.process_action(
             push_action.clone(),
             graspable_context.clone(),
-            push_outcome.clone()
+            push_outcome.clone(),
         );
     }
 
@@ -300,8 +305,11 @@ fn demo_affordance_detection() {
     }
 
     if let Some(best) = detector.most_attractive() {
-        println!("  Most attractive action: {:?} (attractiveness: {:.3})",
-            best.action, best.attractiveness());
+        println!(
+            "  Most attractive action: {:?} (attractiveness: {:.3})",
+            best.action,
+            best.attractiveness()
+        );
     }
 }
 
@@ -344,21 +352,41 @@ fn demo_consciousness_contribution() {
 
     println!("Consciousness Contribution Analysis:");
     println!("  ----------------------------------------");
-    println!("  Sensorimotor Mastery: {:.1}%", contribution.mastery * 100.0);
-    println!("  Prediction Accuracy:  {:.1}%", contribution.prediction_accuracy * 100.0);
+    println!(
+        "  Sensorimotor Mastery: {:.1}%",
+        contribution.mastery * 100.0
+    );
+    println!(
+        "  Prediction Accuracy:  {:.1}%",
+        contribution.prediction_accuracy * 100.0
+    );
     println!("  Current Surprise:     {:.3}", contribution.surprise);
-    println!("  Contingencies Learned: {}", contribution.contingency_count);
-    println!("  Motor Readiness:      {:.3}", contribution.motor_readiness);
-    println!("  Perceptual Clarity:   {:.3}", contribution.perceptual_clarity);
+    println!(
+        "  Contingencies Learned: {}",
+        contribution.contingency_count
+    );
+    println!(
+        "  Motor Readiness:      {:.3}",
+        contribution.motor_readiness
+    );
+    println!(
+        "  Perceptual Clarity:   {:.3}",
+        contribution.perceptual_clarity
+    );
     println!("  ----------------------------------------");
-    println!("  CONSCIOUSNESS CONTRIBUTION (M_smc): {:.3}",
-        contribution.consciousness_contribution());
+    println!(
+        "  CONSCIOUSNESS CONTRIBUTION (M_smc): {:.3}",
+        contribution.consciousness_contribution()
+    );
 
     println!("\n  This value feeds into the Master Consciousness Equation:");
     println!("  C(t) = sigma(softmin(...)) x [weighted_sum] x S x rho(t)");
     println!("\n  Where M_smc contributes to the embodiment factor.");
 
-    println!("\n  Prediction Error ({:.3}) feeds into:", contribution.prediction_error());
+    println!(
+        "\n  Prediction Error ({:.3}) feeds into:",
+        contribution.prediction_error()
+    );
     println!("    - Free Energy Principle minimization");
     println!("    - Active Inference action selection");
     println!("    - Attention reallocation");

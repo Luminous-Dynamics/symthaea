@@ -1,12 +1,11 @@
 // Debug example to compare eigenvalue calculations
 // Run with: cargo run --example debug_eigenvalues --release
 
+use nalgebra::DMatrix;
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator,
-    HDC_DIMENSION,
+    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
-use nalgebra::DMatrix;
 
 fn main() {
     println!("\n🔬 DEBUG: Eigenvalue Calculation Analysis");
@@ -43,8 +42,11 @@ fn main() {
     println!("🎯 FINAL Φ VALUES:");
     println!("  Star:   Φ = {:.4}", phi_star);
     println!("  Random: Φ = {:.4}", phi_random);
-    println!("  Δ = {:.4} ({:+.2}%)", phi_star - phi_random,
-             ((phi_star - phi_random) / phi_random) * 100.0);
+    println!(
+        "  Δ = {:.4} ({:+.2}%)",
+        phi_star - phi_random,
+        ((phi_star - phi_random) / phi_random) * 100.0
+    );
     println!("============================================================\n");
 }
 
@@ -95,7 +97,8 @@ fn analyze_matrix(similarity_matrix: &[Vec<f64>], name: &str) {
     println!("    Avg degree: {:.4}", avg_deg);
 
     // Build and analyze normalized Laplacian
-    let inv_sqrt_degrees: Vec<f64> = degrees.iter()
+    let inv_sqrt_degrees: Vec<f64> = degrees
+        .iter()
         .map(|&d| if d > 1e-10 { 1.0 / d.sqrt() } else { 0.0 })
         .collect();
 
@@ -121,12 +124,22 @@ fn analyze_matrix(similarity_matrix: &[Vec<f64>], name: &str) {
 
     println!("  Normalized Laplacian Eigenvalues (sorted):");
     for (i, ev) in eigenvalues.iter().enumerate() {
-        let label = if i == 0 { "λ₁ (should be ~0)" }
-                   else if i == 1 { "λ₂ (algebraic connectivity)" }
-                   else { "" };
-        println!("    λ_{} = {:.6}  {}", i+1, ev, label);
+        let label = if i == 0 {
+            "λ₁ (should be ~0)"
+        } else if i == 1 {
+            "λ₂ (algebraic connectivity)"
+        } else {
+            ""
+        };
+        println!("    λ_{} = {:.6}  {}", i + 1, ev, label);
     }
 
-    println!("  → Algebraic Connectivity (λ₂): {:.6}", eigenvalues[1].max(0.0));
-    println!("  → Normalized Φ (λ₂/2): {:.6}", (eigenvalues[1].max(0.0) / 2.0).clamp(0.0, 1.0));
+    println!(
+        "  → Algebraic Connectivity (λ₂): {:.6}",
+        eigenvalues[1].max(0.0)
+    );
+    println!(
+        "  → Normalized Φ (λ₂/2): {:.6}",
+        (eigenvalues[1].max(0.0) / 2.0).clamp(0.0, 1.0)
+    );
 }

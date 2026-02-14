@@ -149,7 +149,7 @@ impl DtwAligner {
                 // 3. Skip frame (not allowed in standard DTW)
 
                 let candidates = [
-                    (dp[i - 1][j] + frame_cost, (i - 1, j)),     // Same phoneme
+                    (dp[i - 1][j] + frame_cost, (i - 1, j)), // Same phoneme
                     (dp[i - 1][j - 1] + frame_cost, (i - 1, j - 1)), // New phoneme
                 ];
 

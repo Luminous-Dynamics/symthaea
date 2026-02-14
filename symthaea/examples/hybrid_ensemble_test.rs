@@ -23,7 +23,10 @@ fn main() {
     println!("  Detected type:     {:?}", log_type);
     println!("  Expected type:     DiscreteChaos");
     let log_correct = matches!(log_type, SignalType::DiscreteChaos);
-    println!("  Routing correct:   {}\n", if log_correct { "✅ YES" } else { "⚠️ NO" });
+    println!(
+        "  Routing correct:   {}\n",
+        if log_correct { "✅ YES" } else { "⚠️ NO" }
+    );
 
     // Test 2: Henon Map (Discrete Chaotic)
     println!("=== HENON MAP (DISCRETE CHAOTIC) ===\n");
@@ -31,7 +34,10 @@ fn main() {
     println!("  Detected type:     {:?}", hen_type);
     println!("  Expected type:     DiscreteChaos");
     let hen_correct = matches!(hen_type, SignalType::DiscreteChaos);
-    println!("  Routing correct:   {}\n", if hen_correct { "✅ YES" } else { "⚠️ NO" });
+    println!(
+        "  Routing correct:   {}\n",
+        if hen_correct { "✅ YES" } else { "⚠️ NO" }
+    );
 
     // Test 3: Lorenz System (Continuous Chaotic)
     println!("=== LORENZ SYSTEM (CONTINUOUS CHAOTIC) ===\n");
@@ -39,7 +45,10 @@ fn main() {
     println!("  Detected type:     {:?}", lor_type);
     println!("  Expected type:     ContinuousChaos");
     let lor_correct = matches!(lor_type, SignalType::ContinuousChaos);
-    println!("  Routing correct:   {}\n", if lor_correct { "✅ YES" } else { "⚠️ NO" });
+    println!(
+        "  Routing correct:   {}\n",
+        if lor_correct { "✅ YES" } else { "⚠️ NO" }
+    );
 
     // Summary
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -47,23 +56,45 @@ fn main() {
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!("║  Signal           Accuracy   Routing   Target                ║");
     println!("║  ─────────────────────────────────────────────────────────── ║");
-    println!("║  Logistic r=3.8   {:>5.1}%     {:>6}    75%+                  ║",
-             log_acc, if log_correct { "✅" } else { "⚠️" });
-    println!("║  Henon Map        {:>5.1}%     {:>6}    75%+                  ║",
-             hen_acc, if hen_correct { "✅" } else { "⚠️" });
-    println!("║  Lorenz System    {:>5.1}%     {:>6}    90%+                  ║",
-             lor_acc, if lor_correct { "✅" } else { "⚠️" });
+    println!(
+        "║  Logistic r=3.8   {:>5.1}%     {:>6}    75%+                  ║",
+        log_acc,
+        if log_correct { "✅" } else { "⚠️" }
+    );
+    println!(
+        "║  Henon Map        {:>5.1}%     {:>6}    75%+                  ║",
+        hen_acc,
+        if hen_correct { "✅" } else { "⚠️" }
+    );
+    println!(
+        "║  Lorenz System    {:>5.1}%     {:>6}    90%+                  ║",
+        lor_acc,
+        if lor_correct { "✅" } else { "⚠️" }
+    );
     println!("╚══════════════════════════════════════════════════════════════╝");
 
     // Overall assessment
     let all_routed = log_correct && hen_correct && lor_correct;
     let avg_acc = (log_acc + hen_acc + lor_acc) / 3.0;
-    println!("\n  Signal Type Detection: {}", if all_routed { "✅ ALL CORRECT" } else { "⚠️ NEEDS TUNING" });
+    println!(
+        "\n  Signal Type Detection: {}",
+        if all_routed {
+            "✅ ALL CORRECT"
+        } else {
+            "⚠️ NEEDS TUNING"
+        }
+    );
     println!("  Average Accuracy:      {:.1}%", avg_acc);
-    println!("  Overall Assessment:    {}",
-             if all_routed && avg_acc > 70.0 { "✅ ENSEMBLE WORKING" }
-             else if avg_acc > 60.0 { "🔄 PARTIAL SUCCESS" }
-             else { "⚠️ NEEDS IMPROVEMENT" });
+    println!(
+        "  Overall Assessment:    {}",
+        if all_routed && avg_acc > 70.0 {
+            "✅ ENSEMBLE WORKING"
+        } else if avg_acc > 60.0 {
+            "🔄 PARTIAL SUCCESS"
+        } else {
+            "⚠️ NEEDS IMPROVEMENT"
+        }
+    );
 }
 
 fn test_logistic_map() -> (f64, SignalType) {

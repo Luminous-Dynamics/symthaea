@@ -30,7 +30,7 @@
 //! ```
 
 use std::collections::HashMap;
-use tree_sitter::{Parser, Node, Tree};
+use tree_sitter::{Node, Parser, Tree};
 
 /// Nix AST Parser using tree-sitter
 pub struct NixParser {
@@ -147,14 +147,17 @@ impl NixParser {
     pub fn new() -> Self {
         let mut parser = Parser::new();
         // Set the Nix language for parsing
-        parser.set_language(&tree_sitter_nix::LANGUAGE.into())
+        parser
+            .set_language(&tree_sitter_nix::LANGUAGE.into())
             .expect("Failed to set Nix language for tree-sitter parser");
         Self { parser }
     }
 
     /// Parse Nix source code
     pub fn parse(&mut self, source: &str) -> Result<NixConfig, NixParseError> {
-        let tree = self.parser.parse(source, None)
+        let tree = self
+            .parser
+            .parse(source, None)
             .ok_or_else(|| NixParseError {
                 message: "Failed to parse Nix source".to_string(),
                 line: 1,
@@ -194,7 +197,10 @@ impl NixParser {
             errors.push(NixParseError {
                 message: format!(
                     "Syntax error near: {}",
-                    &source[node.byte_range()].chars().take(50).collect::<String>()
+                    &source[node.byte_range()]
+                        .chars()
+                        .take(50)
+                        .collect::<String>()
                 ),
                 line: start.row + 1,
                 column: start.column + 1,
@@ -231,14 +237,12 @@ impl NixParser {
                         if formal.kind() == "formal" {
                             // Extract identifier
                             if let Some(id) = formal.child_by_field_name("name") {
-                                config.module_args.push(
-                                    source[id.byte_range()].to_string()
-                                );
+                                config.module_args.push(source[id.byte_range()].to_string());
                             }
                         } else if formal.kind() == "identifier" {
-                            config.module_args.push(
-                                source[formal.byte_range()].to_string()
-                            );
+                            config
+                                .module_args
+                                .push(source[formal.byte_range()].to_string());
                         }
                     }
                 }
@@ -346,16 +350,15 @@ impl NixParser {
             "string_expression" | "indented_string_expression" => {
                 let text = source[node.byte_range()].to_string();
                 // Remove quotes
-                let unquoted = text.trim_matches('"')
+                let unquoted = text
+                    .trim_matches('"')
                     .trim_start_matches("''")
                     .trim_end_matches("''")
                     .to_string();
                 NixValue::String(unquoted)
             }
 
-            "path_expression" | "path" => {
-                NixValue::Path(source[node.byte_range()].to_string())
-            }
+            "path_expression" | "path" => NixValue::Path(source[node.byte_range()].to_string()),
 
             "list_expression" => {
                 let mut items = Vec::new();
@@ -385,10 +388,12 @@ impl NixParser {
             }
 
             "with_expression" => {
-                let scope = node.child_by_field_name("environment")
+                let scope = node
+                    .child_by_field_name("environment")
                     .map(|n| source[n.byte_range()].to_string())
                     .unwrap_or_default();
-                let body = node.child_by_field_name("body")
+                let body = node
+                    .child_by_field_name("body")
                     .map(|n| self.parse_value(&n, source))
                     .unwrap_or(NixValue::Null);
                 NixValue::With {
@@ -409,11 +414,11 @@ impl NixParser {
                     "true" => NixValue::Bool(true),
                     "false" => NixValue::Bool(false),
                     "null" => NixValue::Null,
-                    _ => NixValue::Apply(text.to_string())
+                    _ => NixValue::Apply(text.to_string()),
                 }
             }
 
-            _ => NixValue::Expression(source[node.byte_range()].to_string())
+            _ => NixValue::Expression(source[node.byte_range()].to_string()),
         }
     }
 
@@ -459,7 +464,8 @@ impl NixConfig {
 
     /// Get all options under a prefix
     pub fn options_under(&self, prefix: &str) -> Vec<&NixOption> {
-        self.options.iter()
+        self.options
+            .iter()
             .filter(|o| o.path.starts_with(prefix))
             .collect()
     }
@@ -638,7 +644,11 @@ impl NixConfig {
     }
 
     /// Helper to find deepest node containing a point
-    fn find_deepest_node_at_point<'a>(&self, node: &Node<'a>, point: tree_sitter::Point) -> Option<Node<'a>> {
+    fn find_deepest_node_at_point<'a>(
+        &self,
+        node: &Node<'a>,
+        point: tree_sitter::Point,
+    ) -> Option<Node<'a>> {
         let start = node.start_position();
         let end = node.end_position();
 
@@ -662,7 +672,8 @@ impl NixConfig {
     /// Get all named children of a node (excludes syntax tokens like brackets, semicolons)
     pub fn named_children<'a>(&'a self, node: &'a Node<'a>) -> impl Iterator<Item = Node<'a>> {
         let mut cursor = node.walk();
-        let children: Vec<_> = node.children(&mut cursor)
+        let children: Vec<_> = node
+            .children(&mut cursor)
             .filter(|n| n.is_named())
             .collect();
         children.into_iter()
@@ -747,12 +758,14 @@ mod tests {
     #[test]
     fn test_parse_simple_config() {
         let mut parser = NixParser::new();
-        let result = parser.parse(r#"
+        let result = parser.parse(
+            r#"
             { config, pkgs, ... }: {
                 services.nginx.enable = true;
                 networking.hostName = "myhost";
             }
-        "#);
+        "#,
+        );
 
         assert!(result.is_ok());
         let config = result.unwrap();
@@ -764,7 +777,8 @@ mod tests {
     #[test]
     fn test_parse_system_packages() {
         let mut parser = NixParser::new();
-        let result = parser.parse(r#"
+        let result = parser.parse(
+            r#"
             { pkgs, ... }: {
                 environment.systemPackages = with pkgs; [
                     vim
@@ -772,7 +786,8 @@ mod tests {
                     firefox
                 ];
             }
-        "#);
+        "#,
+        );
 
         assert!(result.is_ok());
         let config = result.unwrap();
@@ -784,14 +799,16 @@ mod tests {
     #[test]
     fn test_parse_imports() {
         let mut parser = NixParser::new();
-        let result = parser.parse(r#"
+        let result = parser.parse(
+            r#"
             { ... }: {
                 imports = [
                     ./hardware-configuration.nix
                     ./networking.nix
                 ];
             }
-        "#);
+        "#,
+        );
 
         assert!(result.is_ok());
         let config = result.unwrap();
@@ -802,13 +819,15 @@ mod tests {
     #[test]
     fn test_error_detection() {
         let mut parser = NixParser::new();
-        let result = parser.parse(r#"
+        let result = parser.parse(
+            r#"
             { ... }: {
                 services.nginx.enable = true
                 # Missing semicolon above
                 networking.hostName = "test";
             }
-        "#);
+        "#,
+        );
 
         // Should still parse but report errors
         assert!(result.is_ok());
@@ -819,7 +838,8 @@ mod tests {
     #[test]
     fn test_value_types() {
         let mut parser = NixParser::new();
-        let result = parser.parse(r#"
+        let result = parser.parse(
+            r#"
             {
                 boolVal = true;
                 intVal = 42;
@@ -827,7 +847,8 @@ mod tests {
                 pathVal = ./path;
                 nullVal = null;
             }
-        "#);
+        "#,
+        );
 
         assert!(result.is_ok(), "Parse should succeed");
         let config = result.unwrap();
@@ -852,9 +873,13 @@ mod tests {
     #[test]
     fn test_traverse_ast() {
         let mut parser = NixParser::new();
-        let config = parser.parse(r#"
+        let config = parser
+            .parse(
+                r#"
             { x = 1; y = 2; }
-        "#).unwrap();
+        "#,
+            )
+            .unwrap();
 
         // Traverse should yield multiple nodes
         let nodes: Vec<_> = config.traverse_ast().collect();
@@ -862,20 +887,26 @@ mod tests {
 
         // Should include the root source_code node
         let kinds: Vec<_> = nodes.iter().map(|n| n.kind()).collect();
-        assert!(kinds.contains(&"source_code") || kinds.contains(&"attrset_expression"),
-            "Should contain root or attrset node");
+        assert!(
+            kinds.contains(&"source_code") || kinds.contains(&"attrset_expression"),
+            "Should contain root or attrset node"
+        );
     }
 
     #[test]
     fn test_find_nodes_by_kind() {
         let mut parser = NixParser::new();
-        let config = parser.parse(r#"
+        let config = parser
+            .parse(
+                r#"
             {
                 a = 1;
                 b = 2;
                 c = 3;
             }
-        "#).unwrap();
+        "#,
+            )
+            .unwrap();
 
         // Find all binding nodes
         let bindings = config.find_nodes("binding");
@@ -889,13 +920,17 @@ mod tests {
     #[test]
     fn test_extract_let_bindings() {
         let mut parser = NixParser::new();
-        let config = parser.parse(r#"
+        let config = parser
+            .parse(
+                r#"
             let
               x = 1;
               y = "hello";
               z = true;
             in x
-        "#).unwrap();
+        "#,
+            )
+            .unwrap();
 
         let bindings = config.extract_bindings();
         assert!(!bindings.is_empty(), "Should extract some bindings");
@@ -917,7 +952,10 @@ mod tests {
         assert!(!strings.is_empty(), "Should find string expression");
 
         let source = config.get_source_range(&strings[0]);
-        assert!(source.contains("hello world"), "Should extract string content");
+        assert!(
+            source.contains("hello world"),
+            "Should extract string content"
+        );
     }
 
     #[test]
@@ -957,7 +995,9 @@ mod tests {
     #[test]
     fn test_traverse_complex_nix() {
         let mut parser = NixParser::new();
-        let config = parser.parse(r#"
+        let config = parser
+            .parse(
+                r#"
             { config, pkgs, lib, ... }:
 
             let
@@ -978,11 +1018,17 @@ mod tests {
                 myPkg
               ];
             }
-        "#).unwrap();
+        "#,
+            )
+            .unwrap();
 
         // Should be able to traverse without panic
         let node_count = config.traverse_ast().count();
-        assert!(node_count > 10, "Complex Nix should have many nodes, got {}", node_count);
+        assert!(
+            node_count > 10,
+            "Complex Nix should have many nodes, got {}",
+            node_count
+        );
 
         // Should find let expression
         let let_exprs = config.find_nodes("let_expression");

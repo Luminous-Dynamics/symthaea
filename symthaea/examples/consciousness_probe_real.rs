@@ -27,9 +27,7 @@ use anyhow::Result;
 
 // Feature-gated imports
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{
-    ConsciousnessProbeV2, ConceptCorpus, ProbeConfig,
-};
+use symthaea::perception::{ConceptCorpus, ConsciousnessProbeV2, ProbeConfig};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::TopologyConfig;
@@ -90,7 +88,10 @@ fn run_experiment() -> Result<()> {
 
     let load_start = Instant::now();
     let mut probe = ConsciousnessProbeV2::load_with_probe(probe_path)?;
-    println!("  Model loaded in {:.2}s\n", load_start.elapsed().as_secs_f64());
+    println!(
+        "  Model loaded in {:.2}s\n",
+        load_start.elapsed().as_secs_f64()
+    );
 
     // Configure topology analysis
     let config = ProbeConfig {
@@ -115,22 +116,32 @@ fn run_experiment() -> Result<()> {
     println!("Probing phenomenal concepts...");
     let phen_start = Instant::now();
     let phenomenal_results = probe.probe_corpus_texts(&phenomenal_corpus)?;
-    println!("  Completed in {:.2}s ({} concepts)\n",
-             phen_start.elapsed().as_secs_f64(),
-             phenomenal_results.len());
+    println!(
+        "  Completed in {:.2}s ({} concepts)\n",
+        phen_start.elapsed().as_secs_f64(),
+        phenomenal_results.len()
+    );
 
     println!("Probing functional concepts...");
     let func_start = Instant::now();
     let functional_results = probe.probe_corpus_texts(&functional_corpus)?;
-    println!("  Completed in {:.2}s ({} concepts)\n",
-             func_start.elapsed().as_secs_f64(),
-             functional_results.len());
+    println!(
+        "  Completed in {:.2}s ({} concepts)\n",
+        func_start.elapsed().as_secs_f64(),
+        functional_results.len()
+    );
 
     // Show cache statistics
     let stats = probe.stats();
     println!("Cache Statistics:");
-    println!("  HDC cache hit rate: {:.1}%", stats.hdc_cache_hit_rate() * 100.0);
-    println!("  Embedding cache hit rate: {:.1}%", stats.embedding_cache_hit_rate() * 100.0);
+    println!(
+        "  HDC cache hit rate: {:.1}%",
+        stats.hdc_cache_hit_rate() * 100.0
+    );
+    println!(
+        "  Embedding cache hit rate: {:.1}%",
+        stats.embedding_cache_hit_rate() * 100.0
+    );
     println!("  Avg encode time: {:.1}ms", stats.avg_encode_ms());
     println!("  Avg probe time: {:.1}ms\n", stats.avg_probe_ms());
 
@@ -142,23 +153,43 @@ fn run_experiment() -> Result<()> {
     let comparison = probe.compare_classes(&phenomenal_results, &functional_results);
 
     println!("Phenomenal Concepts (n={}):", comparison.phenomenal_stats.n);
-    println!("  Mean Unity Score: {:.4} (+/- {:.4})",
-             comparison.phenomenal_stats.mean_unity,
-             comparison.phenomenal_stats.std_unity);
-    println!("  Mean beta_0 (components): {:.2}", comparison.phenomenal_stats.mean_beta_0);
-    println!("  Mean beta_1 (cycles): {:.2}\n", comparison.phenomenal_stats.mean_beta_1);
+    println!(
+        "  Mean Unity Score: {:.4} (+/- {:.4})",
+        comparison.phenomenal_stats.mean_unity, comparison.phenomenal_stats.std_unity
+    );
+    println!(
+        "  Mean beta_0 (components): {:.2}",
+        comparison.phenomenal_stats.mean_beta_0
+    );
+    println!(
+        "  Mean beta_1 (cycles): {:.2}\n",
+        comparison.phenomenal_stats.mean_beta_1
+    );
 
     println!("Functional Concepts (n={}):", comparison.functional_stats.n);
-    println!("  Mean Unity Score: {:.4} (+/- {:.4})",
-             comparison.functional_stats.mean_unity,
-             comparison.functional_stats.std_unity);
-    println!("  Mean beta_0 (components): {:.2}", comparison.functional_stats.mean_beta_0);
-    println!("  Mean beta_1 (cycles): {:.2}\n", comparison.functional_stats.mean_beta_1);
+    println!(
+        "  Mean Unity Score: {:.4} (+/- {:.4})",
+        comparison.functional_stats.mean_unity, comparison.functional_stats.std_unity
+    );
+    println!(
+        "  Mean beta_0 (components): {:.2}",
+        comparison.functional_stats.mean_beta_0
+    );
+    println!(
+        "  Mean beta_1 (cycles): {:.2}\n",
+        comparison.functional_stats.mean_beta_1
+    );
 
     println!("Statistical Tests:");
-    println!("  Observed Difference: {:.4}", comparison.observed_difference);
+    println!(
+        "  Observed Difference: {:.4}",
+        comparison.observed_difference
+    );
     println!("  Cohen's d: {:.4}", comparison.cohens_d);
-    println!("  p-value: {:.4} (n={} permutations)", comparison.p_value, comparison.n_permutations);
+    println!(
+        "  p-value: {:.4} (n={} permutations)",
+        comparison.p_value, comparison.n_permutations
+    );
     println!("  Significant (p < 0.05): {}\n", comparison.is_significant);
 
     // Interpretation
@@ -190,7 +221,11 @@ fn run_experiment() -> Result<()> {
     } else {
         "large"
     };
-    println!("\nEffect size: {} (|d| = {:.2})\n", effect_size, comparison.cohens_d.abs());
+    println!(
+        "\nEffect size: {} (|d| = {:.2})\n",
+        effect_size,
+        comparison.cohens_d.abs()
+    );
 
     // Sample results
     println!("================================================================");
@@ -201,28 +236,34 @@ fn run_experiment() -> Result<()> {
     let mut sorted_phen = phenomenal_results.clone();
     sorted_phen.sort_by(|a, b| b.unity_score.partial_cmp(&a.unity_score).unwrap());
     for r in sorted_phen.iter().take(5) {
-        println!("  [{:.4}] {} - \"{}\"",
-                 r.unity_score,
-                 r.concept.category,
-                 truncate(&r.concept.text, 40));
+        println!(
+            "  [{:.4}] {} - \"{}\"",
+            r.unity_score,
+            r.concept.category,
+            truncate(&r.concept.text, 40)
+        );
     }
 
     println!("\nBottom 5 Phenomenal by Unity:");
     for r in sorted_phen.iter().rev().take(5) {
-        println!("  [{:.4}] {} - \"{}\"",
-                 r.unity_score,
-                 r.concept.category,
-                 truncate(&r.concept.text, 40));
+        println!(
+            "  [{:.4}] {} - \"{}\"",
+            r.unity_score,
+            r.concept.category,
+            truncate(&r.concept.text, 40)
+        );
     }
 
     println!("\nTop 5 Functional by Unity:");
     let mut sorted_func = functional_results.clone();
     sorted_func.sort_by(|a, b| b.unity_score.partial_cmp(&a.unity_score).unwrap());
     for r in sorted_func.iter().take(5) {
-        println!("  [{:.4}] {} - \"{}\"",
-                 r.unity_score,
-                 r.concept.category,
-                 truncate(&r.concept.text, 40));
+        println!(
+            "  [{:.4}] {} - \"{}\"",
+            r.unity_score,
+            r.concept.category,
+            truncate(&r.concept.text, 40)
+        );
     }
 
     println!("\n================================================================");
@@ -243,7 +284,7 @@ fn truncate(s: &str, max_len: usize) -> String {
 
 #[cfg(feature = "neural-bridge")]
 fn create_builtin_phenomenal_corpus() -> ConceptCorpus {
-    use symthaea::perception::{Concept, neural_bridge_consciousness_probe::CorpusMetadata};
+    use symthaea::perception::{neural_bridge_consciousness_probe::CorpusMetadata, Concept};
 
     ConceptCorpus {
         metadata: CorpusMetadata {
@@ -252,23 +293,73 @@ fn create_builtin_phenomenal_corpus() -> ConceptCorpus {
             hypothesis: "H1".to_string(),
         },
         concepts: vec![
-            Concept { id: "p1".into(), text: "The subjective experience of seeing red".into(), category: "qualia".into(), subcategory: "visual".into() },
-            Concept { id: "p2".into(), text: "What it is like to feel pain".into(), category: "qualia".into(), subcategory: "somatosensory".into() },
-            Concept { id: "p3".into(), text: "The taste of sweetness on my tongue".into(), category: "qualia".into(), subcategory: "gustatory".into() },
-            Concept { id: "p4".into(), text: "Self-awareness that I am thinking".into(), category: "self_awareness".into(), subcategory: "metacognition".into() },
-            Concept { id: "p5".into(), text: "The unified field of conscious awareness".into(), category: "unity".into(), subcategory: "binding".into() },
-            Concept { id: "p6".into(), text: "The felt quality of intense joy".into(), category: "emotion".into(), subcategory: "positive".into() },
-            Concept { id: "p7".into(), text: "The mysterious gap between brain and mind".into(), category: "philosophical".into(), subcategory: "hard_problem".into() },
-            Concept { id: "p8".into(), text: "The raw sensation of pressure on my skin".into(), category: "qualia".into(), subcategory: "tactile".into() },
-            Concept { id: "p9".into(), text: "Awareness of my own awareness".into(), category: "self_awareness".into(), subcategory: "metacognition".into() },
-            Concept { id: "p10".into(), text: "The phenomenal present moment in its fullness".into(), category: "unity".into(), subcategory: "temporal".into() },
+            Concept {
+                id: "p1".into(),
+                text: "The subjective experience of seeing red".into(),
+                category: "qualia".into(),
+                subcategory: "visual".into(),
+            },
+            Concept {
+                id: "p2".into(),
+                text: "What it is like to feel pain".into(),
+                category: "qualia".into(),
+                subcategory: "somatosensory".into(),
+            },
+            Concept {
+                id: "p3".into(),
+                text: "The taste of sweetness on my tongue".into(),
+                category: "qualia".into(),
+                subcategory: "gustatory".into(),
+            },
+            Concept {
+                id: "p4".into(),
+                text: "Self-awareness that I am thinking".into(),
+                category: "self_awareness".into(),
+                subcategory: "metacognition".into(),
+            },
+            Concept {
+                id: "p5".into(),
+                text: "The unified field of conscious awareness".into(),
+                category: "unity".into(),
+                subcategory: "binding".into(),
+            },
+            Concept {
+                id: "p6".into(),
+                text: "The felt quality of intense joy".into(),
+                category: "emotion".into(),
+                subcategory: "positive".into(),
+            },
+            Concept {
+                id: "p7".into(),
+                text: "The mysterious gap between brain and mind".into(),
+                category: "philosophical".into(),
+                subcategory: "hard_problem".into(),
+            },
+            Concept {
+                id: "p8".into(),
+                text: "The raw sensation of pressure on my skin".into(),
+                category: "qualia".into(),
+                subcategory: "tactile".into(),
+            },
+            Concept {
+                id: "p9".into(),
+                text: "Awareness of my own awareness".into(),
+                category: "self_awareness".into(),
+                subcategory: "metacognition".into(),
+            },
+            Concept {
+                id: "p10".into(),
+                text: "The phenomenal present moment in its fullness".into(),
+                category: "unity".into(),
+                subcategory: "temporal".into(),
+            },
         ],
     }
 }
 
 #[cfg(feature = "neural-bridge")]
 fn create_builtin_functional_corpus() -> ConceptCorpus {
-    use symthaea::perception::{Concept, neural_bridge_consciousness_probe::CorpusMetadata};
+    use symthaea::perception::{neural_bridge_consciousness_probe::CorpusMetadata, Concept};
 
     ConceptCorpus {
         metadata: CorpusMetadata {
@@ -277,16 +368,66 @@ fn create_builtin_functional_corpus() -> ConceptCorpus {
             hypothesis: "H1".to_string(),
         },
         concepts: vec![
-            Concept { id: "f1".into(), text: "Recursive function evaluation in programming".into(), category: "computation".into(), subcategory: "recursion".into() },
-            Concept { id: "f2".into(), text: "Memory allocation and deallocation in systems".into(), category: "computation".into(), subcategory: "memory".into() },
-            Concept { id: "f3".into(), text: "Binary search tree traversal algorithms".into(), category: "algorithms".into(), subcategory: "trees".into() },
-            Concept { id: "f4".into(), text: "Matrix multiplication operations".into(), category: "mathematics".into(), subcategory: "linear_algebra".into() },
-            Concept { id: "f5".into(), text: "Database query optimization execution".into(), category: "systems".into(), subcategory: "databases".into() },
-            Concept { id: "f6".into(), text: "Graph traversal using depth-first search".into(), category: "algorithms".into(), subcategory: "graphs".into() },
-            Concept { id: "f7".into(), text: "Statistical hypothesis testing procedures".into(), category: "mathematics".into(), subcategory: "statistics".into() },
-            Concept { id: "f8".into(), text: "Network packet routing algorithms".into(), category: "systems".into(), subcategory: "networking".into() },
-            Concept { id: "f9".into(), text: "Compiler lexical analysis and tokenization".into(), category: "computation".into(), subcategory: "compilers".into() },
-            Concept { id: "f10".into(), text: "Eigenvalue decomposition of matrices".into(), category: "mathematics".into(), subcategory: "linear_algebra".into() },
+            Concept {
+                id: "f1".into(),
+                text: "Recursive function evaluation in programming".into(),
+                category: "computation".into(),
+                subcategory: "recursion".into(),
+            },
+            Concept {
+                id: "f2".into(),
+                text: "Memory allocation and deallocation in systems".into(),
+                category: "computation".into(),
+                subcategory: "memory".into(),
+            },
+            Concept {
+                id: "f3".into(),
+                text: "Binary search tree traversal algorithms".into(),
+                category: "algorithms".into(),
+                subcategory: "trees".into(),
+            },
+            Concept {
+                id: "f4".into(),
+                text: "Matrix multiplication operations".into(),
+                category: "mathematics".into(),
+                subcategory: "linear_algebra".into(),
+            },
+            Concept {
+                id: "f5".into(),
+                text: "Database query optimization execution".into(),
+                category: "systems".into(),
+                subcategory: "databases".into(),
+            },
+            Concept {
+                id: "f6".into(),
+                text: "Graph traversal using depth-first search".into(),
+                category: "algorithms".into(),
+                subcategory: "graphs".into(),
+            },
+            Concept {
+                id: "f7".into(),
+                text: "Statistical hypothesis testing procedures".into(),
+                category: "mathematics".into(),
+                subcategory: "statistics".into(),
+            },
+            Concept {
+                id: "f8".into(),
+                text: "Network packet routing algorithms".into(),
+                category: "systems".into(),
+                subcategory: "networking".into(),
+            },
+            Concept {
+                id: "f9".into(),
+                text: "Compiler lexical analysis and tokenization".into(),
+                category: "computation".into(),
+                subcategory: "compilers".into(),
+            },
+            Concept {
+                id: "f10".into(),
+                text: "Eigenvalue decomposition of matrices".into(),
+                category: "mathematics".into(),
+                subcategory: "linear_algebra".into(),
+            },
         ],
     }
 }

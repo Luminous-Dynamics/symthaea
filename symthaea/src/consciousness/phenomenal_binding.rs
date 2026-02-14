@@ -995,7 +995,7 @@ mod tests {
             ConsciousnessDimension::Workspace,
         );
 
-        assert!(coherence >= 0.0 && coherence <= 1.0);
+        assert!((0.0..=1.0).contains(&coherence));
     }
 
     #[test]

@@ -38,7 +38,9 @@ impl fmt::Debug for HV16 {
 impl HV16 {
     /// Create a zero hypervector
     pub fn zero() -> Self {
-        Self { words: [0u128; HDC_WORDS] }
+        Self {
+            words: [0u128; HDC_WORDS],
+        }
     }
 
     /// Create a random hypervector from a seed string using BLAKE3
@@ -362,7 +364,11 @@ impl HV16 {
     ///
     /// Uses majority voting: each group of 8 bits votes for 1 output bit.
     pub fn from_core_bytes(bytes: &[u8]) -> Self {
-        assert!(bytes.len() >= CORE_HDC_DIM / 8, "Need at least {} bytes", CORE_HDC_DIM / 8);
+        assert!(
+            bytes.len() >= CORE_HDC_DIM / 8,
+            "Need at least {} bytes",
+            CORE_HDC_DIM / 8
+        );
 
         let mut result = Self::zero();
 
@@ -409,7 +415,11 @@ impl HV16 {
     ///
     /// Compresses back to 2048-bit HV16 using majority voting.
     pub fn from_core_continuous(values: &[f32]) -> Self {
-        assert!(values.len() >= CORE_HDC_DIM, "Need at least {} values", CORE_HDC_DIM);
+        assert!(
+            values.len() >= CORE_HDC_DIM,
+            "Need at least {} values",
+            CORE_HDC_DIM
+        );
 
         let mut result = Self::zero();
 
@@ -546,27 +556,45 @@ mod tests {
         let c_exp = c.expand_to_core();
 
         // Calculate expanded similarities (Hamming-based)
-        let hamming_ab: u32 = a_exp.iter()
+        let hamming_ab: u32 = a_exp
+            .iter()
             .zip(b_exp.iter())
             .map(|(x, y)| (x ^ y).count_ones())
             .sum();
         let exp_sim_a_b = 1.0 - (2.0 * hamming_ab as f32 / CORE_HDC_DIM as f32);
 
-        let hamming_ac: u32 = a_exp.iter()
+        let hamming_ac: u32 = a_exp
+            .iter()
             .zip(c_exp.iter())
             .map(|(x, y)| (x ^ y).count_ones())
             .sum();
         let exp_sim_a_c = 1.0 - (2.0 * hamming_ac as f32 / CORE_HDC_DIM as f32);
 
-        let hamming_bc: u32 = b_exp.iter()
+        let hamming_bc: u32 = b_exp
+            .iter()
             .zip(c_exp.iter())
             .map(|(x, y)| (x ^ y).count_ones())
             .sum();
         let exp_sim_b_c = 1.0 - (2.0 * hamming_bc as f32 / CORE_HDC_DIM as f32);
 
         // Expanded similarities should match original (within tolerance due to expansion)
-        assert!((sim_a_b - exp_sim_a_b).abs() < 0.01, "A-B: {} vs {}", sim_a_b, exp_sim_a_b);
-        assert!((sim_a_c - exp_sim_a_c).abs() < 0.01, "A-C: {} vs {}", sim_a_c, exp_sim_a_c);
-        assert!((sim_b_c - exp_sim_b_c).abs() < 0.01, "B-C: {} vs {}", sim_b_c, exp_sim_b_c);
+        assert!(
+            (sim_a_b - exp_sim_a_b).abs() < 0.01,
+            "A-B: {} vs {}",
+            sim_a_b,
+            exp_sim_a_b
+        );
+        assert!(
+            (sim_a_c - exp_sim_a_c).abs() < 0.01,
+            "A-C: {} vs {}",
+            sim_a_c,
+            exp_sim_a_c
+        );
+        assert!(
+            (sim_b_c - exp_sim_b_c).abs() < 0.01,
+            "B-C: {} vs {}",
+            sim_b_c,
+            exp_sim_b_c
+        );
     }
 }

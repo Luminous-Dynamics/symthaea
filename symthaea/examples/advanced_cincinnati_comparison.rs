@@ -7,11 +7,11 @@
 //!
 //! Run with: cargo run --example advanced_cincinnati_comparison
 
-use symthaea::hdc::cincinnati_ltc::CincinnatiLtcEngine;
-use symthaea::hdc::cincinnati_enhanced::EnhancedCincinnatiEngine;
-use symthaea::hdc::cincinnati_advanced::AdvancedCincinnatiEngine;
-use symthaea::hdc::unified_hv::ContinuousHV;
 use std::f64::consts::PI;
+use symthaea::hdc::cincinnati_advanced::AdvancedCincinnatiEngine;
+use symthaea::hdc::cincinnati_enhanced::EnhancedCincinnatiEngine;
+use symthaea::hdc::cincinnati_ltc::CincinnatiLtcEngine;
+use symthaea::hdc::unified_hv::ContinuousHV;
 
 // =============================================================================
 // SIGNAL GENERATORS
@@ -107,7 +107,13 @@ fn generate_respiratory(sample_rate: f64, duration: f64) -> Vec<f64> {
 fn generate_square_wave(sample_rate: f64, duration: f64, half_period: usize) -> Vec<f64> {
     let n = (sample_rate * duration) as usize;
     (0..n)
-        .map(|i| if (i / half_period) % 2 == 0 { 1.0 } else { -1.0 })
+        .map(|i| {
+            if (i / half_period) % 2 == 0 {
+                1.0
+            } else {
+                -1.0
+            }
+        })
         .collect()
 }
 
@@ -160,7 +166,7 @@ fn generate_lorenz(length: usize, dt: f64) -> Vec<f64> {
             y += dy * dt;
             z += dz * dt;
 
-            x / 20.0  // Normalize
+            x / 20.0 // Normalize
         })
         .collect()
 }
@@ -198,7 +204,10 @@ fn test_baseline(signal: &[f64], _name: &str) -> f64 {
 
         let node_count = engine.node_count();
         while node_states.len() < node_count {
-            node_states.push(ContinuousHV::random(1024, (node_states.len() * 1000 + i) as u64));
+            node_states.push(ContinuousHV::random(
+                1024,
+                (node_states.len() * 1000 + i) as u64,
+            ));
         }
 
         for node_id in 0..node_count {
@@ -209,7 +218,11 @@ fn test_baseline(signal: &[f64], _name: &str) -> f64 {
         let _ = engine.process_budding(&node_states[..node_count], i as f64);
     }
 
-    if total > 0 { correct as f64 / total as f64 } else { 0.5 }
+    if total > 0 {
+        correct as f64 / total as f64
+    } else {
+        0.5
+    }
 }
 
 fn test_enhanced(signal: &[f64], sample_rate: f32, _name: &str) -> f64 {
@@ -243,7 +256,9 @@ fn test_advanced(signal: &[f64], sample_rate: f32, _name: &str) -> (f64, bool, f
 // =============================================================================
 
 fn main() {
-    println!("{}", r#"
+    println!(
+        "{}",
+        r#"
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║              ADVANCED CINCINNATI-LTC COMPARISON                              ║
 ║                                                                              ║
@@ -252,30 +267,56 @@ fn main() {
 ║    2. Enhanced: + Multi-scale + amplitude + attention                        ║
 ║    3. Advanced: + Chaos detection + adaptive weights + memory horizon        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
-"#);
+"#
+    );
 
     let sample_rate = 250.0;
     let duration = 4.0;
 
     // Standard test signals
     let signals: Vec<(&str, Vec<f64>, bool)> = vec![
-        ("EEG Alpha (10 Hz)", generate_alpha(sample_rate, duration), false),
-        ("EEG Beta (20 Hz)", generate_beta(sample_rate, duration), false),
-        ("EEG Gamma (40 Hz)", generate_gamma(sample_rate, duration), false),
+        (
+            "EEG Alpha (10 Hz)",
+            generate_alpha(sample_rate, duration),
+            false,
+        ),
+        (
+            "EEG Beta (20 Hz)",
+            generate_beta(sample_rate, duration),
+            false,
+        ),
+        (
+            "EEG Gamma (40 Hz)",
+            generate_gamma(sample_rate, duration),
+            false,
+        ),
         ("HRV (1.2 Hz)", generate_hrv(sample_rate, duration), false),
-        ("Respiratory", generate_respiratory(sample_rate, duration), false),
-        ("Square Wave (p=8)", generate_square_wave(sample_rate, duration, 4), false),
+        (
+            "Respiratory",
+            generate_respiratory(sample_rate, duration),
+            false,
+        ),
+        (
+            "Square Wave (p=8)",
+            generate_square_wave(sample_rate, duration, 4),
+            false,
+        ),
         ("Logistic r=3.2", generate_logistic(3.2, 1000), false),
-        ("Logistic r=3.8", generate_logistic(3.8, 1000), true),  // Chaotic!
-        ("Henon Map", generate_henon(1000), true),                // Chaotic!
-        ("Lorenz System", generate_lorenz(1000, 0.01), true),     // Chaotic!
+        ("Logistic r=3.8", generate_logistic(3.8, 1000), true), // Chaotic!
+        ("Henon Map", generate_henon(1000), true),              // Chaotic!
+        ("Lorenz System", generate_lorenz(1000, 0.01), true),   // Chaotic!
     ];
 
     // Header
     println!("\n{:=^90}", " ACCURACY COMPARISON ");
-    println!("\n{:<20} │ {:>10} │ {:>10} │ {:>10} │ {:>8} │ {:>8}",
-             "Signal", "Baseline", "Enhanced", "Advanced", "Δ Enh", "Δ Adv");
-    println!("{:─<20}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}─┼─{:─^8}─┼─{:─^8}", "", "", "", "", "", "");
+    println!(
+        "\n{:<20} │ {:>10} │ {:>10} │ {:>10} │ {:>8} │ {:>8}",
+        "Signal", "Baseline", "Enhanced", "Advanced", "Δ Enh", "Δ Adv"
+    );
+    println!(
+        "{:─<20}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}─┼─{:─^8}─┼─{:─^8}",
+        "", "", "", "", "", ""
+    );
 
     let mut totals = (0.0, 0.0, 0.0);
     let mut count = 0;
@@ -283,18 +324,21 @@ fn main() {
     for (name, signal, _expected_chaotic) in &signals {
         let baseline = test_baseline(signal, name);
         let enhanced = test_enhanced(signal, sample_rate as f32, name);
-        let (advanced, _is_chaotic, _lyap, _weights) = test_advanced(signal, sample_rate as f32, name);
+        let (advanced, _is_chaotic, _lyap, _weights) =
+            test_advanced(signal, sample_rate as f32, name);
 
         let delta_enh = (enhanced - baseline) * 100.0;
         let delta_adv = (advanced - baseline) * 100.0;
 
-        println!("{:<20} │ {:>9.1}% │ {:>9.1}% │ {:>9.1}% │ {:>+7.1}% │ {:>+7.1}%",
-                 name,
-                 baseline * 100.0,
-                 enhanced * 100.0,
-                 advanced * 100.0,
-                 delta_enh,
-                 delta_adv);
+        println!(
+            "{:<20} │ {:>9.1}% │ {:>9.1}% │ {:>9.1}% │ {:>+7.1}% │ {:>+7.1}%",
+            name,
+            baseline * 100.0,
+            enhanced * 100.0,
+            advanced * 100.0,
+            delta_enh,
+            delta_adv
+        );
 
         totals.0 += baseline;
         totals.1 += enhanced;
@@ -302,36 +346,55 @@ fn main() {
         count += 1;
     }
 
-    println!("{:─<20}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}─┼─{:─^8}─┼─{:─^8}", "", "", "", "", "", "");
+    println!(
+        "{:─<20}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}─┼─{:─^8}─┼─{:─^8}",
+        "", "", "", "", "", ""
+    );
 
     let avg_baseline = totals.0 / count as f64;
     let avg_enhanced = totals.1 / count as f64;
     let avg_advanced = totals.2 / count as f64;
 
-    println!("{:<20} │ {:>9.1}% │ {:>9.1}% │ {:>9.1}% │ {:>+7.1}% │ {:>+7.1}%",
-             "AVERAGE",
-             avg_baseline * 100.0,
-             avg_enhanced * 100.0,
-             avg_advanced * 100.0,
-             (avg_enhanced - avg_baseline) * 100.0,
-             (avg_advanced - avg_baseline) * 100.0);
+    println!(
+        "{:<20} │ {:>9.1}% │ {:>9.1}% │ {:>9.1}% │ {:>+7.1}% │ {:>+7.1}%",
+        "AVERAGE",
+        avg_baseline * 100.0,
+        avg_enhanced * 100.0,
+        avg_advanced * 100.0,
+        (avg_enhanced - avg_baseline) * 100.0,
+        (avg_advanced - avg_baseline) * 100.0
+    );
 
     // Chaos detection results
     println!("\n{:=^90}", " CHAOS DETECTION ANALYSIS ");
-    println!("\n{:<20} │ {:>12} │ {:>12} │ {:>10} │ {:>20}",
-             "Signal", "Expected", "Detected", "Lyapunov", "Branch Weights");
-    println!("{:─<20}─┼─{:─^12}─┼─{:─^12}─┼─{:─^10}─┼─{:─^20}", "", "", "", "", "");
+    println!(
+        "\n{:<20} │ {:>12} │ {:>12} │ {:>10} │ {:>20}",
+        "Signal", "Expected", "Detected", "Lyapunov", "Branch Weights"
+    );
+    println!(
+        "{:─<20}─┼─{:─^12}─┼─{:─^12}─┼─{:─^10}─┼─{:─^20}",
+        "", "", "", "", ""
+    );
 
     for (name, signal, expected_chaotic) in &signals {
         let (_acc, is_chaotic, lyap, weights) = test_advanced(signal, sample_rate as f32, name);
 
-        let expected_str = if *expected_chaotic { "Chaotic" } else { "Regular" };
+        let expected_str = if *expected_chaotic {
+            "Chaotic"
+        } else {
+            "Regular"
+        };
         let detected_str = if is_chaotic { "Chaotic ✓" } else { "Regular" };
-        let status = if is_chaotic == *expected_chaotic { "" } else { " ⚠" };
+        let status = if is_chaotic == *expected_chaotic {
+            ""
+        } else {
+            " ⚠"
+        };
 
-        println!("{:<20} │ {:>12} │ {:>10}{} │ {:>+9.4} │ [{:.2}, {:.2}, {:.2}]",
-                 name, expected_str, detected_str, status, lyap,
-                 weights[0], weights[1], weights[2]);
+        println!(
+            "{:<20} │ {:>12} │ {:>10}{} │ {:>+9.4} │ [{:.2}, {:.2}, {:.2}]",
+            name, expected_str, detected_str, status, lyap, weights[0], weights[1], weights[2]
+        );
     }
 
     // Focus on chaotic signals improvement
@@ -343,9 +406,14 @@ fn main() {
         ("Lorenz System", generate_lorenz(1000, 0.01)),
     ];
 
-    println!("\n{:<20} │ {:>10} │ {:>10} │ {:>10} │ {:>15}",
-             "Chaotic Signal", "Baseline", "Enhanced", "Advanced", "Improvement");
-    println!("{:─<20}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}─┼─{:─^15}", "", "", "", "", "");
+    println!(
+        "\n{:<20} │ {:>10} │ {:>10} │ {:>10} │ {:>15}",
+        "Chaotic Signal", "Baseline", "Enhanced", "Advanced", "Improvement"
+    );
+    println!(
+        "{:─<20}─┼─{:─^10}─┼─{:─^10}─┼─{:─^10}─┼─{:─^15}",
+        "", "", "", "", ""
+    );
 
     for (name, signal) in &chaotic_signals {
         let baseline = test_baseline(signal, name);
@@ -354,17 +422,20 @@ fn main() {
 
         let improvement = (advanced - baseline) * 100.0;
 
-        println!("{:<20} │ {:>9.1}% │ {:>9.1}% │ {:>9.1}% │ {:>+14.1}%",
-                 name,
-                 baseline * 100.0,
-                 enhanced * 100.0,
-                 advanced * 100.0,
-                 improvement);
+        println!(
+            "{:<20} │ {:>9.1}% │ {:>9.1}% │ {:>9.1}% │ {:>+14.1}%",
+            name,
+            baseline * 100.0,
+            enhanced * 100.0,
+            advanced * 100.0,
+            improvement
+        );
     }
 
     // Summary
     println!("\n{:=^90}", " SUMMARY ");
-    println!(r#"
+    println!(
+        r#"
 Implementation Progression:
 
   BASELINE (Original)     ENHANCED (+27%)          ADVANCED (+?%)
@@ -395,17 +466,28 @@ Key Improvements in Advanced:
 4. AMPLITUDE-WEIGHTED LEARNING
    - High amplitude = faster learning
    - Focuses on significant transitions
-"#);
+"#
+    );
 
     let improvement_overall = (avg_advanced - avg_baseline) * 100.0;
     let improvement_vs_enhanced = (avg_advanced - avg_enhanced) * 100.0;
 
     println!("\n  Results:");
-    println!("  ├─ Baseline → Enhanced:  {:>+6.1}%", (avg_enhanced - avg_baseline) * 100.0);
-    println!("  ├─ Enhanced → Advanced:  {:>+6.1}%", improvement_vs_enhanced);
+    println!(
+        "  ├─ Baseline → Enhanced:  {:>+6.1}%",
+        (avg_enhanced - avg_baseline) * 100.0
+    );
+    println!(
+        "  ├─ Enhanced → Advanced:  {:>+6.1}%",
+        improvement_vs_enhanced
+    );
     println!("  └─ Baseline → Advanced:  {:>+6.1}%", improvement_overall);
 
     println!("\n╔══════════════════════════════════════════════════════════════════════════════════════╗");
-    println!("║                      ADVANCED COMPARISON COMPLETE                                    ║");
-    println!("╚══════════════════════════════════════════════════════════════════════════════════════╝");
+    println!(
+        "║                      ADVANCED COMPARISON COMPLETE                                    ║"
+    );
+    println!(
+        "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+    );
 }

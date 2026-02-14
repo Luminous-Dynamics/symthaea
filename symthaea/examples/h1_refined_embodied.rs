@@ -8,10 +8,10 @@
 //! - consciousness_unity (phenomenal but low unity - abstract)
 //! - machine_learning (functional but high unity - bridges both domains)
 
-use std::time::Instant;
-use std::path::Path;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
+use std::time::Instant;
 
 use anyhow::Result;
 use serde::Deserialize;
@@ -55,27 +55,39 @@ fn run_refined_analysis() -> Result<()> {
     println!("================================================================\n");
 
     // Load corpora
-    let phenomenal_corpus: ConceptCorpus = serde_json::from_reader(
-        BufReader::new(File::open("data/consciousness_probe/phenomenal_concepts_expanded.json")?)
-    )?;
-    let functional_corpus: ConceptCorpus = serde_json::from_reader(
-        BufReader::new(File::open("data/consciousness_probe/functional_concepts_expanded.json")?)
-    )?;
+    let phenomenal_corpus: ConceptCorpus = serde_json::from_reader(BufReader::new(File::open(
+        "data/consciousness_probe/phenomenal_concepts_expanded.json",
+    )?))?;
+    let functional_corpus: ConceptCorpus = serde_json::from_reader(BufReader::new(File::open(
+        "data/consciousness_probe/functional_concepts_expanded.json",
+    )?))?;
 
     // Filter to sensory/embodied categories (high-unity phenomenal)
     let sensory_categories = vec!["qualia", "self_awareness", "aesthetic", "emotion"];
-    let sensory_concepts: Vec<_> = phenomenal_corpus.concepts.iter()
+    let sensory_concepts: Vec<_> = phenomenal_corpus
+        .concepts
+        .iter()
         .filter(|c| sensory_categories.contains(&c.category.as_str()))
         .collect();
 
     // Filter to abstract/procedural categories (low-unity functional)
     let procedural_categories = vec!["computation", "engineering", "systems"];
-    let procedural_concepts: Vec<_> = functional_corpus.concepts.iter()
+    let procedural_concepts: Vec<_> = functional_corpus
+        .concepts
+        .iter()
         .filter(|c| procedural_categories.contains(&c.category.as_str()))
         .collect();
 
-    println!("Sensory/embodied concepts: {} (categories: {:?})", sensory_concepts.len(), sensory_categories);
-    println!("Abstract/procedural concepts: {} (categories: {:?})\n", procedural_concepts.len(), procedural_categories);
+    println!(
+        "Sensory/embodied concepts: {} (categories: {:?})",
+        sensory_concepts.len(),
+        sensory_categories
+    );
+    println!(
+        "Abstract/procedural concepts: {} (categories: {:?})\n",
+        procedural_concepts.len(),
+        procedural_categories
+    );
 
     // Load probe
     let probe_path = Path::new("models/neural_bridge/probe_weights_bge_m3.npy");
@@ -112,7 +124,11 @@ fn run_refined_analysis() -> Result<()> {
             sensory_scores.push(score);
         }
     }
-    println!("  Completed {} concepts in {:.2}s\n", sensory_scores.len(), start.elapsed().as_secs_f64());
+    println!(
+        "  Completed {} concepts in {:.2}s\n",
+        sensory_scores.len(),
+        start.elapsed().as_secs_f64()
+    );
 
     // Analyze procedural concepts
     println!("Analyzing abstract/procedural concepts...");
@@ -123,7 +139,11 @@ fn run_refined_analysis() -> Result<()> {
             procedural_scores.push(score);
         }
     }
-    println!("  Completed {} concepts in {:.2}s\n", procedural_scores.len(), start.elapsed().as_secs_f64());
+    println!(
+        "  Completed {} concepts in {:.2}s\n",
+        procedural_scores.len(),
+        start.elapsed().as_secs_f64()
+    );
 
     // Statistics
     let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
@@ -151,7 +171,11 @@ fn run_refined_analysis() -> Result<()> {
 
     let diff = sensory_mean - procedural_mean;
     let pooled_std = ((sensory_std.powi(2) + procedural_std.powi(2)) / 2.0).sqrt();
-    let cohens_d = if pooled_std > 0.0 { diff / pooled_std } else { 0.0 };
+    let cohens_d = if pooled_std > 0.0 {
+        diff / pooled_std
+    } else {
+        0.0
+    };
 
     println!("\nEffect:");
     println!("  Difference: {:.4}", diff);
@@ -161,7 +185,11 @@ fn run_refined_analysis() -> Result<()> {
     println!("\nRunning permutation test (n=10000)...");
     use rand::seq::SliceRandom;
     let mut rng = rand::thread_rng();
-    let all_scores: Vec<f64> = sensory_scores.iter().chain(procedural_scores.iter()).copied().collect();
+    let all_scores: Vec<f64> = sensory_scores
+        .iter()
+        .chain(procedural_scores.iter())
+        .copied()
+        .collect();
     let n_sensory = sensory_scores.len();
     let n_perms = 10000;
     let mut extreme_count = 0;
@@ -169,8 +197,14 @@ fn run_refined_analysis() -> Result<()> {
     for _ in 0..n_perms {
         let mut indices: Vec<usize> = (0..all_scores.len()).collect();
         indices.shuffle(&mut rng);
-        let perm_sensory: Vec<f64> = indices[..n_sensory].iter().map(|&i| all_scores[i]).collect();
-        let perm_proc: Vec<f64> = indices[n_sensory..].iter().map(|&i| all_scores[i]).collect();
+        let perm_sensory: Vec<f64> = indices[..n_sensory]
+            .iter()
+            .map(|&i| all_scores[i])
+            .collect();
+        let perm_proc: Vec<f64> = indices[n_sensory..]
+            .iter()
+            .map(|&i| all_scores[i])
+            .collect();
         let perm_diff = mean(&perm_sensory) - mean(&perm_proc);
         if perm_diff.abs() >= diff.abs() {
             extreme_count += 1;
@@ -200,10 +234,15 @@ fn run_refined_analysis() -> Result<()> {
     println!("  95% CI: [{:.4}, {:.4}]", ci_lower, ci_upper);
     println!("  CI excludes zero: {}", ci_lower > 0.0 || ci_upper < 0.0);
 
-    let effect_size = if cohens_d.abs() < 0.2 { "negligible" }
-                      else if cohens_d.abs() < 0.5 { "small" }
-                      else if cohens_d.abs() < 0.8 { "medium" }
-                      else { "large" };
+    let effect_size = if cohens_d.abs() < 0.2 {
+        "negligible"
+    } else if cohens_d.abs() < 0.5 {
+        "small"
+    } else if cohens_d.abs() < 0.8 {
+        "medium"
+    } else {
+        "large"
+    };
 
     println!("\n================================================================");
     println!("   SUMMARY");

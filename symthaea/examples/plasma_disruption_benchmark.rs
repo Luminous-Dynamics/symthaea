@@ -45,12 +45,11 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
+use symthaea::hdc::tiered_phi::{ApproximationTier, TieredPhi};
 use symthaea::physics::cmod_adapter::{
-    CModHdcEncoder, CModSample, CModShot,
-    DisruptionLabel, SensorNormalizer, SyntheticConfig,
-    compute_statistics, generate_synthetic_data, load_csv, to_cmod_plasma_sample,
+    compute_statistics, generate_synthetic_data, load_csv, to_cmod_plasma_sample, CModHdcEncoder,
+    CModSample, CModShot, DisruptionLabel, SensorNormalizer, SyntheticConfig,
 };
-use symthaea::hdc::tiered_phi::{TieredPhi, ApproximationTier};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
 // =============================================================================
@@ -191,10 +190,12 @@ impl BenchmarkResult {
             let sum: f64 = self.warning_times_ms.iter().sum();
             self.mean_warning_time_ms = sum / self.warning_times_ms.len() as f64;
 
-            let variance: f64 = self.warning_times_ms
+            let variance: f64 = self
+                .warning_times_ms
                 .iter()
                 .map(|t| (t - self.mean_warning_time_ms).powi(2))
-                .sum::<f64>() / self.warning_times_ms.len() as f64;
+                .sum::<f64>()
+                / self.warning_times_ms.len() as f64;
             self.std_warning_time_ms = variance.sqrt();
         }
 
@@ -312,11 +313,7 @@ fn check_threshold_alert(sample: &CModSample, config: &ThresholdConfig) -> bool 
 }
 
 /// Method 2: Rate-of-change prediction
-fn check_rate_alert(
-    sample: &CModSample,
-    prev: &CModSample,
-    config: &RateConfig,
-) -> bool {
+fn check_rate_alert(sample: &CModSample, prev: &CModSample, config: &RateConfig) -> bool {
     let dt = (sample.time_ms - prev.time_ms).max(0.001);
 
     // dIp/dt
@@ -348,11 +345,7 @@ fn check_rate_alert(
 }
 
 /// Method 3: Phi-based prediction
-fn check_phi_alert(
-    phi: f64,
-    phi_history: &[(f64, f64)],
-    config: &PhiConfig,
-) -> bool {
+fn check_phi_alert(phi: f64, phi_history: &[(f64, f64)], config: &PhiConfig) -> bool {
     // Check absolute threshold
     if phi < config.phi_threshold {
         return true;
@@ -411,14 +404,18 @@ fn run_benchmark(shots: &[CModShot], config: &BenchmarkConfig) -> Vec<BenchmarkR
             }
 
             // === Method 1: Threshold-based ===
-            if !threshold_state.alerted && check_threshold_alert(sample, &config.threshold_critical_sensors) {
+            if !threshold_state.alerted
+                && check_threshold_alert(sample, &config.threshold_critical_sensors)
+            {
                 threshold_state.alerted = true;
                 threshold_state.alert_time_ms = Some(sample.time_ms);
             }
 
             // === Method 2: Rate-of-change ===
             if let Some(ref prev) = rate_state.prev_sample {
-                if !rate_state.alerted && check_rate_alert(sample, prev, &config.rate_critical_thresholds) {
+                if !rate_state.alerted
+                    && check_rate_alert(sample, prev, &config.rate_critical_thresholds)
+                {
                     rate_state.alerted = true;
                     rate_state.alert_time_ms = Some(sample.time_ms);
                 }
@@ -432,7 +429,8 @@ fn run_benchmark(shots: &[CModShot], config: &BenchmarkConfig) -> Vec<BenchmarkR
 
             // Convert ContinuousHV to BinaryHV for Phi calculation
             // We need multiple components for Phi, so we use the sensor-level encodings
-            let components: Vec<BinaryHV> = plasma_sample.sensors
+            let components: Vec<BinaryHV> = plasma_sample
+                .sensors
                 .iter()
                 .enumerate()
                 .map(|(idx, &val)| {
@@ -452,7 +450,9 @@ fn run_benchmark(shots: &[CModShot], config: &BenchmarkConfig) -> Vec<BenchmarkR
             }
 
             // Check Phi alert
-            if !phi_state.alerted && check_phi_alert(phi, &phi_state.phi_history, &config.phi_critical_thresholds) {
+            if !phi_state.alerted
+                && check_phi_alert(phi, &phi_state.phi_history, &config.phi_critical_thresholds)
+            {
                 phi_state.alerted = true;
                 phi_state.alert_time_ms = Some(sample.time_ms);
             }
@@ -466,13 +466,16 @@ fn run_benchmark(shots: &[CModShot], config: &BenchmarkConfig) -> Vec<BenchmarkR
         phi_result.processing_time_ms += processing_time / 3.0;
 
         // === Evaluate predictions ===
-        let evaluate_shot = |state: &ShotPredictionState, result: &mut BenchmarkResult, shot: &CModShot| {
+        let evaluate_shot = |state: &ShotPredictionState,
+                             result: &mut BenchmarkResult,
+                             shot: &CModShot| {
             if shot.disrupted {
                 if let Some(disruption_time) = shot.disruption_time_ms {
                     if state.alerted {
                         if let Some(alert_time) = state.alert_time_ms {
                             let warning_time = disruption_time - alert_time;
-                            if warning_time > 0.0 && warning_time <= config.warning_window_ms * 10.0 {
+                            if warning_time > 0.0 && warning_time <= config.warning_window_ms * 10.0
+                            {
                                 // True positive: predicted before disruption
                                 result.true_positives += 1;
                                 result.warning_times_ms.push(warning_time);
@@ -507,7 +510,9 @@ fn run_benchmark(shots: &[CModShot], config: &BenchmarkConfig) -> Vec<BenchmarkR
         // Track per-shot for comparison
         let get_warning_time = |state: &ShotPredictionState, shot: &CModShot| -> Option<f64> {
             if shot.disrupted {
-                if let (Some(alert), Some(disruption)) = (state.alert_time_ms, shot.disruption_time_ms) {
+                if let (Some(alert), Some(disruption)) =
+                    (state.alert_time_ms, shot.disruption_time_ms)
+                {
                     let warning = disruption - alert;
                     if warning > 0.0 {
                         return Some(warning);
@@ -547,7 +552,11 @@ fn compute_statistical_comparison(results: &[BenchmarkResult]) -> StatisticalCom
     let mut phi_earlier_count = 0;
     let mut total_comparisons = 0;
 
-    for i in 0..phi.warning_times_ms.len().min(threshold.warning_times_ms.len()) {
+    for i in 0..phi
+        .warning_times_ms
+        .len()
+        .min(threshold.warning_times_ms.len())
+    {
         total_comparisons += 1;
         if phi.warning_times_ms[i] > threshold.warning_times_ms[i] {
             phi_earlier_count += 1;
@@ -562,7 +571,8 @@ fn compute_statistical_comparison(results: &[BenchmarkResult]) -> StatisticalCom
 
     // Simple significance test: Phi is "significantly" earlier if it wins > 60% of comparisons
     let phi_earlier_than_threshold = phi_vs_threshold > 0.0 && phi_earlier_percentage > 60.0;
-    let phi_earlier_than_rate = phi_vs_rate > 0.0 && phi.mean_warning_time_ms > rate.mean_warning_time_ms;
+    let phi_earlier_than_rate =
+        phi_vs_rate > 0.0 && phi.mean_warning_time_ms > rate.mean_warning_time_ms;
 
     StatisticalComparison {
         phi_vs_threshold_warning_diff_ms: phi_vs_threshold,
@@ -585,27 +595,34 @@ fn print_comparison_table(results: &[BenchmarkResult]) {
     println!();
 
     // Header
-    println!("{:<20} {:>8} {:>8} {:>8} {:>8} {:>12} {:>10} {:>8}",
-             "Method", "TP", "FP", "FN", "TN", "Warning(ms)", "Precision", "F1");
+    println!(
+        "{:<20} {:>8} {:>8} {:>8} {:>8} {:>12} {:>10} {:>8}",
+        "Method", "TP", "FP", "FN", "TN", "Warning(ms)", "Precision", "F1"
+    );
     println!("{}", "-".repeat(94));
 
     // Results rows
     for result in results {
         let warning_str = if result.mean_warning_time_ms > 0.0 {
-            format!("{:.1} +/- {:.1}", result.mean_warning_time_ms, result.std_warning_time_ms)
+            format!(
+                "{:.1} +/- {:.1}",
+                result.mean_warning_time_ms, result.std_warning_time_ms
+            )
         } else {
             "N/A".to_string()
         };
 
-        println!("{:<20} {:>8} {:>8} {:>8} {:>8} {:>12} {:>10.3} {:>8.3}",
-                 result.method,
-                 result.true_positives,
-                 result.false_positives,
-                 result.false_negatives,
-                 result.true_negatives,
-                 warning_str,
-                 result.precision,
-                 result.f1_score);
+        println!(
+            "{:<20} {:>8} {:>8} {:>8} {:>8} {:>12} {:>10.3} {:>8.3}",
+            result.method,
+            result.true_positives,
+            result.false_positives,
+            result.false_negatives,
+            result.true_negatives,
+            warning_str,
+            result.precision,
+            result.f1_score
+        );
     }
 
     println!("{}", "-".repeat(94));
@@ -619,14 +636,37 @@ fn print_statistical_comparison(comparison: &StatisticalComparison) {
     println!();
 
     println!("Phi vs Threshold-based:");
-    println!("  Warning time difference: {:+.2} ms", comparison.phi_vs_threshold_warning_diff_ms);
-    println!("  Phi earlier in {:.1}% of shots", comparison.phi_earlier_percentage);
-    println!("  Statistically significant: {}", if comparison.phi_earlier_than_threshold { "YES" } else { "NO" });
+    println!(
+        "  Warning time difference: {:+.2} ms",
+        comparison.phi_vs_threshold_warning_diff_ms
+    );
+    println!(
+        "  Phi earlier in {:.1}% of shots",
+        comparison.phi_earlier_percentage
+    );
+    println!(
+        "  Statistically significant: {}",
+        if comparison.phi_earlier_than_threshold {
+            "YES"
+        } else {
+            "NO"
+        }
+    );
     println!();
 
     println!("Phi vs Rate-of-change:");
-    println!("  Warning time difference: {:+.2} ms", comparison.phi_vs_rate_warning_diff_ms);
-    println!("  Statistically significant: {}", if comparison.phi_earlier_than_rate { "YES" } else { "NO" });
+    println!(
+        "  Warning time difference: {:+.2} ms",
+        comparison.phi_vs_rate_warning_diff_ms
+    );
+    println!(
+        "  Statistically significant: {}",
+        if comparison.phi_earlier_than_rate {
+            "YES"
+        } else {
+            "NO"
+        }
+    );
     println!();
 
     if comparison.phi_earlier_than_threshold || comparison.phi_earlier_than_rate {
@@ -686,7 +726,10 @@ fn main() {
                     sample_interval_ms: 1.0,
                     seed: 42,
                 };
-                (generate_synthetic_data(&config), "Synthetic (100 shots, seed=42)".to_string())
+                (
+                    generate_synthetic_data(&config),
+                    "Synthetic (100 shots, seed=42)".to_string(),
+                )
             }
         }
     } else {
@@ -699,7 +742,10 @@ fn main() {
             sample_interval_ms: 1.0,
             seed: 42,
         };
-        (generate_synthetic_data(&config), "Synthetic (100 shots, seed=42)".to_string())
+        (
+            generate_synthetic_data(&config),
+            "Synthetic (100 shots, seed=42)".to_string(),
+        )
     };
 
     // Compute and display dataset statistics
@@ -707,9 +753,11 @@ fn main() {
     println!();
     println!("Dataset Statistics:");
     println!("  Total shots:       {}", stats.total_shots);
-    println!("  Disrupted shots:   {} ({:.1}%)",
-             stats.disrupted_shots,
-             100.0 * stats.disrupted_shots as f64 / stats.total_shots as f64);
+    println!(
+        "  Disrupted shots:   {} ({:.1}%)",
+        stats.disrupted_shots,
+        100.0 * stats.disrupted_shots as f64 / stats.total_shots as f64
+    );
     println!("  Non-disrupted:     {}", stats.non_disrupted_shots);
     println!("  Total samples:     {}", stats.total_samples);
     println!("  Data source:       {}", data_source);
@@ -719,8 +767,14 @@ fn main() {
     let config = BenchmarkConfig::default();
     println!("Running benchmark with configuration:");
     println!("  Warning window:    {} ms", config.warning_window_ms);
-    println!("  Phi threshold:     {}", config.phi_critical_thresholds.phi_threshold);
-    println!("  dPhi/dt threshold: {}/ms", config.phi_critical_thresholds.dphi_dt_threshold);
+    println!(
+        "  Phi threshold:     {}",
+        config.phi_critical_thresholds.phi_threshold
+    );
+    println!(
+        "  dPhi/dt threshold: {}/ms",
+        config.phi_critical_thresholds.dphi_dt_threshold
+    );
     println!();
 
     let start = Instant::now();
@@ -879,9 +933,8 @@ mod tests {
         assert!(check_phi_alert(0.2, &history_stable, &config));
 
         // Dropping Phi - alert
-        let history_dropping: Vec<(f64, f64)> = (0..10)
-            .map(|i| (i as f64, 0.8 - 0.05 * i as f64))
-            .collect();
+        let history_dropping: Vec<(f64, f64)> =
+            (0..10).map(|i| (i as f64, 0.8 - 0.05 * i as f64)).collect();
         assert!(check_phi_alert(0.4, &history_dropping, &config));
     }
 
@@ -897,7 +950,7 @@ mod tests {
         result.finalize();
 
         assert!((result.precision - 0.8).abs() < 0.01); // 8/(8+2) = 0.8
-        assert!((result.recall - 0.8).abs() < 0.01);    // 8/(8+2) = 0.8
+        assert!((result.recall - 0.8).abs() < 0.01); // 8/(8+2) = 0.8
         assert!((result.f1_score - 0.8).abs() < 0.01); // 2*0.8*0.8/(0.8+0.8) = 0.8
         assert!((result.mean_warning_time_ms - 54.0).abs() < 0.01);
     }

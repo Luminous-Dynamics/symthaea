@@ -4,26 +4,21 @@
 //! natural language input through the cognitive core.
 
 use clap::Parser;
-use symthaea_nix::cli::commands::{Cli, Command, OutputFormat, RebuildMode, ObserveDomain};
-use symthaea_nix::cli::interactive;
-use symthaea_nix::cli::completions;
 use symthaea_nix::action::executor::NixOSCommand;
-use symthaea_nix::action::service_manager::ServiceManager;
-use symthaea_nix::action::generation_manager::GenerationManager;
-use symthaea_nix::action::gc_manager::GcManager;
 use symthaea_nix::action::flake_ops::FlakeOps;
+use symthaea_nix::action::gc_manager::GcManager;
+use symthaea_nix::action::generation_manager::GenerationManager;
+use symthaea_nix::action::service_manager::ServiceManager;
+use symthaea_nix::cli::commands::{Cli, Command, ObserveDomain, OutputFormat, RebuildMode};
+use symthaea_nix::cli::completions;
+use symthaea_nix::cli::interactive;
 
 fn main() {
     let cli = Cli::parse();
 
     // Natural language input takes priority
     if cli.has_natural_input() {
-        interactive::process_oneshot(
-            &cli.natural_input(),
-            cli.dry_run,
-            cli.format,
-            cli.phi,
-        );
+        interactive::process_oneshot(&cli.natural_input(), cli.dry_run, cli.format, cli.phi);
         return;
     }
 
@@ -42,11 +37,19 @@ fn main() {
 
     // Dispatch subcommands
     match command {
-        Command::Search { query, options, limit } => {
+        Command::Search {
+            query,
+            options,
+            limit,
+        } => {
             cmd_search(&query, options, limit, cli.format);
         }
 
-        Command::Rebuild { mode, flake, extra_args } => {
+        Command::Rebuild {
+            mode,
+            flake,
+            extra_args,
+        } => {
             let cmd = match mode {
                 RebuildMode::Switch => NixOSCommand::RebuildSwitch { flake, extra_args },
                 RebuildMode::Test => NixOSCommand::RebuildTest { flake, extra_args },
@@ -72,7 +75,12 @@ fn main() {
             cmd_doctor(cli.format);
         }
 
-        Command::Generations { diff, from, to, delete_older_than } => {
+        Command::Generations {
+            diff,
+            from,
+            to,
+            delete_older_than,
+        } => {
             if let Some(days) = delete_older_than {
                 let cmd = GenerationManager::delete_older_than(days);
                 cmd_execute(cmd, cli.dry_run, cli.phi);
@@ -109,7 +117,11 @@ fn main() {
             }
         }
 
-        Command::Gc { analyze, older_than, aggressive } => {
+        Command::Gc {
+            analyze,
+            older_than,
+            aggressive,
+        } => {
             if analyze {
                 cmd_gc_analyze(cli.format);
             } else if aggressive {
@@ -167,29 +179,47 @@ fn main() {
 fn cmd_search(query: &str, options: bool, limit: usize, format: OutputFormat) {
     if options {
         // HDC semantic search over NixOS options
-        use symthaea_nix::encoding::{NixCodebook, search_options};
+        use symthaea_nix::encoding::{search_options, NixCodebook};
 
         let mut codebook = NixCodebook::new();
 
         // Common NixOS option paths for semantic search
         let known_paths = [
-            "services.nginx.enable", "services.nginx.package", "services.nginx.virtualHosts",
-            "services.postgresql.enable", "services.postgresql.package",
-            "services.openssh.enable", "services.openssh.settings.PermitRootLogin",
-            "services.pipewire.enable", "services.pipewire.alsa.enable",
-            "services.docker.enable", "services.podman.enable",
-            "services.xserver.enable", "services.xserver.displayManager.gdm.enable",
+            "services.nginx.enable",
+            "services.nginx.package",
+            "services.nginx.virtualHosts",
+            "services.postgresql.enable",
+            "services.postgresql.package",
+            "services.openssh.enable",
+            "services.openssh.settings.PermitRootLogin",
+            "services.pipewire.enable",
+            "services.pipewire.alsa.enable",
+            "services.docker.enable",
+            "services.podman.enable",
+            "services.xserver.enable",
+            "services.xserver.displayManager.gdm.enable",
             "services.xserver.desktopManager.gnome.enable",
-            "networking.firewall.enable", "networking.firewall.allowedTCPPorts",
-            "networking.networkmanager.enable", "networking.wireguard.enable",
-            "boot.loader.grub.enable", "boot.loader.systemd-boot.enable",
-            "hardware.opengl.enable", "hardware.nvidia.modesetting.enable",
-            "hardware.pulseaudio.enable", "hardware.bluetooth.enable",
-            "security.sudo.enable", "security.polkit.enable",
-            "users.users", "users.defaultUserShell",
-            "environment.systemPackages", "nixpkgs.config.allowUnfree",
-            "programs.zsh.enable", "programs.fish.enable", "programs.steam.enable",
-            "nix.gc.automatic", "nix.settings.experimental-features",
+            "networking.firewall.enable",
+            "networking.firewall.allowedTCPPorts",
+            "networking.networkmanager.enable",
+            "networking.wireguard.enable",
+            "boot.loader.grub.enable",
+            "boot.loader.systemd-boot.enable",
+            "hardware.opengl.enable",
+            "hardware.nvidia.modesetting.enable",
+            "hardware.pulseaudio.enable",
+            "hardware.bluetooth.enable",
+            "security.sudo.enable",
+            "security.polkit.enable",
+            "users.users",
+            "users.defaultUserShell",
+            "environment.systemPackages",
+            "nixpkgs.config.allowUnfree",
+            "programs.zsh.enable",
+            "programs.fish.enable",
+            "programs.steam.enable",
+            "nix.gc.automatic",
+            "nix.settings.experimental-features",
         ];
         let path_refs: Vec<&str> = known_paths.iter().copied().collect();
 
@@ -197,14 +227,20 @@ fn cmd_search(query: &str, options: bool, limit: usize, format: OutputFormat) {
 
         match format {
             OutputFormat::Json => {
-                let json_results: Vec<serde_json::Value> = results.iter().map(|r| {
-                    serde_json::json!({
-                        "path": r.path,
-                        "similarity": r.similarity,
-                        "reason": r.match_reason,
+                let json_results: Vec<serde_json::Value> = results
+                    .iter()
+                    .map(|r| {
+                        serde_json::json!({
+                            "path": r.path,
+                            "similarity": r.similarity,
+                            "reason": r.match_reason,
+                        })
                     })
-                }).collect();
-                println!("{}", serde_json::to_string_pretty(&json_results).unwrap_or_default());
+                    .collect();
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json_results).unwrap_or_default()
+                );
             }
             OutputFormat::Minimal => {
                 for r in &results {
@@ -244,7 +280,10 @@ fn cmd_execute(cmd: NixOSCommand, dry_run: bool, phi_override: Option<f64>) {
             "  Blocked: {:?} requires Phi >= {:.2}, current Phi = {:.2}",
             safety, required, phi
         );
-        eprintln!("  Use --phi={:.1} to override, or confirm explicitly.", required);
+        eprintln!(
+            "  Use --phi={:.1} to override, or confirm explicitly.",
+            required
+        );
         return;
     }
 
@@ -253,9 +292,7 @@ fn cmd_execute(cmd: NixOSCommand, dry_run: bool, phi_override: Option<f64>) {
         println!("  [DRY-RUN] Would execute: {} {}", bin, args.join(" "));
     } else {
         println!("  Executing: {} {}", bin, args.join(" "));
-        let status = std::process::Command::new(&bin)
-            .args(&args)
-            .status();
+        let status = std::process::Command::new(&bin).args(&args).status();
         match status {
             Ok(s) if s.success() => println!("  Done."),
             Ok(s) => {
@@ -276,15 +313,21 @@ fn cmd_observe(domain: Option<ObserveDomain>, format: OutputFormat) {
             match symthaea_nix::observe::systemd::SystemdObserver::list_units() {
                 Ok(units) => match format {
                     OutputFormat::Json => {
-                        let json: Vec<serde_json::Value> = units.iter().map(|u| {
-                            serde_json::json!({
-                                "name": u.name,
-                                "active_state": u.active_state,
-                                "sub_state": u.sub_state,
-                                "description": u.description,
+                        let json: Vec<serde_json::Value> = units
+                            .iter()
+                            .map(|u| {
+                                serde_json::json!({
+                                    "name": u.name,
+                                    "active_state": u.active_state,
+                                    "sub_state": u.sub_state,
+                                    "description": u.description,
+                                })
                             })
-                        }).collect();
-                        println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                            .collect();
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&json).unwrap_or_default()
+                        );
                     }
                     OutputFormat::Minimal => {
                         for unit in &units {
@@ -293,7 +336,10 @@ fn cmd_observe(domain: Option<ObserveDomain>, format: OutputFormat) {
                     }
                     _ => {
                         for unit in &units {
-                            println!("  {} {} {} {}", unit.name, unit.active_state, unit.sub_state, unit.description);
+                            println!(
+                                "  {} {} {} {}",
+                                unit.name, unit.active_state, unit.sub_state, unit.description
+                            );
                         }
                         println!("  {} units total", units.len());
                     }
@@ -311,7 +357,10 @@ fn cmd_observe(domain: Option<ObserveDomain>, format: OutputFormat) {
                             "total_size_bytes": info.total_size_bytes,
                             "deriver_count": info.deriver_count,
                         });
-                        println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&json).unwrap_or_default()
+                        );
                     }
                     OutputFormat::Minimal => {
                         println!("{}\t{}", info.path_count, info.total_size_bytes);
@@ -331,19 +380,26 @@ fn cmd_observe(domain: Option<ObserveDomain>, format: OutputFormat) {
             match symthaea_nix::observe::hardware::HardwareObserver::probe() {
                 Ok(info) => match format {
                     OutputFormat::Json => {
-                        let gpus: Vec<serde_json::Value> = info.gpus.iter().map(|g| {
-                            serde_json::json!({
-                                "name": g.name,
-                                "driver": g.driver,
+                        let gpus: Vec<serde_json::Value> = info
+                            .gpus
+                            .iter()
+                            .map(|g| {
+                                serde_json::json!({
+                                    "name": g.name,
+                                    "driver": g.driver,
+                                })
                             })
-                        }).collect();
+                            .collect();
                         let json = serde_json::json!({
                             "cpu_model": info.cpu_model,
                             "cpu_cores": info.cpu_cores,
                             "memory_total_mb": info.memory_total_mb,
                             "gpus": gpus,
                         });
-                        println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&json).unwrap_or_default()
+                        );
                     }
                     _ => {
                         println!("  CPU: {} ({} cores)", info.cpu_model, info.cpu_cores);
@@ -372,10 +428,14 @@ fn cmd_observe(domain: Option<ObserveDomain>, format: OutputFormat) {
                             "store_size_bytes": snap.store_size_bytes,
                             "store_path_count": snap.store_path_count,
                         });
-                        println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&json).unwrap_or_default()
+                        );
                     }
                     OutputFormat::Minimal => {
-                        println!("services={} gen={} store={}",
+                        println!(
+                            "services={} gen={} store={}",
                             snap.services.len(),
                             snap.generation.map_or("?".into(), |g| g.to_string()),
                             snap.store_size_bytes.unwrap_or(0),
@@ -461,7 +521,10 @@ fn cmd_doctor(format: OutputFormat) {
                     "config_settings": m.config_settings.len(),
                 })),
             });
-            println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json).unwrap_or_default()
+            );
         }
         _ => {
             println!("  Running system diagnostics...");
@@ -515,7 +578,9 @@ fn cmd_doctor(format: OutputFormat) {
             if let Some(ref mi) = module_info {
                 println!(
                     "  Config: {} imports, {} option decls, {} settings",
-                    mi.imports.len(), mi.option_decls.len(), mi.config_settings.len()
+                    mi.imports.len(),
+                    mi.option_decls.len(),
+                    mi.config_settings.len()
                 );
             }
 
@@ -528,21 +593,30 @@ fn cmd_generations_list(format: OutputFormat) {
     match GenerationManager::list() {
         Ok(gens) => match format {
             OutputFormat::Json => {
-                let json: Vec<serde_json::Value> = gens.iter().map(|g| {
-                    serde_json::json!({
-                        "number": g.number,
-                        "date": g.date,
-                        "nixos_version": g.nixos_version,
-                        "kernel_version": g.kernel_version,
-                        "current": g.current,
+                let json: Vec<serde_json::Value> = gens
+                    .iter()
+                    .map(|g| {
+                        serde_json::json!({
+                            "number": g.number,
+                            "date": g.date,
+                            "nixos_version": g.nixos_version,
+                            "kernel_version": g.kernel_version,
+                            "current": g.current,
+                        })
                     })
-                }).collect();
-                println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                    .collect();
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json).unwrap_or_default()
+                );
             }
             OutputFormat::Minimal => {
                 for gen in &gens {
                     let cur = if gen.current { "*" } else { "" };
-                    println!("{}{}\t{}\t{}", gen.number, cur, gen.nixos_version, gen.kernel_version);
+                    println!(
+                        "{}{}\t{}\t{}",
+                        gen.number, cur, gen.nixos_version, gen.kernel_version
+                    );
                 }
             }
             _ => {
@@ -563,17 +637,13 @@ fn cmd_generations_list(format: OutputFormat) {
 fn cmd_generations_diff(from: Option<u32>, to: Option<u32>) {
     let (from, to) = match (from, to) {
         (Some(f), Some(t)) => (f, t),
-        _ => {
-            match GenerationManager::list() {
-                Ok(gens) if gens.len() >= 2 => {
-                    (gens[1].number, gens[0].number)
-                }
-                _ => {
-                    eprintln!("  Need at least 2 generations for diff. Use --from and --to.");
-                    return;
-                }
+        _ => match GenerationManager::list() {
+            Ok(gens) if gens.len() >= 2 => (gens[1].number, gens[0].number),
+            _ => {
+                eprintln!("  Need at least 2 generations for diff. Use --from and --to.");
+                return;
             }
-        }
+        },
     };
 
     match GenerationManager::diff(from, to) {
@@ -621,12 +691,19 @@ fn cmd_gc_analyze(format: OutputFormat) {
                         "recommended": rec.recommended,
                         "reason": rec.reason,
                     });
-                    println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json).unwrap_or_default()
+                    );
                 }
                 _ => {
                     println!("  Store Analysis:");
                     println!("    Total:       {}", analysis.total_store_human());
-                    println!("    Reclaimable: {} ({:.0}%)", analysis.reclaimable_human(), analysis.reclaimable_percent());
+                    println!(
+                        "    Reclaimable: {} ({:.0}%)",
+                        analysis.reclaimable_human(),
+                        analysis.reclaimable_percent()
+                    );
                     println!("    Dead paths:  {}", analysis.dead_path_count);
                     println!("    Live roots:  {}", analysis.live_root_count);
                     println!("    Generations: {}", analysis.total_generations);
@@ -674,9 +751,15 @@ fn cmd_flake_info() {
 
         // Show lock info if available
         if let Some(ref lock) = project.lock_info {
-            println!("  Locked inputs ({}, lock v{}):", lock.inputs.len(), lock.version);
+            println!(
+                "  Locked inputs ({}, lock v{}):",
+                lock.inputs.len(),
+                lock.version
+            );
             for input in &lock.inputs {
-                let rev_short = input.rev.as_deref()
+                let rev_short = input
+                    .rev
+                    .as_deref()
                     .map(|r| if r.len() > 8 { &r[..8] } else { r })
                     .unwrap_or("?");
                 let source = match (&input.owner, &input.repo) {
@@ -706,26 +789,31 @@ fn cmd_flake_info() {
 
 fn cmd_service_status(name: &str, format: OutputFormat) {
     match ServiceManager::status(name) {
-        Ok(status) => {
-            match format {
-                OutputFormat::Json => {
-                    let json = serde_json::json!({
-                        "name": status.name,
-                        "active": status.active,
-                        "enabled": status.enabled,
-                        "active_state": status.active_state,
-                        "sub_state": status.sub_state,
-                    });
-                    println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
-                }
-                _ => {
-                    let indicator = if status.active { "active" } else { "inactive" };
-                    let enabled = if status.enabled { "enabled" } else { "disabled" };
-                    println!("  {} ({}, {})", status.name, indicator, enabled);
-                    println!("    State: {} ({})", status.active_state, status.sub_state);
-                }
+        Ok(status) => match format {
+            OutputFormat::Json => {
+                let json = serde_json::json!({
+                    "name": status.name,
+                    "active": status.active,
+                    "enabled": status.enabled,
+                    "active_state": status.active_state,
+                    "sub_state": status.sub_state,
+                });
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json).unwrap_or_default()
+                );
             }
-        }
+            _ => {
+                let indicator = if status.active { "active" } else { "inactive" };
+                let enabled = if status.enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                };
+                println!("  {} ({}, {})", status.name, indicator, enabled);
+                println!("    State: {} ({})", status.active_state, status.sub_state);
+            }
+        },
         Err(e) => eprintln!("  Failed to get status for {}: {}", name, e),
     }
 }
@@ -734,14 +822,20 @@ fn cmd_service_failed(format: OutputFormat) {
     match symthaea_nix::observe::systemd::SystemdObserver::failed_units() {
         Ok(units) => match format {
             OutputFormat::Json => {
-                let json: Vec<serde_json::Value> = units.iter().map(|u| {
-                    serde_json::json!({
-                        "name": u.name,
-                        "description": u.description,
-                        "sub_state": u.sub_state,
+                let json: Vec<serde_json::Value> = units
+                    .iter()
+                    .map(|u| {
+                        serde_json::json!({
+                            "name": u.name,
+                            "description": u.description,
+                            "sub_state": u.sub_state,
+                        })
                     })
-                }).collect();
-                println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                    .collect();
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json).unwrap_or_default()
+                );
             }
             OutputFormat::Minimal => {
                 for unit in &units {

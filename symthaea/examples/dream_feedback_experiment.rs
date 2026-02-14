@@ -22,8 +22,8 @@
 //! cargo run --example dream_feedback_experiment --release
 //! ```
 
-use std::collections::HashMap;
 use anyhow::Result;
+use std::collections::HashMap;
 
 // Import dream feedback types
 use symthaea::consciousness::recursive_improvement::dream_feedback::{
@@ -55,16 +55,31 @@ fn main() -> Result<()> {
     println!("════════════════════════════════════════════════════════════════\n");
 
     let control = run_simulation(n_contexts, n_cycles, 0.0, true_prior_strength, false);
-    println!("Control: Mean Brier = {:.4} ± {:.4}", control.mean_brier, control.brier_std);
+    println!(
+        "Control: Mean Brier = {:.4} ± {:.4}",
+        control.mean_brier, control.brier_std
+    );
 
     // Run treatment condition
     println!("\n════════════════════════════════════════════════════════════════");
     println!("   CONDITION 2: TREATMENT (With Dream Feedback)");
     println!("════════════════════════════════════════════════════════════════\n");
 
-    let treatment = run_simulation(n_contexts, n_cycles, dream_frequency, true_prior_strength, true);
-    println!("Treatment: Mean Brier = {:.4} ± {:.4}", treatment.mean_brier, treatment.brier_std);
-    println!("Dreams: {}, Priors learned: {}", treatment.dreams_generated, treatment.priors_learned);
+    let treatment = run_simulation(
+        n_contexts,
+        n_cycles,
+        dream_frequency,
+        true_prior_strength,
+        true,
+    );
+    println!(
+        "Treatment: Mean Brier = {:.4} ± {:.4}",
+        treatment.mean_brier, treatment.brier_std
+    );
+    println!(
+        "Dreams: {}, Priors learned: {}",
+        treatment.dreams_generated, treatment.priors_learned
+    );
 
     // Statistical analysis
     println!("\n════════════════════════════════════════════════════════════════");
@@ -75,13 +90,24 @@ fn main() -> Result<()> {
     let improvement_pct = (improvement / control.mean_brier) * 100.0;
 
     let pooled_std = ((control.brier_std.powi(2) + treatment.brier_std.powi(2)) / 2.0).sqrt();
-    let cohens_d = if pooled_std > 0.0 { improvement / pooled_std } else { 0.0 };
+    let cohens_d = if pooled_std > 0.0 {
+        improvement / pooled_std
+    } else {
+        0.0
+    };
 
     let (_, p_value) = mann_whitney_u(&control.brier_scores, &treatment.brier_scores);
 
-    println!("Brier Score Improvement: {:+.4} ({:+.1}%)", improvement, improvement_pct);
+    println!(
+        "Brier Score Improvement: {:+.4} ({:+.1}%)",
+        improvement, improvement_pct
+    );
     println!("Cohen's d: {:+.3}", cohens_d);
-    println!("p-value: {:.4} {}", p_value, if p_value < 0.05 { "*" } else { "" });
+    println!(
+        "p-value: {:.4} {}",
+        p_value,
+        if p_value < 0.05 { "*" } else { "" }
+    );
 
     println!("\n════════════════════════════════════════════════════════════════");
     if improvement > 0.0 && p_value < 0.05 {
@@ -124,7 +150,10 @@ fn run_simulation(
 
     for _ in 0..n_cycles {
         let context_hash = (pseudo_random(&mut rng_seed) * n_contexts as f64) as u64;
-        let true_success_prob = context_difficulty.get(&context_hash).copied().unwrap_or(0.5);
+        let true_success_prob = context_difficulty
+            .get(&context_hash)
+            .copied()
+            .unwrap_or(0.5);
 
         let base_confidence = 0.5 + (pseudo_random(&mut rng_seed) - 0.5) * 0.3;
 
@@ -156,12 +185,8 @@ fn run_simulation(
                 pseudo_random(&mut rng_seed) * 0.3
             };
 
-            let insight = DreamInsight::new(
-                context_hash,
-                vec![0.0; 10],
-                vec![1.0; 10],
-                phi_improvement,
-            );
+            let insight =
+                DreamInsight::new(context_hash, vec![0.0; 10], vec![1.0; 10], phi_improvement);
 
             if bridge.process_insight(insight) {
                 dreams_generated += 1;
@@ -171,7 +196,11 @@ fn run_simulation(
     }
 
     let mean_brier = brier_scores.iter().sum::<f64>() / brier_scores.len() as f64;
-    let variance = brier_scores.iter().map(|b| (b - mean_brier).powi(2)).sum::<f64>() / brier_scores.len() as f64;
+    let variance = brier_scores
+        .iter()
+        .map(|b| (b - mean_brier).powi(2))
+        .sum::<f64>()
+        / brier_scores.len() as f64;
 
     SimulationResults {
         mean_brier,
@@ -199,9 +228,13 @@ fn mann_whitney_u(a: &[f64], b: &[f64]) -> (f64, f64) {
     let mut i = 0;
     while i < combined.len() {
         let mut j = i;
-        while j < combined.len() && combined[j].0 == combined[i].0 { j += 1; }
+        while j < combined.len() && combined[j].0 == combined[i].0 {
+            j += 1;
+        }
         let avg_rank = (i + j + 1) as f64 / 2.0;
-        for k in i..j { ranks.push((avg_rank, combined[k].1)); }
+        for k in i..j {
+            ranks.push((avg_rank, combined[k].1));
+        }
         i = j;
     }
 
@@ -223,6 +256,14 @@ fn normal_cdf(x: f64) -> f64 {
 
 fn erf(x: f64) -> f64 {
     let t = 1.0 / (1.0 + 0.3275911 * x.abs());
-    let y = 1.0 - (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * (-x * x).exp());
-    if x < 0.0 { -y } else { y }
+    let y = 1.0
+        - (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t
+            + 0.254829592)
+            * t
+            * (-x * x).exp());
+    if x < 0.0 {
+        -y
+    } else {
+        y
+    }
 }

@@ -19,11 +19,11 @@
 //! └─────────────────────────────────────────────────────────────────┘
 //! ```
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 
 /// Default beam width for search
 pub const DEFAULT_BEAM_WIDTH: usize = 10;
@@ -56,7 +56,7 @@ pub struct NgramLM {
 
 impl Default for NgramLM {
     fn default() -> Self {
-        Self::new(2)  // Default to bigram
+        Self::new(2) // Default to bigram
     }
 }
 
@@ -72,7 +72,7 @@ impl NgramLM {
             trigrams: HashMap::new(),
             bigram_backoff: HashMap::new(),
             trigram_backoff: HashMap::new(),
-            unk_prob: -10.0,  // Very low probability for unknown words
+            unk_prob: -10.0, // Very low probability for unknown words
             vocab_size: 0,
         }
     }
@@ -107,7 +107,9 @@ impl NgramLM {
                 if i > 1 && self.order >= 3 {
                     let prev2 = tokens[i - 2].clone();
                     let prev1 = tokens[i - 1].clone();
-                    *trigram_counts.entry((prev2, prev1, token.clone())).or_insert(0) += 1;
+                    *trigram_counts
+                        .entry((prev2, prev1, token.clone()))
+                        .or_insert(0) += 1;
                 }
             }
         }
@@ -115,7 +117,7 @@ impl NgramLM {
         self.vocab_size = unigram_counts.len();
 
         // Convert counts to log probabilities with add-k smoothing
-        let k = 0.01;  // Smoothing constant
+        let k = 0.01; // Smoothing constant
         let vocab_f = self.vocab_size as f32;
         let total_f = total_tokens as f32;
 
@@ -142,14 +144,17 @@ impl NgramLM {
         // Trigrams: P(w3 | w1, w2) = (count(w1, w2, w3) + k) / (count(w1, w2) + k*V)
         if self.order >= 3 {
             for ((w1, w2, w3), count) in &trigram_counts {
-                let bigram_count = *bigram_counts.get(&(w1.clone(), w2.clone())).unwrap_or(&1) as f32;
+                let bigram_count =
+                    *bigram_counts.get(&(w1.clone(), w2.clone())).unwrap_or(&1) as f32;
                 let prob = ((*count as f32 + k) / (bigram_count + k * vocab_f)).ln();
-                self.trigrams.insert((w1.clone(), w2.clone(), w3.clone()), prob);
+                self.trigrams
+                    .insert((w1.clone(), w2.clone(), w3.clone()), prob);
             }
 
             // Backoff weights
             for (w1, w2) in bigram_counts.keys() {
-                self.trigram_backoff.insert((w1.clone(), w2.clone()), 0.4_f32.ln());
+                self.trigram_backoff
+                    .insert((w1.clone(), w2.clone()), 0.4_f32.ln());
             }
         }
     }
@@ -192,11 +197,17 @@ impl NgramLM {
         let prev2 = &history[history.len() - 2];
         let prev1 = &history[history.len() - 1];
 
-        if let Some(&prob) = self.trigrams.get(&(prev2.clone(), prev1.clone(), word.to_string())) {
+        if let Some(&prob) = self
+            .trigrams
+            .get(&(prev2.clone(), prev1.clone(), word.to_string()))
+        {
             prob
         } else {
             // Backoff to bigram
-            let backoff = *self.trigram_backoff.get(&(prev2.clone(), prev1.clone())).unwrap_or(&0.0);
+            let backoff = *self
+                .trigram_backoff
+                .get(&(prev2.clone(), prev1.clone()))
+                .unwrap_or(&0.0);
             backoff + self.bigram_score(word, history)
         }
     }
@@ -229,7 +240,7 @@ impl NgramLM {
 
         for sentence in corpus {
             total_log_prob += self.score_sentence(sentence);
-            total_words += sentence.len() + 1;  // +1 for </s>
+            total_words += sentence.len() + 1; // +1 for </s>
         }
 
         // PP = exp(-1/N * sum(log P(w_i)))
@@ -238,8 +249,8 @@ impl NgramLM {
 
     /// Save model to file
     pub fn save<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
-        let json = serde_json::to_string_pretty(self)
-            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let json =
+            serde_json::to_string_pretty(self).map_err(|e| std::io::Error::other(e.to_string()))?;
         let mut file = File::create(path)?;
         file.write_all(json.as_bytes())?;
         Ok(())
@@ -249,8 +260,7 @@ impl NgramLM {
     pub fn load<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        serde_json::from_reader(reader)
-            .map_err(|e| std::io::Error::other(e.to_string()))
+        serde_json::from_reader(reader).map_err(|e| std::io::Error::other(e.to_string()))
     }
 
     /// Load from ARPA format (standard LM format)
@@ -259,7 +269,7 @@ impl NgramLM {
         let reader = BufReader::new(file);
 
         let mut lm = Self::new(3);
-        let mut section = 0;  // 0=header, 1=unigrams, 2=bigrams, 3=trigrams
+        let mut section = 0; // 0=header, 1=unigrams, 2=bigrams, 3=trigrams
 
         for line in reader.lines() {
             let line = line?;
@@ -294,7 +304,7 @@ impl NgramLM {
                     // Unigram: prob word [backoff]
                     if let Ok(prob) = parts[0].parse::<f32>() {
                         let word = parts[1].to_string();
-                        let log_prob = prob * 10.0_f32.ln();  // Convert from log10
+                        let log_prob = prob * 10.0_f32.ln(); // Convert from log10
                         lm.unigrams.insert(word.clone(), log_prob);
 
                         if parts.len() >= 3 {
@@ -314,7 +324,8 @@ impl NgramLM {
 
                         if parts.len() >= 4 {
                             if let Ok(backoff) = parts[3].parse::<f32>() {
-                                lm.trigram_backoff.insert((w1, parts[2].to_string()), backoff * 10.0_f32.ln());
+                                lm.trigram_backoff
+                                    .insert((w1, parts[2].to_string()), backoff * 10.0_f32.ln());
                             }
                         }
                     }
@@ -324,7 +335,11 @@ impl NgramLM {
                     if let Ok(prob) = parts[0].parse::<f32>() {
                         let log_prob = prob * 10.0_f32.ln();
                         lm.trigrams.insert(
-                            (parts[1].to_string(), parts[2].to_string(), parts[3].to_string()),
+                            (
+                                parts[1].to_string(),
+                                parts[2].to_string(),
+                                parts[3].to_string(),
+                            ),
                             log_prob,
                         );
                     }
@@ -334,9 +349,13 @@ impl NgramLM {
         }
 
         lm.vocab_size = lm.unigrams.len();
-        lm.order = if !lm.trigrams.is_empty() { 3 }
-                   else if !lm.bigrams.is_empty() { 2 }
-                   else { 1 };
+        lm.order = if !lm.trigrams.is_empty() {
+            3
+        } else if !lm.bigrams.is_empty() {
+            2
+        } else {
+            1
+        };
 
         Ok(lm)
     }
@@ -411,7 +430,7 @@ impl Default for BeamConfig {
             beam_width: DEFAULT_BEAM_WIDTH,
             lm_weight: DEFAULT_LM_WEIGHT,
             word_bonus: 0.0,
-            min_prob: -20.0,  // Log probability threshold
+            min_prob: -20.0, // Log probability threshold
             length_norm: true,
         }
     }
@@ -471,8 +490,11 @@ impl BeamDecoder {
     /// * `scores` - Log probabilities for each token in vocabulary
     pub fn step(&mut self, scores: &[f32]) {
         if scores.len() != self.vocab.len() && !self.vocab.is_empty() {
-            eprintln!("Warning: score length {} != vocab size {}",
-                     scores.len(), self.vocab.len());
+            eprintln!(
+                "Warning: score length {} != vocab size {}",
+                scores.len(),
+                self.vocab.len()
+            );
         }
 
         let mut new_beam: Vec<Hypothesis> = Vec::new();
@@ -517,7 +539,11 @@ impl BeamDecoder {
         }
 
         // Prune to beam width
-        new_beam.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        new_beam.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         new_beam.truncate(self.config.beam_width);
 
         self.beam = new_beam;
@@ -544,7 +570,11 @@ impl BeamDecoder {
             }
 
             // Re-sort after normalization
-            self.beam.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            self.beam.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
         }
 
         self.beam.clone()
@@ -627,7 +657,7 @@ impl PhonemeToWordDecoder {
 
             // Try longest match first
             for len in (1..=(phonemes.len() - i).min(15)).rev() {
-                let seq: Vec<String> = phonemes[i..i+len].to_vec();
+                let seq: Vec<String> = phonemes[i..i + len].to_vec();
 
                 if let Some(word_list) = self.reverse_dict.get(&seq) {
                     if let Some(word) = word_list.first() {
@@ -746,7 +776,8 @@ impl CombinedDecoder {
         word_hypotheses.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Return best hypothesis
-        word_hypotheses.first()
+        word_hypotheses
+            .first()
             .map(|(words, _)| words.join(" "))
             .unwrap_or_default()
     }
@@ -794,7 +825,9 @@ mod tests {
 
         assert!(lm.vocab_size > 0);
         assert!(lm.unigrams.contains_key("cat"));
-        assert!(lm.bigrams.contains_key(&("the".to_string(), "cat".to_string())));
+        assert!(lm
+            .bigrams
+            .contains_key(&("the".to_string(), "cat".to_string())));
     }
 
     #[test]
@@ -845,8 +878,8 @@ mod tests {
         let mut decoder = BeamDecoder::new(config).with_vocab(vocab);
 
         // Simulate two frames
-        let scores1 = vec![-1.0, -2.0, -3.0];  // "a" is most likely
-        let scores2 = vec![-2.0, -1.0, -3.0];  // "b" is most likely
+        let scores1 = vec![-1.0, -2.0, -3.0]; // "a" is most likely
+        let scores2 = vec![-2.0, -1.0, -3.0]; // "b" is most likely
 
         let results = decoder.decode(&[scores1, scores2]);
 

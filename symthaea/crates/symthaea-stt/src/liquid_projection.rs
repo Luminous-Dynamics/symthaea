@@ -55,8 +55,6 @@ impl PhonemeTargets {
 
     /// Generate a deterministic random HV for a phoneme index
     fn generate_target(index: usize) -> HV16 {
-        
-
         // Use blake3 hash for deterministic randomness
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"phoneme_target_");
@@ -200,7 +198,7 @@ impl RidgeAccumulator {
             let word_idx = i / 128;
             let bit_idx = i % 128;
             let bit = ((target_hv.words[word_idx] >> bit_idx) & 1) as f32;
-            y[i] = bit * 2.0 - 1.0;  // Map 0/1 to -1/+1
+            y[i] = bit * 2.0 - 1.0; // Map 0/1 to -1/+1
         }
 
         self.add(x, &y);
@@ -295,7 +293,7 @@ impl RidgeAccumulator {
         for i in (0..n).rev() {
             let mut sum = b[i];
             for j in (i + 1)..n {
-                sum -= l[j][i] * x[j];  // L^T[i][j] = L[j][i]
+                sum -= l[j][i] * x[j]; // L^T[i][j] = L[j][i]
             }
             x[i] = sum / l[i][i].max(1e-10);
         }
@@ -423,14 +421,12 @@ impl Default for DirectClassifierConfig {
 }
 
 /// Activation function for random features
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[derive(Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub enum RFActivation {
     #[default]
     Tanh,
     ReLU,
 }
-
 
 /// Random nonlinear feature expansion (Extreme Learning Machine / Random Kitchen Sinks)
 /// Maps input x → activation(W*x + b) where W and b are fixed random matrices
@@ -454,9 +450,14 @@ impl RandomProjection {
     }
 
     /// Create a random projection with specified activation
-    pub fn with_activation(input_dim: usize, output_dim: usize, seed: u64, activation: RFActivation) -> Self {
-        use rand::SeedableRng;
+    pub fn with_activation(
+        input_dim: usize,
+        output_dim: usize,
+        seed: u64,
+        activation: RFActivation,
+    ) -> Self {
         use rand::Rng;
+        use rand::SeedableRng;
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
 
         // Scale initialization based on activation
@@ -465,22 +466,34 @@ impl RandomProjection {
             RFActivation::ReLU => (2.0 / input_dim as f64).sqrt() as f32, // He initialization
         };
 
-        let weights: Vec<Vec<f32>> = (0..output_dim).map(|_| {
-            (0..input_dim).map(|_| {
-                // Box-Muller transform for Gaussian
-                let u1: f32 = rng.gen::<f32>().max(1e-7);
-                let u2: f32 = rng.gen();
-                let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
-                z * std
-            }).collect()
-        }).collect();
+        let weights: Vec<Vec<f32>> = (0..output_dim)
+            .map(|_| {
+                (0..input_dim)
+                    .map(|_| {
+                        // Box-Muller transform for Gaussian
+                        let u1: f32 = rng.gen::<f32>().max(1e-7);
+                        let u2: f32 = rng.gen();
+                        let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
+                        z * std
+                    })
+                    .collect()
+            })
+            .collect();
 
-        let bias: Vec<f32> = (0..output_dim).map(|_| {
-            let u: f32 = rng.gen();
-            (u - 0.5) * 2.0 * std
-        }).collect();
+        let bias: Vec<f32> = (0..output_dim)
+            .map(|_| {
+                let u: f32 = rng.gen();
+                (u - 0.5) * 2.0 * std
+            })
+            .collect();
 
-        Self { weights, bias, input_dim, output_dim, activation }
+        Self {
+            weights,
+            bias,
+            input_dim,
+            output_dim,
+            activation,
+        }
     }
 
     /// Apply projection: output = activation(W*x + b)
@@ -577,14 +590,18 @@ impl DirectClassifier {
         }
 
         // Compute softmax probability for the best class (using adjusted logits)
-        let adjusted_logits: Vec<f32> = logits.iter().enumerate().map(|(i, &l)| {
-            let prior = if i < self.log_priors.len() {
-                self.prior_scale * self.log_priors[i]
-            } else {
-                0.0
-            };
-            l - prior
-        }).collect();
+        let adjusted_logits: Vec<f32> = logits
+            .iter()
+            .enumerate()
+            .map(|(i, &l)| {
+                let prior = if i < self.log_priors.len() {
+                    self.prior_scale * self.log_priors[i]
+                } else {
+                    0.0
+                };
+                l - prior
+            })
+            .collect();
         let max_logit = adjusted_logits[best_idx];
         let exp_sum: f32 = adjusted_logits.iter().map(|&l| (l - max_logit).exp()).sum();
         let confidence = 1.0 / exp_sum;
@@ -598,13 +615,16 @@ impl DirectClassifier {
         if total == 0 {
             return;
         }
-        self.log_priors = class_counts.iter().map(|&count| {
-            if count > 0 {
-                (count as f32 / total as f32).ln()
-            } else {
-                -20.0 // Effectively -inf but JSON-safe
-            }
-        }).collect();
+        self.log_priors = class_counts
+            .iter()
+            .map(|&count| {
+                if count > 0 {
+                    (count as f32 / total as f32).ln()
+                } else {
+                    -20.0 // Effectively -inf but JSON-safe
+                }
+            })
+            .collect();
         self.prior_scale = prior_scale;
     }
 
@@ -736,12 +756,20 @@ impl DirectAccumulator {
         // Result: [d × d] row-major
         unsafe {
             matrixmultiply::dgemm(
-                d, batch_size, d,
+                d,
+                batch_size,
+                d,
                 1.0,
-                features_f64.as_ptr(), 1, d as isize,       // B^T view
-                features_f64.as_ptr(), d as isize, 1,        // B row-major
+                features_f64.as_ptr(),
+                1,
+                d as isize, // B^T view
+                features_f64.as_ptr(),
+                d as isize,
+                1, // B row-major
                 1.0,
-                self.xtx.as_mut_ptr(), d as isize, 1,        // X^TX row-major
+                self.xtx.as_mut_ptr(),
+                d as isize,
+                1, // X^TX row-major
             );
         }
         // X^TY per-sample (O(D) each, negligible vs O(D^2) dgemm)
@@ -785,9 +813,7 @@ impl DirectAccumulator {
             }
 
             // Get column of X^T Y for this class
-            let b: Vec<f64> = (0..n)
-                .map(|i| self.xty[i * self.n_classes + cls])
-                .collect();
+            let b: Vec<f64> = (0..n).map(|i| self.xty[i * self.n_classes + cls]).collect();
 
             // Forward/backward substitution
             let z = Self::forward_substitute_flat(&l, &b, n);
@@ -892,7 +918,7 @@ mod tests {
         let weights = acc.solve(0.01);
 
         // Check that we got a reasonable result
-        assert_eq!(weights.len(), 2);  // output_dim
-        assert_eq!(weights[0].len(), 4);  // input_dim
+        assert_eq!(weights.len(), 2); // output_dim
+        assert_eq!(weights[0].len(), 4); // input_dim
     }
 }

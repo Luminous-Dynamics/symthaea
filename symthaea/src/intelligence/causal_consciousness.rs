@@ -1365,7 +1365,7 @@ mod tests {
         let x: Vec<f64> = (0..100).map(|i| i as f64).collect();
         let y: Vec<f64> = x
             .iter()
-            .map(|&xi| 2.0 * xi + 0.1 * (xi as f64).sin())
+            .map(|&xi| 2.0 * xi + 0.1 * xi.sin())
             .collect();
 
         let result = cc.analyze(&x, &y);

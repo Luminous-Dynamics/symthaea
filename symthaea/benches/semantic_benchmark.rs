@@ -11,7 +11,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use symthaea::hdc::semantic_encoder::{
-    SemanticEncoder, CharNgramEncoder, CachedSemanticEncoder, RandomProjection,
+    CachedSemanticEncoder, CharNgramEncoder, RandomProjection, SemanticEncoder,
 };
 use symthaea::hdc::HDC_DIMENSION;
 
@@ -73,7 +73,8 @@ fn bench_char_ngram_encode(c: &mut Criterion) {
 
     // Batch encoding
     for batch_size in [4, 10, 50] {
-        let texts: Vec<&str> = MEDIUM_TEXTS.iter()
+        let texts: Vec<&str> = MEDIUM_TEXTS
+            .iter()
             .cycle()
             .take(batch_size)
             .copied()
@@ -83,9 +84,7 @@ fn bench_char_ngram_encode(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("batch_encode", batch_size),
             &texts,
-            |b, texts| {
-                b.iter(|| black_box(encoder.encode_batch(texts)))
-            },
+            |b, texts| b.iter(|| black_box(encoder.encode_batch(texts))),
         );
     }
 
@@ -113,7 +112,8 @@ fn bench_char_ngram_similarity(c: &mut Criterion) {
 
     // Multiple similarity comparisons
     for n_comparisons in [10, 50, 100] {
-        let pairs: Vec<(&str, &str)> = MEDIUM_TEXTS.iter()
+        let pairs: Vec<(&str, &str)> = MEDIUM_TEXTS
+            .iter()
             .cycle()
             .zip(MEDIUM_TEXTS.iter().cycle().skip(1))
             .take(n_comparisons)
@@ -125,7 +125,8 @@ fn bench_char_ngram_similarity(c: &mut Criterion) {
             &pairs,
             |b, pairs| {
                 b.iter(|| {
-                    pairs.iter()
+                    pairs
+                        .iter()
                         .map(|(a, b)| encoder.similarity(a, b))
                         .sum::<f64>()
                 })
@@ -201,9 +202,7 @@ fn bench_random_projection(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("project", input_dim),
             &(&projection, &input),
-            |b, (proj, input)| {
-                b.iter(|| black_box(proj.project(input)))
-            },
+            |b, (proj, input)| b.iter(|| black_box(proj.project(input))),
         );
     }
 
@@ -212,9 +211,7 @@ fn bench_random_projection(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("init", input_dim),
             &input_dim,
-            |b, &dim| {
-                b.iter(|| black_box(RandomProjection::new(dim, HDC_DIMENSION, 42)))
-            },
+            |b, &dim| b.iter(|| black_box(RandomProjection::new(dim, HDC_DIMENSION, 42))),
         );
     }
 
@@ -241,9 +238,7 @@ fn bench_encoding_scaling(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("text_length", text_len),
             &text,
-            |b, text| {
-                b.iter(|| black_box(encoder.encode(text)))
-            },
+            |b, text| b.iter(|| black_box(encoder.encode(text))),
         );
     }
 
@@ -271,7 +266,8 @@ fn bench_semantic_operations(c: &mut Criterion) {
     // Linear search for most similar
     group.bench_function("linear_search_100", |b| {
         b.iter(|| {
-            corpus.iter()
+            corpus
+                .iter()
                 .map(|hv| query.similarity(hv))
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
@@ -280,21 +276,18 @@ fn bench_semantic_operations(c: &mut Criterion) {
 
     // Top-k search
     for k in [3, 5, 10] {
-        group.bench_with_input(
-            BenchmarkId::new("top_k_search", k),
-            &k,
-            |b, &k| {
-                b.iter(|| {
-                    let mut similarities: Vec<_> = corpus.iter()
-                        .map(|hv| query.similarity(hv))
-                        .enumerate()
-                        .collect();
-                    similarities.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap());
-                    similarities.truncate(k);
-                    black_box(similarities)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("top_k_search", k), &k, |b, &k| {
+            b.iter(|| {
+                let mut similarities: Vec<_> = corpus
+                    .iter()
+                    .map(|hv| query.similarity(hv))
+                    .enumerate()
+                    .collect();
+                similarities.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap());
+                similarities.truncate(k);
+                black_box(similarities)
+            })
+        });
     }
 
     // Threshold-based retrieval
@@ -304,7 +297,8 @@ fn bench_semantic_operations(c: &mut Criterion) {
             &threshold,
             |b, &threshold| {
                 b.iter(|| {
-                    corpus.iter()
+                    corpus
+                        .iter()
                         .filter(|hv| query.similarity(hv) > threshold)
                         .count()
                 })
@@ -342,7 +336,8 @@ fn bench_full_semantic_cycle(c: &mut Criterion) {
                     let mut total_matches = 0;
                     for q in 0..5 {
                         let query = encoder.encode(&format!("Search query {}", q));
-                        total_matches += corpus.iter()
+                        total_matches += corpus
+                            .iter()
                             .filter(|hv| query.similarity(hv) > 0.3)
                             .count();
                     }

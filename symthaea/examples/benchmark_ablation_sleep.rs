@@ -263,7 +263,11 @@ fn main() {
         "\n  Full > Random:                    {:.1}% vs {:.1}%  {}",
         full_acc * 100.0,
         random_acc * 100.0,
-        if full_acc > random_acc { "PASS" } else { "FAIL" }
+        if full_acc > random_acc {
+            "PASS"
+        } else {
+            "FAIL"
+        }
     );
     println!(
         "  Full > 20% (chance):              {:.1}%  {}",
@@ -338,8 +342,11 @@ fn consciousness_to_idx(state: &ConsciousnessState) -> usize {
 
 /// Classify purely from spectral band power ratios, ignoring LTC dynamics.
 fn classify_spectral_only(metrics: &IntegrationMetrics) -> usize {
-    let total = (metrics.delta_power + metrics.theta_power + metrics.alpha_power
-        + metrics.beta_power + metrics.gamma_power)
+    let total = (metrics.delta_power
+        + metrics.theta_power
+        + metrics.alpha_power
+        + metrics.beta_power
+        + metrics.gamma_power)
         .max(1e-10);
     let delta_r = metrics.delta_power / total;
     let theta_r = metrics.theta_power / total;
@@ -485,8 +492,7 @@ fn generate_synthetic_eeg(
                 let t = i as f64 * dt;
                 let theta = 30.0 * (2.0 * std::f64::consts::PI * 5.0 * t).sin();
                 let spindle_env = ((2.0 * std::f64::consts::PI * 0.2 * t).sin()).max(0.0);
-                let spindle =
-                    25.0 * spindle_env * (2.0 * std::f64::consts::PI * 13.0 * t).sin();
+                let spindle = 25.0 * spindle_env * (2.0 * std::f64::consts::PI * 13.0 * t).sin();
                 let noise_f = 12.0 * rand_f64();
                 let noise_o = 12.0 * rand_f64();
                 frontal[i] = theta * 0.4 + spindle * 0.8 + noise_f;
@@ -555,9 +561,9 @@ fn compute_emission_probs(metrics: &[IntegrationMetrics]) -> Vec<Vec<f64>> {
     metrics
         .iter()
         .map(|m| {
-            let total_power = (m.delta_power + m.theta_power + m.alpha_power + m.beta_power
-                + m.gamma_power)
-                .max(1e-10);
+            let total_power =
+                (m.delta_power + m.theta_power + m.alpha_power + m.beta_power + m.gamma_power)
+                    .max(1e-10);
             let delta_ratio = m.delta_power as f64 / total_power as f64;
             let theta_ratio = m.theta_power as f64 / total_power as f64;
             let alpha_ratio = m.alpha_power as f64 / total_power as f64;

@@ -443,8 +443,10 @@ pub trait ConsciousnessDatabase: Send + Sync {
 
 /// Which database backend to use for persistent consciousness memory.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Default)]
 pub enum DatabaseBackend {
     /// SQLite — battle-tested, single-file, always available.
+    #[default]
     Sqlite,
     /// LanceDB — columnar Arrow storage, async-native.
     /// Requires the `lancedb-backend` feature flag.
@@ -452,14 +454,10 @@ pub enum DatabaseBackend {
     Lance,
 }
 
-impl Default for DatabaseBackend {
-    fn default() -> Self {
-        Self::Sqlite
-    }
-}
 
 /// Configuration for the consciousness database layer.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Default)]
 pub struct DatabaseConfig {
     /// Which backend to use.
     pub backend: DatabaseBackend,
@@ -467,14 +465,6 @@ pub struct DatabaseConfig {
     pub path: Option<String>,
 }
 
-impl Default for DatabaseConfig {
-    fn default() -> Self {
-        Self {
-            backend: DatabaseBackend::default(),
-            path: None,
-        }
-    }
-}
 
 /// Create a database instance from configuration.
 pub async fn create_database(config: &DatabaseConfig) -> DbResult<Box<dyn ConsciousnessDatabase>> {

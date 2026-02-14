@@ -1,13 +1,11 @@
 //! Criterion benchmarks for Symthaea STT core operations
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
-use symthaea_stt::{
-    HV16, bundle, weighted_bundle,
-    LtcCell, LtcConfig,
-    PhonemeResonator,
-    AudioFrontend, AudioProjector, AudioConfig,
-};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::f32::consts::PI;
+use symthaea_stt::{
+    bundle, weighted_bundle, AudioConfig, AudioFrontend, AudioProjector, LtcCell, LtcConfig,
+    PhonemeResonator, HV16,
+};
 
 /// Generate synthetic audio for benchmarks
 fn generate_test_audio(duration_sec: f32, sample_rate: u32) -> Vec<f32> {
@@ -40,9 +38,7 @@ fn bench_hdc_bind(c: &mut Criterion) {
     let hv1 = HV16::random("bench_bind1");
     let hv2 = HV16::random("bench_bind2");
 
-    c.bench_function("hdc/bind", |b| {
-        b.iter(|| black_box(hv1.bind(&hv2)))
-    });
+    c.bench_function("hdc/bind", |b| b.iter(|| black_box(hv1.bind(&hv2))));
 }
 
 fn bench_hdc_bundle(c: &mut Criterion) {
@@ -64,7 +60,12 @@ fn bench_hdc_bundle(c: &mut Criterion) {
 
 fn bench_hdc_weighted_bundle(c: &mut Criterion) {
     let weighted_hvs: Vec<(HV16, f32)> = (0..100)
-        .map(|i| (HV16::random(&format!("wbundle_{}", i)), (i as f32 + 1.0) / 100.0))
+        .map(|i| {
+            (
+                HV16::random(&format!("wbundle_{}", i)),
+                (i as f32 + 1.0) / 100.0,
+            )
+        })
         .collect();
 
     c.bench_function("hdc/weighted_bundle_100", |b| {
@@ -150,9 +151,7 @@ fn bench_mel_spectrogram(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}s", duration)),
             &audio,
-            |b, audio| {
-                b.iter(|| black_box(frontend.extract_features(audio)))
-            },
+            |b, audio| b.iter(|| black_box(frontend.extract_features(audio))),
         );
     }
 
@@ -202,9 +201,7 @@ fn bench_resonator_query(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::from_parameter(num_prototypes),
             num_prototypes,
-            |b, _| {
-                b.iter(|| black_box(resonator.query(&query, 5)))
-            },
+            |b, _| b.iter(|| black_box(resonator.query(&query, 5))),
         );
     }
 
@@ -234,10 +231,11 @@ fn bench_full_pipeline(c: &mut Criterion) {
     let mut resonator = PhonemeResonator::new();
 
     // Add some prototypes
-    for phoneme in ["AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH",
-                    "EH", "ER", "EY", "F", "G", "HH", "IH", "IY", "JH", "K",
-                    "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH",
-                    "T", "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH"] {
+    for phoneme in [
+        "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH", "EH", "ER", "EY", "F", "G", "HH",
+        "IH", "IY", "JH", "K", "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH", "T", "TH",
+        "UH", "UW", "V", "W", "Y", "Z", "ZH",
+    ] {
         resonator.store(phoneme, HV16::random(phoneme));
     }
 
@@ -271,17 +269,9 @@ criterion_group!(
     bench_hdc_random,
 );
 
-criterion_group!(
-    ltc_benches,
-    bench_ltc_forward,
-    bench_ltc_sequence,
-);
+criterion_group!(ltc_benches, bench_ltc_forward, bench_ltc_sequence,);
 
-criterion_group!(
-    audio_benches,
-    bench_mel_spectrogram,
-    bench_audio_projection,
-);
+criterion_group!(audio_benches, bench_mel_spectrogram, bench_audio_projection,);
 
 criterion_group!(
     phoneme_benches,
@@ -289,10 +279,7 @@ criterion_group!(
     bench_resonator_store,
 );
 
-criterion_group!(
-    pipeline_benches,
-    bench_full_pipeline,
-);
+criterion_group!(pipeline_benches, bench_full_pipeline,);
 
 criterion_main!(
     hdc_benches,

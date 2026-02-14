@@ -68,21 +68,22 @@ impl SyntheticAudioGenerator {
 
                 // Steady timbre (kick drum-like)
                 let mut mel_bands = vec![0.0; MEL_BANDS];
-                for i in 0..10 { // Low frequency emphasis
+                for i in 0..10 {
+                    // Low frequency emphasis
                     mel_bands[i] = if on_beat { 0.8 - i as f32 * 0.05 } else { 0.1 };
                 }
 
                 AudioFeatures {
                     mel_bands: mel_bands.clone(),
-                    mfcc: vec![0.0; NUM_MFCC],  // Synthetic - no real MFCC
+                    mfcc: vec![0.0; NUM_MFCC], // Synthetic - no real MFCC
                     spectral_centroid: if on_beat { 200.0 } else { 100.0 },
                     spectral_rolloff: if on_beat { 500.0 } else { 200.0 },
                     onset_strength,
                     rms_energy,
                     zero_crossing_rate: 0.05,
-                    spectral_flatness: 0.2,  // Low (tonal beat)
-                    temporal_regularity: 0.9,  // High (steady beat)
-                    envelope_delta: if on_beat { 0.5 } else { 0.02 },  // Sharp transients on beat
+                    spectral_flatness: 0.2,   // Low (tonal beat)
+                    temporal_regularity: 0.9, // High (steady beat)
+                    envelope_delta: if on_beat { 0.5 } else { 0.02 }, // Sharp transients on beat
                     envelope_variance: 0.15,  // High modulation (rhythmic)
                     frame_index,
                     spectral_flux: 0.1,
@@ -129,10 +130,10 @@ impl SyntheticAudioGenerator {
                     onset_strength,
                     rms_energy,
                     zero_crossing_rate: 0.1 + melody * 0.1,
-                    spectral_flatness: 0.3,  // Some noise in music
-                    temporal_regularity: 0.7,  // Fairly regular rhythm
+                    spectral_flatness: 0.3,   // Some noise in music
+                    temporal_regularity: 0.7, // Fairly regular rhythm
                     envelope_delta: if on_beat { 0.3 } else { 0.05 },
-                    envelope_variance: 0.12,  // Moderate modulation
+                    envelope_variance: 0.12, // Moderate modulation
                     frame_index,
                     spectral_flux: 0.1,
                     harmonic_ratio: 0.5,
@@ -163,8 +164,12 @@ impl SyntheticAudioGenerator {
                     for &fb in &formant_bands {
                         if fb < MEL_BANDS {
                             mel_bands[fb] = 0.7;
-                            if fb > 0 { mel_bands[fb - 1] = 0.4; }
-                            if fb < MEL_BANDS - 1 { mel_bands[fb + 1] = 0.4; }
+                            if fb > 0 {
+                                mel_bands[fb - 1] = 0.4;
+                            }
+                            if fb < MEL_BANDS - 1 {
+                                mel_bands[fb + 1] = 0.4;
+                            }
                         }
                     }
                 }
@@ -174,12 +179,16 @@ impl SyntheticAudioGenerator {
                     mfcc: vec![0.0; NUM_MFCC],
                     spectral_centroid: if speaking { 1200.0 } else { 200.0 },
                     spectral_rolloff: if speaking { 4000.0 } else { 500.0 },
-                    onset_strength: if speaking { 0.3 + combined.abs() * 0.3 } else { 0.02 },
+                    onset_strength: if speaking {
+                        0.3 + combined.abs() * 0.3
+                    } else {
+                        0.02
+                    },
                     rms_energy: if speaking { 0.4 } else { 0.05 },
                     zero_crossing_rate: if speaking { 0.15 } else { 0.02 },
-                    spectral_flatness: 0.4,  // Mixed tonal/noise
-                    temporal_regularity: 0.3,  // Irregular (speech)
-                    envelope_delta: if speaking { 0.15 } else { 0.02 },  // Variable speech envelope
+                    spectral_flatness: 0.4,   // Mixed tonal/noise
+                    temporal_regularity: 0.3, // Irregular (speech)
+                    envelope_delta: if speaking { 0.15 } else { 0.02 }, // Variable speech envelope
                     envelope_variance: 0.08,  // Irregular modulation
                     frame_index,
                     spectral_flux: 0.1,
@@ -218,10 +227,10 @@ impl SyntheticAudioGenerator {
                     onset_strength: 0.1 + car_pass * 0.2 + honk * 0.5,
                     rms_energy: 0.3 + car_pass * 0.3,
                     zero_crossing_rate: 0.2,
-                    spectral_flatness: 0.7,  // High (noise-like)
-                    temporal_regularity: 0.2,  // Low (aperiodic)
-                    envelope_delta: 0.03 + honk * 0.4,  // Low except for honk
-                    envelope_variance: 0.05,  // Low modulation
+                    spectral_flatness: 0.7,            // High (noise-like)
+                    temporal_regularity: 0.2,          // Low (aperiodic)
+                    envelope_delta: 0.03 + honk * 0.4, // Low except for honk
+                    envelope_variance: 0.05,           // Low modulation
                     frame_index,
                     spectral_flux: 0.1,
                     harmonic_ratio: 0.5,
@@ -263,10 +272,10 @@ impl SyntheticAudioGenerator {
                     onset_strength: 0.05 + bird * 0.6,
                     rms_energy: 0.15 + wind * 0.1 + bird * 0.3,
                     zero_crossing_rate: 0.05 + bird * 0.2,
-                    spectral_flatness: 0.5,  // Mixed
-                    temporal_regularity: 0.2,  // Low (aperiodic nature sounds)
-                    envelope_delta: bird * 0.4,  // Sharp bird chirps
-                    envelope_variance: 0.06,  // Irregular
+                    spectral_flatness: 0.5,     // Mixed
+                    temporal_regularity: 0.2,   // Low (aperiodic nature sounds)
+                    envelope_delta: bird * 0.4, // Sharp bird chirps
+                    envelope_variance: 0.06,    // Irregular
                     frame_index,
                     spectral_flux: 0.1,
                     harmonic_ratio: 0.5,
@@ -304,10 +313,10 @@ impl SyntheticAudioGenerator {
                     onset_strength: 0.02 + keyboard * 0.3,
                     rms_energy: 0.1 + keyboard * 0.2,
                     zero_crossing_rate: 0.03,
-                    spectral_flatness: 0.3,  // Some noise (HVAC)
-                    temporal_regularity: 0.4,  // Somewhat regular (typing rhythm)
-                    envelope_delta: keyboard * 0.3,  // Clicks have sharp delta
-                    envelope_variance: 0.04,  // Low modulation
+                    spectral_flatness: 0.3,         // Some noise (HVAC)
+                    temporal_regularity: 0.4,       // Somewhat regular (typing rhythm)
+                    envelope_delta: keyboard * 0.3, // Clicks have sharp delta
+                    envelope_variance: 0.04,        // Low modulation
                     frame_index,
                     spectral_flux: 0.1,
                     harmonic_ratio: 0.5,
@@ -333,10 +342,10 @@ impl SyntheticAudioGenerator {
                     onset_strength: occasional * 0.1,
                     rms_energy: ambient + occasional * 0.1,
                     zero_crossing_rate: 0.01,
-                    spectral_flatness: 0.5,  // Neutral
-                    temporal_regularity: 0.1,  // Very low (silence)
-                    envelope_delta: occasional * 0.1,  // Very low delta
-                    envelope_variance: 0.01,  // Minimal modulation
+                    spectral_flatness: 0.5,           // Neutral
+                    temporal_regularity: 0.1,         // Very low (silence)
+                    envelope_delta: occasional * 0.1, // Very low delta
+                    envelope_variance: 0.01,          // Minimal modulation
                     frame_index,
                     spectral_flux: 0.1,
                     harmonic_ratio: 0.5,
@@ -374,10 +383,29 @@ fn main() -> Result<()> {
     println!("╚═══════════════════════════════════════════════════════════════════╝\n");
 
     let patterns: Vec<(&str, SyntheticPattern, AudioCategory)> = vec![
-        ("60BPM", SyntheticPattern::SteadyBeat { bpm: 60 }, AudioCategory::Music),
-        ("120BPM", SyntheticPattern::SteadyBeat { bpm: 120 }, AudioCategory::Music),
-        ("Music90", SyntheticPattern::MusicLike { bpm: 90, melody_speed: 0.5 }, AudioCategory::Music),
-        ("Speech", SyntheticPattern::SpeechLike { words_per_min: 150 }, AudioCategory::Speech),
+        (
+            "60BPM",
+            SyntheticPattern::SteadyBeat { bpm: 60 },
+            AudioCategory::Music,
+        ),
+        (
+            "120BPM",
+            SyntheticPattern::SteadyBeat { bpm: 120 },
+            AudioCategory::Music,
+        ),
+        (
+            "Music90",
+            SyntheticPattern::MusicLike {
+                bpm: 90,
+                melody_speed: 0.5,
+            },
+            AudioCategory::Music,
+        ),
+        (
+            "Speech",
+            SyntheticPattern::SpeechLike { words_per_min: 150 },
+            AudioCategory::Speech,
+        ),
         ("Traffic", SyntheticPattern::Traffic, AudioCategory::Urban),
         ("Nature", SyntheticPattern::Nature, AudioCategory::Nature),
         ("Office", SyntheticPattern::Office, AudioCategory::Urban),
@@ -412,11 +440,14 @@ fn main() -> Result<()> {
 
                     let progress = start.elapsed().as_secs_f32() / duration.as_secs_f32();
                     let bar = (progress * 30.0) as usize;
-                    print!("\r  [{}{}] {:.0}%  Φr={:.4} Φt={:.4}",
-                        "█".repeat(bar), "░".repeat(30 - bar),
+                    print!(
+                        "\r  [{}{}] {:.0}%  Φr={:.4} Φt={:.4}",
+                        "█".repeat(bar),
+                        "░".repeat(30 - bar),
                         progress * 100.0,
                         result.phi_rhythm,
-                        result.phi_timbre);
+                        result.phi_timbre
+                    );
                     io::stdout().flush()?;
 
                     // ~43Hz control rate
@@ -437,7 +468,8 @@ fn main() -> Result<()> {
                 println!("  Cycling through learned patterns every 5 seconds.\n");
 
                 let learned: Vec<_> = sentinel.patterns.keys().cloned().collect();
-                let pattern_map: HashMap<String, SyntheticPattern> = patterns.iter()
+                let pattern_map: HashMap<String, SyntheticPattern> = patterns
+                    .iter()
                     .map(|(name, pat, _)| (name.to_string(), *pat))
                     .collect();
 
@@ -454,7 +486,8 @@ fn main() -> Result<()> {
                         println!("\n  [Switching to {}]", current_pattern);
                     }
 
-                    let syn_pattern = pattern_map.get(current_pattern)
+                    let syn_pattern = pattern_map
+                        .get(current_pattern)
                         .copied()
                         .unwrap_or(SyntheticPattern::Quiet);
 
@@ -472,15 +505,21 @@ fn main() -> Result<()> {
 
                         for (name, sim) in sorted {
                             let _bar_len = (sim.combined * 10.0) as usize;
-                            let color = if result.detected_pattern == *name { "\x1b[32m" } else { "\x1b[90m" };
+                            let color = if result.detected_pattern == *name {
+                                "\x1b[32m"
+                            } else {
+                                "\x1b[90m"
+                            };
                             sim_parts.push(format!("{}:{}{:.2}\x1b[0m", name, color, sim.combined));
                         }
 
-                        print!("\r  Playing: {:8} │ {} │ Detected: {:8} ({:.0}%)    ",
+                        print!(
+                            "\r  Playing: {:8} │ {} │ Detected: {:8} ({:.0}%)    ",
                             current_pattern,
                             sim_parts.join(" "),
                             result.detected_pattern,
-                            result.confidence * 100.0);
+                            result.confidence * 100.0
+                        );
                         io::stdout().flush()?;
                     }
 
@@ -503,21 +542,36 @@ fn main() -> Result<()> {
                 println!("\n  Learned Patterns:");
 
                 for (name, pattern) in &sentinel.patterns {
-                    if pattern.frame_count == 0 { continue; }
-                    println!("    {} ({:?}, {} frames)", name, pattern.category, pattern.frame_count);
+                    if pattern.frame_count == 0 {
+                        continue;
+                    }
+                    println!(
+                        "    {} ({:?}, {} frames)",
+                        name, pattern.category, pattern.frame_count
+                    );
                     print!("      Rhythm Freq Sig: [");
                     for (i, &f) in pattern.rhythm_freq_signature.iter().enumerate() {
-                        if i > 0 { print!(", "); }
+                        if i > 0 {
+                            print!(", ");
+                        }
                         // Highlight dominant frequency
-                        if f > 0.1 { print!("\x1b[33m{:.3}\x1b[0m", f); }
-                        else { print!("{:.3}", f); }
+                        if f > 0.1 {
+                            print!("\x1b[33m{:.3}\x1b[0m", f);
+                        } else {
+                            print!("{:.3}", f);
+                        }
                     }
                     println!("]");
                     print!("      Timbre Freq Sig: [");
                     for (i, &f) in pattern.timbre_freq_signature.iter().enumerate() {
-                        if i > 0 { print!(", "); }
-                        if f > 0.1 { print!("\x1b[36m{:.3}\x1b[0m", f); }
-                        else { print!("{:.3}", f); }
+                        if i > 0 {
+                            print!(", ");
+                        }
+                        if f > 0.1 {
+                            print!("\x1b[36m{:.3}\x1b[0m", f);
+                        } else {
+                            print!("{:.3}", f);
+                        }
                     }
                     println!("]");
                 }
@@ -530,7 +584,9 @@ fn main() -> Result<()> {
             }
 
             _ => {
-                println!("  Unknown command. Use 1-8 to learn, D to detect, S for summary, Q to quit.");
+                println!(
+                    "  Unknown command. Use 1-8 to learn, D to detect, S for summary, Q to quit."
+                );
             }
         }
     }

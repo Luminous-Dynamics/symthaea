@@ -1026,7 +1026,7 @@ mod tests {
         engine.add_goal(BinaryHV::random(100), 0.9, 5);
 
         // Add actions
-        let outcome1 = engine.desired_states[0].state.clone();
+        let outcome1 = engine.desired_states[0].state;
         engine.add_action(BinaryHV::random(100), outcome1);
         engine.add_action(BinaryHV::random(100), BinaryHV::random(100));
 
@@ -1105,7 +1105,7 @@ mod tests {
         let cause = BinaryHV::random(100);
         let effect = BinaryHV::random(100);
 
-        model.learn(cause.clone(), effect.clone(), 0.9);
+        model.learn(cause, effect, 0.9);
 
         let prediction = model.predict(&cause);
         assert!(prediction.is_some());

@@ -4,8 +4,8 @@
 //! Packages in the same category or with similar names will have higher
 //! similarity in HDC space.
 
-use symthaea_core::hdc::ContinuousHV;
 use super::codebook::NixCodebook;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Metadata about a Nix package for encoding.
 #[derive(Debug, Clone)]
@@ -34,7 +34,8 @@ impl<'a> PackageEncoder<'a> {
     /// The name is split on `-` and `.` to capture sub-tokens:
     /// `python311Packages.numpy` → bundle(python311Packages, numpy)
     pub fn encode_name(&mut self, name: &str) -> ContinuousHV {
-        let tokens: Vec<&str> = name.split(['.', '-', '_'])
+        let tokens: Vec<&str> = name
+            .split(['.', '-', '_'])
             .filter(|t| !t.is_empty())
             .collect();
 
@@ -75,7 +76,8 @@ impl<'a> PackageEncoder<'a> {
 
         // Category tags
         if !metadata.categories.is_empty() {
-            let cat_hvs: Vec<ContinuousHV> = metadata.categories
+            let cat_hvs: Vec<ContinuousHV> = metadata
+                .categories
                 .iter()
                 .map(|cat| self.codebook.get_or_create(cat).clone())
                 .collect();
@@ -91,8 +93,8 @@ impl<'a> PackageEncoder<'a> {
     /// Encode description text by tokenizing and bundling.
     fn encode_text_tokens(&mut self, text: &str) -> ContinuousHV {
         let stopwords = [
-            "a", "an", "the", "is", "are", "was", "were", "for", "and",
-            "or", "but", "in", "on", "at", "to", "of", "with", "by",
+            "a", "an", "the", "is", "are", "was", "were", "for", "and", "or", "but", "in", "on",
+            "at", "to", "of", "with", "by",
         ];
 
         let tokens: Vec<&str> = text

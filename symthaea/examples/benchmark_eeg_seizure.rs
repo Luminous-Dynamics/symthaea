@@ -21,9 +21,7 @@
 
 use std::time::Instant;
 
-use symthaea::perception::physio::{
-    SleepSentinel, SleepSentinelConfig, IntegrationMetrics,
-};
+use symthaea::perception::physio::{IntegrationMetrics, SleepSentinel, SleepSentinelConfig};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -40,7 +38,7 @@ fn main() {
         integration_window: 300,
         tau_base: 100.0,
         enable_adaptive_thresholds: true,
-        steps_per_epoch: 500, // Reduced from 3000 for faster benchmark
+        steps_per_epoch: 500,        // Reduced from 3000 for faster benchmark
         use_spectral_analysis: true, // Use Welch PSD for band powers
         ..SleepSentinelConfig::default()
     };
@@ -61,11 +59,7 @@ fn main() {
     // Normal EEG: alpha rhythm, moderate amplitude
     for i in 0..10 {
         let (f, o) = generate_normal_eeg(epoch_len, sample_rate, i as u64);
-        sentinel.train_epoch(
-            &f,
-            &o,
-            symthaea::perception::physio::SleepStage::Wake,
-        );
+        sentinel.train_epoch(&f, &o, symthaea::perception::physio::SleepStage::Wake);
     }
     println!("  Trained 10 normal epochs");
 
@@ -131,7 +125,12 @@ fn main() {
         if i < 3 {
             println!(
                 "  Normal #{}: score={:.4} (thr={:.4}), sync={:.4}, entropy={:.4}, delta={:.4}",
-                i, score, threshold, metrics.synchrony, metrics.spectral_entropy, metrics.delta_power
+                i,
+                score,
+                threshold,
+                metrics.synchrony,
+                metrics.spectral_entropy,
+                metrics.delta_power
             );
         }
     }
@@ -150,7 +149,12 @@ fn main() {
         if i < 3 {
             println!(
                 "  Seizure #{}: score={:.4} (thr={:.4}), sync={:.4}, entropy={:.4}, delta={:.4}",
-                i, score, threshold, metrics.synchrony, metrics.spectral_entropy, metrics.delta_power
+                i,
+                score,
+                threshold,
+                metrics.synchrony,
+                metrics.spectral_entropy,
+                metrics.delta_power
             );
         }
     }
@@ -186,16 +190,46 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let phases: Vec<(&str, Box<dyn Fn(usize, f64, u64) -> (Vec<f64>, Vec<f64>)>)> = vec![
-        ("Normal", Box::new(|len, sr, seed| generate_normal_eeg(len, sr, seed))),
-        ("Normal", Box::new(|len, sr, seed| generate_normal_eeg(len, sr, seed))),
-        ("Pre-ictal", Box::new(|len, sr, seed| generate_preictal_eeg(len, sr, seed))),
-        ("Pre-ictal", Box::new(|len, sr, seed| generate_preictal_eeg(len, sr, seed))),
-        ("Seizure", Box::new(|len, sr, seed| generate_seizure_eeg(len, sr, seed))),
-        ("Seizure", Box::new(|len, sr, seed| generate_seizure_eeg(len, sr, seed))),
-        ("Seizure", Box::new(|len, sr, seed| generate_seizure_eeg(len, sr, seed))),
-        ("Post-ictal", Box::new(|len, sr, seed| generate_postictal_eeg(len, sr, seed))),
-        ("Normal", Box::new(|len, sr, seed| generate_normal_eeg(len, sr, seed))),
-        ("Normal", Box::new(|len, sr, seed| generate_normal_eeg(len, sr, seed))),
+        (
+            "Normal",
+            Box::new(|len, sr, seed| generate_normal_eeg(len, sr, seed)),
+        ),
+        (
+            "Normal",
+            Box::new(|len, sr, seed| generate_normal_eeg(len, sr, seed)),
+        ),
+        (
+            "Pre-ictal",
+            Box::new(|len, sr, seed| generate_preictal_eeg(len, sr, seed)),
+        ),
+        (
+            "Pre-ictal",
+            Box::new(|len, sr, seed| generate_preictal_eeg(len, sr, seed)),
+        ),
+        (
+            "Seizure",
+            Box::new(|len, sr, seed| generate_seizure_eeg(len, sr, seed)),
+        ),
+        (
+            "Seizure",
+            Box::new(|len, sr, seed| generate_seizure_eeg(len, sr, seed)),
+        ),
+        (
+            "Seizure",
+            Box::new(|len, sr, seed| generate_seizure_eeg(len, sr, seed)),
+        ),
+        (
+            "Post-ictal",
+            Box::new(|len, sr, seed| generate_postictal_eeg(len, sr, seed)),
+        ),
+        (
+            "Normal",
+            Box::new(|len, sr, seed| generate_normal_eeg(len, sr, seed)),
+        ),
+        (
+            "Normal",
+            Box::new(|len, sr, seed| generate_normal_eeg(len, sr, seed)),
+        ),
     ];
 
     let mut phi_trajectory = Vec::new();
@@ -210,7 +244,11 @@ fn main() {
         sync_trajectory.push(metrics.synchrony);
         score_trajectory.push(score);
 
-        let label = if score >= threshold { "SEIZURE" } else { "normal " };
+        let label = if score >= threshold {
+            "SEIZURE"
+        } else {
+            "normal "
+        };
         println!(
             "  t={:>2} [{:10}] │ {} │ score={:.4} │ φ={:.4} │ sync={:.4}",
             i, phase_name, label, score, metrics.phi_proxy, metrics.synchrony
@@ -229,14 +267,32 @@ fn main() {
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║                 VALIDATION SUMMARY                         ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║  Specificity (normal→normal):  {:.1}% ({}/{})              ║",
-        specificity * 100.0, normal_correct, test_normal);
-    println!("║  Sensitivity (seizure→detect): {:.1}% ({}/{})              ║",
-        sensitivity * 100.0, seizure_detected, test_seizure);
-    println!("║  Pre-ictal detection:          {:.1}% ({}/{})              ║",
-        preictal_rate * 100.0, preictal_transitional, test_preictal);
-    println!("║  Seizure sync > normal sync:   {}                         ║",
-        if seizure_sync > normal_sync { "PASS" } else { "FAIL" });
+    println!(
+        "║  Specificity (normal→normal):  {:.1}% ({}/{})              ║",
+        specificity * 100.0,
+        normal_correct,
+        test_normal
+    );
+    println!(
+        "║  Sensitivity (seizure→detect): {:.1}% ({}/{})              ║",
+        sensitivity * 100.0,
+        seizure_detected,
+        test_seizure
+    );
+    println!(
+        "║  Pre-ictal detection:          {:.1}% ({}/{})              ║",
+        preictal_rate * 100.0,
+        preictal_transitional,
+        test_preictal
+    );
+    println!(
+        "║  Seizure sync > normal sync:   {}                         ║",
+        if seizure_sync > normal_sync {
+            "PASS"
+        } else {
+            "FAIL"
+        }
+    );
     println!("╟──────────────────────────────────────────────────────────────╢");
 
     let checks = vec![
@@ -250,8 +306,12 @@ fn main() {
         println!("║  {} {:50}   ║", if *pass { "PASS" } else { "FAIL" }, name);
     }
     println!("╟──────────────────────────────────────────────────────────────╢");
-    println!("║  Result: {}/{} tests passed  ({:.1}s)                       ║",
-        passed, checks.len(), test_time);
+    println!(
+        "║  Result: {}/{} tests passed  ({:.1}s)                       ║",
+        passed,
+        checks.len(),
+        test_time
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Save
@@ -278,7 +338,11 @@ fn main() {
 /// Returns a feature vector: [delta_ratio, inv_entropy, synchrony, total_power]
 fn extract_seizure_features(m: &IntegrationMetrics) -> [f32; 4] {
     let total = m.delta_power + m.theta_power + m.alpha_power + m.beta_power + m.gamma_power;
-    let delta_ratio = if total > 1e-6 { m.delta_power / total } else { 0.0 };
+    let delta_ratio = if total > 1e-6 {
+        m.delta_power / total
+    } else {
+        0.0
+    };
     // Invert entropy so high score = seizure-like (low entropy = rhythmic)
     let inv_entropy = 1.0 - m.spectral_entropy.clamp(0.0, 1.0);
     [delta_ratio, inv_entropy, m.synchrony, total]
@@ -305,22 +369,29 @@ fn seizure_score(m: &IntegrationMetrics) -> f32 {
 /// Uses the midpoint between the max normal score and min seizure score.
 /// Falls back to the mean of all scores if classes overlap.
 fn compute_seizure_threshold(normal: &[[f32; 4]], seizure: &[[f32; 4]]) -> f32 {
-    let normal_scores: Vec<f32> = normal.iter().map(|f| {
-        let m = IntegrationMetrics {
-            delta_power: f[0] * (f[0] + 0.001), // reconstruct approximate metrics
-            spectral_entropy: 1.0 - f[1],
-            synchrony: f[2],
-            ..Default::default()
-        };
-        // Actually just compute from features directly
-        0.35 * f[0] + 0.30 * f[1] + 0.20 * f[2] + 0.15 * (f[3] / 50.0).clamp(0.0, 2.0)
-    }).collect();
+    let normal_scores: Vec<f32> = normal
+        .iter()
+        .map(|f| {
+            let m = IntegrationMetrics {
+                delta_power: f[0] * (f[0] + 0.001), // reconstruct approximate metrics
+                spectral_entropy: 1.0 - f[1],
+                synchrony: f[2],
+                ..Default::default()
+            };
+            // Actually just compute from features directly
+            0.35 * f[0] + 0.30 * f[1] + 0.20 * f[2] + 0.15 * (f[3] / 50.0).clamp(0.0, 2.0)
+        })
+        .collect();
 
-    let seizure_scores: Vec<f32> = seizure.iter().map(|f| {
-        0.35 * f[0] + 0.30 * f[1] + 0.20 * f[2] + 0.15 * (f[3] / 50.0).clamp(0.0, 2.0)
-    }).collect();
+    let seizure_scores: Vec<f32> = seizure
+        .iter()
+        .map(|f| 0.35 * f[0] + 0.30 * f[1] + 0.20 * f[2] + 0.15 * (f[3] / 50.0).clamp(0.0, 2.0))
+        .collect();
 
-    let max_normal = normal_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let max_normal = normal_scores
+        .iter()
+        .cloned()
+        .fold(f32::NEG_INFINITY, f32::max);
     let min_seizure = seizure_scores.iter().cloned().fold(f32::INFINITY, f32::min);
 
     if min_seizure > max_normal {

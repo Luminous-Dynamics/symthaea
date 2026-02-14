@@ -24,9 +24,8 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    StandardModel, Hadrons, PeriodicTable, NuclearPhysics,
-    ElectronNuclearCoupling, PhononDynamics, InverseSearchEngine,
-    TargetProperties, TriggerMethod,
+    ElectronNuclearCoupling, Hadrons, InverseSearchEngine, NuclearPhysics, PeriodicTable,
+    PhononDynamics, StandardModel, TargetProperties, TriggerMethod,
 };
 
 fn main() {
@@ -59,10 +58,22 @@ fn main() {
 
     let target = TargetProperties::ideal_energy_source();
     println!("Target Properties (0-1 scale):");
-    println!("  Energy Density:       {:.1} (high = nuclear scale)", target.energy_density);
-    println!("  Trigger Accessibility:{:.1} (high = laser accessible)", target.trigger_accessibility);
-    println!("  Stability:            {:.1} (high = decades)", target.stability);
-    println!("  Abundance:            {:.1} (high = common)", target.abundance);
+    println!(
+        "  Energy Density:       {:.1} (high = nuclear scale)",
+        target.energy_density
+    );
+    println!(
+        "  Trigger Accessibility:{:.1} (high = laser accessible)",
+        target.trigger_accessibility
+    );
+    println!(
+        "  Stability:            {:.1} (high = decades)",
+        target.stability
+    );
+    println!(
+        "  Abundance:            {:.1} (high = common)",
+        target.abundance
+    );
     println!("  NEEC Coupling:        {:.1}", target.neec_coupling);
     println!("  Phonon Coupling:      {:.1}", target.phonon_coupling);
     println!("  Safety:               {:.1}", target.safety);
@@ -71,17 +82,21 @@ fn main() {
     let candidates = engine.search(&target, &neec, &phonons, &table, &hadrons);
 
     println!("TOP 5 CANDIDATES:\n");
-    println!("{:<25} {:>8} {:>8} {:>8} {:>8}",
-             "Candidate", "Match", "Trigger", "Stable", "NEEC");
+    println!(
+        "{:<25} {:>8} {:>8} {:>8} {:>8}",
+        "Candidate", "Match", "Trigger", "Stable", "NEEC"
+    );
     println!("{}", "─".repeat(60));
 
     for (i, candidate) in candidates.iter().take(5).enumerate() {
-        println!("{:<25} {:>7.1}% {:>7.1}% {:>7.1}% {:>7.1}%",
-                 candidate.name,
-                 candidate.match_score * 100.0,
-                 candidate.property_scores.trigger_accessibility * 100.0,
-                 candidate.property_scores.stability * 100.0,
-                 candidate.property_scores.neec_coupling * 100.0);
+        println!(
+            "{:<25} {:>7.1}% {:>7.1}% {:>7.1}% {:>7.1}%",
+            candidate.name,
+            candidate.match_score * 100.0,
+            candidate.property_scores.trigger_accessibility * 100.0,
+            candidate.property_scores.stability * 100.0,
+            candidate.property_scores.neec_coupling * 100.0
+        );
 
         if i == 0 {
             println!("\n  ┌─ BEST MATCH TRIGGER PROTOCOL:");
@@ -110,11 +125,18 @@ fn main() {
 
     println!("TOP 3 NUCLEAR CLOCK CANDIDATES:\n");
     for candidate in clock_candidates.iter().take(3) {
-        println!("  {} (Match: {:.1}%)", candidate.name, candidate.match_score * 100.0);
+        println!(
+            "  {} (Match: {:.1}%)",
+            candidate.name,
+            candidate.match_score * 100.0
+        );
         println!("    Trigger: {:?}", candidate.trigger.method);
         if let Some(wl) = candidate.trigger.wavelength_nm {
             if wl < 200.0 {
-                println!("    Wavelength: {:.2} nm (VUV - challenging but possible)", wl);
+                println!(
+                    "    Wavelength: {:.2} nm (VUV - challenging but possible)",
+                    wl
+                );
             } else {
                 println!("    Wavelength: {:.2} nm", wl);
             }
@@ -141,21 +163,26 @@ fn main() {
     let lcf_candidates = engine.search(&lcf_target, &neec, &phonons, &table, &hadrons);
 
     // Filter to LCF candidates only
-    let lcf_only: Vec<_> = lcf_candidates.iter()
+    let lcf_only: Vec<_> = lcf_candidates
+        .iter()
         .filter(|c| c.name.contains("LCF"))
         .collect();
 
     println!("LATTICE CONFINEMENT FUSION HOSTS:\n");
-    println!("{:<20} {:>10} {:>12} {:>10}",
-             "Material", "LCF Score", "Phonon Coup", "Match");
+    println!(
+        "{:<20} {:>10} {:>12} {:>10}",
+        "Material", "LCF Score", "Phonon Coup", "Match"
+    );
     println!("{}", "─".repeat(55));
 
     for candidate in lcf_only.iter().take(5) {
-        println!("{:<20} {:>9.1}% {:>11.1}% {:>9.1}%",
-                 candidate.name,
-                 candidate.property_scores.energy_density * 100.0,
-                 candidate.property_scores.phonon_coupling * 100.0,
-                 candidate.match_score * 100.0);
+        println!(
+            "{:<20} {:>9.1}% {:>11.1}% {:>9.1}%",
+            candidate.name,
+            candidate.property_scores.energy_density * 100.0,
+            candidate.property_scores.phonon_coupling * 100.0,
+            candidate.match_score * 100.0
+        );
     }
 
     // Analyze best LCF materials
@@ -163,7 +190,11 @@ fn main() {
     for material in phonons.materials.iter().take(5) {
         let lcf = phonons.analyze_lcf_potential(material);
         if lcf.lcf_potential > 0.5 {
-            println!("  {} (LCF Potential: {:.1}%)", material.name, lcf.lcf_potential * 100.0);
+            println!(
+                "  {} (LCF Potential: {:.1}%)",
+                material.name,
+                lcf.lcf_potential * 100.0
+            );
             println!("    H Solubility:   {:.1}%", lcf.h_solubility * 100.0);
             println!("    Screening:      {:.1}%", lcf.screening_factor * 100.0);
             println!("    Phonon Factor:  {:.1}%", lcf.phonon_factor * 100.0);
@@ -178,8 +209,10 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     println!("Known NEEC Candidates (sorted by cross-section estimate):\n");
-    println!("{:<12} {:>10} {:>12} {:>12} {:>12}",
-             "Isomer", "Energy", "Detuning", "Coupling", "X-Section");
+    println!(
+        "{:<12} {:>10} {:>12} {:>12} {:>12}",
+        "Isomer", "Energy", "Detuning", "Coupling", "X-Section"
+    );
     println!("{}", "─".repeat(60));
 
     let mut neec_sorted = neec.candidates.clone();
@@ -199,12 +232,18 @@ fn main() {
             format!("{:.2} MeV", coupling.nuclear.energy_ev / 1_000_000.0)
         };
 
-        println!("{:<12} {:>10} {:>11.2} eV {:>11.1}% {:>12.2e}",
-                 format!("{}-{}", element_symbol(coupling.nuclear.z), coupling.nuclear.a),
-                 energy_str,
-                 coupling.detuning_ev,
-                 coupling.coupling_strength * 100.0,
-                 xs);
+        println!(
+            "{:<12} {:>10} {:>11.2} eV {:>11.1}% {:>12.2e}",
+            format!(
+                "{}-{}",
+                element_symbol(coupling.nuclear.z),
+                coupling.nuclear.a
+            ),
+            energy_str,
+            coupling.detuning_ev,
+            coupling.coupling_strength * 100.0,
+            xs
+        );
     }
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -215,23 +254,31 @@ fn main() {
 
     // For each NEEC candidate, find best phonon coupling
     for coupling in neec.candidates.iter().take(3) {
-        println!("Target: {}-{} ({:.2} eV transition)",
-                 element_symbol(coupling.nuclear.z),
-                 coupling.nuclear.a,
-                 coupling.nuclear.energy_ev);
+        println!(
+            "Target: {}-{} ({:.2} eV transition)",
+            element_symbol(coupling.nuclear.z),
+            coupling.nuclear.a,
+            coupling.nuclear.energy_ev
+        );
 
         let phonon_coupling = phonons.calculate_coupling(
-            phonons.materials.iter()
+            phonons
+                .materials
+                .iter()
                 .find(|m| m.name == "CaF2")
                 .unwrap_or(&phonons.materials[0]),
             coupling.nuclear.energy_ev,
         );
 
         println!("  Best Host: {}", phonon_coupling.material.name);
-        println!("  Phonon Mode: {:.2} THz ({:.4} eV)",
-                 phonon_coupling.phonon.frequency_thz,
-                 phonon_coupling.phonon.energy_ev);
-        println!("  Coupling Strength: {:.1}%", phonon_coupling.coupling_strength * 100.0);
+        println!(
+            "  Phonon Mode: {:.2} THz ({:.4} eV)",
+            phonon_coupling.phonon.frequency_thz, phonon_coupling.phonon.energy_ev
+        );
+        println!(
+            "  Coupling Strength: {:.1}%",
+            phonon_coupling.coupling_strength * 100.0
+        );
         println!("  Detuning: {:.4} eV", phonon_coupling.detuning_ev);
         println!();
     }
@@ -243,18 +290,20 @@ fn main() {
     // Get best overall candidate
     let best = candidates.first();
 
-    println!("RECOMMENDED PATH: {}\n",
-             if let Some(b) = best {
-                 if b.name.contains("Th-229") {
-                     "NEEC (Thorium-229m Nuclear Clock)"
-                 } else if b.name.contains("LCF") {
-                     "Lattice Confinement Fusion"
-                 } else {
-                     "NEEC Coupling"
-                 }
-             } else {
-                 "Unknown"
-             });
+    println!(
+        "RECOMMENDED PATH: {}\n",
+        if let Some(b) = best {
+            if b.name.contains("Th-229") {
+                "NEEC (Thorium-229m Nuclear Clock)"
+            } else if b.name.contains("LCF") {
+                "Lattice Confinement Fusion"
+            } else {
+                "NEEC Coupling"
+            }
+        } else {
+            "Unknown"
+        }
+    );
 
     println!("Key Findings:");
     println!();
@@ -284,9 +333,19 @@ fn main() {
 
 fn element_symbol(z: u8) -> &'static str {
     match z {
-        1 => "H", 2 => "He", 6 => "C", 8 => "O",
-        26 => "Fe", 42 => "Mo", 43 => "Tc", 46 => "Pd",
-        68 => "Er", 72 => "Hf", 73 => "Ta", 90 => "Th", 92 => "U",
+        1 => "H",
+        2 => "He",
+        6 => "C",
+        8 => "O",
+        26 => "Fe",
+        42 => "Mo",
+        43 => "Tc",
+        46 => "Pd",
+        68 => "Er",
+        72 => "Hf",
+        73 => "Ta",
+        90 => "Th",
+        92 => "U",
         _ => "X",
     }
 }

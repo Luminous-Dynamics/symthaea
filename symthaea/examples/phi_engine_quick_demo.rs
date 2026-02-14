@@ -4,9 +4,9 @@
 //! small consciousness topologies. This is intentionally small
 //! and deterministic, suitable for quick sanity checks.
 
-use symthaea::phi_engine::{PhiEngine, PhiMethod};
 use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
 use symthaea::hdc::unified_hv::ContinuousHV;
+use symthaea::phi_engine::{PhiEngine, PhiMethod};
 
 fn main() {
     // Small topology for a fast, reproducible demo
@@ -37,7 +37,10 @@ fn main() {
 
     // 1. Auto method (will choose Continuous for n <= 64)
     let engine_auto = PhiEngine::auto();
-    println!("Method suggestion for n={n_nodes}: {:?}", PhiEngine::suggest_method(n_nodes));
+    println!(
+        "Method suggestion for n={n_nodes}: {:?}",
+        PhiEngine::suggest_method(n_nodes)
+    );
 
     let star_auto = engine_auto.compute(&star_hvs);
     let ring_auto = engine_auto.compute(&ring_hvs);

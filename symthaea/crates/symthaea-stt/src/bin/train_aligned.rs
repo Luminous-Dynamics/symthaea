@@ -20,12 +20,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use symthaea_stt::{
-    AudioFrontend, AudioProjector,
-    TrainedPrototypes, BootstrapConfig,
-    HV16, load_alignments, id_to_audio_path,
-};
 use symthaea_stt::hdc::BundleAccumulator;
+use symthaea_stt::{
+    id_to_audio_path, load_alignments, AudioFrontend, AudioProjector, BootstrapConfig,
+    TrainedPrototypes, HV16,
+};
 
 #[derive(Parser)]
 #[command(
@@ -83,9 +82,7 @@ impl PhonemeAccumulator {
     }
 
     fn add(&mut self, phoneme: &str, hv: &HV16) {
-        let acc = self.accumulators
-            .entry(phoneme.to_string())
-            .or_default();
+        let acc = self.accumulators.entry(phoneme.to_string()).or_default();
         acc.add(hv);
 
         *self.counts.entry(phoneme.to_string()).or_insert(0) += 1;
@@ -112,9 +109,20 @@ impl PhonemeAccumulator {
 fn main() {
     let cli = Cli::parse();
 
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("    SUPERVISED PHONEME PROTOTYPE TRAINING                  ").bold().cyan());
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("    SUPERVISED PHONEME PROTOTYPE TRAINING                  ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
     println!();
     println!("  Uses ground truth phoneme boundaries from forced alignment");
     println!("  This is the GOLDEN PATH to accurate prototypes");
@@ -122,11 +130,19 @@ fn main() {
 
     // Check paths
     if !cli.alignments.exists() {
-        eprintln!("{} Alignments file not found: {:?}", style("ERROR:").red().bold(), cli.alignments);
+        eprintln!(
+            "{} Alignments file not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.alignments
+        );
         std::process::exit(1);
     }
     if !cli.audio_dir.exists() {
-        eprintln!("{} Audio directory not found: {:?}", style("ERROR:").red().bold(), cli.audio_dir);
+        eprintln!(
+            "{} Audio directory not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.audio_dir
+        );
         std::process::exit(1);
     }
 
@@ -135,7 +151,11 @@ fn main() {
     let alignments = match load_alignments(&cli.alignments) {
         Ok(a) => a,
         Err(e) => {
-            eprintln!("{} Failed to load alignments: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to load alignments: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -154,14 +174,19 @@ fn main() {
         alignments.len()
     };
 
-    println!("\n📂 Processing {} utterances from {:?}...", total, cli.audio_dir);
+    println!(
+        "\n📂 Processing {} utterances from {:?}...",
+        total, cli.audio_dir
+    );
 
     // Progress bar
     let pb = ProgressBar::new(total as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-        .unwrap()
-        .progress_chars("#>-"));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+            .unwrap()
+            .progress_chars("#>-"),
+    );
 
     let mut processed = 0;
     let mut skipped = 0;
@@ -229,7 +254,10 @@ fn main() {
 
         // Update progress
         if i % 100 == 0 {
-            pb.set_message(format!("{} frames, {} segments", total_frames, total_segments));
+            pb.set_message(format!(
+                "{} frames, {} segments",
+                total_frames, total_segments
+            ));
         }
     }
 
@@ -251,17 +279,24 @@ fn main() {
         println!("    {} - {}", ph, count);
     }
 
-    let phonemes_above_min = sorted_counts.iter()
+    let phonemes_above_min = sorted_counts
+        .iter()
         .filter(|(_, c)| **c >= cli.min_instances)
         .count();
-    println!("    Phonemes with ≥{} instances: {}", cli.min_instances, phonemes_above_min);
+    println!(
+        "    Phonemes with ≥{} instances: {}",
+        cli.min_instances, phonemes_above_min
+    );
 
     // Finalize prototypes (consumes accumulator)
     let mut prototypes = accumulator.finalize(cli.min_instances);
 
     // Apply contrastive separation
     if cli.min_separation > 0.0 {
-        println!("\n🔧 Applying contrastive separation (target: <{})...", cli.min_separation);
+        println!(
+            "\n🔧 Applying contrastive separation (target: <{})...",
+            cli.min_separation
+        );
 
         let mut trained = TrainedPrototypes {
             prototypes: prototypes.clone(),
@@ -324,10 +359,19 @@ fn main() {
         if !within_class_sims.is_empty() {
             let avg_within = within_class_sims.iter().sum::<f32>() / within_class_sims.len() as f32;
             let avg_cross = cross_class_sims.iter().sum::<f32>() / cross_class_sims.len() as f32;
-            let max_within = within_class_sims.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-            let min_within = within_class_sims.iter().cloned().fold(f32::INFINITY, f32::min);
+            let max_within = within_class_sims
+                .iter()
+                .cloned()
+                .fold(f32::NEG_INFINITY, f32::max);
+            let min_within = within_class_sims
+                .iter()
+                .cloned()
+                .fold(f32::INFINITY, f32::min);
 
-            println!("    Within-class similarity: avg={:.3}, min={:.3}, max={:.3}", avg_within, min_within, max_within);
+            println!(
+                "    Within-class similarity: avg={:.3}, min={:.3}, max={:.3}",
+                avg_within, min_within, max_within
+            );
             println!("    Cross-class similarity: avg={:.3}", avg_cross);
             println!("    Separation margin: {:.3}", avg_within - avg_cross);
         }
@@ -355,8 +399,19 @@ fn main() {
 
     println!("  ✓ Saved {} phonemes", trained.len());
 
-    println!("\n{}", style("═══════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("                SUPERVISED TRAINING COMPLETE               ").bold().green());
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
+    println!(
+        "\n{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("                SUPERVISED TRAINING COMPLETE               ")
+            .bold()
+            .green()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
     println!("\n  Next: stt-eval --prototypes {:?}", cli.output);
 }

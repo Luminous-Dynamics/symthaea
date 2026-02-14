@@ -20,10 +20,9 @@ mod live_impl {
     use std::time::{Duration, Instant};
 
     use symthaea_sentinel::{
-        AudioPump, AudioConfig, AudioSentinel, AudioFeatures, AudioCategory,
-        MEL_BANDS, FREQ_BINS, NUM_MFCC,
-        compute_onset_strength, compute_spectral_centroid, compute_spectral_flatness,
-        compute_temporal_regularity, spectrum_to_mel_bands, compute_mfcc,
+        compute_mfcc, compute_onset_strength, compute_spectral_centroid, compute_spectral_flatness,
+        compute_temporal_regularity, spectrum_to_mel_bands, AudioCategory, AudioConfig,
+        AudioFeatures, AudioPump, AudioSentinel, FREQ_BINS, MEL_BANDS, NUM_MFCC,
     };
 
     pub fn run() -> Result<()> {
@@ -45,8 +44,7 @@ mod live_impl {
 
         // Initialize audio pump
         let config = AudioConfig::default();
-        let mut pump = AudioPump::new(config)
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let mut pump = AudioPump::new(config).map_err(|e| anyhow::anyhow!("{}", e))?;
 
         println!("  Control Rate: {:.1} Hz", pump.control_rate());
         println!("  Sample Rate:  {:.0} Hz\n", pump.sample_rate());
@@ -92,11 +90,14 @@ mod live_impl {
                     while start.elapsed() < duration && running.load(Ordering::Relaxed) {
                         if let Some(spectrum) = pump.next_power_spectrum() {
                             // Compute features
-                            let mel_bands = spectrum_to_mel_bands(&spectrum, MEL_BANDS, pump.sample_rate());
+                            let mel_bands =
+                                spectrum_to_mel_bands(&spectrum, MEL_BANDS, pump.sample_rate());
                             let mfcc = compute_mfcc(&mel_bands);
 
                             let spectral_centroid = compute_spectral_centroid(
-                                &spectrum, pump.sample_rate(), pump.window_size()
+                                &spectrum,
+                                pump.sample_rate(),
+                                pump.window_size(),
                             );
                             let spectral_flatness = compute_spectral_flatness(&spectrum);
 
@@ -115,7 +116,8 @@ mod live_impl {
                             let temporal_regularity = compute_temporal_regularity(&onset_history);
 
                             // Estimate RMS from spectrum (approximation)
-                            let rms_energy = (spectrum.iter().sum::<f32>() / spectrum.len() as f32).sqrt();
+                            let rms_energy =
+                                (spectrum.iter().sum::<f32>() / spectrum.len() as f32).sqrt();
 
                             // Spectral rolloff (85% energy point)
                             let total: f32 = spectrum.iter().sum();
@@ -128,10 +130,12 @@ mod live_impl {
                                     break;
                                 }
                             }
-                            let spectral_rolloff = rolloff_bin as f32 * (pump.sample_rate() / pump.window_size() as f32);
+                            let spectral_rolloff = rolloff_bin as f32
+                                * (pump.sample_rate() / pump.window_size() as f32);
 
                             // Zero crossing rate approximation from high-frequency content
-                            let high_freq_energy: f32 = spectrum.iter().skip(spectrum.len() / 2).sum();
+                            let high_freq_energy: f32 =
+                                spectrum.iter().skip(spectrum.len() / 2).sum();
                             let zero_crossing_rate = (high_freq_energy / total.max(1e-10)).min(0.5);
 
                             let features = AudioFeatures {
@@ -157,11 +161,13 @@ mod live_impl {
                             let level = (rms_energy * 50.0).min(20.0) as usize;
                             let level_bar = "█".repeat(level) + &"░".repeat(20 - level);
 
-                            print!("\r  [{:30}] {:.0}%  Level: [{}] Φr={:.4}",
+                            print!(
+                                "\r  [{:30}] {:.0}%  Level: [{}] Φr={:.4}",
                                 "█".repeat(bar) + &"░".repeat(30 - bar),
                                 progress * 100.0,
                                 level_bar,
-                                result.phi_rhythm);
+                                result.phi_rhythm
+                            );
                             io::stdout().flush()?;
                         }
 
@@ -169,7 +175,10 @@ mod live_impl {
                     }
 
                     sentinel.stop_learning();
-                    println!("\n  ✓ Pattern '{}' learned! ({} frames)\n", name, frame_count);
+                    println!(
+                        "\n  ✓ Pattern '{}' learned! ({} frames)\n",
+                        name, frame_count
+                    );
                 }
 
                 Some('M') => {
@@ -180,8 +189,13 @@ mod live_impl {
 
                     while running.load(Ordering::Relaxed) {
                         if let Some(spectrum) = pump.next_power_spectrum() {
-                            let mel_bands = spectrum_to_mel_bands(&spectrum, MEL_BANDS, pump.sample_rate());
-                            let centroid = compute_spectral_centroid(&spectrum, pump.sample_rate(), pump.window_size());
+                            let mel_bands =
+                                spectrum_to_mel_bands(&spectrum, MEL_BANDS, pump.sample_rate());
+                            let centroid = compute_spectral_centroid(
+                                &spectrum,
+                                pump.sample_rate(),
+                                pump.window_size(),
+                            );
                             let onset = if prev_spectrum.is_empty() {
                                 0.0
                             } else {
@@ -209,8 +223,10 @@ mod live_impl {
                                 mel_viz.push(char);
                             }
 
-                            print!("\r  Mel:[{}] Cent:{:5.0}Hz Onset:{:.3} RMS:{:.3}   ",
-                                mel_viz, centroid, onset, rms);
+                            print!(
+                                "\r  Mel:[{}] Cent:{:5.0}Hz Onset:{:.3} RMS:{:.3}   ",
+                                mel_viz, centroid, onset, rms
+                            );
                             io::stdout().flush()?;
                         }
 
@@ -232,11 +248,14 @@ mod live_impl {
 
                     while running.load(Ordering::Relaxed) {
                         if let Some(spectrum) = pump.next_power_spectrum() {
-                            let mel_bands = spectrum_to_mel_bands(&spectrum, MEL_BANDS, pump.sample_rate());
+                            let mel_bands =
+                                spectrum_to_mel_bands(&spectrum, MEL_BANDS, pump.sample_rate());
                             let mfcc = compute_mfcc(&mel_bands);
 
                             let spectral_centroid = compute_spectral_centroid(
-                                &spectrum, pump.sample_rate(), pump.window_size()
+                                &spectrum,
+                                pump.sample_rate(),
+                                pump.window_size(),
                             );
                             let spectral_flatness = compute_spectral_flatness(&spectrum);
 
@@ -254,7 +273,8 @@ mod live_impl {
                             }
                             let temporal_regularity = compute_temporal_regularity(&onset_history);
 
-                            let rms_energy = (spectrum.iter().sum::<f32>() / spectrum.len() as f32).sqrt();
+                            let rms_energy =
+                                (spectrum.iter().sum::<f32>() / spectrum.len() as f32).sqrt();
 
                             let total: f32 = spectrum.iter().sum();
                             let mut cumsum = 0.0;
@@ -266,8 +286,10 @@ mod live_impl {
                                     break;
                                 }
                             }
-                            let spectral_rolloff = rolloff_bin as f32 * (pump.sample_rate() / pump.window_size() as f32);
-                            let high_freq_energy: f32 = spectrum.iter().skip(spectrum.len() / 2).sum();
+                            let spectral_rolloff = rolloff_bin as f32
+                                * (pump.sample_rate() / pump.window_size() as f32);
+                            let high_freq_energy: f32 =
+                                spectrum.iter().skip(spectrum.len() / 2).sum();
                             let zero_crossing_rate = (high_freq_energy / total.max(1e-10)).min(0.5);
 
                             let features = AudioFeatures {
@@ -293,19 +315,25 @@ mod live_impl {
                                 let bar_len = (sim.combined * 10.0).min(10.0) as usize;
                                 let is_best = result.detected_pattern == *name;
                                 let color = if is_best { "\x1b[32m" } else { "\x1b[90m" };
-                                sim_parts.push(format!("{}:{}{:.2}\x1b[0m",
-                                    &name[..name.len().min(8)], color, sim.combined));
+                                sim_parts.push(format!(
+                                    "{}:{}{:.2}\x1b[0m",
+                                    &name[..name.len().min(8)],
+                                    color,
+                                    sim.combined
+                                ));
                             }
 
                             // Level meter
                             let level = (rms_energy * 50.0).min(10.0) as usize;
                             let level_bar = "█".repeat(level) + &"░".repeat(10 - level);
 
-                            print!("\r  [{}] {} │ \x1b[1m{:10}\x1b[0m ({:.0}%)   ",
+                            print!(
+                                "\r  [{}] {} │ \x1b[1m{:10}\x1b[0m ({:.0}%)   ",
                                 level_bar,
                                 sim_parts.join(" "),
                                 result.detected_pattern,
-                                result.confidence * 100.0);
+                                result.confidence * 100.0
+                            );
                             io::stdout().flush()?;
                         }
 
@@ -322,11 +350,18 @@ mod live_impl {
                     println!("\n  Learned Patterns:");
 
                     for (name, pattern) in &sentinel.patterns {
-                        if pattern.frame_count == 0 { continue; }
-                        println!("    {} ({:?}, {} frames)", name, pattern.category, pattern.frame_count);
+                        if pattern.frame_count == 0 {
+                            continue;
+                        }
+                        println!(
+                            "    {} ({:?}, {} frames)",
+                            name, pattern.category, pattern.frame_count
+                        );
 
                         // Find dominant rhythm frequency
-                        let rhythm_max_idx = pattern.rhythm_freq_signature.iter()
+                        let rhythm_max_idx = pattern
+                            .rhythm_freq_signature
+                            .iter()
                             .enumerate()
                             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
                             .map(|(i, _)| i)
@@ -336,7 +371,9 @@ mod live_impl {
 
                         print!("      Rhythm:  [");
                         for (i, &f) in pattern.rhythm_freq_signature.iter().enumerate() {
-                            if i > 0 { print!(", "); }
+                            if i > 0 {
+                                print!(", ");
+                            }
                             if i == rhythm_max_idx && f > 0.01 {
                                 print!("\x1b[33m{:.3}\x1b[0m", f);
                             } else {
@@ -347,7 +384,9 @@ mod live_impl {
 
                         print!("      Timbre:  [");
                         for (i, &f) in pattern.timbre_freq_signature.iter().enumerate() {
-                            if i > 0 { print!(", "); }
+                            if i > 0 {
+                                print!(", ");
+                            }
                             if f > 0.05 {
                                 print!("\x1b[36m{:.3}\x1b[0m", f);
                             } else {
@@ -365,7 +404,9 @@ mod live_impl {
                 }
 
                 _ => {
-                    println!("  Commands: 1-9 (learn), D (detect), M (monitor), S (summary), Q (quit)");
+                    println!(
+                        "  Commands: 1-9 (learn), D (detect), M (monitor), S (summary), Q (quit)"
+                    );
                 }
             }
         }

@@ -190,7 +190,8 @@ impl ResonatorNetwork {
         self.iteration_history.clear();
 
         // Initialize estimates for each factor
-        let mut estimates: Vec<Vec<f32>> = self.codebooks
+        let mut estimates: Vec<Vec<f32>> = self
+            .codebooks
             .iter()
             .map(|c| {
                 // Start with soft attention over codebook
@@ -214,10 +215,7 @@ impl ResonatorNetwork {
                 }
 
                 // Project residual onto codebook i
-                estimates[i] = self.codebooks[i].soft_attention(
-                    &residual,
-                    self.config.temperature,
-                );
+                estimates[i] = self.codebooks[i].soft_attention(&residual, self.config.temperature);
             }
 
             // Compute current state (binding of all estimates)
@@ -256,7 +254,11 @@ impl ResonatorNetwork {
     /// Given: scene = (cat ⊗ pos_A) + (dog ⊗ pos_B)
     /// Query: "What is at pos_A?"
     /// Returns: cat
-    pub fn query(&mut self, scene: &[f32], known_factors: &[(&str, &[f32])]) -> Result<Vec<(String, Vec<f32>)>> {
+    pub fn query(
+        &mut self,
+        scene: &[f32],
+        known_factors: &[(&str, &[f32])],
+    ) -> Result<Vec<(String, Vec<f32>)>> {
         // Unbind known factors from scene
         let mut residual = scene.to_vec();
         for (_, hv) in known_factors {
@@ -303,7 +305,8 @@ fn unbind(a: &[f32], b: &[f32], bipolar: bool) -> Vec<f32> {
     } else {
         // For binary, we'd need element-wise XOR equivalent
         // Approximate: a * (2*b - 1) maps {0,1} to {-1,+1} then multiply
-        a.iter().zip(b.iter())
+        a.iter()
+            .zip(b.iter())
             .map(|(x, y)| x * (2.0 * y - 1.0))
             .collect()
     }
@@ -313,9 +316,13 @@ fn unbind(a: &[f32], b: &[f32], bipolar: bool) -> Vec<f32> {
 #[allow(dead_code)]
 fn threshold(v: &[f32], bipolar: bool) -> Vec<f32> {
     if bipolar {
-        v.iter().map(|&x| if x >= 0.0 { 1.0 } else { -1.0 }).collect()
+        v.iter()
+            .map(|&x| if x >= 0.0 { 1.0 } else { -1.0 })
+            .collect()
     } else {
-        v.iter().map(|&x| if x >= 0.0 { 1.0 } else { 0.0 }).collect()
+        v.iter()
+            .map(|&x| if x >= 0.0 { 1.0 } else { 0.0 })
+            .collect()
     }
 }
 
@@ -395,7 +402,9 @@ impl ResonatorMemory {
                 // Score = importance - age_penalty
                 let score_a = a.importance - (self.timestamp - a.timestamp) as f32 * 0.001;
                 let score_b = b.importance - (self.timestamp - b.timestamp) as f32 * 0.001;
-                score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+                score_b
+                    .partial_cmp(&score_a)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
             self.episodes.truncate(self.max_episodes);
         }
@@ -436,7 +445,8 @@ impl ResonatorMemory {
         }
 
         // Find matching episodes by similarity
-        let mut matches: Vec<(&Episode, f32)> = self.episodes
+        let mut matches: Vec<(&Episode, f32)> = self
+            .episodes
             .iter()
             .map(|ep| (ep, cosine_similarity(&query, &ep.hv)))
             .collect();
@@ -448,7 +458,11 @@ impl ResonatorMemory {
 
     /// Query: "What was attribute X when attribute Y was Z?"
     /// Uses resonator to factorize the bundled memory
-    pub fn query_factorize(&mut self, scene: &[f32], known: &[(&str, &[f32])]) -> Result<Vec<(String, Vec<f32>)>> {
+    pub fn query_factorize(
+        &mut self,
+        scene: &[f32],
+        known: &[(&str, &[f32])],
+    ) -> Result<Vec<(String, Vec<f32>)>> {
         self.resonator.query(scene, known)
     }
 
@@ -471,7 +485,9 @@ mod tests {
     fn random_hv(dim: usize, seed: u64) -> Vec<f32> {
         use rand::SeedableRng;
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
-        (0..dim).map(|_| if rng.gen::<bool>() { 1.0 } else { -1.0 }).collect()
+        (0..dim)
+            .map(|_| if rng.gen::<bool>() { 1.0 } else { -1.0 })
+            .collect()
     }
 
     #[test]
@@ -544,7 +560,10 @@ mod tests {
     #[test]
     fn test_resonator_memory_store_retrieve() {
         let dim = 256;
-        let config = ResonatorConfig { dim, ..Default::default() };
+        let config = ResonatorConfig {
+            dim,
+            ..Default::default()
+        };
         let mut memory = ResonatorMemory::new(config, 100);
 
         // Setup codebooks
@@ -563,8 +582,16 @@ mod tests {
         memory.add_codebook(actions);
 
         // Store episodes
-        memory.store("ep1", &[("objects", "cat", &cat), ("actions", "sleeping", &sleeping)], 1.0);
-        memory.store("ep2", &[("objects", "dog", &dog), ("actions", "eating", &eating)], 0.8);
+        memory.store(
+            "ep1",
+            &[("objects", "cat", &cat), ("actions", "sleeping", &sleeping)],
+            1.0,
+        );
+        memory.store(
+            "ep2",
+            &[("objects", "dog", &dog), ("actions", "eating", &eating)],
+            0.8,
+        );
 
         assert_eq!(memory.len(), 2);
 
@@ -608,10 +635,15 @@ mod tests {
         let result = resonator.factorize(&scene).unwrap();
 
         // Should converge
-        assert!(resonator.iterations() < 100, "Should converge before max iterations");
+        assert!(
+            resonator.iterations() < 100,
+            "Should converge before max iterations"
+        );
 
         // Should find correct factors
         let labels: Vec<&str> = result.iter().map(|(l, _)| l.as_str()).collect();
-        assert!(labels.iter().any(|l| l.contains("s1_3") || l.contains("s2_7")));
+        assert!(labels
+            .iter()
+            .any(|l| l.contains("s1_3") || l.contains("s2_7")));
     }
 }

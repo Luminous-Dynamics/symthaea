@@ -4,8 +4,8 @@
 //! This shows why HDC excels at structural relations with small vocabularies.
 
 use symthaea_stt::cetacean_scorer::{
-    CetaceanScorer, CetaceanUnit, CetaceanManner, CetaceanPlace,
-    ALL_CAUS, MANNER_NAMES, PLACE_NAMES,
+    CetaceanManner, CetaceanPlace, CetaceanScorer, CetaceanUnit, ALL_CAUS, MANNER_NAMES,
+    PLACE_NAMES,
 };
 
 fn separator(c: char, n: usize) {
@@ -20,13 +20,19 @@ fn main() {
 
     // Create scorer
     let mut scorer = CetaceanScorer::new();
-    println!("Initialized Cetacean Scorer with {} articulatory units", ALL_CAUS.len());
+    println!(
+        "Initialized Cetacean Scorer with {} articulatory units",
+        ALL_CAUS.len()
+    );
     println!();
 
     // Show the articulatory unit inventory
     println!("Cetacean Articulatory Unit Inventory:");
     separator('-', 50);
-    println!("{:15} {:>10} {:>10} {:>10}", "", "Upsweep", "Downsweep", "Flat");
+    println!(
+        "{:15} {:>10} {:>10} {:>10}",
+        "", "Upsweep", "Downsweep", "Flat"
+    );
     for (i, manner) in MANNER_NAMES.iter().enumerate() {
         print!("{:15}", manner);
         for (j, _place) in PLACE_NAMES.iter().enumerate() {
@@ -66,13 +72,19 @@ fn main() {
     println!("Training Patterns:");
     separator('-', 50);
     print!("Sperm Whale Coda:    ");
-    for u in &sperm_coda { print!("{} ", u); }
+    for u in &sperm_coda {
+        print!("{} ", u);
+    }
     println!();
     print!("Humpback Song:       ");
-    for u in &humpback_song { print!("{} ", u); }
+    for u in &humpback_song {
+        print!("{} ", u);
+    }
     println!();
     print!("Orca Call:           ");
-    for u in &orca_call { print!("{} ", u); }
+    for u in &orca_call {
+        print!("{} ", u);
+    }
     println!();
     println!();
 
@@ -104,9 +116,21 @@ fn main() {
     let trained_sperm = scorer.score_sequence(&sperm_coda);
     let trained_humpback = scorer.score_sequence(&humpback_song);
     let trained_orca = scorer.score_sequence(&orca_call);
-    println!("Sperm Whale Coda:    {:.4} (delta = {:+.4})", trained_sperm, trained_sperm - baseline_sperm);
-    println!("Humpback Song:       {:.4} (delta = {:+.4})", trained_humpback, trained_humpback - baseline_humpback);
-    println!("Orca Call:           {:.4} (delta = {:+.4})", trained_orca, trained_orca - baseline_orca);
+    println!(
+        "Sperm Whale Coda:    {:.4} (delta = {:+.4})",
+        trained_sperm,
+        trained_sperm - baseline_sperm
+    );
+    println!(
+        "Humpback Song:       {:.4} (delta = {:+.4})",
+        trained_humpback,
+        trained_humpback - baseline_humpback
+    );
+    println!(
+        "Orca Call:           {:.4} (delta = {:+.4})",
+        trained_orca,
+        trained_orca - baseline_orca
+    );
     println!();
 
     // Phase 4: Discrimination test
@@ -114,8 +138,14 @@ fn main() {
     separator('-', 50);
     let disc_sperm_humpback = scorer.discriminate(&sperm_coda, &humpback_song);
     let disc_sperm_orca = scorer.discriminate(&sperm_coda, &orca_call);
-    println!("Sperm vs Humpback: {:+.4} (positive = Sperm favored)", disc_sperm_humpback);
-    println!("Sperm vs Orca:     {:+.4} (positive = Sperm favored)", disc_sperm_orca);
+    println!(
+        "Sperm vs Humpback: {:+.4} (positive = Sperm favored)",
+        disc_sperm_humpback
+    );
+    println!(
+        "Sperm vs Orca:     {:+.4} (positive = Sperm favored)",
+        disc_sperm_orca
+    );
     println!();
 
     // Phase 5: Test generalization to novel patterns
@@ -142,11 +172,15 @@ fn main() {
     let noise_score = scorer.score_sequence(&noise_pattern);
 
     print!("Novel Sperm-like:    ");
-    for u in &novel_sperm { print!("{} ", u); }
+    for u in &novel_sperm {
+        print!("{} ", u);
+    }
     println!(" -> {:.4}", novel_sperm_score);
 
     print!("Noise Pattern:       ");
-    for u in &noise_pattern { print!("{} ", u); }
+    for u in &noise_pattern {
+        print!("{} ", u);
+    }
     println!(" -> {:.4}", noise_score);
     println!();
 

@@ -6,13 +6,11 @@
 /// 3. Can λ₂ serve as a proxy for IIT Φ?
 ///
 /// Results will inform how to frame the paper's claims.
-
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator,
-    phi_topology_validation::real_hv_to_hv16_probabilistic,
     integrated_information::IntegratedInformation,
-    HDC_DIMENSION,
+    phi_topology_validation::real_hv_to_hv16_probabilistic,
+    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
 
 fn main() {
@@ -123,14 +121,22 @@ fn main() {
     });
 
     // 18. Quantum (1:1:1)
-    measure_topology("Quantum (1:1:1)", &mut results, n_nodes, n_samples, |seed| {
-        ConsciousnessTopology::quantum(n_nodes, HDC_DIMENSION, (1.0, 1.0, 1.0), seed)
-    });
+    measure_topology(
+        "Quantum (1:1:1)",
+        &mut results,
+        n_nodes,
+        n_samples,
+        |seed| ConsciousnessTopology::quantum(n_nodes, HDC_DIMENSION, (1.0, 1.0, 1.0), seed),
+    );
 
     // 19. Quantum (Ring-biased)
-    measure_topology("Quantum (3:1:1)", &mut results, n_nodes, n_samples, |seed| {
-        ConsciousnessTopology::quantum(n_nodes, HDC_DIMENSION, (3.0, 1.0, 1.0), seed)
-    });
+    measure_topology(
+        "Quantum (3:1:1)",
+        &mut results,
+        n_nodes,
+        n_samples,
+        |seed| ConsciousnessTopology::quantum(n_nodes, HDC_DIMENSION, (3.0, 1.0, 1.0), seed),
+    );
 
     // ===== RESULTS ANALYSIS =====
 
@@ -144,8 +150,10 @@ fn main() {
 
     println!("\n📊 RANKED BY λ₂ (Algebraic Connectivity / Spectral):");
     println!("{}", "-".repeat(80));
-    println!("{:<20} {:>10} {:>8} {:>10} {:>8} {:>8}",
-             "Topology", "λ₂", "±", "Φ (IIT)", "±", "λ₂ Rank");
+    println!(
+        "{:<20} {:>10} {:>8} {:>10} {:>8} {:>8}",
+        "Topology", "λ₂", "±", "Φ (IIT)", "±", "λ₂ Rank"
+    );
     println!("{}", "-".repeat(80));
 
     for (rank, (name, l2, l2_std, phi, phi_std)) in lambda_sorted.iter().enumerate() {
@@ -155,8 +163,16 @@ fn main() {
             2 => "🥉",
             _ => "  ",
         };
-        println!("{} {:<18} {:>10.4} {:>8.4} {:>10.4} {:>8.4} {:>8}",
-                 medal, name, l2, l2_std, phi, phi_std, rank + 1);
+        println!(
+            "{} {:<18} {:>10.4} {:>8.4} {:>10.4} {:>8.4} {:>8}",
+            medal,
+            name,
+            l2,
+            l2_std,
+            phi,
+            phi_std,
+            rank + 1
+        );
     }
 
     // Sort by Φ for second table
@@ -165,8 +181,10 @@ fn main() {
 
     println!("\n📊 RANKED BY Φ (IIT-Inspired / Information-Theoretic):");
     println!("{}", "-".repeat(80));
-    println!("{:<20} {:>10} {:>8} {:>10} {:>8} {:>8}",
-             "Topology", "Φ (IIT)", "±", "λ₂", "±", "Φ Rank");
+    println!(
+        "{:<20} {:>10} {:>8} {:>10} {:>8} {:>8}",
+        "Topology", "Φ (IIT)", "±", "λ₂", "±", "Φ Rank"
+    );
     println!("{}", "-".repeat(80));
 
     for (rank, (name, l2, l2_std, phi, phi_std)) in phi_sorted.iter().enumerate() {
@@ -176,8 +194,16 @@ fn main() {
             2 => "🥉",
             _ => "  ",
         };
-        println!("{} {:<18} {:>10.4} {:>8.4} {:>10.4} {:>8.4} {:>8}",
-                 medal, name, phi, phi_std, l2, l2_std, rank + 1);
+        println!(
+            "{} {:<18} {:>10.4} {:>8.4} {:>10.4} {:>8.4} {:>8}",
+            medal,
+            name,
+            phi,
+            phi_std,
+            l2,
+            l2_std,
+            rank + 1
+        );
     }
 
     // ===== CORRELATION ANALYSIS =====
@@ -222,7 +248,10 @@ fn main() {
         rank_diff_sum += diff;
 
         if diff >= 5 {
-            println!("   ⚠️  {}: λ₂ rank {} vs Φ rank {} (diff: {})", name, l2_rank, phi_rank, diff);
+            println!(
+                "   ⚠️  {}: λ₂ rank {} vs Φ rank {} (diff: {})",
+                name, l2_rank, phi_rank, diff
+            );
         }
     }
 
@@ -231,10 +260,26 @@ fn main() {
 
     // Key topology check: Star vs Random
     println!("\n🔑 KEY DIAGNOSTIC - Star vs Random:");
-    let star_l2 = results.iter().find(|r| r.0 == "Star").map(|r| r.1).unwrap_or(0.0);
-    let star_phi = results.iter().find(|r| r.0 == "Star").map(|r| r.3).unwrap_or(0.0);
-    let random_l2 = results.iter().find(|r| r.0 == "Random").map(|r| r.1).unwrap_or(0.0);
-    let random_phi = results.iter().find(|r| r.0 == "Random").map(|r| r.3).unwrap_or(0.0);
+    let star_l2 = results
+        .iter()
+        .find(|r| r.0 == "Star")
+        .map(|r| r.1)
+        .unwrap_or(0.0);
+    let star_phi = results
+        .iter()
+        .find(|r| r.0 == "Star")
+        .map(|r| r.3)
+        .unwrap_or(0.0);
+    let random_l2 = results
+        .iter()
+        .find(|r| r.0 == "Random")
+        .map(|r| r.1)
+        .unwrap_or(0.0);
+    let random_phi = results
+        .iter()
+        .find(|r| r.0 == "Random")
+        .map(|r| r.3)
+        .unwrap_or(0.0);
 
     println!("   Star:   λ₂ = {:.4}, Φ = {:.4}", star_l2, star_phi);
     println!("   Random: λ₂ = {:.4}, Φ = {:.4}", random_l2, random_phi);
@@ -279,7 +324,8 @@ fn measure_topology<F>(
         l2_values.push(l2);
 
         // Φ (IIT-inspired via binary conversion)
-        let binary_components: Vec<_> = topology.node_representations
+        let binary_components: Vec<_> = topology
+            .node_representations
             .iter()
             .map(|real_hv| real_hv_to_hv16_probabilistic(real_hv, seed))
             .collect();
@@ -296,15 +342,16 @@ fn measure_topology<F>(
     let phi_mean = phi_values.iter().sum::<f64>() / phi_values.len() as f64;
     let phi_std = std_dev(&phi_values, phi_mean);
 
-    println!("λ₂={:.4}±{:.3}  Φ={:.4}±{:.3}", l2_mean, l2_std, phi_mean, phi_std);
+    println!(
+        "λ₂={:.4}±{:.3}  Φ={:.4}±{:.3}",
+        l2_mean, l2_std, phi_mean, phi_std
+    );
 
     results.push((name.to_string(), l2_mean, l2_std, phi_mean, phi_std));
 }
 
 fn std_dev(values: &[f64], mean: f64) -> f64 {
-    let variance = values.iter()
-        .map(|x| (x - mean).powi(2))
-        .sum::<f64>() / values.len() as f64;
+    let variance = values.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / values.len() as f64;
     variance.sqrt()
 }
 

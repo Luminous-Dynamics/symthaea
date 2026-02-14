@@ -357,7 +357,7 @@ mod tests {
         let c2 = embedder.embed("c2", ContinuousHV::random(512, 42));
 
         let sim = c1.similarity(&c2, 0.3);
-        assert!(sim >= -1.0 && sim <= 1.0);
+        assert!((-1.0..=1.0).contains(&sim));
     }
 
     #[test]

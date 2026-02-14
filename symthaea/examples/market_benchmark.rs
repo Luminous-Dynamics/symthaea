@@ -8,11 +8,11 @@
 //!
 //! Run with: cargo run --example market_benchmark
 
-use symthaea::markets::{
-    MarketSimulator, SimulatorConfig, PatternMemory, MarketRegime,
-    MarketStateEncoder, OHLCV, TechnicalIndicators,
-};
 use std::collections::HashMap;
+use symthaea::markets::{
+    MarketRegime, MarketSimulator, MarketStateEncoder, PatternMemory, SimulatorConfig,
+    TechnicalIndicators, OHLCV,
+};
 
 fn main() {
     println!("=== Symthaea Market Pattern Recognition Benchmark ===\n");
@@ -47,14 +47,21 @@ fn main() {
     let mut regime_counts: HashMap<String, u32> = HashMap::new();
     for _ in 0..train_days {
         train_sim.next_candle();
-        *regime_counts.entry(format!("{:?}", train_sim.regime())).or_insert(0) += 1;
+        *regime_counts
+            .entry(format!("{:?}", train_sim.regime()))
+            .or_insert(0) += 1;
     }
     train_sim.reset(42);
     train_sim.generate(train_days);
 
     println!("Training data regime distribution:");
     for (regime, count) in &regime_counts {
-        println!("  {}: {} ({:.1}%)", regime, count, *count as f64 / train_days as f64 * 100.0);
+        println!(
+            "  {}: {} ({:.1}%)",
+            regime,
+            count,
+            *count as f64 / train_days as f64 * 100.0
+        );
     }
 
     // Train pattern memory
@@ -100,7 +107,11 @@ fn main() {
     let test_candles = test_sim.generate(test_days);
     let test_indicators = test_sim.calculate_indicators();
 
-    println!("Test data: {} candles, final price: {:.2}", test_candles.len(), test_sim.price());
+    println!(
+        "Test data: {} candles, final price: {:.2}",
+        test_candles.len(),
+        test_sim.price()
+    );
 
     // Benchmark: HDC Pattern Matching
     println!("\n--- HDC Pattern Matching Benchmark ---");
@@ -119,8 +130,10 @@ fn main() {
 
     // Summary comparison
     println!("\n=== Summary Comparison ===");
-    println!("{:<25} {:>12} {:>12} {:>12} {:>12}",
-             "Strategy", "Return %", "Win Rate", "Sharpe", "Max DD %");
+    println!(
+        "{:<25} {:>12} {:>12} {:>12} {:>12}",
+        "Strategy", "Return %", "Win Rate", "Sharpe", "Max DD %"
+    );
     println!("{:-<73}", "");
     print_summary_row("HDC Pattern Matching", &hdc_results);
     print_summary_row("Random Baseline", &random_results);
@@ -178,9 +191,8 @@ impl BenchmarkResults {
             return 0.0;
         }
         let avg: f64 = self.returns.iter().sum::<f64>() / self.returns.len() as f64;
-        let variance: f64 = self.returns.iter()
-            .map(|r| (r - avg).powi(2))
-            .sum::<f64>() / self.returns.len() as f64;
+        let variance: f64 =
+            self.returns.iter().map(|r| (r - avg).powi(2)).sum::<f64>() / self.returns.len() as f64;
         let std_dev = variance.sqrt();
         if std_dev > 0.0 {
             avg / std_dev * (252.0_f64).sqrt()
@@ -246,8 +258,10 @@ fn run_benchmark(
 
     // Debug output
     if results.trade_count == 0 {
-        println!("  [DEBUG] Skipped {} low confidence, {} neutral predictions",
-                 skipped_low_conf, skipped_neutral);
+        println!(
+            "  [DEBUG] Skipped {} low confidence, {} neutral predictions",
+            skipped_low_conf, skipped_neutral
+        );
     }
 
     results
@@ -366,13 +380,22 @@ fn test_regime_classification(
         total += 1;
     }
 
-    println!("Overall accuracy: {:.1}% ({}/{})",
-             correct as f64 / total as f64 * 100.0, correct, total);
+    println!(
+        "Overall accuracy: {:.1}% ({}/{})",
+        correct as f64 / total as f64 * 100.0,
+        correct,
+        total
+    );
     println!("\nPer-regime accuracy:");
     for (regime, (correct, total)) in &regime_accuracy {
         if *total > 0 {
-            println!("  {}: {:.1}% ({}/{})",
-                     regime, *correct as f64 / *total as f64 * 100.0, correct, total);
+            println!(
+                "  {}: {:.1}% ({}/{})",
+                regime,
+                *correct as f64 / *total as f64 * 100.0,
+                correct,
+                total
+            );
         }
     }
 }
@@ -387,10 +410,12 @@ fn print_results(name: &str, results: &BenchmarkResults) {
 }
 
 fn print_summary_row(name: &str, results: &BenchmarkResults) {
-    println!("{:<25} {:>11.2}% {:>11.1}% {:>12.2} {:>11.2}%",
-             name,
-             results.total_return,
-             results.win_rate() * 100.0,
-             results.sharpe_ratio(),
-             results.max_drawdown * 100.0);
+    println!(
+        "{:<25} {:>11.2}% {:>11.1}% {:>12.2} {:>11.2}%",
+        name,
+        results.total_return,
+        results.win_rate() * 100.0,
+        results.sharpe_ratio(),
+        results.max_drawdown * 100.0
+    );
 }

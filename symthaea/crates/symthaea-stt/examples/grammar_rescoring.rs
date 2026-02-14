@@ -8,8 +8,8 @@
 //! disambiguated by checking which hypothesis creates a valid phonotactic
 //! sequence in context.
 
-use symthaea_stt::unified_grammar::UnifiedGrammar;
 use symthaea_stt::temporal_grammar::TemporalEvent;
+use symthaea_stt::unified_grammar::UnifiedGrammar;
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
@@ -66,8 +66,8 @@ impl GrammarRescorer {
     fn new(grammar: UnifiedGrammar) -> Self {
         Self {
             grammar,
-            acoustic_weight: 0.6,  // Trust acoustic model more
-            grammar_weight: 0.4,   // But grammar provides phonotactic constraints
+            acoustic_weight: 0.6, // Trust acoustic model more
+            grammar_weight: 0.4,  // But grammar provides phonotactic constraints
         }
     }
 
@@ -108,8 +108,8 @@ impl GrammarRescorer {
         // Grammar scores are typically in [-1, 1] range
         let normalized_grammar = (grammar_score + 1.0) / 2.0;
 
-        let combined_score = self.acoustic_weight * acoustic_score
-                           + self.grammar_weight * normalized_grammar;
+        let combined_score =
+            self.acoustic_weight * acoustic_score + self.grammar_weight * normalized_grammar;
 
         SequenceHypothesis {
             phonemes: phonemes.to_vec(),
@@ -150,14 +150,23 @@ impl GrammarRescorer {
     }
 
     /// Rescore and rerank N-best list
-    fn rescore_nbest(&mut self, nbest: &[Vec<String>], acoustic_scores: &[f32]) -> Vec<SequenceHypothesis> {
-        let mut scored: Vec<SequenceHypothesis> = nbest.iter()
+    fn rescore_nbest(
+        &mut self,
+        nbest: &[Vec<String>],
+        acoustic_scores: &[f32],
+    ) -> Vec<SequenceHypothesis> {
+        let mut scored: Vec<SequenceHypothesis> = nbest
+            .iter()
             .zip(acoustic_scores.iter())
             .map(|(seq, &acoustic)| self.score_sequence(seq, acoustic))
             .collect();
 
         // Sort by combined score
-        scored.sort_by(|a, b| b.combined_score.partial_cmp(&a.combined_score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.combined_score
+                .partial_cmp(&a.combined_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         scored
     }
@@ -165,8 +174,14 @@ impl GrammarRescorer {
 
 fn estimate_duration(phoneme: &str) -> f32 {
     match phoneme {
-        p if p.starts_with('A') || p.starts_with('E') || p.starts_with('I') ||
-             p.starts_with('O') || p.starts_with('U') => 0.10,
+        p if p.starts_with('A')
+            || p.starts_with('E')
+            || p.starts_with('I')
+            || p.starts_with('O')
+            || p.starts_with('U') =>
+        {
+            0.10
+        }
         "S" | "Z" | "SH" | "ZH" | "F" | "V" | "TH" | "DH" => 0.08,
         "P" | "B" | "T" | "D" | "K" | "G" => 0.05,
         "M" | "N" | "NG" => 0.06,
@@ -176,8 +191,14 @@ fn estimate_duration(phoneme: &str) -> f32 {
 
 fn estimate_intensity(phoneme: &str) -> f32 {
     match phoneme {
-        p if p.starts_with('A') || p.starts_with('E') || p.starts_with('I') ||
-             p.starts_with('O') || p.starts_with('U') => 0.8,
+        p if p.starts_with('A')
+            || p.starts_with('E')
+            || p.starts_with('I')
+            || p.starts_with('O')
+            || p.starts_with('U') =>
+        {
+            0.8
+        }
         "B" | "D" | "G" | "V" | "Z" | "DH" | "ZH" | "M" | "N" | "NG" => 0.6,
         "P" | "T" | "K" | "F" | "S" | "TH" | "SH" | "HH" => 0.5,
         _ => 0.55,
@@ -204,11 +225,13 @@ fn main() {
     ];
 
     for seq in &training_sequences {
-        let events: Vec<TemporalEvent> = seq.iter().enumerate()
+        let events: Vec<TemporalEvent> = seq
+            .iter()
+            .enumerate()
             .filter_map(|(i, p)| {
-                grammar.category_id(*p).map(|cid| {
-                    TemporalEvent::new(*p, cid, i as f32 * 0.06, 0.06, 0.6)
-                })
+                grammar
+                    .category_id(*p)
+                    .map(|cid| TemporalEvent::new(*p, cid, i as f32 * 0.06, 0.06, 0.6))
             })
             .collect();
         for _ in 0..30 {
@@ -218,9 +241,15 @@ fn main() {
 
     let stats = grammar.stats();
     subheader("Phase 1: Grammar Training");
-    println!("    Trained on {} example sequences", training_sequences.len());
-    println!("    Grammar: {} clusters, {:.1}% density",
-             stats.num_clusters, stats.avg_cluster_density * 100.0);
+    println!(
+        "    Trained on {} example sequences",
+        training_sequences.len()
+    );
+    println!(
+        "    Grammar: {} clusters, {:.1}% density",
+        stats.num_clusters,
+        stats.avg_cluster_density * 100.0
+    );
 
     let mut rescorer = GrammarRescorer::new(grammar);
 
@@ -231,18 +260,40 @@ fn main() {
     println!();
 
     let confusions_1 = vec![
-        (vec!["DH", "AH", "P", "AE", "T", "S", "AE", "T"], 0.35, "PAT"),  // Wrong - acoustic confusion
-        (vec!["DH", "AH", "B", "AE", "T", "S", "AE", "T"], 0.30, "BAT"),  // Wrong - acoustic confusion
-        (vec!["DH", "AH", "K", "AE", "T", "S", "AE", "T"], 0.25, "CAT"),  // Correct - lower acoustic
-        (vec!["DH", "AH", "T", "AE", "T", "S", "AE", "T"], 0.10, "TAT"),  // Nonsense
+        (
+            vec!["DH", "AH", "P", "AE", "T", "S", "AE", "T"],
+            0.35,
+            "PAT",
+        ), // Wrong - acoustic confusion
+        (
+            vec!["DH", "AH", "B", "AE", "T", "S", "AE", "T"],
+            0.30,
+            "BAT",
+        ), // Wrong - acoustic confusion
+        (
+            vec!["DH", "AH", "K", "AE", "T", "S", "AE", "T"],
+            0.25,
+            "CAT",
+        ), // Correct - lower acoustic
+        (
+            vec!["DH", "AH", "T", "AE", "T", "S", "AE", "T"],
+            0.10,
+            "TAT",
+        ), // Nonsense
     ];
 
     println!("    N-best (acoustic only):");
     for (seq, score, word) in &confusions_1 {
-        println!("      {:.2}  {}  \"the {} sat\"", score, seq.join(" "), word.to_lowercase());
+        println!(
+            "      {:.2}  {}  \"the {} sat\"",
+            score,
+            seq.join(" "),
+            word.to_lowercase()
+        );
     }
 
-    let nbest: Vec<Vec<String>> = confusions_1.iter()
+    let nbest: Vec<Vec<String>> = confusions_1
+        .iter()
         .map(|(seq, _, _)| seq.iter().map(|s| s.to_string()).collect())
         .collect();
     let acoustic_scores: Vec<f32> = confusions_1.iter().map(|(_, s, _)| *s).collect();
@@ -252,13 +303,19 @@ fn main() {
     println!();
     println!("    After grammar rescoring (60% acoustic, 40% grammar):");
     for (i, hyp) in rescored.iter().take(4).enumerate() {
-        let word = confusions_1.iter()
+        let word = confusions_1
+            .iter()
             .find(|(seq, _, _)| *seq == hyp.phonemes.iter().map(|s| s.as_str()).collect::<Vec<_>>())
             .map(|(_, _, w)| *w)
             .unwrap_or("?");
-        println!("      #{} {:.3} (a:{:.2} g:{:+.2})  \"the {} sat\"",
-                 i + 1, hyp.combined_score, hyp.acoustic_score, hyp.grammar_score,
-                 word.to_lowercase());
+        println!(
+            "      #{} {:.3} (a:{:.2} g:{:+.2})  \"the {} sat\"",
+            i + 1,
+            hyp.combined_score,
+            hyp.acoustic_score,
+            hyp.grammar_score,
+            word.to_lowercase()
+        );
     }
 
     // Test Case 2: Invalid onset cluster rejection
@@ -279,7 +336,8 @@ fn main() {
         println!("      {:.2}  {}  ({})", score, seq.join(" "), desc);
     }
 
-    let nbest: Vec<Vec<String>> = confusions_2.iter()
+    let nbest: Vec<Vec<String>> = confusions_2
+        .iter()
         .map(|(seq, _, _)| seq.iter().map(|s| s.to_string()).collect())
         .collect();
     let acoustic_scores: Vec<f32> = confusions_2.iter().map(|(_, s, _)| *s).collect();
@@ -289,13 +347,20 @@ fn main() {
     println!();
     println!("    After grammar rescoring:");
     for (i, hyp) in rescored.iter().take(4).enumerate() {
-        let desc = confusions_2.iter()
+        let desc = confusions_2
+            .iter()
             .find(|(seq, _, _)| *seq == hyp.phonemes.iter().map(|s| s.as_str()).collect::<Vec<_>>())
             .map(|(_, _, d)| *d)
             .unwrap_or("?");
-        println!("      #{} {:.3} (a:{:.2} g:{:+.2})  {} ({})",
-                 i + 1, hyp.combined_score, hyp.acoustic_score, hyp.grammar_score,
-                 hyp.phonemes.join(" "), desc);
+        println!(
+            "      #{} {:.3} (a:{:.2} g:{:+.2})  {} ({})",
+            i + 1,
+            hyp.combined_score,
+            hyp.acoustic_score,
+            hyp.grammar_score,
+            hyp.phonemes.join(" "),
+            desc
+        );
     }
 
     // Test Case 3: Longer sequence with multiple confusions
@@ -308,49 +373,88 @@ fn main() {
     let frames = vec![
         FrameHypotheses {
             hypotheses: vec![
-                PhonemeHypothesis { phoneme: "B".to_string(), acoustic_score: 0.5 },
-                PhonemeHypothesis { phoneme: "P".to_string(), acoustic_score: 0.3 },
-                PhonemeHypothesis { phoneme: "D".to_string(), acoustic_score: 0.2 },
+                PhonemeHypothesis {
+                    phoneme: "B".to_string(),
+                    acoustic_score: 0.5,
+                },
+                PhonemeHypothesis {
+                    phoneme: "P".to_string(),
+                    acoustic_score: 0.3,
+                },
+                PhonemeHypothesis {
+                    phoneme: "D".to_string(),
+                    acoustic_score: 0.2,
+                },
             ],
             time: 0.0,
             duration: 0.05,
         },
         FrameHypotheses {
             hypotheses: vec![
-                PhonemeHypothesis { phoneme: "IH".to_string(), acoustic_score: 0.8 },
-                PhonemeHypothesis { phoneme: "IY".to_string(), acoustic_score: 0.2 },
+                PhonemeHypothesis {
+                    phoneme: "IH".to_string(),
+                    acoustic_score: 0.8,
+                },
+                PhonemeHypothesis {
+                    phoneme: "IY".to_string(),
+                    acoustic_score: 0.2,
+                },
             ],
             time: 0.05,
             duration: 0.08,
         },
         FrameHypotheses {
             hypotheses: vec![
-                PhonemeHypothesis { phoneme: "G".to_string(), acoustic_score: 0.6 },
-                PhonemeHypothesis { phoneme: "K".to_string(), acoustic_score: 0.4 },
+                PhonemeHypothesis {
+                    phoneme: "G".to_string(),
+                    acoustic_score: 0.6,
+                },
+                PhonemeHypothesis {
+                    phoneme: "K".to_string(),
+                    acoustic_score: 0.4,
+                },
             ],
             time: 0.13,
             duration: 0.06,
         },
         FrameHypotheses {
             hypotheses: vec![
-                PhonemeHypothesis { phoneme: "F".to_string(), acoustic_score: 0.7 },
-                PhonemeHypothesis { phoneme: "V".to_string(), acoustic_score: 0.3 },
+                PhonemeHypothesis {
+                    phoneme: "F".to_string(),
+                    acoustic_score: 0.7,
+                },
+                PhonemeHypothesis {
+                    phoneme: "V".to_string(),
+                    acoustic_score: 0.3,
+                },
             ],
             time: 0.19,
             duration: 0.08,
         },
         FrameHypotheses {
             hypotheses: vec![
-                PhonemeHypothesis { phoneme: "IH".to_string(), acoustic_score: 0.85 },
-                PhonemeHypothesis { phoneme: "IY".to_string(), acoustic_score: 0.15 },
+                PhonemeHypothesis {
+                    phoneme: "IH".to_string(),
+                    acoustic_score: 0.85,
+                },
+                PhonemeHypothesis {
+                    phoneme: "IY".to_string(),
+                    acoustic_score: 0.15,
+                },
             ],
             time: 0.27,
             duration: 0.08,
         },
         FrameHypotheses {
             hypotheses: vec![
-                PhonemeHypothesis { phoneme: "SH".to_string(), acoustic_score: 0.9 },
-                PhonemeHypothesis { phoneme: "CH".to_string(), acoustic_score: 0.1 },
+                PhonemeHypothesis {
+                    phoneme: "SH".to_string(),
+                    acoustic_score: 0.9,
+                },
+                PhonemeHypothesis {
+                    phoneme: "CH".to_string(),
+                    acoustic_score: 0.1,
+                },
             ],
             time: 0.35,
             duration: 0.10,
@@ -362,7 +466,9 @@ fn main() {
 
     println!("    Frame-level confusion lattice:");
     for (i, frame) in frames.iter().enumerate() {
-        let hyps: Vec<String> = frame.hypotheses.iter()
+        let hyps: Vec<String> = frame
+            .hypotheses
+            .iter()
             .map(|h| format!("{}:{:.1}", h.phoneme, h.acoustic_score))
             .collect();
         println!("      Frame {}: [{}]", i + 1, hyps.join(", "));
@@ -372,23 +478,36 @@ fn main() {
     println!("    Generated {} hypotheses (beam=10)", nbest.len());
 
     // Compute acoustic scores for N-best (product of frame scores)
-    let acoustic_scores: Vec<f32> = nbest.iter().map(|seq| {
-        seq.iter().zip(frames.iter()).map(|(phoneme, frame)| {
-            frame.hypotheses.iter()
-                .find(|h| &h.phoneme == phoneme)
-                .map(|h| h.acoustic_score)
-                .unwrap_or(0.1)
-        }).product()
-    }).collect();
+    let acoustic_scores: Vec<f32> = nbest
+        .iter()
+        .map(|seq| {
+            seq.iter()
+                .zip(frames.iter())
+                .map(|(phoneme, frame)| {
+                    frame
+                        .hypotheses
+                        .iter()
+                        .find(|h| &h.phoneme == phoneme)
+                        .map(|h| h.acoustic_score)
+                        .unwrap_or(0.1)
+                })
+                .product()
+        })
+        .collect();
 
     let rescored = rescorer.rescore_nbest(&nbest, &acoustic_scores);
 
     println!();
     println!("    Top 5 after rescoring:");
     for (i, hyp) in rescored.iter().take(5).enumerate() {
-        println!("      #{} {:.4} (a:{:.4} g:{:+.4})  {}",
-                 i + 1, hyp.combined_score, hyp.acoustic_score, hyp.grammar_score,
-                 hyp.phonemes.join(" "));
+        println!(
+            "      #{} {:.4} (a:{:.4} g:{:+.4})  {}",
+            i + 1,
+            hyp.combined_score,
+            hyp.acoustic_score,
+            hyp.grammar_score,
+            hyp.phonemes.join(" ")
+        );
     }
 
     // Summary

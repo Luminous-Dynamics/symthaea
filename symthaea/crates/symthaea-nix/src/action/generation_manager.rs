@@ -4,8 +4,8 @@
 //! Produces [`NixOSCommand`] values for anything that modifies state;
 //! read-only queries (list, diff) run directly.
 
-use std::process::Command;
 use super::executor::{NixOSCommand, SafetyLevel};
+use std::process::Command;
 
 /// Manages NixOS generations: switch, rollback, delete, and boot configuration.
 pub struct GenerationManager;
@@ -47,12 +47,10 @@ impl GenerationManager {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::other(
-                format!(
-                    "nixos-rebuild list-generations failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                ),
-            ));
+            return Err(std::io::Error::other(format!(
+                "nixos-rebuild list-generations failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -66,10 +64,7 @@ impl GenerationManager {
             .find(|g| g.current)
             .map(|g| g.number)
             .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "No current generation found",
-                )
+                std::io::Error::new(std::io::ErrorKind::NotFound, "No current generation found")
             })
     }
 
@@ -238,8 +233,13 @@ impl GenerationManager {
                     let parts: Vec<&str> = rest.splitn(2, arrow).collect();
                     if parts.len() == 2 {
                         let old_ver = parts[0].trim().to_string();
-                        let new_ver = parts[1].trim()
-                            .split(',').next().unwrap_or("").trim().to_string();
+                        let new_ver = parts[1]
+                            .trim()
+                            .split(',')
+                            .next()
+                            .unwrap_or("")
+                            .trim()
+                            .to_string();
                         changed.push((name, old_ver, new_ver));
                     }
                 }

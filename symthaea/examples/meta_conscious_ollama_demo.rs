@@ -15,10 +15,7 @@
 //! ```
 
 use anyhow::Result;
-use symthaea::language::{
-    MetaConsciousLlmBridge, LlmOrgan, LlmConfig, LlmProvider,
-    Message, Role,
-};
+use symthaea::language::{LlmConfig, LlmOrgan, LlmProvider, Message, MetaConsciousLlmBridge, Role};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -91,13 +88,14 @@ async fn main() -> Result<()> {
         }
 
         // Perform meta-conscious translation
-        match bridge.translate_with_meta(&mut llm, trimmed, history.clone()).await {
+        match bridge
+            .translate_with_meta(&mut llm, trimmed, history.clone())
+            .await
+        {
             Ok((meta_state, response)) => {
                 println!(
                     "φ/meta-φ: {:.3} / {:.3} | self-model confidence: {:.3}",
-                    meta_state.phi,
-                    meta_state.meta_phi,
-                    meta_state.self_model.confidence,
+                    meta_state.phi, meta_state.meta_phi, meta_state.self_model.confidence,
                 );
                 println!("meta explanation: {}", meta_state.explanation);
                 println!("symthaea (llm) > {}", truncate_line(&response.content, 80));
@@ -131,4 +129,3 @@ fn truncate_line(s: &str, max_len: usize) -> String {
         s.chars().take(max_len).collect()
     }
 }
-

@@ -11,7 +11,7 @@
 //! - Brain Waves (EEG)
 //! - Musical Notes
 
-use symthaea_stt::temporal_grammar::{TemporalGrammar, TemporalEvent, DomainConfig};
+use symthaea_stt::temporal_grammar::{DomainConfig, TemporalEvent, TemporalGrammar};
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
@@ -55,21 +55,40 @@ fn main() {
     println!("  Configuration:");
     println!("    Categories:  {} phonemes", stats.num_categories);
     println!("    Sparsity:    {:.0}%", stats.sparsity * 100.0);
-    println!("    Hierarchy:   {} levels (phonemes → words)", stats.hierarchy_depth);
+    println!(
+        "    Hierarchy:   {} levels (phonemes → words)",
+        stats.hierarchy_depth
+    );
 
     subheader("Training: English CVC Words");
 
     // Train on common CVC patterns
     let words = [
-        ("CAT", vec![("K", 0.08, 0.7), ("AE", 0.12, 0.8), ("T", 0.06, 0.6)]),
-        ("DOG", vec![("D", 0.06, 0.7), ("AO", 0.15, 0.75), ("G", 0.08, 0.65)]),
-        ("BIT", vec![("B", 0.05, 0.6), ("IH", 0.08, 0.7), ("T", 0.06, 0.6)]),
-        ("SIT", vec![("S", 0.10, 0.5), ("IH", 0.08, 0.7), ("T", 0.06, 0.6)]),
-        ("PEN", vec![("P", 0.07, 0.7), ("EH", 0.10, 0.75), ("N", 0.08, 0.5)]),
+        (
+            "CAT",
+            vec![("K", 0.08, 0.7), ("AE", 0.12, 0.8), ("T", 0.06, 0.6)],
+        ),
+        (
+            "DOG",
+            vec![("D", 0.06, 0.7), ("AO", 0.15, 0.75), ("G", 0.08, 0.65)],
+        ),
+        (
+            "BIT",
+            vec![("B", 0.05, 0.6), ("IH", 0.08, 0.7), ("T", 0.06, 0.6)],
+        ),
+        (
+            "SIT",
+            vec![("S", 0.10, 0.5), ("IH", 0.08, 0.7), ("T", 0.06, 0.6)],
+        ),
+        (
+            "PEN",
+            vec![("P", 0.07, 0.7), ("EH", 0.10, 0.75), ("N", 0.08, 0.5)],
+        ),
     ];
 
     for (word, phonemes) in &words {
-        let events: Vec<TemporalEvent> = phonemes.iter()
+        let events: Vec<TemporalEvent> = phonemes
+            .iter()
             .enumerate()
             .map(|(i, (ph, dur, int))| {
                 let start = phonemes[..i].iter().map(|(_, d, _)| d).sum();
@@ -80,7 +99,15 @@ fn main() {
         for _ in 0..20 {
             speech.train_sequence(&events);
         }
-        println!("    Trained: {} /{}/", word, phonemes.iter().map(|(p,_,_)| *p).collect::<Vec<_>>().join(" "));
+        println!(
+            "    Trained: {} /{}/",
+            word,
+            phonemes
+                .iter()
+                .map(|(p, _, _)| *p)
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
     }
 
     subheader("Discrimination Test: Trained vs Novel");
@@ -116,24 +143,63 @@ fn main() {
     println!("  Configuration:");
     println!("    Categories:  {} call types", stats.num_categories);
     println!("    Sparsity:    {:.0}%", stats.sparsity * 100.0);
-    println!("    Hierarchy:   {} levels (calls → codas)", stats.hierarchy_depth);
+    println!(
+        "    Hierarchy:   {} levels (calls → codas)",
+        stats.hierarchy_depth
+    );
 
     subheader("Training: Sperm Whale Coda Patterns");
 
     // Sperm whale coda: rhythmic click sequences
     let coda_3plus1: Vec<TemporalEvent> = vec![
         TemporalEvent::new("click", whale.category_id("click").unwrap(), 0.0, 0.02, 0.9),
-        TemporalEvent::new("click", whale.category_id("click").unwrap(), 0.1, 0.02, 0.85),
+        TemporalEvent::new(
+            "click",
+            whale.category_id("click").unwrap(),
+            0.1,
+            0.02,
+            0.85,
+        ),
         TemporalEvent::new("click", whale.category_id("click").unwrap(), 0.2, 0.02, 0.8),
-        TemporalEvent::new("silence", whale.category_id("silence").unwrap(), 0.22, 0.3, 0.0),
-        TemporalEvent::new("click", whale.category_id("click").unwrap(), 0.52, 0.02, 0.9),
+        TemporalEvent::new(
+            "silence",
+            whale.category_id("silence").unwrap(),
+            0.22,
+            0.3,
+            0.0,
+        ),
+        TemporalEvent::new(
+            "click",
+            whale.category_id("click").unwrap(),
+            0.52,
+            0.02,
+            0.9,
+        ),
     ];
 
     let coda_regular: Vec<TemporalEvent> = vec![
         TemporalEvent::new("click", whale.category_id("click").unwrap(), 0.0, 0.02, 0.8),
-        TemporalEvent::new("click", whale.category_id("click").unwrap(), 0.15, 0.02, 0.8),
-        TemporalEvent::new("click", whale.category_id("click").unwrap(), 0.30, 0.02, 0.8),
-        TemporalEvent::new("click", whale.category_id("click").unwrap(), 0.45, 0.02, 0.8),
+        TemporalEvent::new(
+            "click",
+            whale.category_id("click").unwrap(),
+            0.15,
+            0.02,
+            0.8,
+        ),
+        TemporalEvent::new(
+            "click",
+            whale.category_id("click").unwrap(),
+            0.30,
+            0.02,
+            0.8,
+        ),
+        TemporalEvent::new(
+            "click",
+            whale.category_id("click").unwrap(),
+            0.45,
+            0.02,
+            0.8,
+        ),
     ];
 
     for _ in 0..30 {
@@ -145,9 +211,27 @@ fn main() {
 
     // Dolphin whistle pattern (very different)
     let dolphin_whistle: Vec<TemporalEvent> = vec![
-        TemporalEvent::new("whistle_up", whale.category_id("whistle_up").unwrap(), 0.0, 0.5, 0.6),
-        TemporalEvent::new("whistle_down", whale.category_id("whistle_down").unwrap(), 0.5, 0.4, 0.5),
-        TemporalEvent::new("whistle_flat", whale.category_id("whistle_flat").unwrap(), 0.9, 0.3, 0.55),
+        TemporalEvent::new(
+            "whistle_up",
+            whale.category_id("whistle_up").unwrap(),
+            0.0,
+            0.5,
+            0.6,
+        ),
+        TemporalEvent::new(
+            "whistle_down",
+            whale.category_id("whistle_down").unwrap(),
+            0.5,
+            0.4,
+            0.5,
+        ),
+        TemporalEvent::new(
+            "whistle_flat",
+            whale.category_id("whistle_flat").unwrap(),
+            0.9,
+            0.3,
+            0.55,
+        ),
     ];
 
     let score_sperm = whale.score_sequence(&coda_3plus1);
@@ -157,7 +241,10 @@ fn main() {
     println!("    Sperm 3+1 (trained):  {:.4}", score_sperm);
     println!("    Sperm Regular:        {:.4}", score_regular);
     println!("    Dolphin Whistle:      {:.4}", score_dolphin);
-    println!("    Sperm vs Dolphin:     {:+.4}", score_sperm - score_dolphin);
+    println!(
+        "    Sperm vs Dolphin:     {:+.4}",
+        score_sperm - score_dolphin
+    );
 
     // =========================================================================
     // DOMAIN 3: CARDIAC (ECG)
@@ -169,7 +256,14 @@ fn main() {
     println!("  Configuration:");
     println!("    Categories:  {} wave types", stats.num_categories);
     println!("    Sparsity:    {:.0}%", stats.sparsity * 100.0);
-    println!("    Prediction:  {} (for regular rhythms)", if stats.predictive_feedback { "ON" } else { "OFF" });
+    println!(
+        "    Prediction:  {} (for regular rhythms)",
+        if stats.predictive_feedback {
+            "ON"
+        } else {
+            "OFF"
+        }
+    );
 
     subheader("Training: Normal Sinus Rhythm");
 
@@ -177,7 +271,7 @@ fn main() {
     let normal_beat: Vec<TemporalEvent> = vec![
         TemporalEvent::new("P", ecg.category_id("P").unwrap(), 0.0, 0.08, 0.25),
         TemporalEvent::new("Q", ecg.category_id("Q").unwrap(), 0.12, 0.02, 0.15),
-        TemporalEvent::new("R", ecg.category_id("R").unwrap(), 0.14, 0.04, 1.0),  // Tallest
+        TemporalEvent::new("R", ecg.category_id("R").unwrap(), 0.14, 0.04, 1.0), // Tallest
         TemporalEvent::new("S", ecg.category_id("S").unwrap(), 0.18, 0.03, 0.3),
         TemporalEvent::new("T", ecg.category_id("T").unwrap(), 0.28, 0.16, 0.4),
     ];
@@ -192,7 +286,13 @@ fn main() {
     // PVC - Premature Ventricular Contraction (abnormal)
     let pvc: Vec<TemporalEvent> = vec![
         TemporalEvent::new("PVC", ecg.category_id("PVC").unwrap(), 0.0, 0.16, 0.95),
-        TemporalEvent::new("baseline", ecg.category_id("baseline").unwrap(), 0.16, 0.4, 0.05),
+        TemporalEvent::new(
+            "baseline",
+            ecg.category_id("baseline").unwrap(),
+            0.16,
+            0.4,
+            0.05,
+        ),
     ];
 
     // Atrial Fibrillation pattern (irregular)
@@ -229,16 +329,31 @@ fn main() {
     println!("  Configuration:");
     println!("    Categories:  {} pattern types", stats.num_categories);
     println!("    Sparsity:    {:.0}%", stats.sparsity * 100.0);
-    println!("    Hierarchy:   {} levels (patterns → epochs → stages)", stats.hierarchy_depth);
+    println!(
+        "    Hierarchy:   {} levels (patterns → epochs → stages)",
+        stats.hierarchy_depth
+    );
 
     subheader("Training: Stage 2 Sleep Signature");
 
     // Stage 2 sleep: spindles and K-complexes
     let stage2_sleep: Vec<TemporalEvent> = vec![
         TemporalEvent::new("theta", eeg.category_id("theta").unwrap(), 0.0, 1.0, 0.4),
-        TemporalEvent::new("spindle", eeg.category_id("spindle").unwrap(), 1.0, 0.5, 0.6),
+        TemporalEvent::new(
+            "spindle",
+            eeg.category_id("spindle").unwrap(),
+            1.0,
+            0.5,
+            0.6,
+        ),
         TemporalEvent::new("theta", eeg.category_id("theta").unwrap(), 1.5, 0.8, 0.35),
-        TemporalEvent::new("k_complex", eeg.category_id("k_complex").unwrap(), 2.3, 0.3, 0.8),
+        TemporalEvent::new(
+            "k_complex",
+            eeg.category_id("k_complex").unwrap(),
+            2.3,
+            0.3,
+            0.8,
+        ),
         TemporalEvent::new("theta", eeg.category_id("theta").unwrap(), 2.6, 1.0, 0.4),
     ];
 
@@ -284,16 +399,29 @@ fn main() {
     println!();
     println!("    Domain         │ Events              │ Discrimination");
     println!("    ───────────────┼─────────────────────┼────────────────");
-    println!("    Speech         │ Phonemes            │ {:+.4}", score_cat - score_map);
-    println!("    Bioacoustics   │ Whale Calls         │ {:+.4}", score_sperm - score_dolphin);
-    println!("    Cardiology     │ ECG Waves           │ {:+.4}", score_normal - score_pvc);
-    println!("    Neurology      │ EEG Patterns        │ {:+.4}", score_stage2 - score_rem);
+    println!(
+        "    Speech         │ Phonemes            │ {:+.4}",
+        score_cat - score_map
+    );
+    println!(
+        "    Bioacoustics   │ Whale Calls         │ {:+.4}",
+        score_sperm - score_dolphin
+    );
+    println!(
+        "    Cardiology     │ ECG Waves           │ {:+.4}",
+        score_normal - score_pvc
+    );
+    println!(
+        "    Neurology      │ EEG Patterns        │ {:+.4}",
+        score_stage2 - score_rem
+    );
     println!();
 
-    let avg_disc = ((score_cat - score_map).abs() +
-                    (score_sperm - score_dolphin).abs() +
-                    (score_normal - score_pvc).abs() +
-                    (score_stage2 - score_rem).abs()) / 4.0;
+    let avg_disc = ((score_cat - score_map).abs()
+        + (score_sperm - score_dolphin).abs()
+        + (score_normal - score_pvc).abs()
+        + (score_stage2 - score_rem).abs())
+        / 4.0;
 
     println!("    Average Discrimination: {:+.4}", avg_disc);
     println!();

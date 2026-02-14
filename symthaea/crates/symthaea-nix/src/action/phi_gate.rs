@@ -14,7 +14,10 @@ pub fn get_nixos_rollback(command: &str) -> Option<String> {
     } else if cmd.contains("nix-env -i") || cmd.contains("nix profile install") {
         let pkg = cmd.split_whitespace().last().unwrap_or("package");
         Some(format!("nix-env -e {} || nix profile remove {}", pkg, pkg))
-    } else if cmd.starts_with("nix build") || cmd.starts_with("nix develop") || cmd.starts_with("nix shell") {
+    } else if cmd.starts_with("nix build")
+        || cmd.starts_with("nix develop")
+        || cmd.starts_with("nix shell")
+    {
         Some("exit".to_string()) // nix environments are ephemeral
     } else if cmd.starts_with("systemctl restart") || cmd.starts_with("systemctl stop") {
         let svc = cmd.split_whitespace().last().unwrap_or("service");
@@ -29,34 +32,48 @@ pub fn classify_command_destructiveness(command: &str) -> SafetyLevel {
     let cmd = command.trim().to_lowercase();
 
     // Destructive operations
-    if cmd.contains("--purge") || cmd.contains("gc") || cmd.contains("delete")
-        || cmd.contains("rm ") || cmd.contains("remove")
+    if cmd.contains("--purge")
+        || cmd.contains("gc")
+        || cmd.contains("delete")
+        || cmd.contains("rm ")
+        || cmd.contains("remove")
         || cmd.starts_with("nix-collect-garbage")
-        || cmd.contains("wipe") || cmd.contains("format")
+        || cmd.contains("wipe")
+        || cmd.contains("format")
     {
         return SafetyLevel::Destructive;
     }
 
     // System-critical
-    if cmd.starts_with("nixos-rebuild") || cmd.contains("switch")
-        || cmd.starts_with("nix profile install") || cmd.starts_with("nix-env -i")
-        || cmd.contains("upgrade") || cmd.contains("update")
+    if cmd.starts_with("nixos-rebuild")
+        || cmd.contains("switch")
+        || cmd.starts_with("nix profile install")
+        || cmd.starts_with("nix-env -i")
+        || cmd.contains("upgrade")
+        || cmd.contains("update")
     {
         return SafetyLevel::SystemCritical;
     }
 
     // User modify
-    if cmd.starts_with("nix build") || cmd.starts_with("nix develop")
-        || cmd.starts_with("nix shell") || cmd.contains("install")
+    if cmd.starts_with("nix build")
+        || cmd.starts_with("nix develop")
+        || cmd.starts_with("nix shell")
+        || cmd.contains("install")
     {
         return SafetyLevel::UserModify;
     }
 
     // Read-only
-    if cmd.starts_with("nix search") || cmd.starts_with("nix-env -q")
-        || cmd.starts_with("nixos-option") || cmd.contains("list")
-        || cmd.contains("info") || cmd.contains("show") || cmd.contains("search")
-        || cmd.starts_with("nix flake show") || cmd.starts_with("nix flake metadata")
+    if cmd.starts_with("nix search")
+        || cmd.starts_with("nix-env -q")
+        || cmd.starts_with("nixos-option")
+        || cmd.contains("list")
+        || cmd.contains("info")
+        || cmd.contains("show")
+        || cmd.contains("search")
+        || cmd.starts_with("nix flake show")
+        || cmd.starts_with("nix flake metadata")
     {
         return SafetyLevel::ReadOnly;
     }
@@ -78,8 +95,17 @@ mod tests {
 
     #[test]
     fn test_classify_destructiveness() {
-        assert_eq!(classify_command_destructiveness("nix search nixpkgs firefox"), SafetyLevel::ReadOnly);
-        assert_eq!(classify_command_destructiveness("nix-collect-garbage -d"), SafetyLevel::Destructive);
-        assert_eq!(classify_command_destructiveness("nixos-rebuild switch"), SafetyLevel::SystemCritical);
+        assert_eq!(
+            classify_command_destructiveness("nix search nixpkgs firefox"),
+            SafetyLevel::ReadOnly
+        );
+        assert_eq!(
+            classify_command_destructiveness("nix-collect-garbage -d"),
+            SafetyLevel::Destructive
+        );
+        assert_eq!(
+            classify_command_destructiveness("nixos-rebuild switch"),
+            SafetyLevel::SystemCritical
+        );
     }
 }

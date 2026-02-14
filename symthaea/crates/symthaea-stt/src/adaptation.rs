@@ -12,7 +12,7 @@
 //! - Bundling accumulates adaptation evidence
 //! - Similarity-preserving means adapted prototypes still work
 
-use crate::hdc::{HV16, BundleAccumulator, bundle};
+use crate::hdc::{bundle, BundleAccumulator, HV16};
 use std::collections::HashMap;
 
 /// Speaker profile containing adaptation parameters
@@ -101,7 +101,9 @@ impl SpeakerProfile {
     /// Finalize the speaker transform after observations
     pub fn finalize_transform(&mut self) {
         // Create transform by bundling all speaker-specific patterns
-        let speaker_patterns: Vec<HV16> = self.accumulators.values()
+        let speaker_patterns: Vec<HV16> = self
+            .accumulators
+            .values()
             .map(|acc| acc.finalize())
             .collect();
 
@@ -120,15 +122,19 @@ impl SpeakerProfile {
             return features.to_vec();
         }
 
-        features.iter().enumerate().map(|(i, &x)| {
-            if i < self.feature_mean.len() {
-                let var = self.feature_var[i] / self.num_frames as f32;
-                let std = var.sqrt().max(1e-6);
-                (x - self.feature_mean[i]) / std
-            } else {
-                x
-            }
-        }).collect()
+        features
+            .iter()
+            .enumerate()
+            .map(|(i, &x)| {
+                if i < self.feature_mean.len() {
+                    let var = self.feature_var[i] / self.num_frames as f32;
+                    let std = var.sqrt().max(1e-6);
+                    (x - self.feature_mean[i]) / std
+                } else {
+                    x
+                }
+            })
+            .collect()
     }
 
     /// Get speaker-adapted version of a prototype
@@ -219,10 +225,8 @@ impl AdaptationEngine {
     /// Create or get a speaker profile
     pub fn get_or_create_speaker(&mut self, speaker_id: &str) -> &mut SpeakerProfile {
         if !self.profiles.contains_key(speaker_id) {
-            self.profiles.insert(
-                speaker_id.to_string(),
-                SpeakerProfile::new(speaker_id)
-            );
+            self.profiles
+                .insert(speaker_id.to_string(), SpeakerProfile::new(speaker_id));
         }
         self.profiles.get_mut(speaker_id).unwrap()
     }
@@ -230,10 +234,8 @@ impl AdaptationEngine {
     /// Set active speaker
     pub fn set_active_speaker(&mut self, speaker_id: &str) {
         if !self.profiles.contains_key(speaker_id) {
-            self.profiles.insert(
-                speaker_id.to_string(),
-                SpeakerProfile::new(speaker_id)
-            );
+            self.profiles
+                .insert(speaker_id.to_string(), SpeakerProfile::new(speaker_id));
         }
         self.active_speaker = Some(speaker_id.to_string());
     }
@@ -288,7 +290,8 @@ impl AdaptationEngine {
 
     /// Get all adapted prototypes for current speaker
     pub fn get_all_adapted(&self) -> Vec<(String, HV16)> {
-        self.base_prototypes.iter()
+        self.base_prototypes
+            .iter()
             .filter_map(|(phoneme, _base)| {
                 self.get_adapted_prototype(phoneme)
                     .map(|adapted| (phoneme.clone(), adapted))
@@ -309,7 +312,9 @@ impl AdaptationEngine {
     /// Identify likely speaker from acoustic sample
     /// Returns (speaker_id, confidence) sorted by confidence
     pub fn identify_speaker(&self, acoustic_hv: &HV16) -> Vec<(String, f32)> {
-        let mut scores: Vec<(String, f32)> = self.profiles.iter()
+        let mut scores: Vec<(String, f32)> = self
+            .profiles
+            .iter()
             .filter(|(_, profile)| profile.total_observations() >= self.min_observations)
             .map(|(id, profile)| {
                 let sim = acoustic_hv.similarity(&profile.transform);
@@ -369,10 +374,9 @@ impl SpeakerDiarizer {
 
         for (i, cluster) in self.clusters.iter().enumerate() {
             let sim = segment_hv.similarity(&cluster.centroid);
-            if sim > self.threshold
-                && best_match.as_ref().map(|(_, s)| sim > *s).unwrap_or(true) {
-                    best_match = Some((i, sim));
-                }
+            if sim > self.threshold && best_match.as_ref().map(|(_, s)| sim > *s).unwrap_or(true) {
+                best_match = Some((i, sim));
+            }
         }
 
         if let Some((idx, _)) = best_match {
@@ -399,7 +403,9 @@ impl SpeakerDiarizer {
             self.clusters.len() - 1
         } else {
             // At capacity - assign to closest
-            let (closest_idx, _) = self.clusters.iter()
+            let (closest_idx, _) = self
+                .clusters
+                .iter()
                 .enumerate()
                 .map(|(i, c)| (i, segment_hv.similarity(&c.centroid)))
                 .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
@@ -428,7 +434,9 @@ impl SpeakerDiarizer {
         while i < self.clusters.len() {
             let mut j = i + 1;
             while j < self.clusters.len() {
-                let sim = self.clusters[i].centroid.similarity(&self.clusters[j].centroid);
+                let sim = self.clusters[i]
+                    .centroid
+                    .similarity(&self.clusters[j].centroid);
                 if sim > merge_threshold {
                     // Copy data from j before merging
                     let centroid_j = self.clusters[j].centroid;
