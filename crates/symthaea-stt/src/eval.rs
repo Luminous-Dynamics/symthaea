@@ -454,52 +454,52 @@ pub struct EvaluationReport {
 
 impl std::fmt::Display for EvaluationReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Evaluation Report ({} utterances)\n",
-            self.num_utterances
-        )?;
-        write!(f, "{}\n", "=".repeat(50))?;
+        writeln!(f, "Evaluation Report ({} utterances)", self.num_utterances)?;
+        writeln!(f, "{}", "=".repeat(50))?;
 
         if let Some(ref per) = self.phoneme_results {
-            write!(f, "\nPhoneme Error Rate (PER)\n")?;
+            writeln!(f)?;
+            writeln!(f, "Phoneme Error Rate (PER)")?;
             write!(f, "{}", "-".repeat(30))?;
-            write!(f, "\n  Reference phonemes: {}\n", per.reference_length)?;
-            write!(f, "  Hypothesis phonemes: {}\n", per.hypothesis_length)?;
-            write!(f, "  Correct: {}\n", per.correct)?;
-            write!(f, "  Substitutions: {}\n", per.substitutions)?;
-            write!(f, "  Insertions: {}\n", per.insertions)?;
-            write!(f, "  Deletions: {}\n", per.deletions)?;
-            write!(f, "  PER: {:.2}%\n", per.error_rate() * 100.0)?;
-            write!(f, "  Accuracy: {:.2}%\n", per.accuracy() * 100.0)?;
+            writeln!(f, "\n  Reference phonemes: {}", per.reference_length)?;
+            writeln!(f, "  Hypothesis phonemes: {}", per.hypothesis_length)?;
+            writeln!(f, "  Correct: {}", per.correct)?;
+            writeln!(f, "  Substitutions: {}", per.substitutions)?;
+            writeln!(f, "  Insertions: {}", per.insertions)?;
+            writeln!(f, "  Deletions: {}", per.deletions)?;
+            writeln!(f, "  PER: {:.2}%", per.error_rate() * 100.0)?;
+            writeln!(f, "  Accuracy: {:.2}%", per.accuracy() * 100.0)?;
         }
 
         if let Some(ref wer) = self.word_results {
-            write!(f, "\nWord Error Rate (WER)\n")?;
+            writeln!(f)?;
+            writeln!(f, "Word Error Rate (WER)")?;
             write!(f, "{}", "-".repeat(30))?;
-            write!(f, "\n  Reference words: {}\n", wer.reference_length)?;
-            write!(f, "  Hypothesis words: {}\n", wer.hypothesis_length)?;
-            write!(f, "  Correct: {}\n", wer.correct)?;
-            write!(f, "  Substitutions: {}\n", wer.substitutions)?;
-            write!(f, "  Insertions: {}\n", wer.insertions)?;
-            write!(f, "  Deletions: {}\n", wer.deletions)?;
-            write!(f, "  WER: {:.2}%\n", wer.error_rate() * 100.0)?;
-            write!(f, "  Accuracy: {:.2}%\n", wer.accuracy() * 100.0)?;
+            writeln!(f, "\n  Reference words: {}", wer.reference_length)?;
+            writeln!(f, "  Hypothesis words: {}", wer.hypothesis_length)?;
+            writeln!(f, "  Correct: {}", wer.correct)?;
+            writeln!(f, "  Substitutions: {}", wer.substitutions)?;
+            writeln!(f, "  Insertions: {}", wer.insertions)?;
+            writeln!(f, "  Deletions: {}", wer.deletions)?;
+            writeln!(f, "  WER: {:.2}%", wer.error_rate() * 100.0)?;
+            writeln!(f, "  Accuracy: {:.2}%", wer.accuracy() * 100.0)?;
         }
 
         if let Some(ref cer) = self.char_results {
-            write!(f, "\nCharacter Error Rate (CER)\n")?;
+            writeln!(f)?;
+            writeln!(f, "Character Error Rate (CER)")?;
             write!(f, "{}", "-".repeat(30))?;
-            write!(f, "\n  CER: {:.2}%\n", cer.error_rate() * 100.0)?;
+            writeln!(f, "\n  CER: {:.2}%", cer.error_rate() * 100.0)?;
         }
 
         if let Some(ref cm) = self.confusion_matrix {
-            write!(f, "\nTop Confusions\n")?;
+            writeln!(f)?;
+            writeln!(f, "Top Confusions")?;
             write!(f, "{}", "-".repeat(30))?;
             for ((r, h), count) in cm.top_confusions(10) {
                 write!(f, "\n  {} -> {}: {}", r, h, count)?;
             }
-            write!(f, "\n")?;
+            writeln!(f)?;
         }
 
         Ok(())
