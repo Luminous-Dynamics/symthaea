@@ -22,7 +22,7 @@
 //!
 //! ## Performance Model (from Session 7)
 //!
-//! ```ignore
+//! ```text
 //! Naive search:    O(n) × 30µs per comparison
 //! SimHash LSH:     O(k) × 30µs where k = n × 0.109 (10.9% candidates)
 //!

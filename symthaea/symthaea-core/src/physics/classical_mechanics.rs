@@ -402,7 +402,7 @@ impl ClassicalMechanicsEncoder {
         }
     }
 
-    /// Encode the virial theorem: 2<T> = -<r·∇V> for bound systems
+    /// Encode the virial theorem: `2<T> = -<r·∇V>` for bound systems
     pub fn virial_theorem(&self) -> ContinuousHV {
         let bound_state = self.genesis.hv("state::bound", PHYSICS_DIM);
         self.kinetic

@@ -23,7 +23,7 @@ thread_local! {
 
 /// 16,384-bit hypervector (2048 bytes = 2 KB)
 ///
-/// This is 32x smaller than Vec<f32> (65KB) representation!
+/// This is 32x smaller than `Vec<f32>` (65KB) representation!
 ///
 /// Memory layout: 2048 bytes = 16,384 bits (2^14)
 /// - Each bit represents one dimension
@@ -144,7 +144,7 @@ impl BinaryHV {
     /// # Performance
     /// - O(2048) byte operations
     /// - ~5-10ns with SIMD (AVX2), ~80ns scalar
-    /// - 200x faster than circular convolution on Vec<f32>
+    /// - 200x faster than circular convolution on `Vec<f32>`
     ///
     /// # Example
     /// ```
@@ -789,7 +789,7 @@ impl BinaryHV {
     /// # Performance
     /// - O(DIM) with popcount
     /// - ~10-20ns with SIMD (AVX2+POPCNT), ~160ns scalar
-    /// - 200x faster than cosine similarity on Vec<f32>
+    /// - 200x faster than cosine similarity on `Vec<f32>`
     ///
     /// # Example
     /// ```

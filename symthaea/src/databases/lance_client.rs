@@ -27,7 +27,7 @@ use arrow_array::{
 use arrow_schema::{ArrowError, DataType, Field, Schema};
 use async_trait::async_trait;
 use futures::TryStreamExt;
-use lancedb::query::{ExecutableQuery, QueryBase};
+use lancedb::query::{ExecutableQuery, QueryBase, Select};
 use std::sync::Arc;
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
@@ -193,6 +193,27 @@ fn batch_to_records(batch: &RecordBatch) -> Vec<MemoryRecord> {
 }
 
 // ============================================================================
+// Raw Hamming Similarity (no BinaryHV construction)
+// ============================================================================
+
+/// Compute Hamming similarity directly from raw byte slices.
+///
+/// Avoids constructing a full BinaryHV for each candidate row,
+/// saving ~2KB of allocation per comparison during search.
+#[inline]
+fn hamming_similarity_raw(a: &[u8], b: &[u8]) -> f32 {
+    let total_bits = (a.len() * 8) as u32;
+    if total_bits == 0 {
+        return 0.0;
+    }
+    let mut xor_count = 0u32;
+    for (ai, bi) in a.iter().zip(b.iter()) {
+        xor_count += (ai ^ bi).count_ones();
+    }
+    1.0 - (xor_count as f32 / total_bits as f32)
+}
+
+// ============================================================================
 // LanceMemory
 // ============================================================================
 
@@ -295,6 +316,136 @@ impl LanceMemory {
         top_k: usize,
         filter: Option<&str>,
     ) -> DbResult<Vec<SearchResult>> {
+        self.search_similar_2pass(query, top_k, filter).await
+    }
+
+    /// 2-pass search: projection pushdown for large tables, single-pass for small ones.
+    ///
+    /// **Pass 1** (large tables, N > top_k * 10): Fetch only `id` + `encoding` columns,
+    /// compute Hamming similarity from raw bytes, take top-k IDs.
+    ///
+    /// **Pass 2**: Fetch full records for top-k IDs only.
+    ///
+    /// For small tables (N <= top_k * 10), a single pass fetching all columns is cheaper
+    /// than two roundtrips.
+    async fn search_similar_2pass(
+        &self,
+        query: &BinaryHV,
+        top_k: usize,
+        filter: Option<&str>,
+    ) -> DbResult<Vec<SearchResult>> {
+        let table = self.table().await?;
+        let total = table
+            .count_rows(filter.map(|f| f.to_string()))
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Count failed: {e}")))?;
+
+        // Small table: single-pass is more efficient than two roundtrips
+        if total <= top_k * 10 {
+            return self.search_single_pass(query, top_k, filter).await;
+        }
+
+        // ── Pass 1: Lightweight scan — id + encoding only ───────────────
+        let query_bytes = &query.0[..];
+
+        let mut q = table.query();
+        if let Some(f) = filter {
+            q = q.only_if(f);
+        }
+        let q = q.select(Select::Columns(vec![
+            "id".to_string(),
+            "encoding".to_string(),
+        ]));
+
+        let stream = q
+            .execute()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Pass-1 query failed: {e}")))?;
+
+        let batches: Vec<RecordBatch> = stream
+            .try_collect()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Pass-1 batch failed: {e}")))?;
+
+        // Compute similarity from raw Arrow bytes (no MemoryRecord construction)
+        let mut scored: Vec<(String, f32)> = Vec::with_capacity(total);
+        for batch in &batches {
+            let Some(id_col) = batch.column(0).as_any().downcast_ref::<StringArray>() else {
+                continue;
+            };
+            let Some(enc_col) = batch
+                .column(1)
+                .as_any()
+                .downcast_ref::<FixedSizeBinaryArray>()
+            else {
+                continue;
+            };
+
+            for i in 0..batch.num_rows() {
+                let sim = hamming_similarity_raw(query_bytes, enc_col.value(i));
+                scored.push((id_col.value(i).to_string(), sim));
+            }
+        }
+
+        scored.sort_by(|a, b| b.1.total_cmp(&a.1));
+        scored.truncate(top_k);
+
+        if scored.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // ── Pass 2: Fetch full records for top-k IDs ────────────────────
+        let similarities: std::collections::HashMap<String, f32> =
+            scored.iter().cloned().collect();
+        let quoted: Vec<String> = scored
+            .iter()
+            .map(|(id, _)| format!("'{}'", id.replace('\'', "''")))
+            .collect();
+        let predicate = format!("id IN ({})", quoted.join(", "));
+
+        let stream = table
+            .query()
+            .only_if(predicate)
+            .execute()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Pass-2 query failed: {e}")))?;
+
+        let batches: Vec<RecordBatch> = stream
+            .try_collect()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Pass-2 batch failed: {e}")))?;
+
+        let mut results: Vec<SearchResult> = batches
+            .iter()
+            .flat_map(batch_to_records)
+            .map(|record| {
+                let similarity = similarities
+                    .get(&record.id)
+                    .copied()
+                    .unwrap_or_else(|| query.similarity(&record.encoding));
+                SearchResult { record, similarity }
+            })
+            .collect();
+
+        results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
+        results.truncate(top_k);
+
+        let returned_ids: Vec<String> = results.iter().map(|r| r.record.id.clone()).collect();
+        if let Err(e) = self.bump_retrieval_stats(&returned_ids).await {
+            tracing::warn!("Reconsolidation bump failed: {e}");
+        }
+
+        Ok(results)
+    }
+
+    /// Single-pass search: loads all columns, computes similarity, returns top-k.
+    /// Used for small tables where two roundtrips are more expensive.
+    async fn search_single_pass(
+        &self,
+        query: &BinaryHV,
+        top_k: usize,
+        filter: Option<&str>,
+    ) -> DbResult<Vec<SearchResult>> {
         let table = self.table().await?;
         let query = *query;
 
@@ -306,7 +457,7 @@ impl LanceMemory {
         let stream = q
             .execute()
             .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Filtered search failed: {e}")))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Single-pass search failed: {e}")))?;
 
         let batches: Vec<RecordBatch> = stream
             .try_collect()
@@ -423,40 +574,7 @@ impl ConsciousnessDatabase for LanceMemory {
     }
 
     async fn search_similar(&self, query: &BinaryHV, top_k: usize) -> DbResult<Vec<SearchResult>> {
-        let table = self.table().await?;
-        let query = *query;
-
-        // Load all records (brute force — LanceDB can't do Hamming ANN)
-        let stream = table
-            .query()
-            .execute()
-            .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Search query failed: {e}")))?;
-
-        let batches: Vec<RecordBatch> = stream
-            .try_collect()
-            .await
-            .map_err(|e| DatabaseError::QueryFailed(format!("Batch collection failed: {e}")))?;
-
-        let mut results: Vec<SearchResult> = batches
-            .iter()
-            .flat_map(batch_to_records)
-            .map(|record| {
-                let similarity = query.similarity(&record.encoding);
-                SearchResult { record, similarity }
-            })
-            .collect();
-
-        results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
-        results.truncate(top_k);
-
-        // Reconsolidate: bump stats on returned results
-        let returned_ids: Vec<String> = results.iter().map(|r| r.record.id.clone()).collect();
-        if let Err(e) = self.bump_retrieval_stats(&returned_ids).await {
-            tracing::warn!("Reconsolidation bump failed: {e}");
-        }
-
-        Ok(results)
+        self.search_similar_2pass(query, top_k, None).await
     }
 
     async fn get(&self, id: &str) -> DbResult<Option<MemoryRecord>> {

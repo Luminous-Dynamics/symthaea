@@ -447,7 +447,7 @@ impl ContinuousHV {
 
     /// Bundle multiple vectors (owned version)
     ///
-    /// Takes owned values instead of references. Useful when you have a Vec<ContinuousHV>
+    /// Takes owned values instead of references. Useful when you have a `Vec<ContinuousHV>`
     /// and don't want to build a reference slice.
     pub fn bundle_owned(hvs: &[Self]) -> Self {
         if hvs.is_empty() {

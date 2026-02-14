@@ -263,9 +263,6 @@ holochain = []                              # Gate only (real integration in sym
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
 network = []                                # Mycelix network client (real HTTP fetching)
 
-# ── GPU ─────────────────────────────────────────────────────────────
-cuda = []                                   # CUDA backend gate (reserved for future use)
-
 # ── Desktop & System Integration ────────────────────────────────────
 notifications = ["zbus"]                    # D-Bus desktop notifications
 nix-mind = ["symthaea-nix"]                 # Conscious NixOS mind with HDC world model + active inference
@@ -772,6 +769,10 @@ harness = false
 
 [[bench]]
 name = "streaming"
+harness = false
+
+[[bench]]
+name = "database_benchmark"
 harness = false
 
 [profile.test]

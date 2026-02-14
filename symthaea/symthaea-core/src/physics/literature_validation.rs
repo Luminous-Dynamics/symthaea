@@ -7,7 +7,7 @@
 //!
 //! - **Neutron Cross-Sections**: ENDF/B-VIII.0 (Evaluated Nuclear Data File)
 //!   Brown et al., Nuclear Data Sheets 148 (2018) 1-142
-//!   https://www.nndc.bnl.gov/endf/
+//!   <https://www.nndc.bnl.gov/endf/>
 //!
 //! - **Thermal Conductivity**: ASM Handbook Vol. 2 (Properties and Selection)
 //!   CRC Handbook of Chemistry and Physics, 104th ed. (2023-2024)

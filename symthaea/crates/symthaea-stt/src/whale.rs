@@ -442,20 +442,17 @@ pub fn analyze_coda_topology(sentinel: &WhaleSentinel) -> CodaTopology {
     let mut similarities = Vec::new();
     let prototypes: Vec<_> = sentinel.prototypes.prototypes.iter().collect();
 
-    for i in 0..prototypes.len() {
-        for j in (i + 1)..prototypes.len() {
-            let (label_i, proto_i) = prototypes[i];
-            let (label_j, proto_j) = prototypes[j];
-
+    for (i, (label_i, proto_i)) in prototypes.iter().enumerate() {
+        for (label_j, proto_j) in &prototypes[i + 1..] {
             let hv_i = proto_i.get_centroid();
             let hv_j = proto_j.get_centroid();
 
             let sim = hv_i.similarity(&hv_j);
-            similarities.push((label_i.clone(), label_j.clone(), sim));
+            similarities.push((label_i.to_string(), label_j.to_string(), sim));
         }
     }
 
-    similarities.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+    similarities.sort_by(|a, b| b.2.total_cmp(&a.2));
 
     let all_sims: Vec<f32> = similarities.iter().map(|(_, _, s)| *s).collect();
     let mean_sim = if all_sims.is_empty() {
