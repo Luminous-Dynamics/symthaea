@@ -27,6 +27,7 @@ use arrow_array::{
 use arrow_schema::{ArrowError, DataType, Field, Schema};
 use async_trait::async_trait;
 use futures::TryStreamExt;
+use lancedb::query::{ExecutableQuery, QueryBase};
 use std::sync::Arc;
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
@@ -279,6 +280,99 @@ impl LanceMemory {
             .ok_or_else(|| DatabaseError::ConnectionFailed("Table not initialized".into()))
     }
 
+    /// Search with optional predicate pushdown.
+    ///
+    /// `filter` is a Lance SQL expression applied BEFORE loading records,
+    /// reducing I/O for large tables.
+    /// Example: `"memory_type = 'episodic' AND timestamp_ms > 1700000000"`
+    pub async fn search_similar_filtered(
+        &self,
+        query: &BinaryHV,
+        top_k: usize,
+        filter: Option<&str>,
+    ) -> DbResult<Vec<SearchResult>> {
+        let table = self.table().await?;
+        let query = *query;
+
+        let mut q = table.query();
+        if let Some(f) = filter {
+            q = q.only_if(f);
+        }
+
+        let stream = q
+            .execute()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Filtered search failed: {e}")))?;
+
+        let batches: Vec<RecordBatch> = stream
+            .try_collect()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Batch collection failed: {e}")))?;
+
+        let mut results: Vec<SearchResult> = batches
+            .iter()
+            .flat_map(batch_to_records)
+            .map(|record| {
+                let similarity = query.similarity(&record.encoding);
+                SearchResult { record, similarity }
+            })
+            .collect();
+
+        results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
+        results.truncate(top_k);
+
+        let returned_ids: Vec<String> = results.iter().map(|r| r.record.id.clone()).collect();
+        if let Err(e) = self.bump_retrieval_stats(&returned_ids).await {
+            tracing::warn!("Reconsolidation bump failed: {e}");
+        }
+
+        Ok(results)
+    }
+
+    /// Migrate all records from a SqliteMemory database to this LanceDB instance.
+    ///
+    /// Reads all records via `list_all()`, batches them into groups of 1000,
+    /// and inserts into the Lance table. Returns the number of records migrated.
+    pub async fn migrate_from_sqlite(
+        &self,
+        sqlite: &super::sqlite_client::SqliteMemory,
+    ) -> DbResult<usize> {
+        use super::ConsciousnessDatabase;
+
+        let records = sqlite.list_all().await?;
+        let total = records.len();
+        if total == 0 {
+            return Ok(0);
+        }
+
+        let table = self.table().await?;
+        let schema = memories_schema();
+
+        for chunk in records.chunks(1000) {
+            let mut batches: Vec<Result<RecordBatch, ArrowError>> = Vec::with_capacity(chunk.len());
+            for record in chunk {
+                batches.push(record_to_batch(record).map_err(|e| {
+                    ArrowError::ExternalError(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        e.to_string(),
+                    )))
+                }));
+            }
+
+            let reader = RecordBatchIterator::new(batches, schema.clone());
+            table
+                .add(reader)
+                .execute()
+                .await
+                .map_err(|e| {
+                    DatabaseError::InsertFailed(format!("Migration batch insert failed: {e}"))
+                })?;
+        }
+
+        tracing::info!(count = total, "Migrated records from SQLite to LanceDB");
+        Ok(total)
+    }
+
     /// Bump retrieval_count and consolidation_strength for returned search results.
     async fn bump_retrieval_stats(&self, ids: &[String]) -> DbResult<()> {
         if ids.is_empty() {
@@ -317,10 +411,10 @@ impl ConsciousnessDatabase for LanceMemory {
         let batches: Vec<Result<RecordBatch, ArrowError>> = vec![Ok(batch)];
         let reader = RecordBatchIterator::new(batches, schema);
 
-        table
-            .merge_insert(&["id"])
-            .when_matched_update_all(None::<String>)
-            .when_not_matched_insert_all()
+        let mut builder = table.merge_insert(&["id"]);
+        builder.when_matched_update_all(None);
+        builder.when_not_matched_insert_all();
+        builder
             .execute(Box::new(reader))
             .await
             .map_err(|e| DatabaseError::InsertFailed(format!("LanceDB upsert failed: {e}")))?;
@@ -428,6 +522,32 @@ impl ConsciousnessDatabase for LanceMemory {
             .await
             .map(|_| true)
             .map_err(|e| DatabaseError::QueryFailed(format!("Health check failed: {e}")))
+    }
+
+    async fn search_similar_filtered(
+        &self,
+        query: &BinaryHV,
+        top_k: usize,
+        filter: Option<&str>,
+    ) -> DbResult<Vec<SearchResult>> {
+        self.search_similar_filtered(query, top_k, filter).await
+    }
+
+    async fn list_all(&self) -> DbResult<Vec<MemoryRecord>> {
+        let table = self.table().await?;
+
+        let stream = table
+            .query()
+            .execute()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("list_all query failed: {e}")))?;
+
+        let batches: Vec<RecordBatch> = stream
+            .try_collect()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("list_all batch failed: {e}")))?;
+
+        Ok(batches.iter().flat_map(batch_to_records).collect())
     }
 
     async fn stats(&self) -> DbResult<DatabaseStats> {
@@ -675,6 +795,53 @@ mod tests {
         // Results should be sorted descending
         assert!(results[0].similarity >= results[1].similarity);
         assert!(results[1].similarity >= results[2].similarity);
+    }
+
+    #[tokio::test]
+    async fn test_lance_search_similar_filtered() {
+        let db = LanceMemory::in_memory().await.unwrap();
+
+        for i in 0..5u64 {
+            let mut rec = test_record(&format!("filter-{i}"), i);
+            rec.memory_type = if i % 2 == 0 {
+                MemoryType::Episodic
+            } else {
+                MemoryType::Semantic
+            };
+            db.store(rec).await.unwrap();
+        }
+
+        // Unfiltered: all 5
+        let all = db.search_similar_filtered(&BinaryHV::random(0), 10, None).await.unwrap();
+        assert_eq!(all.len(), 5);
+
+        // Filtered: only episodic (i=0,2,4)
+        let episodic = db
+            .search_similar_filtered(
+                &BinaryHV::random(0),
+                10,
+                Some("memory_type = 'episodic'"),
+            )
+            .await
+            .unwrap();
+        assert_eq!(episodic.len(), 3);
+        for r in &episodic {
+            assert_eq!(r.record.memory_type, MemoryType::Episodic);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_lance_list_all() {
+        use super::ConsciousnessDatabase;
+
+        let db = LanceMemory::in_memory().await.unwrap();
+
+        for i in 0..3u64 {
+            db.store(test_record(&format!("list-{i}"), i)).await.unwrap();
+        }
+
+        let all = db.list_all().await.unwrap();
+        assert_eq!(all.len(), 3);
     }
 
     #[tokio::test]

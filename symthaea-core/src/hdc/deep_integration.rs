@@ -306,6 +306,10 @@ mod tests {
             recursion: 0.4, efficacy: 0.7, epistemic: 0.8, temporal: 0.9,
         };
         bridge.update(&dims, CognitiveMode::Balanced, ConsciousnessState::FlowState);
-        println!("{}", bridge.report());
+        let report = bridge.report();
+        println!("{}", report);
+
+        // Report should be non-empty
+        assert!(!report.is_empty(), "Integration report should not be empty");
     }
 }

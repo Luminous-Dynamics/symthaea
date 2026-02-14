@@ -347,7 +347,7 @@ impl NixHighlighter {
                     }
                     let mut s = String::from(c);
                     while let Some(&nc) = chars.peek() {
-                        s.push(chars.next().unwrap());
+                        s.push(chars.next().expect("peek() returned Some so next() must succeed"));
                         if nc == '"' && !s.ends_with("\\\"") {
                             break;
                         }
@@ -365,7 +365,7 @@ impl NixHighlighter {
                         if nc == '\n' {
                             break;
                         }
-                        s.push(chars.next().unwrap());
+                        s.push(chars.next().expect("peek() returned Some so next() must succeed"));
                     }
                     tokens.push((s, NixToken::Comment));
                 }

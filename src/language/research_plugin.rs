@@ -20,7 +20,7 @@ impl DomainPlugin for ResearchPlugin {
         let lower = text.to_lowercase();
 
         // Extract paper/DOI references
-        let re_doi = regex::Regex::new(r"(?i)(?:doi[:\s]*)?10\.\d{4,}/\S+").unwrap();
+        let re_doi = regex::Regex::new(r"(?i)(?:doi[:\s]*)?10\.\d{4,}/\S+").expect("valid regex literal");
         for m in re_doi.find_iter(text) {
             entities.push(
                 Entity::new("doi", m.as_str(), m.start(), m.end())
@@ -29,7 +29,7 @@ impl DomainPlugin for ResearchPlugin {
         }
 
         // Extract arXiv IDs
-        let re_arxiv = regex::Regex::new(r"(?i)(?:arxiv[:\s]*)?\d{4}\.\d{4,5}(?:v\d+)?").unwrap();
+        let re_arxiv = regex::Regex::new(r"(?i)(?:arxiv[:\s]*)?\d{4}\.\d{4,5}(?:v\d+)?").expect("valid regex literal");
         for m in re_arxiv.find_iter(text) {
             entities.push(
                 Entity::new("arxiv_id", m.as_str(), m.start(), m.end())
@@ -38,10 +38,10 @@ impl DomainPlugin for ResearchPlugin {
         }
 
         // Extract author citations (Name et al., YYYY) or (Name, YYYY)
-        let re_cite = regex::Regex::new(r"\(([A-Z][a-z]+(?:\s+et\s+al\.)?),?\s*(\d{4})\)").unwrap();
+        let re_cite = regex::Regex::new(r"\(([A-Z][a-z]+(?:\s+et\s+al\.)?),?\s*(\d{4})\)").expect("valid regex literal");
         for cap in re_cite.captures_iter(text) {
             if let (Some(author), Some(year)) = (cap.get(1), cap.get(2)) {
-                let full_match = cap.get(0).unwrap();
+                let full_match = cap.get(0).expect("capture group 0 always exists");
                 entities.push(
                     Entity::new("citation", full_match.as_str(), full_match.start(), full_match.end())
                         .with_confidence(0.85)
@@ -77,7 +77,7 @@ impl DomainPlugin for ResearchPlugin {
         ];
         for dataset in &datasets {
             if lower.contains(dataset) {
-                let pos = lower.find(dataset).unwrap();
+                let pos = lower.find(dataset).expect("dataset confirmed present by contains() check");
                 entities.push(
                     Entity::new("dataset", *dataset, pos, pos + dataset.len())
                         .with_confidence(0.9),

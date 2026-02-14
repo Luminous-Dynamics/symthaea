@@ -24,10 +24,10 @@ impl NumberTheoryEngine {
     pub fn new() -> Self {
         let prims = PrimitiveSystem::global();
         Self {
-            multiplication: prims.get("MULTIPLICATION").unwrap().encoding,
-            addition: prims.get("ADDITION").unwrap().encoding,
-            zero: prims.get("ZERO").unwrap().encoding,
-            successor: prims.get("SUCCESSOR").unwrap().encoding,
+            multiplication: prims.get("MULTIPLICATION").expect("MULTIPLICATION primitive must exist").encoding,
+            addition: prims.get("ADDITION").expect("ADDITION primitive must exist").encoding,
+            zero: prims.get("ZERO").expect("ZERO primitive must exist").encoding,
+            successor: prims.get("SUCCESSOR").expect("SUCCESSOR primitive must exist").encoding,
         }
     }
 

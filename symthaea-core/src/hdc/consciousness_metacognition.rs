@@ -1624,7 +1624,7 @@ impl ConsciousnessStateMachine {
 
     /// Get parameters for current state
     pub fn current_params(&self) -> &StateParameters {
-        self.state_params.get(&self.current_state).unwrap()
+        self.state_params.get(&self.current_state).expect("all states have params in state_params map")
     }
 
     /// Advance time and check for automatic transitions

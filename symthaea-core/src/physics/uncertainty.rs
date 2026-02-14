@@ -62,7 +62,7 @@ impl UncertainParameter {
         match self.distribution {
             UncertaintyDistribution::Normal { std_fraction } => {
                 let std = self.nominal * std_fraction;
-                let normal = rand_distr::Normal::new(self.nominal, std).unwrap();
+                let normal = rand_distr::Normal::new(self.nominal, std).expect("Normal requires finite mean and std >= 0");
                 normal.sample(rng).max(self.nominal * 0.1) // Floor at 10% of nominal
             }
             UncertaintyDistribution::Uniform { range_fraction } => {
@@ -72,14 +72,14 @@ impl UncertainParameter {
             }
             UncertaintyDistribution::LogNormal { sigma } => {
                 let mu = self.nominal.ln();
-                let lognormal = rand_distr::LogNormal::new(mu, sigma).unwrap();
+                let lognormal = rand_distr::LogNormal::new(mu, sigma).expect("LogNormal requires finite mu and sigma >= 0");
                 lognormal.sample(rng)
             }
             UncertaintyDistribution::Triangular { range_fraction } => {
                 let range = self.nominal * range_fraction;
                 let min = self.nominal - range;
                 let max = self.nominal + range;
-                let triangular = rand_distr::Triangular::new(min, max, self.nominal).unwrap();
+                let triangular = rand_distr::Triangular::new(min, max, self.nominal).expect("Triangular requires min <= mode <= max");
                 triangular.sample(rng)
             }
         }

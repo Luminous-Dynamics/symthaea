@@ -245,37 +245,37 @@ impl NixErrorDiagnoser {
     pub fn new() -> Self {
         let patterns = vec![
             ErrorPattern {
-                regex: regex::Regex::new(r"error: syntax error, unexpected").unwrap(),
+                regex: regex::Regex::new(r"error: syntax error, unexpected").expect("valid regex literal"),
                 category: NixErrorCategory::Evaluation,
                 explanation_template: "Syntax error in Nix expression".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"undefined variable '(\w+)'").unwrap(),
+                regex: regex::Regex::new(r"undefined variable '(\w+)'").expect("valid regex literal"),
                 category: NixErrorCategory::Evaluation,
                 explanation_template: "Variable is not defined in scope".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"attribute '(\w+)' missing").unwrap(),
+                regex: regex::Regex::new(r"attribute '(\w+)' missing").expect("valid regex literal"),
                 category: NixErrorCategory::Evaluation,
                 explanation_template: "Required attribute is missing".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"error: hash mismatch").unwrap(),
+                regex: regex::Regex::new(r"error: hash mismatch").expect("valid regex literal"),
                 category: NixErrorCategory::Build,
                 explanation_template: "Downloaded file hash doesn't match expected".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"builder.*failed").unwrap(),
+                regex: regex::Regex::new(r"builder.*failed").expect("valid regex literal"),
                 category: NixErrorCategory::Build,
                 explanation_template: "Package build process failed".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"permission denied").unwrap(),
+                regex: regex::Regex::new(r"permission denied").expect("valid regex literal"),
                 category: NixErrorCategory::Permission,
                 explanation_template: "Insufficient permissions for this operation".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"flake.*error|error.*flake").unwrap(),
+                regex: regex::Regex::new(r"flake.*error|error.*flake").expect("valid regex literal"),
                 category: NixErrorCategory::Flake,
                 explanation_template: "Flake configuration error".to_string(),
             },

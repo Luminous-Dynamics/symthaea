@@ -1153,6 +1153,16 @@ mod tests {
         // Should have attempted some repairs
         // (may be zero if no vectors are "critical" enough)
         println!("✅ Self-heal batch: {} repairs attempted", results.len());
+
+        // Repairs should not exceed the number of corrupted vectors
+        assert!(results.len() <= 3,
+                "Should not repair more vectors than were corrupted");
+
+        // Field health should still be valid after healing
+        let stats = field.health_stats();
+        assert!(stats.overall_health.is_finite(), "Health should be finite after healing");
+        assert!(stats.overall_health >= 0.0 && stats.overall_health <= 1.0,
+                "Health should be in [0, 1]");
     }
 
     #[test]

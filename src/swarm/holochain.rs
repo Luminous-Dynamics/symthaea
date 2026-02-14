@@ -373,7 +373,10 @@ impl HolochainCortex {
 
     /// Create a new Holochain Cortex client with custom cache capacity
     pub fn with_cache_capacity(config: HolochainConfig, cache_capacity: usize) -> Self {
-        let capacity = NonZeroUsize::new(cache_capacity).unwrap_or(NonZeroUsize::new(1).unwrap());
+        let capacity = NonZeroUsize::new(cache_capacity).unwrap_or(
+            // SAFETY: 1 is always non-zero
+            NonZeroUsize::new(1).expect("1 is non-zero")
+        );
         Self {
             config,
             local_agent: None,

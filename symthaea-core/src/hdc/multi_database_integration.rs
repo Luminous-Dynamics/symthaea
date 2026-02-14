@@ -1169,7 +1169,7 @@ impl DuckClientWrapper {
             [],
         ).map_err(|e| DatabaseError::ConnectionFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
 
-        *self.conn.lock().unwrap() = Some(connection);
+        *self.conn.lock().expect("conn Mutex poisoned") = Some(connection);
         self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
@@ -1186,7 +1186,7 @@ impl DuckClientWrapper {
             return Err(DatabaseError::Unavailable("DuckDB".to_string()));
         }
 
-        let guard = self.conn.lock().unwrap();
+        let guard = self.conn.lock().expect("conn Mutex poisoned");
         let conn = guard.as_ref()
             .ok_or_else(|| DatabaseError::Unavailable("DuckDB connection not open".to_string()))?;
 
@@ -1234,7 +1234,7 @@ impl DuckClientWrapper {
             return Err(DatabaseError::Unavailable("DuckDB".to_string()));
         }
 
-        let guard = self.conn.lock().unwrap();
+        let guard = self.conn.lock().expect("conn Mutex poisoned");
         let conn = guard.as_ref()
             .ok_or_else(|| DatabaseError::Unavailable("DuckDB connection not open".to_string()))?;
 
@@ -1268,7 +1268,7 @@ impl DuckClientWrapper {
             return Err(DatabaseError::Unavailable("DuckDB".to_string()));
         }
 
-        let guard = self.conn.lock().unwrap();
+        let guard = self.conn.lock().expect("conn Mutex poisoned");
         let conn = guard.as_ref()
             .ok_or_else(|| DatabaseError::Unavailable("DuckDB connection not open".to_string()))?;
 

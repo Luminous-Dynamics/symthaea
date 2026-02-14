@@ -687,9 +687,11 @@ mod tests {
 
         let attractors = dynamics.find_attractors(3, 20);
 
-        // May find zero or more attractors depending on random initialization
-        // Just check the method works
-        let _ = attractors.len();
+        // Each attractor should have the right number of processes (4)
+        for attractor in &attractors {
+            assert_eq!(attractor.len(), 4,
+                       "Each attractor state should have 4 process vectors");
+        }
     }
 
     #[test]

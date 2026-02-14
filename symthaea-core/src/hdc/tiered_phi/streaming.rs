@@ -294,8 +294,7 @@ impl StreamingPhiGradient {
         let mut gradient_ranking: Vec<usize> = (0..n).collect();
         gradient_ranking.sort_by(|&a, &b| {
             component_gradients[b].abs()
-                .partial_cmp(&component_gradients[a].abs())
-                .unwrap()
+                .total_cmp(&component_gradients[a].abs())
         });
 
         // Identify helpers and hinderers

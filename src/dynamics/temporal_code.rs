@@ -283,7 +283,7 @@ impl TemporalCodeAnalyzer {
 
         let (best_cat, best_score) = categories.iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap();
+            .expect("categories is non-empty (checked via total > 0)");
 
         PredictedChange {
             category: *best_cat,

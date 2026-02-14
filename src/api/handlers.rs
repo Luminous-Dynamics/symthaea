@@ -350,7 +350,7 @@ pub async fn submit_model(
         created_at: now,
     };
 
-    state.submissions.write().unwrap().insert(submission_id, submission);
+    state.submissions.write().expect("submissions RwLock poisoned").insert(submission_id, submission);
 
     // Estimate processing time based on node count
     let n_nodes = match &custom {
@@ -367,7 +367,7 @@ pub async fn submit_model(
 
     let process_inline = n_nodes <= 16;
     if process_inline {
-        if let Some(submission) = state.submissions.write().unwrap().get_mut(&submission_id) {
+        if let Some(submission) = state.submissions.write().expect("submissions RwLock poisoned").get_mut(&submission_id) {
             submission.status = SubmissionStatus::Processing;
         }
 
@@ -379,7 +379,7 @@ pub async fn submit_model(
     }
 
     // Get queue position
-    let queue_position = state.submissions.read().unwrap()
+    let queue_position = state.submissions.read().expect("submissions RwLock poisoned")
         .values()
         .filter(|s| s.status == SubmissionStatus::Queued)
         .count() as u32;
@@ -412,7 +412,7 @@ fn process_submission_inline(
     let (node_representations, _n_nodes) = match build_node_representations(request) {
         Ok(values) => values,
         Err(_) => {
-            if let Some(submission) = state.submissions.write().unwrap().get_mut(&submission_id) {
+            if let Some(submission) = state.submissions.write().expect("submissions RwLock poisoned").get_mut(&submission_id) {
                 submission.status = SubmissionStatus::Failed;
             }
             return;
@@ -442,7 +442,7 @@ fn process_submission_inline(
         standard_deviation: 0.002,
         n_samples: 10,
         rank: 1, // Will be updated when leaderboard is queried
-        total_submissions: state.results.read().unwrap().len() as u32 + 1,
+        total_submissions: state.results.read().expect("results RwLock poisoned").len() as u32 + 1,
         percentile: 50.0,
         comparison_vs_baselines: {
             let mut comparisons = std::collections::HashMap::new();
@@ -455,17 +455,17 @@ fn process_submission_inline(
             comparisons
         },
         detailed_metrics: None,
-        created_at: state.submissions.read().unwrap().get(&submission_id)
+        created_at: state.submissions.read().expect("submissions RwLock poisoned").get(&submission_id)
             .map(|s| s.created_at).unwrap_or(now),
         completed_at: Some(now),
         processing_time_seconds: Some(0.5),
     };
 
     // Store result
-    state.results.write().unwrap().insert(submission_id, result);
+    state.results.write().expect("results RwLock poisoned").insert(submission_id, result);
 
     // Update submission status
-    if let Some(sub) = state.submissions.write().unwrap().get_mut(&submission_id) {
+    if let Some(sub) = state.submissions.write().expect("submissions RwLock poisoned").get_mut(&submission_id) {
         sub.status = SubmissionStatus::Completed;
     }
 }
@@ -477,12 +477,12 @@ pub async fn get_results(
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<EvaluationResult>, (StatusCode, Json<ApiError>)> {
     // Check if result exists
-    if let Some(result) = state.results.read().unwrap().get(&submission_id) {
+    if let Some(result) = state.results.read().expect("results RwLock poisoned").get(&submission_id) {
         return Ok(Json(result.clone()));
     }
 
     // Check if submission exists and is still processing
-    if let Some(submission) = state.submissions.read().unwrap().get(&submission_id) {
+    if let Some(submission) = state.submissions.read().expect("submissions RwLock poisoned").get(&submission_id) {
         if submission.status == SubmissionStatus::Failed {
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -532,7 +532,7 @@ pub async fn get_leaderboard(
     let offset = params.offset.unwrap_or(0);
 
     let entries = state.get_leaderboard(limit, offset);
-    let total = state.results.read().unwrap().len() + state.baselines.len();
+    let total = state.results.read().expect("results RwLock poisoned").len() + state.baselines.len();
 
     Json(LeaderboardResponse {
         total_submissions: total as u32,
@@ -701,7 +701,7 @@ pub async fn compare_models(
 fn get_model_info(state: &AppState, reference: &ModelReference) -> Result<ModelInfo, (StatusCode, Json<ApiError>)> {
     match reference {
         ModelReference::SubmissionId(id) => {
-            if let Some(result) = state.results.read().unwrap().get(id) {
+            if let Some(result) = state.results.read().expect("results RwLock poisoned").get(id) {
                 Ok(ModelInfo {
                     name: result.model_name.clone(),
                     phi: result.phi,

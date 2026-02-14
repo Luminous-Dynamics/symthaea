@@ -299,46 +299,6 @@ impl Default for SemanticEncoder {
     }
 }
 
-/// Burn-based semantic encoder (requires semantic-burn feature)
-#[cfg(feature = "semantic-burn")]
-pub mod burn_encoder {
-    use super::*;
-    use burn::tensor::{Tensor, backend::Backend};
-    use burn_ndarray::NdArray;
-
-    /// Burn-based text encoder
-    ///
-    /// Wraps a Burn model for semantic encoding with HDC output.
-    pub struct BurnSemanticEncoder<B: Backend> {
-        /// JL projector for HDC conversion
-        jl: JLProjector,
-        /// Burn backend marker
-        _backend: std::marker::PhantomData<B>,
-    }
-
-    impl BurnSemanticEncoder<NdArray> {
-        /// Create new Burn encoder with NdArray backend
-        pub fn new(embedding_dim: usize, hdc_dim: usize) -> Self {
-            Self {
-                jl: JLProjector::new(embedding_dim, hdc_dim, 42),
-                _backend: std::marker::PhantomData,
-            }
-        }
-
-        /// Convert Burn tensor to HDC vector
-        pub fn tensor_to_hdc(&self, tensor: Tensor<NdArray, 1>) -> Vec<i8> {
-            let data: Vec<f32> = tensor.to_data().as_slice().unwrap().to_vec();
-            self.jl.project_to_bipolar(&data)
-        }
-
-        /// Convert Burn tensor to packed HDC
-        pub fn tensor_to_packed(&self, tensor: Tensor<NdArray, 1>) -> PackedBipolar {
-            let data: Vec<f32> = tensor.to_data().as_slice().unwrap().to_vec();
-            self.jl.project_to_packed(&data)
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

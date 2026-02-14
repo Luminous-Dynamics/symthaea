@@ -661,7 +661,7 @@ impl ConsciousnessPersistence {
 
                 // Get current state
                 let snapshot_opt = {
-                    let state_guard = state.read().unwrap();
+                    let state_guard = state.read().expect("state RwLock poisoned");
                     state_guard.clone()
                 };
 

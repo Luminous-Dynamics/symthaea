@@ -530,7 +530,7 @@ impl TieredPhi {
         new_hashes: &[u64],
         changed_indices: &[usize],
     ) -> f64 {
-        let state = self.incremental_state.as_mut().unwrap();
+        let state = self.incremental_state.as_mut().expect("update_incremental only called when incremental_state is Some");
         let n = components.len();
 
         // Update only affected rows/columns of similarity matrix

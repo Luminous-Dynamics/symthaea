@@ -568,7 +568,14 @@ mod tests {
         let stats = integrator.stats();
         println!("Conscious count: {}, ratio: {:.3}", stats.conscious_count, stats.conscious_ratio);
 
-        // Verify tracking initialized
-        let _ = stats.conscious_count; // Verify field exists
+        // Conscious ratio should be in valid range [0, 1]
+        assert!(stats.conscious_ratio >= 0.0 && stats.conscious_ratio <= 1.0,
+                "Conscious ratio should be in [0, 1], got {}", stats.conscious_ratio);
+        // Processing 50 observations should have generated some result
+        assert!(stats.conscious_count <= 50,
+                "Conscious count should not exceed observation count");
+
+        // Result vector should have been produced from 50 steps
+        assert_eq!(result.len(), 50, "Should get one result per observation");
     }
 }

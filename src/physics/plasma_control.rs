@@ -716,7 +716,7 @@ impl PlasmaControlLoop {
 
             // Use FEP action if confidence is high enough
             if action_result.action_probabilities.iter()
-                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .max_by(|a, b| a.total_cmp(b))
                 .copied()
                 .unwrap_or(0.0) > self.config.min_action_confidence as f64
             {
@@ -785,8 +785,8 @@ impl PlasmaControlLoop {
         }
 
         // Calculate rate (Phi per second)
-        let newest = recent.first().unwrap();
-        let oldest = recent.last().unwrap();
+        let newest = recent.first().expect("recent has at least 2 elements (checked above)");
+        let oldest = recent.last().expect("recent has at least 2 elements (checked above)");
         let dt_ns = newest.timestamp_ns.saturating_sub(oldest.timestamp_ns);
         let dt_s = dt_ns as f64 / 1_000_000_000.0;
 

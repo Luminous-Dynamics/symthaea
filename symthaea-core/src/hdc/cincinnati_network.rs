@@ -520,6 +520,15 @@ mod tests {
         // States should have evolved
         let similarity = output1.similarity(&output2);
         println!("Output similarity after lateral binding: {:.4}", similarity);
+
+        // Similarity should be finite and in valid range [-1, 1]
+        assert!(similarity.is_finite(), "Output similarity should be finite");
+        assert!(similarity >= -1.0 && similarity <= 1.0,
+                "Similarity should be in [-1, 1], got {}", similarity);
+
+        // After multiple evolution steps, output should have diverged from initial
+        // (lateral binding should cause state changes)
+        assert!(similarity < 1.0, "Output should have changed after lateral binding evolution");
     }
 
     #[test]

@@ -468,7 +468,8 @@ impl PluginRegistry {
 
     /// Get the default plugin
     pub fn default_plugin(&self) -> &dyn DomainPlugin {
-        self.plugins.get(&self.default_plugin).map(|p| p.as_ref()).unwrap()
+        self.plugins.get(&self.default_plugin).map(|p| p.as_ref())
+            .expect("default_plugin key must exist in plugins map")
     }
 
     /// List all registered plugins

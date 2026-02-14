@@ -388,7 +388,7 @@ impl HierarchicalCfCWorldModel {
 
         // Top-down processing if bidirectional
         if self.config.bidirectional {
-            let mut top_down = self.layers.last().unwrap().state().clone();
+            let mut top_down = self.layers.last().expect("layers always has at least one entry").state().clone();
 
             for i in (0..self.down_projections.len()).rev() {
                 top_down = self.down_projections[i].dot(&top_down);
@@ -403,7 +403,7 @@ impl HierarchicalCfCWorldModel {
         self.stats.total_updates += 1;
 
         // Return top-level representation
-        self.layers.last().unwrap().state().clone()
+        self.layers.last().expect("layers always has at least one entry").state().clone()
     }
 
     /// Make predictions at all levels

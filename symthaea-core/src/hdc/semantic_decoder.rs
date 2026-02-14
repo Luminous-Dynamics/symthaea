@@ -819,6 +819,15 @@ mod tests {
         println!("Decoded {} primitives with confidence {:.3}",
                  decoded.primitives.len(), decoded.confidence);
         println!("Expression: {}", decoded.tree.to_string_repr());
+
+        // Confidence should be finite and in [0, 1]
+        assert!(decoded.confidence.is_finite(), "Decode confidence should be finite");
+        assert!(decoded.confidence >= 0.0 && decoded.confidence <= 1.0,
+                "Decode confidence should be in [0, 1], got {}", decoded.confidence);
+
+        // Expression string should be non-empty
+        assert!(!decoded.tree.to_string_repr().is_empty(),
+                "Decoded expression should not be empty");
     }
 
     #[test]

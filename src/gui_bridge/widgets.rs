@@ -191,7 +191,7 @@ impl ModuleBrowser {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             self.error = Some(format!("nix-instantiate failed: {}", stderr));
-            return Err(self.error.clone().unwrap());
+            return Err(self.error.clone().expect("error was just set above"));
         }
 
         // Parse JSON output
@@ -352,7 +352,7 @@ impl GenerationTimeline {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             self.error = Some(format!("Failed to list generations: {}", stderr));
-            return Err(self.error.clone().unwrap());
+            return Err(self.error.clone().expect("error was just set above"));
         }
 
         // Parse output
@@ -595,7 +595,7 @@ impl LiveConfigDiff {
                         });
                     }
 
-                    let hunk = current_hunk.as_mut().unwrap();
+                    let hunk = current_hunk.as_mut().expect("current_hunk initialized above when None");
                     hunk.lines.push(DiffLine {
                         diff_type: DiffType::Removed,
                         line_number_old: Some(old_idx as u32 + 1),
@@ -626,7 +626,7 @@ impl LiveConfigDiff {
                         });
                     }
 
-                    let hunk = current_hunk.as_mut().unwrap();
+                    let hunk = current_hunk.as_mut().expect("current_hunk initialized above when None");
                     hunk.lines.push(DiffLine {
                         diff_type: DiffType::Removed,
                         line_number_old: Some(old_idx as u32 + 1),
@@ -649,7 +649,7 @@ impl LiveConfigDiff {
                         });
                     }
 
-                    let hunk = current_hunk.as_mut().unwrap();
+                    let hunk = current_hunk.as_mut().expect("current_hunk initialized above when None");
                     hunk.lines.push(DiffLine {
                         diff_type: DiffType::Added,
                         line_number_old: None,
@@ -894,7 +894,7 @@ impl ServiceDashboard {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             self.error = Some(format!("systemctl failed: {}", stderr));
-            return Err(self.error.clone().unwrap());
+            return Err(self.error.clone().expect("error was just set above"));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);

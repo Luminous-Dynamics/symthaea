@@ -138,7 +138,7 @@ impl AppState {
 
     /// Get leaderboard entries (sorted by Φ)
     pub fn get_leaderboard(&self, limit: usize, offset: usize) -> Vec<LeaderboardEntry> {
-        let results: Vec<EvaluationResult> = self.results.read().unwrap()
+        let results: Vec<EvaluationResult> = self.results.read().expect("results RwLock poisoned")
             .values()
             .cloned()
             .collect();

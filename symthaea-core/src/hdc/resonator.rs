@@ -1155,6 +1155,13 @@ mod tests {
         let similarity = cosine_similarity(&analogy_result, &queen);
         // Note: This won't be perfect without training, but shows the pattern
         println!("Analogy similarity to queen: {}", similarity);
+
+        // Similarity should be finite
+        assert!(similarity.is_finite(), "Analogy similarity should be finite");
+
+        // The analogy result vector should have the correct dimension
+        assert_eq!(analogy_result.len(), dim,
+                   "Analogy result should have dimension {}", dim);
     }
 
     #[test]

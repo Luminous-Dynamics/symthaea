@@ -249,6 +249,21 @@ use super::*;
                      name, stats.mean, stats.std_dev, stats.heterogeneity);
         }
 
+        // All topologies should have valid, finite statistics
+        for (name, stats) in &stats_vec {
+            assert!(stats.mean.is_finite(), "{} mean should be finite", name);
+            assert!(stats.std_dev.is_finite(), "{} std_dev should be finite", name);
+            assert!(stats.heterogeneity.is_finite(), "{} heterogeneity should be finite", name);
+            assert!(stats.std_dev >= 0.0, "{} std_dev should be non-negative", name);
+        }
+
+        // There should be variation across topologies (not all identical)
+        let means: Vec<f64> = stats_vec.iter().map(|(_, s)| s.mean).collect();
+        let min_mean = means.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max_mean = means.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        assert!(max_mean - min_mean > 0.0,
+                "Different topologies should have different mean similarities");
+
         println!("\n✅ All 8 topologies generated successfully!");
         println!("   Heterogeneity values show clear variation across topologies");
     }
@@ -392,6 +407,24 @@ use super::*;
             println!("{:<15} {:>10.4} {:>10.4} {:>10.4}",
                      name, stats.mean, stats.std_dev, stats.heterogeneity);
         }
+
+        // All exotic topologies should produce valid, finite statistics
+        for (name, stats) in &stats_vec {
+            assert!(stats.mean.is_finite(), "{} mean should be finite", name);
+            assert!(stats.std_dev.is_finite(), "{} std_dev should be finite", name);
+            assert!(stats.heterogeneity.is_finite(), "{} heterogeneity should be finite", name);
+            assert!(stats.std_dev >= 0.0, "{} std_dev should be non-negative", name);
+        }
+
+        // Verify all topologies have nodes
+        assert!(torus.node_identities.len() > 0, "Torus should have nodes");
+        assert!(small_world.node_identities.len() > 0, "Small-world should have nodes");
+        assert!(mobius.node_identities.len() > 0, "Mobius should have nodes");
+        assert!(klein.node_identities.len() > 0, "Klein bottle should have nodes");
+        assert!(hyperbolic.node_identities.len() > 0, "Hyperbolic should have nodes");
+        assert!(scale_free.node_identities.len() > 0, "Scale-free should have nodes");
+        assert!(hypercube_3d.node_identities.len() > 0, "Hypercube 3D should have nodes");
+        assert!(hypercube_4d.node_identities.len() > 0, "Hypercube 4D should have nodes");
 
         println!("\n✅ All 8 exotic topologies generated successfully!");
     }

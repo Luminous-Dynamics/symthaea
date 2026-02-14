@@ -783,12 +783,16 @@ mod tests {
 
         // The function should work without crashing
         let energy_cons = engine.derive_energy_conservation();
-        let _connections = engine.find_connected_laws(&energy_cons, &laws);
+        let connections = engine.find_connected_laws(&energy_cons, &laws);
 
-        // Note: Due to HDC binding semantics, derived laws may have low
-        // direct similarity even when conceptually related. The connection
-        // finding is a heuristic that may return empty for some seeds.
-        // The important thing is that it runs without error.
+        // Laws collection should be non-empty
+        assert!(!laws.is_empty(), "Should derive at least one law");
+
+        // Each connection should have a valid similarity score
+        for (law_name, similarity) in &connections {
+            assert!(similarity.is_finite(),
+                    "Connection similarity for {} should be finite", law_name);
+        }
     }
 
     #[test]

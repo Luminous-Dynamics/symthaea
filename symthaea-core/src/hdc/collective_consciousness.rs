@@ -471,8 +471,8 @@ impl CollectiveConsciousness {
             degrees.insert(id.clone(), 0);
         }
         for (from, to) in adjacency.keys() {
-            *degrees.get_mut(from).unwrap() += 1;
-            *degrees.get_mut(to).unwrap() += 1;
+            if let Some(d) = degrees.get_mut(from) { *d += 1; }
+            if let Some(d) = degrees.get_mut(to) { *d += 1; }
         }
 
         let avg_degree = degrees.values().sum::<usize>() as f64 / n as f64;
@@ -550,7 +550,7 @@ impl CollectiveConsciousness {
                 queue.push_back(start);
 
                 while let Some(current) = queue.pop_front() {
-                    let current_dist = *visited.get(current).unwrap();
+                    let current_dist = *visited.get(current).expect("node was inserted into visited before being enqueued");
 
                     // Find all neighbors
                     for neighbor in &agent_ids {

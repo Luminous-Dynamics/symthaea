@@ -624,10 +624,18 @@ fn test_phi_trend_prediction() {
     let state = pipeline.get_state();
 
     // After 5+ cycles, should have Φ prediction
+    // Phi should always be finite and non-negative
+    assert!(state.phi.is_finite(), "Φ should be finite");
+    assert!(state.phi >= 0.0, "Φ should be non-negative");
+    assert!(state.phi_trend.is_finite(), "Φ trend should be finite");
+
     if state.predicted_phi.is_some() {
+        let predicted = state.predicted_phi.unwrap();
+        assert!(predicted.is_finite(), "Predicted Φ should be finite");
+        assert!(predicted >= 0.0, "Predicted Φ should be non-negative");
         println!("✅ Φ prediction generated:");
         println!("   - Current Φ: {:.4}", state.phi);
-        println!("   - Predicted Φ: {:.4}", state.predicted_phi.unwrap());
+        println!("   - Predicted Φ: {:.4}", predicted);
         println!("   - Φ trend: {:.4}", state.phi_trend);
     } else {
         println!("⚠️ Φ prediction not yet generated (needs more history)");

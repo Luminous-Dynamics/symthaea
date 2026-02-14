@@ -30,17 +30,6 @@ use ndarray::{Array1, Array2};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
-// GPU feature imports - reserved for when burn backend is fully implemented
-#[cfg(feature = "gpu")]
-#[allow(unused_imports)]
-use burn::{
-    backend::{ndarray::NdArray, wgpu::Wgpu},
-    module::Module,
-    nn::{Linear, LinearConfig},
-    prelude::*,
-    tensor::{backend::Backend, Tensor},
-};
-
 use super::cfc::{ActivationType, CfCNetworkConfig};
 
 // =============================================================================
@@ -68,17 +57,7 @@ pub enum GpuBackend {
 impl GpuBackend {
     /// Check if GPU acceleration is available
     pub fn is_gpu_available() -> bool {
-        #[cfg(feature = "gpu")]
-        {
-            // Try to create a WGPU device to check availability
-            std::panic::catch_unwind(|| {
-                let _device = burn::backend::wgpu::WgpuDevice::default();
-            }).is_ok()
-        }
-        #[cfg(not(feature = "gpu"))]
-        {
-            false
-        }
+        false
     }
 
     /// Get a human-readable description of the backend
@@ -105,10 +84,6 @@ impl GpuBackend {
                 #[cfg(feature = "cuda")]
                 if std::env::var("CUDA_VISIBLE_DEVICES").is_ok() {
                     return GpuBackend::Cuda;
-                }
-                #[cfg(feature = "gpu")]
-                if Self::is_gpu_available() {
-                    return GpuBackend::Wgpu;
                 }
                 GpuBackend::Cpu
             }
@@ -329,25 +304,6 @@ pub struct GpuCfcNetwork {
     total_steps: u64,
     total_forward_time_us: u64,
     total_backward_time_us: u64,
-    /// GPU tensors (when GPU is enabled)
-    #[cfg(feature = "gpu")]
-    gpu_state: Option<GpuState>,
-}
-
-/// GPU-specific state for tensor caching
-#[cfg(feature = "gpu")]
-struct GpuState {
-    // Placeholder for GPU tensors - would be populated when gpu feature is enabled
-    device_name: String,
-}
-
-#[cfg(feature = "gpu")]
-impl std::fmt::Debug for GpuState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("GpuState")
-            .field("device_name", &self.device_name)
-            .finish()
-    }
 }
 
 impl GpuCfcNetwork {
@@ -421,8 +377,6 @@ impl GpuCfcNetwork {
             total_steps: 0,
             total_forward_time_us: 0,
             total_backward_time_us: 0,
-            #[cfg(feature = "gpu")]
-            gpu_state: None,
         })
     }
 

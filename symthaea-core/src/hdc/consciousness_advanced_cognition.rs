@@ -782,7 +782,7 @@ impl ImaginationEngine {
         let mut states = vec![*initial_state];
 
         for i in 0..steps {
-            let current = states.last().unwrap();
+            let current = states.last().expect("states initialized with initial_state and only grows");
             // Evolve state through imagination (add temporal drift)
             let next = current.permute(i as usize + 1);
             // Add some creativity

@@ -46,8 +46,8 @@ impl MetacognitiveSubsystem {
         if self.phi_history.len() < 2 {
             return 0.0;
         }
-        let recent = self.phi_history.last().unwrap();
-        let oldest = self.phi_history.first().unwrap();
+        let recent = self.phi_history.last().expect("phi_history has >= 2 elements");
+        let oldest = self.phi_history.first().expect("phi_history has >= 2 elements");
         recent - oldest
     }
 }

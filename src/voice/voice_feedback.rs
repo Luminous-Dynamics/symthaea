@@ -392,7 +392,7 @@ impl VoiceFeedbackBridge {
             return false;
         }
 
-        let current_rate = *self.rate_history.back().unwrap();
+        let current_rate = *self.rate_history.back().expect("rate_history checked non-empty above");
         let target = self.config.target_speech_rate;
         let acceptable_range = target * self.config.acceptable_rate_variance;
 
