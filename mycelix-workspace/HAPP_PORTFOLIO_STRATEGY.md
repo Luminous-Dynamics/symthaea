@@ -170,10 +170,12 @@ DeSci is a REST API service (Actix-web, 141 tests, 400K claims/sec), not a Holoc
 3. **FL conductor tests written** — 6 E2E tests (3 SDK + 3 conductor) at `tests/sweettest/tests/fl_bridge_e2e.rs`
 4. **Cross-cluster tests expanded** — 12 sweettest scenarios including all 5 P0 dispatch paths
 5. **FL reputation persistence fixed** — path inconsistency bug corrected, defaults now persisted to DHT
+6. **Observatory Byzantine threshold verified** — all values already 0.34/34% (no changes needed)
+7. **SDK PQC tests verified** — all FIPS 204 sizes already correct (4032/3309/4627)
+8. **FL modularization unblocked** — include_str!() tests updated to concat!() across all 16 source files; config.rs extracted as first module
 
 ## Next Actions
 
 1. **LUCID integration tests** — Requires GTK dev deps via `nix develop` for full Tauri build
-2. **Observatory Byzantine threshold** — Update 15 occurrences of 45% -> 34% in observatory UI
-3. **SDK PQC test fixes** — Update 4 NIST FIPS 204 size constants (Dilithium3 -> ML-DSA-65)
-4. **FL coordinator modularization** — 15 module files ready; full lib.rs migration blocked by `include_str!` regression tests
+2. **FL coordinator modularization** — include_str! blocker RESOLVED (concat!() across all files). config.rs wired in. 14 modules remain (require `nix develop` for WASM verification)
+3. **Merge feature/space-phase5 to main** — All improvements ready for mainline
