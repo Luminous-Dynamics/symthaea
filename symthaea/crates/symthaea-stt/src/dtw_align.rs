@@ -155,7 +155,7 @@ impl DtwAligner {
 
                 let (best_cost, best_prev) = candidates
                     .iter()
-                    .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
+                    .min_by(|a, b| a.0.total_cmp(&b.0))
                     .unwrap();
 
                 dp[i][j] = *best_cost;

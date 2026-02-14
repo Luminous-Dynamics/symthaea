@@ -408,7 +408,7 @@ impl SpeakerDiarizer {
                 .iter()
                 .enumerate()
                 .map(|(i, c)| (i, segment_hv.similarity(&c.centroid)))
-                .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                .max_by(|a, b| a.1.total_cmp(&b.1))
                 .unwrap_or((0, 0.0));
 
             self.clusters[closest_idx].accumulator.add(segment_hv);
