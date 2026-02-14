@@ -196,10 +196,10 @@ impl PhonemeClasses {
         let voicing_evidence =
             acoustic_hv.similarity(&self.voiced) - acoustic_hv.similarity(&self.voiceless);
 
-        if features.is_voiced && voicing_evidence > 0.05 {
-            score += 0.3;
-        } else if !features.is_voiced && voicing_evidence < -0.05 {
-            score += 0.3;
+        if (features.is_voiced && voicing_evidence > 0.05)
+            || (!features.is_voiced && voicing_evidence < -0.05)
+        {
+            score += 0.3; // Voicing matches acoustic evidence
         } else if features.is_voiced && voicing_evidence < -0.1 {
             score -= 0.3; // Penalty for mismatch
         } else if !features.is_voiced && voicing_evidence > 0.1 {
