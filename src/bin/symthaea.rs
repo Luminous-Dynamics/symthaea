@@ -812,11 +812,11 @@ impl ServiceState {
                         }
                     }
                 }
-                #[cfg(not(feature = "voice"))]
+                #[cfg(not(feature = "voice-tts"))]
                 {
                     let _ = text;
                     Response::Error {
-                        message: "Voice feature not compiled".into(),
+                        message: "Voice feature not compiled (build with --features voice-tts)".into(),
                     }
                 }
             }
@@ -840,10 +840,10 @@ impl ServiceState {
                         }
                     }
                 }
-                #[cfg(not(feature = "voice"))]
+                #[cfg(not(feature = "voice-tts"))]
                 {
                     Response::Error {
-                        message: "Voice feature not compiled".into(),
+                        message: "Voice feature not compiled (build with --features voice-tts)".into(),
                     }
                 }
             }
@@ -894,10 +894,10 @@ impl ServiceState {
                         }
                     }
                 }
-                #[cfg(not(feature = "voice"))]
+                #[cfg(not(feature = "voice-tts"))]
                 {
                     Response::Error {
-                        message: "Voice feature not compiled".into(),
+                        message: "Voice feature not compiled (build with --features voice-tts)".into(),
                     }
                 }
             }
@@ -912,7 +912,7 @@ impl ServiceState {
                         voice_id: self.voice.as_ref().map(|_| 0).unwrap_or(0),
                     }
                 }
-                #[cfg(not(feature = "voice"))]
+                #[cfg(not(feature = "voice-tts"))]
                 {
                     Response::VoiceStatusResponse {
                         enabled: false,
@@ -1531,9 +1531,9 @@ async fn main() -> Result<()> {
                 println!("   • Voice: ❌ Disabled (use --voice to enable)");
             }
         }
-        #[cfg(not(feature = "voice"))]
+        #[cfg(not(feature = "voice-tts"))]
         {
-            println!("   • Voice: ❌ Not compiled (build with --features voice)");
+            println!("   • Voice: ❌ Not compiled (build with --features voice-tts)");
         }
     }
 
