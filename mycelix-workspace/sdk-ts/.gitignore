@@ -35,3 +35,12 @@ npm-debug.log*
 # Temporary files
 tmp/
 temp/
+
+# Build artifacts
+*.tgz
+
+# Test/mutation reports
+reports/
+
+# Lock files (npm is primary; pnpm-lock is derivative)
+pnpm-lock.yaml

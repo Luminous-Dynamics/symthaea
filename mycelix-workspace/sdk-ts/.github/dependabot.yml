@@ -1,0 +1,164 @@
+# Dependabot Configuration
+# Smart dependency management with grouped updates and security-first approach
+
+version: 2
+
+registries:
+  npm-registry:
+    type: npm-registry
+    url: https://registry.npmjs.org
+    replaces-base: true
+
+updates:
+  # ==========================================================================
+  # NPM DEPENDENCIES
+  # ==========================================================================
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    registries:
+      - npm-registry
+
+    # Reviewers and assignees
+    reviewers:
+      - "Luminous-Dynamics/sdk-team"
+    assignees:
+      - "Luminous-Dynamics/sdk-team"
+
+    # Labels for organization
+    labels:
+      - "dependencies"
+      - "automated"
+
+    # Commit message format
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps(dev)"
+      include: "scope"
+
+    # ==========================================================================
+    # GROUPED UPDATES - Reduces PR noise
+    # ==========================================================================
+    groups:
+      # Security updates - always separate for visibility
+      security-patches:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+          - "minor"
+
+      # TypeScript ecosystem
+      typescript-ecosystem:
+        patterns:
+          - "typescript"
+          - "@typescript-eslint/*"
+          - "typedoc"
+          - "@types/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # Testing tools
+      testing-tools:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "fast-check"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # Linting and formatting
+      code-quality:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "prettier"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # Holochain client updates
+      holochain:
+        patterns:
+          - "@holochain/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # OpenTelemetry observability
+      observability:
+        patterns:
+          - "@opentelemetry/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # GraphQL ecosystem
+      graphql:
+        patterns:
+          - "graphql"
+          - "graphql-*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # All other minor/patch updates
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+        exclude-patterns:
+          - "typescript"
+          - "@typescript-eslint/*"
+          - "vitest"
+          - "@vitest/*"
+          - "eslint*"
+          - "prettier"
+          - "@holochain/*"
+          - "@opentelemetry/*"
+          - "graphql*"
+
+    # ==========================================================================
+    # IGNORE PATTERNS - Don't update these automatically
+    # ==========================================================================
+    ignore:
+      # Major version updates require manual review
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # ==========================================================================
+  # GITHUB ACTIONS
+  # ==========================================================================
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automated"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      # Group all action updates together
+      github-actions:
+        patterns:
+          - "*"

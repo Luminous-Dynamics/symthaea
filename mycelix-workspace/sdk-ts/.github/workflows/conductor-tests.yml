@@ -1,0 +1,285 @@
+# Holochain Conductor Integration Tests
+#
+# This workflow runs integration tests against a real Holochain conductor.
+# These tests verify that the Mycelix SDK Bridge clients work correctly
+# with the Holochain backend.
+#
+# Triggers:
+# - Manual dispatch (workflow_dispatch)
+# - Push to main/develop with conductor-related changes
+# - Weekly schedule for regression testing
+
+name: Conductor Integration Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      holochain_version:
+        description: 'Holochain version to test against'
+        required: false
+        default: '0.4.0-dev.4'
+      skip_slow_tests:
+        description: 'Skip slow stress tests'
+        required: false
+        type: boolean
+        default: false
+
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/bridge/**'
+      - 'tests/conductor/**'
+      - 'docker/**'
+      - '.github/workflows/conductor-tests.yml'
+
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/bridge/**'
+      - 'tests/conductor/**'
+
+  schedule:
+    # Run weekly on Sunday at midnight UTC
+    - cron: '0 0 * * 0'
+
+env:
+  HOLOCHAIN_VERSION: ${{ github.event.inputs.holochain_version || '0.4.0-dev.4' }}
+  CONDUCTOR_AVAILABLE: 'true'
+  HOLOCHAIN_APP_URL: 'ws://localhost:8888'
+  HOLOCHAIN_ADMIN_URL: 'ws://localhost:8889'
+  MYCELIX_APP_ID: 'mycelix_ecosystem'
+
+jobs:
+  # Build and cache the conductor image
+  build-conductor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-conductor-${{ env.HOLOCHAIN_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-conductor-
+
+      - name: Build conductor image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.conductor
+          push: false
+          load: true
+          tags: mycelix-conductor:test
+          build-args: |
+            HOLOCHAIN_VERSION=${{ env.HOLOCHAIN_VERSION }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: Save conductor image
+        run: docker save mycelix-conductor:test > /tmp/conductor-image.tar
+
+      - name: Upload conductor image
+        uses: actions/upload-artifact@v4
+        with:
+          name: conductor-image
+          path: /tmp/conductor-image.tar
+          retention-days: 1
+
+  # Run conductor integration tests
+  conductor-tests:
+    runs-on: ubuntu-latest
+    needs: build-conductor
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite:
+          - identity
+          - finance
+          - property
+          - energy
+          - media
+          - governance
+          - justice
+          - knowledge
+          - cross-happ
+          - stress
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build SDK
+        run: npm run build
+
+      - name: Download conductor image
+        uses: actions/download-artifact@v4
+        with:
+          name: conductor-image
+          path: /tmp
+
+      - name: Load conductor image
+        run: docker load < /tmp/conductor-image.tar
+
+      - name: Start conductor
+        run: |
+          docker run -d \
+            --name mycelix-conductor \
+            -p 8888:8888 \
+            -p 8889:8889 \
+            -e RUST_LOG=info \
+            mycelix-conductor:test
+
+          # Wait for conductor to be ready
+          echo "Waiting for conductor to start..."
+          for i in {1..60}; do
+            if curl -s http://localhost:8889/ > /dev/null 2>&1; then
+              echo "Conductor is ready!"
+              break
+            fi
+            echo "Waiting... ($i/60)"
+            sleep 1
+          done
+
+      - name: Show conductor logs
+        run: docker logs mycelix-conductor
+
+      - name: Run ${{ matrix.test-suite }} tests
+        run: |
+          if [ "${{ matrix.test-suite }}" = "stress" ] && [ "${{ github.event.inputs.skip_slow_tests }}" = "true" ]; then
+            echo "Skipping stress tests as requested"
+            exit 0
+          fi
+
+          npm run test:conductor -- --grep "${{ matrix.test-suite }}" --reporter=verbose
+        env:
+          CONDUCTOR_AVAILABLE: 'true'
+
+      - name: Collect conductor logs on failure
+        if: failure()
+        run: |
+          docker logs mycelix-conductor > conductor-${{ matrix.test-suite }}.log 2>&1
+
+      - name: Upload conductor logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conductor-logs-${{ matrix.test-suite }}
+          path: conductor-*.log
+          retention-days: 7
+
+      - name: Stop conductor
+        if: always()
+        run: docker stop mycelix-conductor || true
+
+  # Aggregated test results
+  conductor-tests-summary:
+    runs-on: ubuntu-latest
+    needs: conductor-tests
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.conductor-tests.result }}" = "failure" ]; then
+            echo "::error::Some conductor integration tests failed"
+            exit 1
+          fi
+          echo "All conductor integration tests passed!"
+
+  # Full integration test (all 8 hApps in sequence)
+  full-integration:
+    runs-on: ubuntu-latest
+    needs: build-conductor
+    timeout-minutes: 45
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build SDK
+        run: npm run build
+
+      - name: Download conductor image
+        uses: actions/download-artifact@v4
+        with:
+          name: conductor-image
+          path: /tmp
+
+      - name: Load conductor image
+        run: docker load < /tmp/conductor-image.tar
+
+      - name: Start conductor
+        run: |
+          docker run -d \
+            --name mycelix-conductor \
+            -p 8888:8888 \
+            -p 8889:8889 \
+            -e RUST_LOG=info \
+            mycelix-conductor:test
+
+          # Wait for conductor to be ready
+          for i in {1..60}; do
+            if curl -s http://localhost:8889/ > /dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run full integration test suite
+        run: npm run test:conductor:all
+        env:
+          CONDUCTOR_AVAILABLE: 'true'
+
+      - name: Generate test report
+        if: always()
+        run: |
+          echo "# Conductor Integration Test Report" > test-report.md
+          echo "" >> test-report.md
+          echo "**Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> test-report.md
+          echo "**Holochain Version:** ${{ env.HOLOCHAIN_VERSION }}" >> test-report.md
+          echo "**Trigger:** ${{ github.event_name }}" >> test-report.md
+          echo "" >> test-report.md
+          echo "## Results" >> test-report.md
+          npm run test:conductor:all -- --reporter=json > test-results.json 2>&1 || true
+          cat test-results.json >> test-report.md || echo "No results available" >> test-report.md
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-integration-report
+          path: |
+            test-report.md
+            test-results.json
+          retention-days: 30
+
+      - name: Stop conductor
+        if: always()
+        run: docker stop mycelix-conductor || true
