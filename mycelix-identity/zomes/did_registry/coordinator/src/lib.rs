@@ -125,8 +125,32 @@ fn notify_bridge_of_did_event(did: &str, event_type: &str, payload: &str) -> Ext
 
     match response {
         ZomeCallResponse::Ok(_) => Ok(()),
-        _ => {
-            debug!("Bridge notification failed for {} event on {} - non-critical", event_type, did);
+        ZomeCallResponse::Unauthorized(_, _, zome, fn_name) => {
+            warn!(
+                "Bridge notification unauthorized: zome={:?} fn={:?} event={} did={}",
+                zome, fn_name, event_type, did
+            );
+            Ok(())
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            warn!(
+                "Bridge notification network error: {} event={} did={}",
+                err, event_type, did
+            );
+            Ok(())
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            warn!(
+                "Bridge notification countersigning error: {} event={} did={}",
+                err, event_type, did
+            );
+            Ok(())
+        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => {
+            warn!(
+                "Bridge notification auth failed: event={} did={}",
+                event_type, did
+            );
             Ok(())
         }
     }
@@ -353,9 +377,18 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
         &EntryTypes::DidDocument(updated_did),
     )?;
 
-    // Create a new AgentToDid link pointing to the updated record.
-    // get_did_document picks the latest link by timestamp, so the
-    // new link will be preferred over the original from create_did.
+    // Delete stale AgentToDid links to prevent DHT bloat.
+    // Without cleanup, every update_did_document call adds another link,
+    // and get_did_document must scan them all to find the latest.
+    let existing_links = get_links(
+        LinkQuery::try_new(agent_pub_key.clone(), LinkTypes::AgentToDid)?,
+        GetStrategy::default(),
+    )?;
+    for link in existing_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+
+    // Create a single AgentToDid link pointing to the updated record.
     create_link(
         agent_pub_key,
         action_hash.clone(),
@@ -412,10 +445,25 @@ pub fn deactivate_did(reason: String) -> ExternResult<Record> {
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
 
-    // Check if already deactivated
+    // Idempotent: if already deactivated, return the existing deactivation record
     if !is_did_active(current_did.id.clone())? {
+        // Find and return the existing deactivation record
+        let deactivation_links = get_links(
+            LinkQuery::try_new(agent_pub_key.clone(), LinkTypes::DidToDeactivation)?,
+            GetStrategy::default(),
+        )?;
+        if let Some(link) = deactivation_links.into_iter().max_by_key(|l| l.timestamp) {
+            let existing_hash = ActionHash::try_from(link.target).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid deactivation link target".into()))
+            })?;
+            return get(existing_hash, GetOptions::default())?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Deactivation record not found".into()
+                )));
+        }
+        // Fallback: links gone but DID is inactive (shouldn't happen)
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "DID is already deactivated".into()
+            "DID is deactivated but deactivation record is missing".into()
         )));
     }
 
@@ -523,8 +571,15 @@ fn cascade_revoke_credentials_for_did(did: &str, reason: &str, _deactivated_at: 
                 r.action().entry_hash().map(|h| h.to_string())
             }).collect()
         }
-        _ => {
-            debug!("Could not query credentials for DID cascade revocation");
+        other => {
+            warn!("Could not query credentials for DID cascade revocation: {:?}",
+                  match &other {
+                      ZomeCallResponse::Unauthorized(_, _, z, f) => format!("unauthorized zome={:?} fn={:?}", z, f),
+                      ZomeCallResponse::NetworkError(e) => format!("network: {}", e),
+                      ZomeCallResponse::CountersigningSession(e) => format!("countersigning: {}", e),
+                      ZomeCallResponse::AuthenticationFailed(_, _) => "auth_failed".to_string(),
+                      _ => "unknown".to_string(),
+                  });
             return Ok(());
         }
     };
@@ -555,8 +610,20 @@ fn cascade_revoke_credentials_for_did(did: &str, reason: &str, _deactivated_at: 
             debug!("Successfully cascade-revoked credentials for deactivated DID: {}", did);
             Ok(())
         }
-        _ => {
-            warn!("Failed to cascade-revoke credentials for DID: {}", did);
+        ZomeCallResponse::Unauthorized(_, _, zome, fn_name) => {
+            warn!("Cascade revocation unauthorized: zome={:?} fn={:?} did={}", zome, fn_name, did);
+            Ok(())
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            warn!("Cascade revocation network error: {} did={}", err, did);
+            Ok(())
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            warn!("Cascade revocation countersigning error: {} did={}", err, did);
+            Ok(())
+        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => {
+            warn!("Cascade revocation auth failed: did={}", did);
             Ok(())
         }
     }
@@ -1211,7 +1278,8 @@ mod tests {
             .into_string();
         let multibase = format!("z{}", encoded);
 
-        let alg = validate_multibase_key(&multibase).unwrap();
+        let alg = validate_multibase_key(&multibase)
+            .expect("Ed25519 multicodec key should validate");
         assert_eq!(alg, AlgorithmId::Ed25519);
     }
 
@@ -1223,7 +1291,8 @@ mod tests {
             .into_string();
         let multibase = format!("z{}", encoded);
 
-        let alg = validate_multibase_key(&multibase).unwrap();
+        let alg = validate_multibase_key(&multibase)
+            .expect("Raw 32-byte key should validate as legacy Ed25519");
         assert_eq!(alg, AlgorithmId::Ed25519);
     }
 
@@ -1237,7 +1306,8 @@ mod tests {
             .into_string();
         let multibase = format!("z{}", encoded);
 
-        let alg = validate_multibase_key(&multibase).unwrap();
+        let alg = validate_multibase_key(&multibase)
+            .expect("ML-DSA-65 multicodec key should validate");
         assert_eq!(alg, AlgorithmId::MlDsa65);
     }
 

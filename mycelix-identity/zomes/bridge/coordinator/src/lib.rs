@@ -1163,6 +1163,90 @@ pub struct EnhancedTrustResult {
     pub meets_mfa_requirement: bool,
 }
 
+// ==================== LIGHTWEIGHT BRIDGE QUERIES ====================
+// These externs are designed for other hApps to call without creating
+// audit trail entries (unlike query_identity which creates IdentityQuery
+// and IdentityVerification records). Use these for frequent, low-overhead
+// identity checks during normal operation.
+
+/// Get combined DID verification status without creating audit entries.
+///
+/// Returns validity, deactivation status, and MFA assurance in one call.
+/// Other hApps should use this instead of making separate cross-zome calls
+/// to did_registry and mfa zomes directly.
+#[hdk_extern]
+pub fn get_did_verification_status(did: String) -> ExternResult<DidVerificationStatus> {
+    if !did.starts_with("did:mycelix:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID format — must start with did:mycelix:".into()
+        )));
+    }
+
+    let exists = verify_did_exists(&did)?;
+    let deactivated = if exists { is_did_deactivated(&did)? } else { false };
+    let mfa_summary = get_mfa_summary_for_did(&did)?;
+
+    Ok(DidVerificationStatus {
+        did,
+        exists,
+        active: exists && !deactivated,
+        mfa_enrolled: mfa_summary.is_some(),
+        mfa_assurance_level: mfa_summary.as_ref().map(|s| format!("{:?}", s.assurance_level)),
+        mfa_assurance_score: mfa_summary.as_ref().map(|s| s.assurance_score).unwrap_or(0.0),
+    })
+}
+
+/// Lightweight DID verification status (no audit trail)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DidVerificationStatus {
+    pub did: String,
+    /// Whether the DID document exists on the DHT
+    pub exists: bool,
+    /// Whether the DID is active (exists and not deactivated)
+    pub active: bool,
+    /// Whether the DID has MFA factors enrolled
+    pub mfa_enrolled: bool,
+    /// MFA assurance level as string (e.g. "Basic", "Verified", "HighlyAssured")
+    pub mfa_assurance_level: Option<String>,
+    /// Numeric MFA assurance score (0.0 - 1.0)
+    pub mfa_assurance_score: f64,
+}
+
+/// Get just the MFA assurance level for a DID (no audit trail).
+///
+/// Returns the assurance level string and score. Useful for other hApps
+/// that need to gate features based on MFA level (e.g. FL participation).
+#[hdk_extern]
+pub fn get_mfa_assurance_level(did: String) -> ExternResult<MfaAssuranceLevelResult> {
+    if !did.starts_with("did:mycelix:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID format — must start with did:mycelix:".into()
+        )));
+    }
+
+    let mfa_summary = get_mfa_summary_for_did(&did)?;
+
+    Ok(MfaAssuranceLevelResult {
+        did,
+        enrolled: mfa_summary.is_some(),
+        assurance_level: mfa_summary.as_ref().map(|s| format!("{:?}", s.assurance_level)),
+        assurance_score: mfa_summary.as_ref().map(|s| s.assurance_score).unwrap_or(0.0),
+        factor_count: mfa_summary.as_ref().map(|s| s.factor_count as u32).unwrap_or(0),
+        fl_eligible: mfa_summary.as_ref().map(|s| s.fl_eligible).unwrap_or(false),
+    })
+}
+
+/// MFA assurance level result (no audit trail)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MfaAssuranceLevelResult {
+    pub did: String,
+    pub enrolled: bool,
+    pub assurance_level: Option<String>,
+    pub assurance_score: f64,
+    pub factor_count: u32,
+    pub fl_eligible: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
