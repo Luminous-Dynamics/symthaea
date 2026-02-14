@@ -39,13 +39,13 @@
 //! - **Emotional Prosody**: Consciousness state influences tone
 //! - **Kokoro TTS**: High-quality neural synthesis (when feature enabled)
 
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 // TTS infrastructure modules
+pub mod articulatory_synthesizer;
 pub mod formant_targets;
 pub mod phoneme_hdc;
-pub mod articulatory_synthesizer;
 pub mod vocoder;
 
 // Cognitive loop integration
@@ -54,45 +54,47 @@ pub mod voice_feedback;
 
 // Rap/rhythmic synthesis modules
 pub mod beat_sync;
-pub mod rhyme_hdc;
 pub mod rap;
+pub mod rhyme_hdc;
 
 // REPL voice output (consciousness-modulated speech for interactive use)
 pub mod repl_voice;
 
 // Kokoro TTS engine (ONNX-based neural TTS)
-pub mod kokoro_engine;
 pub mod g2p;
+pub mod kokoro_engine;
 
 // Re-export formant types
-pub use formant_targets::{FormantTarget, FormantDatabase};
-pub use phoneme_hdc::{PhonemeHdcCodec, PhonemeSpec, Place, Manner, AcousticParams, PitchContour};
-pub use articulatory_synthesizer::{ArticulatorySynthesizer, ArticulatoryConfig, FormantFrame, TimedPhoneme};
+pub use articulatory_synthesizer::{
+    ArticulatoryConfig, ArticulatorySynthesizer, FormantFrame, TimedPhoneme,
+};
+pub use formant_targets::{FormantDatabase, FormantTarget};
+pub use phoneme_hdc::{AcousticParams, Manner, PhonemeHdcCodec, PhonemeSpec, PitchContour, Place};
 pub use vocoder::{FormantVocoder, VocoderConfig};
 
 // Re-export cognitive bridge types
 pub use cognitive_bridge::{
-    CognitivePacing, CognitiveVoiceBridge,
-    SemanticCategory, SemanticProsody,
+    CognitivePacing, CognitiveVoiceBridge, SemanticCategory, SemanticProsody,
 };
 
 // Re-export voice feedback types
 pub use voice_feedback::{
-    VoiceFeedbackBridge, VoiceFeedbackConfig,
-    VoiceOutputMetrics, VoiceQualitySummary,
+    VoiceFeedbackBridge, VoiceFeedbackConfig, VoiceOutputMetrics, VoiceQualitySummary,
 };
 
 // Re-export rap synthesis types
-pub use beat_sync::{BeatSync, BeatPosition, FlowPattern, SyllableTiming, SwingConfig};
-pub use rhyme_hdc::{RhymeEncoder, RhymeScore, RhymeType, RhymeScheme};
-pub use rap::{RapSynthesizer, RapConfig, FlowStyle, Verse, LyricLine, PhonemeDict, SimplePhonemeDict};
+pub use beat_sync::{BeatPosition, BeatSync, FlowPattern, SwingConfig, SyllableTiming};
+pub use rap::{
+    FlowStyle, LyricLine, PhonemeDict, RapConfig, RapSynthesizer, SimplePhonemeDict, Verse,
+};
+pub use rhyme_hdc::{RhymeEncoder, RhymeScheme, RhymeScore, RhymeType};
 
 // Re-export REPL voice types
-pub use repl_voice::{ReplVoiceOutput, ReplVoiceConfig, SimpleG2P};
+pub use repl_voice::{ReplVoiceConfig, ReplVoiceOutput, SimpleG2P};
 
 // Re-export Kokoro TTS types
-pub use kokoro_engine::{KokoroEngine, KokoroConfig, save_wav};
 pub use g2p::G2PConverter;
+pub use kokoro_engine::{save_wav, KokoroConfig, KokoroEngine};
 
 /// LTC-driven speech pacing parameters
 ///
@@ -232,8 +234,10 @@ impl LTCPacing {
             phrase_pause: self.phrase_pause + (other.phrase_pause - self.phrase_pause) * t,
             sentence_pause: self.sentence_pause + (other.sentence_pause - self.sentence_pause) * t,
             emphasis: self.emphasis + (other.emphasis - self.emphasis) * t,
-            breath_probability: self.breath_probability + (other.breath_probability - self.breath_probability) * t,
-            emotional_valence: self.emotional_valence + (other.emotional_valence - self.emotional_valence) * t,
+            breath_probability: self.breath_probability
+                + (other.breath_probability - self.breath_probability) * t,
+            emotional_valence: self.emotional_valence
+                + (other.emotional_valence - self.emotional_valence) * t,
             arousal: self.arousal + (other.arousal - self.arousal) * t,
             tau: self.tau + (other.tau - self.tau) * t,
         }
@@ -438,7 +442,8 @@ impl VoiceOutput {
         self.stats.total_chars += text.len() as u64;
         self.stats.total_audio_seconds += audio_seconds;
         let n = self.stats.total_utterances as f32;
-        self.stats.avg_synthesis_time_ms = (self.stats.avg_synthesis_time_ms * (n - 1.0) + elapsed) / n;
+        self.stats.avg_synthesis_time_ms =
+            (self.stats.avg_synthesis_time_ms * (n - 1.0) + elapsed) / n;
 
         Ok(samples)
     }
@@ -451,11 +456,12 @@ impl VoiceOutput {
         let base_duration = text.len() as f32 * 0.08 / pacing.rate;
 
         // Add pauses
-        let pause_count = text.matches('.').count() + text.matches('?').count() + text.matches('!').count();
+        let pause_count =
+            text.matches('.').count() + text.matches('?').count() + text.matches('!').count();
         let phrase_count = text.matches(',').count();
 
-        let total_pause = pause_count as f32 * pacing.sentence_pause +
-                         phrase_count as f32 * pacing.phrase_pause;
+        let total_pause =
+            pause_count as f32 * pacing.sentence_pause + phrase_count as f32 * pacing.phrase_pause;
 
         let total_duration = base_duration + total_pause;
         let num_samples = (total_duration * sample_rate) as usize;
@@ -657,7 +663,9 @@ mod tests {
         let mut voice = VoiceOutput::default();
         let pacing = LTCPacing::calm();
 
-        let samples = voice.synthesize_with_pacing("This is a calm message.", &pacing).unwrap();
+        let samples = voice
+            .synthesize_with_pacing("This is a calm message.", &pacing)
+            .unwrap();
         assert!(!samples.is_empty());
     }
 
@@ -681,20 +689,24 @@ mod tests {
         let mut voice = VoiceOutput::default();
 
         // Synthesize with excited adaptive behavior
-        let samples_excited = voice.synthesize_with_adaptive_behavior(
-            "Hello world.",
-            1.2,  // faster speech
-            0.7,  // shorter pauses
-            1.3,  // higher attention
-        ).unwrap();
+        let samples_excited = voice
+            .synthesize_with_adaptive_behavior(
+                "Hello world.",
+                1.2, // faster speech
+                0.7, // shorter pauses
+                1.3, // higher attention
+            )
+            .unwrap();
 
         // Synthesize same text with contemplative behavior
-        let samples_calm = voice.synthesize_with_adaptive_behavior(
-            "Hello world.",
-            0.8,  // slower speech
-            1.5,  // longer pauses
-            0.7,  // lower attention
-        ).unwrap();
+        let samples_calm = voice
+            .synthesize_with_adaptive_behavior(
+                "Hello world.",
+                0.8, // slower speech
+                1.5, // longer pauses
+                0.7, // lower attention
+            )
+            .unwrap();
 
         // Calm version should be longer due to slower rate and longer pauses
         assert!(samples_calm.len() > samples_excited.len());

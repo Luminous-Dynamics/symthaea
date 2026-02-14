@@ -55,8 +55,14 @@ mod tests {
 
         // Note: IIT-compliant partition sampling is O(n × samples)
         // In debug mode, expect ~100-500ms for n=20
-        assert!(elapsed.as_millis() < 2000, "Heuristic should complete in reasonable time (<2s for n=20 in debug)");
-        assert!(result >= 0.0 && result <= 1.0, "Result should be normalized");
+        assert!(
+            elapsed.as_millis() < 2000,
+            "Heuristic should complete in reasonable time (<2s for n=20 in debug)"
+        );
+        assert!(
+            result >= 0.0 && result <= 1.0,
+            "Result should be normalized"
+        );
     }
 
     #[test]
@@ -118,28 +124,43 @@ mod tests {
         println!("Φ (integrated):            {:.4}", phi_integrated);
 
         // Assertions
-        assert!(phi_homogeneous >= 0.0 && phi_homogeneous <= 1.0, "Φ should be in [0,1]");
-        assert!(phi_random >= 0.0 && phi_random <= 1.0, "Φ should be in [0,1]");
-        assert!(phi_integrated >= 0.0 && phi_integrated <= 1.0, "Φ should be in [0,1]");
+        assert!(
+            phi_homogeneous >= 0.0 && phi_homogeneous <= 1.0,
+            "Φ should be in [0,1]"
+        );
+        assert!(
+            phi_random >= 0.0 && phi_random <= 1.0,
+            "Φ should be in [0,1]"
+        );
+        assert!(
+            phi_integrated >= 0.0 && phi_integrated <= 1.0,
+            "Φ should be in [0,1]"
+        );
 
         // CRITICAL: Values should NOT all converge to ~0.08
         let not_all_converging = (phi_homogeneous - 0.08).abs() > 0.02
             || (phi_random - 0.08).abs() > 0.02
             || (phi_integrated - 0.08).abs() > 0.02;
-        assert!(not_all_converging,
+        assert!(
+            not_all_converging,
             "FAILED: Φ values converging to ~0.08! (homog={:.4}, rand={:.4}, integ={:.4})",
-            phi_homogeneous, phi_random, phi_integrated);
+            phi_homogeneous, phi_random, phi_integrated
+        );
 
         // CRITICAL: Integrated should have higher Φ than purely homogeneous or random
         // (The exact ordering depends on the specific structure, but integrated should be competitive)
         let shows_variation = phi_integrated != phi_homogeneous && phi_integrated != phi_random;
-        assert!(shows_variation,
+        assert!(
+            shows_variation,
             "FAILED: Φ not differentiating structures (homog={:.4}, rand={:.4}, integ={:.4})",
-            phi_homogeneous, phi_random, phi_integrated);
+            phi_homogeneous, phi_random, phi_integrated
+        );
 
         println!("✓ Fix validated: Φ values show meaningful variation across different structures");
-        println!("  Homogeneous: {:.4}, Random: {:.4}, Integrated: {:.4}",
-            phi_homogeneous, phi_random, phi_integrated);
+        println!(
+            "  Homogeneous: {:.4}, Random: {:.4}, Integrated: {:.4}",
+            phi_homogeneous, phi_random, phi_integrated
+        );
     }
 
     #[test]
@@ -149,7 +170,10 @@ mod tests {
         let components = create_test_components(20);
         let result = phi.compute(&components);
 
-        assert!(result >= 0.0 && result <= 1.0, "Result should be normalized");
+        assert!(
+            result >= 0.0 && result <= 1.0,
+            "Result should be normalized"
+        );
     }
 
     #[test]
@@ -163,15 +187,30 @@ mod tests {
         let result = phi.compute(&components);
         let elapsed = start.elapsed();
 
-        assert!(elapsed.as_secs() < 1, "Exact on small system should be fast");
-        assert!(result >= 0.0 && result <= 1.0, "Result should be normalized");
+        assert!(
+            elapsed.as_secs() < 1,
+            "Exact on small system should be fast"
+        );
+        assert!(
+            result >= 0.0 && result <= 1.0,
+            "Result should be normalized"
+        );
     }
 
     #[test]
     fn test_tier_suggestions() {
-        assert_eq!(ApproximationTier::suggest_for(4), ApproximationTier::ExhaustivePartition);
-        assert_eq!(ApproximationTier::suggest_for(50), ApproximationTier::SpectralConnectivity);
-        assert_eq!(ApproximationTier::suggest_for(500), ApproximationTier::SampledPartition);
+        assert_eq!(
+            ApproximationTier::suggest_for(4),
+            ApproximationTier::ExhaustivePartition
+        );
+        assert_eq!(
+            ApproximationTier::suggest_for(50),
+            ApproximationTier::SpectralConnectivity
+        );
+        assert_eq!(
+            ApproximationTier::suggest_for(500),
+            ApproximationTier::SampledPartition
+        );
     }
 
     #[test]
@@ -216,8 +255,14 @@ mod tests {
     fn test_tier_complexity() {
         assert_eq!(ApproximationTier::RandomBaseline.complexity(), "O(1)");
         assert_eq!(ApproximationTier::SampledPartition.complexity(), "O(n)");
-        assert_eq!(ApproximationTier::SpectralConnectivity.complexity(), "O(n²)");
-        assert_eq!(ApproximationTier::ExhaustivePartition.complexity(), "O(2^n)");
+        assert_eq!(
+            ApproximationTier::SpectralConnectivity.complexity(),
+            "O(n²)"
+        );
+        assert_eq!(
+            ApproximationTier::ExhaustivePartition.complexity(),
+            "O(2^n)"
+        );
     }
 
     #[test]
@@ -293,7 +338,9 @@ mod tests {
 
         // Create unique components each time (different seeds)
         let components1: Vec<_> = (0..5).map(|i| BinaryHV::random(i as u64 * 12345)).collect();
-        let components2: Vec<_> = (0..7).map(|i| BinaryHV::random((i + 100) as u64 * 67890)).collect();
+        let components2: Vec<_> = (0..7)
+            .map(|i| BinaryHV::random((i + 100) as u64 * 67890))
+            .collect();
 
         global_phi(&components1);
         global_phi(&components2);
@@ -302,7 +349,9 @@ mod tests {
 
         // Stats should have increased (at least 2 calculations)
         // Note: Use delta instead of absolute to handle test parallelism
-        let delta = final_stats.total_calculations.saturating_sub(initial_stats.total_calculations);
+        let delta = final_stats
+            .total_calculations
+            .saturating_sub(initial_stats.total_calculations);
         assert!(
             delta >= 2,
             "Expected at least 2 new calculations, got delta {} (initial: {}, final: {})",
@@ -353,9 +402,14 @@ mod tests {
         for i in 0..25 {
             for j in 0..25 {
                 let diff = (parallel_matrix[i][j] - sequential_matrix[i][j]).abs();
-                assert!(diff < 1e-10,
+                assert!(
+                    diff < 1e-10,
                     "Mismatch at [{},{}]: parallel={}, sequential={}",
-                    i, j, parallel_matrix[i][j], sequential_matrix[i][j]);
+                    i,
+                    j,
+                    parallel_matrix[i][j],
+                    sequential_matrix[i][j]
+                );
             }
         }
     }
@@ -380,9 +434,11 @@ mod tests {
 
         // Should complete in reasonable time (< 500ms for 5 iterations)
         // This validates that parallel execution is working
-        assert!(elapsed.as_millis() < 500,
+        assert!(
+            elapsed.as_millis() < 500,
             "Parallel spectral should be fast, took {}ms for 5 iterations",
-            elapsed.as_millis());
+            elapsed.as_millis()
+        );
     }
 
     // ========================================================================
@@ -422,11 +478,17 @@ mod tests {
         let phi2 = phi.compute_incremental(&components);
 
         // Should return same value
-        assert!((phi1 - phi2).abs() < 1e-10, "Φ should be identical for unchanged components");
+        assert!(
+            (phi1 - phi2).abs() < 1e-10,
+            "Φ should be identical for unchanged components"
+        );
 
         // Should NOT count as incremental update (no change = cache hit)
         let stats = phi.incremental_stats().unwrap();
-        assert_eq!(stats.0, 0, "No incremental updates for unchanged components");
+        assert_eq!(
+            stats.0, 0,
+            "No incremental updates for unchanged components"
+        );
     }
 
     #[test]
@@ -500,7 +562,10 @@ mod tests {
 
         // Should trigger full recompute, not incremental
         let stats = phi.incremental_stats().unwrap();
-        assert_eq!(stats.0, 0, "Should have 0 incremental updates (>n/2 changes)");
+        assert_eq!(
+            stats.0, 0,
+            "Should have 0 incremental updates (>n/2 changes)"
+        );
         assert_eq!(stats.1, 2, "Should have 2 full recomputes");
     }
 
@@ -535,9 +600,12 @@ mod tests {
         // Incremental should be at least 2x faster for single-component changes
         // (In practice, it should be ~n/2 times faster for n=40, so ~20x)
         println!("Incremental: {:?}, Full: {:?}", incremental_time, full_time);
-        assert!(incremental_time < full_time,
+        assert!(
+            incremental_time < full_time,
             "Incremental ({:?}) should be faster than full ({:?})",
-            incremental_time, full_time);
+            incremental_time,
+            full_time
+        );
     }
 
     #[test]
@@ -618,10 +686,16 @@ mod tests {
 
         // High similarity should lead to few clusters
         // (all similar components should be in same cluster)
-        assert!(h.num_clusters <= 3, "Similar components should cluster together");
+        assert!(
+            h.num_clusters <= 3,
+            "Similar components should cluster together"
+        );
 
         // Micro Φ should be high (strong within-cluster binding)
-        assert!(h.micro_phi > 0.3, "Similar components should have high micro Φ");
+        assert!(
+            h.micro_phi > 0.3,
+            "Similar components should have high micro Φ"
+        );
     }
 
     #[test]
@@ -649,8 +723,10 @@ mod tests {
 
         // Meso Φ (between clusters) should generally be lower than micro Φ
         // unless random components happen to be similar
-        println!("Clusters: {}, Micro: {:.3}, Meso: {:.3}, Macro: {:.3}",
-            h.num_clusters, h.micro_phi, h.meso_phi, h.macro_phi);
+        println!(
+            "Clusters: {}, Micro: {:.3}, Meso: {:.3}, Macro: {:.3}",
+            h.num_clusters, h.micro_phi, h.meso_phi, h.macro_phi
+        );
     }
 
     #[test]
@@ -665,8 +741,10 @@ mod tests {
 
         // If emergence_ratio > 1, macro integration exceeds sum of local
         // This indicates true emergent consciousness!
-        println!("Emergence ratio: {:.3} (>1 = emergent integration)",
-            h.emergence_ratio);
+        println!(
+            "Emergence ratio: {:.3} (>1 = emergent integration)",
+            h.emergence_ratio
+        );
     }
 
     #[test]
@@ -682,8 +760,10 @@ mod tests {
         let expected_bottleneck = (h.macro_phi - h.meso_phi).abs();
         assert!((h.bottleneck_score - expected_bottleneck).abs() < 1e-10);
 
-        println!("Bottleneck score: {:.3} (lower = better integration)",
-            h.bottleneck_score);
+        println!(
+            "Bottleneck score: {:.3} (lower = better integration)",
+            h.bottleneck_score
+        );
     }
 
     #[test]
@@ -697,9 +777,12 @@ mod tests {
 
         // They should be close (both use same underlying algorithm)
         // Allow some tolerance due to different code paths
-        assert!((h.macro_phi - regular_phi).abs() < 0.1,
+        assert!(
+            (h.macro_phi - regular_phi).abs() < 0.1,
             "Hierarchical macro Φ ({:.3}) should match regular Φ ({:.3})",
-            h.macro_phi, regular_phi);
+            h.macro_phi,
+            regular_phi
+        );
     }
 
     // ========================================================================
@@ -745,7 +828,10 @@ mod tests {
         let attr = phi.compute_attribution(&components);
 
         // Basic sanity checks
-        assert!(attr.baseline_phi > 0.0, "5 components should have positive Φ");
+        assert!(
+            attr.baseline_phi > 0.0,
+            "5 components should have positive Φ"
+        );
         assert_eq!(attr.component_scores.len(), 5);
         assert_eq!(attr.importance_ranking.len(), 5);
 
@@ -811,7 +897,10 @@ mod tests {
         assert!((full_attr.baseline_phi - fast_attr.baseline_phi).abs() < 1e-10);
 
         // Both should have same number of components
-        assert_eq!(full_attr.component_scores.len(), fast_attr.component_scores.len());
+        assert_eq!(
+            full_attr.component_scores.len(),
+            fast_attr.component_scores.len()
+        );
 
         // Fast method may have different ranking but should identify
         // similar critical/redundant patterns
@@ -835,14 +924,18 @@ mod tests {
         // All components should have similar importance (uniform distribution)
         let scores = &attr.component_scores;
         let mean: f64 = scores.iter().sum::<f64>() / scores.len() as f64;
-        let variance: f64 = scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / scores.len() as f64;
+        let variance: f64 =
+            scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / scores.len() as f64;
 
         println!("Identical components test:");
         println!("  Scores: {:?}", scores);
         println!("  Mean: {:.4}, Variance: {:.6}", mean, variance);
 
         // Low variance = uniform importance
-        assert!(variance < 0.01, "Identical components should have low variance in importance");
+        assert!(
+            variance < 0.01,
+            "Identical components should have low variance in importance"
+        );
     }
 
     #[test]
@@ -857,17 +950,25 @@ mod tests {
 
         // Verify critical components are actually above threshold
         for &i in &attr.critical_components {
-            assert!(attr.component_scores[i] > threshold,
+            assert!(
+                attr.component_scores[i] > threshold,
                 "Critical component {} has score {:.4} below threshold {:.4}",
-                i, attr.component_scores[i], threshold);
+                i,
+                attr.component_scores[i],
+                threshold
+            );
         }
 
         // Verify redundant components are actually below 1% threshold
         let redundant_threshold = attr.baseline_phi * 0.01;
         for &i in &attr.redundant_components {
-            assert!(attr.component_scores[i] < redundant_threshold,
+            assert!(
+                attr.component_scores[i] < redundant_threshold,
                 "Redundant component {} has score {:.4} above threshold {:.4}",
-                i, attr.component_scores[i], redundant_threshold);
+                i,
+                attr.component_scores[i],
+                redundant_threshold
+            );
         }
     }
 
@@ -883,15 +984,23 @@ mod tests {
 
         // System 2: Mostly similar components (may have more concentrated importance)
         let base = BinaryHV::random(42);
-        let similar: Vec<BinaryHV> = (0..6).map(|i| {
-            let noise = BinaryHV::random(i as u64);
-            BinaryHV::bundle(&[base.clone(), base.clone(), base.clone(), noise])
-        }).collect();
+        let similar: Vec<BinaryHV> = (0..6)
+            .map(|i| {
+                let noise = BinaryHV::random(i as u64);
+                BinaryHV::bundle(&[base.clone(), base.clone(), base.clone(), noise])
+            })
+            .collect();
         let attr_similar = phi.compute_attribution(&similar);
 
         println!("Concentration gradient test:");
-        println!("  Diverse system concentration: {:.4}", attr_diverse.concentration_index);
-        println!("  Similar system concentration: {:.4}", attr_similar.concentration_index);
+        println!(
+            "  Diverse system concentration: {:.4}",
+            attr_diverse.concentration_index
+        );
+        println!(
+            "  Similar system concentration: {:.4}",
+            attr_similar.concentration_index
+        );
 
         // Both should be valid concentration indices
         assert!(attr_diverse.concentration_index >= 0.0);
@@ -915,7 +1024,10 @@ mod tests {
         assert_eq!(attr.most_critical(), Some(attr.importance_ranking[0]));
 
         // Most redundant should be last in ranking
-        assert_eq!(attr.most_redundant(), Some(attr.importance_ranking[attr.importance_ranking.len() - 1]));
+        assert_eq!(
+            attr.most_redundant(),
+            Some(attr.importance_ranking[attr.importance_ranking.len() - 1])
+        );
 
         // is_distributed should match concentration threshold
         let expected_distributed = attr.concentration_index < 0.3;
@@ -972,11 +1084,15 @@ mod tests {
         let snapshot = last_snapshot.expect("Should have snapshot");
 
         // Should be stable or slightly increasing
-        assert!(snapshot.trend.direction == TrendDirection::Stable ||
-                snapshot.trend.direction == TrendDirection::Increasing);
+        assert!(
+            snapshot.trend.direction == TrendDirection::Stable
+                || snapshot.trend.direction == TrendDirection::Increasing
+        );
 
-        println!("Stable sequence trend: {:?}, strength: {:.4}",
-                 snapshot.trend.direction, snapshot.trend.strength);
+        println!(
+            "Stable sequence trend: {:?}, strength: {:.4}",
+            snapshot.trend.direction, snapshot.trend.strength
+        );
     }
 
     #[test]
@@ -995,8 +1111,10 @@ mod tests {
         assert_eq!(snapshot.trend.direction, TrendDirection::Increasing);
         assert!(snapshot.trend.strength > 0.0);
 
-        println!("Increasing trend: strength = {:.4}, predicted_next = {:.4}",
-                 snapshot.trend.strength, snapshot.trend.predicted_next);
+        println!(
+            "Increasing trend: strength = {:.4}, predicted_next = {:.4}",
+            snapshot.trend.strength, snapshot.trend.predicted_next
+        );
     }
 
     #[test]
@@ -1014,8 +1132,10 @@ mod tests {
 
         assert_eq!(snapshot.trend.direction, TrendDirection::Decreasing);
 
-        println!("Decreasing trend: strength = {:.4}, predicted_next = {:.4}",
-                 snapshot.trend.strength, snapshot.trend.predicted_next);
+        println!(
+            "Decreasing trend: strength = {:.4}, predicted_next = {:.4}",
+            snapshot.trend.strength, snapshot.trend.predicted_next
+        );
     }
 
     #[test]
@@ -1030,14 +1150,19 @@ mod tests {
         // Now introduce a sudden change
         let snapshot = dynamics.record(0.8); // Big jump!
 
-        assert!(snapshot.transition.is_some(), "Should detect phase transition");
+        assert!(
+            snapshot.transition.is_some(),
+            "Should detect phase transition"
+        );
 
         let transition = snapshot.transition.unwrap();
         assert_eq!(transition.direction, TransitionDirection::Rising);
         assert!(transition.magnitude_sigma > 2.0); // Should be significant
 
-        println!("Detected transition: {:?}, magnitude: {:.2}σ, type: {:?}",
-                 transition.direction, transition.magnitude_sigma, transition.transition_type);
+        println!(
+            "Detected transition: {:?}, magnitude: {:.2}σ, type: {:?}",
+            transition.direction, transition.magnitude_sigma, transition.transition_type
+        );
     }
 
     #[test]
@@ -1052,13 +1177,18 @@ mod tests {
         // Sudden drop
         let snapshot = dynamics.record(0.3);
 
-        assert!(snapshot.transition.is_some(), "Should detect falling transition");
+        assert!(
+            snapshot.transition.is_some(),
+            "Should detect falling transition"
+        );
 
         let transition = snapshot.transition.unwrap();
         assert_eq!(transition.direction, TransitionDirection::Falling);
 
-        println!("Falling transition detected: magnitude = {:.2}σ",
-                 transition.magnitude_sigma);
+        println!(
+            "Falling transition detected: magnitude = {:.2}σ",
+            transition.magnitude_sigma
+        );
     }
 
     #[test]
@@ -1075,10 +1205,15 @@ mod tests {
         let snapshot = last_snapshot.expect("Should have snapshot");
 
         // Should detect oscillation or low strength trend
-        assert!(snapshot.trend.strength < 0.5 || snapshot.trend.direction == TrendDirection::Oscillating);
+        assert!(
+            snapshot.trend.strength < 0.5
+                || snapshot.trend.direction == TrendDirection::Oscillating
+        );
 
-        println!("Oscillating pattern: direction = {:?}, strength = {:.4}",
-                 snapshot.trend.direction, snapshot.trend.strength);
+        println!(
+            "Oscillating pattern: direction = {:?}, strength = {:.4}",
+            snapshot.trend.direction, snapshot.trend.strength
+        );
     }
 
     #[test]
@@ -1104,8 +1239,12 @@ mod tests {
         let values: Vec<f64> = history.iter().map(|(_, v)| *v).collect();
         for (i, v) in values.iter().enumerate() {
             let expected = (15 + i) as f64 * 0.1; // Last 10 values: 1.5, 1.6, ..., 2.4
-            assert!((*v - expected).abs() < 1e-10,
-                    "Expected {:.1}, got {:.1}", expected, *v);
+            assert!(
+                (*v - expected).abs() < 1e-10,
+                "Expected {:.1}, got {:.1}",
+                expected,
+                *v
+            );
         }
     }
 
@@ -1141,14 +1280,22 @@ mod tests {
         // After adding 6.0, we have [1, 2, 3, 4, 5, 6]
         // Mean should be 3.5
         let expected_mean = 3.5;
-        assert!((snapshot.mean_phi - expected_mean).abs() < 1e-10,
-                "Expected mean {}, got {}", expected_mean, snapshot.mean_phi);
+        assert!(
+            (snapshot.mean_phi - expected_mean).abs() < 1e-10,
+            "Expected mean {}, got {}",
+            expected_mean,
+            snapshot.mean_phi
+        );
 
         // Variance = E[X²] - E[X]² = (1+4+9+16+25+36)/6 - 12.25 = 91/6 - 12.25 ≈ 2.9167
         // Std = sqrt(2.9167) ≈ 1.7078
         let expected_volatility = (2.9166666667_f64).sqrt();
-        assert!((snapshot.volatility - expected_volatility).abs() < 0.01,
-                "Expected volatility {:.4}, got {:.4}", expected_volatility, snapshot.volatility);
+        assert!(
+            (snapshot.volatility - expected_volatility).abs() < 0.01,
+            "Expected volatility {:.4}, got {:.4}",
+            expected_volatility,
+            snapshot.volatility
+        );
     }
 
     #[test]
@@ -1164,8 +1311,10 @@ mod tests {
             let snapshot = dynamics.record(phi_value);
 
             if let Some(transition) = snapshot.transition {
-                println!("Transition at step {}: {:?} ({:.2}σ)",
-                         seed, transition.direction, transition.magnitude_sigma);
+                println!(
+                    "Transition at step {}: {:?} ({:.2}σ)",
+                    seed, transition.direction, transition.magnitude_sigma
+                );
             }
         }
 
@@ -1205,7 +1354,10 @@ mod tests {
         println!("Small system (n=4) pyramid:");
         println!("  Scales: {:?}", result.components_per_scale);
         println!("  Φ by scale: {:?}", result.phi_by_scale);
-        println!("  Peak at scale {}: Φ = {:.4}", result.peak_scale, result.peak_phi);
+        println!(
+            "  Peak at scale {}: Φ = {:.4}",
+            result.peak_scale, result.peak_phi
+        );
     }
 
     #[test]
@@ -1216,18 +1368,31 @@ mod tests {
         let result = pyramid.compute(&components);
 
         // Should have multiple scales (at least 3: 2, 4, 8, 16, 32)
-        assert!(result.phi_by_scale.len() >= 3,
-            "Expected at least 3 scales, got {}", result.phi_by_scale.len());
+        assert!(
+            result.phi_by_scale.len() >= 3,
+            "Expected at least 3 scales, got {}",
+            result.phi_by_scale.len()
+        );
 
         // Scales should be powers of 2 (or close)
         assert!(result.components_per_scale[0] >= 2);
 
         println!("Multi-scale pyramid (n=32):");
-        for (i, (comps, phi)) in result.components_per_scale.iter()
-            .zip(result.phi_by_scale.iter()).enumerate()
+        for (i, (comps, phi)) in result
+            .components_per_scale
+            .iter()
+            .zip(result.phi_by_scale.iter())
+            .enumerate()
         {
-            let marker = if i == result.peak_scale { " ← PEAK" } else { "" };
-            println!("  Scale {}: {} components, Φ = {:.4}{}", i, comps, phi, marker);
+            let marker = if i == result.peak_scale {
+                " ← PEAK"
+            } else {
+                ""
+            };
+            println!(
+                "  Scale {}: {} components, Φ = {:.4}{}",
+                i, comps, phi, marker
+            );
         }
     }
 
@@ -1259,8 +1424,10 @@ mod tests {
         // Variance should be non-negative
         assert!(result.scale_variance >= 0.0);
 
-        println!("Scale variance: {:.4} (high = scale-dependent consciousness)",
-                 result.scale_variance);
+        println!(
+            "Scale variance: {:.4} (high = scale-dependent consciousness)",
+            result.scale_variance
+        );
     }
 
     #[test]
@@ -1276,8 +1443,15 @@ mod tests {
         println!("  Is hierarchical: {}", result.is_hierarchical);
         println!("  Φ gradient: {:?}", result.scale_gradient());
 
-        assert!(!result.phi_by_scale.is_empty(), "pyramid should produce at least one scale of phi values");
-        assert!(result.peak_phi >= 0.0, "peak phi should be non-negative, got {}", result.peak_phi);
+        assert!(
+            !result.phi_by_scale.is_empty(),
+            "pyramid should produce at least one scale of phi values"
+        );
+        assert!(
+            result.peak_phi >= 0.0,
+            "peak phi should be non-negative, got {}",
+            result.peak_phi
+        );
     }
 
     #[test]
@@ -1290,8 +1464,10 @@ mod tests {
         let result = pyramid.compute(&components);
         let elapsed = start.elapsed();
 
-        assert!(result.phi_by_scale.len() <= 4,
-            "Fast config should have at most 4 scales");
+        assert!(
+            result.phi_by_scale.len() <= 4,
+            "Fast config should have at most 4 scales"
+        );
 
         println!("Fast pyramid took {:.2}ms", elapsed.as_secs_f64() * 1000.0);
     }
@@ -1326,7 +1502,13 @@ mod tests {
 
             println!("Scale gradient (Φ change between scales):");
             for (i, g) in gradient.iter().enumerate() {
-                let direction = if *g > 0.01 { "↑" } else if *g < -0.01 { "↓" } else { "→" };
+                let direction = if *g > 0.01 {
+                    "↑"
+                } else if *g < -0.01 {
+                    "↓"
+                } else {
+                    "→"
+                };
                 println!("  Scale {} → {}: {:.4} {}", i, i + 1, g, direction);
             }
         }
@@ -1347,16 +1529,31 @@ mod tests {
         }
 
         println!("Pyramid comparison across system sizes:");
-        println!("{:>6} | {:>10} | {:>8} | {:>12}", "Size", "Peak Scale", "Peak Φ", "Locality");
+        println!(
+            "{:>6} | {:>10} | {:>8} | {:>12}",
+            "Size", "Peak Scale", "Peak Φ", "Locality"
+        );
         println!("{:-<6}-+-{:-<10}-+-{:-<8}-+-{:-<12}", "", "", "", "");
 
         for (n, peak_scale, peak_phi, locality) in &results {
-            println!("{:>6} | {:>10} | {:>8.4} | {:>12.4}", n, peak_scale, peak_phi, locality);
+            println!(
+                "{:>6} | {:>10} | {:>8.4} | {:>12.4}",
+                n, peak_scale, peak_phi, locality
+            );
         }
 
-        assert_eq!(results.len(), sizes.len(), "should have results for all system sizes");
+        assert_eq!(
+            results.len(),
+            sizes.len(),
+            "should have results for all system sizes"
+        );
         for &(n, _, peak_phi, _) in &results {
-            assert!(peak_phi >= 0.0, "peak_phi should be non-negative for size {}, got {}", n, peak_phi);
+            assert!(
+                peak_phi >= 0.0,
+                "peak_phi should be non-negative for size {}, got {}",
+                n,
+                peak_phi
+            );
         }
     }
 
@@ -1376,8 +1573,11 @@ mod tests {
         let result = pyramid.compute(&components);
 
         // Should have scales: 3, 9, 27 (3 scales with factor 3)
-        assert!(result.phi_by_scale.len() <= 5,
-            "Expected at most 5 scales, got {}", result.phi_by_scale.len());
+        assert!(
+            result.phi_by_scale.len() <= 5,
+            "Expected at most 5 scales, got {}",
+            result.phi_by_scale.len()
+        );
 
         println!("Custom config (factor=3) pyramid:");
         println!("  Components per scale: {:?}", result.components_per_scale);
@@ -1393,7 +1593,10 @@ mod tests {
         // Should have recorded computation time
         assert!(result.computation_time_ms > 0.0);
 
-        println!("Pyramid computation time: {:.2}ms", result.computation_time_ms);
+        println!(
+            "Pyramid computation time: {:.2}ms",
+            result.computation_time_ms
+        );
     }
 
     // ============================================================================
@@ -1413,7 +1616,10 @@ mod tests {
         assert_eq!(result.sample_count, 10);
         assert_eq!(result.predictability, 1.0);
 
-        println!("Insufficient samples handled correctly: {} samples", result.sample_count);
+        println!(
+            "Insufficient samples handled correctly: {} samples",
+            result.sample_count
+        );
     }
 
     #[test]
@@ -1429,12 +1635,20 @@ mod tests {
         let result = analyzer.analyze(&values, None);
 
         // Constant signal should have zero entropy
-        assert_eq!(result.shannon_entropy, 0.0, "Constant signal should have zero entropy");
+        assert_eq!(
+            result.shannon_entropy, 0.0,
+            "Constant signal should have zero entropy"
+        );
         assert_eq!(result.normalized_entropy, 0.0);
-        assert!(result.predictability > 0.99, "Constant signal should be highly predictable");
+        assert!(
+            result.predictability > 0.99,
+            "Constant signal should be highly predictable"
+        );
 
-        println!("Constant signal: entropy = {:.4}, predictability = {:.4}",
-                 result.shannon_entropy, result.predictability);
+        println!(
+            "Constant signal: entropy = {:.4}, predictability = {:.4}",
+            result.shannon_entropy, result.predictability
+        );
     }
 
     #[test]
@@ -1461,13 +1675,21 @@ mod tests {
         let result = analyzer.analyze(&values, None);
 
         // Random signal should have high normalized entropy
-        assert!(result.normalized_entropy > 0.5,
-                "Random signal should have high entropy: {}", result.normalized_entropy);
-        assert!(result.predictability < 0.5,
-                "Random signal should have low predictability: {}", result.predictability);
+        assert!(
+            result.normalized_entropy > 0.5,
+            "Random signal should have high entropy: {}",
+            result.normalized_entropy
+        );
+        assert!(
+            result.predictability < 0.5,
+            "Random signal should have low predictability: {}",
+            result.predictability
+        );
 
-        println!("Random signal: normalized entropy = {:.4}, predictability = {:.4}",
-                 result.normalized_entropy, result.predictability);
+        println!(
+            "Random signal: normalized entropy = {:.4}, predictability = {:.4}",
+            result.normalized_entropy, result.predictability
+        );
     }
 
     #[test]
@@ -1491,13 +1713,21 @@ mod tests {
         // Shannon entropy for uniform 4-bin distribution = log2(4) = 2.0 bits
         // Normalized = 2.0 / log2(4) = 1.0
         // In practice, due to binning edge effects, it may be slightly less
-        assert!(result.shannon_entropy > 1.5,
-                "Uniform distribution should have entropy > 1.5: {}", result.shannon_entropy);
-        assert!(result.normalized_entropy > 0.8,
-                "Uniform distribution should have normalized entropy > 0.8: {}", result.normalized_entropy);
+        assert!(
+            result.shannon_entropy > 1.5,
+            "Uniform distribution should have entropy > 1.5: {}",
+            result.shannon_entropy
+        );
+        assert!(
+            result.normalized_entropy > 0.8,
+            "Uniform distribution should have normalized entropy > 0.8: {}",
+            result.normalized_entropy
+        );
 
-        println!("Shannon entropy: {:.4} bits, normalized: {:.4}",
-                 result.shannon_entropy, result.normalized_entropy);
+        println!(
+            "Shannon entropy: {:.4} bits, normalized: {:.4}",
+            result.shannon_entropy, result.normalized_entropy
+        );
     }
 
     #[test]
@@ -1511,9 +1741,7 @@ mod tests {
         let analyzer = PhiEntropyAnalyzer::with_config(config);
 
         // Periodic signal (low sample entropy)
-        let periodic: Vec<f64> = (0..100)
-            .map(|i| (i as f64 * 0.1).sin())
-            .collect();
+        let periodic: Vec<f64> = (0..100).map(|i| (i as f64 * 0.1).sin()).collect();
 
         // Random-ish signal (higher sample entropy)
         let chaotic: Vec<f64> = (0..100)
@@ -1528,8 +1756,14 @@ mod tests {
 
         // Sample entropy should generally be lower for periodic signals
         // (though this depends on the specific signals and parameters)
-        println!("Periodic sample entropy: {:.4}", periodic_result.sample_entropy);
-        println!("Chaotic sample entropy: {:.4}", chaotic_result.sample_entropy);
+        println!(
+            "Periodic sample entropy: {:.4}",
+            periodic_result.sample_entropy
+        );
+        println!(
+            "Chaotic sample entropy: {:.4}",
+            chaotic_result.sample_entropy
+        );
 
         // Both should produce valid (non-negative) sample entropy
         assert!(periodic_result.sample_entropy >= 0.0);
@@ -1557,10 +1791,14 @@ mod tests {
         let repetitive_result = analyzer.analyze(&repetitive, None);
         let varied_result = analyzer.analyze(&varied, None);
 
-        println!("Repetitive LZ: {:.4} (normalized: {:.4})",
-                 repetitive_result.lz_complexity, repetitive_result.normalized_lz);
-        println!("Varied LZ: {:.4} (normalized: {:.4})",
-                 varied_result.lz_complexity, varied_result.normalized_lz);
+        println!(
+            "Repetitive LZ: {:.4} (normalized: {:.4})",
+            repetitive_result.lz_complexity, repetitive_result.normalized_lz
+        );
+        println!(
+            "Varied LZ: {:.4} (normalized: {:.4})",
+            varied_result.lz_complexity, varied_result.normalized_lz
+        );
 
         // Both should produce valid complexity values
         assert!(repetitive_result.lz_complexity >= 0.0);
@@ -1586,10 +1824,16 @@ mod tests {
         let result = analyzer.analyze(&values, None);
 
         // Should have multi-scale entropy values
-        assert!(!result.multi_scale_entropy.is_empty(),
-                "Should have multi-scale entropy for {} samples", result.sample_count);
+        assert!(
+            !result.multi_scale_entropy.is_empty(),
+            "Should have multi-scale entropy for {} samples",
+            result.sample_count
+        );
 
-        println!("Multi-scale entropy ({} scales):", result.multi_scale_entropy.len());
+        println!(
+            "Multi-scale entropy ({} scales):",
+            result.multi_scale_entropy.len()
+        );
         for (scale, se) in result.multi_scale_entropy.iter().enumerate() {
             println!("  Scale {}: {:.4}", scale + 1, se);
         }
@@ -1604,28 +1848,36 @@ mod tests {
         let analyzer = PhiEntropyAnalyzer::with_config(config);
 
         // Create varied signal
-        let values: Vec<f64> = (0..100)
-            .map(|i| (i as f64 * 0.17) % 1.0)
-            .collect();
+        let values: Vec<f64> = (0..100).map(|i| (i as f64 * 0.17) % 1.0).collect();
 
         // Test with different mean Φ values
         let result_low_phi = analyzer.analyze(&values, Some(0.1));
         let result_high_phi = analyzer.analyze(&values, Some(0.9));
 
         // Same complexity, different Φ should yield different integrated complexity
-        assert!(result_high_phi.integrated_complexity > result_low_phi.integrated_complexity,
-                "Higher Φ should yield higher integrated complexity");
+        assert!(
+            result_high_phi.integrated_complexity > result_low_phi.integrated_complexity,
+            "Higher Φ should yield higher integrated complexity"
+        );
 
         // Verify integrated complexity formula: Φ × complexity_index
         let expected_low = 0.1 * result_low_phi.complexity_index;
         let expected_high = 0.9 * result_high_phi.complexity_index;
 
-        assert!((result_low_phi.integrated_complexity - expected_low).abs() < 0.01,
-                "Integrated complexity should match Φ × complexity_index");
+        assert!(
+            (result_low_phi.integrated_complexity - expected_low).abs() < 0.01,
+            "Integrated complexity should match Φ × complexity_index"
+        );
         assert!((result_high_phi.integrated_complexity - expected_high).abs() < 0.01);
 
-        println!("Low Φ (0.1): integrated_complexity = {:.4}", result_low_phi.integrated_complexity);
-        println!("High Φ (0.9): integrated_complexity = {:.4}", result_high_phi.integrated_complexity);
+        println!(
+            "Low Φ (0.1): integrated_complexity = {:.4}",
+            result_low_phi.integrated_complexity
+        );
+        println!(
+            "High Φ (0.9): integrated_complexity = {:.4}",
+            result_high_phi.integrated_complexity
+        );
     }
 
     #[test]
@@ -1682,16 +1934,17 @@ mod tests {
     #[test]
     fn test_entropy_convenience_functions() {
         // Test analyze_phi_complexity
-        let values: Vec<f64> = (0..100)
-            .map(|i| (i as f64 * 0.1) % 1.0)
-            .collect();
+        let values: Vec<f64> = (0..100).map(|i| (i as f64 * 0.1) % 1.0).collect();
 
         let result = analyze_phi_complexity(&values);
         assert!(result.sample_count == 100);
 
         // Test integrated_complexity function
         let ic = integrated_complexity(&values, 0.5);
-        assert!(ic >= 0.0 && ic <= 1.0, "Integrated complexity should be in [0, 1]");
+        assert!(
+            ic >= 0.0 && ic <= 1.0,
+            "Integrated complexity should be in [0, 1]"
+        );
 
         println!("Convenience functions: analyze_phi_complexity and integrated_complexity working");
     }
@@ -1730,12 +1983,17 @@ mod tests {
 
         // Complexity index should be geometric mean of entropy measures
         // Bounded between 0 and 1
-        assert!(result.complexity_index >= 0.0 && result.complexity_index <= 1.0,
-                "Complexity index should be in [0, 1]: {}", result.complexity_index);
+        assert!(
+            result.complexity_index >= 0.0 && result.complexity_index <= 1.0,
+            "Complexity index should be in [0, 1]: {}",
+            result.complexity_index
+        );
 
         println!("Complexity index: {:.4}", result.complexity_index);
-        println!("Components: norm_entropy={:.4}, sample_ent={:.4}, norm_lz={:.4}",
-                 result.normalized_entropy, result.sample_entropy, result.normalized_lz);
+        println!(
+            "Components: norm_entropy={:.4}, sample_ent={:.4}, norm_lz={:.4}",
+            result.normalized_entropy, result.sample_entropy, result.normalized_lz
+        );
     }
 
     // ============================================================================
@@ -1743,7 +2001,9 @@ mod tests {
     // ============================================================================
 
     fn create_test_realvh_components(n: usize, dim: usize, seed: u64) -> Vec<ContinuousHV> {
-        (0..n).map(|i| ContinuousHV::random(dim, seed + i as u64 * 1000)).collect()
+        (0..n)
+            .map(|i| ContinuousHV::random(dim, seed + i as u64 * 1000))
+            .collect()
     }
 
     #[test]
@@ -1763,9 +2023,12 @@ mod tests {
         assert_eq!(signature.num_components, 8);
         assert_eq!(signature.topology_type, Some("Test".to_string()));
 
-        println!("Signature extracted with {} dimensions",signature.dim());
+        println!("Signature extracted with {} dimensions", signature.dim());
         println!("  Similarity features: {:?}", signature.similarity_features);
-        println!("  Connectivity features: {:?}", signature.connectivity_features);
+        println!(
+            "  Connectivity features: {:?}",
+            signature.connectivity_features
+        );
     }
 
     #[test]
@@ -1804,8 +2067,12 @@ mod tests {
         );
 
         // Transfer should produce improvement
-        assert!(result.enhanced_phi > result.original_phi,
-                "Enhanced Φ {} should exceed original {}", result.enhanced_phi, result.original_phi);
+        assert!(
+            result.enhanced_phi > result.original_phi,
+            "Enhanced Φ {} should exceed original {}",
+            result.enhanced_phi,
+            result.original_phi
+        );
         assert!(result.improvement_ratio > 1.0);
         assert!(result.converged);
 
@@ -1825,7 +2092,10 @@ mod tests {
         let potential = transfer.transfer_potential(&source, &target, 0.5, 0.3);
 
         // Transfer potential should be positive
-        assert!(potential >= 0.0, "Transfer potential should be non-negative");
+        assert!(
+            potential >= 0.0,
+            "Transfer potential should be non-negative"
+        );
         assert!(potential <= 1.0, "Transfer potential should be bounded");
 
         println!("Transfer potential: {:.4}", potential);
@@ -1855,7 +2125,10 @@ mod tests {
         };
         assert!(!failed.is_successful());
 
-        println!("Result methods working: improvement = {:.1}%", result.improvement_percent());
+        println!(
+            "Result methods working: improvement = {:.1}%",
+            result.improvement_percent()
+        );
     }
 
     #[test]
@@ -1890,8 +2163,10 @@ mod tests {
         assert_eq!(sig_empty.num_components, 0);
         assert_eq!(sig_single.num_components, 1);
 
-        println!("Edge cases handled: empty={}, single={}",
-                 sig_empty.num_components, sig_single.num_components);
+        println!(
+            "Edge cases handled: empty={}, single={}",
+            sig_empty.num_components, sig_single.num_components
+        );
     }
 
     #[test]
@@ -1920,7 +2195,10 @@ mod tests {
         // Should have learned weights
         assert!(transfer.transfer_weights.is_some());
 
-        println!("Transfer learning complete: {} source signatures", sources.len());
+        println!(
+            "Transfer learning complete: {} source signatures",
+            sources.len()
+        );
     }
 
     #[test]
@@ -1958,11 +2236,19 @@ mod tests {
         let result_no_improve = transfer.transfer(&target, &source, 0.3, 0.6, "Low", "High");
 
         // High→Low should show more improvement potential
-        assert!(result_improve.improvement_percent() > 0.0,
-                "High→Low should show improvement");
+        assert!(
+            result_improve.improvement_percent() > 0.0,
+            "High→Low should show improvement"
+        );
 
-        println!("High→Low improvement: {:.2}%", result_improve.improvement_percent());
-        println!("Low→High improvement: {:.2}%", result_no_improve.improvement_percent());
+        println!(
+            "High→Low improvement: {:.2}%",
+            result_improve.improvement_percent()
+        );
+        println!(
+            "Low→High improvement: {:.2}%",
+            result_no_improve.improvement_percent()
+        );
     }
 
     // ========================================================================
@@ -2009,7 +2295,10 @@ mod tests {
             (result.attractor_phi - 0.5).abs() < 0.05,
             "Attractor Φ should be near 0.5"
         );
-        assert!(result.lyapunov_exponent < 0.0, "Lyapunov should be negative (stable)");
+        assert!(
+            result.lyapunov_exponent < 0.0,
+            "Lyapunov should be negative (stable)"
+        );
 
         println!("Fixed point test:");
         println!("  Attractor Φ: {:.4}", result.attractor_phi);
@@ -2042,7 +2331,10 @@ mod tests {
         println!("Limit cycle test:");
         println!("  Type: {:?}", result.attractor_type);
         println!("  Oscillation period: {:?}", result.oscillation_period);
-        println!("  Interpretation: {}", result.attractor_type.consciousness_interpretation());
+        println!(
+            "  Interpretation: {}",
+            result.attractor_type.consciousness_interpretation()
+        );
     }
 
     #[test]
@@ -2063,8 +2355,14 @@ mod tests {
         let result_diverging = PhiAttractor::new().analyze(&diverging);
 
         println!("Lyapunov exponent test:");
-        println!("  Stable trajectory: λ = {:.4}", result_stable.lyapunov_exponent);
-        println!("  Diverging trajectory: λ = {:.4}", result_diverging.lyapunov_exponent);
+        println!(
+            "  Stable trajectory: λ = {:.4}",
+            result_stable.lyapunov_exponent
+        );
+        println!(
+            "  Diverging trajectory: λ = {:.4}",
+            result_diverging.lyapunov_exponent
+        );
 
         // Diverging should have larger (more positive) Lyapunov
         assert!(
@@ -2106,17 +2404,34 @@ mod tests {
         // Test all classification methods work
         let cases = vec![
             ("Stable", vec![0.5; 50], AttractorType::FixedPoint),
-            ("Chaotic", (0..50).map(|i| 0.5 + 0.3 * (i as f64 * 0.7).sin() * (i as f64 * 1.3).cos()).collect::<Vec<_>>(), AttractorType::LimitCycle),
+            (
+                "Chaotic",
+                (0..50)
+                    .map(|i| 0.5 + 0.3 * (i as f64 * 0.7).sin() * (i as f64 * 1.3).cos())
+                    .collect::<Vec<_>>(),
+                AttractorType::LimitCycle,
+            ),
         ];
 
         for (name, trajectory, _expected) in &cases {
             let result = attractor.analyze(trajectory);
             println!("{} trajectory -> {:?}", name, result.attractor_type);
             println!("  Description: {}", result.attractor_type.description());
-            println!("  Consciousness: {}", result.attractor_type.consciousness_interpretation());
+            println!(
+                "  Consciousness: {}",
+                result.attractor_type.consciousness_interpretation()
+            );
 
-            assert!(result.attractor_phi.is_finite(), "attractor_phi should be finite for {} trajectory", name);
-            assert!(!result.attractor_type.description().is_empty(), "attractor type description should not be empty for {}", name);
+            assert!(
+                result.attractor_phi.is_finite(),
+                "attractor_phi should be finite for {} trajectory",
+                name
+            );
+            assert!(
+                !result.attractor_type.description().is_empty(),
+                "attractor type description should not be empty for {}",
+                name
+            );
         }
     }
 
@@ -2136,13 +2451,25 @@ mod tests {
         };
 
         // Test state checks
-        assert!(result.is_stable(), "Fixed point with negative Lyapunov should be stable");
-        assert!(!result.is_transitioning(), "Fixed point should not be transitioning");
+        assert!(
+            result.is_stable(),
+            "Fixed point with negative Lyapunov should be stable"
+        );
+        assert!(
+            !result.is_transitioning(),
+            "Fixed point should not be transitioning"
+        );
         assert!(!result.is_complex(), "Fixed point should not be complex");
 
         // Test scores
-        assert!(result.stability_score() > 0.0, "Stability score should be positive");
-        assert!((result.robustness_score() - 0.8).abs() < 0.001, "Robustness should match basin_size");
+        assert!(
+            result.stability_score() > 0.0,
+            "Stability score should be positive"
+        );
+        assert!(
+            (result.robustness_score() - 0.8).abs() < 0.001,
+            "Robustness should match basin_size"
+        );
 
         println!("AttractorResult methods test:");
         println!("  is_stable: {}", result.is_stable());
@@ -2157,7 +2484,10 @@ mod tests {
         // Simulate from initial state to target
         let trajectory = attractor.simulate(0.1, 0.7);
 
-        assert!(!trajectory.is_empty(), "Simulation should produce trajectory");
+        assert!(
+            !trajectory.is_empty(),
+            "Simulation should produce trajectory"
+        );
         assert_eq!(trajectory[0], 0.1, "Should start at initial state");
 
         // Should move toward target
@@ -2202,7 +2532,10 @@ mod tests {
         let trajectory = vec![0.3, 0.4, 0.45, 0.48, 0.5, 0.5, 0.5, 0.5];
         let result = analyze_phi_attractor(&trajectory);
 
-        assert!(result.converged, "Simple convergent trajectory should converge");
+        assert!(
+            result.converged,
+            "Simple convergent trajectory should converge"
+        );
 
         // Test classify_consciousness_state
         let (attractor_type, stability) = classify_consciousness_state(&trajectory);
@@ -2212,7 +2545,10 @@ mod tests {
 
         println!("Convenience functions test:");
         println!("  analyze_phi_attractor → {:?}", result.attractor_type);
-        println!("  classify_consciousness_state → {:?}, stability={:.4}", attractor_type, stability);
+        println!(
+            "  classify_consciousness_state → {:?}, stability={:.4}",
+            attractor_type, stability
+        );
     }
 
     #[test]
@@ -2229,9 +2565,18 @@ mod tests {
         assert!(research.config.convergence_threshold < default.config.convergence_threshold);
 
         println!("Config presets test:");
-        println!("  Fast: max_iter={}, samples={}", fast.config.max_iterations, fast.config.basin_samples);
-        println!("  Default: max_iter={}, samples={}", default.config.max_iterations, default.config.basin_samples);
-        println!("  Research: max_iter={}, samples={}", research.config.max_iterations, research.config.basin_samples);
+        println!(
+            "  Fast: max_iter={}, samples={}",
+            fast.config.max_iterations, fast.config.basin_samples
+        );
+        println!(
+            "  Default: max_iter={}, samples={}",
+            default.config.max_iterations, default.config.basin_samples
+        );
+        println!(
+            "  Research: max_iter={}, samples={}",
+            research.config.max_iterations, research.config.basin_samples
+        );
     }
 
     #[test]
@@ -2249,8 +2594,16 @@ mod tests {
             let desc = t.description();
             let interp = t.consciousness_interpretation();
 
-            assert!(!desc.is_empty(), "Description should not be empty for {:?}", t);
-            assert!(!interp.is_empty(), "Interpretation should not be empty for {:?}", t);
+            assert!(
+                !desc.is_empty(),
+                "Description should not be empty for {:?}",
+                t
+            );
+            assert!(
+                !interp.is_empty(),
+                "Interpretation should not be empty for {:?}",
+                t
+            );
 
             println!("{:?}:", t);
             println!("  Description: {}", desc);
@@ -2279,10 +2632,16 @@ mod tests {
         println!("  Converged: {}", result.converged);
         println!("  Lyapunov: {:.4}", result.lyapunov_exponent);
 
-        assert!(result.lyapunov_exponent.is_finite(), "Lyapunov exponent should be finite, got {}", result.lyapunov_exponent);
+        assert!(
+            result.lyapunov_exponent.is_finite(),
+            "Lyapunov exponent should be finite, got {}",
+            result.lyapunov_exponent
+        );
         // With a tight convergence threshold and oscillating input, it should not report as converged to a fixed point
-        assert!(!result.converged || !matches!(result.attractor_type, AttractorType::FixedPoint),
-            "oscillating trajectory should not converge to a fixed point");
+        assert!(
+            !result.converged || !matches!(result.attractor_type, AttractorType::FixedPoint),
+            "oscillating trajectory should not converge to a fixed point"
+        );
     }
 
     #[test]
@@ -2313,12 +2672,19 @@ mod tests {
 
         assert!(stable_result.stability_score() > chaotic_result.stability_score());
         assert!(stable_result.stability_score() > neutral_result.stability_score());
-        assert_eq!(chaotic_result.stability_score(), 0.0, "Positive Lyapunov → 0 stability");
+        assert_eq!(
+            chaotic_result.stability_score(),
+            0.0,
+            "Positive Lyapunov → 0 stability"
+        );
 
         println!("Stability scores:");
         println!("  Stable (λ=-1.0): {:.4}", stable_result.stability_score());
         println!("  Neutral (λ=0.0): {:.4}", neutral_result.stability_score());
-        println!("  Chaotic (λ=+0.5): {:.4}", chaotic_result.stability_score());
+        println!(
+            "  Chaotic (λ=+0.5): {:.4}",
+            chaotic_result.stability_score()
+        );
     }
 
     // ========================================================================
@@ -2408,11 +2774,31 @@ mod tests {
         assert!(!clamp.interpretation().is_empty());
 
         println!("Intervention types:");
-        println!("  Knockout: {} - {}", knockout.description(), knockout.interpretation());
-        println!("  Amplify: {} - {}", amplify.description(), amplify.interpretation());
-        println!("  Dampen: {} - {}", dampen.description(), dampen.interpretation());
-        println!("  Noise: {} - {}", noise.description(), noise.interpretation());
-        println!("  Clamp: {} - {}", clamp.description(), clamp.interpretation());
+        println!(
+            "  Knockout: {} - {}",
+            knockout.description(),
+            knockout.interpretation()
+        );
+        println!(
+            "  Amplify: {} - {}",
+            amplify.description(),
+            amplify.interpretation()
+        );
+        println!(
+            "  Dampen: {} - {}",
+            dampen.description(),
+            dampen.interpretation()
+        );
+        println!(
+            "  Noise: {} - {}",
+            noise.description(),
+            noise.interpretation()
+        );
+        println!(
+            "  Clamp: {} - {}",
+            clamp.description(),
+            clamp.interpretation()
+        );
     }
 
     #[test]
@@ -2428,9 +2814,18 @@ mod tests {
         assert!(research_config.bootstrap_samples > default_config.bootstrap_samples);
 
         println!("Config presets:");
-        println!("  Default bootstrap samples: {}", default_config.bootstrap_samples);
-        println!("  Fast bootstrap samples: {}", fast_config.bootstrap_samples);
-        println!("  Research bootstrap samples: {}", research_config.bootstrap_samples);
+        println!(
+            "  Default bootstrap samples: {}",
+            default_config.bootstrap_samples
+        );
+        println!(
+            "  Fast bootstrap samples: {}",
+            fast_config.bootstrap_samples
+        );
+        println!(
+            "  Research bootstrap samples: {}",
+            research_config.bootstrap_samples
+        );
     }
 
     #[test]
@@ -2457,20 +2852,44 @@ mod tests {
         };
 
         // Test is_critical
-        assert!(knockout_critical.is_critical(), "40% drop should be critical");
-        assert!(!knockout_redundant.is_critical(), "2% drop should not be critical");
+        assert!(
+            knockout_critical.is_critical(),
+            "40% drop should be critical"
+        );
+        assert!(
+            !knockout_redundant.is_critical(),
+            "2% drop should not be critical"
+        );
 
         // Test is_redundant
-        assert!(knockout_redundant.is_redundant(), "2% change should be redundant");
-        assert!(!knockout_critical.is_redundant(), "40% drop should not be redundant");
+        assert!(
+            knockout_redundant.is_redundant(),
+            "2% change should be redundant"
+        );
+        assert!(
+            !knockout_critical.is_redundant(),
+            "40% drop should not be redundant"
+        );
 
         // Test is_significant
-        assert!(knockout_critical.is_significant(5.0), "40% should be significant at 5% threshold");
-        assert!(!knockout_redundant.is_significant(5.0), "2% should not be significant at 5% threshold");
+        assert!(
+            knockout_critical.is_significant(5.0),
+            "40% should be significant at 5% threshold"
+        );
+        assert!(
+            !knockout_redundant.is_significant(5.0),
+            "2% should not be significant at 5% threshold"
+        );
 
         println!("Node intervention result methods:");
-        println!("  Critical (40% drop): is_critical={}", knockout_critical.is_critical());
-        println!("  Redundant (2% drop): is_redundant={}", knockout_redundant.is_redundant());
+        println!(
+            "  Critical (40% drop): is_critical={}",
+            knockout_critical.is_critical()
+        );
+        println!(
+            "  Redundant (2% drop): is_redundant={}",
+            knockout_redundant.is_redundant()
+        );
     }
 
     #[test]
@@ -2529,8 +2948,15 @@ mod tests {
         println!("  Causal power: {:?}", result.causal_power);
         println!("  Most critical: {:?}", result.most_critical_node());
 
-        assert!(result.baseline_phi >= 0.0, "baseline phi should be non-negative, got {}", result.baseline_phi);
-        assert!(!result.node_ranking.is_empty(), "node ranking should not be empty for hub topology");
+        assert!(
+            result.baseline_phi >= 0.0,
+            "baseline phi should be non-negative, got {}",
+            result.baseline_phi
+        );
+        assert!(
+            !result.node_ranking.is_empty(),
+            "node ranking should not be empty for hub topology"
+        );
     }
 
     #[test]
@@ -2573,7 +2999,10 @@ mod tests {
 
         println!("Subset analysis (nodes 0, 2, 4):");
         for r in &subset_results {
-            println!("  Node {}: Δ={:.4} ({:.2}%)", r.node_index, r.delta_phi, r.percent_change);
+            println!(
+                "  Node {}: Δ={:.4} ({:.2}%)",
+                r.node_index, r.delta_phi, r.percent_change
+            );
         }
     }
 
@@ -2629,10 +3058,16 @@ mod tests {
         println!("    Robustness: {:.4}", robust_result.robustness());
         println!("    Concentration: {:.4}", robust_result.concentration());
 
-        assert!(fragile_result.robustness() >= 0.0 && fragile_result.robustness() <= 1.0,
-            "fragile robustness should be in [0,1], got {}", fragile_result.robustness());
-        assert!(robust_result.robustness() >= 0.0 && robust_result.robustness() <= 1.0,
-            "robust robustness should be in [0,1], got {}", robust_result.robustness());
+        assert!(
+            fragile_result.robustness() >= 0.0 && fragile_result.robustness() <= 1.0,
+            "fragile robustness should be in [0,1], got {}",
+            fragile_result.robustness()
+        );
+        assert!(
+            robust_result.robustness() >= 0.0 && robust_result.robustness() <= 1.0,
+            "robust robustness should be in [0,1], got {}",
+            robust_result.robustness()
+        );
     }
 
     #[test]
@@ -2693,10 +3128,18 @@ mod tests {
 
     #[test]
     fn test_module_detection_method_descriptions() {
-        assert!(ModuleDetectionMethod::Spectral.description().contains("Spectral"));
-        assert!(ModuleDetectionMethod::Agglomerative.description().contains("agglomerative"));
-        assert!(ModuleDetectionMethod::Greedy.description().contains("Greedy"));
-        assert!(ModuleDetectionMethod::KMeans.description().contains("K-means"));
+        assert!(ModuleDetectionMethod::Spectral
+            .description()
+            .contains("Spectral"));
+        assert!(ModuleDetectionMethod::Agglomerative
+            .description()
+            .contains("agglomerative"));
+        assert!(ModuleDetectionMethod::Greedy
+            .description()
+            .contains("Greedy"));
+        assert!(ModuleDetectionMethod::KMeans
+            .description()
+            .contains("K-means"));
     }
 
     #[test]
@@ -2962,10 +3405,25 @@ mod tests {
         // Hub should be identified as special
         let hub_class = &result.node_classifications[0];
         println!("  Hub node role: {:?}", hub_class.role);
-        println!("  Hub participation: {:.4}", hub_class.participation_coefficient);
+        println!(
+            "  Hub participation: {:.4}",
+            hub_class.participation_coefficient
+        );
 
-        assert!(result.total_phi >= 0.0, "total phi should be non-negative, got {}", result.total_phi);
-        assert!(result.num_modules() >= 1, "should detect at least 1 module, got {}", result.num_modules());
-        assert!(result.modularity_score.is_finite(), "modularity score should be finite, got {}", result.modularity_score);
+        assert!(
+            result.total_phi >= 0.0,
+            "total phi should be non-negative, got {}",
+            result.total_phi
+        );
+        assert!(
+            result.num_modules() >= 1,
+            "should detect at least 1 module, got {}",
+            result.num_modules()
+        );
+        assert!(
+            result.modularity_score.is_finite(),
+            "modularity score should be finite, got {}",
+            result.modularity_score
+        );
     }
 }

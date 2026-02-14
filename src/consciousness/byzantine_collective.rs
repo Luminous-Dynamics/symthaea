@@ -37,9 +37,9 @@
 //! - Adaptive trust scoring for reasoning instances
 //! - Provable robustness against adversarial actors
 
-use super::unified_intelligence::UnifiedIntelligence;
 use super::primitive_evolution::{CandidatePrimitive, EvolutionConfig};
-use anyhow::{Result, Context};
+use super::unified_intelligence::UnifiedIntelligence;
+use anyhow::{Context, Result};
 use std::collections::HashMap;
 
 /// Trust score for a reasoning instance
@@ -294,7 +294,9 @@ impl ByzantineResistantCollective {
         source_instance: &str,
     ) -> Result<VerificationResult> {
         // Check source trust score
-        let source_trust = self.trust_scores.get(source_instance)
+        let source_trust = self
+            .trust_scores
+            .get(source_instance)
             .context("Source instance not found")?;
 
         if !source_trust.is_trusted() {
@@ -313,14 +315,12 @@ impl ByzantineResistantCollective {
 
         // Get verification from other instances
         let verifiers = self.get_verification_quorum();
-        let verification_score = self.compute_verification_score(
-            primitive,
-            &verifiers,
-            &anomalies,
-        )?;
+        let verification_score =
+            self.compute_verification_score(primitive, &verifiers, &anomalies)?;
 
         // Check if verification passed
-        let quorum_size = (self.trust_scores.len() as f64 * self.verification_quorum).ceil() as usize;
+        let quorum_size =
+            (self.trust_scores.len() as f64 * self.verification_quorum).ceil() as usize;
         let passed = verification_score >= self.detection_threshold
             && verifiers.len() >= quorum_size
             && anomalies.is_empty();
@@ -389,8 +389,8 @@ impl ByzantineResistantCollective {
 
         // Update resistance efficiency
         if self.stats.malicious_attempts > 0 {
-            self.stats.resistance_efficiency =
-                1.0 - (self.stats.accepted_contributions as f64 / self.stats.malicious_attempts as f64);
+            self.stats.resistance_efficiency = 1.0
+                - (self.stats.accepted_contributions as f64 / self.stats.malicious_attempts as f64);
         }
 
         Ok(outcome)
@@ -412,7 +412,10 @@ impl ByzantineResistantCollective {
 
         // Check 3: Harmonic alignment in valid range
         if primitive.harmonic_alignment < 0.0 || primitive.harmonic_alignment > 1.0 {
-            anomalies.push(format!("Invalid harmonic alignment: {}", primitive.harmonic_alignment));
+            anomalies.push(format!(
+                "Invalid harmonic alignment: {}",
+                primitive.harmonic_alignment
+            ));
         }
 
         // Check 4: Name suspiciously short or long
@@ -422,7 +425,10 @@ impl ByzantineResistantCollective {
 
         // Check 5: Definition suspiciously short
         if primitive.definition.len() < 5 {
-            anomalies.push(format!("Suspicious definition length: {}", primitive.definition.len()));
+            anomalies.push(format!(
+                "Suspicious definition length: {}",
+                primitive.definition.len()
+            ));
         }
 
         anomalies
@@ -432,7 +438,8 @@ impl ByzantineResistantCollective {
     fn get_verification_quorum(&self) -> Vec<String> {
         // In real implementation, would query actual instances
         // For now, return trusted instances
-        self.trust_scores.iter()
+        self.trust_scores
+            .iter()
             .filter(|(_, trust)| trust.is_trusted())
             .map(|(id, _)| id.clone())
             .collect()
@@ -459,7 +466,9 @@ impl ByzantineResistantCollective {
         let quality_score = (primitive.fitness + primitive.harmonic_alignment) / 2.0;
 
         // Combined score
-        let score = (quorum_score * 0.4 + quality_score * 0.6 - anomaly_penalty).max(0.0).min(1.0);
+        let score = (quorum_score * 0.4 + quality_score * 0.6 - anomaly_penalty)
+            .max(0.0)
+            .min(1.0);
 
         Ok(score)
     }
@@ -475,10 +484,14 @@ impl ByzantineResistantCollective {
         }
 
         // Hash fitness
-        checksum = checksum.wrapping_mul(31).wrapping_add(primitive.fitness.to_bits());
+        checksum = checksum
+            .wrapping_mul(31)
+            .wrapping_add(primitive.fitness.to_bits());
 
         // Hash harmonic alignment
-        checksum = checksum.wrapping_mul(31).wrapping_add(primitive.harmonic_alignment.to_bits());
+        checksum = checksum
+            .wrapping_mul(31)
+            .wrapping_add(primitive.harmonic_alignment.to_bits());
 
         let leaf = MerkleNode {
             checksum,
@@ -615,14 +628,16 @@ impl ByzantineResistantCollective {
 
     /// Get number of trusted instances
     pub fn trusted_instances_count(&self) -> usize {
-        self.trust_scores.values()
+        self.trust_scores
+            .values()
             .filter(|trust| trust.is_trusted())
             .count()
     }
 
     /// Get number of quarantined instances
     pub fn quarantined_instances_count(&self) -> usize {
-        self.trust_scores.values()
+        self.trust_scores
+            .values()
             .filter(|trust| trust.should_quarantine())
             .count()
     }
@@ -630,8 +645,8 @@ impl ByzantineResistantCollective {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::meta_reasoning::MetaReasoningConfig;
+    use super::*;
     use crate::hdc::primitive_system::PrimitiveTier;
 
     #[test]
@@ -669,11 +684,8 @@ mod tests {
     fn test_anomaly_detection() {
         let evolution_config = EvolutionConfig::default();
         let meta_config = MetaReasoningConfig::default();
-        let collective = ByzantineResistantCollective::new(
-            "test".to_string(),
-            evolution_config,
-            meta_config,
-        );
+        let collective =
+            ByzantineResistantCollective::new("test".to_string(), evolution_config, meta_config);
 
         // Normal primitive
         let normal = CandidatePrimitive::new(

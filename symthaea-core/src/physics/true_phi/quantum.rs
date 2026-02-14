@@ -51,9 +51,7 @@ impl QuantumEntropyCalculator {
         let step = hv.values.len() / d;
 
         // Subsample and normalize
-        let mut psi: Vec<f64> = (0..d)
-            .map(|i| hv.values[i * step] as f64)
-            .collect();
+        let mut psi: Vec<f64> = (0..d).map(|i| hv.values[i * step] as f64).collect();
 
         let norm: f64 = psi.iter().map(|x| x * x).sum::<f64>().sqrt();
         if norm > 1e-10 {
@@ -109,7 +107,8 @@ impl QuantumEntropyCalculator {
         let mut eigenvalues = Vec::new();
         let mut remaining = rho.to_vec();
 
-        for _ in 0..d.min(10) { // Get top 10 eigenvalues
+        for _ in 0..d.min(10) {
+            // Get top 10 eigenvalues
             let (lambda, v) = self.power_iteration(&remaining, 50);
             if lambda < 1e-10 {
                 break;

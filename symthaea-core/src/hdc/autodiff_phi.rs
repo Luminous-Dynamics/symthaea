@@ -193,16 +193,17 @@ impl DiffNetwork {
     pub fn apply_gradients(&mut self, learning_rate: f64) {
         for node in &mut self.nodes {
             for (v, g) in node.values.iter_mut().zip(node.grad.iter()) {
-                *v += learning_rate * g;  // + for gradient ASCENT (maximizing Phi)
+                *v += learning_rate * g; // + for gradient ASCENT (maximizing Phi)
             }
-            node.normalize();  // Keep on unit hypersphere
+            node.normalize(); // Keep on unit hypersphere
         }
 
-        if let (Some(ref mut weights), Some(ref grads)) = (&mut self.edge_weights, &self.edge_grad) {
+        if let (Some(ref mut weights), Some(ref grads)) = (&mut self.edge_weights, &self.edge_grad)
+        {
             for i in 0..weights.len() {
                 for j in 0..weights[i].len() {
                     weights[i][j] += learning_rate * grads[i][j];
-                    weights[i][j] = weights[i][j].clamp(0.0, 2.0);  // Clamp to valid range
+                    weights[i][j] = weights[i][j].clamp(0.0, 2.0); // Clamp to valid range
                 }
             }
         }
@@ -369,7 +370,8 @@ impl AutodiffPhiEngine {
         let whole_integration = self.compute_integration(&similarity_matrix, None);
 
         // Step 4: Compute partition integrations
-        let partition_integrations: Vec<f64> = partition_weights.iter()
+        let partition_integrations: Vec<f64> = partition_weights
+            .iter()
             .map(|weights| self.compute_integration(&similarity_matrix, Some(weights)))
             .collect();
 
@@ -428,9 +430,9 @@ impl AutodiffPhiEngine {
             for j in (i + 1)..n {
                 let s = result.similarity_matrix[i][j].abs().min(0.9999);
                 let d_mi_d_s = 2.0 * s / (1.0 - s * s + self.config.eps);
-                let pair_weight = 2.0 / (n * (n - 1)) as f64;  // Symmetric pairs
+                let pair_weight = 2.0 / (n * (n - 1)) as f64; // Symmetric pairs
                 d_sim[i][j] += d_whole * d_mi_d_s * pair_weight;
-                d_sim[j][i] = d_sim[i][j];  // Symmetric
+                d_sim[j][i] = d_sim[i][j]; // Symmetric
             }
         }
 
@@ -473,7 +475,8 @@ impl AutodiffPhiEngine {
         }
 
         // Optionally backpropagate to edge weights
-        if let (Some(ref mut edge_grad), Some(_)) = (&mut network.edge_grad, &network.edge_weights) {
+        if let (Some(ref mut edge_grad), Some(_)) = (&mut network.edge_grad, &network.edge_weights)
+        {
             for i in 0..n {
                 for j in 0..n {
                     if i != j {
@@ -486,7 +489,10 @@ impl AutodiffPhiEngine {
     }
 
     /// Compute similarity matrix and cache intermediate values
-    fn compute_similarity_matrix(&mut self, network: &DiffNetwork) -> (Vec<Vec<f64>>, Vec<f64>, Vec<Vec<f64>>) {
+    fn compute_similarity_matrix(
+        &mut self,
+        network: &DiffNetwork,
+    ) -> (Vec<Vec<f64>>, Vec<f64>, Vec<Vec<f64>>) {
         let n = network.n_nodes();
         let mut similarity = vec![vec![0.0; n]; n];
         let mut norms = Vec::with_capacity(n);
@@ -502,7 +508,9 @@ impl AutodiffPhiEngine {
             similarity[i][i] = 1.0;
             for j in (i + 1)..n {
                 // Dot product
-                let dot: f64 = network.nodes[i].values.iter()
+                let dot: f64 = network.nodes[i]
+                    .values
+                    .iter()
                     .zip(network.nodes[j].values.iter())
                     .map(|(a, b)| a * b)
                     .sum();
@@ -525,14 +533,16 @@ impl AutodiffPhiEngine {
                 };
 
                 // Temperature scaling for smoother gradients
-                let scaled_sim = (weighted_sim / self.config.temperature).tanh() * self.config.temperature;
+                let scaled_sim =
+                    (weighted_sim / self.config.temperature).tanh() * self.config.temperature;
 
                 similarity[i][j] = scaled_sim;
                 similarity[j][i] = scaled_sim;
 
                 // Record for tape
                 self.tape.record(TapeOp::CosineSimilarity {
-                    i, j,
+                    i,
+                    j,
                     sim: scaled_sim,
                     norm_i: norms[i],
                     norm_j: norms[j],
@@ -604,9 +614,9 @@ impl AutodiffPhiEngine {
             let mut logits = Vec::with_capacity(n);
             for i in 0..n {
                 let affinity = if i == center_idx {
-                    1.0  // Center has high affinity
+                    1.0 // Center has high affinity
                 } else {
-                    1.0 - similarity[i][center_idx].abs()  // Use dissimilarity for partition
+                    1.0 - similarity[i][center_idx].abs() // Use dissimilarity for partition
                 };
                 let logit = affinity / self.config.temperature;
                 logits.push(logit);
@@ -745,7 +755,9 @@ impl ConsciousnessOptimizer {
 
     /// Initialize velocity for a network
     fn init_velocity(&mut self, network: &DiffNetwork) {
-        self.velocity = network.nodes.iter()
+        self.velocity = network
+            .nodes
+            .iter()
             .map(|node| vec![0.0; node.dim()])
             .collect();
     }
@@ -771,7 +783,9 @@ impl ConsciousnessOptimizer {
         engine.backward(network, &result);
 
         // Compute gradient norm
-        let grad_norm: f64 = network.nodes.iter()
+        let grad_norm: f64 = network
+            .nodes
+            .iter()
             .flat_map(|node| node.grad.iter())
             .map(|g| g * g)
             .sum::<f64>()
@@ -786,13 +800,10 @@ impl ConsciousnessOptimizer {
 
         // Update with momentum
         for (i, node) in network.nodes.iter_mut().enumerate() {
-            for (j, (v, g)) in node.values.iter_mut()
-                .zip(node.grad.iter())
-                .enumerate()
-            {
+            for (j, (v, g)) in node.values.iter_mut().zip(node.grad.iter()).enumerate() {
                 // Momentum update
-                self.velocity[i][j] = self.config.momentum * self.velocity[i][j]
-                    + self.current_lr * g * clip_scale;
+                self.velocity[i][j] =
+                    self.config.momentum * self.velocity[i][j] + self.current_lr * g * clip_scale;
 
                 // Gradient ASCENT (maximizing Phi)
                 *v += self.velocity[i][j];
@@ -804,8 +815,8 @@ impl ConsciousnessOptimizer {
         self.current_lr = (self.current_lr * self.config.lr_decay).max(self.config.min_lr);
 
         // Temperature annealing
-        engine.config.temperature = (engine.config.temperature * self.config.temp_anneal)
-            .max(self.config.min_temp);
+        engine.config.temperature =
+            (engine.config.temperature * self.config.temp_anneal).max(self.config.min_temp);
 
         self.step += 1;
 
@@ -1008,7 +1019,9 @@ mod tests {
         engine.backward(&mut network, &result);
 
         // Check that gradients are computed
-        let grad_norm: f64 = network.nodes.iter()
+        let grad_norm: f64 = network
+            .nodes
+            .iter()
             .flat_map(|node| node.grad.iter())
             .map(|g| g * g)
             .sum::<f64>()
@@ -1042,9 +1055,12 @@ mod tests {
         let avg_first_10: f64 = history.iter().take(10).map(|s| s.phi).sum::<f64>() / 10.0;
         let avg_last_10: f64 = history.iter().rev().take(10).map(|s| s.phi).sum::<f64>() / 10.0;
 
-        assert!(avg_last_10 >= avg_first_10 * 0.9,
-                "Average Phi should not decrease significantly (first 10: {:.4}, last 10: {:.4})",
-                avg_first_10, avg_last_10);
+        assert!(
+            avg_last_10 >= avg_first_10 * 0.9,
+            "Average Phi should not decrease significantly (first 10: {:.4}, last 10: {:.4})",
+            avg_first_10,
+            avg_last_10
+        );
     }
 
     #[test]
@@ -1077,16 +1093,31 @@ mod tests {
 
         // Gradient magnitude should generally decrease as we approach optimum
         let early_grad = history.iter().take(5).map(|s| s.grad_norm).sum::<f64>() / 5.0;
-        let late_grad = history.iter().rev().take(5).map(|s| s.grad_norm).sum::<f64>() / 5.0;
+        let late_grad = history
+            .iter()
+            .rev()
+            .take(5)
+            .map(|s| s.grad_norm)
+            .sum::<f64>()
+            / 5.0;
 
         println!("Early gradient norm: {:.6}", early_grad);
         println!("Late gradient norm: {:.6}", late_grad);
 
         // Gradient norms should be finite and non-negative
-        assert!(early_grad.is_finite(), "Early gradient norm should be finite");
+        assert!(
+            early_grad.is_finite(),
+            "Early gradient norm should be finite"
+        );
         assert!(late_grad.is_finite(), "Late gradient norm should be finite");
-        assert!(early_grad >= 0.0, "Early gradient norm should be non-negative");
-        assert!(late_grad >= 0.0, "Late gradient norm should be non-negative");
+        assert!(
+            early_grad >= 0.0,
+            "Early gradient norm should be non-negative"
+        );
+        assert!(
+            late_grad >= 0.0,
+            "Late gradient norm should be non-negative"
+        );
 
         // Optimization history should have 30 entries
         assert_eq!(history.len(), 30, "Should have 30 optimization steps");

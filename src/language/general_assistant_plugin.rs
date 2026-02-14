@@ -50,19 +50,23 @@ impl DomainPlugin for GeneralAssistantPlugin {
 
         // Extract comparison markers
         if lower.contains(" vs ") || lower.contains(" versus ") || lower.contains("compare") {
-            let pos = lower.find("vs").or(lower.find("versus")).or(lower.find("compare")).unwrap_or(0);
+            let pos = lower
+                .find("vs")
+                .or(lower.find("versus"))
+                .or(lower.find("compare"))
+                .unwrap_or(0);
             entities.push(
-                Entity::new("comparison", "comparison_request", pos, pos + 2)
-                    .with_confidence(0.85),
+                Entity::new("comparison", "comparison_request", pos, pos + 2).with_confidence(0.85),
             );
         }
 
         // Extract summarization markers
-        if lower.contains("summarize") || lower.contains("summary") || lower.contains("tldr") || lower.contains("tl;dr") {
-            entities.push(
-                Entity::new("task_type", "summarization", 0, 0)
-                    .with_confidence(0.9),
-            );
+        if lower.contains("summarize")
+            || lower.contains("summary")
+            || lower.contains("tldr")
+            || lower.contains("tl;dr")
+        {
+            entities.push(Entity::new("task_type", "summarization", 0, 0).with_confidence(0.9));
         }
 
         entities
@@ -70,22 +74,49 @@ impl DomainPlugin for GeneralAssistantPlugin {
 
     fn intent_prototypes(&self) -> IntentPrototypes {
         let mut protos = IntentPrototypes::default();
-        protos.custom.insert("explain".to_string(), vec![
-            "explain".to_string(), "what is".to_string(), "what are".to_string(),
-            "define".to_string(), "meaning".to_string(), "describe".to_string(),
-        ]);
-        protos.custom.insert("summarize".to_string(), vec![
-            "summarize".to_string(), "summary".to_string(), "tldr".to_string(),
-            "brief".to_string(), "overview".to_string(), "recap".to_string(),
-        ]);
-        protos.custom.insert("compare".to_string(), vec![
-            "compare".to_string(), "versus".to_string(), "difference".to_string(),
-            "vs".to_string(), "better".to_string(), "pros and cons".to_string(),
-        ]);
-        protos.custom.insert("list".to_string(), vec![
-            "list".to_string(), "enumerate".to_string(), "examples".to_string(),
-            "options".to_string(), "alternatives".to_string(),
-        ]);
+        protos.custom.insert(
+            "explain".to_string(),
+            vec![
+                "explain".to_string(),
+                "what is".to_string(),
+                "what are".to_string(),
+                "define".to_string(),
+                "meaning".to_string(),
+                "describe".to_string(),
+            ],
+        );
+        protos.custom.insert(
+            "summarize".to_string(),
+            vec![
+                "summarize".to_string(),
+                "summary".to_string(),
+                "tldr".to_string(),
+                "brief".to_string(),
+                "overview".to_string(),
+                "recap".to_string(),
+            ],
+        );
+        protos.custom.insert(
+            "compare".to_string(),
+            vec![
+                "compare".to_string(),
+                "versus".to_string(),
+                "difference".to_string(),
+                "vs".to_string(),
+                "better".to_string(),
+                "pros and cons".to_string(),
+            ],
+        );
+        protos.custom.insert(
+            "list".to_string(),
+            vec![
+                "list".to_string(),
+                "enumerate".to_string(),
+                "examples".to_string(),
+                "options".to_string(),
+                "alternatives".to_string(),
+            ],
+        );
         protos
     }
 
@@ -93,13 +124,16 @@ impl DomainPlugin for GeneralAssistantPlugin {
         DomainPrompts {
             system: "You are Symthaea, a consciousness-first AI assistant. \
                      Provide clear, helpful, and honest responses. \
-                     Mark uncertainty explicitly.".to_string(),
+                     Mark uncertainty explicitly."
+                .to_string(),
             clarification: "I want to help, but I need more context. \
-                           Could you clarify: {}".to_string(),
+                           Could you clarify: {}"
+                .to_string(),
             action_confirm: "Here's what I understand you're asking: {}".to_string(),
             error_explain: "I encountered an issue: {}".to_string(),
             out_of_domain: "I can help with general questions. \
-                           For specialized topics, a domain-specific plugin may help. {}".to_string(),
+                           For specialized topics, a domain-specific plugin may help. {}"
+                .to_string(),
         }
     }
 
@@ -107,8 +141,18 @@ impl DomainPlugin for GeneralAssistantPlugin {
         let lower = topic.to_lowercase();
         // General assistant is a broad catch-all, but with moderate confidence
         // to allow more specific plugins to win
-        let keywords = ["explain", "tell me", "what is", "help me", "can you",
-                        "summarize", "compare", "list", "describe", "define"];
+        let keywords = [
+            "explain",
+            "tell me",
+            "what is",
+            "help me",
+            "can you",
+            "summarize",
+            "compare",
+            "list",
+            "describe",
+            "define",
+        ];
         let matches = keywords.iter().filter(|k| lower.contains(*k)).count();
         if matches > 0 {
             (0.3 + matches as f64 * 0.1).min(0.7)
@@ -119,9 +163,20 @@ impl DomainPlugin for GeneralAssistantPlugin {
 
     fn vocabulary(&self) -> Vec<String> {
         vec![
-            "explain", "summarize", "compare", "list", "define",
-            "describe", "elaborate", "clarify", "simplify", "overview",
-        ].into_iter().map(String::from).collect()
+            "explain",
+            "summarize",
+            "compare",
+            "list",
+            "define",
+            "describe",
+            "elaborate",
+            "clarify",
+            "simplify",
+            "overview",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect()
     }
 
     fn validate_input(&self, input: &str) -> ValidationResult {
@@ -161,7 +216,9 @@ mod tests {
     fn test_extract_summarization_entity() {
         let plugin = GeneralAssistantPlugin;
         let entities = plugin.extract_entities("Can you summarize this article?");
-        assert!(entities.iter().any(|e| e.entity_type == "task_type" && e.value == "summarization"));
+        assert!(entities
+            .iter()
+            .any(|e| e.entity_type == "task_type" && e.value == "summarization"));
     }
 
     #[test]

@@ -29,8 +29,8 @@ use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::{
-    IgnoranceRecord, IgnoranceDetection, IgnoranceType, IgnoranceStatus,
-    Uncertainty3D, Domain, ZKIgnoranceSignature, IgnoranceResolution, ResolutionMethod,
+    Domain, IgnoranceDetection, IgnoranceRecord, IgnoranceResolution, IgnoranceStatus,
+    IgnoranceType, ResolutionMethod, Uncertainty3D, ZKIgnoranceSignature,
 };
 
 // ============================================================================
@@ -94,11 +94,13 @@ pub struct StoredIgnoranceRecord {
 impl StoredIgnoranceRecord {
     /// Convert from IgnoranceRecord
     pub fn from_record(record: &IgnoranceRecord) -> Self {
-        let created_at = record.created_at
+        let created_at = record
+            .created_at
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        let updated_at = record.updated_at
+        let updated_at = record
+            .updated_at
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
@@ -109,11 +111,15 @@ impl StoredIgnoranceRecord {
             let answer = r.answer.clone().unwrap_or_default();
             let confidence = r.confidence;
             let source = r.source.clone();
-            let resolved_at = r.resolved_at
+            let resolved_at = r
+                .resolved_at
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs();
-            format!("{}|{}|{}|{}|{}", method, answer, confidence, source, resolved_at)
+            format!(
+                "{}|{}|{}|{}|{}",
+                method, answer, confidence, source, resolved_at
+            )
         });
 
         Self {
@@ -147,7 +153,11 @@ impl StoredIgnoranceRecord {
             let parts: Vec<&str> = s.split('|').collect();
             if parts.len() >= 5 {
                 let method = Self::parse_resolution_method(parts[0]).ok()?;
-                let answer = if parts[1].is_empty() { None } else { Some(parts[1].to_string()) };
+                let answer = if parts[1].is_empty() {
+                    None
+                } else {
+                    Some(parts[1].to_string())
+                };
                 let confidence = parts[2].parse().ok()?;
                 let source = parts[3].to_string();
                 let resolved_at = UNIX_EPOCH + Duration::from_secs(parts[4].parse().ok()?);
@@ -193,9 +203,10 @@ impl StoredIgnoranceRecord {
             "KnownUnknown" => Ok(IgnoranceType::KnownUnknown),
             "Unknown" => Ok(IgnoranceType::Unknown),
             "Impossible" => Ok(IgnoranceType::Impossible),
-            _ => Err(PersistenceError::Deserialization(
-                format!("Unknown ignorance type: {}", s)
-            )),
+            _ => Err(PersistenceError::Deserialization(format!(
+                "Unknown ignorance type: {}",
+                s
+            ))),
         }
     }
 
@@ -207,9 +218,10 @@ impl StoredIgnoranceRecord {
             "Subjective" => Ok(Domain::Subjective),
             "General" => Ok(Domain::General),
             "Undefined" => Ok(Domain::Undefined),
-            _ => Err(PersistenceError::Deserialization(
-                format!("Unknown domain: {}", s)
-            )),
+            _ => Err(PersistenceError::Deserialization(format!(
+                "Unknown domain: {}",
+                s
+            ))),
         }
     }
 
@@ -219,9 +231,10 @@ impl StoredIgnoranceRecord {
             "ResolutionRequested" => Ok(IgnoranceStatus::ResolutionRequested),
             "Resolved" => Ok(IgnoranceStatus::Resolved),
             "Expired" => Ok(IgnoranceStatus::Expired),
-            _ => Err(PersistenceError::Deserialization(
-                format!("Unknown status: {}", s)
-            )),
+            _ => Err(PersistenceError::Deserialization(format!(
+                "Unknown status: {}",
+                s
+            ))),
         }
     }
 
@@ -233,9 +246,10 @@ impl StoredIgnoranceRecord {
             "DarkSpotMatch" => Ok(ResolutionMethod::DarkSpotMatch),
             "UserProvided" => Ok(ResolutionMethod::UserProvided),
             "Reframed" => Ok(ResolutionMethod::Reframed),
-            _ => Err(PersistenceError::Deserialization(
-                format!("Unknown resolution method: {}", s)
-            )),
+            _ => Err(PersistenceError::Deserialization(format!(
+                "Unknown resolution method: {}",
+                s
+            ))),
         }
     }
 }
@@ -280,7 +294,10 @@ impl InMemoryPersistence {
     }
 
     /// Store an ignorance record
-    pub fn store_ignorance_record(&mut self, record: &IgnoranceRecord) -> Result<(), PersistenceError> {
+    pub fn store_ignorance_record(
+        &mut self,
+        record: &IgnoranceRecord,
+    ) -> Result<(), PersistenceError> {
         let stored = StoredIgnoranceRecord::from_record(record);
         let id = stored.id.clone();
         let domain = stored.domain.clone();
@@ -294,10 +311,7 @@ impl InMemoryPersistence {
             .or_default()
             .push(id.clone());
 
-        self.status_index
-            .entry(status)
-            .or_default()
-            .push(id);
+        self.status_index.entry(status).or_default().push(id);
 
         Ok(())
     }
@@ -311,7 +325,10 @@ impl InMemoryPersistence {
     }
 
     /// Update an ignorance record
-    pub fn update_ignorance_record(&mut self, record: &IgnoranceRecord) -> Result<(), PersistenceError> {
+    pub fn update_ignorance_record(
+        &mut self,
+        record: &IgnoranceRecord,
+    ) -> Result<(), PersistenceError> {
         if !self.ignorance_records.contains_key(&record.id) {
             return Err(PersistenceError::NotFound(record.id.clone()));
         }
@@ -339,8 +356,15 @@ impl InMemoryPersistence {
     }
 
     /// Query records by category (domain)
-    pub fn query_by_category(&self, category: &str) -> Result<Vec<IgnoranceRecord>, PersistenceError> {
-        let ids = self.category_index.get(category).cloned().unwrap_or_default();
+    pub fn query_by_category(
+        &self,
+        category: &str,
+    ) -> Result<Vec<IgnoranceRecord>, PersistenceError> {
+        let ids = self
+            .category_index
+            .get(category)
+            .cloned()
+            .unwrap_or_default();
         ids.iter()
             .filter_map(|id| self.get_ignorance_record(id).ok())
             .collect::<Vec<_>>()
@@ -357,7 +381,11 @@ impl InMemoryPersistence {
     }
 
     /// Query records by EIG range
-    pub fn query_by_eig_range(&self, min: f32, max: f32) -> Result<Vec<IgnoranceRecord>, PersistenceError> {
+    pub fn query_by_eig_range(
+        &self,
+        min: f32,
+        max: f32,
+    ) -> Result<Vec<IgnoranceRecord>, PersistenceError> {
         self.ignorance_records
             .values()
             .filter(|r| r.eig >= min && r.eig <= max)
@@ -389,7 +417,11 @@ impl InMemoryPersistence {
         let total = self.ignorance_records.len();
         let by_status = self.count_by_status();
         let total_eig: f32 = self.ignorance_records.values().map(|r| r.eig).sum();
-        let avg_eig = if total > 0 { total_eig / total as f32 } else { 0.0 };
+        let avg_eig = if total > 0 {
+            total_eig / total as f32
+        } else {
+            0.0
+        };
 
         PersistenceStatistics {
             total_records: total,
@@ -410,7 +442,10 @@ impl InMemoryPersistence {
     }
 
     /// Store a ZK signature
-    pub fn store_zk_signature(&mut self, sig: &ZKIgnoranceSignature) -> Result<(), PersistenceError> {
+    pub fn store_zk_signature(
+        &mut self,
+        sig: &ZKIgnoranceSignature,
+    ) -> Result<(), PersistenceError> {
         let stored = StoredZKSignature {
             id: sig.id.clone(),
             category: sig.category.clone(),
@@ -419,7 +454,8 @@ impl InMemoryPersistence {
             eig_range_max: sig.eig_range_proof.range().1,
             publisher_id: sig.publisher.id.clone(),
             nonce: sig.nonce.to_vec(),
-            created_at: sig.created_at
+            created_at: sig
+                .created_at
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs(),
@@ -513,7 +549,10 @@ impl GISPersistence {
     // Delegate to in-memory storage
 
     /// Store an ignorance record
-    pub fn store_ignorance_record(&mut self, record: &IgnoranceRecord) -> Result<(), PersistenceError> {
+    pub fn store_ignorance_record(
+        &mut self,
+        record: &IgnoranceRecord,
+    ) -> Result<(), PersistenceError> {
         self.memory.store_ignorance_record(record)
     }
 
@@ -523,7 +562,10 @@ impl GISPersistence {
     }
 
     /// Update an ignorance record
-    pub fn update_ignorance_record(&mut self, record: &IgnoranceRecord) -> Result<(), PersistenceError> {
+    pub fn update_ignorance_record(
+        &mut self,
+        record: &IgnoranceRecord,
+    ) -> Result<(), PersistenceError> {
         self.memory.update_ignorance_record(record)
     }
 
@@ -533,7 +575,10 @@ impl GISPersistence {
     }
 
     /// Query records by category
-    pub fn query_by_category(&self, category: &str) -> Result<Vec<IgnoranceRecord>, PersistenceError> {
+    pub fn query_by_category(
+        &self,
+        category: &str,
+    ) -> Result<Vec<IgnoranceRecord>, PersistenceError> {
         self.memory.query_by_category(category)
     }
 
@@ -543,7 +588,11 @@ impl GISPersistence {
     }
 
     /// Query records by EIG range
-    pub fn query_by_eig_range(&self, min: f32, max: f32) -> Result<Vec<IgnoranceRecord>, PersistenceError> {
+    pub fn query_by_eig_range(
+        &self,
+        min: f32,
+        max: f32,
+    ) -> Result<Vec<IgnoranceRecord>, PersistenceError> {
         self.memory.query_by_eig_range(min, max)
     }
 
@@ -563,7 +612,10 @@ impl GISPersistence {
     }
 
     /// Store a ZK signature
-    pub fn store_zk_signature(&mut self, sig: &ZKIgnoranceSignature) -> Result<(), PersistenceError> {
+    pub fn store_zk_signature(
+        &mut self,
+        sig: &ZKIgnoranceSignature,
+    ) -> Result<(), PersistenceError> {
         self.memory.store_zk_signature(sig)
     }
 
@@ -601,9 +653,18 @@ impl GISPersistence {
 
         json.push_str("  ],\n  \"statistics\": {\n");
         let stats = self.get_statistics();
-        json.push_str(&format!("    \"total_records\": {},\n", stats.total_records));
-        json.push_str(&format!("    \"active_records\": {},\n", stats.active_records));
-        json.push_str(&format!("    \"resolved_records\": {},\n", stats.resolved_records));
+        json.push_str(&format!(
+            "    \"total_records\": {},\n",
+            stats.total_records
+        ));
+        json.push_str(&format!(
+            "    \"active_records\": {},\n",
+            stats.active_records
+        ));
+        json.push_str(&format!(
+            "    \"resolved_records\": {},\n",
+            stats.resolved_records
+        ));
         json.push_str(&format!("    \"average_eig\": {:.4}\n", stats.average_eig));
         json.push_str("  }\n}");
 
@@ -682,9 +743,12 @@ mod tests {
         let mut db = InMemoryPersistence::new();
 
         // Add records with different EIG values
-        db.store_ignorance_record(&create_test_record("low_1", "Low value query", 0.2)).unwrap();
-        db.store_ignorance_record(&create_test_record("mid_1", "Mid value query", 0.5)).unwrap();
-        db.store_ignorance_record(&create_test_record("high_1", "High value query", 0.9)).unwrap();
+        db.store_ignorance_record(&create_test_record("low_1", "Low value query", 0.2))
+            .unwrap();
+        db.store_ignorance_record(&create_test_record("mid_1", "Mid value query", 0.5))
+            .unwrap();
+        db.store_ignorance_record(&create_test_record("high_1", "High value query", 0.9))
+            .unwrap();
 
         // Query high EIG records
         let high = db.query_by_eig_range(0.7, 1.0).unwrap();
@@ -701,9 +765,12 @@ mod tests {
     fn test_statistics() {
         let mut db = InMemoryPersistence::new();
 
-        db.store_ignorance_record(&create_test_record("r1", "Query 1", 0.5)).unwrap();
-        db.store_ignorance_record(&create_test_record("r2", "Query 2", 0.7)).unwrap();
-        db.store_ignorance_record(&create_test_record("r3", "Query 3", 0.9)).unwrap();
+        db.store_ignorance_record(&create_test_record("r1", "Query 1", 0.5))
+            .unwrap();
+        db.store_ignorance_record(&create_test_record("r2", "Query 2", 0.7))
+            .unwrap();
+        db.store_ignorance_record(&create_test_record("r3", "Query 3", 0.9))
+            .unwrap();
 
         let stats = db.get_statistics();
         assert_eq!(stats.total_records, 3);
@@ -731,7 +798,8 @@ mod tests {
     fn test_export_json() {
         let mut db = GISPersistence::in_memory();
 
-        db.store_ignorance_record(&create_test_record("json_1", "Export test", 0.75)).unwrap();
+        db.store_ignorance_record(&create_test_record("json_1", "Export test", 0.75))
+            .unwrap();
 
         let json = db.export_json().unwrap();
         assert!(json.contains("json_1"));

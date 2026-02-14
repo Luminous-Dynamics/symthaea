@@ -11,10 +11,10 @@
 //! - `TieredPhi` - Binary with multiple approximation tiers
 //! - `ResonatorPhi` - O(n log N) resonator-based approximation
 
-use crate::hdc::unified_hv::ContinuousHV;
 use super::result::{PhiResult, PhiUncertainty};
-use std::time::Instant;
+use crate::hdc::unified_hv::ContinuousHV;
 use rand::Rng;
+use std::time::Instant;
 
 /// Computational complexity classification
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,9 +120,8 @@ pub trait PhiCalculator: Send + Sync {
         }
 
         let mean: f64 = phi_values.iter().sum::<f64>() / n_samples as f64;
-        let variance: f64 = phi_values.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / (n_samples - 1) as f64;
+        let variance: f64 =
+            phi_values.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n_samples - 1) as f64;
         let std_dev = variance.sqrt();
 
         // 95% confidence interval (assuming normal distribution)

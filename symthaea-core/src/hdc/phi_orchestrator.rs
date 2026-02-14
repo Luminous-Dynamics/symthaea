@@ -38,10 +38,10 @@
 //! println!("Φ = {:.4} (via {:?})", result.phi, result.calculator_used);
 //! ```
 
-use crate::hdc::unified_hv::ContinuousHV;
+use crate::hdc::phi_resonant::{ResonantConfig, ResonantPhiCalculator};
 use crate::hdc::spectral_connectivity::ConnectivityCalculator;
-use crate::hdc::phi_resonant::{ResonantPhiCalculator, ResonantConfig};
-use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
+use crate::hdc::tiered_phi::{ApproximationTier, TieredPhi};
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -62,8 +62,7 @@ struct CacheEntry {
 const CACHE_SIZE: usize = 16;
 
 /// Φ calculation mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum PhiMode {
     /// Automatically select best calculator based on n
     #[default]
@@ -81,7 +80,6 @@ pub enum PhiMode {
     /// Balanced: Use accurate for small n, fast for large n
     Balanced,
 }
-
 
 /// Result of Φ calculation with metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -198,7 +196,8 @@ impl PhiOrchestrator {
 
     /// Look up cached result
     fn cache_lookup(&self, hash: u64, count: usize) -> Option<&PhiResult> {
-        self.result_cache.iter()
+        self.result_cache
+            .iter()
             .find(|e| e.hash == hash && e.count == count)
             .map(|e| &e.result)
     }
@@ -213,7 +212,11 @@ impl PhiOrchestrator {
             self.result_cache.remove(0);
         }
 
-        self.result_cache.push(CacheEntry { hash, count, result });
+        self.result_cache.push(CacheEntry {
+            hash,
+            count,
+            result,
+        });
     }
 
     /// Get cache statistics
@@ -338,7 +341,10 @@ impl PhiOrchestrator {
     }
 
     /// Adaptive computation: select best calculator based on n
-    fn compute_adaptive(&self, processes: &[ContinuousHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
+    fn compute_adaptive(
+        &self,
+        processes: &[ContinuousHV],
+    ) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
         let n = processes.len();
 
         if n <= 5 {
@@ -352,25 +358,45 @@ impl PhiOrchestrator {
         } else {
             // Large: use fast resonant
             let result = self.resonant_calculator.compute(processes);
-            (result.phi, CalculatorType::Resonant, Some(result.converged), Some(result.iterations))
+            (
+                result.phi,
+                CalculatorType::Resonant,
+                Some(result.converged),
+                Some(result.iterations),
+            )
         }
     }
 
     /// Always use accurate (Real) calculator
-    fn compute_accurate(&self, processes: &[ContinuousHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
+    fn compute_accurate(
+        &self,
+        processes: &[ContinuousHV],
+    ) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
         let phi = self.real_calculator.algebraic_connectivity(processes);
         (phi, CalculatorType::Real, Some(true), None)
     }
 
     /// Always use fast (Resonant) calculator
-    fn compute_fast(&self, processes: &[ContinuousHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
+    fn compute_fast(
+        &self,
+        processes: &[ContinuousHV],
+    ) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
         let result = self.resonant_calculator.compute(processes);
-        (result.phi, CalculatorType::Resonant, Some(result.converged), Some(result.iterations))
+        (
+            result.phi,
+            CalculatorType::Resonant,
+            Some(result.converged),
+            Some(result.iterations),
+        )
     }
 
     /// Use tiered calculator with specific tier
     /// Note: TieredPhi uses BinaryHV, so we fall back to real calculator for ContinuousHV
-    fn compute_tiered(&mut self, processes: &[ContinuousHV], tier: ApproximationTier) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
+    fn compute_tiered(
+        &mut self,
+        processes: &[ContinuousHV],
+        tier: ApproximationTier,
+    ) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
         // TieredPhi works with BinaryHV, not ContinuousHV. For now, fall back to accurate calculation.
         // Future: Convert ContinuousHV to BinaryHV for tiered computation
         let phi = self.real_calculator.algebraic_connectivity(processes);
@@ -378,7 +404,10 @@ impl PhiOrchestrator {
     }
 
     /// Balanced: accurate for small, fast for large
-    fn compute_balanced(&self, processes: &[ContinuousHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
+    fn compute_balanced(
+        &self,
+        processes: &[ContinuousHV],
+    ) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
         let n = processes.len();
 
         if n <= 10 {
@@ -386,7 +415,12 @@ impl PhiOrchestrator {
             (phi, CalculatorType::Real, Some(true), None)
         } else {
             let result = self.resonant_calculator.compute(processes);
-            (result.phi, CalculatorType::Resonant, Some(result.converged), Some(result.iterations))
+            (
+                result.phi,
+                CalculatorType::Resonant,
+                Some(result.converged),
+                Some(result.iterations),
+            )
         }
     }
 
@@ -399,15 +433,20 @@ impl PhiOrchestrator {
     }
 
     /// Calculate confidence in result
-    fn calculate_confidence(&self, calculator: &CalculatorType, n: usize, converged: Option<bool>) -> f64 {
+    fn calculate_confidence(
+        &self,
+        calculator: &CalculatorType,
+        n: usize,
+        converged: Option<bool>,
+    ) -> f64 {
         let base_confidence = match calculator {
-            CalculatorType::Real => 0.95,  // Algebraic connectivity is well-understood
+            CalculatorType::Real => 0.95, // Algebraic connectivity is well-understood
             CalculatorType::Resonant => {
                 // Confidence depends on convergence
                 if converged.unwrap_or(false) {
                     0.85
                 } else {
-                    0.5  // Lower confidence if didn't converge
+                    0.5 // Lower confidence if didn't converge
                 }
             }
             CalculatorType::Tiered(tier) => match tier {
@@ -415,7 +454,7 @@ impl PhiOrchestrator {
                 ApproximationTier::SpectralConnectivity => 0.90,
                 ApproximationTier::SampledPartition => 0.70,
                 ApproximationTier::RandomBaseline => 0.10,
-            }
+            },
         };
 
         // Adjust for component count (higher n = slightly lower confidence due to approximations)
@@ -464,7 +503,11 @@ impl PhiOrchestrator {
             fast_threshold: self.fast_threshold,
             recent_computations: self.recent_times_ms.len(),
             average_time_ms: self.average_computation_time_ms(),
-            min_time_ms: self.recent_times_ms.iter().cloned().fold(f64::INFINITY, f64::min),
+            min_time_ms: self
+                .recent_times_ms
+                .iter()
+                .cloned()
+                .fold(f64::INFINITY, f64::min),
             max_time_ms: self.recent_times_ms.iter().cloned().fold(0.0, f64::max),
         }
     }
@@ -558,6 +601,6 @@ mod tests {
             .collect();
 
         let result = orch.compute(&processes);
-        assert!(result.confidence > 0.9);  // Real calculator has high confidence
+        assert!(result.confidence > 0.9); // Real calculator has high confidence
     }
 }

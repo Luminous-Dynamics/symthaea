@@ -37,8 +37,7 @@ use super::cfc::{ActivationType, CfCNetworkConfig};
 // =============================================================================
 
 /// Available GPU backends for CfC acceleration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum GpuBackend {
     /// Automatic selection (CUDA > WebGPU > CPU)
     #[default]
@@ -52,7 +51,6 @@ pub enum GpuBackend {
     /// CPU backend (always available, used as fallback)
     Cpu,
 }
-
 
 impl GpuBackend {
     /// Check if GPU acceleration is available
@@ -191,7 +189,12 @@ struct CpuCfcLayer {
 }
 
 impl CpuCfcLayer {
-    fn new(input_dim: usize, hidden_dim: usize, tau_range: (f32, f32), activation: ActivationType) -> Self {
+    fn new(
+        input_dim: usize,
+        hidden_dim: usize,
+        tau_range: (f32, f32),
+        activation: ActivationType,
+    ) -> Self {
         use rand::Rng;
         let mut rng = rand::thread_rng();
 
@@ -241,7 +244,13 @@ impl CpuCfcLayer {
         let mut new_state = &h_inf + &((&self.state - &h_inf) * &decay);
 
         // Clamp to prevent divergence
-        new_state.mapv_inplace(|x| if x.is_finite() { x.clamp(-10.0, 10.0) } else { 0.0 });
+        new_state.mapv_inplace(|x| {
+            if x.is_finite() {
+                x.clamp(-10.0, 10.0)
+            } else {
+                0.0
+            }
+        });
 
         self.state = new_state.clone();
         new_state
@@ -249,7 +258,9 @@ impl CpuCfcLayer {
 
     #[allow(dead_code)] // Batch API reserved for GPU acceleration path
     fn forward_batch(&mut self, inputs: &[Array1<f32>], dts: &[f32]) -> Vec<Array1<f32>> {
-        inputs.iter().zip(dts.iter())
+        inputs
+            .iter()
+            .zip(dts.iter())
             .map(|(input, dt)| self.forward(input, *dt))
             .collect()
     }
@@ -262,7 +273,9 @@ impl CpuCfcLayer {
     fn apply_activation(&self, x: f32) -> f32 {
         match self.activation {
             ActivationType::SiLU => x * fast_sigmoid(x),
-            ActivationType::GELU => 0.5 * x * (1.0 + (0.797_884_6 * (x + 0.044715 * x.powi(3))).tanh()),
+            ActivationType::GELU => {
+                0.5 * x * (1.0 + (0.797_884_6 * (x + 0.044715 * x.powi(3))).tanh())
+            }
             ActivationType::ReLU => x.max(0.0),
             ActivationType::Tanh => x.tanh(),
             ActivationType::Sigmoid => fast_sigmoid(x),
@@ -348,16 +361,18 @@ impl GpuCfcNetwork {
             let mut biases = Vec::new();
 
             // First backbone layer: input_dim -> backbone_dim
-            weights.push(Array2::from_shape_fn((config.backbone_dim, config.input_dim), |_| {
-                (rng.gen::<f32>() - 0.5) * 2.0 * scale
-            }));
+            weights.push(Array2::from_shape_fn(
+                (config.backbone_dim, config.input_dim),
+                |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale,
+            ));
             biases.push(Array1::zeros(config.backbone_dim));
 
             // Additional backbone layers
             for _ in 1..config.backbone_layers {
-                weights.push(Array2::from_shape_fn((config.backbone_dim, config.backbone_dim), |_| {
-                    (rng.gen::<f32>() - 0.5) * 2.0 * scale
-                }));
+                weights.push(Array2::from_shape_fn(
+                    (config.backbone_dim, config.backbone_dim),
+                    |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale,
+                ));
                 biases.push(Array1::zeros(config.backbone_dim));
             }
 
@@ -392,12 +407,15 @@ impl GpuCfcNetwork {
 
     /// Check if using GPU acceleration
     pub fn is_gpu_accelerated(&self) -> bool {
-        matches!(self.backend, GpuBackend::Wgpu) ||
-        {
+        matches!(self.backend, GpuBackend::Wgpu) || {
             #[cfg(feature = "cuda")]
-            { matches!(self.backend, GpuBackend::Cuda) }
+            {
+                matches!(self.backend, GpuBackend::Cuda)
+            }
             #[cfg(not(feature = "cuda"))]
-            { false }
+            {
+                false
+            }
         }
     }
 
@@ -416,7 +434,11 @@ impl GpuCfcNetwork {
         }
 
         let mut x = input.clone();
-        for (w, b) in self.backbone_weights.iter().zip(self.backbone_biases.iter()) {
+        for (w, b) in self
+            .backbone_weights
+            .iter()
+            .zip(self.backbone_biases.iter())
+        {
             let z = w.dot(&x) + b;
             x = z.mapv(|v| {
                 // SiLU activation
@@ -474,7 +496,9 @@ impl GpuCfcNetwork {
 
         let start = Instant::now();
 
-        let results: Vec<Vec<f32>> = inputs.iter().zip(dts.iter())
+        let results: Vec<Vec<f32>> = inputs
+            .iter()
+            .zip(dts.iter())
             .map(|(input, dt)| {
                 let input_arr = Array1::from_vec(input.clone());
                 let mut h = self.backbone_forward(&input_arr);
@@ -584,7 +608,11 @@ impl GpuCfcNetwork {
         let mut count = 0;
 
         // Backbone parameters
-        for (w, b) in self.backbone_weights.iter().zip(self.backbone_biases.iter()) {
+        for (w, b) in self
+            .backbone_weights
+            .iter()
+            .zip(self.backbone_biases.iter())
+        {
             count += w.len() + b.len();
         }
 
@@ -700,18 +728,25 @@ mod tests {
     #[test]
     fn test_gpu_backend_detection() {
         let backend = GpuBackend::Auto.resolve();
-        println!("Resolved backend: {:?} - {}", backend, backend.description());
+        println!(
+            "Resolved backend: {:?} - {}",
+            backend,
+            backend.description()
+        );
 
         // Should always resolve to something
-        assert!(matches!(
-            backend,
-            GpuBackend::Cpu | GpuBackend::Wgpu
-        ) || {
-            #[cfg(feature = "cuda")]
-            { matches!(backend, GpuBackend::Cuda) }
-            #[cfg(not(feature = "cuda"))]
-            { false }
-        });
+        assert!(
+            matches!(backend, GpuBackend::Cpu | GpuBackend::Wgpu) || {
+                #[cfg(feature = "cuda")]
+                {
+                    matches!(backend, GpuBackend::Cuda)
+                }
+                #[cfg(not(feature = "cuda"))]
+                {
+                    false
+                }
+            }
+        );
     }
 
     #[test]
@@ -789,14 +824,8 @@ mod tests {
         let mut network = GpuCfcNetwork::new(config, GpuBackend::Cpu).unwrap();
 
         // Simple training data
-        let inputs: Vec<Vec<f32>> = vec![
-            vec![1.0; 16],
-            vec![0.0; 16],
-        ];
-        let targets: Vec<Vec<f32>> = vec![
-            vec![1.0; 8],
-            vec![0.0; 8],
-        ];
+        let inputs: Vec<Vec<f32>> = vec![vec![1.0; 16], vec![0.0; 16]];
+        let targets: Vec<Vec<f32>> = vec![vec![1.0; 8], vec![0.0; 8]];
         let dts = vec![0.1, 0.1];
 
         let initial_loss = network.train_step(&inputs, &targets, &dts, 0.01).unwrap();
@@ -839,16 +868,14 @@ mod tests {
         assert_eq!(state.len(), 2); // 2 layers
 
         // State should be non-zero after forward passes
-        let total_magnitude: f32 = state.iter()
-            .flat_map(|s| s.iter())
-            .map(|&x| x.abs())
-            .sum();
+        let total_magnitude: f32 = state.iter().flat_map(|s| s.iter()).map(|&x| x.abs()).sum();
         assert!(total_magnitude > 0.0);
 
         // Reset and verify
         network.reset();
         let reset_state = network.state();
-        let reset_magnitude: f32 = reset_state.iter()
+        let reset_magnitude: f32 = reset_state
+            .iter()
             .flat_map(|s| s.iter())
             .map(|&x| x.abs())
             .sum();

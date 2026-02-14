@@ -3,8 +3,8 @@
 //! ScaleFree, Fractal, Hypercube, Sierpinski, FractalTree, Koch, Quantum.
 //! Also includes similarity analysis methods.
 
-use super::types::{ConsciousnessTopology, TopologyType, SimilarityStats};
 use super::super::unified_hv::ContinuousHV;
+use super::types::{ConsciousnessTopology, SimilarityStats, TopologyType};
 
 impl ConsciousnessTopology {
     /// Generate a scale-free network (Barabási-Albert model)
@@ -25,29 +25,29 @@ impl ConsciousnessTopology {
         assert!(m >= 1, "m must be >= 1");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        use rand::{Rng, SeedableRng};
         use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
         let mut rng = StdRng::seed_from_u64(seed);
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         // Build adjacency list
         let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
 
         // Start with a small complete graph (m+1 nodes all connected)
         for i in 0..=m {
-            for j in (i+1)..=m.min(n_nodes-1) {
+            for j in (i + 1)..=m.min(n_nodes - 1) {
                 adjacency[i].push(j);
                 adjacency[j].push(i);
             }
         }
 
         // Add remaining nodes one by one with preferential attachment
-        for new_node in (m+1)..n_nodes {
+        for new_node in (m + 1)..n_nodes {
             // Calculate total degree (for normalization)
-            let total_degree: usize = adjacency.iter()
+            let total_degree: usize = adjacency
+                .iter()
                 .take(new_node)
                 .map(|neighbors| neighbors.len())
                 .sum();
@@ -114,7 +114,6 @@ impl ConsciousnessTopology {
             }
         }
 
-
         Self {
             n_nodes,
             dim,
@@ -174,7 +173,9 @@ impl ConsciousnessTopology {
         for _level in 1..levels {
             let prev_count: usize = nodes_per_level.iter().sum();
             let new_count = prev_count * 3;
-            if new_count > n_nodes { break; }
+            if new_count > n_nodes {
+                break;
+            }
 
             // Add connections at this level
             for i in prev_count..new_count.min(n_nodes) {
@@ -276,7 +277,7 @@ impl ConsciousnessTopology {
         // In a hypercube, two vertices are connected if their binary
         // representations differ in exactly one bit
         for i in 0..n_nodes {
-            for j in (i+1)..n_nodes {
+            for j in (i + 1)..n_nodes {
                 // Count differing bits (Hamming distance)
                 let xor = i ^ j;
                 let hamming_dist = xor.count_ones();
@@ -758,15 +759,15 @@ impl ConsciousnessTopology {
             let random_component = random.node_representations[i].scale(w.2);
 
             // Superposed state = weighted sum
-            let superposed = ring_component
-                .add(&star_component)
-                .add(&random_component);
+            let superposed = ring_component.add(&star_component).add(&random_component);
 
             node_representations.push(superposed);
         }
 
         // Combine edges from all three topologies (deduplicated)
-        let mut edges: Vec<(usize, usize)> = ring.edges.iter()
+        let mut edges: Vec<(usize, usize)> = ring
+            .edges
+            .iter()
             .chain(star.edges.iter())
             .chain(random.edges.iter())
             .cloned()
@@ -794,8 +795,7 @@ impl ConsciousnessTopology {
 
         for i in 0..n {
             for j in 0..n {
-                let sim = self.node_representations[i]
-                    .similarity(&self.node_representations[j]);
+                let sim = self.node_representations[i].similarity(&self.node_representations[j]);
                 matrix[i][j] = sim;
             }
         }
@@ -813,7 +813,8 @@ impl ConsciousnessTopology {
 
         for i in 0..n {
             self_similarities.push(matrix[i][i]);
-            for j in (i+1)..n {  // Upper triangle only
+            for j in (i + 1)..n {
+                // Upper triangle only
                 values.push(matrix[i][j]);
             }
         }
@@ -829,9 +830,7 @@ impl ConsciousnessTopology {
         }
 
         let mean = values.iter().sum::<f32>() / values.len() as f32;
-        let variance = values.iter()
-            .map(|v| (v - mean).powi(2))
-            .sum::<f32>() / values.len() as f32;
+        let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / values.len() as f32;
         let std_dev = variance.sqrt();
 
         let min = values.iter().cloned().fold(f32::INFINITY, f32::min);

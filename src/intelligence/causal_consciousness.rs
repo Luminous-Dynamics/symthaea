@@ -1363,10 +1363,7 @@ mod tests {
 
         // Test data: Y = 2X + noise
         let x: Vec<f64> = (0..100).map(|i| i as f64).collect();
-        let y: Vec<f64> = x
-            .iter()
-            .map(|&xi| 2.0 * xi + 0.1 * xi.sin())
-            .collect();
+        let y: Vec<f64> = x.iter().map(|&xi| 2.0 * xi + 0.1 * xi.sin()).collect();
 
         let result = cc.analyze(&x, &y);
         println!("Causal analysis result: {:?}", result);

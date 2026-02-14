@@ -209,7 +209,7 @@ Key types are re-exported at the crate root for convenience:
     clippy::wrong_self_convention,
     clippy::await_holding_lock,
     clippy::cloned_ref_to_slice_refs,
-    clippy::doc_overindented_list_items,
+    clippy::doc_overindented_list_items
 )]
 
 // ============================================================================

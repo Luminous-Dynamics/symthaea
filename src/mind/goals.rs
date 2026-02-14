@@ -21,7 +21,9 @@ impl ContinuousMind {
         }
 
         // Update active goals list
-        self.state.active_goals = self.goals.iter()
+        self.state.active_goals = self
+            .goals
+            .iter()
             .filter(|g| g.is_active)
             .map(|g| g.id.clone())
             .collect();

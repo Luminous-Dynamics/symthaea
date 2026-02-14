@@ -3,11 +3,11 @@
 //! Contains the main cognitive cycle (`tick()`), dream processing,
 //! input handling, consciousness updates, and output generation.
 
-use symthaea_core::hdc::ContinuousHV;
 use crate::chronobiology::{Biorhythm, CircadianPhase};
+use symthaea_core::hdc::ContinuousHV;
 
-use super::{ContinuousMind, Goal, InputType, MindOutput, OutputType};
 use super::utils::permute_hv;
+use super::{ContinuousMind, Goal, InputType, MindOutput, OutputType};
 
 impl ContinuousMind {
     /// Process one tick of the mind.
@@ -50,9 +50,10 @@ impl ContinuousMind {
             self.working_memory.len() as f32 / self.config.working_memory_capacity as f32;
 
         // Update statistics
-        self.stats.avg_consciousness =
-            (self.stats.avg_consciousness * (self.stats.total_ticks - 1) as f64
-                + self.state.consciousness_level) / self.stats.total_ticks as f64;
+        self.stats.avg_consciousness = (self.stats.avg_consciousness
+            * (self.stats.total_ticks - 1) as f64
+            + self.state.consciousness_level)
+            / self.stats.total_ticks as f64;
 
         if self.state.consciousness_level > self.stats.peak_consciousness {
             self.stats.peak_consciousness = self.state.consciousness_level;
@@ -110,7 +111,8 @@ impl ContinuousMind {
     /// Process queued inputs.
     pub(crate) fn process_inputs(&mut self) {
         self.input_queue.sort_by(|a, b| {
-            a.priority.partial_cmp(&b.priority)
+            a.priority
+                .partial_cmp(&b.priority)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -131,7 +133,11 @@ impl ContinuousMind {
                 InputType::Goal => {
                     let goal = Goal {
                         id: format!("goal_{}", self.goals.len()),
-                        description: input.metadata.get("description").cloned().unwrap_or_default(),
+                        description: input
+                            .metadata
+                            .get("description")
+                            .cloned()
+                            .unwrap_or_default(),
                         embedding: self.state.current_thought.clone(),
                         priority: input.priority,
                         progress: 0.0,
@@ -184,7 +190,10 @@ impl ContinuousMind {
 
             return Some(MindOutput {
                 output_type: OutputType::Thought,
-                content: format!("Thinking about {} items in working memory", self.working_memory.len()),
+                content: format!(
+                    "Thinking about {} items in working memory",
+                    self.working_memory.len()
+                ),
                 embedding: self.state.current_thought.clone(),
                 confidence: self.state.consciousness_level as f32,
                 emotional_tone: self.state.emotional_valence,

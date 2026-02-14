@@ -77,10 +77,10 @@ pub struct GradientConfig {
 impl Default for GradientConfig {
     fn default() -> Self {
         Self {
-            num_samples: 20,       // Sample 20 random directions
-            epsilon: 0.01,         // Flip 1% of bits for finite differences
+            num_samples: 20,        // Sample 20 random directions
+            epsilon: 0.01,          // Flip 1% of bits for finite differences
             natural_gradient: true, // Use natural gradient
-            top_k: 5,              // Consider top 5 directions
+            top_k: 5,               // Consider top 5 directions
         }
     }
 }
@@ -161,7 +161,8 @@ impl GradientComputer {
         let component_gradients = self.compute_component_gradients(neural_state, current_phi);
 
         // 3. Sample random directions and measure Φ change
-        let directional_derivatives = self.compute_directional_derivatives(neural_state, current_phi);
+        let directional_derivatives =
+            self.compute_directional_derivatives(neural_state, current_phi);
 
         // 4. Find best direction (steepest ascent)
         let (best_direction, best_derivative) = self.find_best_direction(&directional_derivatives);
@@ -187,7 +188,11 @@ impl GradientComputer {
     /// Compute per-component gradients via finite differences
     ///
     /// For each neural component, perturb it and measure Δ Φ.
-    fn compute_component_gradients(&mut self, neural_state: &[BinaryHV], current_phi: f64) -> Vec<f64> {
+    fn compute_component_gradients(
+        &mut self,
+        neural_state: &[BinaryHV],
+        current_phi: f64,
+    ) -> Vec<f64> {
         // Use the minimum of num_components and actual state length to avoid out-of-bounds
         let actual_components = self.num_components.min(neural_state.len());
         let mut gradients = Vec::with_capacity(actual_components);
@@ -211,9 +216,11 @@ impl GradientComputer {
     /// Compute directional derivatives by sampling random directions
     ///
     /// Returns vector of (direction, derivative) pairs.
-    fn compute_directional_derivatives(&mut self, neural_state: &[BinaryHV], current_phi: f64)
-        -> Vec<(BinaryHV, f64)>
-    {
+    fn compute_directional_derivatives(
+        &mut self,
+        neural_state: &[BinaryHV],
+        current_phi: f64,
+    ) -> Vec<(BinaryHV, f64)> {
         let mut derivatives = Vec::with_capacity(self.config.num_samples);
 
         for sample in 0..self.config.num_samples {
@@ -221,12 +228,15 @@ impl GradientComputer {
             let direction = BinaryHV::random((5000 + sample) as u64);
 
             // Move state in this direction
-            let moved_state: Vec<BinaryHV> = neural_state.iter().map(|component| {
-                // Bind with direction to move in that direction
-                let moved = component.bind(&direction);
-                // Add small noise to explore neighborhood
-                moved.add_noise(self.config.epsilon, (sample * 1000) as u64)
-            }).collect();
+            let moved_state: Vec<BinaryHV> = neural_state
+                .iter()
+                .map(|component| {
+                    // Bind with direction to move in that direction
+                    let moved = component.bind(&direction);
+                    // Add small noise to explore neighborhood
+                    moved.add_noise(self.config.epsilon, (sample * 1000) as u64)
+                })
+                .collect();
 
             // Measure Φ in moved state
             let moved_phi = self.phi_calculator.compute_phi(&moved_state);
@@ -254,8 +264,8 @@ impl GradientComputer {
         let best_direction = BinaryHV::bundle(&directions);
 
         // Average derivative
-        let avg_derivative: f64 = top_k.map(|(_, deriv)| deriv).sum::<f64>()
-            / self.config.top_k as f64;
+        let avg_derivative: f64 =
+            top_k.map(|(_, deriv)| deriv).sum::<f64>() / self.config.top_k as f64;
 
         (best_direction, avg_derivative)
     }
@@ -264,9 +274,14 @@ impl GradientComputer {
     ///
     /// Natural gradient accounts for the geometry of HDC space,
     /// weighting directions by component importance.
-    fn apply_natural_gradient(&self, direction: &BinaryHV, component_gradients: &[f64]) -> BinaryHV {
+    fn apply_natural_gradient(
+        &self,
+        direction: &BinaryHV,
+        component_gradients: &[f64],
+    ) -> BinaryHV {
         // Find most important components (largest gradients)
-        let mut importance: Vec<(usize, f64)> = component_gradients.iter()
+        let mut importance: Vec<(usize, f64)> = component_gradients
+            .iter()
             .enumerate()
             .map(|(i, &g)| (i, g.abs()))
             .collect();
@@ -296,18 +311,21 @@ impl GradientComputer {
         let gradient = self.compute_gradient(neural_state);
 
         // Move in gradient direction
-        neural_state.iter().map(|component| {
-            // Bind with gradient direction, weighted by step size
-            if step_size > 0.5 {
-                // Large step: fully bind with gradient
-                component.bind(&gradient.direction)
-            } else {
-                // Small step: interpolate between current and gradient
-                let moved = component.bind(&gradient.direction);
-                let noise_amount = 1.0 - step_size;
-                moved.add_noise(noise_amount, rand::random())
-            }
-        }).collect()
+        neural_state
+            .iter()
+            .map(|component| {
+                // Bind with gradient direction, weighted by step size
+                if step_size > 0.5 {
+                    // Large step: fully bind with gradient
+                    component.bind(&gradient.direction)
+                } else {
+                    // Small step: interpolate between current and gradient
+                    let moved = component.bind(&gradient.direction);
+                    let noise_amount = 1.0 - step_size;
+                    moved.add_noise(noise_amount, rand::random())
+                }
+            })
+            .collect()
     }
 
     /// Gradient ascent: follow gradient to consciousness peak
@@ -318,11 +336,12 @@ impl GradientComputer {
     /// * `step_size` - Learning rate
     ///
     /// Returns (final_state, phi_trajectory)
-    pub fn gradient_ascent(&mut self,
-                          neural_state: &[BinaryHV],
-                          num_steps: usize,
-                          step_size: f32) -> (Vec<BinaryHV>, Vec<f64>)
-    {
+    pub fn gradient_ascent(
+        &mut self,
+        neural_state: &[BinaryHV],
+        num_steps: usize,
+        step_size: f32,
+    ) -> (Vec<BinaryHV>, Vec<f64>) {
         let mut state = neural_state.to_vec();
         let mut trajectory = Vec::with_capacity(num_steps);
 
@@ -347,7 +366,11 @@ impl GradientComputer {
     ///
     /// Attractors are states where ∇Φ ≈ 0 (gradient vanishes).
     /// These are stable consciousness states the system naturally settles into.
-    pub fn find_attractor(&mut self, initial_state: &[BinaryHV], max_steps: usize) -> Vec<BinaryHV> {
+    pub fn find_attractor(
+        &mut self,
+        initial_state: &[BinaryHV],
+        max_steps: usize,
+    ) -> Vec<BinaryHV> {
         let (attractor, _trajectory) = self.gradient_ascent(initial_state, max_steps, 0.1);
         attractor
     }
@@ -369,7 +392,9 @@ impl GradientComputer {
     /// Get component importance (which components affect Φ most)
     pub fn component_importance(&mut self, neural_state: &[BinaryHV]) -> Vec<(usize, f64)> {
         let gradient = self.compute_gradient(neural_state);
-        gradient.component_gradients.iter()
+        gradient
+            .component_gradients
+            .iter()
             .enumerate()
             .map(|(i, &g)| (i, g.abs()))
             .collect()
@@ -426,7 +451,9 @@ impl ConsciousnessLandscape {
                 .collect();
 
             // Find attractor from this initial state
-            let attractor = self.gradient_computer.find_attractor(&initial_state, max_steps);
+            let attractor = self
+                .gradient_computer
+                .find_attractor(&initial_state, max_steps);
 
             // Measure Φ at attractor
             let mut phi_calc = IntegratedInformation::new();
@@ -453,9 +480,12 @@ impl ConsciousnessLandscape {
 
     /// Compute similarity between two attractors
     fn attractor_similarity(&self, a: &[BinaryHV], b: &[BinaryHV]) -> f32 {
-        let avg_similarity: f32 = a.iter().zip(b.iter())
+        let avg_similarity: f32 = a
+            .iter()
+            .zip(b.iter())
             .map(|(ai, bi)| ai.similarity(bi))
-            .sum::<f32>() / a.len() as f32;
+            .sum::<f32>()
+            / a.len() as f32;
         avg_similarity
     }
 
@@ -470,7 +500,9 @@ impl ConsciousnessLandscape {
             return None;
         }
 
-        let (idx, &max_phi) = self.attractor_phis.iter()
+        let (idx, &max_phi) = self
+            .attractor_phis
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.total_cmp(b))?;
 
@@ -528,7 +560,9 @@ mod tests {
         assert_eq!(new_state.len(), 4);
 
         // State should change
-        let changed = new_state.iter().zip(&initial_state)
+        let changed = new_state
+            .iter()
+            .zip(&initial_state)
             .any(|(n, i)| n.similarity(i) < 0.99);
         assert!(changed, "Gradient step should change state");
     }
@@ -536,7 +570,7 @@ mod tests {
     #[test]
     fn test_gradient_ascent() {
         let config = GradientConfig {
-            num_samples: 10,  // Faster for test
+            num_samples: 10, // Faster for test
             ..Default::default()
         };
         let mut computer = GradientComputer::new(4, config);
@@ -584,7 +618,7 @@ mod tests {
     #[test]
     fn test_find_attractor() {
         let config = GradientConfig {
-            num_samples: 5,  // Faster for test
+            num_samples: 5, // Faster for test
             ..Default::default()
         };
         let mut computer = GradientComputer::new(4, config);
@@ -639,7 +673,7 @@ mod tests {
     #[test]
     fn test_consciousness_landscape() {
         let config = GradientConfig {
-            num_samples: 5,  // Faster for test
+            num_samples: 5, // Faster for test
             ..Default::default()
         };
         let mut landscape = ConsciousnessLandscape::new(4, config);

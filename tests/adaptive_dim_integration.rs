@@ -34,7 +34,11 @@ fn test_adaptive_dim_full_lifecycle() {
     // Phase 1: high error -> scale UP
     for _ in 0..30 {
         let dim = bridge.current_hdc_dim();
-        assert!(dim >= min_dim && dim <= max_dim, "dim {} out of bounds", dim);
+        assert!(
+            dim >= min_dim && dim <= max_dim,
+            "dim {} out of bounds",
+            dim
+        );
         bridge.maybe_resize(0.9);
     }
     let dim_after_up = bridge.current_hdc_dim();
@@ -49,7 +53,11 @@ fn test_adaptive_dim_full_lifecycle() {
     // Phase 2: low error -> scale DOWN
     for _ in 0..30 {
         let dim = bridge.current_hdc_dim();
-        assert!(dim >= min_dim && dim <= max_dim, "dim {} out of bounds", dim);
+        assert!(
+            dim >= min_dim && dim <= max_dim,
+            "dim {} out of bounds",
+            dim
+        );
         bridge.maybe_resize(0.1);
     }
     let dim_after_down = bridge.current_hdc_dim();
@@ -81,5 +89,8 @@ fn test_adaptive_dim_full_lifecycle() {
         output.iter().all(|v| v.is_finite()),
         "forward() produced non-finite values after resize"
     );
-    println!("forward() works after resize lifecycle: output len = {}", output.len());
+    println!(
+        "forward() works after resize lifecycle: output len = {}",
+        output.len()
+    );
 }

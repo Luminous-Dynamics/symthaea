@@ -31,7 +31,12 @@ impl Observation {
     }
 
     /// Create from consciousness state observables
-    pub fn from_consciousness_state(phi: f64, integration: f64, coherence: f64, attention: f64) -> Self {
+    pub fn from_consciousness_state(
+        phi: f64,
+        integration: f64,
+        coherence: f64,
+        attention: f64,
+    ) -> Self {
         Self {
             values: vec![phi, integration, coherence, attention],
             precision: 1.0,
@@ -101,7 +106,9 @@ impl HiddenState {
 
     /// Compute discrete entropy over modes
     pub fn mode_entropy(&self) -> f64 {
-        -self.mode_probs.iter()
+        -self
+            .mode_probs
+            .iter()
             .filter(|p| **p > 0.0)
             .map(|p| p * p.ln())
             .sum::<f64>()

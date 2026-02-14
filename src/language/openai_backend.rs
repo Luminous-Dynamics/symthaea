@@ -68,8 +68,7 @@ impl OpenAiBackend {
     /// Returns `None` if `OPENAI_API_KEY` is not set.
     pub fn from_env() -> Option<Self> {
         let api_key = std::env::var("OPENAI_API_KEY").ok()?;
-        let model = std::env::var("OPENAI_MODEL")
-            .unwrap_or_else(|_| "gpt-4o-mini".to_string());
+        let model = std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o-mini".to_string());
         let base_url = std::env::var("OPENAI_BASE_URL")
             .unwrap_or_else(|_| "https://api.openai.com/v1".to_string());
         Some(Self::new(api_key, model, base_url))
@@ -81,7 +80,12 @@ impl OpenAiBackend {
             .timeout(std::time::Duration::from_secs(120))
             .build()
             .unwrap_or_default();
-        Self { api_key, model, base_url, client }
+        Self {
+            api_key,
+            model,
+            base_url,
+            client,
+        }
     }
 }
 
@@ -90,9 +94,15 @@ impl LLMBackend for OpenAiBackend {
     async fn generate(&self, prompt: &str, params: &GenerationParams) -> Result<String> {
         let mut messages = Vec::new();
         if let Some(ref sys) = params.system_prompt {
-            messages.push(ChatMessage { role: "system", content: sys });
+            messages.push(ChatMessage {
+                role: "system",
+                content: sys,
+            });
         }
-        messages.push(ChatMessage { role: "user", content: prompt });
+        messages.push(ChatMessage {
+            role: "user",
+            content: prompt,
+        });
 
         let body = ChatRequest {
             model: &self.model,
@@ -102,7 +112,8 @@ impl LLMBackend for OpenAiBackend {
             stream: false,
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .json(&body)
@@ -116,10 +127,14 @@ impl LLMBackend for OpenAiBackend {
             anyhow::bail!("OpenAI returned {}: {}", status, text);
         }
 
-        let chat_resp: ChatResponse = response.json().await
+        let chat_resp: ChatResponse = response
+            .json()
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to parse OpenAI response: {}", e))?;
 
-        chat_resp.choices.first()
+        chat_resp
+            .choices
+            .first()
             .and_then(|c| c.message.content.clone())
             .ok_or_else(|| anyhow::anyhow!("OpenAI returned empty response"))
     }
@@ -132,9 +147,15 @@ impl LLMBackend for OpenAiBackend {
     ) -> Result<String> {
         let mut messages = Vec::new();
         if let Some(ref sys) = params.system_prompt {
-            messages.push(ChatMessage { role: "system", content: sys });
+            messages.push(ChatMessage {
+                role: "system",
+                content: sys,
+            });
         }
-        messages.push(ChatMessage { role: "user", content: prompt });
+        messages.push(ChatMessage {
+            role: "user",
+            content: prompt,
+        });
 
         let body = ChatRequest {
             model: &self.model,
@@ -144,7 +165,8 @@ impl LLMBackend for OpenAiBackend {
             stream: true,
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .json(&body)
@@ -162,7 +184,9 @@ impl LLMBackend for OpenAiBackend {
         let mut buffer = Vec::new();
         let mut stream = response;
 
-        while let Some(chunk) = stream.chunk().await
+        while let Some(chunk) = stream
+            .chunk()
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to read OpenAI stream: {}", e))?
         {
             buffer.extend_from_slice(&chunk);

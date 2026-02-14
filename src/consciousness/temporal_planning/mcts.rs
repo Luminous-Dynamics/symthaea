@@ -11,12 +11,7 @@ use super::types::*;
 /// Expected Value of Simulation: reliability-gated simulation signal.
 ///
 /// Determines whether simulation is worthwhile given current reliability.
-pub fn evs(
-    conflict_entropy: f64,
-    reliability: f64,
-    n_actions: usize,
-    recent_utility: f64,
-) -> f64 {
+pub fn evs(conflict_entropy: f64, reliability: f64, n_actions: usize, recent_utility: f64) -> f64 {
     use crate::consciousness::epistemic_conflict::thresholds::R_SIM_MIN;
 
     // Hard gate: don't simulate on nonsense

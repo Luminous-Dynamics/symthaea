@@ -94,9 +94,7 @@ impl GitTracker {
             }
         }
 
-        let has_changes = !modified.is_empty()
-            || !added.is_empty()
-            || !deleted.is_empty();
+        let has_changes = !modified.is_empty() || !added.is_empty() || !deleted.is_empty();
 
         Ok(RepoStatus {
             modified,
@@ -125,8 +123,10 @@ impl GitTracker {
     pub fn commit(&self, message: &str) -> Result<CommitInfo, GitError> {
         let output = self.run_git(&[
             "commit",
-            "-m", message,
-            "--author", &format!("{} <{}>", self.author_name, self.author_email),
+            "-m",
+            message,
+            "--author",
+            &format!("{} <{}>", self.author_name, self.author_email),
         ])?;
 
         if !output.status.success() {
@@ -158,7 +158,10 @@ impl GitTracker {
             if changes.packages_removed.len() == 1 {
                 parts.push(format!("Remove package: {}", changes.packages_removed[0]));
             } else {
-                parts.push(format!("Remove {} packages", changes.packages_removed.len()));
+                parts.push(format!(
+                    "Remove {} packages",
+                    changes.packages_removed.len()
+                ));
             }
         }
 
@@ -197,7 +200,10 @@ impl GitTracker {
     }
 
     /// Auto-commit if enabled and changes exist
-    pub fn auto_commit_if_needed(&self, changes: &ConfigChanges) -> Result<Option<CommitInfo>, GitError> {
+    pub fn auto_commit_if_needed(
+        &self,
+        changes: &ConfigChanges,
+    ) -> Result<Option<CommitInfo>, GitError> {
         if !self.auto_commit {
             return Ok(None);
         }
@@ -234,11 +240,8 @@ impl GitTracker {
 
     /// Get commit history
     pub fn log(&self, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
-        let output = self.run_git(&[
-            "log",
-            &format!("-{}", limit),
-            "--format=%H|%an|%ae|%at|%s",
-        ])?;
+        let output =
+            self.run_git(&["log", &format!("-{}", limit), "--format=%H|%an|%ae|%at|%s"])?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut commits = Vec::new();

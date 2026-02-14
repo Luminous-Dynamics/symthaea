@@ -6,9 +6,7 @@
 use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
-use super::{
-    ContinuousEntropyEstimator, TruePartition, TruePhiCalculator, TemporalTransition,
-};
+use super::{ContinuousEntropyEstimator, TemporalTransition, TruePartition, TruePhiCalculator};
 
 /// Cause-effect information result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,7 +74,8 @@ impl TemporalPhiCalculator {
     /// Uses mutual information between current state and the prior state.
     pub fn cause_information(&self, transition: &TemporalTransition) -> f64 {
         // Use the fast MI method
-        self.estimator.mutual_information_fast(&transition.next, &transition.current)
+        self.estimator
+            .mutual_information_fast(&transition.next, &transition.current)
     }
 
     /// Compute effect information I(current; future)
@@ -84,7 +83,8 @@ impl TemporalPhiCalculator {
     /// How much does the current state tell us about what will happen?
     pub fn effect_information(&self, transition: &TemporalTransition) -> f64 {
         // Effect info is the same MI but conceptually different
-        self.estimator.mutual_information_fast(&transition.current, &transition.next)
+        self.estimator
+            .mutual_information_fast(&transition.current, &transition.next)
     }
 
     /// Compute cause repertoire entropy
@@ -119,23 +119,20 @@ impl TemporalPhiCalculator {
     ///
     /// φ_cause = min over partitions of I(M_A; past_A) + I(M_B; past_B)
     /// where M is the mechanism and A,B partition the system
-    pub fn integrated_cause_info(
-        &self,
-        components: &[TemporalTransition],
-    ) -> f64 {
+    pub fn integrated_cause_info(&self, components: &[TemporalTransition]) -> f64 {
         let n = components.len();
         if n < 2 {
             return 0.0;
         }
 
         // Compute whole system cause info
-        let current_bundle = self.bundle_states(
-            &components.iter().map(|t| &t.current).collect::<Vec<_>>()
-        );
-        let past_bundle = self.bundle_states(
-            &components.iter().map(|t| &t.next).collect::<Vec<_>>()
-        );
-        let system_cause = self.estimator.mutual_information_fast(&current_bundle, &past_bundle);
+        let current_bundle =
+            self.bundle_states(&components.iter().map(|t| &t.current).collect::<Vec<_>>());
+        let past_bundle =
+            self.bundle_states(&components.iter().map(|t| &t.next).collect::<Vec<_>>());
+        let system_cause = self
+            .estimator
+            .mutual_information_fast(&current_bundle, &past_bundle);
 
         // Find MIP for cause
         let mut min_partition_cause = f64::INFINITY;
@@ -148,12 +145,24 @@ impl TemporalPhiCalculator {
             }
 
             // Compute cause info for each partition
-            let current_a = self.bundle_indices(&components.iter().map(|t| &t.current).collect::<Vec<_>>(), &partition.part_a);
-            let past_a = self.bundle_indices(&components.iter().map(|t| &t.next).collect::<Vec<_>>(), &partition.part_a);
+            let current_a = self.bundle_indices(
+                &components.iter().map(|t| &t.current).collect::<Vec<_>>(),
+                &partition.part_a,
+            );
+            let past_a = self.bundle_indices(
+                &components.iter().map(|t| &t.next).collect::<Vec<_>>(),
+                &partition.part_a,
+            );
             let cause_a = self.estimator.mutual_information_fast(&current_a, &past_a);
 
-            let current_b = self.bundle_indices(&components.iter().map(|t| &t.current).collect::<Vec<_>>(), &partition.part_b);
-            let past_b = self.bundle_indices(&components.iter().map(|t| &t.next).collect::<Vec<_>>(), &partition.part_b);
+            let current_b = self.bundle_indices(
+                &components.iter().map(|t| &t.current).collect::<Vec<_>>(),
+                &partition.part_b,
+            );
+            let past_b = self.bundle_indices(
+                &components.iter().map(|t| &t.next).collect::<Vec<_>>(),
+                &partition.part_b,
+            );
             let cause_b = self.estimator.mutual_information_fast(&current_b, &past_b);
 
             let partition_cause = cause_a + cause_b;
@@ -167,23 +176,20 @@ impl TemporalPhiCalculator {
     /// Compute integrated effect information for a system
     ///
     /// φ_effect = min over partitions of I(M_A; future_A) + I(M_B; future_B)
-    pub fn integrated_effect_info(
-        &self,
-        components: &[TemporalTransition],
-    ) -> f64 {
+    pub fn integrated_effect_info(&self, components: &[TemporalTransition]) -> f64 {
         let n = components.len();
         if n < 2 {
             return 0.0;
         }
 
         // Compute whole system effect info
-        let current_bundle = self.bundle_states(
-            &components.iter().map(|t| &t.current).collect::<Vec<_>>()
-        );
-        let future_bundle = self.bundle_states(
-            &components.iter().map(|t| &t.next).collect::<Vec<_>>()
-        );
-        let system_effect = self.estimator.mutual_information_fast(&current_bundle, &future_bundle);
+        let current_bundle =
+            self.bundle_states(&components.iter().map(|t| &t.current).collect::<Vec<_>>());
+        let future_bundle =
+            self.bundle_states(&components.iter().map(|t| &t.next).collect::<Vec<_>>());
+        let system_effect = self
+            .estimator
+            .mutual_information_fast(&current_bundle, &future_bundle);
 
         // Find MIP for effect
         let mut min_partition_effect = f64::INFINITY;
@@ -194,13 +200,29 @@ impl TemporalPhiCalculator {
                 continue;
             }
 
-            let current_a = self.bundle_indices(&components.iter().map(|t| &t.current).collect::<Vec<_>>(), &partition.part_a);
-            let future_a = self.bundle_indices(&components.iter().map(|t| &t.next).collect::<Vec<_>>(), &partition.part_a);
-            let effect_a = self.estimator.mutual_information_fast(&current_a, &future_a);
+            let current_a = self.bundle_indices(
+                &components.iter().map(|t| &t.current).collect::<Vec<_>>(),
+                &partition.part_a,
+            );
+            let future_a = self.bundle_indices(
+                &components.iter().map(|t| &t.next).collect::<Vec<_>>(),
+                &partition.part_a,
+            );
+            let effect_a = self
+                .estimator
+                .mutual_information_fast(&current_a, &future_a);
 
-            let current_b = self.bundle_indices(&components.iter().map(|t| &t.current).collect::<Vec<_>>(), &partition.part_b);
-            let future_b = self.bundle_indices(&components.iter().map(|t| &t.next).collect::<Vec<_>>(), &partition.part_b);
-            let effect_b = self.estimator.mutual_information_fast(&current_b, &future_b);
+            let current_b = self.bundle_indices(
+                &components.iter().map(|t| &t.current).collect::<Vec<_>>(),
+                &partition.part_b,
+            );
+            let future_b = self.bundle_indices(
+                &components.iter().map(|t| &t.next).collect::<Vec<_>>(),
+                &partition.part_b,
+            );
+            let effect_b = self
+                .estimator
+                .mutual_information_fast(&current_b, &future_b);
 
             let partition_effect = effect_a + effect_b;
             min_partition_effect = min_partition_effect.min(partition_effect);
@@ -215,10 +237,7 @@ impl TemporalPhiCalculator {
     /// - Cause and effect information
     /// - Integrated cause and effect
     /// - φ_cause_effect (minimum of integrated cause and effect)
-    pub fn compute_cause_effect(
-        &self,
-        transition: &TemporalTransition,
-    ) -> CauseEffectInfo {
+    pub fn compute_cause_effect(&self, transition: &TemporalTransition) -> CauseEffectInfo {
         let cause_info = self.cause_information(transition);
         let effect_info = self.effect_information(transition);
         let cause_entropy = self.estimator.entropy(&transition.current);
@@ -260,15 +279,17 @@ impl TemporalPhiCalculator {
         }
 
         // Bundle all states
-        let current_bundle = self.bundle_states(
-            &components.iter().map(|t| &t.current).collect::<Vec<_>>()
-        );
-        let next_bundle = self.bundle_states(
-            &components.iter().map(|t| &t.next).collect::<Vec<_>>()
-        );
+        let current_bundle =
+            self.bundle_states(&components.iter().map(|t| &t.current).collect::<Vec<_>>());
+        let next_bundle =
+            self.bundle_states(&components.iter().map(|t| &t.next).collect::<Vec<_>>());
 
-        let cause_info = self.estimator.mutual_information_fast(&next_bundle, &current_bundle);
-        let effect_info = self.estimator.mutual_information_fast(&current_bundle, &next_bundle);
+        let cause_info = self
+            .estimator
+            .mutual_information_fast(&next_bundle, &current_bundle);
+        let effect_info = self
+            .estimator
+            .mutual_information_fast(&current_bundle, &next_bundle);
         let cause_entropy = self.estimator.entropy(&current_bundle);
         let effect_entropy = self.estimator.entropy(&next_bundle);
 
@@ -297,7 +318,8 @@ impl TemporalPhiCalculator {
 
     /// Helper: Bundle states at specific indices
     fn bundle_indices(&self, states: &[&ContinuousHV], indices: &[usize]) -> ContinuousHV {
-        let selected: Vec<&ContinuousHV> = indices.iter()
+        let selected: Vec<&ContinuousHV> = indices
+            .iter()
             .filter_map(|&i| states.get(i).copied())
             .collect();
         self.bundle_states(&selected)

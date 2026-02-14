@@ -6,17 +6,17 @@
 //! 3. Directional Phi Flow
 
 use symthaea::benchmarks::{
-    TuebingenAdapter,
     // Individual primitives
     discover_by_compression,
-    discover_by_intervention,
     discover_by_directional_phi,
+    discover_by_intervention,
     // Unified reasoning
     discover_by_unified_reasoning,
-    UnifiedCausalReasoning,
     // Previous methods for comparison
     discover_information_theoretic,
     discover_majority_voting,
+    TuebingenAdapter,
+    UnifiedCausalReasoning,
 };
 
 fn main() {
@@ -40,48 +40,60 @@ fn main() {
     // Test HDC Compression
     println!("  [1/4] HDC Compression Asymmetry...");
     let results_compression = adapter.run(discover_by_compression);
-    println!("         Accuracy: {:.1}% ({}/{})",
-             results_compression.accuracy() * 100.0,
-             results_compression.correct,
-             results_compression.total);
+    println!(
+        "         Accuracy: {:.1}% ({}/{})",
+        results_compression.accuracy() * 100.0,
+        results_compression.correct,
+        results_compression.total
+    );
 
     // Test LTC Interventional
     println!("  [2/4] LTC Interventional Invariance...");
     let results_intervention = adapter.run(discover_by_intervention);
-    println!("         Accuracy: {:.1}% ({}/{})",
-             results_intervention.accuracy() * 100.0,
-             results_intervention.correct,
-             results_intervention.total);
+    println!(
+        "         Accuracy: {:.1}% ({}/{})",
+        results_intervention.accuracy() * 100.0,
+        results_intervention.correct,
+        results_intervention.total
+    );
 
     // Test Directional Phi
     println!("  [3/4] Directional Phi Flow...");
     let results_phi = adapter.run(discover_by_directional_phi);
-    println!("         Accuracy: {:.1}% ({}/{})",
-             results_phi.accuracy() * 100.0,
-             results_phi.correct,
-             results_phi.total);
+    println!(
+        "         Accuracy: {:.1}% ({}/{})",
+        results_phi.accuracy() * 100.0,
+        results_phi.correct,
+        results_phi.total
+    );
 
     // Test Unified Reasoning
     println!("  [4/4] Unified Causal Reasoning...");
     let results_unified = adapter.run(discover_by_unified_reasoning);
-    println!("         Accuracy: {:.1}% ({}/{})",
-             results_unified.accuracy() * 100.0,
-             results_unified.correct,
-             results_unified.total);
+    println!(
+        "         Accuracy: {:.1}% ({}/{})",
+        results_unified.accuracy() * 100.0,
+        results_unified.correct,
+        results_unified.total
+    );
 
     println!("\nComparing with Previous Methods:\n");
 
     let results_info = adapter.run(discover_information_theoretic);
-    println!("  Info-Theoretic: {:.1}% ({}/{})",
-             results_info.accuracy() * 100.0,
-             results_info.correct,
-             results_info.total);
+    println!(
+        "  Info-Theoretic: {:.1}% ({}/{})",
+        results_info.accuracy() * 100.0,
+        results_info.correct,
+        results_info.total
+    );
 
     let results_majority = adapter.run(discover_majority_voting);
-    println!("  Majority Voting: {:.1}% ({}/{})",
-             results_majority.accuracy() * 100.0,
-             results_majority.correct,
-             results_majority.total);
+    println!(
+        "  Majority Voting: {:.1}% ({}/{})",
+        results_majority.accuracy() * 100.0,
+        results_majority.correct,
+        results_majority.total
+    );
 
     // Summary
     println!("\n╔══════════════════════════════════════════════════════════════╗");
@@ -101,15 +113,30 @@ fn main() {
     println!("  ─────────────────────────────────────────────────────────");
     for (name, acc) in &methods {
         let delta = (acc - 0.5) * 100.0;
-        let marker = if *acc > 0.70 { "★★" }
-            else if *acc > 0.60 { "★" }
-            else if *acc > 0.55 { "✓" }
-            else if *acc > 0.50 { "~" }
-            else { "✗" };
-        println!("  {:22} {:5.1}%      {:+5.1}%      {}", name, acc * 100.0, delta, marker);
+        let marker = if *acc > 0.70 {
+            "★★"
+        } else if *acc > 0.60 {
+            "★"
+        } else if *acc > 0.55 {
+            "✓"
+        } else if *acc > 0.50 {
+            "~"
+        } else {
+            "✗"
+        };
+        println!(
+            "  {:22} {:5.1}%      {:+5.1}%      {}",
+            name,
+            acc * 100.0,
+            delta,
+            marker
+        );
     }
 
-    let best = methods.iter().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
+    let best = methods
+        .iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .unwrap();
     let unified_acc = results_unified.accuracy();
     let majority_acc = results_majority.accuracy();
 
@@ -119,8 +146,12 @@ fn main() {
         println!("\n  ✓ Unified Reasoning matches or exceeds Majority Voting!");
     } else {
         let gap = (majority_acc - unified_acc) * 100.0;
-        println!("\n  Gap to close: {:.1}% (Unified: {:.1}% vs Majority: {:.1}%)",
-                 gap, unified_acc * 100.0, majority_acc * 100.0);
+        println!(
+            "\n  Gap to close: {:.1}% (Unified: {:.1}% vs Majority: {:.1}%)",
+            gap,
+            unified_acc * 100.0,
+            majority_acc * 100.0
+        );
     }
 
     // Show example explanation

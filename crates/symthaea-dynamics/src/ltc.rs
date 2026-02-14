@@ -479,7 +479,6 @@ impl LiquidNetwork {
             self.state.iter().map(|&x| (x - mean).powi(2)).sum::<f32>() / self.num_neurons as f32;
 
         // Combine: conscious if active AND diverse
-        
 
         (active_fraction * variance.sqrt()).min(1.0)
     }

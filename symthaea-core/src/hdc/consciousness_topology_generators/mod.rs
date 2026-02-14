@@ -14,11 +14,11 @@
 //! Each topology is represented as a set of node vectors, where each node's
 //! representation encodes its connections to other nodes via ContinuousHV operations.
 
-mod types;
 mod basic;
-mod geometric;
 mod fractal;
+mod geometric;
 mod neural;
+mod types;
 
 #[cfg(test)]
 mod tests;

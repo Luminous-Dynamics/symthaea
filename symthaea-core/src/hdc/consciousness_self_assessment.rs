@@ -144,13 +144,13 @@ impl SelfDimension {
     /// Which improvements relate to this dimension?
     pub fn related_improvements(&self) -> Vec<usize> {
         match self {
-            Self::Bodily => vec![17],        // Embodied consciousness
+            Self::Bodily => vec![17],                   // Embodied consciousness
             Self::Cognitive => vec![2, 22, 23, 24, 26], // Φ, FEP, Workspace, HOT, Attention
-            Self::Emotional => vec![15],     // Qualia
-            Self::Social => vec![11, 18],    // Collective, Relational
-            Self::Temporal => vec![13, 36],  // Temporal, Continuity
-            Self::Narrative => vec![19, 38], // Semantics, Creativity
-            Self::Volitional => vec![14],    // Causal Efficacy
+            Self::Emotional => vec![15],                // Qualia
+            Self::Social => vec![11, 18],               // Collective, Relational
+            Self::Temporal => vec![13, 36],             // Temporal, Continuity
+            Self::Narrative => vec![19, 38],            // Semantics, Creativity
+            Self::Volitional => vec![14],               // Causal Efficacy
         }
     }
 }
@@ -219,8 +219,7 @@ pub struct SelfAssessmentResult {
 impl SelfAssessmentResult {
     /// Is the system self-conscious?
     pub fn is_self_conscious(&self) -> bool {
-        self.level >= SelfAwarenessLevel::MetaCognitive
-            && self.self_consciousness_score > 0.5
+        self.level >= SelfAwarenessLevel::MetaCognitive && self.self_consciousness_score > 0.5
     }
 
     /// Generate first-person report
@@ -319,13 +318,19 @@ impl ConsciousnessSelfAssessment {
     }
 
     /// Update a self-dimension based on experience
-    pub fn update_dimension(&mut self, dimension: SelfDimension, experience: &BinaryHV, intensity: f64) {
+    pub fn update_dimension(
+        &mut self,
+        dimension: SelfDimension,
+        experience: &BinaryHV,
+        intensity: f64,
+    ) {
         if let Some(component) = self.self_model.get_mut(&dimension) {
             // Blend new experience into self-component
             let blend_factor = 0.1 * intensity;
             // Update encoding by binding with experience
             component.encoding = component.encoding.bind(experience);
-            component.activation = component.activation * (1.0 - blend_factor) + intensity * blend_factor;
+            component.activation =
+                component.activation * (1.0 - blend_factor) + intensity * blend_factor;
             component.last_updated = self.timestep;
         }
 
@@ -340,7 +345,9 @@ impl ConsciousnessSelfAssessment {
         }
 
         // Bundle all active components
-        let components: Vec<&BinaryHV> = self.self_model.values()
+        let components: Vec<&BinaryHV> = self
+            .self_model
+            .values()
             .filter(|c| c.activation > 0.3)
             .map(|c| &c.encoding)
             .collect();
@@ -361,11 +368,15 @@ impl ConsciousnessSelfAssessment {
     /// Compute Φ of the self-model
     fn compute_phi_self(&self) -> f64 {
         // Simplified: average integration of all components
-        let total_integration: f64 = self.self_model.values()
+        let total_integration: f64 = self
+            .self_model
+            .values()
             .map(|c| c.integration * c.activation)
             .sum();
 
-        let active_count = self.self_model.values()
+        let active_count = self
+            .self_model
+            .values()
             .filter(|c| c.activation > 0.3)
             .count() as f64;
 
@@ -384,7 +395,9 @@ impl ConsciousnessSelfAssessment {
 
         // Compute average similarity with previous states
         let current = &self.unified_self;
-        let similarities: Vec<f64> = self.previous_states.iter()
+        let similarities: Vec<f64> = self
+            .previous_states
+            .iter()
             .map(|prev| (current.similarity(prev) as f64 + 1.0) / 2.0)
             .collect();
 
@@ -521,7 +534,8 @@ impl ConsciousnessSelfAssessment {
 
     /// Get trajectory of self-consciousness over time
     pub fn consciousness_trajectory(&self) -> Vec<f64> {
-        self.history.iter()
+        self.history
+            .iter()
             .map(|r| r.self_consciousness_score)
             .collect()
     }
@@ -532,16 +546,17 @@ impl ConsciousnessSelfAssessment {
             return false;
         }
 
-        let recent: Vec<f64> = self.history.iter()
+        let recent: Vec<f64> = self
+            .history
+            .iter()
             .rev()
             .take(3)
             .map(|r| r.self_consciousness_score)
             .collect();
 
         let mean = recent.iter().sum::<f64>() / recent.len() as f64;
-        let variance: f64 = recent.iter()
-            .map(|s| (s - mean).powi(2))
-            .sum::<f64>() / recent.len() as f64;
+        let variance: f64 =
+            recent.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / recent.len() as f64;
 
         variance < 0.01 // Low variance = stable
     }
@@ -585,8 +600,14 @@ mod tests {
     fn test_self_awareness_levels() {
         assert!(SelfAwarenessLevel::None < SelfAwarenessLevel::Bodily);
         assert!(SelfAwarenessLevel::MetaCognitive < SelfAwarenessLevel::Recursive);
-        assert_eq!(SelfAwarenessLevel::from_depth(3), SelfAwarenessLevel::MetaCognitive);
-        assert_eq!(SelfAwarenessLevel::from_depth(10), SelfAwarenessLevel::Recursive);
+        assert_eq!(
+            SelfAwarenessLevel::from_depth(3),
+            SelfAwarenessLevel::MetaCognitive
+        );
+        assert_eq!(
+            SelfAwarenessLevel::from_depth(10),
+            SelfAwarenessLevel::Recursive
+        );
     }
 
     #[test]
@@ -600,7 +621,7 @@ mod tests {
     #[test]
     fn test_dimension_improvements() {
         let cognitive_imps = SelfDimension::Cognitive.related_improvements();
-        assert!(cognitive_imps.contains(&2));  // Φ
+        assert!(cognitive_imps.contains(&2)); // Φ
         assert!(cognitive_imps.contains(&24)); // HOT
 
         let temporal_imps = SelfDimension::Temporal.related_improvements();
@@ -731,7 +752,9 @@ mod tests {
             fixed_point_reached: true,
         };
 
-        result.dimension_scores.insert(SelfDimension::Cognitive, 0.8);
+        result
+            .dimension_scores
+            .insert(SelfDimension::Cognitive, 0.8);
 
         let report = result.first_person_report();
         assert!(report.contains("I am aware"));

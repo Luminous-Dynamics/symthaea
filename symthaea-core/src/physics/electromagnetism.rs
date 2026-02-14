@@ -23,10 +23,10 @@
 //! - Wave optics (interference, diffraction)
 //! - Photonics (lasers, fiber optics, metamaterials)
 
+use super::constants::{C, H};
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::{C, H};
 use serde::{Deserialize, Serialize};
 
 /// Polarization state
@@ -257,14 +257,20 @@ impl EMEncoder {
     }
 
     /// Create an EM wave
-    pub fn create_wave(&self, frequency_hz: f64, polarization: Polarization, genesis: &GenesisSeed) -> EMWave {
+    pub fn create_wave(
+        &self,
+        frequency_hz: f64,
+        polarization: Polarization,
+        genesis: &GenesisSeed,
+    ) -> EMWave {
         let wavelength_m = C / frequency_hz;
         let region = self.classify_region(frequency_hz);
 
         let region_vec = genesis.hv(region.domain(), PHYSICS_DIM);
         let pol_vec = genesis.hv(polarization.domain(), PHYSICS_DIM);
 
-        let vector = self.wave
+        let vector = self
+            .wave
             .bind(&self.em_field)
             .bind(&region_vec)
             .bind(&pol_vec)
@@ -281,13 +287,21 @@ impl EMEncoder {
     }
 
     fn classify_region(&self, frequency_hz: f64) -> SpectrumRegion {
-        if frequency_hz < 3e9 { SpectrumRegion::Radio }
-        else if frequency_hz < 3e11 { SpectrumRegion::Microwave }
-        else if frequency_hz < 4e14 { SpectrumRegion::Infrared }
-        else if frequency_hz < 8e14 { SpectrumRegion::Visible }
-        else if frequency_hz < 3e16 { SpectrumRegion::Ultraviolet }
-        else if frequency_hz < 3e19 { SpectrumRegion::XRay }
-        else { SpectrumRegion::GammaRay }
+        if frequency_hz < 3e9 {
+            SpectrumRegion::Radio
+        } else if frequency_hz < 3e11 {
+            SpectrumRegion::Microwave
+        } else if frequency_hz < 4e14 {
+            SpectrumRegion::Infrared
+        } else if frequency_hz < 8e14 {
+            SpectrumRegion::Visible
+        } else if frequency_hz < 3e16 {
+            SpectrumRegion::Ultraviolet
+        } else if frequency_hz < 3e19 {
+            SpectrumRegion::XRay
+        } else {
+            SpectrumRegion::GammaRay
+        }
     }
 
     /// Create visible light
@@ -297,11 +311,17 @@ impl EMEncoder {
     }
 
     /// Create a photon
-    pub fn create_photon(&self, energy_ev: f64, polarization: Polarization, genesis: &GenesisSeed) -> Photon {
+    pub fn create_photon(
+        &self,
+        energy_ev: f64,
+        polarization: Polarization,
+        genesis: &GenesisSeed,
+    ) -> Photon {
         let frequency_hz = energy_ev * 1.602e-19 / H;
         let pol_vec = genesis.hv(polarization.domain(), PHYSICS_DIM);
 
-        let vector = self.photon
+        let vector = self
+            .photon
             .bind(&self.quantized)
             .bind(&pol_vec)
             .scale(energy_ev.ln() as f32);
@@ -316,7 +336,9 @@ impl EMEncoder {
 
     /// Gauss's law for electric field: ∇·E = ρ/ε₀
     pub fn gauss_law_e(&self) -> ContinuousHV {
-        self.divergence.bind(&self.electric_field).bind(&self.charge_density)
+        self.divergence
+            .bind(&self.electric_field)
+            .bind(&self.charge_density)
     }
 
     /// Gauss's law for magnetic field: ∇·B = 0
@@ -326,13 +348,19 @@ impl EMEncoder {
 
     /// Faraday's law: ∇×E = -∂B/∂t
     pub fn faraday_law(&self) -> ContinuousHV {
-        self.curl.bind(&self.electric_field).bind(&self.magnetic_field)
+        self.curl
+            .bind(&self.electric_field)
+            .bind(&self.magnetic_field)
     }
 
     /// Ampère-Maxwell law: ∇×B = μ₀J + μ₀ε₀∂E/∂t
     pub fn ampere_maxwell_law(&self) -> ContinuousHV {
-        self.curl.bind(&self.magnetic_field)
-            .bind(&ContinuousHV::bundle(&[&self.current_density, &self.electric_field]))
+        self.curl
+            .bind(&self.magnetic_field)
+            .bind(&ContinuousHV::bundle(&[
+                &self.current_density,
+                &self.electric_field,
+            ]))
     }
 
     /// Full Maxwell equations (combined)
@@ -351,7 +379,7 @@ impl EMEncoder {
         if sin_theta2.abs() <= 1.0 {
             Some(sin_theta2.asin())
         } else {
-            None  // Total internal reflection
+            None // Total internal reflection
         }
     }
 
@@ -366,8 +394,14 @@ impl EMEncoder {
     }
 
     /// Create a lens
-    pub fn lens(&self, focal_length_m: f64, refractive_index: f64, genesis: &GenesisSeed) -> OpticalElement {
-        let vector = genesis.hv("optics::lens", PHYSICS_DIM)
+    pub fn lens(
+        &self,
+        focal_length_m: f64,
+        refractive_index: f64,
+        genesis: &GenesisSeed,
+    ) -> OpticalElement {
+        let vector = genesis
+            .hv("optics::lens", PHYSICS_DIM)
             .bind(&self.refraction)
             .scale((1.0 / focal_length_m).ln() as f32);
 
@@ -382,7 +416,8 @@ impl EMEncoder {
 
     /// Create a diffraction grating
     pub fn diffraction_grating(&self, lines_per_mm: f64, genesis: &GenesisSeed) -> OpticalElement {
-        let vector = genesis.hv("optics::grating", PHYSICS_DIM)
+        let vector = genesis
+            .hv("optics::grating", PHYSICS_DIM)
             .bind(&self.diffraction)
             .scale(lines_per_mm.ln() as f32);
 
@@ -396,7 +431,12 @@ impl EMEncoder {
     }
 
     /// Two-slit interference pattern (Young's experiment)
-    pub fn double_slit_interference(&self, wavelength_m: f64, slit_separation_m: f64, screen_distance_m: f64) -> ContinuousHV {
+    pub fn double_slit_interference(
+        &self,
+        wavelength_m: f64,
+        slit_separation_m: f64,
+        screen_distance_m: f64,
+    ) -> ContinuousHV {
         let fringe_spacing = wavelength_m * screen_distance_m / slit_separation_m;
         self.interference
             .bind(&self.wave)
@@ -469,11 +509,11 @@ mod tests {
         assert!(theta2.is_some());
 
         let angle = theta2.unwrap();
-        assert!(angle < std::f64::consts::FRAC_PI_4);  // Refracted towards normal
+        assert!(angle < std::f64::consts::FRAC_PI_4); // Refracted towards normal
 
         // Total internal reflection: glass to air at steep angle
         let tir = encoder.snells_law(1.5, 1.0, std::f64::consts::FRAC_PI_3);
-        assert!(tir.is_none());  // TIR occurs
+        assert!(tir.is_none()); // TIR occurs
     }
 
     #[test]
@@ -518,9 +558,9 @@ mod tests {
         let (encoder, _) = setup();
 
         let interference = encoder.double_slit_interference(
-            550e-9,  // 550 nm green light
-            0.5e-3,  // 0.5 mm slit separation
-            1.0,     // 1 m screen distance
+            550e-9, // 550 nm green light
+            0.5e-3, // 0.5 mm slit separation
+            1.0,    // 1 m screen distance
         );
 
         assert!(interference.norm() > 0.0);

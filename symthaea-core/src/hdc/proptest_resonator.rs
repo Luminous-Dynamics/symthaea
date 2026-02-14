@@ -1,10 +1,8 @@
 //! Property-based tests for the Resonator Network module.
 //! Tests algebraic properties of constraint satisfaction via coupled oscillators.
 
+use super::resonator::{Constraint, ResonatorConfig, ResonatorNetwork};
 use proptest::prelude::*;
-use super::resonator::{
-    ResonatorNetwork, ResonatorConfig, Constraint,
-};
 
 // Use small dimensions for speed
 const TEST_DIM: usize = 128;

@@ -3,10 +3,10 @@
 //! These subsystems modulate the cognitive loop by providing emotional context,
 //! novelty-seeking behavior, and meta-learning through introspection.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 use super::ActionHint;
+use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 
 /// Emotion contagion - emotional content influences consciousness state
 ///
@@ -49,24 +49,78 @@ impl Default for EmotionContagion {
 impl EmotionContagion {
     /// Positive emotion indicators
     const POSITIVE_WORDS: &'static [&'static str] = &[
-        "happy", "joy", "love", "great", "wonderful", "excellent", "amazing",
-        "beautiful", "fantastic", "good", "perfect", "brilliant", "awesome",
-        "delighted", "excited", "pleased", "thrilled", "grateful", "hope",
-        "success", "win", "celebrate", "smile", "laugh", "fun", "enjoy",
+        "happy",
+        "joy",
+        "love",
+        "great",
+        "wonderful",
+        "excellent",
+        "amazing",
+        "beautiful",
+        "fantastic",
+        "good",
+        "perfect",
+        "brilliant",
+        "awesome",
+        "delighted",
+        "excited",
+        "pleased",
+        "thrilled",
+        "grateful",
+        "hope",
+        "success",
+        "win",
+        "celebrate",
+        "smile",
+        "laugh",
+        "fun",
+        "enjoy",
     ];
 
     /// Negative emotion indicators
     const NEGATIVE_WORDS: &'static [&'static str] = &[
-        "sad", "angry", "fear", "hate", "terrible", "awful", "horrible",
-        "bad", "wrong", "fail", "lost", "pain", "hurt", "worry", "anxious",
-        "stressed", "frustrated", "disappointed", "regret", "sorry", "grief",
-        "cry", "suffer", "struggle", "difficult", "problem", "error",
+        "sad",
+        "angry",
+        "fear",
+        "hate",
+        "terrible",
+        "awful",
+        "horrible",
+        "bad",
+        "wrong",
+        "fail",
+        "lost",
+        "pain",
+        "hurt",
+        "worry",
+        "anxious",
+        "stressed",
+        "frustrated",
+        "disappointed",
+        "regret",
+        "sorry",
+        "grief",
+        "cry",
+        "suffer",
+        "struggle",
+        "difficult",
+        "problem",
+        "error",
     ];
 
     /// High arousal indicators (excitement/intensity)
     const HIGH_AROUSAL: &'static [&'static str] = &[
-        "!", "amazing", "incredible", "urgent", "now", "immediately",
-        "excited", "thrilled", "furious", "terrified", "ecstatic",
+        "!",
+        "amazing",
+        "incredible",
+        "urgent",
+        "now",
+        "immediately",
+        "excited",
+        "thrilled",
+        "furious",
+        "terrified",
+        "ecstatic",
     ];
 
     /// Analyze text for emotional content
@@ -77,15 +131,18 @@ impl EmotionContagion {
         let word_count = (words.len().max(1) as f64) as f32;
 
         // Count emotional indicators (safe casts via f64)
-        let positive_count = (Self::POSITIVE_WORDS.iter()
+        let positive_count = (Self::POSITIVE_WORDS
+            .iter()
             .filter(|w| text_lower.contains(*w))
             .count() as f64) as f32;
 
-        let negative_count = (Self::NEGATIVE_WORDS.iter()
+        let negative_count = (Self::NEGATIVE_WORDS
+            .iter()
             .filter(|w| text_lower.contains(*w))
             .count() as f64) as f32;
 
-        let arousal_count = (Self::HIGH_AROUSAL.iter()
+        let arousal_count = (Self::HIGH_AROUSAL
+            .iter()
             .filter(|w| text_lower.contains(*w))
             .count() as f64) as f32;
 
@@ -253,7 +310,8 @@ impl CuriosityDrive {
         }
 
         // Boredom grows with low error streak (safe cast via f64)
-        let streak_factor = ((self.low_error_streak as f64 / Self::BOREDOM_STREAK.max(1) as f64) as f32).min(1.0);
+        let streak_factor =
+            ((self.low_error_streak as f64 / Self::BOREDOM_STREAK.max(1) as f64) as f32).min(1.0);
         self.boredom = 0.9 * self.boredom + 0.1 * streak_factor;
 
         // Curiosity is inverse of average error (interesting when things are predictable)
@@ -331,7 +389,6 @@ impl CuriosityDrive {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelfReflection {
     // ===== Adaptive Thresholds =====
-
     /// Flow entry error threshold (adjusted based on flow frequency)
     pub flow_error_threshold: f32,
 
@@ -345,7 +402,6 @@ pub struct SelfReflection {
     pub trust_threshold: f32,
 
     // ===== Meta-Statistics =====
-
     /// Total reflection cycles performed
     pub reflection_count: u64,
 
@@ -371,7 +427,6 @@ pub struct SelfReflection {
     learning_effectiveness: f32,
 
     // ===== Adjustment History =====
-
     /// Number of threshold adjustments made
     pub adjustments_made: u32,
 
@@ -382,7 +437,6 @@ pub struct SelfReflection {
     last_boredom_adjustment: i8,
 
     // ===== Insights =====
-
     /// Current self-assessment
     pub self_assessment: SelfAssessment,
 
@@ -493,7 +547,8 @@ impl SelfReflection {
         // Update EMAs
         let alpha = 0.05;
         self.historical_error = self.historical_error * (1.0 - alpha) + prediction_error * alpha;
-        self.historical_confidence = self.historical_confidence * (1.0 - alpha) + confidence * alpha;
+        self.historical_confidence =
+            self.historical_confidence * (1.0 - alpha) + confidence * alpha;
 
         // Track flow and exploration rates
         let flow_val = if in_flow { 1.0 } else { 0.0 };
@@ -563,7 +618,9 @@ impl SelfReflection {
                     target: RecommendationTarget::BoredomThreshold,
                     direction: AdjustmentDirection::Decrease,
                     confidence: 0.8,
-                    reason: "System is stagnating; lower boredom threshold to encourage exploration".into(),
+                    reason:
+                        "System is stagnating; lower boredom threshold to encourage exploration"
+                            .into(),
                 });
                 // Increase exploration factor
                 self.recommendations.push(Recommendation {
@@ -660,11 +717,13 @@ impl SelfReflection {
                 RecommendationTarget::FlowThreshold => {
                     match rec.direction {
                         AdjustmentDirection::Increase => {
-                            self.flow_error_threshold = (self.flow_error_threshold + Self::ADJUSTMENT_STEP).min(0.4);
+                            self.flow_error_threshold =
+                                (self.flow_error_threshold + Self::ADJUSTMENT_STEP).min(0.4);
                             self.last_flow_adjustment = 1;
                         }
                         AdjustmentDirection::Decrease => {
-                            self.flow_error_threshold = (self.flow_error_threshold - Self::ADJUSTMENT_STEP).max(0.1);
+                            self.flow_error_threshold =
+                                (self.flow_error_threshold - Self::ADJUSTMENT_STEP).max(0.1);
                             self.last_flow_adjustment = -1;
                         }
                         AdjustmentDirection::NoChange => {
@@ -676,11 +735,13 @@ impl SelfReflection {
                 RecommendationTarget::BoredomThreshold => {
                     match rec.direction {
                         AdjustmentDirection::Increase => {
-                            self.boredom_threshold = (self.boredom_threshold + Self::ADJUSTMENT_STEP).min(0.3);
+                            self.boredom_threshold =
+                                (self.boredom_threshold + Self::ADJUSTMENT_STEP).min(0.3);
                             self.last_boredom_adjustment = 1;
                         }
                         AdjustmentDirection::Decrease => {
-                            self.boredom_threshold = (self.boredom_threshold - Self::ADJUSTMENT_STEP).max(0.05);
+                            self.boredom_threshold =
+                                (self.boredom_threshold - Self::ADJUSTMENT_STEP).max(0.05);
                             self.last_boredom_adjustment = -1;
                         }
                         AdjustmentDirection::NoChange => {
@@ -692,10 +753,12 @@ impl SelfReflection {
                 RecommendationTarget::TrustThreshold => {
                     match rec.direction {
                         AdjustmentDirection::Increase => {
-                            self.trust_threshold = (self.trust_threshold + Self::ADJUSTMENT_STEP).min(0.7);
+                            self.trust_threshold =
+                                (self.trust_threshold + Self::ADJUSTMENT_STEP).min(0.7);
                         }
                         AdjustmentDirection::Decrease => {
-                            self.trust_threshold = (self.trust_threshold - Self::ADJUSTMENT_STEP).max(0.2);
+                            self.trust_threshold =
+                                (self.trust_threshold - Self::ADJUSTMENT_STEP).max(0.2);
                         }
                         AdjustmentDirection::NoChange => {}
                     }
@@ -711,7 +774,8 @@ impl SelfReflection {
         // If making many adjustments, reflect more often
         // If stable, reflect less often
         // Safe cast via f64 to prevent precision loss on large values
-        let recent_adjustment_rate = (self.adjustments_made as f64 / self.reflection_count.max(1) as f64) as f32;
+        let recent_adjustment_rate =
+            (self.adjustments_made as f64 / self.reflection_count.max(1) as f64) as f32;
 
         if recent_adjustment_rate > 0.8 {
             // Lots of adjustments = unstable, reflect more
@@ -743,7 +807,9 @@ impl SelfReflection {
             learning_effectiveness: self.learning_effectiveness,
             historical_error: self.historical_error,
             historical_confidence: self.historical_confidence,
-            next_reflection_in: self.reflection_interval.saturating_sub(self.cycles_since_reflection),
+            next_reflection_in: self
+                .reflection_interval
+                .saturating_sub(self.cycles_since_reflection),
         }
     }
 

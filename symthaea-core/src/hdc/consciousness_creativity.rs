@@ -160,7 +160,7 @@ impl Concept {
     pub fn distance_to(&self, other: &Concept) -> f64 {
         // 1 - similarity gives distance
         let similarity = self.encoding.similarity(&other.encoding) as f64;
-        1.0 - (similarity + 1.0) / 2.0  // Map [-1,1] to [0,1], then invert
+        1.0 - (similarity + 1.0) / 2.0 // Map [-1,1] to [0,1], then invert
     }
 }
 
@@ -336,12 +336,12 @@ impl ConsciousnessCreativity {
 
         // Adjust precision based on mode
         self.precision = match mode {
-            CreativeMode::Preparation => 0.7,    // High precision - focused gathering
-            CreativeMode::Divergent => 0.2,      // Low precision - explore freely
-            CreativeMode::Incubation => 0.1,     // Very low - unconscious wandering
-            CreativeMode::Insight => 0.05,       // Minimal - maximum openness
-            CreativeMode::Convergent => 0.8,     // High - focused selection
-            CreativeMode::Verification => 0.9,   // Very high - careful testing
+            CreativeMode::Preparation => 0.7, // High precision - focused gathering
+            CreativeMode::Divergent => 0.2,   // Low precision - explore freely
+            CreativeMode::Incubation => 0.1,  // Very low - unconscious wandering
+            CreativeMode::Insight => 0.05,    // Minimal - maximum openness
+            CreativeMode::Convergent => 0.8,  // High - focused selection
+            CreativeMode::Verification => 0.9, // Very high - careful testing
         };
     }
 
@@ -424,7 +424,9 @@ impl ConsciousnessCreativity {
         }
 
         // Average distance from all existing ideas
-        let total_distance: f64 = self.ideas.iter()
+        let total_distance: f64 = self
+            .ideas
+            .iter()
             .map(|idea| {
                 let sim = encoding.similarity(&idea.encoding) as f64;
                 1.0 - (sim + 1.0) / 2.0
@@ -463,16 +465,14 @@ impl ConsciousnessCreativity {
         let mut best_pair: Option<(String, String)> = None;
 
         for i in 0..self.incubation_buffer.len() {
-            for j in (i+1)..self.incubation_buffer.len() {
-                let distance = self.association_distance(
-                    &self.incubation_buffer[i],
-                    &self.incubation_buffer[j]
-                );
+            for j in (i + 1)..self.incubation_buffer.len() {
+                let distance = self
+                    .association_distance(&self.incubation_buffer[i], &self.incubation_buffer[j]);
                 if distance > max_distance {
                     max_distance = distance;
                     best_pair = Some((
                         self.incubation_buffer[i].clone(),
-                        self.incubation_buffer[j].clone()
+                        self.incubation_buffer[j].clone(),
                     ));
                 }
             }
@@ -500,7 +500,7 @@ impl ConsciousnessCreativity {
             intensity: max_distance,
             incubation_duration: self.incubation_buffer.len(),
             certainty: max_distance * 0.8 + 0.2, // High distance → high certainty
-            positive_affect: 0.9, // Insights feel good!
+            positive_affect: 0.9,                // Insights feel good!
         };
 
         self.insights.push(insight.clone());
@@ -522,9 +522,11 @@ impl ConsciousnessCreativity {
         }
 
         // Update best idea
-        if let Some(best) = self.ideas.iter().max_by(|a, b| {
-            a.creativity_score.total_cmp(&b.creativity_score)
-        }) {
+        if let Some(best) = self
+            .ideas
+            .iter()
+            .max_by(|a, b| a.creativity_score.total_cmp(&b.creativity_score))
+        {
             self.best_idea = Some(best.clone());
         }
     }
@@ -566,24 +568,24 @@ impl ConsciousnessCreativity {
         // Divergent score: fluency × flexibility × originality
         let fluency = self.ideas.len() as f64 / (self.step as f64 + 1.0).max(1.0);
         let flexibility = self.count_unique_domains() as f64 / self.concepts.len() as f64;
-        let originality = self.ideas.iter()
-            .map(|i| i.novelty)
-            .sum::<f64>() / (self.ideas.len() as f64).max(1.0);
-        let divergent_score = (fluency * flexibility * originality).powf(1.0/3.0);
+        let originality =
+            self.ideas.iter().map(|i| i.novelty).sum::<f64>() / (self.ideas.len() as f64).max(1.0);
+        let divergent_score = (fluency * flexibility * originality).powf(1.0 / 3.0);
 
         // Convergent score: best idea quality
-        let convergent_score = self.best_idea.as_ref()
+        let convergent_score = self
+            .best_idea
+            .as_ref()
             .map(|i| i.creativity_score)
             .unwrap_or(0.0);
 
         // Association remoteness
-        let association_remoteness = self.ideas.iter()
-            .map(|i| i.surprise)
-            .sum::<f64>() / (self.ideas.len() as f64).max(1.0);
+        let association_remoteness =
+            self.ideas.iter().map(|i| i.surprise).sum::<f64>() / (self.ideas.len() as f64).max(1.0);
 
         // Incubation depth
-        let incubation_depth = self.incubation_buffer.len() as f64
-            / (self.concepts.len() as f64).max(1.0);
+        let incubation_depth =
+            self.incubation_buffer.len() as f64 / (self.concepts.len() as f64).max(1.0);
 
         // Insight readiness
         let insight_readiness = if self.mode == CreativeMode::Incubation {
@@ -594,10 +596,14 @@ impl ConsciousnessCreativity {
         };
 
         // Overall creative potential
-        let creative_potential = (divergent_score + convergent_score
-            + association_remoteness + insight_readiness.min(1.0)) / 4.0;
+        let creative_potential = (divergent_score
+            + convergent_score
+            + association_remoteness
+            + insight_readiness.min(1.0))
+            / 4.0;
 
-        let explanation = format!(
+        let explanation =
+            format!(
             "Mode: {:?}, {} ideas, {} insights, divergent={:.2}, convergent={:.2}, potential={:.2}",
             self.mode, self.ideas.len(), self.insights.len(),
             divergent_score, convergent_score, creative_potential
@@ -619,7 +625,9 @@ impl ConsciousnessCreativity {
 
     /// Count unique domains in workspace
     fn count_unique_domains(&self) -> usize {
-        let domains: std::collections::HashSet<&String> = self.workspace.iter()
+        let domains: std::collections::HashSet<&String> = self
+            .workspace
+            .iter()
             .filter_map(|name| self.concepts.get(name).map(|c| &c.domain))
             .collect();
         domains.len()
@@ -629,11 +637,9 @@ impl ConsciousnessCreativity {
     fn max_incubation_distance(&self) -> f64 {
         let mut max = 0.0;
         for i in 0..self.incubation_buffer.len() {
-            for j in (i+1)..self.incubation_buffer.len() {
-                let d = self.association_distance(
-                    &self.incubation_buffer[i],
-                    &self.incubation_buffer[j]
-                );
+            for j in (i + 1)..self.incubation_buffer.len() {
+                let d = self
+                    .association_distance(&self.incubation_buffer[i], &self.incubation_buffer[j]);
                 if d > max {
                     max = d;
                 }
@@ -774,10 +780,18 @@ mod tests {
         // If a combination was generated, it should have valid fields
         if let Some(combo) = combination {
             assert!(!combo.id.is_empty(), "Combination id should be non-empty");
-            assert!(combo.novelty.is_finite(), "Combination novelty should be finite");
-            assert!(combo.novelty >= 0.0 && combo.novelty <= 1.0,
-                    "Novelty should be in [0, 1]");
-            assert!(combo.sources.len() >= 2, "Should combine at least 2 concepts");
+            assert!(
+                combo.novelty.is_finite(),
+                "Combination novelty should be finite"
+            );
+            assert!(
+                combo.novelty >= 0.0 && combo.novelty <= 1.0,
+                "Novelty should be in [0, 1]"
+            );
+            assert!(
+                combo.sources.len() >= 2,
+                "Should combine at least 2 concepts"
+            );
         }
     }
 

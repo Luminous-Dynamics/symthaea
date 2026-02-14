@@ -35,14 +35,14 @@
 //! └─────────────────────────────────────────────────────────────────────┘
 //! ```
 
+use crate::consciousness::primitive_reasoning::{
+    AdaptivePrimitiveSelector, PrimitiveAffinityGraph, ReasoningChain, TaskType, TierAwareConfig,
+    TransformationType,
+};
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
 use symthaea_core::hdc::BinaryHV;
-use crate::consciousness::primitive_reasoning::{
-    ReasoningChain, TransformationType, AdaptivePrimitiveSelector,
-    PrimitiveAffinityGraph, TaskType, TierAwareConfig,
-};
-use serde::{Serialize, Deserialize};
-use anyhow::Result;
 
 // =============================================================================
 // PRIMITIVE CONSCIOUSNESS STATE
@@ -99,10 +99,15 @@ pub enum ActivationReason {
     TopDown { goal: String },
 
     /// Lateral: activated by another primitive
-    Lateral { source_primitive: String, affinity: f64 },
+    Lateral {
+        source_primitive: String,
+        affinity: f64,
+    },
 
     /// Sustained: maintained from previous state
-    Sustained { original_reason: Box<ActivationReason> },
+    Sustained {
+        original_reason: Box<ActivationReason>,
+    },
 }
 
 /// Binding between two primitives
@@ -144,7 +149,8 @@ impl PrimitiveConsciousnessState {
 
     /// Get active primitives for a specific tier
     pub fn tier_active(&self, tier: PrimitiveTier) -> Vec<&ActivePrimitive> {
-        self.active_by_tier.get(&tier)
+        self.active_by_tier
+            .get(&tier)
             .map(|v| v.iter().collect())
             .unwrap_or_default()
     }
@@ -171,9 +177,7 @@ impl PrimitiveConsciousnessState {
         }
 
         // Collect all encodings for bundling
-        let encodings: Vec<BinaryHV> = actives.iter()
-            .map(|a| a.primitive.encoding)
-            .collect();
+        let encodings: Vec<BinaryHV> = actives.iter().map(|a| a.primitive.encoding).collect();
 
         // Bundle all active primitives
         let unified = BinaryHV::bundle(&encodings);
@@ -183,7 +187,8 @@ impl PrimitiveConsciousnessState {
 
     /// Get the dominant tier (most active primitives)
     pub fn dominant_tier(&self) -> Option<PrimitiveTier> {
-        self.active_by_tier.iter()
+        self.active_by_tier
+            .iter()
             .max_by_key(|(_, v)| v.len())
             .map(|(tier, _)| *tier)
     }
@@ -246,13 +251,18 @@ impl ConsciousnessPrimitiveProcessor {
             PrimitiveTier::Consciousness,
         ];
 
-        tiers.iter()
+        tiers
+            .iter()
             .flat_map(|tier| self.primitive_system.get_tier(*tier))
             .collect()
     }
 
     /// Process semantic input to activate primitives
-    pub fn process_input(&mut self, input: &BinaryHV, timestamp: f64) -> PrimitiveConsciousnessState {
+    pub fn process_input(
+        &mut self,
+        input: &BinaryHV,
+        timestamp: f64,
+    ) -> PrimitiveConsciousnessState {
         let mut state = PrimitiveConsciousnessState::new(timestamp);
 
         // Find primitives that resonate with input
@@ -266,7 +276,9 @@ impl ConsciousnessPrimitiveProcessor {
                 state.activate(
                     prim.clone(),
                     similarity as f64,
-                    ActivationReason::BottomUp { input_similarity: similarity as f64 },
+                    ActivationReason::BottomUp {
+                        input_similarity: similarity as f64,
+                    },
                 );
             }
         }
@@ -299,7 +311,12 @@ impl ConsciousnessPrimitiveProcessor {
     }
 
     /// Create a reasoning chain for a question
-    pub fn reason(&self, question: BinaryHV, task: TaskType, depth: usize) -> Result<ReasoningChain> {
+    pub fn reason(
+        &self,
+        question: BinaryHV,
+        task: TaskType,
+        depth: usize,
+    ) -> Result<ReasoningChain> {
         let mut chain = ReasoningChain::new(question);
 
         // Select primitives for task
@@ -355,7 +372,18 @@ impl ConsciousnessPrimitiveProcessor {
         for prim in active.iter().take(8) {
             // Convert encoding to continuous representation
             let bits: Vec<f32> = (0..16)
-                .map(|i| if prim.primitive.encoding.get_bit(i % crate::hdc::HDC_DIMENSION) != 0 { 1.0f32 } else { -1.0f32 })
+                .map(|i| {
+                    if prim
+                        .primitive
+                        .encoding
+                        .get_bit(i % crate::hdc::HDC_DIMENSION)
+                        != 0
+                    {
+                        1.0f32
+                    } else {
+                        -1.0f32
+                    }
+                })
                 .collect();
             nodes.push(ContinuousHV::from_vec(bits));
         }
@@ -455,7 +483,8 @@ impl ConsciousnessDecomposer {
             *tier_scores.entry(prim.tier).or_insert(0.0) += score;
         }
 
-        tier_scores.into_iter()
+        tier_scores
+            .into_iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(tier, _)| tier)
     }
@@ -463,7 +492,8 @@ impl ConsciousnessDecomposer {
     /// Convert semantic vector to BinaryHV
     fn semantic_to_hv(&self, semantic: &[f32]) -> BinaryHV {
         // Use semantic hash as seed for reproducible conversion
-        let seed: u64 = semantic.iter()
+        let seed: u64 = semantic
+            .iter()
             .enumerate()
             .map(|(i, &v)| (v.to_bits() as u64).wrapping_mul(i as u64 + 1))
             .fold(0u64, |acc, x| acc.wrapping_add(x));
@@ -527,7 +557,8 @@ impl PrimitiveBindingEngine {
         let phi = self.estimate_binding_phi(prim1, prim2, &result);
 
         // Record in affinity graph
-        self.affinity_graph.record_composition(&prim1.name, &prim2.name, phi);
+        self.affinity_graph
+            .record_composition(&prim1.name, &prim2.name, phi);
 
         PrimitiveBinding {
             prim1: prim1.name.clone(),
@@ -546,7 +577,9 @@ impl PrimitiveBindingEngine {
     /// Estimate phi contribution from binding
     fn estimate_binding_phi(&self, prim1: &Primitive, prim2: &Primitive, result: &BinaryHV) -> f64 {
         // Tier affinity contributes to phi
-        let tier_affinity = self.affinity_graph.get_tier_affinity(prim1.tier, prim2.tier);
+        let tier_affinity = self
+            .affinity_graph
+            .get_tier_affinity(prim1.tier, prim2.tier);
 
         // Orthogonality contributes to information integration
         let similarity = prim1.encoding.similarity(&prim2.encoding) as f64;
@@ -595,7 +628,13 @@ mod tests {
             derivation: None,
         };
 
-        state.activate(prim, 0.8, ActivationReason::BottomUp { input_similarity: 0.8 });
+        state.activate(
+            prim,
+            0.8,
+            ActivationReason::BottomUp {
+                input_similarity: 0.8,
+            },
+        );
 
         assert_eq!(state.all_active().len(), 1);
         assert_eq!(state.tier_active(PrimitiveTier::Physical).len(), 1);
@@ -625,7 +664,10 @@ mod tests {
         let activations = decomposer.decompose(&semantic);
         // Decomposition should return valid (Primitive, f64) pairs
         for (_prim, score) in &activations {
-            assert!(score.is_finite(), "Activation score must be finite: {score}");
+            assert!(
+                score.is_finite(),
+                "Activation score must be finite: {score}"
+            );
         }
     }
 

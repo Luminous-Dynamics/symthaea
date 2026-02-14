@@ -4,10 +4,10 @@
 //! between peers. Tickets are the mechanism by which peers establish
 //! direct QUIC connections.
 
-use crate::swarm::{SwarmResult, SwarmError, ConnectionTicket};
+use crate::swarm::{ConnectionTicket, SwarmError, SwarmResult};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
-use parking_lot::RwLock;
 
 /// Manages connection tickets for peer discovery and connection
 ///
@@ -62,7 +62,9 @@ impl TicketManager {
             created_at: SystemTime::now(),
             use_count: 0,
         };
-        self.outgoing_tickets.write().insert(ticket.node_id.clone(), entry);
+        self.outgoing_tickets
+            .write()
+            .insert(ticket.node_id.clone(), entry);
     }
 
     /// Store an incoming ticket (one we received from a peer)
@@ -74,7 +76,9 @@ impl TicketManager {
             created_at: SystemTime::now(),
             use_count: 0,
         };
-        self.incoming_tickets.write().insert(ticket.node_id.clone(), entry);
+        self.incoming_tickets
+            .write()
+            .insert(ticket.node_id.clone(), entry);
     }
 
     /// Get an incoming ticket for a specific node
@@ -101,13 +105,17 @@ impl TicketManager {
         let _now = SystemTime::now();
 
         self.outgoing_tickets.write().retain(|_, entry| {
-            entry.created_at.elapsed()
+            entry
+                .created_at
+                .elapsed()
                 .map(|d| d < self.default_expiration)
                 .unwrap_or(false)
         });
 
         self.incoming_tickets.write().retain(|_, entry| {
-            entry.created_at.elapsed()
+            entry
+                .created_at
+                .elapsed()
                 .map(|d| d < self.default_expiration)
                 .unwrap_or(false)
         });
@@ -117,10 +125,7 @@ impl TicketManager {
     ///
     /// Used by `IrohNode::known_peer_ids()` for peer discovery.
     pub fn known_peers(&self) -> Vec<String> {
-        self.incoming_tickets.read()
-            .keys()
-            .cloned()
-            .collect()
+        self.incoming_tickets.read().keys().cloned().collect()
     }
 
     /// Get the number of stored tickets (outgoing, incoming)
@@ -326,7 +331,10 @@ mod tests {
         let empty_ticket = ConnectionTicket::new("", "node");
         let result = manager.validate(&empty_ticket);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), SwarmError::InvalidTicket { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            SwarmError::InvalidTicket { .. }
+        ));
     }
 
     #[test]
@@ -336,7 +344,10 @@ mod tests {
         let empty_node = ConnectionTicket::new("ticket", "");
         let result = manager.validate(&empty_node);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), SwarmError::InvalidTicket { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            SwarmError::InvalidTicket { .. }
+        ));
     }
 
     #[test]
@@ -349,7 +360,9 @@ mod tests {
 
         let result = manager.validate(&expired_ticket);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), SwarmError::InvalidTicket { reason } if reason.contains("expired")));
+        assert!(
+            matches!(result.unwrap_err(), SwarmError::InvalidTicket { reason } if reason.contains("expired"))
+        );
     }
 
     #[test]
@@ -451,10 +464,7 @@ mod tests {
         for i in 0..10 {
             let mgr = Arc::clone(&manager);
             handles.push(thread::spawn(move || {
-                let ticket = ConnectionTicket::new(
-                    format!("ticket-{}", i),
-                    format!("node-{}", i),
-                );
+                let ticket = ConnectionTicket::new(format!("ticket-{}", i), format!("node-{}", i));
                 mgr.store_incoming(ticket);
                 mgr.known_peers();
                 mgr.ticket_count();

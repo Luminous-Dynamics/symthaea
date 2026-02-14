@@ -5,29 +5,27 @@
 //! self-reflection, consciousness patterns, voice feedback, unification
 //! engine, and memory systems.
 
-use anyhow::Result;
-use crate::dynamics::cfc_coherence::CoherenceSummary;
-use crate::dynamics::temporal_signatures::{ConsciousnessPattern, TemporalStateSummary};
-use crate::voice::voice_feedback::{VoiceOutputMetrics, VoiceQualitySummary};
+use crate::causal::{CausalGraph, DiscoveredRelationship};
 use crate::consciousness::consciousness_unification::{
-    ConsciousnessUnificationEngine, UnifiedEmotionalState, UnifiedEmotion, EmotionalPattern,
+    ConsciousnessUnificationEngine, EmotionalPattern, UnifiedEmotion, UnifiedEmotionalState,
 };
 use crate::consciousness::fep_active_inference::ActiveInferenceAgent;
 use crate::consciousness::stability_regime::StabilityRegimeProcessor;
+use crate::dynamics::cfc_coherence::CoherenceSummary;
+use crate::dynamics::temporal_signatures::{ConsciousnessPattern, TemporalStateSummary};
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
-use crate::causal::{CausalGraph, DiscoveredRelationship};
+use crate::voice::voice_feedback::{VoiceOutputMetrics, VoiceQualitySummary};
+use anyhow::Result;
 
-use super::{
-    CognitiveLoopService, CognitiveLoopConfig, LoopStats, AdaptiveBehavior,
-    FlowState, EmotionContagion, CuriosityDrive, SelfReflection,
-    SelfAssessment, ReflectionSummary, ReflectionThresholds, Recommendation,
-    ThalamicRouter, CognitiveDepth, ActiveInferenceBridge, CouplingQuality,
-    ClosedLearningLoop, ResponseStrategy, CycleLearningResult,
-    EpisodicMemoryBridge, EpisodicMemory, GoalSystemBridge, CognitiveGoal,
-    WorldModelBridge, ActionHint,
-};
 use super::snapshot::ConsciousnessSnapshot;
 use super::temporal_network::TemporalNetwork;
+use super::{
+    ActionHint, ActiveInferenceBridge, AdaptiveBehavior, ClosedLearningLoop, CognitiveDepth,
+    CognitiveGoal, CognitiveLoopConfig, CognitiveLoopService, CouplingQuality, CuriosityDrive,
+    CycleLearningResult, EmotionContagion, EpisodicMemory, EpisodicMemoryBridge, FlowState,
+    GoalSystemBridge, LoopStats, Recommendation, ReflectionSummary, ReflectionThresholds,
+    ResponseStrategy, SelfAssessment, SelfReflection, ThalamicRouter, WorldModelBridge,
+};
 
 impl CognitiveLoopService {
     /// Get current statistics
@@ -56,7 +54,9 @@ impl CognitiveLoopService {
 
     /// Get discovered causal relationships history
     pub fn causal_discoveries(&self) -> Option<&[DiscoveredRelationship]> {
-        self.causal_enhancer.as_ref().map(|e| e.discovered_relationships())
+        self.causal_enhancer
+            .as_ref()
+            .map(|e| e.discovered_relationships())
     }
 
     /// Get causal enhancer statistics
@@ -66,7 +66,8 @@ impl CognitiveLoopService {
 
     /// Check if any causal structure has been discovered
     pub fn has_causal_structure(&self) -> bool {
-        self.causal_enhancer.as_ref()
+        self.causal_enhancer
+            .as_ref()
             .map(|e| e.has_causal_structure())
             .unwrap_or(false)
     }
@@ -78,12 +79,16 @@ impl CognitiveLoopService {
 
     /// Get causal attention weights for a target dimension
     pub fn causal_attention_weights(&mut self, target_dim: usize) -> Option<Vec<f32>> {
-        self.causal_enhancer.as_mut().map(|e| e.causal_attention_weights(target_dim))
+        self.causal_enhancer
+            .as_mut()
+            .map(|e| e.causal_attention_weights(target_dim))
     }
 
     /// Suggest an intervention based on discovered causal structure
     pub fn suggest_causal_intervention(&mut self) -> Option<(usize, f64)> {
-        self.causal_enhancer.as_mut().and_then(|e| e.suggest_intervention())
+        self.causal_enhancer
+            .as_mut()
+            .and_then(|e| e.suggest_intervention())
     }
 
     /// Get encoder statistics
@@ -101,28 +106,38 @@ impl CognitiveLoopService {
     }
 
     /// Get episodic replay statistics
-    pub fn episodic_replay_stats(&self) -> Option<crate::memory::episodic_replay::EpisodicMemoryStats> {
+    pub fn episodic_replay_stats(
+        &self,
+    ) -> Option<crate::memory::episodic_replay::EpisodicMemoryStats> {
         self.phi_episodic_replay.as_ref().map(|r| r.stats())
     }
 
     /// Get the number of stored episodes
     pub fn episodic_replay_count(&self) -> usize {
-        self.phi_episodic_replay.as_ref().map(|r| r.len()).unwrap_or(0)
+        self.phi_episodic_replay
+            .as_ref()
+            .map(|r| r.len())
+            .unwrap_or(0)
     }
 
     /// Get top N episodes by Phi (highest consciousness moments)
     pub fn top_phi_episodes(&self, n: usize) -> Vec<crate::memory::episodic_replay::Episode> {
-        self.phi_episodic_replay.as_ref()
+        self.phi_episodic_replay
+            .as_ref()
             .map(|r| r.get_top_episodes(n))
             .unwrap_or_default()
     }
 
     /// Force an episodic replay session (useful for testing or manual consolidation)
-    pub fn force_episodic_replay(&mut self, learning_rate: f32) -> Option<crate::memory::episodic_replay::ReplaySessionResult> {
+    pub fn force_episodic_replay(
+        &mut self,
+        learning_rate: f32,
+    ) -> Option<crate::memory::episodic_replay::ReplaySessionResult> {
         if let Some(ref mut replay) = self.phi_episodic_replay {
             if let TemporalNetwork::CfC(ref mut cfc) = self.temporal_network {
                 // Temporarily bypass should_replay check by manually running replay
-                let batch = replay.sample_replay_batch(self.config.episodic_replay_config.batch_size);
+                let batch =
+                    replay.sample_replay_batch(self.config.episodic_replay_config.batch_size);
                 if batch.is_empty() {
                     return Some(crate::memory::episodic_replay::ReplaySessionResult {
                         episodes_replayed: 0,
@@ -183,17 +198,21 @@ impl CognitiveLoopService {
             v
         } else {
             let step = embedding.len() / input_dim;
-            embedding.iter()
+            embedding
+                .iter()
                 .step_by(step)
                 .take(input_dim)
                 .cloned()
                 .collect::<Vec<_>>()
         };
 
-        self.temporal_network.project_to_hdc_vec(&compressed)
-            .ok_or_else(|| anyhow::anyhow!(
-                "HDC projection not available (using CfC backend, not HdcLtcBridge)"
-            ))
+        self.temporal_network
+            .project_to_hdc_vec(&compressed)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "HDC projection not available (using CfC backend, not HdcLtcBridge)"
+                )
+            })
     }
 
     /// Check if loop is learning (error trend negative)
@@ -452,7 +471,12 @@ impl CognitiveLoopService {
             total_flow_time_secs: self.flow_state.total_flow_time_with_current(),
             flow_periods: self.flow_state.flow_periods,
             avg_flow_duration_secs: self.flow_state.avg_flow_duration_secs,
-            fep_free_energy: self.fep_agent.last_fe_components.as_ref().map(|fe| fe.total).unwrap_or(0.0),
+            fep_free_energy: self
+                .fep_agent
+                .last_fe_components
+                .as_ref()
+                .map(|fe| fe.total)
+                .unwrap_or(0.0),
             fep_precision: self.fep_agent.precision.perceptual_precision(),
         }
     }
@@ -487,7 +511,8 @@ impl CognitiveLoopService {
 
     /// Update listener prediction feedback
     pub fn update_listener_prediction(&mut self, success: f32) {
-        self.voice_feedback_bridge.update_listener_prediction(success);
+        self.voice_feedback_bridge
+            .update_listener_prediction(success);
     }
 
     /// Get voice quality summary for external systems
@@ -502,7 +527,8 @@ impl CognitiveLoopService {
 
     /// Get combined phi contribution from all feedback sources
     pub fn combined_phi_contribution(&self) -> f32 {
-        self.coherence_bridge.phi_contribution() + self.voice_feedback_bridge.compute_phi_adjustment()
+        self.coherence_bridge.phi_contribution()
+            + self.voice_feedback_bridge.compute_phi_adjustment()
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -560,7 +586,10 @@ impl CognitiveLoopService {
     }
 
     /// Process input through the unified dialogue pipeline
-    pub fn process_unified(&mut self, input: &str) -> crate::consciousness::consciousness_unification::UnifiedConsciousnessResult {
+    pub fn process_unified(
+        &mut self,
+        input: &str,
+    ) -> crate::consciousness::consciousness_unification::UnifiedConsciousnessResult {
         self.unification_engine.process(input)
     }
 
@@ -581,7 +610,10 @@ impl CognitiveLoopService {
 
     /// Get the current FEP free energy (if available)
     pub fn fep_free_energy(&self) -> Option<f64> {
-        self.fep_agent.last_fe_components.as_ref().map(|fe| fe.total)
+        self.fep_agent
+            .last_fe_components
+            .as_ref()
+            .map(|fe| fe.total)
     }
 
     /// Get the conversation coherence tracker reference
@@ -601,7 +633,9 @@ impl CognitiveLoopService {
 
     /// Check if prediction-outcome coupling is meaningful
     pub fn has_meaningful_coupling(&self) -> bool {
-        self.active_inference_bridge.coupling_quality().is_meaningful()
+        self.active_inference_bridge
+            .coupling_quality()
+            .is_meaningful()
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -679,7 +713,8 @@ impl CognitiveLoopService {
 
     /// Add a goal to the system
     pub fn add_goal(&mut self, id: &str, description: &str, priority: f32) {
-        self.goal_system.add_goal(CognitiveGoal::new(id, description, priority));
+        self.goal_system
+            .add_goal(CognitiveGoal::new(id, description, priority));
     }
 
     /// Get active goals

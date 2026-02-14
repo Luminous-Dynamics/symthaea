@@ -6,12 +6,9 @@
 //! without requiring actual P2P connections.
 
 use symthaea::swarm::{
-    SwarmConfig, SwarmError, SwarmNode, PeerInfo, TrustLevel,
-    ConsciousnessVector, TensorPayload, TensorType, SwarmMessage,
-    Hyperfeel, AffectiveState, EmotionLabel,
-    HybridHandshake, HandshakeResult,
-    HolochainCortex, AgentPubKey, AgentInfo,
-    TensorStream, StreamConfig,
+    AffectiveState, AgentInfo, AgentPubKey, ConsciousnessVector, EmotionLabel, HandshakeResult,
+    HolochainCortex, HybridHandshake, Hyperfeel, PeerInfo, StreamConfig, SwarmConfig, SwarmError,
+    SwarmMessage, SwarmNode, TensorPayload, TensorStream, TensorType, TrustLevel,
 };
 
 // ============================================================================
@@ -22,9 +19,15 @@ use symthaea::swarm::{
 fn test_swarm_config_default() {
     let config = SwarmConfig::default();
 
-    assert_eq!(config.listen_port, 0, "Should use OS-assigned port by default");
+    assert_eq!(
+        config.listen_port, 0,
+        "Should use OS-assigned port by default"
+    );
     assert!(config.enable_mdns, "mDNS should be enabled by default");
-    assert!(config.enable_derp, "DERP relays should be enabled by default");
+    assert!(
+        config.enable_derp,
+        "DERP relays should be enabled by default"
+    );
     assert!(config.max_peers > 0, "Should have positive max_peers");
     assert!(config.min_trust_level > 0.0 && config.min_trust_level < 1.0);
 }
@@ -33,16 +36,28 @@ fn test_swarm_config_default() {
 fn test_swarm_config_local_only() {
     let config = SwarmConfig::local_only();
 
-    assert!(!config.enable_derp, "DERP should be disabled for local-only");
-    assert!(config.bootstrap_peers.is_empty(), "No bootstrap peers for local-only");
+    assert!(
+        !config.enable_derp,
+        "DERP should be disabled for local-only"
+    );
+    assert!(
+        config.bootstrap_peers.is_empty(),
+        "No bootstrap peers for local-only"
+    );
 }
 
 #[test]
 fn test_swarm_config_production() {
     let config = SwarmConfig::production();
 
-    assert_eq!(config.max_peers, 100, "Production should have higher max_peers");
-    assert_eq!(config.min_trust_level, 0.7, "Production should have higher trust requirement");
+    assert_eq!(
+        config.max_peers, 100,
+        "Production should have higher max_peers"
+    );
+    assert_eq!(
+        config.min_trust_level, 0.7,
+        "Production should have higher trust requirement"
+    );
 }
 
 // ============================================================================
@@ -195,13 +210,18 @@ fn test_tensor_types() {
 #[test]
 fn test_swarm_message_types() {
     let messages = [
-        SwarmMessage::Heartbeat { phi: 0.5, peer_count: 3 },
+        SwarmMessage::Heartbeat {
+            phi: 0.5,
+            peer_count: 3,
+        },
         SwarmMessage::JoinRequest {
             agent_key: "test".to_string(),
             capabilities: vec!["tensor".to_string()],
         },
         SwarmMessage::TicketRequest,
-        SwarmMessage::Goodbye { reason: "shutdown".to_string() },
+        SwarmMessage::Goodbye {
+            reason: "shutdown".to_string(),
+        },
     ];
 
     assert_eq!(messages[0].message_type(), "Heartbeat");
@@ -278,12 +298,7 @@ fn test_hybrid_handshake_challenge() {
 
 #[test]
 fn test_handshake_result() {
-    let success = HandshakeResult::success(
-        "peer-1",
-        "agent-1",
-        TrustLevel::Verified(0.8),
-        150,
-    );
+    let success = HandshakeResult::success("peer-1", "agent-1", TrustLevel::Verified(0.8), 150);
     assert!(success.streaming_allowed);
     assert_eq!(success.handshake_time_ms, 150);
 
@@ -383,13 +398,15 @@ fn test_collective_resonance_via_addition() {
     let pattern3: Vec<i8> = vec![-1, -1, 1, -1, 1]; // Opposite of pattern1
 
     // Adding similar patterns reinforces
-    let sum_similar: Vec<i16> = pattern1.iter()
+    let sum_similar: Vec<i16> = pattern1
+        .iter()
         .zip(pattern2.iter())
         .map(|(&a, &b)| a as i16 + b as i16)
         .collect();
 
     // Adding opposite patterns cancels
-    let sum_opposite: Vec<i16> = pattern1.iter()
+    let sum_opposite: Vec<i16> = pattern1
+        .iter()
         .zip(pattern3.iter())
         .map(|(&a, &b)| a as i16 + b as i16)
         .collect();

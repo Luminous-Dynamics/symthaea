@@ -15,12 +15,15 @@ async fn test_resume_rejects_zero_dim_state() {
 
     symthaea.pause(&path).expect("pause state");
 
-    let mut state: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(&path).expect("read state"),
-    ).expect("parse state json");
+    let mut state: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&path).expect("read state"))
+            .expect("parse state json");
     state["hdc_dim"] = serde_json::Value::from(0);
-    std::fs::write(&path, serde_json::to_string_pretty(&state).expect("serialize"))
-        .expect("write state");
+    std::fs::write(
+        &path,
+        serde_json::to_string_pretty(&state).expect("serialize"),
+    )
+    .expect("write state");
 
     let resumed = Symthaea::resume(&path);
     assert!(resumed.is_err());

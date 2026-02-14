@@ -41,8 +41,8 @@
 //! }
 //! ```
 
+use super::resonator::{Constraint, ResonatorConfig, ResonatorNetwork};
 use super::unified_hv::ContinuousHV;
-use super::resonator::{ResonatorNetwork, ResonatorConfig, Constraint};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -262,7 +262,12 @@ impl PatternDiscoveryEngine {
     }
 
     /// Add a memory to the discovery engine
-    pub fn add_memory(&mut self, id: impl Into<String>, vector: ContinuousHV, emotional_strength: f32) {
+    pub fn add_memory(
+        &mut self,
+        id: impl Into<String>,
+        vector: ContinuousHV,
+        emotional_strength: f32,
+    ) {
         let id = id.into();
         let memory = MemoryEntry::new(id.clone(), vector, emotional_strength);
         self.memories.insert(id, memory);
@@ -303,7 +308,8 @@ impl PatternDiscoveryEngine {
             }
 
             // Get memory vectors for this cluster
-            let cluster_vectors: Vec<ContinuousHV> = cluster_memory_ids.iter()
+            let cluster_vectors: Vec<ContinuousHV> = cluster_memory_ids
+                .iter()
                 .filter_map(|id| self.memories.get(id).map(|m| m.vector.clone()))
                 .collect();
 
@@ -325,18 +331,17 @@ impl PatternDiscoveryEngine {
         // Step 3: Update statistics and consolidation
         for pattern in &new_patterns {
             self.stats.patterns_discovered += 1;
-            self.stats.avg_pattern_strength = (
-                self.stats.avg_pattern_strength * (self.stats.patterns_discovered - 1) as f32
-                + pattern.strength
-            ) / self.stats.patterns_discovered as f32;
+            self.stats.avg_pattern_strength = (self.stats.avg_pattern_strength
+                * (self.stats.patterns_discovered - 1) as f32
+                + pattern.strength)
+                / self.stats.patterns_discovered as f32;
 
             // Consolidate contributing memories
             if self.config.auto_consolidate {
                 for mem_id in &pattern.member_memory_ids {
                     if let Some(memory) = self.memories.get_mut(mem_id) {
-                        memory.consolidation = (
-                            memory.consolidation + sleep_intensity * 0.2
-                        ).min(1.0);
+                        memory.consolidation =
+                            (memory.consolidation + sleep_intensity * 0.2).min(1.0);
                         self.stats.memories_consolidated += 1;
                     }
                 }
@@ -442,14 +447,16 @@ impl PatternDiscoveryEngine {
         let centroid = self.compute_centroid(vectors);
 
         // Create constraints based on each memory being close to the pattern
-        let constraints: Vec<Constraint> = vectors.iter()
+        let constraints: Vec<Constraint> = vectors
+            .iter()
             .enumerate()
             .map(|(i, vec)| {
                 Constraint::named(
                     &format!("similar_to_mem_{}", i),
                     centroid.values.clone(),
                     vec.values.clone(),
-                ).with_weight(1.0)
+                )
+                .with_weight(1.0)
             })
             .collect();
 
@@ -541,8 +548,13 @@ impl PatternDiscoveryEngine {
     }
 
     /// Get patterns that match a query vector
-    pub fn find_matching_patterns(&self, query: &ContinuousHV, min_similarity: f32) -> Vec<&DiscoveredPattern> {
-        self.discovered_patterns.iter()
+    pub fn find_matching_patterns(
+        &self,
+        query: &ContinuousHV,
+        min_similarity: f32,
+    ) -> Vec<&DiscoveredPattern> {
+        self.discovered_patterns
+            .iter()
             .filter(|p| {
                 let pattern_hv = ContinuousHV::from_slice(&p.vector);
                 pattern_hv.similarity(query) >= min_similarity
@@ -612,7 +624,9 @@ mod tests {
 
     fn similar_hv(base: &ContinuousHV, noise: f32, seed: u64) -> ContinuousHV {
         let noise_hv = random_hv(base.dim(), seed);
-        let values: Vec<f32> = base.values.iter()
+        let values: Vec<f32> = base
+            .values
+            .iter()
             .zip(noise_hv.values.iter())
             .map(|(&b, &n)| b * (1.0 - noise) + n * noise)
             .collect();
@@ -680,8 +694,14 @@ mod tests {
         assert!(!patterns.is_empty(), "Should discover at least one pattern");
 
         let first_pattern = &patterns[0];
-        assert!(first_pattern.occurrence_count >= 3, "Pattern should have multiple members");
-        assert!(first_pattern.internal_coherence > 0.5, "Pattern should be coherent");
+        assert!(
+            first_pattern.occurrence_count >= 3,
+            "Pattern should have multiple members"
+        );
+        assert!(
+            first_pattern.internal_coherence > 0.5,
+            "Pattern should be coherent"
+        );
     }
 
     #[test]
@@ -708,9 +728,11 @@ mod tests {
 
         // With min_occurrences=3 and similarity_threshold=0.8,
         // 10 random vectors should yield very few (likely 0) patterns
-        assert!(patterns.len() <= 5,
-                "Random vectors with high threshold should produce few patterns, got {}",
-                patterns.len());
+        assert!(
+            patterns.len() <= 5,
+            "Random vectors with high threshold should produce few patterns, got {}",
+            patterns.len()
+        );
     }
 
     #[test]
@@ -773,8 +795,14 @@ mod tests {
 
         // Each match should have a valid similarity score
         for m in &matches {
-            assert!(m.similarity.is_finite(), "Match similarity should be finite");
-            assert!(m.similarity >= 0.0, "Match similarity should be non-negative");
+            assert!(
+                m.internal_coherence.is_finite(),
+                "Match similarity should be finite"
+            );
+            assert!(
+                m.internal_coherence >= 0.0,
+                "Match similarity should be non-negative"
+            );
         }
     }
 
@@ -802,9 +830,13 @@ mod tests {
         println!("Memories consolidated: {}", stats.memories_consolidated);
 
         // After discover_patterns with auto_consolidate, stats should be valid
-        assert_eq!(stats.cycles_processed, 1,
-                   "Should have processed exactly 1 discovery cycle");
-        assert!(stats.memories_consolidated <= 4,
-                "Cannot consolidate more memories than were added");
+        assert_eq!(
+            stats.cycles_processed, 1,
+            "Should have processed exactly 1 discovery cycle"
+        );
+        assert!(
+            stats.memories_consolidated <= 4,
+            "Cannot consolidate more memories than were added"
+        );
     }
 }

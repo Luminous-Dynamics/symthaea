@@ -62,9 +62,11 @@ impl ConsciousnessSubsystem for PhiOptimizationSubsystem {
         "phi_optimization"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
-        -> Result<(), SubsystemError>
-    {
+    fn process_cycle(
+        &mut self,
+        state: &mut ConsciousnessState,
+        _inputs: &[BinaryHV],
+    ) -> Result<(), SubsystemError> {
         self.cycle_count += 1;
 
         // Track best Phi
@@ -82,7 +84,8 @@ impl ConsciousnessSubsystem for PhiOptimizationSubsystem {
         let phi_delta = state.phi - self.prev_phi;
 
         // Update topological unity with EMA
-        self.topological_unity_ema = self.ema_alpha * state.phi + (1.0 - self.ema_alpha) * self.topological_unity_ema;
+        self.topological_unity_ema =
+            self.ema_alpha * state.phi + (1.0 - self.ema_alpha) * self.topological_unity_ema;
         state.topological_unity = self.topological_unity_ema;
 
         // Update Phi trend based on delta
@@ -106,8 +109,8 @@ impl ConsciousnessSubsystem for PhiOptimizationSubsystem {
 // =============================================================================
 
 use super::consciousness_phase_transitions::{
-    ConsciousnessPhaseTransitions, PhaseTransitionConfig,
-    ConsciousnessPhase, PhaseTransitionAssessment,
+    ConsciousnessPhase, ConsciousnessPhaseTransitions, PhaseTransitionAssessment,
+    PhaseTransitionConfig,
 };
 
 /// Engine-backed phase transition subsystem.
@@ -161,10 +164,14 @@ impl ConsciousnessSubsystem for PhaseTransitionWrapped {
         "phase_transitions"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
-        -> Result<(), SubsystemError>
-    {
-        let workspace_hvs: Vec<super::binary_hv::BinaryHV> = state.conscious_contents.iter()
+    fn process_cycle(
+        &mut self,
+        state: &mut ConsciousnessState,
+        _inputs: &[BinaryHV],
+    ) -> Result<(), SubsystemError> {
+        let workspace_hvs: Vec<super::binary_hv::BinaryHV> = state
+            .conscious_contents
+            .iter()
             .map(|item| item.content)
             .collect();
         self.engine.observe(state.phi, workspace_hvs);
@@ -236,11 +243,16 @@ mod tests {
         for _ in 0..4 {
             sub.process_cycle(&mut state, &inputs).unwrap();
         }
-        assert_eq!(state.topological_unity, initial_topo, "Topological unity should not change before optimization cycle");
+        assert_eq!(
+            state.topological_unity, initial_topo,
+            "Topological unity should not change before optimization cycle"
+        );
 
         // After 5th cycle, it should be updated
         sub.process_cycle(&mut state, &inputs).unwrap();
-        assert!(state.topological_unity != initial_topo || state.phi_trend != 0.0,
-            "Either topological_unity or phi_trend should change on optimization cycle");
+        assert!(
+            state.topological_unity != initial_topo || state.phi_trend != 0.0,
+            "Either topological_unity or phi_trend should change on optimization cycle"
+        );
     }
 }

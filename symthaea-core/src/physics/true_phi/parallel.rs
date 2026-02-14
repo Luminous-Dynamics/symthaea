@@ -4,14 +4,12 @@
 
 use crate::hdc::unified_hv::ContinuousHV;
 
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::sync::RwLock;
-use once_cell::sync::Lazy;
 
-use super::{
-    ContinuousEntropyEstimator, TruePartition, TruePhiResult, TruePhiCalculator,
-};
+use super::{ContinuousEntropyEstimator, TruePartition, TruePhiCalculator, TruePhiResult};
 
 /// Thread-safe cache for expensive computations
 pub(crate) struct EntropyCache {
@@ -66,14 +64,22 @@ impl EntropyCache {
     pub(crate) fn get_mi(&self, hv1: &ContinuousHV, hv2: &ContinuousHV) -> Option<f64> {
         let hash1 = Self::hash_hv(hv1);
         let hash2 = Self::hash_hv(hv2);
-        let key = if hash1 <= hash2 { (hash1, hash2) } else { (hash2, hash1) };
+        let key = if hash1 <= hash2 {
+            (hash1, hash2)
+        } else {
+            (hash2, hash1)
+        };
         self.mi_cache.read().ok()?.get(&key).copied()
     }
 
     pub(crate) fn set_mi(&self, hv1: &ContinuousHV, hv2: &ContinuousHV, value: f64) {
         let hash1 = Self::hash_hv(hv1);
         let hash2 = Self::hash_hv(hv2);
-        let key = if hash1 <= hash2 { (hash1, hash2) } else { (hash2, hash1) };
+        let key = if hash1 <= hash2 {
+            (hash1, hash2)
+        } else {
+            (hash2, hash1)
+        };
         if let Ok(mut cache) = self.mi_cache.write() {
             if cache.len() >= self.max_size / 2 {
                 let keys: Vec<_> = cache.keys().take(cache.len() / 2).copied().collect();
@@ -137,7 +143,8 @@ impl ParallelEntropyCalculator {
     /// Returns entropies in the same order as input vectors.
     pub fn entropy_batch(&self, vectors: &[ContinuousHV]) -> Vec<f64> {
         if self.use_cache {
-            vectors.par_iter()
+            vectors
+                .par_iter()
                 .map(|hv| {
                     if let Some(cached) = ENTROPY_CACHE.get_entropy(hv) {
                         cached
@@ -149,7 +156,8 @@ impl ParallelEntropyCalculator {
                 })
                 .collect()
         } else {
-            vectors.par_iter()
+            vectors
+                .par_iter()
                 .map(|hv| self.estimator.entropy(hv))
                 .collect()
         }
@@ -174,18 +182,22 @@ impl ParallelEntropyCalculator {
             .collect();
 
         // Compute all pairwise MIs in parallel
-        let mis: Vec<((usize, usize), f64)> = pairs.par_iter()
+        let mis: Vec<((usize, usize), f64)> = pairs
+            .par_iter()
             .map(|&(i, j)| {
                 let mi = if self.use_cache {
                     if let Some(cached) = ENTROPY_CACHE.get_mi(&vectors[i], &vectors[j]) {
                         cached
                     } else {
-                        let mi = self.estimator.mutual_information_fast(&vectors[i], &vectors[j]);
+                        let mi = self
+                            .estimator
+                            .mutual_information_fast(&vectors[i], &vectors[j]);
                         ENTROPY_CACHE.set_mi(&vectors[i], &vectors[j], mi);
                         mi
                     }
                 } else {
-                    self.estimator.mutual_information_fast(&vectors[i], &vectors[j])
+                    self.estimator
+                        .mutual_information_fast(&vectors[i], &vectors[j])
                 };
                 ((i, j), mi)
             })
@@ -217,18 +229,22 @@ impl ParallelEntropyCalculator {
             .flat_map(|i| ((i + 1)..n).map(move |j| (i, j)))
             .collect();
 
-        pairs.par_iter()
+        pairs
+            .par_iter()
             .map(|&(i, j)| {
                 if self.use_cache {
                     if let Some(cached) = ENTROPY_CACHE.get_mi(&vectors[i], &vectors[j]) {
                         cached
                     } else {
-                        let mi = self.estimator.mutual_information_fast(&vectors[i], &vectors[j]);
+                        let mi = self
+                            .estimator
+                            .mutual_information_fast(&vectors[i], &vectors[j]);
                         ENTROPY_CACHE.set_mi(&vectors[i], &vectors[j], mi);
                         mi
                     }
                 } else {
-                    self.estimator.mutual_information_fast(&vectors[i], &vectors[j])
+                    self.estimator
+                        .mutual_information_fast(&vectors[i], &vectors[j])
                 }
             })
             .sum()
@@ -300,12 +316,12 @@ impl ParallelEntropyCalculator {
 
     /// Get cache statistics
     pub fn cache_stats() -> (usize, usize) {
-        let entropy_size = ENTROPY_CACHE.entropy_cache.read()
+        let entropy_size = ENTROPY_CACHE
+            .entropy_cache
+            .read()
             .map(|c| c.len())
             .unwrap_or(0);
-        let mi_size = ENTROPY_CACHE.mi_cache.read()
-            .map(|c| c.len())
-            .unwrap_or(0);
+        let mi_size = ENTROPY_CACHE.mi_cache.read().map(|c| c.len()).unwrap_or(0);
         (entropy_size, mi_size)
     }
 }

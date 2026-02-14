@@ -79,7 +79,11 @@ impl ReasoningBudget {
     /// Remaining microseconds.
     pub fn remaining_us(&self) -> u64 {
         let elapsed = self.elapsed_us();
-        if elapsed >= self.max_us { 0 } else { self.max_us - elapsed }
+        if elapsed >= self.max_us {
+            0
+        } else {
+            self.max_us - elapsed
+        }
     }
 
     /// Elapsed microseconds.
@@ -195,7 +199,12 @@ pub struct ForkedState {
 
 impl ForkedState {
     /// Create a new forked state.
-    pub fn new(weights: Arc<Vec<f32>>, states: Vec<Vec<f32>>, taus: Vec<f32>, seed: [u8; 32]) -> Self {
+    pub fn new(
+        weights: Arc<Vec<f32>>,
+        states: Vec<Vec<f32>>,
+        taus: Vec<f32>,
+        seed: [u8; 32],
+    ) -> Self {
         Self {
             weights,
             states,

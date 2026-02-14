@@ -31,11 +31,11 @@
 //! }
 //! ```
 
-use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
-use crate::hdc::spectral_connectivity::ConnectivityCalculator;  // ✨ NEW: Direct ContinuousHV Φ calculation
+use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
+use crate::hdc::spectral_connectivity::ConnectivityCalculator; // ✨ NEW: Direct ContinuousHV Φ calculation
+use crate::hdc::tiered_phi::{ApproximationTier, TieredPhi};
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use thiserror::Error;
@@ -144,7 +144,8 @@ pub fn real_hv_to_hv16_probabilistic(real_hv: &ContinuousHV, seed: u64) -> Binar
     // Normalize values to roughly [-3, 3] range for sigmoid
     let sum: f32 = values.iter().sum();
     let mean = sum / values.len() as f32;
-    let variance: f32 = values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / values.len() as f32;
+    let variance: f32 =
+        values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / values.len() as f32;
     let std_dev = variance.sqrt().max(0.001); // Avoid division by zero
 
     for (i, &val) in values.iter().enumerate() {
@@ -215,7 +216,8 @@ pub fn real_hv_to_hv16_quantile(real_hv: &ContinuousHV, percentile: f32) -> Bina
 /// Takes all node representations from a topology and converts them to
 /// binary format suitable for Φ calculation.
 pub fn topology_to_hv16_components(topology: &ConsciousnessTopology) -> Vec<BinaryHV> {
-    topology.node_representations
+    topology
+        .node_representations
         .iter()
         .map(real_hv_to_hv16)
         .collect()
@@ -284,7 +286,9 @@ impl ValidationResult {
 
     /// Check if validation succeeded (significant + large effect)
     pub fn validation_succeeded(&self) -> bool {
-        self.is_significant() && self.has_large_effect() && self.mean_phi_star > self.mean_phi_random
+        self.is_significant()
+            && self.has_large_effect()
+            && self.mean_phi_star > self.mean_phi_random
     }
 
     /// Get a human-readable summary
@@ -296,11 +300,21 @@ impl ValidationResult {
              t({:.1}) = {:.3}, p = {:.4}, d = {:.3}\n\
              Significant: {}, Large Effect: {}, Validation: {}\n\
              Total time: {}ms, Avg per Φ: {:.2}ms",
-            self.mean_phi_random, self.std_phi_random, self.n_random,
-            self.mean_phi_star, self.std_phi_star, self.n_star,
-            self.degrees_of_freedom, self.t_statistic, self.p_value, self.effect_size,
-            self.is_significant(), self.has_large_effect(), self.validation_succeeded(),
-            self.total_time_ms, self.avg_time_per_phi_ms
+            self.mean_phi_random,
+            self.std_phi_random,
+            self.n_random,
+            self.mean_phi_star,
+            self.std_phi_star,
+            self.n_star,
+            self.degrees_of_freedom,
+            self.t_statistic,
+            self.p_value,
+            self.effect_size,
+            self.is_significant(),
+            self.has_large_effect(),
+            self.validation_succeeded(),
+            self.total_time_ms,
+            self.avg_time_per_phi_ms
         )
     }
 }
@@ -398,7 +412,10 @@ impl MinimalPhiValidation {
 
         println!("\n🔬 MINIMAL Φ VALIDATION: Random vs Star Topologies");
         println!("============================================================");
-        println!("Samples: {} random, {} star", self.n_random_samples, self.n_star_samples);
+        println!(
+            "Samples: {} random, {} star",
+            self.n_random_samples, self.n_star_samples
+        );
         println!("Nodes per topology: {}", self.n_nodes);
         println!("Dimensionality: {}", self.dim);
         println!("Φ calculator: {:?}", self.phi_calculator.tier());
@@ -406,13 +423,19 @@ impl MinimalPhiValidation {
         println!();
 
         // Step 1: Generate Random topologies and compute Φ
-        println!("📊 Step 1: Generating {} Random topologies...", self.n_random_samples);
+        println!(
+            "📊 Step 1: Generating {} Random topologies...",
+            self.n_random_samples
+        );
         let phi_random_values = self.compute_phi_for_topology_type("random")?;
         println!("   Mean Φ (Random): {:.4}", mean(&phi_random_values));
         println!();
 
         // Step 2: Generate Star topologies and compute Φ
-        println!("⭐ Step 2: Generating {} Star topologies...", self.n_star_samples);
+        println!(
+            "⭐ Step 2: Generating {} Star topologies...",
+            self.n_star_samples
+        );
         let phi_star_values = self.compute_phi_for_topology_type("star")?;
         println!("   Mean Φ (Star): {:.4}", mean(&phi_star_values));
         println!();
@@ -462,20 +485,29 @@ impl MinimalPhiValidation {
         println!("\n🔬 REAL Φ VALIDATION: Random vs Star Topologies (No Binarization)");
         println!("============================================================");
         println!("Method: ConnectivityCalculator (cosine similarity, no conversion)");
-        println!("Samples: {} random, {} star", self.n_random_samples, self.n_star_samples);
+        println!(
+            "Samples: {} random, {} star",
+            self.n_random_samples, self.n_star_samples
+        );
         println!("Nodes per topology: {}", self.n_nodes);
         println!("Dimensionality: {}", self.dim);
         println!("Seed: {}", self.seed);
         println!();
 
         // Step 1: Generate Random topologies and compute Φ using RealPhi
-        println!("📊 Step 1: Generating {} Random topologies...", self.n_random_samples);
+        println!(
+            "📊 Step 1: Generating {} Random topologies...",
+            self.n_random_samples
+        );
         let phi_random_values = self.compute_real_phi_for_topology_type("random")?;
         println!("   Mean Φ (Random): {:.4}", mean(&phi_random_values));
         println!();
 
         // Step 2: Generate Star topologies and compute Φ using RealPhi
-        println!("⭐ Step 2: Generating {} Star topologies...", self.n_star_samples);
+        println!(
+            "⭐ Step 2: Generating {} Star topologies...",
+            self.n_star_samples
+        );
         let phi_star_values = self.compute_real_phi_for_topology_type("star")?;
         println!("   Mean Φ (Star): {:.4}", mean(&phi_star_values));
         println!();
@@ -513,11 +545,18 @@ impl MinimalPhiValidation {
     /// # Errors
     ///
     /// Returns `PhiValidationError::UnknownTopologyType` if topology_type is not "random" or "star"
-    fn compute_real_phi_for_topology_type(&mut self, topology_type: &str) -> Result<Vec<f64>, PhiValidationError> {
+    fn compute_real_phi_for_topology_type(
+        &mut self,
+        topology_type: &str,
+    ) -> Result<Vec<f64>, PhiValidationError> {
         let n_samples = match topology_type {
             "random" => self.n_random_samples,
             "star" => self.n_star_samples,
-            _ => return Err(PhiValidationError::UnknownTopologyType(topology_type.to_string())),
+            _ => {
+                return Err(PhiValidationError::UnknownTopologyType(
+                    topology_type.to_string(),
+                ))
+            }
         };
 
         let mut phi_values = Vec::with_capacity(n_samples);
@@ -538,12 +577,14 @@ impl MinimalPhiValidation {
 
             // DEBUG: Print cosine similarities for first sample
             if i == 0 {
-                println!("   🔍 DEBUG: Cosine similarities for first {} topology:", topology_type);
+                println!(
+                    "   🔍 DEBUG: Cosine similarities for first {} topology:",
+                    topology_type
+                );
                 for node_i in 0..components.len().min(5) {
                     for node_j in (node_i + 1)..components.len().min(5) {
                         let sim = components[node_i].similarity(&components[node_j]);
-                        println!("      Node {} ↔ Node {}: {:.4}",
-                                 node_i, node_j, sim);
+                        println!("      Node {} ↔ Node {}: {:.4}", node_i, node_j, sim);
                     }
                 }
                 println!();
@@ -553,7 +594,8 @@ impl MinimalPhiValidation {
             let phi = real_phi_calc.algebraic_connectivity(components);
 
             // DEBUG: Print Φ value for each sample
-            if i < 5 {  // First 5 samples only
+            if i < 5 {
+                // First 5 samples only
                 println!("      Sample {}: Φ = {:.6}", i, phi);
             }
 
@@ -576,11 +618,18 @@ impl MinimalPhiValidation {
     /// # Errors
     ///
     /// Returns `PhiValidationError::UnknownTopologyType` if topology_type is not "random" or "star"
-    fn compute_phi_for_topology_type(&mut self, topology_type: &str) -> Result<Vec<f64>, PhiValidationError> {
+    fn compute_phi_for_topology_type(
+        &mut self,
+        topology_type: &str,
+    ) -> Result<Vec<f64>, PhiValidationError> {
         let n_samples = match topology_type {
             "random" => self.n_random_samples,
             "star" => self.n_star_samples,
-            _ => return Err(PhiValidationError::UnknownTopologyType(topology_type.to_string())),
+            _ => {
+                return Err(PhiValidationError::UnknownTopologyType(
+                    topology_type.to_string(),
+                ))
+            }
         };
 
         let mut phi_values = Vec::with_capacity(n_samples);
@@ -600,12 +649,20 @@ impl MinimalPhiValidation {
 
             // DEBUG: Print Hamming distances for first sample
             if i == 0 {
-                println!("   🔍 DEBUG: Hamming distances for first {} topology:", topology_type);
+                println!(
+                    "   🔍 DEBUG: Hamming distances for first {} topology:",
+                    topology_type
+                );
                 for node_i in 0..components.len() {
                     for node_j in (node_i + 1)..components.len() {
                         let dist = components[node_i].hamming_distance(&components[node_j]);
-                        println!("      Node {} ↔ Node {}: {} / 2048 = {:.4}",
-                                 node_i, node_j, dist, dist as f64 / 2048.0);
+                        println!(
+                            "      Node {} ↔ Node {}: {} / 2048 = {:.4}",
+                            node_i,
+                            node_j,
+                            dist,
+                            dist as f64 / 2048.0
+                        );
                     }
                 }
                 println!();
@@ -615,7 +672,8 @@ impl MinimalPhiValidation {
             let phi = self.phi_calculator.compute(&components);
 
             // DEBUG: Print Φ value for each sample
-            if i < 5 {  // First 5 samples only
+            if i < 5 {
+                // First 5 samples only
                 println!("      Sample {}: Φ = {:.6}", i, phi);
             }
 
@@ -652,13 +710,14 @@ impl MinimalPhiValidation {
         let n2 = phi_star.len() as f64;
 
         // Pooled standard deviation
-        let pooled_std = ((((n1 - 1.0) * std_random * std_random) +
-                          ((n2 - 1.0) * std_star * std_star)) /
-                         (n1 + n2 - 2.0)).sqrt();
+        let pooled_std = ((((n1 - 1.0) * std_random * std_random)
+            + ((n2 - 1.0) * std_star * std_star))
+            / (n1 + n2 - 2.0))
+            .sqrt();
 
         // t-statistic
-        let t_statistic = (mean_star - mean_random) /
-                         (pooled_std * ((1.0 / n1) + (1.0 / n2)).sqrt());
+        let t_statistic =
+            (mean_star - mean_random) / (pooled_std * ((1.0 / n1) + (1.0 / n2)).sqrt());
 
         // Degrees of freedom
         let df = n1 + n2 - 2.0;
@@ -676,7 +735,16 @@ impl MinimalPhiValidation {
         // Cohen's d effect size
         let cohens_d = (mean_star - mean_random) / pooled_std;
 
-        (mean_random, std_random, mean_star, std_star, t_statistic, df, p_value, cohens_d)
+        (
+            mean_random,
+            std_random,
+            mean_star,
+            std_star,
+            t_statistic,
+            df,
+            p_value,
+            cohens_d,
+        )
     }
 }
 
@@ -698,9 +766,8 @@ fn std_dev(values: &[f64], mean: f64) -> f64 {
         return 0.0;
     }
 
-    let variance = values.iter()
-        .map(|&x| (x - mean).powi(2))
-        .sum::<f64>() / (values.len() - 1) as f64;
+    let variance =
+        values.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
 
     variance.sqrt()
 }
@@ -717,8 +784,11 @@ fn normal_cdf(z: f64) -> f64 {
 
     // Simple erf approximation (Abramowitz-Stegun, good to ~5 decimal places)
     let t = 1.0 / (1.0 + 0.3275911 * x.abs());
-    let erf = 1.0 - (((((1.061405429 * t + -1.453152027) * t) + 1.421413741) * t +
-                     -0.284496736) * t + 0.254829592) * t * (-x * x).exp();
+    let erf = 1.0
+        - (((((1.061405429 * t + -1.453152027) * t) + 1.421413741) * t + -0.284496736) * t
+            + 0.254829592)
+            * t
+            * (-x * x).exp();
 
     if z >= 0.0 {
         0.5 * (1.0 + erf)
@@ -768,7 +838,11 @@ mod tests {
         // Each should be valid BinaryHV (16,384 bits = 2048 bytes)
         for comp in &components {
             let bytes = &comp.0;
-            assert_eq!(bytes.len(), 2048, "BinaryHV should be 2048 bytes (16,384 bits)");
+            assert_eq!(
+                bytes.len(),
+                2048,
+                "BinaryHV should be 2048 bytes (16,384 bits)"
+            );
         }
     }
 
@@ -788,9 +862,18 @@ mod tests {
     #[test]
     fn test_normal_cdf() {
         // Test known values
-        assert!((normal_cdf(0.0) - 0.5).abs() < 0.01, "CDF(0) should be ~0.5");
-        assert!((normal_cdf(1.96) - 0.975).abs() < 0.01, "CDF(1.96) should be ~0.975");
-        assert!((normal_cdf(-1.96) - 0.025).abs() < 0.01, "CDF(-1.96) should be ~0.025");
+        assert!(
+            (normal_cdf(0.0) - 0.5).abs() < 0.01,
+            "CDF(0) should be ~0.5"
+        );
+        assert!(
+            (normal_cdf(1.96) - 0.975).abs() < 0.01,
+            "CDF(1.96) should be ~0.975"
+        );
+        assert!(
+            (normal_cdf(-1.96) - 0.025).abs() < 0.01,
+            "CDF(-1.96) should be ~0.025"
+        );
     }
 
     #[test]
@@ -830,7 +913,10 @@ mod tests {
         let dim = crate::hdc::HDC_DIMENSION;
         let mut phi_calc = TieredPhi::new(ApproximationTier::ExhaustivePartition);
 
-        println!("\n  RUNNING Phi VALIDATION (ExhaustivePartition, n={})", n_nodes);
+        println!(
+            "\n  RUNNING Phi VALIDATION (ExhaustivePartition, n={})",
+            n_nodes
+        );
         println!("=================================================\n");
 
         // Compute Phi for Random topologies
@@ -838,7 +924,9 @@ mod tests {
         for i in 0..n_samples {
             let seed = 42 + (i as u64 * 1000);
             let topo = ConsciousnessTopology::random(n_nodes, dim, seed);
-            let binary: Vec<BinaryHV> = topo.node_representations.iter()
+            let binary: Vec<BinaryHV> = topo
+                .node_representations
+                .iter()
                 .map(|c| c.to_binary(0.0))
                 .collect();
             let phi = phi_calc.compute_phi(&binary);
@@ -851,7 +939,9 @@ mod tests {
         for i in 0..n_samples {
             let seed = 42 + (i as u64 * 1000);
             let topo = ConsciousnessTopology::star(n_nodes, dim, seed);
-            let binary: Vec<BinaryHV> = topo.node_representations.iter()
+            let binary: Vec<BinaryHV> = topo
+                .node_representations
+                .iter()
                 .map(|c| c.to_binary(0.0))
                 .collect();
             let phi = phi_calc.compute_phi(&binary);
@@ -867,7 +957,8 @@ mod tests {
         assert!(
             mean_star > 0.0 && mean_random > 0.0,
             "Both Phi values should be positive (got star={:.6}, random={:.6})",
-            mean_star, mean_random
+            mean_star,
+            mean_random
         );
 
         // Hard assertion: star topology should have higher Phi than random
@@ -875,11 +966,14 @@ mod tests {
         assert!(
             mean_star > mean_random,
             "Star Phi ({:.6}) should exceed Random Phi ({:.6}) with ExhaustivePartition",
-            mean_star, mean_random
+            mean_star,
+            mean_random
         );
 
-        println!("  SUCCESS: Star topology Phi ({:.6}) > Random Phi ({:.6})",
-            mean_star, mean_random);
+        println!(
+            "  SUCCESS: Star topology Phi ({:.6}) > Random Phi ({:.6})",
+            mean_star, mean_random
+        );
         println!("  Ratio: {:.2}x", mean_star / mean_random);
     }
 }

@@ -45,8 +45,8 @@
 //! let hv_x = HV::Binary(x);
 //! ```
 
-use serde::{Deserialize, Serialize};
 pub use super::binary_hv::BinaryHV;
+use serde::{Deserialize, Serialize};
 
 /// Standard HDC dimension (2^14 = 16,384)
 /// This is SIMD-optimized and matches research consensus.
@@ -178,7 +178,8 @@ impl ContinuousHV {
 
         #[cfg(not(feature = "simd"))]
         {
-            let values: Vec<f32> = self.values
+            let values: Vec<f32> = self
+                .values
                 .iter()
                 .zip(other.values.iter())
                 .map(|(a, b)| a * b)
@@ -242,7 +243,8 @@ impl ContinuousHV {
 
             let values: Vec<f32> = (0..dim)
                 .map(|i| {
-                    let weighted_sum: f32 = hvs.iter()
+                    let weighted_sum: f32 = hvs
+                        .iter()
                         .zip(weights.iter())
                         .map(|(hv, w)| hv.values[i] * w)
                         .sum();
@@ -341,11 +343,11 @@ impl ContinuousHV {
     pub fn inverse(&self) -> Self {
         const EPSILON: f32 = 1e-7;
         Self {
-            values: self.values.iter()
-                .map(|&v| {
-                    if v.abs() < EPSILON { 0.0 } else { 1.0 / v }
-                })
-                .collect()
+            values: self
+                .values
+                .iter()
+                .map(|&v| if v.abs() < EPSILON { 0.0 } else { 1.0 / v })
+                .collect(),
         }
     }
 
@@ -355,7 +357,8 @@ impl ContinuousHV {
         debug_assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
 
         Self {
-            values: self.values
+            values: self
+                .values
                 .iter()
                 .zip(other.values.iter())
                 .map(|(a, b)| a + b)
@@ -369,7 +372,8 @@ impl ContinuousHV {
         debug_assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
 
         Self {
-            values: self.values
+            values: self
+                .values
                 .iter()
                 .zip(other.values.iter())
                 .map(|(a, b)| a - b)
@@ -433,7 +437,11 @@ impl ContinuousHV {
     /// Element-wise sigmoid activation
     pub fn sigmoid(&self) -> Self {
         Self {
-            values: self.values.iter().map(|x| 1.0 / (1.0 + (-x).exp())).collect(),
+            values: self
+                .values
+                .iter()
+                .map(|x| 1.0 / (1.0 + (-x).exp()))
+                .collect(),
         }
     }
 
@@ -485,16 +493,21 @@ impl ContinuousHV {
         for v in &self.values {
             hasher.update(&v.to_le_bytes());
         }
-        hasher.update(&(std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64).to_le_bytes());
+        hasher.update(
+            &(std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos() as u64)
+                .to_le_bytes(),
+        );
 
         let mut bytes = vec![0u8; self.values.len() * 4];
         let mut xof = hasher.finalize_xof();
         xof.fill(&mut bytes);
 
-        let values: Vec<f32> = self.values.iter()
+        let values: Vec<f32> = self
+            .values
+            .iter()
             .zip(bytes.chunks_exact(4))
             .map(|(&val, chunk)| {
                 let bits = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
@@ -663,7 +676,11 @@ mod tests {
         let sim = a.similarity(&b);
 
         // Random vectors should be nearly orthogonal
-        assert!(sim.abs() < 0.1, "Expected near-zero similarity, got {}", sim);
+        assert!(
+            sim.abs() < 0.1,
+            "Expected near-zero similarity, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -743,7 +760,11 @@ mod tests {
 
         // Should preserve structure (not exact values)
         let sim = continuous.similarity(&back);
-        assert!(sim > 0.5, "Expected high similarity after conversion, got {}", sim);
+        assert!(
+            sim > 0.5,
+            "Expected high similarity after conversion, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -765,7 +786,10 @@ mod tests {
         let restored = permuted.inverse_permute(shift);
 
         let sim = a.similarity(&restored);
-        assert!((sim - 1.0).abs() < 0.001, "Permutation should be invertible");
+        assert!(
+            (sim - 1.0).abs() < 0.001,
+            "Permutation should be invertible"
+        );
     }
 
     #[test]
@@ -776,14 +800,18 @@ mod tests {
         let result = a.bind(&inv);
 
         // Each element a_i * (1/a_i) should be ~1.0 for non-zero a_i
-        let near_one_count = result.values.iter()
+        let near_one_count = result
+            .values
+            .iter()
             .filter(|&&v| (v - 1.0).abs() < 0.01)
             .count();
 
         // Most elements should be near 1.0 (only near-zero inputs deviate)
         assert!(
             near_one_count > HDC_DIMENSION / 2,
-            "Expected most elements near 1.0, got {}/{}", near_one_count, HDC_DIMENSION
+            "Expected most elements near 1.0, got {}/{}",
+            near_one_count,
+            HDC_DIMENSION
         );
     }
 
@@ -791,7 +819,10 @@ mod tests {
     fn test_inverse_of_zero_is_zero() {
         let zero = ContinuousHV::zero(100);
         let inv = zero.inverse();
-        assert!(inv.values.iter().all(|&v| v == 0.0), "Inverse of zero should be zero");
+        assert!(
+            inv.values.iter().all(|&v| v == 0.0),
+            "Inverse of zero should be zero"
+        );
     }
 
     #[test]

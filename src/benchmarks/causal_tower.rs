@@ -11,11 +11,17 @@
 //!
 //! Goal: Approach 100% accuracy on causal discovery benchmarks
 
-use super::tuebingen_adapter::{CausalDirection, CausalDiscoveryResult, CausalFeatures, discover_by_information_theoretic};
+use super::tuebingen_adapter::{
+    discover_by_information_theoretic, CausalDirection, CausalDiscoveryResult, CausalFeatures,
+};
 use std::collections::HashMap;
 
 /// Helper function to create a CausalDiscoveryResult with all required fields
-fn make_result(direction: CausalDirection, p_forward: f64, confidence: f64) -> CausalDiscoveryResult {
+fn make_result(
+    direction: CausalDirection,
+    p_forward: f64,
+    confidence: f64,
+) -> CausalDiscoveryResult {
     CausalDiscoveryResult {
         direction,
         p_forward,
@@ -43,7 +49,7 @@ pub struct ImprovedHdcCompression {
 impl ImprovedHdcCompression {
     pub fn new() -> Self {
         Self {
-            codebook_sizes: vec![4, 8, 16, 32],  // Multiple granularities
+            codebook_sizes: vec![4, 8, 16, 32], // Multiple granularities
             num_prototypes: 16,
         }
     }
@@ -61,7 +67,8 @@ impl ImprovedHdcCompression {
         let range = (max_val - min_val).max(1e-10);
 
         // Quantize to codebook
-        let quantized: Vec<usize> = data.iter()
+        let quantized: Vec<usize> = data
+            .iter()
             .map(|&v| {
                 let norm = (v - min_val) / range;
                 ((norm * (codebook_size - 1) as f64) as usize).min(codebook_size - 1)
@@ -76,7 +83,8 @@ impl ImprovedHdcCompression {
 
         // Shannon entropy as description length proxy
         let n_f = n as f64;
-        let entropy: f64 = freq.iter()
+        let entropy: f64 = freq
+            .iter()
             .filter(|&&f| f > 0)
             .map(|&f| {
                 let p = f as f64 / n_f;
@@ -84,7 +92,7 @@ impl ImprovedHdcCompression {
             })
             .sum();
 
-        entropy * n_f  // Total bits
+        entropy * n_f // Total bits
     }
 
     /// Compute conditional description length K(Y|X)
@@ -104,7 +112,8 @@ impl ImprovedHdcCompression {
         let y_range = (y_max - y_min).max(1e-10);
 
         // Quantize X to create bins
-        let x_bins: Vec<usize> = x.iter()
+        let x_bins: Vec<usize> = x
+            .iter()
             .map(|&v| {
                 let norm = (v - x_min) / x_range;
                 ((norm * (codebook_size - 1) as f64) as usize).min(codebook_size - 1)
@@ -193,7 +202,11 @@ impl ImprovedHdcCompression {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -311,7 +324,9 @@ impl ImprovedLtcDynamics {
 
         // Normalize x for numerical stability
         let x_mean: f64 = x.iter().sum::<f64>() / n as f64;
-        let x_std = (x.iter().map(|&xi| (xi - x_mean).powi(2)).sum::<f64>() / n as f64).sqrt().max(1e-10);
+        let x_std = (x.iter().map(|&xi| (xi - x_mean).powi(2)).sum::<f64>() / n as f64)
+            .sqrt()
+            .max(1e-10);
         let x_norm: Vec<f64> = x.iter().map(|&xi| (xi - x_mean) / x_std).collect();
 
         for _ in 0..100 {
@@ -380,7 +395,14 @@ impl ImprovedLtcDynamics {
         }
     }
 
-    fn nadaraya_watson(&self, x: &[f64], y: &[f64], query: f64, bandwidth: f64, exclude_idx: usize) -> f64 {
+    fn nadaraya_watson(
+        &self,
+        x: &[f64],
+        y: &[f64],
+        query: f64,
+        bandwidth: f64,
+        exclude_idx: usize,
+    ) -> f64 {
         let mut weight_sum = 0.0;
         let mut weighted_y = 0.0;
 
@@ -412,7 +434,11 @@ impl ImprovedLtcDynamics {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -465,8 +491,12 @@ impl ImprovedPhiFlow {
         let mut hkx = vec![vec![0.0; n]; n];
         let mut hky = vec![vec![0.0; n]; n];
 
-        let kx_row_means: Vec<f64> = (0..n).map(|i| kx[i].iter().sum::<f64>() / n as f64).collect();
-        let ky_row_means: Vec<f64> = (0..n).map(|i| ky[i].iter().sum::<f64>() / n as f64).collect();
+        let kx_row_means: Vec<f64> = (0..n)
+            .map(|i| kx[i].iter().sum::<f64>() / n as f64)
+            .collect();
+        let ky_row_means: Vec<f64> = (0..n)
+            .map(|i| ky[i].iter().sum::<f64>() / n as f64)
+            .collect();
         let kx_mean: f64 = kx_row_means.iter().sum::<f64>() / n as f64;
         let ky_mean: f64 = ky_row_means.iter().sum::<f64>() / n as f64;
 
@@ -494,13 +524,24 @@ impl ImprovedPhiFlow {
         let x_std = variance(x).sqrt();
         let bandwidth = x_std * 0.5;
 
-        x.iter().zip(y.iter()).enumerate().map(|(i, (&xi, &yi))| {
-            let pred = self.nadaraya_watson_exclude(x, y, xi, bandwidth, i);
-            yi - pred
-        }).collect()
+        x.iter()
+            .zip(y.iter())
+            .enumerate()
+            .map(|(i, (&xi, &yi))| {
+                let pred = self.nadaraya_watson_exclude(x, y, xi, bandwidth, i);
+                yi - pred
+            })
+            .collect()
     }
 
-    fn nadaraya_watson_exclude(&self, x: &[f64], y: &[f64], query: f64, bandwidth: f64, exclude: usize) -> f64 {
+    fn nadaraya_watson_exclude(
+        &self,
+        x: &[f64],
+        y: &[f64],
+        query: f64,
+        bandwidth: f64,
+        exclude: usize,
+    ) -> f64 {
         let mut weight_sum = 0.0;
         let mut weighted_y = 0.0;
 
@@ -532,12 +573,16 @@ impl ImprovedPhiFlow {
         let hsic_backward = self.hsic(y, &residuals_backward);
 
         // Lower HSIC = more independent = better causal model
-        let asymmetry = hsic_backward - hsic_forward;  // Positive if forward is better
+        let asymmetry = hsic_backward - hsic_forward; // Positive if forward is better
         let p_forward = 1.0 / (1.0 + (-asymmetry * 50.0).exp());
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -583,8 +628,8 @@ impl IgciDiscovery {
         // Compute slopes
         let mut log_slopes = Vec::new();
         for i in 1..pairs.len() {
-            let dx = pairs[i].0 - pairs[i-1].0;
-            let dy = pairs[i].1 - pairs[i-1].1;
+            let dx = pairs[i].0 - pairs[i - 1].0;
+            let dy = pairs[i].1 - pairs[i - 1].1;
             if dx.abs() > 1e-10 {
                 let slope = dy / dx;
                 if slope.abs() > 1e-10 {
@@ -611,7 +656,11 @@ impl IgciDiscovery {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -645,7 +694,7 @@ impl LingamDiscovery {
         let m4: f64 = data.iter().map(|&x| (x - mean).powi(4)).sum::<f64>() / n;
 
         if m2 > 1e-10 {
-            m4 / (m2 * m2) - 3.0  // Excess kurtosis
+            m4 / (m2 * m2) - 3.0 // Excess kurtosis
         } else {
             0.0
         }
@@ -668,7 +717,9 @@ impl LingamDiscovery {
         let b = if var_x > 1e-10 { cov_xy / var_x } else { 0.0 };
         let a = mean_y - b * mean_x;
 
-        let residuals: Vec<f64> = x.iter().zip(y.iter())
+        let residuals: Vec<f64> = x
+            .iter()
+            .zip(y.iter())
             .map(|(&xi, &yi)| yi - (a + b * xi))
             .collect();
 
@@ -687,12 +738,16 @@ impl LingamDiscovery {
         // In LiNGaM, key insight: residuals in correct direction should be
         // INDEPENDENT of cause. Non-Gaussianity helps identify the noise term.
         // Higher kurtosis in backward = backward has the "mixed" residuals = forward is causal
-        let asymmetry = kurt_backward - kurt_forward;  // INVERTED: we want higher in backward
+        let asymmetry = kurt_backward - kurt_forward; // INVERTED: we want higher in backward
         let p_forward = 1.0 / (1.0 + (-asymmetry * 0.5).exp());
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -732,7 +787,14 @@ impl ReciDiscovery {
         total_error / n as f64
     }
 
-    fn nadaraya_watson_exclude(&self, x: &[f64], y: &[f64], query: f64, bandwidth: f64, exclude: usize) -> f64 {
+    fn nadaraya_watson_exclude(
+        &self,
+        x: &[f64],
+        y: &[f64],
+        query: f64,
+        bandwidth: f64,
+        exclude: usize,
+    ) -> f64 {
         let mut weight_sum = 0.0;
         let mut weighted_y = 0.0;
 
@@ -766,7 +828,11 @@ impl ReciDiscovery {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -797,7 +863,7 @@ impl EnhancedReci {
             .map(|i| x_std * (0.1 + 0.15 * i as f64))
             .collect();
 
-        let mut best_bw = bandwidths[3];  // Default to middle
+        let mut best_bw = bandwidths[3]; // Default to middle
         let mut best_cv_error = f64::INFINITY;
 
         for &bw in &bandwidths {
@@ -895,7 +961,11 @@ impl EnhancedReci {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -933,10 +1003,12 @@ impl CamDiscovery {
         let x_std = variance(x).sqrt();
         let bandwidth = x_std * 0.4;
 
-        let residuals: Vec<f64> = (0..n).map(|i| {
-            let pred = self.kernel_pred_exclude(x, y, x[i], bandwidth, i);
-            y[i] - pred
-        }).collect();
+        let residuals: Vec<f64> = (0..n)
+            .map(|i| {
+                let pred = self.kernel_pred_exclude(x, y, x[i], bandwidth, i);
+                y[i] - pred
+            })
+            .collect();
 
         // Check independence of residuals from X using correlation
         let corr = correlation(x, &residuals).abs();
@@ -945,7 +1017,14 @@ impl CamDiscovery {
         1.0 - corr
     }
 
-    fn kernel_pred_exclude(&self, x: &[f64], y: &[f64], query: f64, bandwidth: f64, exclude: usize) -> f64 {
+    fn kernel_pred_exclude(
+        &self,
+        x: &[f64],
+        y: &[f64],
+        query: f64,
+        bandwidth: f64,
+        exclude: usize,
+    ) -> f64 {
         let mut weight_sum = 0.0;
         let mut weighted_y = 0.0;
 
@@ -975,7 +1054,11 @@ impl CamDiscovery {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -1011,10 +1094,12 @@ impl AnmDiscovery {
 
         for &bw in &bandwidths {
             // Compute residuals using leave-one-out kernel regression
-            let residuals: Vec<f64> = (0..n).map(|i| {
-                let pred = self.kernel_regression_loo(x, y, i, bw);
-                y[i] - pred
-            }).collect();
+            let residuals: Vec<f64> = (0..n)
+                .map(|i| {
+                    let pred = self.kernel_regression_loo(x, y, i, bw);
+                    y[i] - pred
+                })
+                .collect();
 
             // Measure independence using HSIC approximation (faster than full HSIC)
             let independence = self.fast_independence_score(x, &residuals);
@@ -1045,7 +1130,9 @@ impl AnmDiscovery {
             weighted_y / weight_sum
         } else {
             // Fallback to mean
-            let sum: f64 = y.iter().enumerate()
+            let sum: f64 = y
+                .iter()
+                .enumerate()
                 .filter(|(i, _)| *i != exclude)
                 .map(|(_, &v)| v)
                 .sum();
@@ -1073,7 +1160,7 @@ impl AnmDiscovery {
     }
 
     pub fn discover(&self, x: &[f64], y: &[f64]) -> CausalDiscoveryResult {
-        let score_forward = self.anm_score(x, y);  // Independence of residuals from X
+        let score_forward = self.anm_score(x, y); // Independence of residuals from X
         let score_backward = self.anm_score(y, x); // Independence of residuals from Y
 
         // Higher score = more independent = better causal model
@@ -1082,7 +1169,11 @@ impl AnmDiscovery {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -1113,9 +1204,7 @@ impl SlopeDiscovery {
         }
 
         // Sort by x
-        let mut pairs: Vec<(f64, f64)> = x.iter().zip(y.iter())
-            .map(|(&a, &b)| (a, b))
-            .collect();
+        let mut pairs: Vec<(f64, f64)> = x.iter().zip(y.iter()).map(|(&a, &b)| (a, b)).collect();
         pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
         // Compute local slopes
@@ -1149,7 +1238,8 @@ impl SlopeDiscovery {
         }
 
         let n_slopes = slopes.len() as f64;
-        let entropy: f64 = bins.iter()
+        let entropy: f64 = bins
+            .iter()
             .filter(|&&c| c > 0)
             .map(|&c| {
                 let p = c as f64 / n_slopes;
@@ -1170,7 +1260,11 @@ impl SlopeDiscovery {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -1198,9 +1292,9 @@ pub struct MetaFeatures {
     pub y_skewness: f64,
     pub x_kurtosis: f64,
     pub y_kurtosis: f64,
-    pub linearity: f64,       // How linear is the relationship
-    pub noise_level: f64,     // Estimated noise level
-    pub symmetry: f64,        // How symmetric is the relationship
+    pub linearity: f64,   // How linear is the relationship
+    pub noise_level: f64, // Estimated noise level
+    pub symmetry: f64,    // How symmetric is the relationship
 }
 
 impl MetaFeatures {
@@ -1275,14 +1369,14 @@ impl MetaCausalLearner {
         // Weights proportional to (accuracy - 0.5), emphasizing above-random performance
         Self {
             algorithm_weights: vec![
-                0.046,  // HDC: 54.6% - 50% = 4.6%
-                0.083,  // LTC: 58.3% - 50% = 8.3%
-                0.028,  // Phi: 52.8% - 50% = 2.8%
-                0.083,  // IGCI: 58.3% - 50% = 8.3%
-                0.040,  // LiNGaM: ~54% - 50% = 4%
-                0.167,  // RECI: 66.7% - 50% = 16.7%
-                0.001,  // CAM: 50% - 50% = 0% (essentially random, near-zero weight)
-                0.176,  // InfoTheoretic: 67.6% - 50% = 17.6% (BEST!)
+                0.046, // HDC: 54.6% - 50% = 4.6%
+                0.083, // LTC: 58.3% - 50% = 8.3%
+                0.028, // Phi: 52.8% - 50% = 2.8%
+                0.083, // IGCI: 58.3% - 50% = 8.3%
+                0.040, // LiNGaM: ~54% - 50% = 4%
+                0.167, // RECI: 66.7% - 50% = 16.7%
+                0.001, // CAM: 50% - 50% = 0% (essentially random, near-zero weight)
+                0.176, // InfoTheoretic: 67.6% - 50% = 17.6% (BEST!)
             ],
             trained: false,
         }
@@ -1297,42 +1391,42 @@ impl MetaCausalLearner {
 
         // HDC works well for complex, non-linear relationships
         if features.noise_level > 0.3 && features.linearity < 0.5 {
-            weights[0] *= 1.5;  // HDC
+            weights[0] *= 1.5; // HDC
         }
 
         // LTC works well for functional relationships with moderate linearity
         if features.linearity > 0.4 && features.linearity < 0.9 {
-            weights[1] *= 1.3;  // LTC
+            weights[1] *= 1.3; // LTC
         }
 
         // HSIC-Phi works well for non-linear with moderate noise
         if features.noise_level > 0.2 && features.noise_level < 0.6 {
-            weights[2] *= 1.4;  // Phi
+            weights[2] *= 1.4; // Phi
         }
 
         // IGCI works well for near-deterministic relationships
         if features.noise_level < 0.2 {
-            weights[3] *= 1.5;  // IGCI
+            weights[3] *= 1.5; // IGCI
         }
 
         // LiNGaM works well for non-Gaussian data
         if features.x_kurtosis.abs() > 1.0 || features.y_kurtosis.abs() > 1.0 {
-            weights[4] *= 1.5;  // LiNGaM
+            weights[4] *= 1.5; // LiNGaM
         }
 
         // RECI is our best performer - give extra weight when residuals likely informative
         if features.noise_level > 0.1 {
-            weights[5] *= 1.3;  // RECI - already high base weight
+            weights[5] *= 1.3; // RECI - already high base weight
         }
 
         // CAM: only boost for clearly additive non-linear relationships
         if features.linearity > 0.3 && features.linearity < 0.6 && features.noise_level < 0.3 {
-            weights[6] *= 2.0;  // CAM needs a boost but only in ideal conditions
+            weights[6] *= 2.0; // CAM needs a boost but only in ideal conditions
         }
 
         // InfoTheoretic: our best method, boost when multiple signals likely to combine well
         if features.noise_level > 0.1 && features.noise_level < 0.8 {
-            weights[7] *= 1.2;  // InfoTheoretic - already highest base weight
+            weights[7] *= 1.2; // InfoTheoretic - already highest base weight
         }
 
         // Normalize
@@ -1358,11 +1452,11 @@ impl Default for MetaCausalLearner {
 /// Semantic hints about variable types
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum VariableType {
-    Physical,      // Temperature, pressure, altitude, etc.
-    Biological,    // Age, height, weight, etc.
-    Economic,      // Price, income, GDP, etc.
-    Temporal,      // Time-related measurements
-    Categorical,   // Discrete categories
+    Physical,    // Temperature, pressure, altitude, etc.
+    Biological,  // Age, height, weight, etc.
+    Economic,    // Price, income, GDP, etc.
+    Temporal,    // Time-related measurements
+    Categorical, // Discrete categories
     Unknown,
 }
 
@@ -1387,31 +1481,46 @@ impl SemanticCausalReasoner {
         // Biological often causes physical
         patterns.insert((VariableType::Biological, VariableType::Physical), 0.6);
 
-        Self { causal_patterns: patterns }
+        Self {
+            causal_patterns: patterns,
+        }
     }
 
     /// Infer variable type from description (simplified)
     pub fn infer_type(&self, description: &str) -> VariableType {
         let desc_lower = description.to_lowercase();
 
-        if desc_lower.contains("time") || desc_lower.contains("year") ||
-           desc_lower.contains("age") || desc_lower.contains("date") {
+        if desc_lower.contains("time")
+            || desc_lower.contains("year")
+            || desc_lower.contains("age")
+            || desc_lower.contains("date")
+        {
             return VariableType::Temporal;
         }
 
-        if desc_lower.contains("temperature") || desc_lower.contains("pressure") ||
-           desc_lower.contains("altitude") || desc_lower.contains("distance") ||
-           desc_lower.contains("speed") || desc_lower.contains("force") {
+        if desc_lower.contains("temperature")
+            || desc_lower.contains("pressure")
+            || desc_lower.contains("altitude")
+            || desc_lower.contains("distance")
+            || desc_lower.contains("speed")
+            || desc_lower.contains("force")
+        {
             return VariableType::Physical;
         }
 
-        if desc_lower.contains("height") || desc_lower.contains("weight") ||
-           desc_lower.contains("gene") || desc_lower.contains("protein") {
+        if desc_lower.contains("height")
+            || desc_lower.contains("weight")
+            || desc_lower.contains("gene")
+            || desc_lower.contains("protein")
+        {
             return VariableType::Biological;
         }
 
-        if desc_lower.contains("price") || desc_lower.contains("income") ||
-           desc_lower.contains("gdp") || desc_lower.contains("cost") {
+        if desc_lower.contains("price")
+            || desc_lower.contains("income")
+            || desc_lower.contains("gdp")
+            || desc_lower.contains("cost")
+        {
             return VariableType::Economic;
         }
 
@@ -1420,7 +1529,9 @@ impl SemanticCausalReasoner {
 
     /// Get prior probability for X→Y based on semantic types
     pub fn semantic_prior(&self, x_type: VariableType, y_type: VariableType) -> Option<f64> {
-        self.causal_patterns.get(&(x_type.clone(), y_type.clone())).copied()
+        self.causal_patterns
+            .get(&(x_type.clone(), y_type.clone()))
+            .copied()
             .or_else(|| {
                 // Check reverse
                 self.causal_patterns.get(&(y_type, x_type)).map(|p| 1.0 - p)
@@ -1435,7 +1546,7 @@ impl SemanticCausalReasoner {
                 let y_type = self.infer_type(yd);
                 self.semantic_prior(x_type, y_type)
             }
-            _ => None
+            _ => None,
         }
     }
 }
@@ -1453,12 +1564,12 @@ impl Default for SemanticCausalReasoner {
 /// Reason why a relationship is undetermined
 #[derive(Debug, Clone)]
 pub enum UndeterminedReason {
-    LinearGaussian,           // Fundamentally unidentifiable
-    SymmetricRelationship,    // No asymmetry detected
-    PossibleConfounder,       // Evidence of hidden variable
-    InsufficientData,         // Too few samples
-    AlgorithmDisagreement,    // Algorithms strongly disagree
-    LowSignal,                // Very weak causal signal
+    LinearGaussian,        // Fundamentally unidentifiable
+    SymmetricRelationship, // No asymmetry detected
+    PossibleConfounder,    // Evidence of hidden variable
+    InsufficientData,      // Too few samples
+    AlgorithmDisagreement, // Algorithms strongly disagree
+    LowSignal,             // Very weak causal signal
 }
 
 /// Rich causal verdict with uncertainty quantification
@@ -1550,13 +1661,21 @@ impl CausalTower {
         votes.insert("RECI".to_string(), self.reci.discover(x, y));
         votes.insert("CAM".to_string(), self.cam.discover(x, y));
         // Add our best performing method: Info-Theoretic (67.6%)
-        votes.insert("InfoTheoretic".to_string(), discover_by_information_theoretic(x, y));
+        votes.insert(
+            "InfoTheoretic".to_string(),
+            discover_by_information_theoretic(x, y),
+        );
 
         votes
     }
 
     /// Detect if relationship is undetermined
-    fn detect_undetermined(&self, x: &[f64], y: &[f64], votes: &HashMap<String, CausalDiscoveryResult>) -> Option<UndeterminedReason> {
+    fn detect_undetermined(
+        &self,
+        x: &[f64],
+        y: &[f64],
+        votes: &HashMap<String, CausalDiscoveryResult>,
+    ) -> Option<UndeterminedReason> {
         // Check sample size
         if x.len() < 20 {
             return Some(UndeterminedReason::InsufficientData);
@@ -1572,7 +1691,8 @@ impl CausalTower {
         }
 
         // Check algorithm disagreement
-        let forward_votes: usize = votes.values()
+        let forward_votes: usize = votes
+            .values()
             .filter(|v| matches!(v.direction, CausalDirection::Forward))
             .count();
         let backward_votes = votes.len() - forward_votes;
@@ -1585,7 +1705,8 @@ impl CausalTower {
         }
 
         // Check for symmetric relationship
-        let avg_confidence: f64 = votes.values().map(|v| v.confidence).sum::<f64>() / votes.len() as f64;
+        let avg_confidence: f64 =
+            votes.values().map(|v| v.confidence).sum::<f64>() / votes.len() as f64;
         if avg_confidence < 0.1 {
             return Some(UndeterminedReason::SymmetricRelationship);
         }
@@ -1609,7 +1730,16 @@ impl CausalTower {
         let weights = self.meta_learner.predict_weights(&features);
 
         // Weighted voting - includes all 8 algorithms
-        let algorithms = ["HDC", "LTC", "Phi", "IGCI", "LiNGaM", "RECI", "CAM", "InfoTheoretic"];
+        let algorithms = [
+            "HDC",
+            "LTC",
+            "Phi",
+            "IGCI",
+            "LiNGaM",
+            "RECI",
+            "CAM",
+            "InfoTheoretic",
+        ];
         let mut weighted_p_forward = 0.0;
         let mut total_weight = 0.0;
 
@@ -1634,8 +1764,7 @@ impl CausalTower {
                 let prior = semantic_prior;
                 let likelihood = p_forward;
 
-                (prior * likelihood) /
-                    (prior * likelihood + (1.0 - prior) * (1.0 - likelihood))
+                (prior * likelihood) / (prior * likelihood + (1.0 - prior) * (1.0 - likelihood))
             } else {
                 p_forward
             }
@@ -1648,16 +1777,22 @@ impl CausalTower {
         let is_determined = undetermined_reason.is_none();
 
         // Calculate agreement
-        let forward_count = votes.values()
+        let forward_count = votes
+            .values()
             .filter(|v| matches!(v.direction, CausalDirection::Forward))
             .count();
-        let agreement = (forward_count.max(votes.len() - forward_count) as f64) / votes.len() as f64;
+        let agreement =
+            (forward_count.max(votes.len() - forward_count) as f64) / votes.len() as f64;
 
         // Calculate confidence
         let confidence = (final_p_forward - 0.5).abs() * 2.0 * agreement;
 
         CausalVerdict {
-            direction: if final_p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            direction: if final_p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward: final_p_forward,
             confidence,
             is_determined,
@@ -1748,7 +1883,7 @@ fn kurtosis(data: &[f64]) -> f64 {
     let m4: f64 = data.iter().map(|&x| (x - mean).powi(4)).sum::<f64>() / n;
 
     if m2 > 1e-10 {
-        m4 / (m2 * m2) - 3.0  // Excess kurtosis
+        m4 / (m2 * m2) - 3.0 // Excess kurtosis
     } else {
         0.0
     }
@@ -1763,7 +1898,7 @@ fn median_distance(data: &[f64]) -> f64 {
     // Collect all pairwise distances
     let mut distances = Vec::new();
     for i in 0..n {
-        for j in (i+1)..n {
+        for j in (i + 1)..n {
             distances.push((data[i] - data[j]).abs());
         }
     }
@@ -1800,9 +1935,7 @@ fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
 /// Convert values to ranks (1-based)
 fn to_ranks(data: &[f64]) -> Vec<f64> {
     let n = data.len();
-    let mut indexed: Vec<(usize, f64)> = data.iter().enumerate()
-        .map(|(i, &v)| (i, v))
-        .collect();
+    let mut indexed: Vec<(usize, f64)> = data.iter().enumerate().map(|(i, &v)| (i, v)).collect();
     indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
     let mut ranks = vec![0.0; n];
@@ -1877,14 +2010,18 @@ impl SmartTower {
         // Collect votes from reliable methods with performance-based weights
         // Weights derived from Tübingen benchmark accuracy
         let methods: Vec<(&str, CausalDiscoveryResult, f64)> = vec![
-            ("RECI", self.reci.discover(x, y), 0.167),      // 66.7%
-            ("IGCI", self.igci.discover(x, y), 0.083),      // 58.3%
-            ("LTC", self.ltc.discover(x, y), 0.083),        // 58.3%
-            ("HDC", self.hdc.discover(x, y), 0.046),        // 54.6%
-            ("LiNGaM", self.lingam.discover(x, y), 0.037),  // 53.7%
-            ("ANM", self.anm.discover(x, y), 0.10),         // New - estimated
-            ("Slope", self.slope.discover(x, y), 0.05),     // New - estimated
-            ("InfoTheoretic", discover_by_information_theoretic(x, y), 0.176), // 67.6%
+            ("RECI", self.reci.discover(x, y), 0.167),     // 66.7%
+            ("IGCI", self.igci.discover(x, y), 0.083),     // 58.3%
+            ("LTC", self.ltc.discover(x, y), 0.083),       // 58.3%
+            ("HDC", self.hdc.discover(x, y), 0.046),       // 54.6%
+            ("LiNGaM", self.lingam.discover(x, y), 0.037), // 53.7%
+            ("ANM", self.anm.discover(x, y), 0.10),        // New - estimated
+            ("Slope", self.slope.discover(x, y), 0.05),    // New - estimated
+            (
+                "InfoTheoretic",
+                discover_by_information_theoretic(x, y),
+                0.176,
+            ), // 67.6%
         ];
 
         // Get oracle's preferred algorithm
@@ -1917,7 +2054,11 @@ impl SmartTower {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -1934,7 +2075,7 @@ impl SmartTower {
             "LiNGaM" => self.lingam.discover(x, y),
             "ANM" => self.anm.discover(x, y),
             "LTC" => self.ltc.discover(x, y),
-            _ => self.reci.discover(x, y),  // Default fallback
+            _ => self.reci.discover(x, y), // Default fallback
         }
     }
 }
@@ -2000,7 +2141,11 @@ impl UltimateEnsemble {
     }
 
     /// Discover with possible abstention
-    pub fn discover_with_abstention(&self, x: &[f64], y: &[f64]) -> (CausalDiscoveryResult, Option<&'static str>) {
+    pub fn discover_with_abstention(
+        &self,
+        x: &[f64],
+        y: &[f64],
+    ) -> (CausalDiscoveryResult, Option<&'static str>) {
         // Check if we should abstain
         if let Some(reason) = self.should_abstain(x, y) {
             // Return uncertain prediction
@@ -2016,13 +2161,15 @@ impl UltimateEnsemble {
         let features = MetaFeatures::extract(x, y);
 
         // Collect all algorithm results
-        let results = [("EnhancedRECI", self.enhanced_reci.discover(x, y)),
+        let results = [
+            ("EnhancedRECI", self.enhanced_reci.discover(x, y)),
             ("RECI", self.reci.discover(x, y)),
             ("IGCI", self.igci.discover(x, y)),
             ("LTC", self.ltc.discover(x, y)),
             ("HDC", self.hdc.discover(x, y)),
             ("LiNGaM", self.lingam.discover(x, y)),
-            ("InfoTheoretic", discover_by_information_theoretic(x, y))];
+            ("InfoTheoretic", discover_by_information_theoretic(x, y)),
+        ];
 
         // Dynamic weights based on data characteristics
         let weights = self.compute_dynamic_weights(&features);
@@ -2045,16 +2192,22 @@ impl UltimateEnsemble {
             weighted_p_forward / total_weight
         } else {
             // Fallback to simple majority
-            let forward_count = results.iter()
-                .filter(|(_, r)| r.p_forward > 0.5)
-                .count();
-            if forward_count > results.len() / 2 { 0.6 } else { 0.4 }
+            let forward_count = results.iter().filter(|(_, r)| r.p_forward > 0.5).count();
+            if forward_count > results.len() / 2 {
+                0.6
+            } else {
+                0.4
+            }
         };
 
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -2077,23 +2230,23 @@ impl UltimateEnsemble {
 
         // High linearity → boost IGCI
         if features.linearity > 0.7 {
-            weights[2] *= 1.5;  // IGCI
+            weights[2] *= 1.5; // IGCI
         }
 
         // Non-Gaussian → boost LiNGaM
         if features.x_kurtosis.abs() > 1.5 || features.y_kurtosis.abs() > 1.5 {
-            weights[5] *= 2.0;  // LiNGaM
+            weights[5] *= 2.0; // LiNGaM
         }
 
         // High noise → boost RECI methods (robust to noise)
         if features.noise_level > 0.4 {
-            weights[0] *= 1.3;  // EnhancedRECI
-            weights[1] *= 1.3;  // RECI
+            weights[0] *= 1.3; // EnhancedRECI
+            weights[1] *= 1.3; // RECI
         }
 
         // Low noise → boost InfoTheoretic
         if features.noise_level < 0.2 {
-            weights[6] *= 1.3;  // InfoTheoretic
+            weights[6] *= 1.3; // InfoTheoretic
         }
 
         // Normalize
@@ -2120,7 +2273,7 @@ impl Default for UltimateEnsemble {
 pub struct SemanticDiscovery {
     base_ensemble: UltimateEnsemble,
     /// Known causal relationships by keyword
-    causal_keywords: Vec<(&'static str, &'static str, f64)>,  // (cause_keyword, effect_keyword, prior)
+    causal_keywords: Vec<(&'static str, &'static str, f64)>, // (cause_keyword, effect_keyword, prior)
 }
 
 impl SemanticDiscovery {
@@ -2135,28 +2288,24 @@ impl SemanticDiscovery {
                 ("distance", "time", 0.70),
                 ("speed", "distance", 0.75),
                 ("force", "acceleration", 0.90),
-
                 // Temporal causation (time causes things)
                 ("age", "height", 0.80),
                 ("age", "weight", 0.75),
                 ("time", "growth", 0.85),
                 ("year", "population", 0.70),
                 ("date", "price", 0.65),
-
                 // Biological causation
                 ("gene", "protein", 0.90),
                 ("hormone", "growth", 0.80),
                 ("exercise", "fitness", 0.75),
                 ("diet", "weight", 0.70),
                 ("smoking", "cancer", 0.75),
-
                 // Economic causation
                 ("supply", "price", 0.75),
                 ("demand", "price", 0.75),
                 ("income", "spending", 0.70),
                 ("education", "income", 0.65),
                 ("interest", "investment", 0.70),
-
                 // Environmental
                 ("rainfall", "crop", 0.80),
                 ("sunlight", "growth", 0.85),
@@ -2187,10 +2336,10 @@ impl SemanticDiscovery {
         let time_words = ["time", "year", "month", "day", "age", "date", "period"];
         for tw in time_words {
             if x_lower.contains(tw) && !y_lower.contains(tw) {
-                return Some(0.7);  // Time-like X probably causes Y
+                return Some(0.7); // Time-like X probably causes Y
             }
             if y_lower.contains(tw) && !x_lower.contains(tw) {
-                return Some(0.3);  // Time-like Y probably causes X
+                return Some(0.3); // Time-like Y probably causes X
             }
         }
 
@@ -2198,7 +2347,13 @@ impl SemanticDiscovery {
     }
 
     /// Discover with semantic hints
-    pub fn discover(&self, x: &[f64], y: &[f64], x_desc: Option<&str>, y_desc: Option<&str>) -> CausalDiscoveryResult {
+    pub fn discover(
+        &self,
+        x: &[f64],
+        y: &[f64],
+        x_desc: Option<&str>,
+        y_desc: Option<&str>,
+    ) -> CausalDiscoveryResult {
         // Get base statistical result
         let base_result = self.base_ensemble.discover(x, y);
 
@@ -2212,7 +2367,7 @@ impl SemanticDiscovery {
         if let Some(prior) = semantic_prior {
             // Bayesian update: combine prior with statistical evidence
             let stat_p = base_result.p_forward;
-            let semantic_weight = 0.3;  // How much to trust semantic prior
+            let semantic_weight = 0.3; // How much to trust semantic prior
 
             // Weighted average (simple combination)
             let combined_p = (1.0 - semantic_weight) * stat_p + semantic_weight * prior;
@@ -2222,7 +2377,11 @@ impl SemanticDiscovery {
             let combined_confidence = base_result.confidence * (0.7 + 0.3 * agreement);
 
             make_result(
-                if combined_p > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+                if combined_p > 0.5 {
+                    CausalDirection::Forward
+                } else {
+                    CausalDirection::Backward
+                },
                 combined_p,
                 combined_confidence,
             )
@@ -2258,13 +2417,13 @@ impl NeuralCausalDiscovery {
         //            linearity, noise_level, sample_size_factor]
         Self {
             feature_weights: vec![
-                2.5,   // error_asymmetry (RECI-like) - strong signal
-                1.5,   // independence_asymmetry - moderate signal
-                0.8,   // skewness_asymmetry - weak signal
-                0.6,   // kurtosis_asymmetry (LiNGaM-like) - weak signal
-                -0.3,  // linearity - slightly negative (linear = harder)
-                -0.5,  // noise_level - negative (noisy = harder)
-                0.2,   // sample_size_factor - slight positive
+                2.5,  // error_asymmetry (RECI-like) - strong signal
+                1.5,  // independence_asymmetry - moderate signal
+                0.8,  // skewness_asymmetry - weak signal
+                0.6,  // kurtosis_asymmetry (LiNGaM-like) - weak signal
+                -0.3, // linearity - slightly negative (linear = harder)
+                -0.5, // noise_level - negative (noisy = harder)
+                0.2,  // sample_size_factor - slight positive
             ],
             bias: 0.0,
         }
@@ -2308,7 +2467,7 @@ impl NeuralCausalDiscovery {
         let noise_level = 1.0 - linearity;
 
         // 7. Sample size factor (normalized)
-        let sample_factor = ((n as f64).ln() / 7.0).min(1.0);  // log(1000) ≈ 7
+        let sample_factor = ((n as f64).ln() / 7.0).min(1.0); // log(1000) ≈ 7
 
         vec![
             error_asymmetry,
@@ -2337,7 +2496,11 @@ impl NeuralCausalDiscovery {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -2360,27 +2523,31 @@ fn compute_residuals_and_independence(x: &[f64], y: &[f64]) -> (Vec<f64>, f64) {
     let x_std = variance(x).sqrt().max(1e-10);
     let bandwidth = x_std * 0.3;
 
-    let residuals: Vec<f64> = (0..n).map(|i| {
-        let query = x[i];
-        let mut weight_sum = 0.0;
-        let mut weighted_y = 0.0;
+    let residuals: Vec<f64> = (0..n)
+        .map(|i| {
+            let query = x[i];
+            let mut weight_sum = 0.0;
+            let mut weighted_y = 0.0;
 
-        for (j, (&xj, &yj)) in x.iter().zip(y.iter()).enumerate() {
-            if j == i { continue; }
-            let diff = (xj - query) / bandwidth;
-            let weight = (-0.5 * diff * diff).exp();
-            weight_sum += weight;
-            weighted_y += weight * yj;
-        }
+            for (j, (&xj, &yj)) in x.iter().zip(y.iter()).enumerate() {
+                if j == i {
+                    continue;
+                }
+                let diff = (xj - query) / bandwidth;
+                let weight = (-0.5 * diff * diff).exp();
+                weight_sum += weight;
+                weighted_y += weight * yj;
+            }
 
-        let pred = if weight_sum > 1e-10 {
-            weighted_y / weight_sum
-        } else {
-            y.iter().sum::<f64>() / n as f64
-        };
+            let pred = if weight_sum > 1e-10 {
+                weighted_y / weight_sum
+            } else {
+                y.iter().sum::<f64>() / n as f64
+            };
 
-        y[i] - pred
-    }).collect();
+            y[i] - pred
+        })
+        .collect();
 
     let independence = 1.0 - correlation(x, &residuals).abs();
     (residuals, independence)
@@ -2407,7 +2574,13 @@ impl FinalBoss {
     }
 
     /// The ultimate discovery method
-    pub fn discover(&self, x: &[f64], y: &[f64], x_desc: Option<&str>, y_desc: Option<&str>) -> CausalDiscoveryResult {
+    pub fn discover(
+        &self,
+        x: &[f64],
+        y: &[f64],
+        x_desc: Option<&str>,
+        y_desc: Option<&str>,
+    ) -> CausalDiscoveryResult {
         // Get results from all systems
         let semantic_result = self.semantic.discover(x, y, x_desc, y_desc);
         let neural_result = self.neural.discover(x, y);
@@ -2435,7 +2608,11 @@ impl FinalBoss {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -2499,7 +2676,12 @@ pub fn discover_by_ultimate_ensemble(x: &[f64], y: &[f64]) -> CausalDiscoveryRes
 }
 
 /// Discover using semantic hints (requires variable descriptions for best results)
-pub fn discover_by_semantic(x: &[f64], y: &[f64], x_desc: Option<&str>, y_desc: Option<&str>) -> CausalDiscoveryResult {
+pub fn discover_by_semantic(
+    x: &[f64],
+    y: &[f64],
+    x_desc: Option<&str>,
+    y_desc: Option<&str>,
+) -> CausalDiscoveryResult {
     let semantic = SemanticDiscovery::new();
     semantic.discover(x, y, x_desc, y_desc)
 }
@@ -2530,10 +2712,16 @@ mod tests {
         let result = tower.discover(&x, &y);
 
         // Confidence and p_forward should be in [0, 1]
-        assert!(result.confidence >= 0.0 && result.confidence <= 1.0,
-            "Confidence must be in [0,1]: {}", result.confidence);
-        assert!(result.p_forward >= 0.0 && result.p_forward <= 1.0,
-            "p_forward must be in [0,1]: {}", result.p_forward);
+        assert!(
+            result.confidence >= 0.0 && result.confidence <= 1.0,
+            "Confidence must be in [0,1]: {}",
+            result.confidence
+        );
+        assert!(
+            result.p_forward >= 0.0 && result.p_forward <= 1.0,
+            "p_forward must be in [0,1]: {}",
+            result.p_forward
+        );
     }
 
     #[test]
@@ -2543,7 +2731,14 @@ mod tests {
 
         let features = MetaFeatures::extract(&x, &y);
         // Linear data should have high linearity
-        assert!(features.linearity > 0.5, "Linear data should have high linearity: {}", features.linearity);
-        assert!(features.noise_level.is_finite(), "Noise level must be finite");
+        assert!(
+            features.linearity > 0.5,
+            "Linear data should have high linearity: {}",
+            features.linearity
+        );
+        assert!(
+            features.noise_level.is_finite(),
+            "Noise level must be finite"
+        );
     }
 }

@@ -308,7 +308,9 @@ impl ContinuousEntropyEstimator {
         let k = self.k_neighbors.min(n - 1).max(1);
 
         // Build 2D point set
-        let points: Vec<(f64, f64)> = hv1.values.iter()
+        let points: Vec<(f64, f64)> = hv1
+            .values
+            .iter()
             .zip(hv2.values.iter())
             .map(|(&a, &b)| (a as f64, b as f64))
             .collect();
@@ -448,10 +450,8 @@ impl ContinuousEntropyEstimator {
         }
 
         // Sort for efficient neighbor finding
-        let mut indexed: Vec<(f32, usize)> = hv.values.iter()
-            .enumerate()
-            .map(|(i, &v)| (v, i))
-            .collect();
+        let mut indexed: Vec<(f32, usize)> =
+            hv.values.iter().enumerate().map(|(i, &v)| (v, i)).collect();
         indexed.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
         // Truncation distance: beyond 4σ, contribution is negligible
@@ -575,8 +575,7 @@ pub(crate) fn digamma(mut x: f64) -> f64 {
 
     // Asymptotic expansion
     let x2 = 1.0 / (x * x);
-    result += x.ln() - 0.5 / x
-        - x2 * (1.0/12.0 - x2 * (1.0/120.0 - x2 / 252.0));
+    result += x.ln() - 0.5 / x - x2 * (1.0 / 12.0 - x2 * (1.0 / 120.0 - x2 / 252.0));
 
     result
 }
@@ -590,12 +589,14 @@ pub(crate) fn silverman_bandwidth(values: &[f32]) -> f64 {
 
     // Compute standard deviation
     let mean: f64 = values.iter().map(|&v| v as f64).sum::<f64>() / n as f64;
-    let variance: f64 = values.iter()
+    let variance: f64 = values
+        .iter()
         .map(|&v| {
             let d = v as f64 - mean;
             d * d
         })
-        .sum::<f64>() / n as f64;
+        .sum::<f64>()
+        / n as f64;
     let std = variance.sqrt();
 
     // Compute IQR

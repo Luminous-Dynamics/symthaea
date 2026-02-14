@@ -1,41 +1,41 @@
 //! Constructor and backend selection for CognitiveLoopService.
 
+use crate::causal::{CausalEnhancerConfig, CausalLoopEnhancer};
+use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
+use crate::consciousness::fep_active_inference::{
+    ActiveInferenceAgent, ActiveInferenceAgentConfig, EnhancedFEPBridge,
+};
+use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
+use crate::consciousness::primitive_discovery::{
+    DiscoveryServiceConfig, PrimitiveDiscoveryService,
+};
+use crate::consciousness::stability_regime::StabilityRegimeProcessor;
+use crate::dynamics::cfc::CfCNetwork;
+use crate::dynamics::cfc_coherence::{CfCCoherenceBridge, CoherenceConfig};
+use crate::dynamics::temporal_signatures::{SignatureConfig, TemporalSignatureEncoder};
+use crate::hdc::moral_algebra::MoralAlgebra;
+use crate::hdc::moral_parser::MoralParser;
+use crate::hdc_ltc_bridge::HdcLtcBridge;
+use crate::memory::coherence_tracker::ConversationCoherenceTracker;
+use crate::memory::memory_coordinator::{CoordinatorConfig, MemoryCoordinator};
+use crate::memory::semantic_memory::SemanticMemory;
+#[cfg(feature = "neural-bridge")]
+use crate::perception::NeuralBridge;
+use crate::voice::voice_feedback::{VoiceFeedbackBridge, VoiceFeedbackConfig};
 use anyhow::Result;
 use rand::Rng;
 use std::collections::VecDeque;
 use std::time::Instant;
 use symthaea_core::hdc::predictive_encoder::PredictiveHdcEncoder;
-use crate::dynamics::cfc::CfCNetwork;
-use crate::dynamics::cfc_coherence::{CfCCoherenceBridge, CoherenceConfig};
-use crate::dynamics::temporal_signatures::{TemporalSignatureEncoder, SignatureConfig};
-use crate::voice::voice_feedback::{VoiceFeedbackBridge, VoiceFeedbackConfig};
-use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
-use crate::consciousness::fep_active_inference::{
-    ActiveInferenceAgent, ActiveInferenceAgentConfig,
-    EnhancedFEPBridge,
-};
-use crate::memory::coherence_tracker::ConversationCoherenceTracker;
-use crate::memory::semantic_memory::SemanticMemory;
-use crate::memory::memory_coordinator::{MemoryCoordinator, CoordinatorConfig};
-use crate::hdc_ltc_bridge::HdcLtcBridge;
-use crate::consciousness::stability_regime::StabilityRegimeProcessor;
-use crate::consciousness::primitive_discovery::{PrimitiveDiscoveryService, DiscoveryServiceConfig};
-use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
-use crate::causal::{CausalLoopEnhancer, CausalEnhancerConfig};
-use crate::hdc::moral_algebra::MoralAlgebra;
-use crate::hdc::moral_parser::MoralParser;
-#[cfg(feature = "neural-bridge")]
-use crate::perception::NeuralBridge;
 
-use super::{
-    CognitiveLoopService,
-    CognitiveLoopConfig, TemporalBackend, LoopStats, AdaptiveBehavior,
-    FlowState, EmotionContagion, CuriosityDrive, SelfReflection,
-    ThalamicRouter, CognitiveDepth, ActiveInferenceBridge, ClosedLearningLoop,
-    EpisodicMemoryBridge, GoalSystemBridge, WorldModelBridge,
-};
-use super::training::AsyncTrainerHandle;
 use super::temporal_network::TemporalNetwork;
+use super::training::AsyncTrainerHandle;
+use super::{
+    ActiveInferenceBridge, AdaptiveBehavior, ClosedLearningLoop, CognitiveDepth,
+    CognitiveLoopConfig, CognitiveLoopService, CuriosityDrive, EmotionContagion,
+    EpisodicMemoryBridge, FlowState, GoalSystemBridge, LoopStats, SelfReflection, TemporalBackend,
+    ThalamicRouter, WorldModelBridge,
+};
 
 impl CognitiveLoopService {
     /// Create a new cognitive loop service
@@ -116,10 +116,14 @@ impl CognitiveLoopService {
         let causal_enhancer = if config.causal_enhancement {
             let causal_config = CausalEnhancerConfig {
                 discovery_interval: config.causal_discovery_interval,
-                seed: config.genesis_phrase.as_ref()
-                    .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p)
-                        .domain("causal_enhancer")
-                        .gen::<u64>())
+                seed: config
+                    .genesis_phrase
+                    .as_ref()
+                    .map(|p| {
+                        symthaea_core::genesis::GenesisSeed::from_phrase(p)
+                            .domain("causal_enhancer")
+                            .gen::<u64>()
+                    })
                     .unwrap_or(42),
                 ..Default::default()
             };
@@ -131,7 +135,7 @@ impl CognitiveLoopService {
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
-                config.episodic_replay_config.clone()
+                config.episodic_replay_config.clone(),
             ))
         } else {
             None
@@ -180,11 +184,11 @@ impl CognitiveLoopService {
                 ActiveInferenceAgentConfig {
                     state_dim: 8,
                     obs_dim: 4,
-                    num_actions: 8,  // Matches MotorCommandType variants
+                    num_actions: 8, // Matches MotorCommandType variants
                     enable_td_learning: true,
                     ..Default::default()
                 },
-                4,  // Motor state dimension
+                4, // Motor state dimension
             ),
             fep_learning_signal: 0.0,
             fep_lr_boost: 1.0,
@@ -215,7 +219,10 @@ impl CognitiveLoopService {
                         }
                     }
                 } else {
-                    tracing::debug!("No probe weights at {}, neural bridge disabled", probe_path.display());
+                    tracing::debug!(
+                        "No probe weights at {}, neural bridge disabled",
+                        probe_path.display()
+                    );
                     None
                 }
             },
@@ -223,10 +230,14 @@ impl CognitiveLoopService {
             causal_enhancer,
             phi_episodic_replay,
             #[cfg(feature = "reasoning_engine")]
-            reasoning_engine: Some(crate::consciousness::reasoning_engine::ConsciousReasoningEngine::new()),
+            reasoning_engine: Some(
+                crate::consciousness::reasoning_engine::ConsciousReasoningEngine::new(),
+            ),
             // MFDI Bridge for identity verification and signed outputs
             #[cfg(feature = "identity")]
-            mfdi_bridge: crate::identity::MfdiBridge::new(crate::identity::MfdiBridgeConfig::default()),
+            mfdi_bridge: crate::identity::MfdiBridge::new(
+                crate::identity::MfdiBridgeConfig::default(),
+            ),
 
             // Moral Algebra for compositional ethical reasoning
             moral_algebra: MoralAlgebra::default_dim(),

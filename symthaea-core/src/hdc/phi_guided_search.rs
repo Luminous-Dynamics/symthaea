@@ -43,9 +43,9 @@
 //! }
 //! ```
 
-use serde::{Deserialize, Serialize};
-use crate::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use crate::hdc::spectral_connectivity::ConnectivityCalculator;
+use crate::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
+use serde::{Deserialize, Serialize};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -154,7 +154,11 @@ pub struct ConsciousnessNetwork {
 impl ConsciousnessNetwork {
     /// Create new network with given nodes
     pub fn new(nodes: Vec<ContinuousHV>) -> Self {
-        let dim = if nodes.is_empty() { HDC_DIMENSION } else { nodes[0].dim() };
+        let dim = if nodes.is_empty() {
+            HDC_DIMENSION
+        } else {
+            nodes[0].dim()
+        };
         Self {
             nodes,
             edges: Vec::new(),
@@ -183,28 +187,29 @@ impl ConsciousnessNetwork {
 
     /// Check if edge exists
     pub fn has_edge(&self, from: usize, to: usize) -> bool {
-        self.edges.iter().any(|e| {
-            (e.from == from && e.to == to) || (e.from == to && e.to == from)
-        })
+        self.edges
+            .iter()
+            .any(|e| (e.from == from && e.to == to) || (e.from == to && e.to == from))
     }
 
     /// Remove edge
     pub fn remove_edge(&mut self, from: usize, to: usize) {
-        self.edges.retain(|e| {
-            !((e.from == from && e.to == to) || (e.from == to && e.to == from))
-        });
+        self.edges
+            .retain(|e| !((e.from == from && e.to == to) || (e.from == to && e.to == from)));
     }
 
     /// Get number of edges connected to a node
     pub fn degree(&self, node: usize) -> usize {
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter(|e| e.from == node || e.to == node)
             .count()
     }
 
     /// Get neighbors of a node
     pub fn neighbors(&self, node: usize) -> Vec<usize> {
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter_map(|e| {
                 if e.from == node {
                     Some(e.to)
@@ -220,24 +225,28 @@ impl ConsciousnessNetwork {
     /// Convert to topology representation for Φ calculation
     pub fn to_node_representations(&self) -> Vec<ContinuousHV> {
         // Create node representations by binding each node with its neighbors
-        self.nodes.iter()
+        self.nodes
+            .iter()
             .enumerate()
             .map(|(i, node)| {
                 let neighbors = self.neighbors(i);
 
                 if neighbors.is_empty() {
                     // Isolated node - just return its own representation
-                    ContinuousHV { values: node.values.clone() }
+                    ContinuousHV {
+                        values: node.values.clone(),
+                    }
                 } else {
                     // Bind with weighted neighbors
-                    let neighbor_hvs: Vec<&ContinuousHV> = neighbors.iter()
-                        .map(|&j| &self.nodes[j])
-                        .collect();
+                    let neighbor_hvs: Vec<&ContinuousHV> =
+                        neighbors.iter().map(|&j| &self.nodes[j]).collect();
 
                     // Get weights for each neighbor edge
-                    let weights: Vec<f32> = neighbors.iter()
+                    let weights: Vec<f32> = neighbors
+                        .iter()
                         .map(|&j| {
-                            self.edges.iter()
+                            self.edges
+                                .iter()
                                 .find(|e| (e.from == i && e.to == j) || (e.from == j && e.to == i))
                                 .map(|e| e.weight as f32)
                                 .unwrap_or(1.0)
@@ -250,7 +259,9 @@ impl ConsciousnessNetwork {
                     // Bind node with neighbor bundle
                     let representation = node.bind(&neighbor_bundle);
 
-                    ContinuousHV { values: representation.values }
+                    ContinuousHV {
+                        values: representation.values,
+                    }
                 }
             })
             .collect()
@@ -399,8 +410,7 @@ impl PhiGuidedOptimizer {
         let avg_gradient = if network.edges.is_empty() {
             0.0
         } else {
-            network.edges.iter().map(|e| e.gradient.abs()).sum::<f64>()
-                / network.edges.len() as f64
+            network.edges.iter().map(|e| e.gradient.abs()).sum::<f64>() / network.edges.len() as f64
         };
 
         OptimizationResult {
@@ -420,7 +430,8 @@ impl PhiGuidedOptimizer {
         for edge_idx in 0..network.edges.len() {
             // Perturb edge weight +epsilon
             let original_weight = network.edges[edge_idx].weight;
-            network.edges[edge_idx].weight = (original_weight + epsilon).min(self.config.max_weight);
+            network.edges[edge_idx].weight =
+                (original_weight + epsilon).min(self.config.max_weight);
 
             let representations = network.to_node_representations();
             let phi_plus = self.calculator.algebraic_connectivity(&representations);
@@ -444,8 +455,8 @@ impl PhiGuidedOptimizer {
     fn update_edge_weights(&mut self, network: &mut ConsciousnessNetwork) {
         for edge in network.edges.iter_mut() {
             // Update momentum
-            edge.momentum = self.config.momentum * edge.momentum
-                + (1.0 - self.config.momentum) * edge.gradient;
+            edge.momentum =
+                self.config.momentum * edge.momentum + (1.0 - self.config.momentum) * edge.gradient;
 
             // Adaptive learning rate based on gradient magnitude
             let lr = if self.config.adaptive_lr {
@@ -466,13 +477,19 @@ impl PhiGuidedOptimizer {
     fn prune_edges(&mut self, network: &mut ConsciousnessNetwork) -> usize {
         let initial_count = network.edges.len();
 
-        network.edges.retain(|e| e.weight >= self.config.prune_threshold);
+        network
+            .edges
+            .retain(|e| e.weight >= self.config.prune_threshold);
 
         initial_count - network.edges.len()
     }
 
     /// Consider adding new edges that might increase Φ
-    fn consider_new_edges(&mut self, network: &mut ConsciousnessNetwork, current_phi: f64) -> usize {
+    fn consider_new_edges(
+        &mut self,
+        network: &mut ConsciousnessNetwork,
+        current_phi: f64,
+    ) -> usize {
         // Random chance to consider new edges
         self.rng_state ^= self.rng_state << 13;
         self.rng_state ^= self.rng_state >> 7;
@@ -508,12 +525,13 @@ impl PhiGuidedOptimizer {
 
             // Check if node has too many edges
             if network.degree(from) >= self.config.max_edges_per_node
-                || network.degree(to) >= self.config.max_edges_per_node {
+                || network.degree(to) >= self.config.max_edges_per_node
+            {
                 continue;
             }
 
             // Try adding edge and see if Φ improves
-            network.add_edge(from, to, 0.5);  // Start with moderate weight
+            network.add_edge(from, to, 0.5); // Start with moderate weight
 
             let representations = network.to_node_representations();
             let new_phi = self.calculator.algebraic_connectivity(&representations);
@@ -739,7 +757,7 @@ mod tests {
 
         assert_eq!(network.edge_count(), 3);
         assert!(network.has_edge(0, 1));
-        assert!(network.has_edge(1, 0));  // Undirected
+        assert!(network.has_edge(1, 0)); // Undirected
         assert!(!network.has_edge(0, 3));
     }
 
@@ -768,17 +786,17 @@ mod tests {
 
         // Star
         InitializationStrategy::Star.apply(&mut network, 0);
-        assert_eq!(network.edge_count(), 7);  // n-1 edges from hub
+        assert_eq!(network.edge_count(), 7); // n-1 edges from hub
 
         // Fully connected
         InitializationStrategy::FullyConnected.apply(&mut network, 0);
-        assert_eq!(network.edge_count(), 8 * 7 / 2);  // n*(n-1)/2
+        assert_eq!(network.edge_count(), 8 * 7 / 2); // n*(n-1)/2
     }
 
     #[test]
     fn test_optimizer_single_step() {
         let config = PhiOptimizationConfig {
-            dim: 512,  // Smaller for faster tests
+            dim: 512, // Smaller for faster tests
             ..Default::default()
         };
 
@@ -798,7 +816,7 @@ mod tests {
     #[test]
     fn test_optimizer_multiple_steps() {
         let config = PhiOptimizationConfig {
-            dim: 256,  // Small for speed
+            dim: 256, // Small for speed
             learning_rate: 0.2,
             ..Default::default()
         };
@@ -826,10 +844,10 @@ mod tests {
         let mut network = ConsciousnessNetwork::random(4, 256, 42);
 
         // Add edges with varying weights
-        network.add_edge(0, 1, 1.0);  // Keep
-        network.add_edge(1, 2, 0.3);  // Prune (< 0.5)
-        network.add_edge(2, 3, 0.8);  // Keep
-        network.add_edge(0, 3, 0.1);  // Prune (< 0.5)
+        network.add_edge(0, 1, 1.0); // Keep
+        network.add_edge(1, 2, 0.3); // Prune (< 0.5)
+        network.add_edge(2, 3, 0.8); // Keep
+        network.add_edge(0, 3, 0.1); // Prune (< 0.5)
 
         let pruned = optimizer.prune_edges(&mut network);
 

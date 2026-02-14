@@ -60,11 +60,11 @@ impl IgnoranceType {
     /// Can this type of ignorance be resolved in principle?
     pub fn is_resolvable(&self) -> bool {
         match self {
-            Self::None => true, // Already resolved
-            Self::Known => true, // Just need to fetch it
+            Self::None => true,         // Already resolved
+            Self::Known => true,        // Just need to fetch it
             Self::KnownUnknown => true, // Can research it
-            Self::Unknown => false, // Can't target what we don't know
-            Self::Impossible => false, // Fundamentally impossible
+            Self::Unknown => false,     // Can't target what we don't know
+            Self::Impossible => false,  // Fundamentally impossible
         }
     }
 
@@ -414,7 +414,11 @@ impl HarmonicIgnorance {
     pub fn add_affected_harmony(&mut self, harmony: Harmony, impact: f32) {
         let impact = impact.clamp(0.0, 1.0);
         // Update if already present, otherwise add
-        if let Some(entry) = self.affected_harmonies.iter_mut().find(|(h, _)| *h == harmony) {
+        if let Some(entry) = self
+            .affected_harmonies
+            .iter_mut()
+            .find(|(h, _)| *h == harmony)
+        {
             entry.1 = impact;
         } else {
             self.affected_harmonies.push((harmony, impact));
@@ -423,25 +427,30 @@ impl HarmonicIgnorance {
 
     /// Calculate total harmonic impact (weighted sum)
     pub fn total_harmonic_impact(&self) -> f32 {
-        self.affected_harmonies.iter()
+        self.affected_harmonies
+            .iter()
             .map(|(harmony, impact)| harmony.base_weight() * impact)
             .sum()
     }
 
     /// Get the primary (most affected) harmony gap
     pub fn primary_harmony_gap(&self) -> Option<Harmony> {
-        self.affected_harmonies.iter()
+        self.affected_harmonies
+            .iter()
             .max_by(|a, b| {
                 let weight_a = a.0.base_weight() * a.1;
                 let weight_b = b.0.base_weight() * b.1;
-                weight_a.partial_cmp(&weight_b).unwrap_or(std::cmp::Ordering::Equal)
+                weight_a
+                    .partial_cmp(&weight_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(h, _)| *h)
     }
 
     /// Get harmonies above a threshold impact
     pub fn significant_gaps(&self, threshold: f32) -> Vec<Harmony> {
-        self.affected_harmonies.iter()
+        self.affected_harmonies
+            .iter()
             .filter(|(_, impact)| *impact >= threshold)
             .map(|(h, _)| *h)
             .collect()
@@ -449,7 +458,8 @@ impl HarmonicIgnorance {
 
     /// Generate resolution paths based on affected harmonies
     pub fn resolution_paths(&self) -> Vec<HarmonicResolution> {
-        self.affected_harmonies.iter()
+        self.affected_harmonies
+            .iter()
             .filter(|(_, impact)| *impact > 0.3) // Only significant gaps
             .map(|(harmony, impact)| HarmonicResolution {
                 harmony: *harmony,
@@ -466,7 +476,9 @@ impl HarmonicIgnorance {
             return String::from("H{}");
         }
 
-        let parts: Vec<String> = self.affected_harmonies.iter()
+        let parts: Vec<String> = self
+            .affected_harmonies
+            .iter()
             .filter(|(_, impact)| *impact > 0.1) // Only show significant impacts
             .map(|(h, impact)| format!("{}:{:.1}", h.code(), impact))
             .collect();
@@ -481,7 +493,9 @@ impl HarmonicIgnorance {
         let base_ceiling = self.base_ignorance.confidence_ceiling();
 
         // Critical harmonies reduce ceiling more
-        let critical_penalty: f32 = self.affected_harmonies.iter()
+        let critical_penalty: f32 = self
+            .affected_harmonies
+            .iter()
             .filter(|(h, _)| matches!(h, Harmony::PanSentientFlourishing | Harmony::IntegralWisdom))
             .map(|(_, impact)| impact * 0.2)
             .sum();
@@ -525,7 +539,10 @@ pub enum HarmonicResolutionStrategy {
 }
 
 /// Determine resolution strategy based on harmony and ignorance type
-fn harmony_resolution_strategy(harmony: Harmony, ignorance: IgnoranceType) -> HarmonicResolutionStrategy {
+fn harmony_resolution_strategy(
+    harmony: Harmony,
+    ignorance: IgnoranceType,
+) -> HarmonicResolutionStrategy {
     match (harmony, ignorance) {
         (Harmony::ResonantCoherence, _) => HarmonicResolutionStrategy::SeekIntegration,
         (Harmony::PanSentientFlourishing, _) => HarmonicResolutionStrategy::ConsultAffected,
@@ -572,9 +589,18 @@ mod tests {
 
     #[test]
     fn test_confidence_ceilings() {
-        assert!(IgnoranceType::None.confidence_ceiling() > IgnoranceType::KnownUnknown.confidence_ceiling());
-        assert!(IgnoranceType::KnownUnknown.confidence_ceiling() > IgnoranceType::Unknown.confidence_ceiling());
-        assert!(IgnoranceType::Unknown.confidence_ceiling() > IgnoranceType::Impossible.confidence_ceiling());
+        assert!(
+            IgnoranceType::None.confidence_ceiling()
+                > IgnoranceType::KnownUnknown.confidence_ceiling()
+        );
+        assert!(
+            IgnoranceType::KnownUnknown.confidence_ceiling()
+                > IgnoranceType::Unknown.confidence_ceiling()
+        );
+        assert!(
+            IgnoranceType::Unknown.confidence_ceiling()
+                > IgnoranceType::Impossible.confidence_ceiling()
+        );
     }
 
     #[test]
@@ -598,7 +624,11 @@ mod tests {
     #[test]
     fn test_harmony_weights_sum_to_one() {
         let total: f32 = Harmony::all().iter().map(|h| h.base_weight()).sum();
-        assert!((total - 1.0).abs() < 0.01, "Harmony weights should sum to ~1.0, got {}", total);
+        assert!(
+            (total - 1.0).abs() < 0.01,
+            "Harmony weights should sum to ~1.0, got {}",
+            total
+        );
     }
 
     #[test]
@@ -615,7 +645,10 @@ mod tests {
         hi.add_affected_harmony(Harmony::IntegralWisdom, 0.6);
 
         assert_eq!(hi.affected_harmonies.len(), 2);
-        assert_eq!(hi.primary_harmony_gap(), Some(Harmony::PanSentientFlourishing));
+        assert_eq!(
+            hi.primary_harmony_gap(),
+            Some(Harmony::PanSentientFlourishing)
+        );
     }
 
     #[test]
@@ -624,7 +657,11 @@ mod tests {
         hi.add_affected_harmony(Harmony::PanSentientFlourishing, 1.0); // weight 0.20
 
         let impact = hi.total_harmonic_impact();
-        assert!((impact - 0.20).abs() < 0.01, "Impact should be ~0.20, got {}", impact);
+        assert!(
+            (impact - 0.20).abs() < 0.01,
+            "Impact should be ~0.20, got {}",
+            impact
+        );
     }
 
     #[test]
@@ -634,8 +671,16 @@ mod tests {
         hi.add_affected_harmony(Harmony::InfinitePlay, 0.3);
 
         let code = hi.h_code();
-        assert!(code.contains("RC:0.8"), "Should contain RC:0.8, got {}", code);
-        assert!(code.contains("IP:0.3"), "Should contain IP:0.3, got {}", code);
+        assert!(
+            code.contains("RC:0.8"),
+            "Should contain RC:0.8, got {}",
+            code
+        );
+        assert!(
+            code.contains("IP:0.3"),
+            "Should contain IP:0.3, got {}",
+            code
+        );
     }
 
     #[test]
@@ -647,7 +692,9 @@ mod tests {
 
         let paths = hi.resolution_paths();
         assert_eq!(paths.len(), 2); // Only PSF and IW
-        assert!(paths.iter().any(|p| p.harmony == Harmony::PanSentientFlourishing));
+        assert!(paths
+            .iter()
+            .any(|p| p.harmony == Harmony::PanSentientFlourishing));
         assert!(paths.iter().any(|p| p.harmony == Harmony::IntegralWisdom));
     }
 
@@ -660,6 +707,9 @@ mod tests {
         hi.add_affected_harmony(Harmony::PanSentientFlourishing, 0.8);
 
         let adjusted_ceiling = hi.confidence_ceiling();
-        assert!(adjusted_ceiling < base_ceiling, "Critical harmony should reduce ceiling");
+        assert!(
+            adjusted_ceiling < base_ceiling,
+            "Critical harmony should reduce ceiling"
+        );
     }
 }

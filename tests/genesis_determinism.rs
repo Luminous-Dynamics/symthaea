@@ -97,7 +97,10 @@ fn genesis_determinism_across_fresh_instantiations() {
     let run1 = collect();
     let run2 = collect();
 
-    assert_eq!(run1, run2, "Two independent runs with same genesis must match exactly");
+    assert_eq!(
+        run1, run2,
+        "Two independent runs with same genesis must match exactly"
+    );
 }
 
 // =============================================================================
@@ -292,10 +295,7 @@ fn builder_with_genesis_phrase_produces_identical_cycles() {
     let snapshots_b = collect_cycle_snapshots(&mut loop_b, 50);
 
     for (i, (a, b)) in snapshots_a.iter().zip(snapshots_b.iter()).enumerate() {
-        assert_eq!(
-            a, b,
-            "Builder-based genesis loop diverged at cycle {i}"
-        );
+        assert_eq!(a, b, "Builder-based genesis loop diverged at cycle {i}");
     }
 }
 

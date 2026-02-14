@@ -21,10 +21,10 @@
 //! 2. **Nuclear Battery Triggers**: Find lattices that naturally excite isomers
 //! 3. **Mössbauer Effect**: Recoil-free nuclear transitions in crystals
 
+use super::periodic_table::PeriodicTable;
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::periodic_table::PeriodicTable;
 use serde::{Deserialize, Serialize};
 
 /// Crystal structure types
@@ -234,17 +234,14 @@ impl PhononDynamics {
             ("Palladium", 46, CrystalStructure::FCC, 274.0, 5.7, 3.89),
             ("Titanium", 22, CrystalStructure::HCP, 420.0, 8.7, 2.95),
             ("Nickel", 28, CrystalStructure::FCC, 450.0, 9.4, 3.52),
-            ("Erbium", 68, CrystalStructure::HCP, 168.0, 3.5, 3.56),  // NASA LCF host
-            ("Iron", 26, CrystalStructure::BCC, 470.0, 9.8, 2.87),    // Mössbauer
-
+            ("Erbium", 68, CrystalStructure::HCP, 168.0, 3.5, 3.56), // NASA LCF host
+            ("Iron", 26, CrystalStructure::BCC, 470.0, 9.8, 2.87),   // Mössbauer
             // Actinide hosts
             ("Thorium", 90, CrystalStructure::FCC, 163.0, 3.4, 5.08),
             ("Uranium", 92, CrystalStructure::FCC, 207.0, 4.3, 3.47),
-
             // Fluorite structures (good for Thorium-229 clock)
             ("CaF2", 20, CrystalStructure::Fluorite, 510.0, 10.6, 5.46),
             ("ThO2", 90, CrystalStructure::Fluorite, 259.0, 5.4, 5.60),
-
             // Hydrogen storage / fusion hosts
             ("Deuterium-Pd", 46, CrystalStructure::FCC, 275.0, 5.7, 3.89),
             ("TiD2", 22, CrystalStructure::FCC, 400.0, 8.3, 4.45),
@@ -252,7 +249,8 @@ impl PhononDynamics {
 
         for (name, z, structure, debye_k, debye_thz, lattice_a) in material_data {
             let struct_vec = self.structure_vector(structure);
-            let element_vec = table.element(z)
+            let element_vec = table
+                .element(z)
                 .map(|e| e.vector.clone())
                 .unwrap_or_else(|| genesis.hv(&format!("element::{}", z), PHYSICS_DIM));
 
@@ -405,13 +403,17 @@ impl PhononDynamics {
         _isomer_z: u8,
         nuclear_energy_ev: f64,
     ) -> Vec<PhononNuclearCoupling> {
-        let mut couplings: Vec<PhononNuclearCoupling> = self.materials.iter()
+        let mut couplings: Vec<PhononNuclearCoupling> = self
+            .materials
+            .iter()
             .map(|m| self.calculate_coupling(m, nuclear_energy_ev))
             .collect();
 
         // Sort by coupling strength
         couplings.sort_by(|a, b| {
-            b.coupling_strength.partial_cmp(&a.coupling_strength).unwrap_or(std::cmp::Ordering::Equal)
+            b.coupling_strength
+                .partial_cmp(&a.coupling_strength)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         couplings
@@ -445,10 +447,12 @@ impl PhononDynamics {
         // Optimal range ~150-350K; use a broad Gaussian centered at 250K
         let debye_optimal = 250.0;
         let debye_sigma = 200.0;
-        let phonon_factor = (-((material.debye_temp_k - debye_optimal) / debye_sigma).powi(2) / 2.0).exp();
+        let phonon_factor =
+            (-((material.debye_temp_k - debye_optimal) / debye_sigma).powi(2) / 2.0).exp();
 
         // Overall LCF potential: weighted combination favoring hydrogen solubility
-        let lcf_potential = (0.5 * h_solubility + 0.25 * screening_factor + 0.25 * phonon_factor).min(1.0);
+        let lcf_potential =
+            (0.5 * h_solubility + 0.25 * screening_factor + 0.25 * phonon_factor).min(1.0);
 
         LCFAnalysis {
             material_name: material.name.clone(),
@@ -495,8 +499,17 @@ mod tests {
 
         for material in &phonons.materials {
             let max_phonon = material.max_phonon_ev();
-            assert!(max_phonon > 0.0, "{} should have positive phonon energy", material.name);
-            assert!(max_phonon < 0.1, "{} phonon energy {} too high", material.name, max_phonon);
+            assert!(
+                max_phonon > 0.0,
+                "{} should have positive phonon energy",
+                material.name
+            );
+            assert!(
+                max_phonon < 0.1,
+                "{} phonon energy {} too high",
+                material.name,
+                max_phonon
+            );
         }
     }
 
@@ -505,11 +518,15 @@ mod tests {
         let (_, _, phonons) = setup();
 
         // Find Palladium and Erbium
-        let pd = phonons.materials.iter()
+        let pd = phonons
+            .materials
+            .iter()
             .find(|m| m.name == "Palladium")
             .expect("Palladium should exist");
 
-        let er = phonons.materials.iter()
+        let er = phonons
+            .materials
+            .iter()
             .find(|m| m.name == "Erbium")
             .expect("Erbium should exist");
 

@@ -11,19 +11,19 @@
 //! 5. **E: Consciousness Prosody** - LTC-driven speech with embodied emotion
 //! 6. **F: Test Framework** - Comprehensive scenario testing
 
-pub mod do_calculus;
-pub mod dialogue;
 pub mod being;
-mod sharing;
+pub mod dialogue;
+pub mod do_calculus;
 mod extensions;
 pub mod scenarios;
+mod sharing;
 
 #[cfg(test)]
 mod tests;
 
 // Re-export all public items for backward compatibility
-pub use do_calculus::*;
-pub use dialogue::*;
 pub use being::*;
-pub use sharing::*;
+pub use dialogue::*;
+pub use do_calculus::*;
 pub use scenarios::*;
+pub use sharing::*;

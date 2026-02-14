@@ -3,191 +3,192 @@
 //! This module implements a compositional physics hierarchy where higher-level
 //! structures are **derived** from lower-level ones using HDC operations.
 
-pub mod constants;
-mod standard_model;
-mod hadrons;
-mod periodic_table;
-pub mod chemistry;
-mod nuclear;
-mod consciousness_bridge;
-mod electron_nuclear_coupling;
-mod phonon_dynamics;
-mod inverse_search;
-mod radiation_damage;
-mod high_entropy_alloys;
 mod advanced_materials;
-mod spark_engine;
-mod thermal_transport;
-mod neutron_shielding;
-mod geometry;
-mod pulse_dynamics;
-#[allow(dead_code)] // Most items unused; LcfPhysicsConstants, GamowIntegrationResult, DDChannelResult used by coupled_physics
-mod trigger_systems;
+pub mod chemistry;
+mod consciousness_bridge;
+pub mod constants;
 mod coupled_physics;
-mod spark_prototype_spec;
-mod design_space;
-mod literature_validation;
-mod uncertainty;
-mod manufacturing;
-mod economics;
 mod design_integration;
+mod design_space;
+mod economics;
+mod electron_nuclear_coupling;
+mod geometry;
+mod hadrons;
+mod high_entropy_alloys;
+mod inverse_search;
+mod literature_validation;
+mod manufacturing;
+mod neutron_shielding;
+mod nuclear;
+mod periodic_table;
+mod phonon_dynamics;
+mod pulse_dynamics;
+mod radiation_damage;
+mod spark_engine;
+mod spark_prototype_spec;
+mod standard_model;
+mod thermal_transport;
 mod trajectory_analysis;
+#[allow(dead_code)]
+// Most items unused; LcfPhysicsConstants, GamowIntegrationResult, DDChannelResult used by coupled_physics
+mod trigger_systems;
+mod uncertainty;
 
 // HDC Scientific Knowledge Expansion modules
 mod antimatter;
-mod thermodynamics;
 mod astrophysics;
+mod emergence_chain;
+mod hdc_emergence_metrics;
+mod molecular_biology;
+mod neuroscience;
 mod phase_transitions;
 #[allow(dead_code)] // Exploratory: QFT Feynman diagrams, propagators, vertices
 mod qft;
-mod molecular_biology;
-mod neuroscience;
 mod quantum_gravity;
-mod emergence_chain;
+mod thermodynamics;
 mod true_phi;
-mod hdc_emergence_metrics;
 
 // Phase 2: Additional physics domains (pub mod to avoid glob conflicts)
 // Exploratory modules - HDC encodings for fundamental physics domains.
 // Items are publicly exported; allow(dead_code) suppresses warnings for
 // items not yet consumed within the crate itself.
 #[allow(dead_code)]
-pub mod general_relativity;
-mod quantum_information;
+pub mod condensed_matter;
+mod cosmology;
 #[allow(dead_code)]
 pub mod electromagnetism;
-#[allow(dead_code)]
-pub mod condensed_matter;
 mod fluid_dynamics;
 #[allow(dead_code)]
+pub mod general_relativity;
+#[allow(dead_code)]
 pub mod plasma_physics;
-mod cosmology;
+mod quantum_information;
 
 // Phase 3: Laws derivation, classical mechanics, and more domains
 // Exploratory modules - HDC encodings for classical and statistical physics.
 // Public APIs are re-exported below; allow(dead_code) suppresses warnings
 // for items not yet consumed within the crate.
 #[allow(dead_code)]
-mod derived_laws;
-#[allow(dead_code)]
-mod classical_mechanics;
-#[allow(dead_code)]
-mod statistical_mechanics;
+mod acoustics;
 #[allow(dead_code)]
 mod chemical_kinetics;
 #[allow(dead_code)]
-mod acoustics;
+mod classical_mechanics;
+#[allow(dead_code)]
+mod derived_laws;
+#[allow(dead_code)]
+mod statistical_mechanics;
 
 // Phase 4: Specialized domains and analogy discovery
 // Exploratory modules - HDC encodings for specialized physics and cross-domain
 // analogy discovery. Public APIs are re-exported below.
 #[allow(dead_code)]
-mod optics;
+mod analogy_engine;
 #[allow(dead_code)]
 mod biophysics;
 #[allow(dead_code)]
 mod geophysics;
 #[allow(dead_code)]
-mod analogy_engine;
+mod optics;
 
 // Phase 5: New physics implementations (reorganization plan)
-mod quantum_tunneling;
-mod decoherence;
-mod tensor_algebra;
 mod chaos_dynamics;
+mod decoherence;
 mod nonequilibrium;
+mod quantum_tunneling;
+mod tensor_algebra;
 
 // Phase 6: Simulation bridge (connects encoding modules to dynamical system framework)
 pub mod simulation_bridge;
 
 // Integration examples showing cross-module usage
 #[cfg(test)]
-mod physics_integration_examples;
+mod physics_benchmark_gates;
 #[cfg(test)]
-mod physics_test_helpers;
-#[cfg(test)]
-mod physics_numerical_validation;
-#[cfg(test)]
-mod physics_validation_r7;
-#[cfg(test)]
-mod physics_validation_particle;
+mod physics_correctness_audit;
 #[cfg(test)]
 mod physics_cross_validation;
 #[cfg(test)]
-mod physics_benchmark_gates;
+mod physics_integration_examples;
+#[cfg(test)]
+mod physics_numerical_validation;
 #[cfg(test)]
 mod physics_proptest_validation;
 #[cfg(test)]
-mod physics_correctness_audit;
+mod physics_test_helpers;
+#[cfg(test)]
+mod physics_validation_particle;
+#[cfg(test)]
+mod physics_validation_r7;
 
 // Demonstration module
 #[cfg(test)]
 mod demo;
 
-pub use standard_model::*;
 pub use hadrons::*;
 pub use periodic_table::*;
+pub use standard_model::*;
 // Note: chemistry::ReactionType conflicts with periodic_table::ReactionType.
 // Access chemistry types via physics::chemistry:: prefix.
 // pub use chemistry::*;
-pub use nuclear::*;
-pub use consciousness_bridge::*;
-pub use electron_nuclear_coupling::*;
-pub use phonon_dynamics::*;
-pub use inverse_search::*;
-pub use radiation_damage::*;
-pub use high_entropy_alloys::*;
 pub use advanced_materials::*;
-pub use spark_engine::*;
-pub use thermal_transport::*;
-pub use neutron_shielding::*;
-pub use geometry::*;
-pub use pulse_dynamics::*;
+pub use consciousness_bridge::*;
 pub use coupled_physics::*;
-pub use spark_prototype_spec::*;
-pub use design_space::*;
-pub use literature_validation::*;
-pub use uncertainty::*;
-pub use manufacturing::*;
-pub use economics::*;
 pub use design_integration::*;
+pub use design_space::*;
+pub use economics::*;
+pub use electron_nuclear_coupling::*;
+pub use geometry::*;
+pub use high_entropy_alloys::*;
+pub use inverse_search::*;
+pub use literature_validation::*;
+pub use manufacturing::*;
+pub use neutron_shielding::*;
+pub use nuclear::*;
+pub use phonon_dynamics::*;
+pub use pulse_dynamics::*;
+pub use radiation_damage::*;
+pub use spark_engine::*;
+pub use spark_prototype_spec::*;
+pub use thermal_transport::*;
 pub use trajectory_analysis::*;
+pub use uncertainty::*;
 
 // HDC Scientific Knowledge Expansion exports
 pub use antimatter::*;
-pub use thermodynamics::*;
 pub use astrophysics::*;
-pub use phase_transitions::*;
-pub use qft::*;
+pub use emergence_chain::*;
+pub use hdc_emergence_metrics::*;
 pub use molecular_biology::*;
 pub use neuroscience::*;
+pub use phase_transitions::*;
+pub use qft::*;
 pub use quantum_gravity::*;
-pub use emergence_chain::*;
+pub use thermodynamics::*;
 pub use true_phi::*;
-pub use hdc_emergence_metrics::*;
 
 // Phase 2: exports (non-conflicting only; access others via physics::module_name)
-pub use quantum_information::*;
-pub use fluid_dynamics::*;
 pub use cosmology::*;
+pub use fluid_dynamics::*;
+pub use quantum_information::*;
 
 // Phase 3: exports (statistical_mechanics and chemical_kinetics have
 // conflicting names with thermodynamics and chemistry - access via physics::module_name)
-pub use derived_laws::*;
 pub use classical_mechanics::*;
+pub use derived_laws::*;
 // Note: statistical_mechanics conflicts with thermodynamics (K_BOLTZMANN, Ensemble)
 // Note: chemical_kinetics conflicts with chemistry (ReactionType, Reaction)
 pub use acoustics::*;
 
 // Phase 4: exports
-pub use optics::*;
+pub use analogy_engine::*;
 pub use biophysics::*;
 pub use geophysics::*;
-pub use analogy_engine::*;
+pub use optics::*;
 
 // Phase 5: exports (new physics implementations)
-pub use quantum_tunneling::*;
-pub use decoherence::*;
-pub use tensor_algebra::*;
 pub use chaos_dynamics::*;
+pub use decoherence::*;
 pub use nonequilibrium::*;
+pub use quantum_tunneling::*;
+pub use tensor_algebra::*;

@@ -15,11 +15,11 @@
 //! - **Bose-Einstein Condensate**: Macroscopic quantum state
 //! - **Topological Insulators**: Bulk insulator, conducting surface
 
+use super::periodic_table::PeriodicTable;
+use super::standard_model::PHYSICS_DIM;
+use super::thermodynamics::ThermoEncoder;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::periodic_table::PeriodicTable;
-use super::thermodynamics::ThermoEncoder;
 use serde::{Deserialize, Serialize};
 
 /// Phase transition order
@@ -115,13 +115,19 @@ impl PhaseEncoder {
     /// connecting phase transitions to entropy and free energy.
     pub fn from_thermo(thermo: &ThermoEncoder, genesis: &GenesisSeed) -> Self {
         // Order parameter relates to entropy reduction
-        let order_parameter = thermo.entropy.bind(&genesis.hv("phase::ordering", PHYSICS_DIM));
+        let order_parameter = thermo
+            .entropy
+            .bind(&genesis.hv("phase::ordering", PHYSICS_DIM));
 
         // Symmetry breaking is a free energy transition
-        let symmetry_breaking = thermo.gibbs.bind(&genesis.hv("symmetry::broken", PHYSICS_DIM));
+        let symmetry_breaking = thermo
+            .gibbs
+            .bind(&genesis.hv("symmetry::broken", PHYSICS_DIM));
 
         // Critical point is where fluctuations diverge
-        let critical_point = thermo.temperature.bind(&genesis.hv("critical::divergence", PHYSICS_DIM));
+        let critical_point = thermo
+            .temperature
+            .bind(&genesis.hv("critical::divergence", PHYSICS_DIM));
 
         // Phases related to thermodynamic states
         let solid = ContinuousHV::bundle(&[
@@ -129,7 +135,9 @@ impl PhaseEncoder {
             &genesis.hv("phase::solid", PHYSICS_DIM),
         ]);
 
-        let liquid = thermo.entropy.bind(&genesis.hv("phase::liquid", PHYSICS_DIM));
+        let liquid = thermo
+            .entropy
+            .bind(&genesis.hv("phase::liquid", PHYSICS_DIM));
 
         let gas = ContinuousHV::bundle(&[
             &thermo.entropy.scale(2.0), // High entropy
@@ -207,8 +215,8 @@ impl PhaseEncoder {
 
     /// Ferromagnetic transition
     pub fn ferromagnetic_transition(&self, curie_temp_k: f64) -> PhaseTransition {
-        let paramagnetic = self.gas.bind(&self.fluctuations);  // Disordered
-        let ferromagnetic = self.solid.bind(&self.order_parameter);  // Ordered
+        let paramagnetic = self.gas.bind(&self.fluctuations); // Disordered
+        let ferromagnetic = self.solid.bind(&self.order_parameter); // Ordered
 
         self.create_transition(
             "Ferromagnetic",
@@ -250,13 +258,17 @@ pub struct Superconductor {
 
 impl PhaseEncoder {
     /// BCS Cooper pair: bound electron pair via phonon exchange
-    pub fn create_cooper_pair(&self, electron: &ContinuousHV, phonon_: &ContinuousHV) -> ContinuousHV {
+    pub fn create_cooper_pair(
+        &self,
+        electron: &ContinuousHV,
+        phonon_: &ContinuousHV,
+    ) -> ContinuousHV {
         // Two electrons with opposite spin and momentum
         let e1 = electron.permute(0);
-        let e2 = electron.permute(PHYSICS_DIM / 2);  // Opposite momentum (CPT-like)
+        let e2 = electron.permute(PHYSICS_DIM / 2); // Opposite momentum (CPT-like)
 
         let pair = ContinuousHV::bundle(&[&e1, &e2]);
-        pair.bind(phonon_).bind(&self.cooper_pair)  // Phonon-mediated attraction
+        pair.bind(phonon_).bind(&self.cooper_pair) // Phonon-mediated attraction
     }
 
     /// Create a superconductor
@@ -268,7 +280,7 @@ impl PhaseEncoder {
         type_: SuperconductorType,
         electron: &ContinuousHV,
     ) -> Superconductor {
-        let gap_mev = 1.76 * 8.617e-2 * critical_temp_k;  // BCS relation: Δ ≈ 1.76 k_B T_c
+        let gap_mev = 1.76 * 8.617e-2 * critical_temp_k; // BCS relation: Δ ≈ 1.76 k_B T_c
         let cooper_pair = self.create_cooper_pair(electron, &self.phonon);
 
         let type_factor = match type_ {
@@ -276,7 +288,8 @@ impl PhaseEncoder {
             SuperconductorType::TypeII => 1.5,
         };
 
-        let vector = self.superconductor
+        let vector = self
+            .superconductor
             .bind(&cooper_pair)
             .scale((critical_temp_k / 100.0) as f32 * type_factor);
 
@@ -310,7 +323,7 @@ impl PhaseEncoder {
     pub fn cuprate_superconductor(&self, electron: &ContinuousHV) -> Superconductor {
         self.create_superconductor(
             "YBCO",
-            92.0,  // 92 K
+            92.0, // 92 K
             100.0,
             SuperconductorType::TypeII,
             electron,
@@ -318,11 +331,16 @@ impl PhaseEncoder {
     }
 
     /// Conventional BCS superconductor (s-wave)
-    pub fn conventional_superconductor(&self, material: &str, tc: f64, electron: &ContinuousHV) -> Superconductor {
+    pub fn conventional_superconductor(
+        &self,
+        material: &str,
+        tc: f64,
+        electron: &ContinuousHV,
+    ) -> Superconductor {
         self.create_superconductor(
             material,
             tc,
-            0.1,  // Low critical field for Type I
+            0.1, // Low critical field for Type I
             SuperconductorType::TypeI,
             electron,
         )
@@ -350,7 +368,12 @@ impl PhaseEncoder {
     /// Create a Bose-Einstein condensate
     ///
     /// BEC: macroscopic ground state occupation for bosons
-    pub fn create_bec(&self, atom: &ContinuousHV, n_atoms: f64, temp_nk: f64) -> BoseEinsteinCondensate {
+    pub fn create_bec(
+        &self,
+        atom: &ContinuousHV,
+        n_atoms: f64,
+        temp_nk: f64,
+    ) -> BoseEinsteinCondensate {
         // Critical temperature estimate (simplified)
         let tc = 3.3125 * (n_atoms / 1e6).powf(2.0 / 3.0);
 
@@ -379,15 +402,25 @@ impl PhaseEncoder {
     }
 
     /// BEC interference pattern (two BECs)
-    pub fn bec_interference(&self, bec1: &BoseEinsteinCondensate, bec2: &BoseEinsteinCondensate) -> ContinuousHV {
+    pub fn bec_interference(
+        &self,
+        bec1: &BoseEinsteinCondensate,
+        bec2: &BoseEinsteinCondensate,
+    ) -> ContinuousHV {
         // Interference requires phase coherence
         let phase_diff = bec1.atom.permute(1000);
         bec1.vector.bind(&bec2.vector).bind(&phase_diff)
     }
 
     /// Rubidium-87 BEC (first observed BEC)
-    pub fn rb87_bec(&self, table: &PeriodicTable, n_atoms: f64, temp_nk: f64) -> BoseEinsteinCondensate {
-        let rb = table.element(37)
+    pub fn rb87_bec(
+        &self,
+        table: &PeriodicTable,
+        n_atoms: f64,
+        temp_nk: f64,
+    ) -> BoseEinsteinCondensate {
+        let rb = table
+            .element(37)
             .map(|e| e.vector.clone())
             .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
         self.create_bec(&rb, n_atoms, temp_nk)
@@ -412,7 +445,8 @@ pub struct Superfluid {
 impl PhaseEncoder {
     /// Helium-4 superfluid (boson condensate)
     pub fn helium4_superfluid(&self, table: &PeriodicTable) -> Superfluid {
-        let he = table.element(2)
+        let he = table
+            .element(2)
             .map(|e| e.vector.clone())
             .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
 
@@ -421,7 +455,7 @@ impl PhaseEncoder {
 
         Superfluid {
             material: "He-4".to_string(),
-            critical_temp_k: 2.17,  // Lambda point
+            critical_temp_k: 2.17, // Lambda point
             viscosity: 0.0,
             quantized_vortex,
             vector,
@@ -430,12 +464,13 @@ impl PhaseEncoder {
 
     /// Helium-3 superfluid (fermion pairing, like BCS)
     pub fn helium3_superfluid(&self, table: &PeriodicTable) -> Superfluid {
-        let he = table.element(2)
+        let he = table
+            .element(2)
             .map(|e| e.vector.clone())
             .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
 
         // He-3 is a fermion, so it pairs like Cooper pairs
-        let he3 = he.permute(3000);  // Distinguish from He-4
+        let he3 = he.permute(3000); // Distinguish from He-4
         let paired = self.create_cooper_pair(&he3, &self.phonon);
 
         let quantized_vortex = self.vortex.bind(&he3);
@@ -443,7 +478,7 @@ impl PhaseEncoder {
 
         Superfluid {
             material: "He-3".to_string(),
-            critical_temp_k: 0.0025,  // 2.5 mK
+            critical_temp_k: 0.0025, // 2.5 mK
             viscosity: 0.0,
             quantized_vortex,
             vector,
@@ -487,8 +522,11 @@ impl PhaseEncoder {
         band_gap_ev: f64,
         z2: i32,
     ) -> TopologicalInsulator {
-        let surface_state = self.topological.permute((z2.unsigned_abs() as usize) * PHYSICS_DIM / 4);
-        let vector = self.topological
+        let surface_state = self
+            .topological
+            .permute((z2.unsigned_abs() as usize) * PHYSICS_DIM / 4);
+        let vector = self
+            .topological
             .bind(&surface_state)
             .scale(band_gap_ev as f32);
 
@@ -652,7 +690,10 @@ mod tests {
 
         // FQHE has fractional charge, should differ from IQHE in magnitude effects
         // (scaling preserves direction but not magnitude)
-        assert!(iqhe.norm() > fqhe.norm(), "IQHE norm > FQHE norm due to scaling");
+        assert!(
+            iqhe.norm() > fqhe.norm(),
+            "IQHE norm > FQHE norm due to scaling"
+        );
     }
 
     #[test]

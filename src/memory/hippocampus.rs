@@ -37,14 +37,13 @@
 //! └────────────────────────────────────────────────────────────────────┘
 //! ```
 
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
-use anyhow::Result;
 
 /// Emotional valence attached to memories
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum EmotionalValence {
     /// Highly positive experience
     VeryPositive,
@@ -86,7 +85,6 @@ impl EmotionalValence {
         }
     }
 }
-
 
 /// A memory trace in the hippocampus
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -442,8 +440,7 @@ impl HippocampusActor {
         let elapsed = start.elapsed().as_secs_f32() * 1000.0;
 
         let n = (self.stats.total_recalled + 1) as f32;
-        self.stats.avg_recall_time_ms =
-            (self.stats.avg_recall_time_ms * (n - 1.0) + elapsed) / n;
+        self.stats.avg_recall_time_ms = (self.stats.avg_recall_time_ms * (n - 1.0) + elapsed) / n;
         self.stats.total_recalled += 1;
 
         let (memories, scores): (Vec<_>, Vec<_>) = results.into_iter().unzip();
@@ -505,7 +502,11 @@ impl HippocampusActor {
     /// Prune the weakest memories (static to avoid borrow issues)
     fn prune_weakest_memories(memories: &mut Vec<MemoryTrace>) -> usize {
         // Sort by strength ascending
-        memories.sort_by(|a, b| a.strength.partial_cmp(&b.strength).unwrap_or(std::cmp::Ordering::Equal));
+        memories.sort_by(|a, b| {
+            a.strength
+                .partial_cmp(&b.strength)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Remove the weakest 10%
         let to_remove = memories.len() / 10;
@@ -557,7 +558,10 @@ mod tests {
         let mut hippo = HippocampusActor::new(100);
         let embedding = vec![0.1f32; 128];
 
-        let id = hippo.encode("Test memory", embedding, EmotionalValence::Positive).await.unwrap();
+        let id = hippo
+            .encode("Test memory", embedding, EmotionalValence::Positive)
+            .await
+            .unwrap();
         assert!(id > 0);
         assert_eq!(hippo.memory_count().await, 1);
     }
@@ -569,8 +573,14 @@ mod tests {
         let emb1 = vec![0.1f32; 128];
         let emb2 = vec![0.2f32; 128];
 
-        hippo.encode("First memory", emb1.clone(), EmotionalValence::Positive).await.unwrap();
-        hippo.encode("Second memory", emb2.clone(), EmotionalValence::Neutral).await.unwrap();
+        hippo
+            .encode("First memory", emb1.clone(), EmotionalValence::Positive)
+            .await
+            .unwrap();
+        hippo
+            .encode("Second memory", emb2.clone(), EmotionalValence::Neutral)
+            .await
+            .unwrap();
 
         let query = RecallQuery::from_embedding(emb1).with_top_k(5);
         let result = hippo.recall(query).await.unwrap();
@@ -584,7 +594,10 @@ mod tests {
         let mut hippo = HippocampusActor::new(100);
         let embedding = vec![0.1f32; 128];
 
-        hippo.encode("Test memory", embedding, EmotionalValence::VeryPositive).await.unwrap();
+        hippo
+            .encode("Test memory", embedding, EmotionalValence::VeryPositive)
+            .await
+            .unwrap();
 
         let consolidated = hippo.consolidate().await.unwrap();
         assert_eq!(consolidated, 1);
@@ -596,9 +609,15 @@ mod tests {
         assert_eq!(EmotionalValence::Neutral.to_f64(), 0.0);
         assert_eq!(EmotionalValence::VeryNegative.to_f64(), -1.0);
 
-        assert_eq!(EmotionalValence::from_f64(0.9), EmotionalValence::VeryPositive);
+        assert_eq!(
+            EmotionalValence::from_f64(0.9),
+            EmotionalValence::VeryPositive
+        );
         assert_eq!(EmotionalValence::from_f64(0.0), EmotionalValence::Neutral);
-        assert_eq!(EmotionalValence::from_f64(-0.9), EmotionalValence::VeryNegative);
+        assert_eq!(
+            EmotionalValence::from_f64(-0.9),
+            EmotionalValence::VeryNegative
+        );
     }
 
     #[test]
@@ -626,7 +645,10 @@ mod tests {
             for j in 0..i.min(128) {
                 emb[j] = 0.0; // Make embeddings progressively different
             }
-            hippo.encode(format!("Memory {}", i), emb, EmotionalValence::Neutral).await.unwrap();
+            hippo
+                .encode(format!("Memory {}", i), emb, EmotionalValence::Neutral)
+                .await
+                .unwrap();
         }
 
         // Request top 5
@@ -638,8 +660,10 @@ mod tests {
 
         // Results should be sorted by similarity (descending)
         for i in 1..result.scores.len() {
-            assert!(result.scores[i - 1] >= result.scores[i],
-                "Results should be sorted by similarity descending");
+            assert!(
+                result.scores[i - 1] >= result.scores[i],
+                "Results should be sorted by similarity descending"
+            );
         }
 
         // First result should be the most similar (Memory 0, which is identical to query)
@@ -653,7 +677,10 @@ mod tests {
         let embedding = vec![0.5f32; 128];
 
         // Test with fewer results than k
-        hippo.encode("Only memory", embedding.clone(), EmotionalValence::Neutral).await.unwrap();
+        hippo
+            .encode("Only memory", embedding.clone(), EmotionalValence::Neutral)
+            .await
+            .unwrap();
 
         let query = RecallQuery::from_embedding(embedding.clone()).with_top_k(10);
         let result = hippo.recall(query).await.unwrap();

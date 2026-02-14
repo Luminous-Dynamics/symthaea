@@ -36,12 +36,11 @@
 //! let analysis = SimulationAnalysis::from_result(&result);
 //! ```
 
-use crate::hdc::dynamical_system::{
-    DynamicalSystem, Integrator, Rk4Integrator, simulate, SimulationResult,
-    HarmonicOscillator, NBodyGravity, LorenzSystem, ChargedParticle, HeatEquation1D,
-    state_to_hv, trajectory_to_hvs,
-};
 use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::dynamical_system::{
+    simulate, state_to_hv, trajectory_to_hvs, ChargedParticle, DynamicalSystem, HarmonicOscillator,
+    HeatEquation1D, Integrator, LorenzSystem, NBodyGravity, Rk4Integrator, SimulationResult,
+};
 use crate::hdc::unified_hv::ContinuousHV;
 
 // =============================================================================
@@ -68,11 +67,7 @@ pub struct PhysicsSimulator {
 
 impl PhysicsSimulator {
     /// Create a new PhysicsSimulator with the given system, name, and initial state.
-    pub fn new(
-        system: Box<dyn DynamicalSystem>,
-        name: String,
-        initial_state: Vec<f64>,
-    ) -> Self {
+    pub fn new(system: Box<dyn DynamicalSystem>, name: String, initial_state: Vec<f64>) -> Self {
         assert_eq!(
             initial_state.len(),
             system.state_dim(),
@@ -80,7 +75,11 @@ impl PhysicsSimulator {
             initial_state.len(),
             system.state_dim()
         );
-        Self { system, name, initial_state }
+        Self {
+            system,
+            name,
+            initial_state,
+        }
     }
 
     /// Run a numerical simulation from t=0 to t=t_end using RK4 integration.
@@ -183,10 +182,10 @@ impl PhysicsSimulator {
         // Body 2 at (+r2, 0), velocity (0, +v2)
         // This ensures zero total momentum.
         let initial_state = vec![
-            -r1, 0.0,  // pos body 1
-             r2, 0.0,  // pos body 2
-             0.0, -v1, // vel body 1
-             0.0,  v2, // vel body 2
+            -r1, 0.0, // pos body 1
+            r2, 0.0, // pos body 2
+            0.0, -v1, // vel body 1
+            0.0, v2, // vel body 2
         ];
 
         Self::new(
@@ -258,12 +257,7 @@ impl PhysicsSimulator {
     /// # Physics connection
     /// Corresponds to `thermodynamics` module's thermal state encodings, but
     /// with actual diffusion dynamics on a discretized spatial domain.
-    pub fn heat_diffusion(
-        alpha: f64,
-        n_points: usize,
-        t_left: f64,
-        t_right: f64,
-    ) -> Self {
+    pub fn heat_diffusion(alpha: f64, n_points: usize, t_left: f64, t_right: f64) -> Self {
         let system = HeatEquation1D::new(alpha, 1.0, n_points, t_left, t_right);
 
         // Initial condition: uniform temperature at the average of boundaries,
@@ -362,11 +356,17 @@ impl SimulationAnalysis {
     /// Compute energy drift for a harmonic oscillator trajectory.
     ///
     /// Returns the maximum relative energy deviation from the initial energy.
-    pub fn with_harmonic_energy(mut self, osc: &HarmonicOscillator, result: &SimulationResult) -> Self {
+    pub fn with_harmonic_energy(
+        mut self,
+        osc: &HarmonicOscillator,
+        result: &SimulationResult,
+    ) -> Self {
         if let Some(first) = result.states.first() {
             let e0 = osc.energy(first);
             if e0.abs() > 1e-30 {
-                let max_drift = result.states.iter()
+                let max_drift = result
+                    .states
+                    .iter()
                     .map(|s| (osc.energy(s) - e0).abs() / e0.abs())
                     .fold(0.0f64, f64::max);
                 self.energy_drift = Some(max_drift);
@@ -380,7 +380,9 @@ impl SimulationAnalysis {
         if let Some(first) = result.states.first() {
             let e0 = nbody.energy(first);
             if e0.abs() > 1e-30 {
-                let max_drift = result.states.iter()
+                let max_drift = result
+                    .states
+                    .iter()
                     .map(|s| (nbody.energy(s) - e0).abs() / e0.abs())
                     .fold(0.0f64, f64::max);
                 self.energy_drift = Some(max_drift);
@@ -391,11 +393,17 @@ impl SimulationAnalysis {
 
     /// Compute energy drift for a charged particle trajectory (kinetic energy
     /// in pure magnetic field).
-    pub fn with_charged_particle_ke(mut self, cp: &ChargedParticle, result: &SimulationResult) -> Self {
+    pub fn with_charged_particle_ke(
+        mut self,
+        cp: &ChargedParticle,
+        result: &SimulationResult,
+    ) -> Self {
         if let Some(first) = result.states.first() {
             let ke0 = cp.kinetic_energy(first);
             if ke0.abs() > 1e-30 {
-                let max_drift = result.states.iter()
+                let max_drift = result
+                    .states
+                    .iter()
                     .map(|s| (cp.kinetic_energy(s) - ke0).abs() / ke0.abs())
                     .fold(0.0f64, f64::max);
                 self.energy_drift = Some(max_drift);
@@ -460,7 +468,8 @@ impl SimulationAnalysis {
             t += dt;
 
             if (step + 1) % renorm_interval == 0 {
-                let dist: f64 = state.iter()
+                let dist: f64 = state
+                    .iter()
                     .zip(perturbed.iter())
                     .map(|(a, b)| (a - b) * (a - b))
                     .sum::<f64>()
@@ -472,8 +481,7 @@ impl SimulationAnalysis {
 
                     // Renormalize
                     for i in 0..dim {
-                        perturbed[i] = state[i]
-                            + (perturbed[i] - state[i]) * perturbation / dist;
+                        perturbed[i] = state[i] + (perturbed[i] - state[i]) * perturbation / dist;
                     }
                 }
             }
@@ -706,7 +714,9 @@ mod tests {
             assert!(
                 (t - t_steady).abs() < 30.0,
                 "Temperature at point {} = {:.2}, steady = {:.2}, diff too large",
-                i, t, t_steady
+                i,
+                t,
+                t_steady
             );
         }
     }
@@ -796,8 +806,7 @@ mod tests {
         let sim = PhysicsSimulator::harmonic(2.0, 1.0, 0.0);
         let result = sim.simulate(10.0, 0.001);
 
-        let analysis = analyze_trajectory(&result)
-            .with_harmonic_energy(&osc, &result);
+        let analysis = analyze_trajectory(&result).with_harmonic_energy(&osc, &result);
 
         assert!(analysis.energy_drift.is_some());
         let drift = analysis.energy_drift.unwrap();
@@ -814,14 +823,13 @@ mod tests {
         let sim = PhysicsSimulator::lorenz();
         let result = sim.simulate(30.0, 0.01);
 
-        let analysis = analyze_trajectory(&result)
-            .with_lyapunov_estimate(
-                sim.system.as_ref(),
-                &sim.initial_state,
-                30.0,
-                0.01,
-                1e-8,
-            );
+        let analysis = analyze_trajectory(&result).with_lyapunov_estimate(
+            sim.system.as_ref(),
+            &sim.initial_state,
+            30.0,
+            0.01,
+            1e-8,
+        );
 
         assert!(analysis.lyapunov_estimate.is_some());
         let lambda = analysis.lyapunov_estimate.unwrap();
@@ -848,7 +856,9 @@ mod tests {
             assert!(
                 t_min >= -5.0 && t_max <= 105.0,
                 "Grid point {} temperature out of range: [{:.2}, {:.2}]",
-                i, t_min, t_max
+                i,
+                t_min,
+                t_max
             );
         }
     }
@@ -864,8 +874,7 @@ mod tests {
         );
         let result = sim.simulate(10.0, 0.001);
 
-        let analysis = analyze_trajectory(&result)
-            .with_charged_particle_ke(&cp, &result);
+        let analysis = analyze_trajectory(&result).with_charged_particle_ke(&cp, &result);
 
         assert!(analysis.energy_drift.is_some());
         let drift = analysis.energy_drift.unwrap();

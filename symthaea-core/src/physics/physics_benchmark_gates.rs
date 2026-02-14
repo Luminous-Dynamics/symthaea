@@ -4,15 +4,15 @@
 //! generous time bounds (typically 5x expected). They catch catastrophic
 //! performance regressions without requiring a separate benchmark harness.
 
-use std::time::Instant;
-use super::decoherence::{Complex64, DecoherenceChannel, DensityMatrix, simulate_decoherence};
+use super::decoherence::{simulate_decoherence, Complex64, DecoherenceChannel, DensityMatrix};
+use super::hadrons::Hadrons;
+use super::nonequilibrium::JarzynskiEstimator;
 use super::quantum_tunneling::TunnelingCalculator;
 use super::standard_model::StandardModel;
-use super::hadrons::Hadrons;
 use super::true_phi::TruePhiCalculator;
-use super::nonequilibrium::JarzynskiEstimator;
-use crate::hdc::unified_hv::ContinuousHV;
 use crate::genesis::GenesisSeed;
+use crate::hdc::unified_hv::ContinuousHV;
+use std::time::Instant;
 
 /// Single Lindblad RK4 decoherence step should complete under 1ms.
 #[test]

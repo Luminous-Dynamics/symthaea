@@ -86,8 +86,8 @@ impl AffectiveState {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
 
-        let intensity = ((valence.abs() + (arousal - 0.5).abs() * 2.0 + dominance.abs()) / 3.0)
-            .clamp(0.0, 1.0);
+        let intensity =
+            ((valence.abs() + (arousal - 0.5).abs() * 2.0 + dominance.abs()) / 3.0).clamp(0.0, 1.0);
 
         Self {
             valence: valence.clamp(-1.0, 1.0),
@@ -274,8 +274,8 @@ impl PeerAffect {
 
         // Build trust over time
         if self.update_count >= config.min_trust_updates {
-            self.trust = ((self.update_count as f32 - config.min_trust_updates as f32) / 10.0)
-                .min(1.0);
+            self.trust =
+                ((self.update_count as f32 - config.min_trust_updates as f32) / 10.0).min(1.0);
         }
 
         // Update running average
@@ -456,7 +456,8 @@ impl Hyperfeel {
             // Weight by trust and mirror strength
             let weight = peer.trust * self.config.trust_weight_factor * self.config.mirror_strength;
             if weight > 0.01 {
-                weighted_sum = weighted_sum.blend(&peer.average_state, weight / (total_weight + weight));
+                weighted_sum =
+                    weighted_sum.blend(&peer.average_state, weight / (total_weight + weight));
                 total_weight += weight;
             }
         }
@@ -501,7 +502,11 @@ impl Hyperfeel {
         let centroid = AffectiveState::new(avg_valence, avg_arousal, avg_dominance);
 
         // Compute alignment (inverse of average distance from centroid)
-        let avg_distance: f32 = active_states.iter().map(|s| s.distance(&centroid)).sum::<f32>() / n;
+        let avg_distance: f32 = active_states
+            .iter()
+            .map(|s| s.distance(&centroid))
+            .sum::<f32>()
+            / n;
         let alignment = (1.0 - avg_distance / 2.0).clamp(0.0, 1.0); // Max distance is ~2.0
 
         // Determine dominant mood
@@ -652,7 +657,9 @@ impl Hyperfeel {
         let factor = 1.0 - self.config.decay_rate * dt;
 
         // Decay local toward neutral when not being set
-        self.local_state = self.local_state.blend(&AffectiveState::neutral(), 1.0 - factor);
+        self.local_state = self
+            .local_state
+            .blend(&AffectiveState::neutral(), 1.0 - factor);
 
         // Remove very stale peers
         let stale_threshold = Duration::from_millis(self.config.stale_threshold_ms * 3);
@@ -800,7 +807,10 @@ mod tests {
         hf.set_local_state(AffectiveState::new(0.7, 0.6, 0.3));
 
         let status = hf.how_are_we_doing();
-        assert!(matches!(status.health, SwarmHealth::Thriving | SwarmHealth::Stable));
+        assert!(matches!(
+            status.health,
+            SwarmHealth::Thriving | SwarmHealth::Stable
+        ));
     }
 
     #[test]

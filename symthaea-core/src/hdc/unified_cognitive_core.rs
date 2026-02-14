@@ -107,9 +107,8 @@ impl CognitiveMarkers {
     /// These use fixed seeds for reproducibility across sessions
     pub fn new() -> Self {
         // Temporal positions (24 for hours, reusable for other cycles)
-        let temporal_positions: Vec<BinaryHV> = (0..24)
-            .map(|i| BinaryHV::random(5000 + i as u64))
-            .collect();
+        let temporal_positions: Vec<BinaryHV> =
+            (0..24).map(|i| BinaryHV::random(5000 + i as u64)).collect();
 
         Self {
             // Causal (seeds 1000-1099)
@@ -225,7 +224,8 @@ impl UnifiedCognitiveElement {
 
     /// Add causal information: this UCE CAUSES the effect
     pub fn add_cause(&mut self, effect: &BinaryHV, strength: f64, markers: &CognitiveMarkers) {
-        let causal_binding = markers.causes
+        let causal_binding = markers
+            .causes
             .bind(effect)
             .bind(markers.strength_marker(strength));
         self.vector = BinaryHV::bundle(&[self.vector, causal_binding]);
@@ -233,7 +233,8 @@ impl UnifiedCognitiveElement {
 
     /// Add causal information: this UCE IS CAUSED BY the cause
     pub fn add_effect_of(&mut self, cause: &BinaryHV, strength: f64, markers: &CognitiveMarkers) {
-        let causal_binding = markers.caused_by
+        let causal_binding = markers
+            .caused_by
             .bind(cause)
             .bind(markers.strength_marker(strength));
         self.vector = BinaryHV::bundle(&[self.vector, causal_binding]);
@@ -371,15 +372,11 @@ impl UnifiedCognitiveCore {
     /// Get or create a cognitive element
     pub fn get_or_create(&mut self, label: &str) -> &UnifiedCognitiveElement {
         if !self.elements.contains_key(label) {
-            let seed = label.bytes().fold(42u64, |acc, b| {
-                acc.wrapping_add(b as u64).wrapping_mul(31)
-            });
+            let seed = label
+                .bytes()
+                .fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
             let semantic = BinaryHV::random(seed);
-            let uce = UnifiedCognitiveElement::new(
-                label.to_string(),
-                semantic,
-                self.current_time,
-            );
+            let uce = UnifiedCognitiveElement::new(label.to_string(), semantic, self.current_time);
             self.elements.insert(label.to_string(), uce);
         }
         self.elements.get(label).unwrap()
@@ -400,12 +397,12 @@ impl UnifiedCognitiveCore {
     /// This updates BOTH the cause and effect UCEs with their causal structure
     pub fn learn_causal(&mut self, cause_label: &str, effect_label: &str, strength: f64) {
         // Get or create both elements
-        let cause_seed = cause_label.bytes().fold(42u64, |acc, b| {
-            acc.wrapping_add(b as u64).wrapping_mul(31)
-        });
-        let effect_seed = effect_label.bytes().fold(42u64, |acc, b| {
-            acc.wrapping_add(b as u64).wrapping_mul(31)
-        });
+        let cause_seed = cause_label
+            .bytes()
+            .fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
+        let effect_seed = effect_label
+            .bytes()
+            .fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
 
         let cause_semantic = BinaryHV::random(cause_seed);
         let effect_semantic = BinaryHV::random(effect_seed);
@@ -443,12 +440,12 @@ impl UnifiedCognitiveCore {
 
     /// Learn a temporal sequence: predecessor → successor
     pub fn learn_temporal(&mut self, predecessor_label: &str, successor_label: &str) {
-        let pred_seed = predecessor_label.bytes().fold(42u64, |acc, b| {
-            acc.wrapping_add(b as u64).wrapping_mul(31)
-        });
-        let succ_seed = successor_label.bytes().fold(42u64, |acc, b| {
-            acc.wrapping_add(b as u64).wrapping_mul(31)
-        });
+        let pred_seed = predecessor_label
+            .bytes()
+            .fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
+        let succ_seed = successor_label
+            .bytes()
+            .fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
 
         let pred_semantic = BinaryHV::random(pred_seed);
         let succ_semantic = BinaryHV::random(succ_seed);
@@ -484,16 +481,16 @@ impl UnifiedCognitiveCore {
 
     /// Learn a semantic relation: entity IS A category
     pub fn learn_is_a(&mut self, entity_label: &str, category_label: &str) {
-        let cat_seed = category_label.bytes().fold(42u64, |acc, b| {
-            acc.wrapping_add(b as u64).wrapping_mul(31)
-        });
+        let cat_seed = category_label
+            .bytes()
+            .fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
         let category_semantic = BinaryHV::random(cat_seed);
 
         // Create entity if not exists
         if !self.elements.contains_key(entity_label) {
-            let seed = entity_label.bytes().fold(42u64, |acc, b| {
-                acc.wrapping_add(b as u64).wrapping_mul(31)
-            });
+            let seed = entity_label
+                .bytes()
+                .fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
             let uce = UnifiedCognitiveElement::new(
                 entity_label.to_string(),
                 BinaryHV::random(seed),
@@ -530,7 +527,7 @@ impl UnifiedCognitiveCore {
 
                 if let (Some(cause), Some(effect)) = (
                     before.split_whitespace().last(),
-                    after.split_whitespace().next()
+                    after.split_whitespace().next(),
                 ) {
                     let cause = cause.trim_matches(|c: char| !c.is_alphanumeric());
                     let effect = effect.trim_matches(|c: char| !c.is_alphanumeric());
@@ -553,7 +550,7 @@ impl UnifiedCognitiveCore {
 
                 if let (Some(pred), Some(succ)) = (
                     before.split_whitespace().last(),
-                    after.split_whitespace().next()
+                    after.split_whitespace().next(),
                 ) {
                     let pred = pred.trim_matches(|c: char| !c.is_alphanumeric());
                     let succ = succ.trim_matches(|c: char| !c.is_alphanumeric());
@@ -573,7 +570,7 @@ impl UnifiedCognitiveCore {
 
             if let (Some(entity), Some(category)) = (
                 before.split_whitespace().last(),
-                after.split_whitespace().next()
+                after.split_whitespace().next(),
             ) {
                 let entity = entity.trim_matches(|c: char| !c.is_alphanumeric());
                 let category = category.trim_matches(|c: char| !c.is_alphanumeric());
@@ -608,7 +605,9 @@ impl UnifiedCognitiveCore {
         let cause_query = uce.query_causes(&self.markers);
 
         // Find similar elements (potential causes)
-        let mut results: Vec<QueryResult> = self.elements.iter()
+        let mut results: Vec<QueryResult> = self
+            .elements
+            .iter()
             .filter(|(l, _)| *l != label)
             .map(|(l, other)| {
                 let sim = cause_query.similarity(&other.vector);
@@ -637,7 +636,9 @@ impl UnifiedCognitiveCore {
         let effect_query = uce.query_effects(&self.markers);
 
         // Find similar elements (potential effects)
-        let mut results: Vec<QueryResult> = self.elements.iter()
+        let mut results: Vec<QueryResult> = self
+            .elements
+            .iter()
             .filter(|(l, _)| *l != label)
             .map(|(l, other)| {
                 let sim = effect_query.similarity(&other.vector);
@@ -664,7 +665,9 @@ impl UnifiedCognitiveCore {
 
         let succ_query = uce.query_successors(&self.markers);
 
-        let mut results: Vec<QueryResult> = self.elements.iter()
+        let mut results: Vec<QueryResult> = self
+            .elements
+            .iter()
             .filter(|(l, _)| *l != label)
             .map(|(l, other)| {
                 let sim = succ_query.similarity(&other.vector);
@@ -689,7 +692,9 @@ impl UnifiedCognitiveCore {
             None => return Vec::new(),
         };
 
-        let mut results: Vec<QueryResult> = self.elements.iter()
+        let mut results: Vec<QueryResult> = self
+            .elements
+            .iter()
             .filter(|(l, _)| *l != label)
             .map(|(l, other)| QueryResult {
                 label: l.clone(),
@@ -736,7 +741,7 @@ impl UnifiedCognitiveCore {
 
         let elements: Vec<_> = self.elements.values().collect();
         for i in 0..elements.len() {
-            for j in (i+1)..elements.len() {
+            for j in (i + 1)..elements.len() {
                 total_similarity += elements[i].similarity(elements[j]) as f64;
                 pair_count += 1;
             }

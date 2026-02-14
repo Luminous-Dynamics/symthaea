@@ -25,30 +25,25 @@
 //! The Seven Harmonies aren't just tracked values; they are reasoning modes
 //! that bias thought in specific directions.
 
-pub mod harmonics;
 pub mod autopoiesis;
+pub mod harmonics;
 pub mod meta_cognition;
 
+pub use autopoiesis::{AutopoieticMonitor, OperationalClosure, SelfProductionMetrics};
 pub use harmonics::{
-    HarmonicMode, HarmonicProfile, ReasoningBias,
-    ActiveHarmonic, HarmonicQuestion,
+    ActiveHarmonic, HarmonicMode, HarmonicProfile, HarmonicQuestion, ReasoningBias,
 };
-pub use autopoiesis::{
-    AutopoieticMonitor, OperationalClosure, SelfProductionMetrics,
-};
-pub use meta_cognition::{
-    MetaCognitiveLayer, RecursiveModel, SelfModelAccuracy,
-};
+pub use meta_cognition::{MetaCognitiveLayer, RecursiveModel, SelfModelAccuracy};
 
 /// The core question each harmony asks of any situation
 pub const HARMONIC_QUESTIONS: [&str; 7] = [
-    "Does this hang together?",           // Coherence
-    "Does this serve flourishing?",       // Flourishing
-    "What don't I know?",                 // Wisdom
-    "What haven't I tried?",              // Play
-    "How is this connected?",             // Interconnect
-    "What am I giving/receiving?",        // Reciprocity
-    "How does this help us grow?",        // Evolution
+    "Does this hang together?",     // Coherence
+    "Does this serve flourishing?", // Flourishing
+    "What don't I know?",           // Wisdom
+    "What haven't I tried?",        // Play
+    "How is this connected?",       // Interconnect
+    "What am I giving/receiving?",  // Reciprocity
+    "How does this help us grow?",  // Evolution
 ];
 
 /// Initialize the wisdom layer with default configuration
@@ -102,7 +97,12 @@ impl WisdomState {
     }
 
     /// Update wisdom state based on an experience
-    pub fn update_from_experience(&mut self, prediction_error: f32, uncertainty: f32, coherence: f32) {
+    pub fn update_from_experience(
+        &mut self,
+        prediction_error: f32,
+        uncertainty: f32,
+        coherence: f32,
+    ) {
         // High prediction error → boost Wisdom (what don't I know?)
         if prediction_error > 0.5 {
             self.harmonics.boost(ActiveHarmonic::Wisdom, 0.1);

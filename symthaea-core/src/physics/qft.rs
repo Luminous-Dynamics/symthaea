@@ -17,11 +17,11 @@
 //! - **QCD**: SU(3) - strong interaction (αs ≈ 0.12 at MZ)
 //! - **Electroweak**: SU(2)×U(1) - weak and electromagnetic unified
 
+use super::constants::ALPHA;
+use super::hadrons::Hadrons;
+use super::standard_model::{StandardModel, PHYSICS_DIM};
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::{StandardModel, PHYSICS_DIM};
-use super::hadrons::Hadrons;
-use super::constants::ALPHA;
 use serde::{Deserialize, Serialize};
 
 /// Propagator type (line style in Feynman diagram)
@@ -170,15 +170,19 @@ impl QEDEncoder {
 
     /// Basic QED vertex: e⁻ + γ → e⁻
     pub fn vertex(&self) -> Vertex {
-        let incoming = vec![self.electron_propagator.clone(), self.photon_propagator.clone()];
+        let incoming = vec![
+            self.electron_propagator.clone(),
+            self.photon_propagator.clone(),
+        ];
         let outgoing = vec![self.electron_propagator.clone()];
 
-        let vertex_vector = self.qed_vertex
+        let vertex_vector = self
+            .qed_vertex
             .bind(&self.electron_propagator)
             .bind(&self.photon_propagator);
 
         Vertex {
-            coupling: self.fine_structure.sqrt(),  // √α
+            coupling: self.fine_structure.sqrt(), // √α
             incoming,
             outgoing,
             vector: vertex_vector,
@@ -193,7 +197,7 @@ impl QEDEncoder {
         // s-channel and u-channel diagrams
         let prop = self.electron_prop();
 
-        let amplitude = self.fine_structure;  // α from two vertices
+        let amplitude = self.fine_structure; // α from two vertices
 
         let vector = v1.vector.bind(&v2.vector).bind(&prop.vector);
 
@@ -327,7 +331,8 @@ impl QCDEncoder {
     /// Quark-gluon vertex
     pub fn qqg_vertex_with_color(&self, color_idx: usize) -> Vertex {
         let color = &self.color_charges[color_idx % 8];
-        let vertex_vector = self.qqg_vertex
+        let vertex_vector = self
+            .qqg_vertex
             .bind(&self.quark_propagator)
             .bind(&self.gluon_propagator)
             .bind(color);
@@ -342,9 +347,7 @@ impl QCDEncoder {
 
     /// Triple gluon vertex (non-Abelian self-interaction)
     pub fn triple_gluon_vertex(&self) -> Vertex {
-        let vertex_vector = self.ggg_vertex
-            .bind(&self.gluon_propagator)
-            .scale(3.0);
+        let vertex_vector = self.ggg_vertex.bind(&self.gluon_propagator).scale(3.0);
 
         Vertex {
             coupling: self.strong_coupling.sqrt(),
@@ -356,12 +359,10 @@ impl QCDEncoder {
 
     /// Quartic gluon vertex
     pub fn quartic_gluon_vertex(&self) -> Vertex {
-        let vertex_vector = self.gggg_vertex
-            .bind(&self.gluon_propagator)
-            .scale(4.0);
+        let vertex_vector = self.gggg_vertex.bind(&self.gluon_propagator).scale(4.0);
 
         Vertex {
-            coupling: self.strong_coupling,  // g² not g
+            coupling: self.strong_coupling, // g² not g
             incoming: vec![self.gluon_propagator.clone(), self.gluon_propagator.clone()],
             outgoing: vec![self.gluon_propagator.clone(), self.gluon_propagator.clone()],
             vector: vertex_vector,
@@ -440,13 +441,14 @@ impl ElectroweakEncoder {
     /// Beta decay: n → p + e⁻ + ν̄ₑ (W⁻ exchange)
     pub fn beta_decay(&self, hadrons: &Hadrons, model: &StandardModel) -> FeynmanDiagram {
         // Weak vertex at quark level: d → u + W⁻
-        let vertex_vector = self.ffw_vertex
+        let vertex_vector = self
+            .ffw_vertex
             .bind(&self.w_propagator)
             .bind(&hadrons.neutron)
             .bind(&hadrons.proton);
 
         let v1 = Vertex {
-            coupling: 0.65,  // Weak coupling g
+            coupling: 0.65, // Weak coupling g
             incoming: vec![hadrons.neutron.clone()],
             outgoing: vec![hadrons.proton.clone()],
             vector: vertex_vector.clone(),
@@ -475,23 +477,27 @@ impl ElectroweakEncoder {
             vertices: vec![v1, v2],
             external_legs: vec![],
             loop_order: 0,
-            amplitude_estimate: 1e-5,  // GF ~ 1e-5 GeV⁻²
+            amplitude_estimate: 1e-5, // GF ~ 1e-5 GeV⁻²
             vector: diagram_vector,
         }
     }
 
     /// Higgs decay: H → b + b̄
     pub fn higgs_to_bb(&self, model: &StandardModel) -> FeynmanDiagram {
-        let yukawa: f64 = (4.18_f64 / 246.0).sqrt();  // m_b / v
+        let yukawa: f64 = (4.18_f64 / 246.0).sqrt(); // m_b / v
 
-        let vertex_vector = self.ffh_vertex
+        let vertex_vector = self
+            .ffh_vertex
             .bind(&self.higgs_propagator)
             .bind(&model.bottom_quark);
 
         let v = Vertex {
             coupling: yukawa,
             incoming: vec![self.higgs_propagator.clone()],
-            outgoing: vec![model.bottom_quark.clone(), model.bottom_quark.permute(PHYSICS_DIM / 2)],
+            outgoing: vec![
+                model.bottom_quark.clone(),
+                model.bottom_quark.permute(PHYSICS_DIM / 2),
+            ],
             vector: vertex_vector.clone(),
         };
 
@@ -509,13 +515,14 @@ impl ElectroweakEncoder {
     /// W pair production: e⁺e⁻ → W⁺W⁻
     pub fn w_pair_production(&self, model: &StandardModel) -> FeynmanDiagram {
         // s-channel: e⁺e⁻ → γ/Z → W⁺W⁻
-        let vertex_vector = self.wwz_vertex
-            .bind(&self.w_propagator)
-            .scale(2.0);
+        let vertex_vector = self.wwz_vertex.bind(&self.w_propagator).scale(2.0);
 
         let v = Vertex {
             coupling: 0.65,
-            incoming: vec![model.electron.clone(), model.electron.permute(PHYSICS_DIM / 2)],
+            incoming: vec![
+                model.electron.clone(),
+                model.electron.permute(PHYSICS_DIM / 2),
+            ],
             outgoing: vec![self.w_propagator.clone(), self.w_propagator.permute(1000)],
             vector: vertex_vector.clone(),
         };
@@ -550,11 +557,12 @@ pub struct LoopDiagram {
 impl QEDEncoder {
     /// Electron self-energy (1-loop)
     pub fn electron_self_energy(&self) -> LoopDiagram {
-        let loop_vec = self.electron_propagator
+        let loop_vec = self
+            .electron_propagator
             .bind(&self.photon_propagator)
             .permute(1000);
 
-        let counterterm = Some(self.electron_propagator.scale(0.1));  // Mass counterterm
+        let counterterm = Some(self.electron_propagator.scale(0.1)); // Mass counterterm
 
         LoopDiagram {
             tree_diagram: self.compton_scattering(),
@@ -567,7 +575,8 @@ impl QEDEncoder {
 
     /// Vacuum polarization (photon self-energy)
     pub fn vacuum_polarization(&self) -> LoopDiagram {
-        let loop_vec = self.photon_propagator
+        let loop_vec = self
+            .photon_propagator
             .bind(&self.electron_propagator)
             .bind(&self.electron_propagator.permute(PHYSICS_DIM / 2))
             .permute(2000);
@@ -583,14 +592,12 @@ impl QEDEncoder {
 
     /// Vertex correction (anomalous magnetic moment)
     pub fn vertex_correction(&self) -> LoopDiagram {
-        let loop_vec = self.qed_vertex
-            .bind(&self.photon_propagator)
-            .permute(3000);
+        let loop_vec = self.qed_vertex.bind(&self.photon_propagator).permute(3000);
 
         LoopDiagram {
             tree_diagram: self.compton_scattering(),
             loop_order: 1,
-            divergence_type: DivergenceType::Finite,  // Anomalous moment is finite
+            divergence_type: DivergenceType::Finite, // Anomalous moment is finite
             counterterm: None,
             vector: loop_vec,
         }
@@ -601,7 +608,14 @@ impl QEDEncoder {
 mod tests {
     use super::*;
 
-    fn setup() -> (StandardModel, Hadrons, QEDEncoder, QCDEncoder, ElectroweakEncoder, GenesisSeed) {
+    fn setup() -> (
+        StandardModel,
+        Hadrons,
+        QEDEncoder,
+        QCDEncoder,
+        ElectroweakEncoder,
+        GenesisSeed,
+    ) {
         let genesis = GenesisSeed::from_phrase("qft test");
         let model = StandardModel::from_genesis(&genesis);
         let hadrons = Hadrons::from_model(&model, &genesis);
@@ -630,7 +644,7 @@ mod tests {
 
         let diagram = qed.compton_scattering();
 
-        assert_eq!(diagram.loop_order, 0);  // Tree level
+        assert_eq!(diagram.loop_order, 0); // Tree level
         assert_eq!(diagram.vertices.len(), 2);
         assert!((diagram.amplitude_estimate - ALPHA).abs() < 0.0001);
     }
@@ -663,7 +677,12 @@ mod tests {
         for i in 0..8 {
             for j in (i + 1)..8 {
                 let sim = qcd.color_charges[i].similarity(&qcd.color_charges[j]);
-                assert!(sim < 0.5, "Color charges should be distinct: {} vs {}", i, j);
+                assert!(
+                    sim < 0.5,
+                    "Color charges should be distinct: {} vs {}",
+                    i,
+                    j
+                );
             }
         }
     }
@@ -698,7 +717,7 @@ mod tests {
 
         assert_eq!(diagram.name, "Beta decay");
         assert_eq!(diagram.loop_order, 0);
-        assert!(diagram.amplitude_estimate < 1e-4);  // Weak interaction
+        assert!(diagram.amplitude_estimate < 1e-4); // Weak interaction
     }
 
     #[test]

@@ -69,8 +69,8 @@
 //! | Grounding | None | Embodied experience |
 //! | Consciousness | None | Φ-integrated |
 
-use super::universal_semantics::{UniversalSemantics, SemanticPrime};
 use super::binary_hv::BinaryHV;
+use super::universal_semantics::{SemanticPrime, UniversalSemantics};
 use std::collections::HashMap;
 
 // =============================================================================
@@ -151,29 +151,51 @@ impl CausalRoleMarkers {
     fn initialize(&mut self) {
         // Cause markers with position info
         // "X because Y" -> Y is cause, X is effect (cause After marker)
-        self.cause_markers.insert("because".to_string(), CausePosition::After);
-        self.cause_markers.insert("since".to_string(), CausePosition::After);
-        self.cause_markers.insert("as".to_string(), CausePosition::After);
-        self.cause_markers.insert("due to".to_string(), CausePosition::After);
+        self.cause_markers
+            .insert("because".to_string(), CausePosition::After);
+        self.cause_markers
+            .insert("since".to_string(), CausePosition::After);
+        self.cause_markers
+            .insert("as".to_string(), CausePosition::After);
+        self.cause_markers
+            .insert("due to".to_string(), CausePosition::After);
 
         // "X so Y" / "X therefore Y" -> X is cause, Y is effect (cause Before marker)
-        self.cause_markers.insert("so".to_string(), CausePosition::Before);
-        self.cause_markers.insert("therefore".to_string(), CausePosition::Before);
-        self.cause_markers.insert("thus".to_string(), CausePosition::Before);
-        self.cause_markers.insert("hence".to_string(), CausePosition::Before);
-        self.cause_markers.insert("consequently".to_string(), CausePosition::Before);
+        self.cause_markers
+            .insert("so".to_string(), CausePosition::Before);
+        self.cause_markers
+            .insert("therefore".to_string(), CausePosition::Before);
+        self.cause_markers
+            .insert("thus".to_string(), CausePosition::Before);
+        self.cause_markers
+            .insert("hence".to_string(), CausePosition::Before);
+        self.cause_markers
+            .insert("consequently".to_string(), CausePosition::Before);
 
         // Agent verbs (subject typically Agent)
         self.agent_verbs = vec![
-            "make", "cause", "create", "build", "write", "say", "tell",
-            "push", "pull", "break", "fix", "help", "hurt", "kill",
-        ].into_iter().map(String::from).collect();
+            "make", "cause", "create", "build", "write", "say", "tell", "push", "pull", "break",
+            "fix", "help", "hurt", "kill",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         // Patient verbs (subject typically Patient)
         self.patient_verbs = vec![
-            "receive", "experience", "suffer", "feel", "see", "hear",
-            "become", "get", "fall",
-        ].into_iter().map(String::from).collect();
+            "receive",
+            "experience",
+            "suffer",
+            "feel",
+            "see",
+            "hear",
+            "become",
+            "get",
+            "fall",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
     }
 
     /// Extract causal structure from text
@@ -185,7 +207,11 @@ impl CausalRoleMarkers {
         // Simple heuristic extraction
         for (i, word) in words.iter().enumerate() {
             // Check for agent verbs
-            if self.agent_verbs.iter().any(|v| word.starts_with(v.as_str())) {
+            if self
+                .agent_verbs
+                .iter()
+                .any(|v| word.starts_with(v.as_str()))
+            {
                 // Subject before verb is likely Agent
                 if i > 0 {
                     let subject = words[0..i].join(" ");
@@ -195,7 +221,7 @@ impl CausalRoleMarkers {
                 }
                 // Object after verb is likely Patient
                 if i + 1 < words.len() {
-                    let object = words[i+1..].join(" ");
+                    let object = words[i + 1..].join(" ");
                     if !object.is_empty() {
                         results.push((object, CausalRole::Patient));
                     }
@@ -204,7 +230,11 @@ impl CausalRoleMarkers {
             }
 
             // Check for patient verbs
-            if self.patient_verbs.iter().any(|v| word.starts_with(v.as_str())) {
+            if self
+                .patient_verbs
+                .iter()
+                .any(|v| word.starts_with(v.as_str()))
+            {
                 // Subject is Patient/Experiencer
                 if i > 0 {
                     let subject = words[0..i].join(" ");
@@ -277,10 +307,10 @@ pub struct LexicalGrounding {
 /// Types of causal relations expressed in language
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CausalRelation {
-    Causes,     // because, since, therefore
-    Prevents,   // despite, although, prevents
-    Enables,    // allows, lets, permits
-    Temporal,   // before, after, when, while
+    Causes,      // because, since, therefore
+    Prevents,    // despite, although, prevents
+    Enables,     // allows, lets, permits
+    Temporal,    // before, after, when, while
     Conditional, // if, unless, would
 }
 
@@ -311,34 +341,149 @@ impl LexicalGrounding {
         self.add_word("body", vec![SemanticPrime::Body], 0.0, 0.3);
 
         // === EMOTIONS → MENTAL PREDICATES + EVALUATORS ===
-        self.add_word("happy", vec![SemanticPrime::Feel, SemanticPrime::Good], 0.8, 0.6);
-        self.add_word("joy", vec![SemanticPrime::Feel, SemanticPrime::Good], 0.9, 0.7);
-        self.add_word("joyful", vec![SemanticPrime::Feel, SemanticPrime::Good], 0.9, 0.7);
-        self.add_word("love", vec![SemanticPrime::Feel, SemanticPrime::Good, SemanticPrime::Want], 0.9, 0.7);
-        self.add_word("sad", vec![SemanticPrime::Feel, SemanticPrime::Bad], -0.7, 0.4);
-        self.add_word("grief", vec![SemanticPrime::Feel, SemanticPrime::Bad, SemanticPrime::Die], -0.9, 0.5);
-        self.add_word("angry", vec![SemanticPrime::Feel, SemanticPrime::Bad, SemanticPrime::Want], -0.6, 0.9);
-        self.add_word("fear", vec![SemanticPrime::Feel, SemanticPrime::Bad, SemanticPrime::Maybe], -0.7, 0.8);
-        self.add_word("afraid", vec![SemanticPrime::Feel, SemanticPrime::Bad, SemanticPrime::Maybe], -0.7, 0.8);
-        self.add_word("calm", vec![SemanticPrime::Feel, SemanticPrime::Good], 0.3, 0.1);
-        self.add_word("peaceful", vec![SemanticPrime::Feel, SemanticPrime::Good], 0.5, 0.1);
-        self.add_word("anxious", vec![SemanticPrime::Feel, SemanticPrime::Bad, SemanticPrime::Maybe], -0.5, 0.7);
-        self.add_word("worried", vec![SemanticPrime::Think, SemanticPrime::Bad, SemanticPrime::Maybe], -0.4, 0.6);
-        self.add_word("excited", vec![SemanticPrime::Feel, SemanticPrime::Good], 0.7, 0.9);
-        self.add_word("surprised", vec![SemanticPrime::Feel, SemanticPrime::Know], 0.1, 0.8);
+        self.add_word(
+            "happy",
+            vec![SemanticPrime::Feel, SemanticPrime::Good],
+            0.8,
+            0.6,
+        );
+        self.add_word(
+            "joy",
+            vec![SemanticPrime::Feel, SemanticPrime::Good],
+            0.9,
+            0.7,
+        );
+        self.add_word(
+            "joyful",
+            vec![SemanticPrime::Feel, SemanticPrime::Good],
+            0.9,
+            0.7,
+        );
+        self.add_word(
+            "love",
+            vec![
+                SemanticPrime::Feel,
+                SemanticPrime::Good,
+                SemanticPrime::Want,
+            ],
+            0.9,
+            0.7,
+        );
+        self.add_word(
+            "sad",
+            vec![SemanticPrime::Feel, SemanticPrime::Bad],
+            -0.7,
+            0.4,
+        );
+        self.add_word(
+            "grief",
+            vec![SemanticPrime::Feel, SemanticPrime::Bad, SemanticPrime::Die],
+            -0.9,
+            0.5,
+        );
+        self.add_word(
+            "angry",
+            vec![SemanticPrime::Feel, SemanticPrime::Bad, SemanticPrime::Want],
+            -0.6,
+            0.9,
+        );
+        self.add_word(
+            "fear",
+            vec![
+                SemanticPrime::Feel,
+                SemanticPrime::Bad,
+                SemanticPrime::Maybe,
+            ],
+            -0.7,
+            0.8,
+        );
+        self.add_word(
+            "afraid",
+            vec![
+                SemanticPrime::Feel,
+                SemanticPrime::Bad,
+                SemanticPrime::Maybe,
+            ],
+            -0.7,
+            0.8,
+        );
+        self.add_word(
+            "calm",
+            vec![SemanticPrime::Feel, SemanticPrime::Good],
+            0.3,
+            0.1,
+        );
+        self.add_word(
+            "peaceful",
+            vec![SemanticPrime::Feel, SemanticPrime::Good],
+            0.5,
+            0.1,
+        );
+        self.add_word(
+            "anxious",
+            vec![
+                SemanticPrime::Feel,
+                SemanticPrime::Bad,
+                SemanticPrime::Maybe,
+            ],
+            -0.5,
+            0.7,
+        );
+        self.add_word(
+            "worried",
+            vec![
+                SemanticPrime::Think,
+                SemanticPrime::Bad,
+                SemanticPrime::Maybe,
+            ],
+            -0.4,
+            0.6,
+        );
+        self.add_word(
+            "excited",
+            vec![SemanticPrime::Feel, SemanticPrime::Good],
+            0.7,
+            0.9,
+        );
+        self.add_word(
+            "surprised",
+            vec![SemanticPrime::Feel, SemanticPrime::Know],
+            0.1,
+            0.8,
+        );
 
         // === MENTAL VERBS ===
         self.add_word("think", vec![SemanticPrime::Think], 0.0, 0.4);
         self.add_word("know", vec![SemanticPrime::Know], 0.1, 0.3);
-        self.add_word("believe", vec![SemanticPrime::Think, SemanticPrime::True], 0.1, 0.3);
+        self.add_word(
+            "believe",
+            vec![SemanticPrime::Think, SemanticPrime::True],
+            0.1,
+            0.3,
+        );
         self.add_word("want", vec![SemanticPrime::Want], 0.2, 0.5);
         self.add_word("need", vec![SemanticPrime::Want], 0.0, 0.6);
         self.add_word("feel", vec![SemanticPrime::Feel], 0.0, 0.5);
         self.add_word("see", vec![SemanticPrime::See], 0.0, 0.3);
         self.add_word("hear", vec![SemanticPrime::Hear], 0.0, 0.3);
-        self.add_word("understand", vec![SemanticPrime::Know, SemanticPrime::Think], 0.2, 0.4);
-        self.add_word("remember", vec![SemanticPrime::Know, SemanticPrime::Before], 0.0, 0.4);
-        self.add_word("forget", vec![SemanticPrime::Know, SemanticPrime::Not], -0.2, 0.3);
+        self.add_word(
+            "understand",
+            vec![SemanticPrime::Know, SemanticPrime::Think],
+            0.2,
+            0.4,
+        );
+        self.add_word(
+            "remember",
+            vec![SemanticPrime::Know, SemanticPrime::Before],
+            0.0,
+            0.4,
+        );
+        self.add_word(
+            "forget",
+            vec![SemanticPrime::Know, SemanticPrime::Not],
+            -0.2,
+            0.3,
+        );
 
         // === ACTIONS ===
         self.add_word("do", vec![SemanticPrime::Do], 0.0, 0.5);
@@ -346,41 +491,129 @@ impl LexicalGrounding {
         self.add_word("move", vec![SemanticPrime::Move], 0.0, 0.5);
         self.add_word("go", vec![SemanticPrime::Move], 0.0, 0.4);
         self.add_word("come", vec![SemanticPrime::Move], 0.1, 0.4);
-        self.add_word("leave", vec![SemanticPrime::Move, SemanticPrime::Far], -0.2, 0.4);
-        self.add_word("left", vec![SemanticPrime::Move, SemanticPrime::Far, SemanticPrime::Before], -0.2, 0.3);
-        self.add_word("stay", vec![SemanticPrime::Move, SemanticPrime::Not], 0.1, 0.2);
+        self.add_word(
+            "leave",
+            vec![SemanticPrime::Move, SemanticPrime::Far],
+            -0.2,
+            0.4,
+        );
+        self.add_word(
+            "left",
+            vec![
+                SemanticPrime::Move,
+                SemanticPrime::Far,
+                SemanticPrime::Before,
+            ],
+            -0.2,
+            0.3,
+        );
+        self.add_word(
+            "stay",
+            vec![SemanticPrime::Move, SemanticPrime::Not],
+            0.1,
+            0.2,
+        );
         self.add_word("say", vec![SemanticPrime::Say], 0.0, 0.4);
-        self.add_word("said", vec![SemanticPrime::Say, SemanticPrime::Before], 0.0, 0.3);
+        self.add_word(
+            "said",
+            vec![SemanticPrime::Say, SemanticPrime::Before],
+            0.0,
+            0.3,
+        );
         self.add_word("tell", vec![SemanticPrime::Say], 0.0, 0.4);
         self.add_word("live", vec![SemanticPrime::Live], 0.3, 0.3);
         self.add_word("die", vec![SemanticPrime::Die], -0.8, 0.6);
-        self.add_word("died", vec![SemanticPrime::Die, SemanticPrime::Before], -0.9, 0.5);
+        self.add_word(
+            "died",
+            vec![SemanticPrime::Die, SemanticPrime::Before],
+            -0.9,
+            0.5,
+        );
 
         // === EVALUATORS ===
         self.add_word("good", vec![SemanticPrime::Good], 0.7, 0.3);
-        self.add_word("great", vec![SemanticPrime::Good, SemanticPrime::Very], 0.9, 0.5);
-        self.add_word("wonderful", vec![SemanticPrime::Good, SemanticPrime::Very], 0.9, 0.6);
+        self.add_word(
+            "great",
+            vec![SemanticPrime::Good, SemanticPrime::Very],
+            0.9,
+            0.5,
+        );
+        self.add_word(
+            "wonderful",
+            vec![SemanticPrime::Good, SemanticPrime::Very],
+            0.9,
+            0.6,
+        );
         self.add_word("bad", vec![SemanticPrime::Bad], -0.7, 0.4);
-        self.add_word("terrible", vec![SemanticPrime::Bad, SemanticPrime::Very], -0.9, 0.6);
+        self.add_word(
+            "terrible",
+            vec![SemanticPrime::Bad, SemanticPrime::Very],
+            -0.9,
+            0.6,
+        );
         self.add_word("big", vec![SemanticPrime::Big], 0.1, 0.3);
         self.add_word("small", vec![SemanticPrime::Small], -0.1, 0.2);
         self.add_word("true", vec![SemanticPrime::True], 0.3, 0.3);
-        self.add_word("false", vec![SemanticPrime::True, SemanticPrime::Not], -0.3, 0.3);
+        self.add_word(
+            "false",
+            vec![SemanticPrime::True, SemanticPrime::Not],
+            -0.3,
+            0.3,
+        );
 
         // === RELATIONAL ===
-        self.add_word("friend", vec![SemanticPrime::Someone, SemanticPrime::Good, SemanticPrime::Want], 0.6, 0.4);
-        self.add_word("enemy", vec![SemanticPrime::Someone, SemanticPrime::Bad], -0.6, 0.6);
-        self.add_word("family", vec![SemanticPrime::People, SemanticPrime::Like], 0.5, 0.4);
-        self.add_word("mother", vec![SemanticPrime::Someone, SemanticPrime::Live], 0.5, 0.4);
-        self.add_word("father", vec![SemanticPrime::Someone, SemanticPrime::Live], 0.5, 0.4);
-        self.add_word("child", vec![SemanticPrime::Someone, SemanticPrime::Small], 0.4, 0.5);
+        self.add_word(
+            "friend",
+            vec![
+                SemanticPrime::Someone,
+                SemanticPrime::Good,
+                SemanticPrime::Want,
+            ],
+            0.6,
+            0.4,
+        );
+        self.add_word(
+            "enemy",
+            vec![SemanticPrime::Someone, SemanticPrime::Bad],
+            -0.6,
+            0.6,
+        );
+        self.add_word(
+            "family",
+            vec![SemanticPrime::People, SemanticPrime::Like],
+            0.5,
+            0.4,
+        );
+        self.add_word(
+            "mother",
+            vec![SemanticPrime::Someone, SemanticPrime::Live],
+            0.5,
+            0.4,
+        );
+        self.add_word(
+            "father",
+            vec![SemanticPrime::Someone, SemanticPrime::Live],
+            0.5,
+            0.4,
+        );
+        self.add_word(
+            "child",
+            vec![SemanticPrime::Someone, SemanticPrime::Small],
+            0.4,
+            0.5,
+        );
 
         // === LOGICAL/CAUSAL ===
         self.add_word("not", vec![SemanticPrime::Not], 0.0, 0.2);
         self.add_word("no", vec![SemanticPrime::Not], -0.1, 0.3);
         self.add_word("maybe", vec![SemanticPrime::Maybe], 0.0, 0.3);
         self.add_word("can", vec![SemanticPrime::Can], 0.1, 0.3);
-        self.add_word("cannot", vec![SemanticPrime::Can, SemanticPrime::Not], -0.2, 0.4);
+        self.add_word(
+            "cannot",
+            vec![SemanticPrime::Can, SemanticPrime::Not],
+            -0.2,
+            0.4,
+        );
         self.add_word("if", vec![SemanticPrime::If], 0.0, 0.3);
         self.add_word("because", vec![SemanticPrime::Because], 0.0, 0.4);
 
@@ -416,35 +649,62 @@ impl LexicalGrounding {
         self.add_word("very", vec![SemanticPrime::Very], 0.0, 0.4);
         self.add_word("really", vec![SemanticPrime::Very], 0.0, 0.4);
         self.add_word("more", vec![SemanticPrime::More], 0.1, 0.3);
-        self.add_word("less", vec![SemanticPrime::More, SemanticPrime::Not], -0.1, 0.2);
+        self.add_word(
+            "less",
+            vec![SemanticPrime::More, SemanticPrime::Not],
+            -0.1,
+            0.2,
+        );
 
         // === CAUSAL MARKERS ===
-        self.causal_markers.insert("because".to_string(), CausalRelation::Causes);
-        self.causal_markers.insert("since".to_string(), CausalRelation::Causes);
-        self.causal_markers.insert("therefore".to_string(), CausalRelation::Causes);
-        self.causal_markers.insert("so".to_string(), CausalRelation::Causes);
-        self.causal_markers.insert("thus".to_string(), CausalRelation::Causes);
-        self.causal_markers.insert("hence".to_string(), CausalRelation::Causes);
+        self.causal_markers
+            .insert("because".to_string(), CausalRelation::Causes);
+        self.causal_markers
+            .insert("since".to_string(), CausalRelation::Causes);
+        self.causal_markers
+            .insert("therefore".to_string(), CausalRelation::Causes);
+        self.causal_markers
+            .insert("so".to_string(), CausalRelation::Causes);
+        self.causal_markers
+            .insert("thus".to_string(), CausalRelation::Causes);
+        self.causal_markers
+            .insert("hence".to_string(), CausalRelation::Causes);
 
-        self.causal_markers.insert("despite".to_string(), CausalRelation::Prevents);
-        self.causal_markers.insert("although".to_string(), CausalRelation::Prevents);
-        self.causal_markers.insert("but".to_string(), CausalRelation::Prevents);
-        self.causal_markers.insert("however".to_string(), CausalRelation::Prevents);
-        self.causal_markers.insert("yet".to_string(), CausalRelation::Prevents);
+        self.causal_markers
+            .insert("despite".to_string(), CausalRelation::Prevents);
+        self.causal_markers
+            .insert("although".to_string(), CausalRelation::Prevents);
+        self.causal_markers
+            .insert("but".to_string(), CausalRelation::Prevents);
+        self.causal_markers
+            .insert("however".to_string(), CausalRelation::Prevents);
+        self.causal_markers
+            .insert("yet".to_string(), CausalRelation::Prevents);
 
-        self.causal_markers.insert("allows".to_string(), CausalRelation::Enables);
-        self.causal_markers.insert("lets".to_string(), CausalRelation::Enables);
-        self.causal_markers.insert("enables".to_string(), CausalRelation::Enables);
-        self.causal_markers.insert("permits".to_string(), CausalRelation::Enables);
+        self.causal_markers
+            .insert("allows".to_string(), CausalRelation::Enables);
+        self.causal_markers
+            .insert("lets".to_string(), CausalRelation::Enables);
+        self.causal_markers
+            .insert("enables".to_string(), CausalRelation::Enables);
+        self.causal_markers
+            .insert("permits".to_string(), CausalRelation::Enables);
 
-        self.causal_markers.insert("before".to_string(), CausalRelation::Temporal);
-        self.causal_markers.insert("after".to_string(), CausalRelation::Temporal);
-        self.causal_markers.insert("when".to_string(), CausalRelation::Temporal);
-        self.causal_markers.insert("while".to_string(), CausalRelation::Temporal);
+        self.causal_markers
+            .insert("before".to_string(), CausalRelation::Temporal);
+        self.causal_markers
+            .insert("after".to_string(), CausalRelation::Temporal);
+        self.causal_markers
+            .insert("when".to_string(), CausalRelation::Temporal);
+        self.causal_markers
+            .insert("while".to_string(), CausalRelation::Temporal);
 
-        self.causal_markers.insert("if".to_string(), CausalRelation::Conditional);
-        self.causal_markers.insert("unless".to_string(), CausalRelation::Conditional);
-        self.causal_markers.insert("would".to_string(), CausalRelation::Conditional);
+        self.causal_markers
+            .insert("if".to_string(), CausalRelation::Conditional);
+        self.causal_markers
+            .insert("unless".to_string(), CausalRelation::Conditional);
+        self.causal_markers
+            .insert("would".to_string(), CausalRelation::Conditional);
     }
 
     fn add_word(&mut self, word: &str, primes: Vec<SemanticPrime>, valence: f32, arousal: f32) {
@@ -557,17 +817,17 @@ pub struct EmbodiedGrounding {
 /// Hormone modulation hint based on understood meaning
 #[derive(Debug, Clone)]
 pub struct HormoneHint {
-    pub cortisol_delta: f32,    // stress
-    pub dopamine_delta: f32,    // reward
+    pub cortisol_delta: f32,      // stress
+    pub dopamine_delta: f32,      // reward
     pub acetylcholine_delta: f32, // focus
 }
 
 /// Prosody hints for expressing understood meaning
 #[derive(Debug, Clone)]
 pub struct ProsodyHint {
-    pub rate: f32,      // speech rate
-    pub pitch: f32,     // pitch shift
-    pub energy: f32,    // vocal energy
+    pub rate: f32,   // speech rate
+    pub pitch: f32,  // pitch shift
+    pub energy: f32, // vocal energy
 }
 
 // =============================================================================
@@ -647,8 +907,16 @@ impl GroundedUnderstanding {
         };
 
         // 4. Compute embodied grounding
-        let avg_valence = if word_count > 0 { total_valence / word_count as f32 } else { 0.0 };
-        let avg_arousal = if word_count > 0 { total_arousal / word_count as f32 } else { 0.3 };
+        let avg_valence = if word_count > 0 {
+            total_valence / word_count as f32
+        } else {
+            0.0
+        };
+        let avg_arousal = if word_count > 0 {
+            total_arousal / word_count as f32
+        } else {
+            0.3
+        };
 
         let embodied = self.compute_embodied_grounding(avg_valence, avg_arousal);
 
@@ -690,7 +958,8 @@ impl GroundedUnderstanding {
         }
 
         // Get HV for each prime
-        let hvs: Vec<BinaryHV> = primes.iter()
+        let hvs: Vec<BinaryHV> = primes
+            .iter()
             .map(|p| *self.semantics.get_prime(*p))
             .collect();
 
@@ -722,24 +991,26 @@ impl GroundedUnderstanding {
             CausalRelation::Causes => {
                 // "X because Y" → Y causes X
                 let effect = &words[..idx];
-                let cause = &words[idx+1..];
+                let cause = &words[idx + 1..];
                 (cause.to_vec(), effect.to_vec())
             }
             _ => {
                 // "X enables/prevents Y" → X relation Y
                 let cause = &words[..idx];
-                let effect = &words[idx+1..];
+                let effect = &words[idx + 1..];
                 (cause.to_vec(), effect.to_vec())
             }
         };
 
         // Compose HDC vectors for cause and effect
-        let cause_primes: Vec<SemanticPrime> = cause_words.iter()
+        let cause_primes: Vec<SemanticPrime> = cause_words
+            .iter()
             .filter_map(|w| self.lexicon.decompose(w))
             .flatten()
             .copied()
             .collect();
-        let effect_primes: Vec<SemanticPrime> = effect_words.iter()
+        let effect_primes: Vec<SemanticPrime> = effect_words
+            .iter()
             .filter_map(|w| self.lexicon.decompose(w))
             .flatten()
             .copied()
@@ -775,9 +1046,9 @@ impl GroundedUnderstanding {
 
         // Prosody hints
         let prosody = ProsodyHint {
-            rate: 0.9 + arousal * 0.3,  // Higher arousal = faster
-            pitch: valence * 2.0,        // Positive = higher pitch
-            energy: arousal,             // Arousal = energy
+            rate: 0.9 + arousal * 0.3, // Higher arousal = faster
+            pitch: valence * 2.0,      // Positive = higher pitch
+            energy: arousal,           // Arousal = energy
         };
 
         EmbodiedGrounding {
@@ -868,9 +1139,18 @@ mod tests {
     fn test_causal_detection() {
         let lexicon = LexicalGrounding::new();
 
-        assert_eq!(lexicon.causal_relation("because"), Some(CausalRelation::Causes));
-        assert_eq!(lexicon.causal_relation("although"), Some(CausalRelation::Prevents));
-        assert_eq!(lexicon.causal_relation("if"), Some(CausalRelation::Conditional));
+        assert_eq!(
+            lexicon.causal_relation("because"),
+            Some(CausalRelation::Causes)
+        );
+        assert_eq!(
+            lexicon.causal_relation("although"),
+            Some(CausalRelation::Prevents)
+        );
+        assert_eq!(
+            lexicon.causal_relation("if"),
+            Some(CausalRelation::Conditional)
+        );
     }
 
     #[test]

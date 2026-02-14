@@ -174,7 +174,7 @@ pub struct EmotionalMoment {
 pub struct MoodState {
     pub baseline_valence: f64,
     pub baseline_arousal: f64,
-    pub stability: f64,  // How stable the mood is (0.0-1.0)
+    pub stability: f64, // How stable the mood is (0.0-1.0)
 }
 
 /// Which emotional systems contributed to unified state
@@ -245,20 +245,39 @@ impl UnifiedEmotion {
     /// Find closest emotion from VAD values
     pub fn from_vad(valence: f64, arousal: f64, dominance: f64) -> Self {
         let emotions = [
-            Self::Joy, Self::Sadness, Self::Anger, Self::Fear,
-            Self::Surprise, Self::Disgust, Self::Trust, Self::Anticipation,
-            Self::Love, Self::Peace, Self::Curiosity, Self::Gratitude,
-            Self::Seeking, Self::Rage, Self::Lust, Self::Care,
-            Self::Panic, Self::Play, Self::Neutral,
+            Self::Joy,
+            Self::Sadness,
+            Self::Anger,
+            Self::Fear,
+            Self::Surprise,
+            Self::Disgust,
+            Self::Trust,
+            Self::Anticipation,
+            Self::Love,
+            Self::Peace,
+            Self::Curiosity,
+            Self::Gratitude,
+            Self::Seeking,
+            Self::Rage,
+            Self::Lust,
+            Self::Care,
+            Self::Panic,
+            Self::Play,
+            Self::Neutral,
         ];
 
-        emotions.into_iter()
+        emotions
+            .into_iter()
             .min_by(|a, b| {
                 let (av, aa, ad) = a.to_vad();
                 let (bv, ba, bd) = b.to_vad();
-                let dist_a = (av - valence).powi(2) + (aa - arousal).powi(2) + (ad - dominance).powi(2);
-                let dist_b = (bv - valence).powi(2) + (ba - arousal).powi(2) + (bd - dominance).powi(2);
-                dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
+                let dist_a =
+                    (av - valence).powi(2) + (aa - arousal).powi(2) + (ad - dominance).powi(2);
+                let dist_b =
+                    (bv - valence).powi(2) + (ba - arousal).powi(2) + (bd - dominance).powi(2);
+                dist_a
+                    .partial_cmp(&dist_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .unwrap_or(Self::Neutral)
     }
@@ -314,22 +333,30 @@ impl UnifiedEmotionalState {
         self.arousal = self.arousal * momentum + arousal * (1.0 - momentum);
 
         // Update discrete emotion
-        self.discrete_emotion = Some(UnifiedEmotion::from_vad(self.valence, self.arousal, self.dominance));
+        self.discrete_emotion = Some(UnifiedEmotion::from_vad(
+            self.valence,
+            self.arousal,
+            self.dominance,
+        ));
 
         // Slowly update mood
         let mood_momentum = 0.95;
-        self.mood.baseline_valence = self.mood.baseline_valence * mood_momentum + valence * (1.0 - mood_momentum);
-        self.mood.baseline_arousal = self.mood.baseline_arousal * mood_momentum + arousal * (1.0 - mood_momentum);
+        self.mood.baseline_valence =
+            self.mood.baseline_valence * mood_momentum + valence * (1.0 - mood_momentum);
+        self.mood.baseline_arousal =
+            self.mood.baseline_arousal * mood_momentum + arousal * (1.0 - mood_momentum);
     }
 
     /// Get emotional intensity (distance from neutral)
     pub fn intensity(&self) -> f64 {
-        (self.valence.powi(2) + self.arousal.powi(2) + self.dominance.powi(2)).sqrt() / 3.0_f64.sqrt()
+        (self.valence.powi(2) + self.arousal.powi(2) + self.dominance.powi(2)).sqrt()
+            / 3.0_f64.sqrt()
     }
 
     /// Describe the emotional state in natural language
     pub fn describe(&self) -> String {
-        let emotion_word = self.discrete_emotion
+        let emotion_word = self
+            .discrete_emotion
             .map(|e| format!("{:?}", e).to_lowercase())
             .unwrap_or_else(|| "neutral".to_string());
 
@@ -344,8 +371,23 @@ impl UnifiedEmotionalState {
         };
 
         let trend = if self.trajectory.len() >= 5 {
-            let recent: f64 = self.trajectory.iter().rev().take(3).map(|m| m.valence).sum::<f64>() / 3.0;
-            let older: f64 = self.trajectory.iter().rev().skip(3).take(3).map(|m| m.valence).sum::<f64>() / 3.0;
+            let recent: f64 = self
+                .trajectory
+                .iter()
+                .rev()
+                .take(3)
+                .map(|m| m.valence)
+                .sum::<f64>()
+                / 3.0;
+            let older: f64 = self
+                .trajectory
+                .iter()
+                .rev()
+                .skip(3)
+                .take(3)
+                .map(|m| m.valence)
+                .sum::<f64>()
+                / 3.0;
             if recent > older + 0.1 {
                 " and improving"
             } else if recent < older - 0.1 {
@@ -398,7 +440,12 @@ impl EmotionalBridge {
     }
 
     /// Update from EmotionalDepthSystem blend
-    pub fn update_from_emotional_depth(&mut self, primary_emotion: &str, intensity: f64, blend: Vec<(String, f64)>) {
+    pub fn update_from_emotional_depth(
+        &mut self,
+        primary_emotion: &str,
+        intensity: f64,
+        blend: Vec<(String, f64)>,
+    ) {
         // Map string emotion to unified
         let emotion = match primary_emotion.to_lowercase().as_str() {
             "joy" | "happy" => UnifiedEmotion::Joy,
@@ -421,7 +468,8 @@ impl EmotionalBridge {
         self.unified.discrete_emotion = Some(emotion);
 
         // Map blend
-        self.unified.blend = blend.into_iter()
+        self.unified.blend = blend
+            .into_iter()
             .filter_map(|(name, weight)| {
                 let e = match name.to_lowercase().as_str() {
                     "joy" => Some(UnifiedEmotion::Joy),
@@ -439,7 +487,12 @@ impl EmotionalBridge {
     }
 
     /// Update from EmotionalCore response
-    pub fn update_from_emotional_core(&mut self, valence: f64, arousal: f64, primary_emotion: &str) {
+    pub fn update_from_emotional_core(
+        &mut self,
+        valence: f64,
+        arousal: f64,
+        primary_emotion: &str,
+    ) {
         let emotion = match primary_emotion.to_lowercase().as_str() {
             "joy" => UnifiedEmotion::Joy,
             "sadness" => UnifiedEmotion::Sadness,
@@ -492,11 +545,41 @@ impl EmotionalBridge {
             return EmotionalPattern::Stable;
         }
 
-        let recent: f64 = self.history.iter().rev().take(3).map(|s| s.valence).sum::<f64>() / 3.0;
-        let older: f64 = self.history.iter().rev().skip(3).take(3).map(|s| s.valence).sum::<f64>() / 3.0;
+        let recent: f64 = self
+            .history
+            .iter()
+            .rev()
+            .take(3)
+            .map(|s| s.valence)
+            .sum::<f64>()
+            / 3.0;
+        let older: f64 = self
+            .history
+            .iter()
+            .rev()
+            .skip(3)
+            .take(3)
+            .map(|s| s.valence)
+            .sum::<f64>()
+            / 3.0;
 
-        let arousal_recent: f64 = self.history.iter().rev().take(3).map(|s| s.arousal).sum::<f64>() / 3.0;
-        let arousal_older: f64 = self.history.iter().rev().skip(3).take(3).map(|s| s.arousal).sum::<f64>() / 3.0;
+        let arousal_recent: f64 = self
+            .history
+            .iter()
+            .rev()
+            .take(3)
+            .map(|s| s.arousal)
+            .sum::<f64>()
+            / 3.0;
+        let arousal_older: f64 = self
+            .history
+            .iter()
+            .rev()
+            .skip(3)
+            .take(3)
+            .map(|s| s.arousal)
+            .sum::<f64>()
+            / 3.0;
 
         if recent > older + 0.15 && arousal_recent > arousal_older + 0.1 {
             EmotionalPattern::Escalating
@@ -527,7 +610,10 @@ pub enum EmotionalPattern {
 #[derive(Debug, Clone)]
 pub enum CausalQuery {
     /// What would happen if X?
-    WhatIf { intervention: String, target: String },
+    WhatIf {
+        intervention: String,
+        target: String,
+    },
     /// Why did X happen?
     WhyDid { event: String },
     /// What caused X?
@@ -535,7 +621,10 @@ pub enum CausalQuery {
     /// What will X cause?
     WhatWillCause { cause: String },
     /// Counterfactual: If X had been different?
-    Counterfactual { actual: String, hypothetical: String },
+    Counterfactual {
+        actual: String,
+        hypothetical: String,
+    },
 }
 
 /// Detail level for causal reasoning
@@ -615,20 +704,41 @@ impl UnifiedCausalReasoning {
 
         // For now, provide a structured framework
         let (conclusion, confidence, sources) = match (&query, detail) {
-            (CausalQuery::Counterfactual { actual, hypothetical }, CausalDetail::Rigorous) => {
+            (
+                CausalQuery::Counterfactual {
+                    actual,
+                    hypothetical,
+                },
+                CausalDetail::Rigorous,
+            ) => {
                 // Would use Pearl's do-calculus
                 (
-                    format!("If {} had been {}, the outcome would differ", actual, hypothetical),
+                    format!(
+                        "If {} had been {}, the outcome would differ",
+                        actual, hypothetical
+                    ),
                     0.8,
-                    CausalSources { used_pearl_scm: true, ..Default::default() }
+                    CausalSources {
+                        used_pearl_scm: true,
+                        ..Default::default()
+                    },
                 )
             }
-            (CausalQuery::WhatIf { intervention, target }, CausalDetail::Fast) => {
+            (
+                CausalQuery::WhatIf {
+                    intervention,
+                    target,
+                },
+                CausalDetail::Fast,
+            ) => {
                 // Would use CausalMind embedding
                 (
                     format!("Intervening on {} would affect {}", intervention, target),
                     0.6,
-                    CausalSources { used_causal_mind: true, ..Default::default() }
+                    CausalSources {
+                        used_causal_mind: true,
+                        ..Default::default()
+                    },
                 )
             }
             (CausalQuery::WhyDid { event }, _) => {
@@ -636,24 +746,30 @@ impl UnifiedCausalReasoning {
                 (
                     format!("The event '{}' occurred due to preceding conditions", event),
                     0.7,
-                    CausalSources { used_uce: true, ..Default::default() }
+                    CausalSources {
+                        used_uce: true,
+                        ..Default::default()
+                    },
                 )
             }
             (_, CausalDetail::Comprehensive) => {
                 // Triangulate across all systems
                 (
-                    "Comprehensive analysis combining symbolic, embedding, and semantic reasoning".to_string(),
+                    "Comprehensive analysis combining symbolic, embedding, and semantic reasoning"
+                        .to_string(),
                     0.85,
-                    CausalSources { used_pearl_scm: true, used_causal_mind: true, used_uce: true }
+                    CausalSources {
+                        used_pearl_scm: true,
+                        used_causal_mind: true,
+                        used_uce: true,
+                    },
                 )
             }
-            _ => {
-                (
-                    "Causal analysis performed".to_string(),
-                    0.5,
-                    CausalSources::default()
-                )
-            }
+            _ => (
+                "Causal analysis performed".to_string(),
+                0.5,
+                CausalSources::default(),
+            ),
         };
 
         let result = CausalResult {
@@ -740,14 +856,16 @@ impl SystemReality {
 
     /// Check if a package is installed
     pub fn is_installed(&self, name: &str) -> Option<bool> {
-        self.packages.iter()
+        self.packages
+            .iter()
             .find(|p| p.name == name)
             .map(|p| p.installed)
     }
 
     /// Check if a service is active
     pub fn is_service_active(&self, name: &str) -> Option<bool> {
-        self.services.iter()
+        self.services
+            .iter()
             .find(|s| s.name == name)
             .map(|s| s.active)
     }
@@ -836,7 +954,12 @@ impl ConsciousDialoguePipeline {
     }
 
     /// Generate a response based on consciousness state
-    pub fn generate(&mut self, input: &str, phi: f64, emotional_bridge: &EmotionalBridge) -> DialogueResponse {
+    pub fn generate(
+        &mut self,
+        input: &str,
+        phi: f64,
+        emotional_bridge: &EmotionalBridge,
+    ) -> DialogueResponse {
         // Determine depth based on Φ
         let depth = if phi > 0.6 {
             DialogueDepth::Integrative
@@ -847,7 +970,9 @@ impl ConsciousDialoguePipeline {
         };
 
         // Get emotional tone
-        let emotional_tone = emotional_bridge.state().discrete_emotion
+        let emotional_tone = emotional_bridge
+            .state()
+            .discrete_emotion
             .unwrap_or(UnifiedEmotion::Neutral);
 
         // Generate response (placeholder - real implementation would use full system)
@@ -855,13 +980,16 @@ impl ConsciousDialoguePipeline {
             DialogueDepth::Integrative => {
                 format!(
                     "With deep integration (Φ={:.2}), I understand '{}'. {}",
-                    phi, input, emotional_bridge.state().describe()
+                    phi,
+                    input,
+                    emotional_bridge.state().describe()
                 )
             }
             DialogueDepth::Reflective => {
                 format!(
                     "Reflecting on '{}', I sense {}",
-                    input, emotional_bridge.state().describe()
+                    input,
+                    emotional_bridge.state().describe()
                 )
             }
             DialogueDepth::Reactive => {
@@ -899,8 +1027,9 @@ impl ConsciousDialoguePipeline {
 
         // Adjust for expertise
         if self.user_adaptation.expertise < 0.3 {
-            text = text.replace("Φ", "consciousness integration")
-                      .replace("phi", "integration level");
+            text = text
+                .replace("Φ", "consciousness integration")
+                .replace("phi", "integration level");
         }
 
         text
@@ -1047,13 +1176,24 @@ impl PhiMethodPrimitiveGrounding {
     pub fn new(method: PhiMethod, system: &PrimitiveSystem) -> Self {
         let (primitives, rigor) = Self::nsm_mapping(method);
         let encoding = encode_primitives(&primitives, system);
-        Self { method, nsm_primitives: primitives, primitive_encoding: encoding, computational_rigor: rigor }
+        Self {
+            method,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            computational_rigor: rigor,
+        }
     }
 
     fn nsm_mapping(method: PhiMethod) -> (Vec<String>, f64) {
         match method {
             PhiMethod::IntegratedInformationTheory => (
-                vec!["ALL".into(), "TOGETHER".into(), "ONE".into(), "KNOW".into(), "TRUE".into()],
+                vec![
+                    "ALL".into(),
+                    "TOGETHER".into(),
+                    "ONE".into(),
+                    "KNOW".into(),
+                    "TRUE".into(),
+                ],
                 1.0,
             ),
             PhiMethod::WeightedGeometricMean => (
@@ -1065,7 +1205,12 @@ impl PhiMethodPrimitiveGrounding {
                 0.5,
             ),
             PhiMethod::MultiSourceComposite => (
-                vec!["MANY".into(), "PLACE".into(), "TOGETHER".into(), "ONE".into()],
+                vec![
+                    "MANY".into(),
+                    "PLACE".into(),
+                    "TOGETHER".into(),
+                    "ONE".into(),
+                ],
                 0.8,
             ),
             PhiMethod::TheoryVotingAggregate => (
@@ -1089,30 +1234,192 @@ impl UnifiedEmotionPrimitiveGrounding {
     pub fn new(emotion: UnifiedEmotion, system: &PrimitiveSystem) -> Self {
         let (primitives, polarity) = Self::nsm_mapping(emotion);
         let encoding = encode_primitives(&primitives, system);
-        Self { emotion, nsm_primitives: primitives, primitive_encoding: encoding, valence_polarity: polarity }
+        Self {
+            emotion,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            valence_polarity: polarity,
+        }
     }
 
     fn nsm_mapping(emotion: UnifiedEmotion) -> (Vec<String>, i8) {
         match emotion {
             UnifiedEmotion::Joy => (vec!["FEEL".into(), "GOOD".into(), "VERY".into()], 1),
-            UnifiedEmotion::Sadness => (vec!["FEEL".into(), "BAD".into(), "BECAUSE".into(), "NOT".into(), "HAVE".into()], -1),
-            UnifiedEmotion::Anger => (vec!["FEEL".into(), "BAD".into(), "WANT".into(), "DO".into(), "SOMETHING".into()], -1),
-            UnifiedEmotion::Fear => (vec!["FEEL".into(), "BAD".into(), "SOMETHING".into(), "HAPPEN".into(), "NOT".into(), "WANT".into()], -1),
-            UnifiedEmotion::Surprise => (vec!["NOT".into(), "KNOW".into(), "BEFORE".into(), "NOW".into(), "KNOW".into()], 0),
-            UnifiedEmotion::Disgust => (vec!["FEEL".into(), "BAD".into(), "NOT".into(), "WANT".into(), "NEAR".into()], -1),
-            UnifiedEmotion::Trust => (vec!["THINK".into(), "GOOD".into(), "SOMEONE".into(), "DO".into(), "GOOD".into()], 1),
-            UnifiedEmotion::Anticipation => (vec!["THINK".into(), "SOMETHING".into(), "HAPPEN".into(), "AFTER".into()], 0),
-            UnifiedEmotion::Love => (vec!["FEEL".into(), "VERY".into(), "GOOD".into(), "BECAUSE".into(), "SOMEONE".into()], 1),
-            UnifiedEmotion::Peace => (vec!["FEEL".into(), "GOOD".into(), "NOT".into(), "WANT".into(), "MORE".into()], 1),
-            UnifiedEmotion::Curiosity => (vec!["WANT".into(), "KNOW".into(), "MORE".into(), "SOMETHING".into()], 1),
-            UnifiedEmotion::Gratitude => (vec!["FEEL".into(), "GOOD".into(), "BECAUSE".into(), "SOMEONE".into(), "DO".into(), "GOOD".into()], 1),
-            UnifiedEmotion::Seeking => (vec!["WANT".into(), "SOMETHING".into(), "DO".into(), "MOVE".into()], 1),
-            UnifiedEmotion::Rage => (vec!["FEEL".into(), "VERY".into(), "BAD".into(), "WANT".into(), "DO".into(), "BAD".into()], -1),
-            UnifiedEmotion::Lust => (vec!["WANT".into(), "VERY".into(), "BODY".into(), "SOMEONE".into()], 1),
-            UnifiedEmotion::Care => (vec!["WANT".into(), "DO".into(), "GOOD".into(), "SOMEONE".into()], 1),
-            UnifiedEmotion::Panic => (vec!["FEEL".into(), "VERY".into(), "BAD".into(), "NOT".into(), "CAN".into(), "DO".into()], -1),
-            UnifiedEmotion::Play => (vec!["FEEL".into(), "GOOD".into(), "DO".into(), "BECAUSE".into(), "WANT".into()], 1),
-            UnifiedEmotion::Neutral => (vec!["NOT".into(), "FEEL".into(), "GOOD".into(), "NOT".into(), "FEEL".into(), "BAD".into()], 0),
+            UnifiedEmotion::Sadness => (
+                vec![
+                    "FEEL".into(),
+                    "BAD".into(),
+                    "BECAUSE".into(),
+                    "NOT".into(),
+                    "HAVE".into(),
+                ],
+                -1,
+            ),
+            UnifiedEmotion::Anger => (
+                vec![
+                    "FEEL".into(),
+                    "BAD".into(),
+                    "WANT".into(),
+                    "DO".into(),
+                    "SOMETHING".into(),
+                ],
+                -1,
+            ),
+            UnifiedEmotion::Fear => (
+                vec![
+                    "FEEL".into(),
+                    "BAD".into(),
+                    "SOMETHING".into(),
+                    "HAPPEN".into(),
+                    "NOT".into(),
+                    "WANT".into(),
+                ],
+                -1,
+            ),
+            UnifiedEmotion::Surprise => (
+                vec![
+                    "NOT".into(),
+                    "KNOW".into(),
+                    "BEFORE".into(),
+                    "NOW".into(),
+                    "KNOW".into(),
+                ],
+                0,
+            ),
+            UnifiedEmotion::Disgust => (
+                vec![
+                    "FEEL".into(),
+                    "BAD".into(),
+                    "NOT".into(),
+                    "WANT".into(),
+                    "NEAR".into(),
+                ],
+                -1,
+            ),
+            UnifiedEmotion::Trust => (
+                vec![
+                    "THINK".into(),
+                    "GOOD".into(),
+                    "SOMEONE".into(),
+                    "DO".into(),
+                    "GOOD".into(),
+                ],
+                1,
+            ),
+            UnifiedEmotion::Anticipation => (
+                vec![
+                    "THINK".into(),
+                    "SOMETHING".into(),
+                    "HAPPEN".into(),
+                    "AFTER".into(),
+                ],
+                0,
+            ),
+            UnifiedEmotion::Love => (
+                vec![
+                    "FEEL".into(),
+                    "VERY".into(),
+                    "GOOD".into(),
+                    "BECAUSE".into(),
+                    "SOMEONE".into(),
+                ],
+                1,
+            ),
+            UnifiedEmotion::Peace => (
+                vec![
+                    "FEEL".into(),
+                    "GOOD".into(),
+                    "NOT".into(),
+                    "WANT".into(),
+                    "MORE".into(),
+                ],
+                1,
+            ),
+            UnifiedEmotion::Curiosity => (
+                vec![
+                    "WANT".into(),
+                    "KNOW".into(),
+                    "MORE".into(),
+                    "SOMETHING".into(),
+                ],
+                1,
+            ),
+            UnifiedEmotion::Gratitude => (
+                vec![
+                    "FEEL".into(),
+                    "GOOD".into(),
+                    "BECAUSE".into(),
+                    "SOMEONE".into(),
+                    "DO".into(),
+                    "GOOD".into(),
+                ],
+                1,
+            ),
+            UnifiedEmotion::Seeking => (
+                vec![
+                    "WANT".into(),
+                    "SOMETHING".into(),
+                    "DO".into(),
+                    "MOVE".into(),
+                ],
+                1,
+            ),
+            UnifiedEmotion::Rage => (
+                vec![
+                    "FEEL".into(),
+                    "VERY".into(),
+                    "BAD".into(),
+                    "WANT".into(),
+                    "DO".into(),
+                    "BAD".into(),
+                ],
+                -1,
+            ),
+            UnifiedEmotion::Lust => (
+                vec![
+                    "WANT".into(),
+                    "VERY".into(),
+                    "BODY".into(),
+                    "SOMEONE".into(),
+                ],
+                1,
+            ),
+            UnifiedEmotion::Care => (
+                vec!["WANT".into(), "DO".into(), "GOOD".into(), "SOMEONE".into()],
+                1,
+            ),
+            UnifiedEmotion::Panic => (
+                vec![
+                    "FEEL".into(),
+                    "VERY".into(),
+                    "BAD".into(),
+                    "NOT".into(),
+                    "CAN".into(),
+                    "DO".into(),
+                ],
+                -1,
+            ),
+            UnifiedEmotion::Play => (
+                vec![
+                    "FEEL".into(),
+                    "GOOD".into(),
+                    "DO".into(),
+                    "BECAUSE".into(),
+                    "WANT".into(),
+                ],
+                1,
+            ),
+            UnifiedEmotion::Neutral => (
+                vec![
+                    "NOT".into(),
+                    "FEEL".into(),
+                    "GOOD".into(),
+                    "NOT".into(),
+                    "FEEL".into(),
+                    "BAD".into(),
+                ],
+                0,
+            ),
         }
     }
 }
@@ -1129,12 +1436,18 @@ impl EmotionalPatternPrimitiveGrounding {
     pub fn new(pattern: EmotionalPattern, system: &PrimitiveSystem) -> Self {
         let primitives = Self::nsm_mapping(pattern);
         let encoding = encode_primitives(&primitives, system);
-        Self { pattern, nsm_primitives: primitives, primitive_encoding: encoding }
+        Self {
+            pattern,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+        }
     }
 
     fn nsm_mapping(pattern: EmotionalPattern) -> Vec<String> {
         match pattern {
-            EmotionalPattern::Stable => vec!["SAME".into(), "TIME".into(), "NOT".into(), "CHANGE".into()],
+            EmotionalPattern::Stable => {
+                vec!["SAME".into(), "TIME".into(), "NOT".into(), "CHANGE".into()]
+            }
             EmotionalPattern::Escalating => vec!["MORE".into(), "TIME".into(), "AFTER".into()],
             EmotionalPattern::Calming => vec!["LESS".into(), "TIME".into(), "AFTER".into()],
             EmotionalPattern::Volatile => vec!["CHANGE".into(), "MUCH".into(), "TIME".into()],
@@ -1154,16 +1467,32 @@ impl CausalRelationPrimitiveGrounding {
     pub fn new(relation: CausalRelation, system: &PrimitiveSystem) -> Self {
         let primitives = Self::nsm_mapping(relation);
         let encoding = encode_primitives(&primitives, system);
-        Self { relation, nsm_primitives: primitives, primitive_encoding: encoding }
+        Self {
+            relation,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+        }
     }
 
     fn nsm_mapping(relation: CausalRelation) -> Vec<String> {
         match relation {
             CausalRelation::Causes => vec!["BECAUSE".into(), "THIS".into(), "HAPPEN".into()],
             CausalRelation::CausedBy => vec!["HAPPEN".into(), "BECAUSE".into(), "OTHER".into()],
-            CausalRelation::Prevents => vec!["BECAUSE".into(), "THIS".into(), "NOT".into(), "HAPPEN".into()],
-            CausalRelation::Enables => vec!["BECAUSE".into(), "THIS".into(), "CAN".into(), "HAPPEN".into()],
-            CausalRelation::Correlates => vec!["WHEN".into(), "THIS".into(), "ALSO".into(), "OTHER".into()],
+            CausalRelation::Prevents => vec![
+                "BECAUSE".into(),
+                "THIS".into(),
+                "NOT".into(),
+                "HAPPEN".into(),
+            ],
+            CausalRelation::Enables => vec![
+                "BECAUSE".into(),
+                "THIS".into(),
+                "CAN".into(),
+                "HAPPEN".into(),
+            ],
+            CausalRelation::Correlates => {
+                vec!["WHEN".into(), "THIS".into(), "ALSO".into(), "OTHER".into()]
+            }
         }
     }
 }
@@ -1181,14 +1510,34 @@ impl DialogueDepthPrimitiveGrounding {
     pub fn new(depth: DialogueDepth, system: &PrimitiveSystem) -> Self {
         let (primitives, proc_depth) = Self::nsm_mapping(depth);
         let encoding = encode_primitives(&primitives, system);
-        Self { depth, nsm_primitives: primitives, primitive_encoding: encoding, processing_depth: proc_depth }
+        Self {
+            depth,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            processing_depth: proc_depth,
+        }
     }
 
     fn nsm_mapping(depth: DialogueDepth) -> (Vec<String>, u8) {
         match depth {
-            DialogueDepth::Reactive => (vec!["DO".into(), "NOW".into(), "BECAUSE".into(), "BEFORE".into()], 1),
-            DialogueDepth::Reflective => (vec!["THINK".into(), "BEFORE".into(), "KNOW".into(), "DO".into()], 2),
-            DialogueDepth::Integrative => (vec!["THINK".into(), "ALL".into(), "TOGETHER".into(), "KNOW".into(), "DO".into()], 3),
+            DialogueDepth::Reactive => (
+                vec!["DO".into(), "NOW".into(), "BECAUSE".into(), "BEFORE".into()],
+                1,
+            ),
+            DialogueDepth::Reflective => (
+                vec!["THINK".into(), "BEFORE".into(), "KNOW".into(), "DO".into()],
+                2,
+            ),
+            DialogueDepth::Integrative => (
+                vec![
+                    "THINK".into(),
+                    "ALL".into(),
+                    "TOGETHER".into(),
+                    "KNOW".into(),
+                    "DO".into(),
+                ],
+                3,
+            ),
         }
     }
 }
@@ -1213,8 +1562,10 @@ impl ConsciousnessUnificationNSMGrounding {
 
         // Ground phi methods
         for method in &[
-            PhiMethod::IntegratedInformationTheory, PhiMethod::WeightedGeometricMean,
-            PhiMethod::SimilarityApproximation, PhiMethod::MultiSourceComposite,
+            PhiMethod::IntegratedInformationTheory,
+            PhiMethod::WeightedGeometricMean,
+            PhiMethod::SimilarityApproximation,
+            PhiMethod::MultiSourceComposite,
             PhiMethod::TheoryVotingAggregate,
         ] {
             phi_methods.insert(*method, PhiMethodPrimitiveGrounding::new(*method, system));
@@ -1222,44 +1573,81 @@ impl ConsciousnessUnificationNSMGrounding {
 
         // Ground emotions
         for emotion in &[
-            UnifiedEmotion::Joy, UnifiedEmotion::Sadness, UnifiedEmotion::Anger,
-            UnifiedEmotion::Fear, UnifiedEmotion::Surprise, UnifiedEmotion::Disgust,
-            UnifiedEmotion::Trust, UnifiedEmotion::Anticipation, UnifiedEmotion::Love,
-            UnifiedEmotion::Peace, UnifiedEmotion::Curiosity, UnifiedEmotion::Gratitude,
-            UnifiedEmotion::Seeking, UnifiedEmotion::Rage, UnifiedEmotion::Lust,
-            UnifiedEmotion::Care, UnifiedEmotion::Panic, UnifiedEmotion::Play,
+            UnifiedEmotion::Joy,
+            UnifiedEmotion::Sadness,
+            UnifiedEmotion::Anger,
+            UnifiedEmotion::Fear,
+            UnifiedEmotion::Surprise,
+            UnifiedEmotion::Disgust,
+            UnifiedEmotion::Trust,
+            UnifiedEmotion::Anticipation,
+            UnifiedEmotion::Love,
+            UnifiedEmotion::Peace,
+            UnifiedEmotion::Curiosity,
+            UnifiedEmotion::Gratitude,
+            UnifiedEmotion::Seeking,
+            UnifiedEmotion::Rage,
+            UnifiedEmotion::Lust,
+            UnifiedEmotion::Care,
+            UnifiedEmotion::Panic,
+            UnifiedEmotion::Play,
             UnifiedEmotion::Neutral,
         ] {
-            emotions.insert(*emotion, UnifiedEmotionPrimitiveGrounding::new(*emotion, system));
+            emotions.insert(
+                *emotion,
+                UnifiedEmotionPrimitiveGrounding::new(*emotion, system),
+            );
         }
 
         // Ground patterns
         for pattern in &[
-            EmotionalPattern::Stable, EmotionalPattern::Escalating,
-            EmotionalPattern::Calming, EmotionalPattern::Volatile,
+            EmotionalPattern::Stable,
+            EmotionalPattern::Escalating,
+            EmotionalPattern::Calming,
+            EmotionalPattern::Volatile,
         ] {
-            emotional_patterns.insert(*pattern, EmotionalPatternPrimitiveGrounding::new(*pattern, system));
+            emotional_patterns.insert(
+                *pattern,
+                EmotionalPatternPrimitiveGrounding::new(*pattern, system),
+            );
         }
 
         // Ground causal relations
         for relation in &[
-            CausalRelation::Causes, CausalRelation::CausedBy, CausalRelation::Prevents,
-            CausalRelation::Enables, CausalRelation::Correlates,
+            CausalRelation::Causes,
+            CausalRelation::CausedBy,
+            CausalRelation::Prevents,
+            CausalRelation::Enables,
+            CausalRelation::Correlates,
         ] {
-            causal_relations.insert(*relation, CausalRelationPrimitiveGrounding::new(*relation, system));
+            causal_relations.insert(
+                *relation,
+                CausalRelationPrimitiveGrounding::new(*relation, system),
+            );
         }
 
         // Ground dialogue depths
-        for depth in &[DialogueDepth::Reactive, DialogueDepth::Reflective, DialogueDepth::Integrative] {
+        for depth in &[
+            DialogueDepth::Reactive,
+            DialogueDepth::Reflective,
+            DialogueDepth::Integrative,
+        ] {
             dialogue_depths.insert(*depth, DialogueDepthPrimitiveGrounding::new(*depth, system));
         }
 
-        Self { phi_methods, emotions, emotional_patterns, causal_relations, dialogue_depths }
+        Self {
+            phi_methods,
+            emotions,
+            emotional_patterns,
+            causal_relations,
+            dialogue_depths,
+        }
     }
 
     /// Get positive-valence emotions
     pub fn positive_emotions(&self) -> Vec<&UnifiedEmotion> {
-        self.emotions.iter()
+        self.emotions
+            .iter()
             .filter(|(_, g)| g.valence_polarity > 0)
             .map(|(e, _)| e)
             .collect()
@@ -1267,7 +1655,8 @@ impl ConsciousnessUnificationNSMGrounding {
 
     /// Get negative-valence emotions
     pub fn negative_emotions(&self) -> Vec<&UnifiedEmotion> {
-        self.emotions.iter()
+        self.emotions
+            .iter()
             .filter(|(_, g)| g.valence_polarity < 0)
             .map(|(e, _)| e)
             .collect()
@@ -1275,7 +1664,9 @@ impl ConsciousnessUnificationNSMGrounding {
 
     /// Query emotions by semantic similarity
     pub fn query_emotions(&self, query: &BinaryHV, threshold: f32) -> Vec<(&UnifiedEmotion, f32)> {
-        let mut results: Vec<_> = self.emotions.iter()
+        let mut results: Vec<_> = self
+            .emotions
+            .iter()
             .map(|(e, g)| (e, g.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
             .collect();
@@ -1294,7 +1685,9 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
             } else if let Some(p) = system.get(&name.to_lowercase()) {
                 p.encoding
             } else {
-                let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                let seed = name
+                    .bytes()
+                    .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
                 BinaryHV::random(seed)
             }
         })
@@ -1393,8 +1786,16 @@ mod tests {
             method: PhiMethod::IntegratedInformationTheory,
             confidence: 0.95,
             components: vec![
-                PhiComponent { name: "topology".to_string(), weight: 0.4, value: 0.8 },
-                PhiComponent { name: "integration".to_string(), weight: 0.6, value: 0.7 },
+                PhiComponent {
+                    name: "topology".to_string(),
+                    weight: 0.4,
+                    value: 0.8,
+                },
+                PhiComponent {
+                    name: "integration".to_string(),
+                    weight: 0.6,
+                    value: 0.7,
+                },
             ],
         };
 

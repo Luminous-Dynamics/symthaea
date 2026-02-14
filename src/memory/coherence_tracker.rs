@@ -55,8 +55,12 @@ impl ConversationCoherenceTracker {
         }
 
         // Update min/max
-        if coherence < self.min_coherence { self.min_coherence = coherence; }
-        if coherence > self.max_coherence { self.max_coherence = coherence; }
+        if coherence < self.min_coherence {
+            self.min_coherence = coherence;
+        }
+        if coherence > self.max_coherence {
+            self.max_coherence = coherence;
+        }
 
         // Update EMA
         let prev_ema = self.ema_coherence;
@@ -67,7 +71,6 @@ impl ConversationCoherenceTracker {
         self.sum_sq_diff += (diff * diff) as f64;
 
         // Degradation detection: EMA dropped below threshold or consecutive drops
-
 
         if self.ema_coherence < self.degradation_threshold {
             self.degradation_streak += 1;
@@ -113,8 +116,16 @@ impl ConversationCoherenceTracker {
 
         CoherenceTrajectoryStats {
             current_ema: self.ema_coherence,
-            min_coherence: if self.total_turns > 0 { self.min_coherence } else { 0.0 },
-            max_coherence: if self.total_turns > 0 { self.max_coherence } else { 0.0 },
+            min_coherence: if self.total_turns > 0 {
+                self.min_coherence
+            } else {
+                0.0
+            },
+            max_coherence: if self.total_turns > 0 {
+                self.max_coherence
+            } else {
+                0.0
+            },
             degradation_count: self.degradation_count,
             stability,
             total_turns: self.total_turns,
@@ -182,6 +193,10 @@ mod tests {
             tracker.record_turn(0.6);
         }
         let stats = tracker.stats();
-        assert!(stats.stability > 0.9, "Stability should be high for constant input: {}", stats.stability);
+        assert!(
+            stats.stability > 0.9,
+            "Stability should be high for constant input: {}",
+            stats.stability
+        );
     }
 }

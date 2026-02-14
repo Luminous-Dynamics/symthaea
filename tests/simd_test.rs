@@ -50,7 +50,11 @@ fn test_binary_hv_batch_similarity() {
     // Verify batch matches individual calls
     for (i, &sim) in batch.iter().enumerate() {
         let expected = query.similarity(&targets[i]);
-        assert!((sim - expected).abs() < 1e-6, "Batch similarity mismatch at {}", i);
+        assert!(
+            (sim - expected).abs() < 1e-6,
+            "Batch similarity mismatch at {}",
+            i
+        );
     }
 }
 
@@ -64,6 +68,9 @@ fn test_binary_hv_top_k() {
 
     // Results should be sorted descending by similarity
     for i in 1..top5.len() {
-        assert!(top5[i - 1].1 >= top5[i].1, "Top-K should be sorted descending");
+        assert!(
+            top5[i - 1].1 >= top5[i].1,
+            "Top-K should be sorted descending"
+        );
     }
 }

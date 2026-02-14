@@ -20,19 +20,20 @@
 //! The system maintains a pool of potential bridge connections that can be
 //! dynamically activated/deactivated based on the current cognitive mode.
 
-use super::unified_hv::ContinuousHV;
-use super::spectral_connectivity::ConnectivityCalculator;
 use super::process_topology::{ProcessTopologyOrganizer, TopologyMetrics};
+use super::spectral_connectivity::ConnectivityCalculator;
+use super::unified_hv::ContinuousHV;
 use std::collections::HashSet;
 
 /// Cognitive mode determining target bridge ratio
 ///
 /// Each mode represents a distinct cognitive state with characteristic
 /// integration patterns optimized for different types of processing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum CognitiveMode {
     // === ORIGINAL MODES ===
-
     /// Balanced integration (40-45% bridges) - General processing
     #[default]
     Balanced,
@@ -48,7 +49,6 @@ pub enum CognitiveMode {
     PhiGuided,
 
     // === NEW MODES (Symthaea Enhancement) ===
-
     /// Dreaming mode (70-80% bridges) - Memory consolidation and creative recombination
     ///
     /// High integration with relaxed coherence requirements. Used during
@@ -99,24 +99,24 @@ impl CognitiveMode {
             CognitiveMode::PhiGuided => 0.425, // Start balanced, let gradient guide
 
             // New modes
-            CognitiveMode::Dreaming => 0.75,      // Very high integration for consolidation
-            CognitiveMode::Meditative => 0.375,   // Slightly below balanced, internal focus
-            CognitiveMode::Flow => 0.475,         // Slightly above balanced, optimal engagement
-            CognitiveMode::Social => 0.60,        // High integration for ToM
-            CognitiveMode::Vigilant => 0.275,     // Low integration for fast reactions
-            CognitiveMode::Playful => 0.65,       // High integration for creativity
+            CognitiveMode::Dreaming => 0.75, // Very high integration for consolidation
+            CognitiveMode::Meditative => 0.375, // Slightly below balanced, internal focus
+            CognitiveMode::Flow => 0.475,    // Slightly above balanced, optimal engagement
+            CognitiveMode::Social => 0.60,   // High integration for ToM
+            CognitiveMode::Vigilant => 0.275, // Low integration for fast reactions
+            CognitiveMode::Playful => 0.65,  // High integration for creativity
         }
     }
 
     /// Tolerance around target ratio
     pub fn tolerance(&self) -> f64 {
         match self {
-            CognitiveMode::PhiGuided => 0.15,  // Wide tolerance for gradient exploration
-            CognitiveMode::Dreaming => 0.10,   // Relaxed tolerance during sleep
-            CognitiveMode::Playful => 0.08,    // Moderate flexibility for play
-            CognitiveMode::Flow => 0.03,       // Tight tolerance for optimal performance
-            CognitiveMode::Vigilant => 0.03,   // Tight tolerance for threat response
-            _ => 0.05,                         // Standard tolerance
+            CognitiveMode::PhiGuided => 0.15, // Wide tolerance for gradient exploration
+            CognitiveMode::Dreaming => 0.10,  // Relaxed tolerance during sleep
+            CognitiveMode::Playful => 0.08,   // Moderate flexibility for play
+            CognitiveMode::Flow => 0.03,      // Tight tolerance for optimal performance
+            CognitiveMode::Vigilant => 0.03,  // Tight tolerance for threat response
+            _ => 0.05,                        // Standard tolerance
         }
     }
 
@@ -158,10 +158,10 @@ impl CognitiveMode {
 
     /// Suggest mode based on context
     pub fn suggest_for_context(
-        emotional_valence: f64,    // -1.0 to 1.0
-        task_complexity: f64,      // 0.0 to 1.0
+        emotional_valence: f64, // -1.0 to 1.0
+        task_complexity: f64,   // 0.0 to 1.0
         social_context: bool,
-        threat_level: f64,         // 0.0 to 1.0
+        threat_level: f64,           // 0.0 to 1.0
         time_of_day_normalized: f64, // 0.0 = midnight, 0.5 = noon
     ) -> Self {
         // High threat → Vigilant
@@ -284,11 +284,10 @@ impl AdaptiveTopology {
         // Create potential bridges between all cross-module pairs not already connected
         for (i, pi) in processes.iter() {
             for (j, pj) in processes.iter() {
-                if i < j && pi.module != pj.module
-                    && !existing_edges.contains(&(*i, *j)) {
-                        let bridge = PotentialBridge::new(*i, *j, pi.module, pj.module);
-                        bridge_pool.push(bridge);
-                    }
+                if i < j && pi.module != pj.module && !existing_edges.contains(&(*i, *j)) {
+                    let bridge = PotentialBridge::new(*i, *j, pi.module, pj.module);
+                    bridge_pool.push(bridge);
+                }
             }
         }
 
@@ -320,7 +319,11 @@ impl AdaptiveTopology {
         }
 
         // Count cross-module edges in base topology
-        let base_cross_module = self.organizer.topology().edges.iter()
+        let base_cross_module = self
+            .organizer
+            .topology()
+            .edges
+            .iter()
             .filter(|&&(a, b)| {
                 let pa = self.organizer.get_process(a);
                 let pb = self.organizer.get_process(b);
@@ -365,12 +368,15 @@ impl AdaptiveTopology {
     /// Activate the bridge with highest estimated Φ contribution
     fn activate_best_bridge(&mut self) {
         // Find best inactive bridge
-        let best_idx = self.bridge_pool
+        let best_idx = self
+            .bridge_pool
             .iter()
             .enumerate()
             .filter(|(idx, _)| !self.active_bridges.contains(idx))
             .max_by(|(_, a), (_, b)| {
-                a.phi_contribution.partial_cmp(&b.phi_contribution).unwrap_or(std::cmp::Ordering::Equal)
+                a.phi_contribution
+                    .partial_cmp(&b.phi_contribution)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(idx, _)| idx);
 
@@ -383,10 +389,12 @@ impl AdaptiveTopology {
     /// Deactivate the bridge with lowest Φ contribution
     fn deactivate_worst_bridge(&mut self) {
         // Find worst active bridge
-        let worst_idx = self.active_bridges
+        let worst_idx = self
+            .active_bridges
             .iter()
             .min_by(|&&a, &&b| {
-                self.bridge_pool[a].phi_contribution
+                self.bridge_pool[a]
+                    .phi_contribution
                     .partial_cmp(&self.bridge_pool[b].phi_contribution)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
@@ -439,10 +447,12 @@ impl AdaptiveTopology {
                     if rand_f64(idx as u64) < self.learning_rate {
                         self.active_bridges.insert(idx);
                     }
-                } else if bridge.phi_contribution < -0.01 && self.active_bridges.contains(&idx)
-                    && rand_f64(idx as u64 + 1000) < self.learning_rate {
-                        self.active_bridges.remove(&idx);
-                    }
+                } else if bridge.phi_contribution < -0.01
+                    && self.active_bridges.contains(&idx)
+                    && rand_f64(idx as u64 + 1000) < self.learning_rate
+                {
+                    self.active_bridges.remove(&idx);
+                }
             }
         }
     }
@@ -450,7 +460,8 @@ impl AdaptiveTopology {
     /// Compute current Φ considering active bridges
     pub fn compute_phi(&self) -> f64 {
         // Get all process states
-        let representations: Vec<ContinuousHV> = self.organizer
+        let representations: Vec<ContinuousHV> = self
+            .organizer
             .processes()
             .values()
             .map(|p| p.state.clone())
@@ -468,9 +479,11 @@ impl AdaptiveTopology {
 
         // Compute average Φ contribution of active bridges
         let avg_phi_contribution = if !self.active_bridges.is_empty() {
-            self.active_bridges.iter()
+            self.active_bridges
+                .iter()
                 .map(|&idx| self.bridge_pool[idx].phi_contribution)
-                .sum::<f64>() / active_bridge_count as f64
+                .sum::<f64>()
+                / active_bridge_count as f64
         } else {
             0.0
         };
@@ -504,7 +517,6 @@ impl AdaptiveTopology {
         let sum_xy: f64 = recent.iter().enumerate().map(|(i, &y)| i as f64 * y).sum();
         let sum_xx: f64 = (0..recent.len()).map(|i| (i * i) as f64).sum();
 
-        
         (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x)
     }
 
@@ -530,7 +542,8 @@ impl AdaptiveTopology {
 
     /// Get all active bridge connections
     pub fn active_bridge_connections(&self) -> Vec<(usize, usize)> {
-        self.active_bridges.iter()
+        self.active_bridges
+            .iter()
             .map(|&idx| (self.bridge_pool[idx].from, self.bridge_pool[idx].to))
             .collect()
     }
@@ -572,7 +585,9 @@ impl std::fmt::Display for AdaptiveTopologyMetrics {
 
 // Simple deterministic "random" for reproducibility
 fn rand_f64(seed: u64) -> f64 {
-    let x = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    let x = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (x >> 33) as f64 / (1u64 << 31) as f64
 }
 
@@ -609,8 +624,12 @@ mod tests {
             adaptive.set_mode(*mode);
             let metrics = adaptive.metrics();
 
-            println!("{:?}: ratio={:.3}, target={:.3}",
-                     mode, metrics.bridge_ratio, mode.target_bridge_ratio());
+            println!(
+                "{:?}: ratio={:.3}, target={:.3}",
+                mode,
+                metrics.bridge_ratio,
+                mode.target_bridge_ratio()
+            );
 
             // Verify valid state after mode switch
             assert!(metrics.bridge_ratio >= 0.0 && metrics.bridge_ratio <= 1.0);
@@ -665,9 +684,16 @@ mod tests {
 
             assert!(phi.is_finite(), "{:?} Φ should be finite", mode);
             assert!(phi >= 0.0, "{:?} Φ should be non-negative", mode);
-            assert!(ratio.is_finite(), "{:?} bridge ratio should be finite", mode);
-            assert!(ratio >= 0.0 && ratio <= 1.0,
-                    "{:?} bridge ratio should be in [0, 1]", mode);
+            assert!(
+                ratio.is_finite(),
+                "{:?} bridge ratio should be finite",
+                mode
+            );
+            assert!(
+                ratio >= 0.0 && ratio <= 1.0,
+                "{:?} bridge ratio should be in [0, 1]",
+                mode
+            );
         }
     }
 }

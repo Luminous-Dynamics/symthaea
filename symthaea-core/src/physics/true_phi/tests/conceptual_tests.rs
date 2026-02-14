@@ -20,9 +20,15 @@ fn test_conceptual_structure_basic() {
     println!("Conceptual Structure:");
     println!("  Big \u{03a6}: {:.6}", structure.big_phi);
     println!("  Total \u{03c6}: {:.6}", structure.total_phi);
-    println!("  Concepts: {} / {} mechanisms",
-        structure.concepts.len(), structure.mechanisms_considered);
-    println!("  Concept fraction: {:.2}%", structure.concept_fraction * 100.0);
+    println!(
+        "  Concepts: {} / {} mechanisms",
+        structure.concepts.len(),
+        structure.mechanisms_considered
+    );
+    println!(
+        "  Concept fraction: {:.2}%",
+        structure.concept_fraction * 100.0
+    );
 }
 
 #[test]
@@ -35,7 +41,7 @@ fn test_conceptual_structure_correlated() {
         .map(|i| {
             ContinuousHV::weighted_bundle(
                 &[&base, &ContinuousHV::random(HDC_DIMENSION, 100 + i as u64)],
-                &[0.7, 0.3]
+                &[0.7, 0.3],
             )
         })
         .collect();
@@ -47,8 +53,10 @@ fn test_conceptual_structure_correlated() {
     println!("  Concepts: {}", structure.concepts.len());
 
     // Should have at least some concepts
-    assert!(structure.mechanisms_considered >= 4,
-        "Should consider at least 4 mechanisms");
+    assert!(
+        structure.mechanisms_considered >= 4,
+        "Should consider at least 4 mechanisms"
+    );
 }
 
 #[test]
@@ -65,15 +73,21 @@ fn test_conceptual_structure_top_concepts() {
     // Top concepts should be sorted by phi
     if top.len() >= 2 {
         for i in 0..top.len() - 1 {
-            assert!(top[i].phi >= top[i + 1].phi,
-                "Top concepts should be sorted by phi");
+            assert!(
+                top[i].phi >= top[i + 1].phi,
+                "Top concepts should be sorted by phi"
+            );
         }
     }
 
     println!("Top concepts:");
     for (i, concept) in top.iter().enumerate() {
-        println!("  {}: mechanism={:?}, \u{03c6}={:.6}",
-            i + 1, concept.mechanism, concept.phi);
+        println!(
+            "  {}: mechanism={:?}, \u{03c6}={:.6}",
+            i + 1,
+            concept.mechanism,
+            concept.phi
+        );
     }
 }
 
@@ -95,12 +109,18 @@ fn test_conceptual_structure_distance() {
 
     let distance = calc.conceptual_distance(&s1, &s2);
 
-    assert!(distance >= 0.0, "Conceptual distance should be non-negative");
+    assert!(
+        distance >= 0.0,
+        "Conceptual distance should be non-negative"
+    );
 
     // Distance to self should be 0
     let self_distance = calc.conceptual_distance(&s1, &s1);
-    assert!(self_distance < 1e-10,
-        "Distance to self should be 0: {:.6}", self_distance);
+    assert!(
+        self_distance < 1e-10,
+        "Distance to self should be 0: {:.6}",
+        self_distance
+    );
 
     println!("Conceptual distances:");
     println!("  d(S1, S2) = {:.6}", distance);
@@ -120,10 +140,25 @@ fn test_concept_properties() {
     for concept in &structure.concepts {
         // All concepts should have valid properties
         assert!(concept.phi >= 0.0, "\u{03c6} should be non-negative");
-        assert!(concept.cause_info >= 0.0, "Cause info should be non-negative");
-        assert!(concept.effect_info >= 0.0, "Effect info should be non-negative");
-        assert!(concept.cause_entropy >= 0.0, "Cause entropy should be non-negative");
-        assert!(concept.effect_entropy >= 0.0, "Effect entropy should be non-negative");
-        assert!(!concept.mechanism.is_empty(), "Mechanism should not be empty");
+        assert!(
+            concept.cause_info >= 0.0,
+            "Cause info should be non-negative"
+        );
+        assert!(
+            concept.effect_info >= 0.0,
+            "Effect info should be non-negative"
+        );
+        assert!(
+            concept.cause_entropy >= 0.0,
+            "Cause entropy should be non-negative"
+        );
+        assert!(
+            concept.effect_entropy >= 0.0,
+            "Effect entropy should be non-negative"
+        );
+        assert!(
+            !concept.mechanism.is_empty(),
+            "Mechanism should not be empty"
+        );
     }
 }

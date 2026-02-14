@@ -75,15 +75,12 @@
 use std::collections::VecDeque;
 use std::time::Instant;
 
-use crate::user_state_inference::{
-    UserStateInference, ContextKind,
-};
-use crate::language::emotional_core::{
-    CoreEmotion, EmpathyModel, EmpathyType, EmpathicCue,
-    EmotionalRegulator,
-};
 use crate::consciousness::consciousness_unification::EmotionalBridge;
+use crate::language::emotional_core::{
+    CoreEmotion, EmotionalRegulator, EmpathicCue, EmpathyModel, EmpathyType,
+};
 use crate::resonant_speech::{CognitiveLoad, UserState};
+use crate::user_state_inference::{ContextKind, UserStateInference};
 
 // ============================================================================
 // USER EMOTIONAL STATE - What we infer about the user
@@ -260,7 +257,12 @@ impl EmpathicMemory {
     }
 
     /// Record an empathic moment
-    pub fn record(&mut self, user_state: UserEmotionalState, response: EmpathicResponse, felt_successful: bool) {
+    pub fn record(
+        &mut self,
+        user_state: UserEmotionalState,
+        response: EmpathicResponse,
+        felt_successful: bool,
+    ) {
         // Update running averages
         let n = self.moments.len() as f64 + 1.0;
         self.avg_user_stress = (self.avg_user_stress * (n - 1.0) + user_state.stress_level) / n;
@@ -270,7 +272,10 @@ impl EmpathicMemory {
             self.relationship_warmth = (self.relationship_warmth * 0.95 + 0.1).min(1.0);
         }
 
-        if matches!(response.tone_guidance, ToneGuidance::Supportive | ToneGuidance::Reassuring) {
+        if matches!(
+            response.tone_guidance,
+            ToneGuidance::Supportive | ToneGuidance::Reassuring
+        ) {
             self.supportive_count += 1;
         }
 
@@ -298,7 +303,11 @@ impl EmpathicMemory {
         }
 
         let recent: Vec<_> = self.moments.iter().rev().take(5).collect();
-        let avg_recent = recent.iter().map(|m| m.user_state.stress_level).sum::<f64>() / recent.len() as f64;
+        let avg_recent = recent
+            .iter()
+            .map(|m| m.user_state.stress_level)
+            .sum::<f64>()
+            / recent.len() as f64;
 
         // Positive = stress increasing, negative = calming down
         avg_recent - self.avg_user_stress
@@ -313,7 +322,8 @@ impl EmpathicMemory {
         let recent: Vec<_> = self.moments.iter().rev().take(5).collect();
 
         // Check for high stress (> 0.5) OR repeated failures
-        let high_stress_count = recent.iter()
+        let high_stress_count = recent
+            .iter()
             .filter(|m| m.user_state.stress_level > 0.5 || !m.felt_successful)
             .count();
 
@@ -322,7 +332,8 @@ impl EmpathicMemory {
 
     /// Count recent unsuccessful interactions (last 5 moments)
     pub fn recent_failure_count(&self) -> usize {
-        self.moments.iter()
+        self.moments
+            .iter()
             .rev()
             .take(5)
             .filter(|m| !m.felt_successful)
@@ -429,7 +440,8 @@ impl EmpathicUnification {
         let text_cue = self.empathy_model.detect_emotion(input);
 
         // Step 3: Infer full emotional state
-        let inferred_state = self.infer_user_emotional_state(&user_state, &text_cue, context, input);
+        let inferred_state =
+            self.infer_user_emotional_state(&user_state, &text_cue, context, input);
         self.current_user_state = inferred_state.clone();
 
         // Step 4: Generate empathic response
@@ -489,11 +501,12 @@ impl EmpathicUnification {
         let frustration = self.calculate_frustration(user_state, input);
 
         // Combined stress level
-        let stress_level = (stress_from_load * 0.4 + context_stress * 0.3 + frustration * 0.3)
-            .min(1.0);
+        let stress_level =
+            (stress_from_load * 0.4 + context_stress * 0.3 + frustration * 0.3).min(1.0);
 
         // Infer what they need
-        let inferred_need = self.infer_user_need(stress_level, frustration, &primary_emotion, context);
+        let inferred_need =
+            self.infer_user_need(stress_level, frustration, &primary_emotion, context);
 
         // Infer cause
         let inferred_cause = self.infer_cause(context, user_state, input);
@@ -603,7 +616,12 @@ impl EmpathicUnification {
     }
 
     /// Infer why the user might feel this way
-    fn infer_cause(&self, context: ContextKind, user_state: &UserState, input: &str) -> Option<String> {
+    fn infer_cause(
+        &self,
+        context: ContextKind,
+        user_state: &UserState,
+        input: &str,
+    ) -> Option<String> {
         match context {
             ContextKind::ErrorHandling => {
                 if user_state.cognitive_load == CognitiveLoad::High {
@@ -612,18 +630,16 @@ impl EmpathicUnification {
                     Some("Troubleshooting an issue".to_string())
                 }
             }
-            ContextKind::Upgrade => {
-                Some("System upgrade can feel risky".to_string())
-            }
-            ContextKind::Setup => {
-                Some("Initial setup requires learning".to_string())
-            }
+            ContextKind::Upgrade => Some("System upgrade can feel risky".to_string()),
+            ContextKind::Setup => Some("Initial setup requires learning".to_string()),
             _ => {
                 // Look for clues in input
                 let input_lower = input.to_lowercase();
                 if input_lower.contains("deadline") || input_lower.contains("urgent") {
                     Some("Time pressure".to_string())
-                } else if input_lower.contains("confused") || input_lower.contains("don't understand") {
+                } else if input_lower.contains("confused")
+                    || input_lower.contains("don't understand")
+                {
                     Some("Complexity or unclear documentation".to_string())
                 } else {
                     None
@@ -647,19 +663,21 @@ impl EmpathicUnification {
         let tone_guidance = self.determine_tone(user_state);
 
         // Calculate adjustments
-        let warmth_adjustment = if user_state.stress_level > self.config.stress_threshold_supportive {
+        let warmth_adjustment = if user_state.stress_level > self.config.stress_threshold_supportive
+        {
             0.3
         } else {
             0.0
         };
 
-        let patience_adjustment = if user_state.frustration > self.config.frustration_threshold_patience {
-            0.4
-        } else if user_state.stress_level > 0.5 {
-            0.2
-        } else {
-            0.0
-        };
+        let patience_adjustment =
+            if user_state.frustration > self.config.frustration_threshold_patience {
+                0.4
+            } else if user_state.stress_level > 0.5 {
+                0.2
+            } else {
+                0.0
+            };
 
         // Proactive support
         let proactive_support = self.generate_proactive_support(user_state);
@@ -686,7 +704,7 @@ impl EmpathicUnification {
         match user_state.primary_emotion {
             // User is struggling → Symthaea feels compassionate concern
             CoreEmotion::Fear | CoreEmotion::Sadness => CoreEmotion::Love, // Compassionate love
-            CoreEmotion::Anger => CoreEmotion::Peace, // Calming presence
+            CoreEmotion::Anger => CoreEmotion::Peace,                      // Calming presence
 
             // User is positive → Symthaea shares the joy
             CoreEmotion::Joy => CoreEmotion::Joy,
@@ -769,15 +787,19 @@ impl EmpathicUnification {
             UserNeed::Reassurance => {
                 Some("This is fixable. Let me show you what's happening.".to_string())
             }
-            UserNeed::Encouragement => {
-                Some("You're making progress - this part is tricky but you've got this.".to_string())
-            }
+            UserNeed::Encouragement => Some(
+                "You're making progress - this part is tricky but you've got this.".to_string(),
+            ),
             _ => None,
         }
     }
 
     /// Update the emotional bridge with our empathic response
-    fn update_emotional_bridge(&mut self, _user_state: &UserEmotionalState, response: &EmpathicResponse) {
+    fn update_emotional_bridge(
+        &mut self,
+        _user_state: &UserEmotionalState,
+        response: &EmpathicResponse,
+    ) {
         // Convert to valence/arousal for bridge
         let valence = response.resonant_emotion.default_valence() as f64;
         let arousal = response.resonant_emotion.default_arousal() as f64;
@@ -843,7 +865,9 @@ impl EmpathicUnification {
     /// Get tone guidance string for response generation
     pub fn tone_guidance_string(&self) -> &'static str {
         match self.last_response.tone_guidance {
-            ToneGuidance::Supportive => "Be warm, gentle, and reassuring. Show you understand their struggle.",
+            ToneGuidance::Supportive => {
+                "Be warm, gentle, and reassuring. Show you understand their struggle."
+            }
             ToneGuidance::Patient => "Be patient and measured. Don't rush. Explain thoroughly.",
             ToneGuidance::Efficient => "Be clear and direct. Get to the point quickly.",
             ToneGuidance::Playful => "Be curious and exploratory. Engage with their ideas.",
@@ -868,7 +892,8 @@ impl EmpathicUnification {
             CoreEmotion::Joy => Some("I can feel your excitement! "),
             CoreEmotion::Curiosity => Some("I love your curiosity here - "),
             _ => None,
-        }.map(|s| s.to_string())
+        }
+        .map(|s| s.to_string())
     }
 }
 

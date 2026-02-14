@@ -7,16 +7,13 @@
 //! - **Budget Tiers**: Tier0 (≤2ms), Tier1 (≤8ms), Tier2 (≤20ms)
 //! - **Dream Integration**: Counterfactual insights → action priors
 
-pub mod types;
-pub mod snapshot;
-pub mod mcts;
 pub mod dream_integration;
+pub mod mcts;
+pub mod snapshot;
+pub mod types;
 
 // Re-export key types
-pub use types::{
-    BudgetTier, ReasoningBudget, MctsConfig, MctsResult,
-    ForkedState, PlannedAction,
-};
-pub use snapshot::SnapshotManager;
-pub use mcts::{MctsPlanner, evs};
 pub use dream_integration::uniform_priors;
+pub use mcts::{evs, MctsPlanner};
+pub use snapshot::SnapshotManager;
+pub use types::{BudgetTier, ForkedState, MctsConfig, MctsResult, PlannedAction, ReasoningBudget};

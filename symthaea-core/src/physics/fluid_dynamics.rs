@@ -20,9 +20,9 @@
 //! - Turbulent: Chaotic, mixing (Re > 4000 in pipes)
 //! - Transitional: Between laminar and turbulent
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 use serde::{Deserialize, Serialize};
 
 /// Flow regime
@@ -215,9 +215,14 @@ impl FluidEncoder {
         let regime = self.classify_regime(re);
         let regime_vec = genesis.hv(regime.domain(), PHYSICS_DIM);
 
-        let compressibility = if ma > 0.3 { &self.compressible } else { &self.incompressible };
+        let compressibility = if ma > 0.3 {
+            &self.compressible
+        } else {
+            &self.incompressible
+        };
 
-        let vector = self.velocity
+        let vector = self
+            .velocity
             .bind(&regime_vec)
             .bind(compressibility)
             .scale(re.ln() as f32);
@@ -249,15 +254,21 @@ impl FluidEncoder {
 
     /// Euler equations (inviscid limit of Navier-Stokes)
     pub fn euler_equations(&self) -> ContinuousHV {
-        self.navier_stokes().bind(&ContinuousHV::zero(PHYSICS_DIM))  // Zero viscosity
+        self.navier_stokes().bind(&ContinuousHV::zero(PHYSICS_DIM)) // Zero viscosity
     }
 
     /// Create a vortex
-    pub fn create_vortex(&self, circulation: f64, core_radius: f64, _genesis: &GenesisSeed) -> Vortex {
+    pub fn create_vortex(
+        &self,
+        circulation: f64,
+        core_radius: f64,
+        _genesis: &GenesisSeed,
+    ) -> Vortex {
         // Rankine vortex: v_θ = Γ/(2πr) for r > core
         let max_velocity = circulation / (2.0 * std::f64::consts::PI * core_radius);
 
-        let vector = self.vortex
+        let vector = self
+            .vortex
             .bind(&self.vorticity)
             .bind(&self.circulation.scale(circulation as f32));
 
@@ -301,15 +312,19 @@ impl FluidEncoder {
 
     /// Bernoulli's equation: p + ½ρv² + ρgh = const
     pub fn bernoulli(&self) -> ContinuousHV {
-        ContinuousHV::bundle(&[
-            &self.pressure,
-            &self.velocity,
-            &self.density,
-        ]).bind(&self.steady).bind(&self.incompressible)
+        ContinuousHV::bundle(&[&self.pressure, &self.velocity, &self.density])
+            .bind(&self.steady)
+            .bind(&self.incompressible)
     }
 
     /// Poiseuille flow (laminar pipe flow)
-    pub fn poiseuille_flow(&self, radius: f64, pressure_gradient: f64, viscosity: f64, genesis: &GenesisSeed) -> FluidFlow {
+    pub fn poiseuille_flow(
+        &self,
+        radius: f64,
+        pressure_gradient: f64,
+        viscosity: f64,
+        genesis: &GenesisSeed,
+    ) -> FluidFlow {
         // Q = πR⁴ΔP / (8μL)
         // Mean velocity v = Q/(πR²) = R²ΔP / (8μL)
         let mean_velocity = radius * radius * pressure_gradient / (8.0 * viscosity);

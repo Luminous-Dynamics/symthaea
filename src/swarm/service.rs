@@ -52,19 +52,18 @@
 //! ```
 
 use crate::swarm::{
-    SwarmConfig, SwarmResult, SwarmError,
-    ConsciousnessVector, PeerInfo, TrustLevel,
-    HybridHandshake,
+    ConsciousnessVector, HybridHandshake, PeerInfo, SwarmConfig, SwarmError, SwarmResult,
+    TrustLevel,
 };
 
+use crate::swarm::config::BootstrapConfig;
 #[cfg(feature = "swarm")]
 use crate::swarm::IrohNode;
-use crate::swarm::config::BootstrapConfig;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 use tokio::sync::broadcast;
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 /// Channel buffer size for consciousness updates
 const CONSCIOUSNESS_CHANNEL_SIZE: usize = 100;
@@ -85,10 +84,18 @@ pub enum PeerEvent {
     Disconnected { peer_id: String, reason: String },
 
     /// Peer trust level changed
-    TrustChanged { peer_id: String, old: TrustLevel, new: TrustLevel },
+    TrustChanged {
+        peer_id: String,
+        old: TrustLevel,
+        new: TrustLevel,
+    },
 
     /// Peer consciousness state updated
-    ConsciousnessUpdate { peer_id: String, phi: f64, sequence: u64 },
+    ConsciousnessUpdate {
+        peer_id: String,
+        phi: f64,
+        sequence: u64,
+    },
 }
 
 /// Service statistics
@@ -186,7 +193,10 @@ impl NetworkService {
         // Create Iroh node
         let iroh = IrohNode::new(config.clone()).await?;
         let nid = iroh.node_id();
-        info!("NetworkService started with Iroh node: {}", &nid[..nid.len().min(16)]);
+        info!(
+            "NetworkService started with Iroh node: {}",
+            &nid[..nid.len().min(16)]
+        );
 
         Ok(Self {
             config: config.clone(),
@@ -206,7 +216,10 @@ impl NetworkService {
     pub fn node_id(&self) -> String {
         #[cfg(feature = "swarm")]
         {
-            self.iroh.as_ref().map(|n| n.node_id().to_string()).unwrap_or_default()
+            self.iroh
+                .as_ref()
+                .map(|n| n.node_id().to_string())
+                .unwrap_or_default()
         }
         #[cfg(not(feature = "swarm"))]
         {
@@ -271,7 +284,10 @@ impl NetworkService {
 
         // Try each bootstrap node
         for node_ticket in bootstrap_config.all_nodes() {
-            debug!("Attempting bootstrap connection to: {}", &node_ticket[..32.min(node_ticket.len())]);
+            debug!(
+                "Attempting bootstrap connection to: {}",
+                &node_ticket[..32.min(node_ticket.len())]
+            );
 
             match self.connect_to_peer(node_ticket).await {
                 Ok(peer_info) => {
@@ -315,17 +331,24 @@ impl NetworkService {
             let peer_info = PeerInfo::new(&peer_id);
 
             // Store peer
-            self.peers.write().insert(peer_id.clone(), peer_info.clone());
+            self.peers
+                .write()
+                .insert(peer_id.clone(), peer_info.clone());
 
             // Emit event
-            let _ = self.peer_event_tx.send(PeerEvent::Connected(peer_info.clone()));
+            let _ = self
+                .peer_event_tx
+                .send(PeerEvent::Connected(peer_info.clone()));
 
             Ok(peer_info)
         }
     }
 
     /// Broadcast our consciousness state to all connected peers
-    pub async fn broadcast_consciousness(&self, _state: &ConsciousnessVector) -> SwarmResult<usize> {
+    pub async fn broadcast_consciousness(
+        &self,
+        _state: &ConsciousnessVector,
+    ) -> SwarmResult<usize> {
         #[cfg(not(feature = "swarm"))]
         {
             // In stub mode, just return 0
@@ -362,14 +385,18 @@ impl NetworkService {
     /// Process received consciousness from a peer
     pub fn receive_consciousness(&self, peer_id: &str, state: ConsciousnessVector) {
         // Update stored state
-        self.peer_consciousness.write().insert(peer_id.to_string(), state.clone());
+        self.peer_consciousness
+            .write()
+            .insert(peer_id.to_string(), state.clone());
 
         // Update stats
         self.stats.write().messages_received += 1;
         self.stats.write().bytes_received += state.estimated_size() as u64;
 
         // Emit to subscribers
-        let _ = self.consciousness_tx.send((peer_id.to_string(), state.clone()));
+        let _ = self
+            .consciousness_tx
+            .send((peer_id.to_string(), state.clone()));
 
         // Emit peer event
         let _ = self.peer_event_tx.send(PeerEvent::ConsciousnessUpdate {
@@ -435,9 +462,11 @@ impl NetworkService {
         }
 
         let mean = self.network_mean_phi();
-        let variance: f64 = consciousness.values()
+        let variance: f64 = consciousness
+            .values()
             .map(|c| (c.phi - mean).powi(2))
-            .sum::<f64>() / consciousness.len() as f64;
+            .sum::<f64>()
+            / consciousness.len() as f64;
 
         // Convert variance to coherence (0-1 scale)
         // Low variance (< 0.1) = high coherence
@@ -446,7 +475,8 @@ impl NetworkService {
 
     /// Shutdown the network service
     pub async fn shutdown(self) {
-        self.running.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.running
+            .store(false, std::sync::atomic::Ordering::SeqCst);
 
         // Disconnect all peers
         let peer_ids: Vec<String> = self.peers.read().keys().cloned().collect();
@@ -499,9 +529,9 @@ impl SwarmBridge {
         let phi = (magnitude / (pattern.len() as f32).sqrt()).min(1.0) as f64;
 
         // Create context hash from the context string
-        let focus_hash = context.bytes().fold(0u64, |acc, b| {
-            acc.wrapping_mul(31).wrapping_add(b as u64)
-        });
+        let focus_hash = context
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
 
         // Build consciousness vector
         let mut consciousness = ConsciousnessVector::new(attention, phi);
@@ -525,7 +555,11 @@ impl SwarmBridge {
     ///
     /// For now, returns empty results. Enable the `mycelix-dht` feature (future)
     /// for full pattern query support.
-    pub async fn query_patterns(&self, _query: &[f32], _k: usize) -> SwarmResult<Vec<(String, f64)>> {
+    pub async fn query_patterns(
+        &self,
+        _query: &[f32],
+        _k: usize,
+    ) -> SwarmResult<Vec<(String, f64)>> {
         // Future implementation would:
         // 1. Hash the query pattern using locality-sensitive hashing
         // 2. Query the Holochain DHT for entries with similar hashes
@@ -541,7 +575,8 @@ impl SwarmBridge {
             peer_count: self.service.peer_count(),
             mean_phi: self.service.network_mean_phi(),
             coherence: self.service.network_coherence(),
-            total_messages: self.service.stats().messages_sent + self.service.stats().messages_received,
+            total_messages: self.service.stats().messages_sent
+                + self.service.stats().messages_received,
         }
     }
 }
@@ -732,7 +767,11 @@ mod tests {
             sequence: 42,
         };
         match event {
-            PeerEvent::ConsciousnessUpdate { peer_id, phi, sequence } => {
+            PeerEvent::ConsciousnessUpdate {
+                peer_id,
+                phi,
+                sequence,
+            } => {
                 assert_eq!(peer_id, "conscious-peer");
                 assert!((phi - 0.75).abs() < 0.01);
                 assert_eq!(sequence, 42);

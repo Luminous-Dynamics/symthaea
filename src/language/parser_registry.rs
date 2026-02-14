@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use super::code_parser::{CodeParser, ParsedCode, CodeDiagnostic, DiagnosticSeverity};
+use super::code_parser::{CodeDiagnostic, CodeParser, DiagnosticSeverity, ParsedCode};
 
 /// Registry of language-specific code parsers
 pub struct ParserRegistry {
@@ -129,11 +129,13 @@ impl ParserRegistry {
     ) -> Result<ParsedCode, CodeDiagnostic> {
         let lang = match language {
             Some(l) => l.to_string(),
-            None => self.detect_language(source, filename).ok_or_else(|| CodeDiagnostic {
-                severity: DiagnosticSeverity::Error,
-                message: "Could not detect language".to_string(),
-                span: None,
-            })?,
+            None => self
+                .detect_language(source, filename)
+                .ok_or_else(|| CodeDiagnostic {
+                    severity: DiagnosticSeverity::Error,
+                    message: "Could not detect language".to_string(),
+                    span: None,
+                })?,
         };
 
         let parser = self.parsers.get_mut(&lang).ok_or_else(|| CodeDiagnostic {
@@ -171,10 +173,7 @@ mod tests {
             registry.detect_language("", Some("app.py")),
             Some("python".to_string())
         );
-        assert_eq!(
-            registry.detect_language("", Some("unknown.xyz")),
-            None
-        );
+        assert_eq!(registry.detect_language("", Some("unknown.xyz")), None);
     }
 
     #[test]

@@ -237,11 +237,7 @@ impl StabilityAnalyzer {
     /// J_ij ~ (f_i(x + eps*e_j) - f_i(x - eps*e_j)) / (2*eps)
     ///
     /// The dynamical system `f` maps state vectors to their time derivatives.
-    pub fn compute_jacobian(
-        &self,
-        f: &dyn Fn(&[f64]) -> Vec<f64>,
-        x: &[f64],
-    ) -> JacobianResult {
+    pub fn compute_jacobian(&self, f: &dyn Fn(&[f64]) -> Vec<f64>, x: &[f64]) -> JacobianResult {
         assert_eq!(x.len(), self.dim, "State dimension mismatch");
 
         let eps = self.config.epsilon;
@@ -543,7 +539,11 @@ impl StabilityAnalyzer {
         let n = self.dim;
         assert_eq!(x0.len(), n, "Initial state dimension mismatch");
 
-        let total_steps = if steps > 0 { steps } else { self.config.lyapunov_steps };
+        let total_steps = if steps > 0 {
+            steps
+        } else {
+            self.config.lyapunov_steps
+        };
 
         // Initialize state
         let mut x = x0.to_vec();
@@ -737,11 +737,7 @@ impl StabilityAnalyzer {
     /// Newton-Raphson iteration to find a fixed point starting from `x0`.
     ///
     /// x_{n+1} = x_n - J^{-1}(x_n) * f(x_n)
-    fn newton_raphson(
-        &self,
-        f: &dyn Fn(&[f64]) -> Vec<f64>,
-        x0: &[f64],
-    ) -> Option<FixedPoint> {
+    fn newton_raphson(&self, f: &dyn Fn(&[f64]) -> Vec<f64>, x0: &[f64]) -> Option<FixedPoint> {
         let n = self.dim;
         let mut x = x0.to_vec();
 
@@ -785,11 +781,7 @@ impl StabilityAnalyzer {
     }
 
     /// Compute a numerical Jacobian matrix (without eigenvalue analysis).
-    fn numerical_jacobian(
-        &self,
-        f: &dyn Fn(&[f64]) -> Vec<f64>,
-        x: &[f64],
-    ) -> Vec<Vec<f64>> {
+    fn numerical_jacobian(&self, f: &dyn Fn(&[f64]) -> Vec<f64>, x: &[f64]) -> Vec<Vec<f64>> {
         let n = self.dim;
         let eps = self.config.epsilon;
         let mut jac = vec![vec![0.0; n]; n];
@@ -817,11 +809,7 @@ impl StabilityAnalyzer {
 
     /// Solve a linear system A * x = b using Gaussian elimination with
     /// partial pivoting. Returns None if the system is singular.
-    fn solve_linear_system(
-        &self,
-        a: &[Vec<f64>],
-        b: &[f64],
-    ) -> Option<Vec<f64>> {
+    fn solve_linear_system(&self, a: &[Vec<f64>], b: &[f64]) -> Option<Vec<f64>> {
         let n = a.len();
         // Build augmented matrix
         let mut aug: Vec<Vec<f64>> = a
@@ -981,7 +969,8 @@ impl StabilityAnalyzer {
             let curr_re = curr_eigs[i].0;
 
             // Sign change in real part: crossing the imaginary axis
-            if prev_re * curr_re < 0.0 || (prev_re.abs() < tol && curr_re.abs() > tol)
+            if prev_re * curr_re < 0.0
+                || (prev_re.abs() < tol && curr_re.abs() > tol)
                 || (prev_re.abs() > tol && curr_re.abs() < tol)
             {
                 // Interpolate parameter value at crossing
@@ -1028,10 +1017,7 @@ impl StabilityAnalyzer {
     /// meaning all trajectories converge exponentially. In consciousness terms,
     /// a contracting system will always settle into its unique attractor
     /// regardless of initial conditions -- a strong form of perceptual stability.
-    pub fn contraction_rate(
-        &self,
-        jacobian: &[Vec<f64>],
-    ) -> f64 {
+    pub fn contraction_rate(&self, jacobian: &[Vec<f64>]) -> f64 {
         let n = jacobian.len();
         if n == 0 {
             return 0.0;
@@ -1079,12 +1065,7 @@ mod tests {
     /// dy/dt =  omega*x - sigma*y
     /// Eigenvalues: -sigma +/- i*omega
     fn damped_oscillator(sigma: f64, omega: f64) -> impl Fn(&[f64]) -> Vec<f64> {
-        move |x: &[f64]| {
-            vec![
-                -sigma * x[0] - omega * x[1],
-                omega * x[0] - sigma * x[1],
-            ]
-        }
+        move |x: &[f64]| vec![-sigma * x[0] - omega * x[1], omega * x[0] - sigma * x[1]]
     }
 
     #[test]
@@ -1122,10 +1103,7 @@ mod tests {
         }
 
         // Should have nonzero imaginary parts
-        let has_imaginary = result
-            .eigenvalues
-            .iter()
-            .any(|(_, im)| im.abs() > 0.1);
+        let has_imaginary = result.eigenvalues.iter().any(|(_, im)| im.abs() > 0.1);
         assert!(has_imaginary, "Should have imaginary eigenvalue components");
     }
 
@@ -1278,7 +1256,10 @@ mod tests {
         let f = |x: &[f64]| -> Vec<f64> { vec![x[0]] };
         let result = analyzer.compute_jacobian(&f, &[0.0]);
 
-        assert!(!result.is_stable, "Positive eigenvalue system should be unstable");
+        assert!(
+            !result.is_stable,
+            "Positive eigenvalue system should be unstable"
+        );
         assert!(
             (result.eigenvalues[0].0 - 1.0).abs() < 1e-5,
             "Eigenvalue should be +1"
@@ -1310,10 +1291,7 @@ mod tests {
 
         let bifs = analyzer.detect_bifurcations(&f_param, &[0.0], (-1.0, 1.0), 100);
 
-        assert!(
-            !bifs.is_empty(),
-            "Should detect a bifurcation near mu = 0"
-        );
+        assert!(!bifs.is_empty(), "Should detect a bifurcation near mu = 0");
 
         // The bifurcation parameter should be near 0
         let bif = &bifs[0];
@@ -1335,11 +1313,7 @@ mod tests {
         // j = 2, sum_j = 0.3, |lambda_3| = 1.0
         // D_KY = 2 + 0.3/1.0 = 2.3
         let dky = analyzer.compute_kaplan_yorke(&[0.5, -0.2, -1.0]);
-        assert!(
-            (dky - 2.3).abs() < 1e-10,
-            "D_KY should be 2.3, got {}",
-            dky
-        );
+        assert!((dky - 2.3).abs() < 1e-10, "D_KY should be 2.3, got {}", dky);
     }
 
     #[test]

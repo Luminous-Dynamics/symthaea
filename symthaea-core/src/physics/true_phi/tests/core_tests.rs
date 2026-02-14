@@ -18,7 +18,11 @@ fn test_vector_distribution() {
 
     // Probabilities should sum to 1
     let sum: f64 = dist.probabilities.iter().sum();
-    assert!((sum - 1.0).abs() < 1e-10, "Probabilities should sum to 1, got {}", sum);
+    assert!(
+        (sum - 1.0).abs() < 1e-10,
+        "Probabilities should sum to 1, got {}",
+        sum
+    );
 
     // All probabilities should be non-negative
     assert!(dist.probabilities.iter().all(|&p| p >= 0.0));
@@ -36,7 +40,12 @@ fn test_entropy_bounds() {
 
     // Entropy should be at most log(num_bins) bits
     let max_entropy = (calc.config.num_bins as f64).log2();
-    assert!(entropy <= max_entropy + 0.01, "Entropy {} should be at most {}", entropy, max_entropy);
+    assert!(
+        entropy <= max_entropy + 0.01,
+        "Entropy {} should be at most {}",
+        entropy,
+        max_entropy
+    );
 }
 
 #[test]
@@ -56,7 +65,12 @@ fn test_uniform_distribution_max_entropy() {
     let max_entropy = (calc.config.num_bins as f64).log2();
 
     // Should be close to max entropy
-    assert!(entropy > max_entropy * 0.95, "Uniform dist entropy {} should be near max {}", entropy, max_entropy);
+    assert!(
+        entropy > max_entropy * 0.95,
+        "Uniform dist entropy {} should be near max {}",
+        entropy,
+        max_entropy
+    );
 }
 
 #[test]
@@ -70,7 +84,10 @@ fn test_joint_entropy() {
     let h_xy = calc.joint_entropy(&hv1, &hv2);
 
     // Joint entropy should be >= max of individual entropies
-    assert!(h_xy >= h_x.max(h_y) - 0.01, "H(X,Y) should be >= max(H(X), H(Y))");
+    assert!(
+        h_xy >= h_x.max(h_y) - 0.01,
+        "H(X,Y) should be >= max(H(X), H(Y))"
+    );
 
     // Joint entropy should be <= sum of individual entropies
     assert!(h_xy <= h_x + h_y + 0.01, "H(X,Y) should be <= H(X) + H(Y)");
@@ -85,7 +102,11 @@ fn test_mutual_information_non_negative() {
     let mi = calc.mutual_information(&hv1, &hv2);
 
     // MI should be non-negative
-    assert!(mi >= 0.0, "Mutual information should be non-negative, got {}", mi);
+    assert!(
+        mi >= 0.0,
+        "Mutual information should be non-negative, got {}",
+        mi
+    );
 }
 
 #[test]
@@ -97,8 +118,12 @@ fn test_self_mutual_information_equals_entropy() {
     let self_mi = calc.mutual_information(&hv, &hv);
 
     // I(X;X) = H(X)
-    assert!((self_mi - entropy).abs() < 0.01,
-        "Self MI {} should equal entropy {}", self_mi, entropy);
+    assert!(
+        (self_mi - entropy).abs() < 0.01,
+        "Self MI {} should equal entropy {}",
+        self_mi,
+        entropy
+    );
 }
 
 #[test]
@@ -120,8 +145,12 @@ fn test_effective_information_increases_with_correlation() {
     let ei_correlated = calc.effective_information(&correlated);
 
     // Correlated should have higher EI
-    assert!(ei_correlated > ei_independent,
-        "Correlated EI {} should exceed independent EI {}", ei_correlated, ei_independent);
+    assert!(
+        ei_correlated > ei_independent,
+        "Correlated EI {} should exceed independent EI {}",
+        ei_correlated,
+        ei_independent
+    );
 }
 
 #[test]
@@ -154,7 +183,10 @@ fn test_true_phi_exhaustive_search() {
     let result = calc.compute_true_phi(&components);
 
     assert!(result.phi >= 0.0, "\u{03a6} should be non-negative");
-    assert!(result.system_ei >= result.mip_ei, "System EI should be >= MIP EI");
+    assert!(
+        result.system_ei >= result.mip_ei,
+        "System EI should be >= MIP EI"
+    );
     assert_eq!(result.component_entropies.len(), 4);
 }
 
@@ -167,8 +199,10 @@ fn test_true_phi_heuristic_search() {
     let result = calc.compute_true_phi(&components);
 
     assert!(result.phi >= 0.0, "\u{03a6} should be non-negative");
-    assert!(!result.mip.part_a.is_empty() && !result.mip.part_b.is_empty(),
-        "MIP should have non-empty parts");
+    assert!(
+        !result.mip.part_a.is_empty() && !result.mip.part_b.is_empty(),
+        "MIP should have non-empty parts"
+    );
 }
 
 #[test]
@@ -191,7 +225,10 @@ fn test_bound_vs_bundle_different_phi() {
 
     // They should have different Φ values (bind creates orthogonal structure)
     // This test verifies that our entropy measure is sensitive to structural differences
-    println!("\u{03a6}(bundled) = {:.4}, \u{03a6}(bound) = {:.4}", phi_bundled.phi, phi_bound.phi);
+    println!(
+        "\u{03a6}(bundled) = {:.4}, \u{03a6}(bound) = {:.4}",
+        phi_bundled.phi, phi_bound.phi
+    );
     // Note: We don't assert specific relationship, just that they're computed correctly
 }
 
@@ -204,10 +241,16 @@ fn test_phi_fast() {
     let phi_full = calc.compute_true_phi(&components);
 
     // Fast should be in [0, 1]
-    assert!(phi_fast >= 0.0 && phi_fast <= 1.0, "Fast \u{03a6} should be normalized");
+    assert!(
+        phi_fast >= 0.0 && phi_fast <= 1.0,
+        "Fast \u{03a6} should be normalized"
+    );
 
     // They should be positively correlated (but not equal)
-    println!("\u{03a6}_fast = {:.4}, \u{03a6}_full = {:.4}", phi_fast, phi_full.phi);
+    println!(
+        "\u{03a6}_fast = {:.4}, \u{03a6}_full = {:.4}",
+        phi_fast, phi_full.phi
+    );
 }
 
 #[test]
@@ -221,8 +264,10 @@ fn test_mi_matrix_symmetric() {
     // Check symmetry
     for i in 0..matrix.len() {
         for j in 0..matrix.len() {
-            assert!((matrix[i][j] - matrix[j][i]).abs() < 1e-10,
-                "MI matrix should be symmetric");
+            assert!(
+                (matrix[i][j] - matrix[j][i]).abs() < 1e-10,
+                "MI matrix should be symmetric"
+            );
         }
     }
 }
@@ -235,12 +280,24 @@ fn test_spectral_partition() {
 
     // Create components with clear cluster structure
     let base1 = ContinuousHV::random(HDC_DIMENSION, 100);
-    let c1 = ContinuousHV::weighted_bundle(&[&base1, &ContinuousHV::random(HDC_DIMENSION, 101)], &[0.9, 0.1]);
-    let c2 = ContinuousHV::weighted_bundle(&[&base1, &ContinuousHV::random(HDC_DIMENSION, 102)], &[0.9, 0.1]);
+    let c1 = ContinuousHV::weighted_bundle(
+        &[&base1, &ContinuousHV::random(HDC_DIMENSION, 101)],
+        &[0.9, 0.1],
+    );
+    let c2 = ContinuousHV::weighted_bundle(
+        &[&base1, &ContinuousHV::random(HDC_DIMENSION, 102)],
+        &[0.9, 0.1],
+    );
 
     let base2 = ContinuousHV::random(HDC_DIMENSION, 200);
-    let c3 = ContinuousHV::weighted_bundle(&[&base2, &ContinuousHV::random(HDC_DIMENSION, 201)], &[0.9, 0.1]);
-    let c4 = ContinuousHV::weighted_bundle(&[&base2, &ContinuousHV::random(HDC_DIMENSION, 202)], &[0.9, 0.1]);
+    let c3 = ContinuousHV::weighted_bundle(
+        &[&base2, &ContinuousHV::random(HDC_DIMENSION, 201)],
+        &[0.9, 0.1],
+    );
+    let c4 = ContinuousHV::weighted_bundle(
+        &[&base2, &ContinuousHV::random(HDC_DIMENSION, 202)],
+        &[0.9, 0.1],
+    );
 
     let components = vec![c1, c2, c3, c4];
     let mi_matrix = calc.build_mi_matrix(&components);
@@ -249,7 +306,10 @@ fn test_spectral_partition() {
     assert!(partition.is_some(), "Spectral partition should succeed");
 
     let p = partition.unwrap();
-    assert!(!p.part_a.is_empty() && !p.part_b.is_empty(), "Partition should have non-empty parts");
+    assert!(
+        !p.part_a.is_empty() && !p.part_b.is_empty(),
+        "Partition should have non-empty parts"
+    );
 }
 
 #[test]
@@ -261,8 +321,15 @@ fn test_simulated_annealing_partition() {
 
     assert!(partition.is_some(), "SA partition should succeed");
     let p = partition.unwrap();
-    assert!(!p.part_a.is_empty() && !p.part_b.is_empty(), "SA partition should have non-empty parts");
-    assert_eq!(p.part_a.len() + p.part_b.len(), 12, "All elements should be assigned");
+    assert!(
+        !p.part_a.is_empty() && !p.part_b.is_empty(),
+        "SA partition should have non-empty parts"
+    );
+    assert_eq!(
+        p.part_a.len() + p.part_b.len(),
+        12,
+        "All elements should be assigned"
+    );
 }
 
 #[test]
@@ -279,7 +346,10 @@ fn test_greedy_bisection_with_local_search() {
 
     let greedy_ei = calc.partition_effective_information(&components, &greedy);
     let refined_ei = calc.partition_effective_information(&components, &refined);
-    assert!(refined_ei <= greedy_ei + 1e-10, "Local search should not increase EI");
+    assert!(
+        refined_ei <= greedy_ei + 1e-10,
+        "Local search should not increase EI"
+    );
 }
 
 #[test]
@@ -291,8 +361,15 @@ fn test_large_system_mip_search() {
     let result = calc.compute_true_phi(&components);
 
     assert!(result.phi >= 0.0, "\u{03a6} should be non-negative");
-    assert!(!result.mip.part_a.is_empty() && !result.mip.part_b.is_empty(), "MIP should have non-empty parts");
-    assert_eq!(result.mip.part_a.len() + result.mip.part_b.len(), 12, "All components should be in partition");
+    assert!(
+        !result.mip.part_a.is_empty() && !result.mip.part_b.is_empty(),
+        "MIP should have non-empty parts"
+    );
+    assert_eq!(
+        result.mip.part_a.len() + result.mip.part_b.len(),
+        12,
+        "All components should be in partition"
+    );
 }
 
 #[test]
@@ -320,7 +397,11 @@ fn test_power_iteration_fiedler() {
 
     assert_eq!(fiedler.len(), 4);
     let sum: f64 = fiedler.iter().sum();
-    assert!(sum.abs() < 0.1, "Fiedler should be mean-centered, sum={}", sum);
+    assert!(
+        sum.abs() < 0.1,
+        "Fiedler should be mean-centered, sum={}",
+        sum
+    );
 }
 
 // Tests for continuous entropy estimation
@@ -359,7 +440,12 @@ fn test_histogram_entropy_bounds() {
     let h = est.entropy(&hv);
     assert!(h >= 0.0, "Entropy should be non-negative");
     let max_h = (est.adaptive_bins as f64).log2();
-    assert!(h <= max_h + 0.1, "Entropy {} should be at most {}", h, max_h);
+    assert!(
+        h <= max_h + 0.1,
+        "Entropy {} should be at most {}",
+        h,
+        max_h
+    );
 }
 
 #[test]
@@ -399,14 +485,36 @@ fn test_entropy_methods_correlate() {
     let h_adaptive = ContinuousEntropyEstimator::adaptive(16).entropy(&hv);
 
     // All should be non-negative
-    assert!(h_hist >= 0.0, "Histogram entropy should be non-negative: {}", h_hist);
-    assert!(h_knn >= 0.0, "k-NN entropy should be non-negative: {}", h_knn);
-    assert!(h_kde >= 0.0, "KDE entropy should be non-negative: {}", h_kde);
-    assert!(h_adaptive >= 0.0, "Adaptive entropy should be non-negative: {}", h_adaptive);
+    assert!(
+        h_hist >= 0.0,
+        "Histogram entropy should be non-negative: {}",
+        h_hist
+    );
+    assert!(
+        h_knn >= 0.0,
+        "k-NN entropy should be non-negative: {}",
+        h_knn
+    );
+    assert!(
+        h_kde >= 0.0,
+        "KDE entropy should be non-negative: {}",
+        h_kde
+    );
+    assert!(
+        h_adaptive >= 0.0,
+        "Adaptive entropy should be non-negative: {}",
+        h_adaptive
+    );
 
     // Histogram and adaptive should give positive entropy for random data
-    assert!(h_hist > 0.0, "Histogram should have positive entropy for random data");
-    assert!(h_adaptive > 0.0, "Adaptive should have positive entropy for random data");
+    assert!(
+        h_hist > 0.0,
+        "Histogram should have positive entropy for random data"
+    );
+    assert!(
+        h_adaptive > 0.0,
+        "Adaptive should have positive entropy for random data"
+    );
 
     // For methods that give positive values, check they're in same ballpark
     let positive_entropies: Vec<f64> = [h_hist, h_knn, h_kde, h_adaptive]
@@ -418,9 +526,14 @@ fn test_entropy_methods_correlate() {
     if positive_entropies.len() >= 2 {
         let max_h = positive_entropies.iter().copied().fold(0.0, f64::max);
         let min_h = positive_entropies.iter().copied().fold(f64::MAX, f64::min);
-        assert!(max_h / min_h < 10.0,
+        assert!(
+            max_h / min_h < 10.0,
             "Methods should give similar results: hist={:.3}, knn={:.3}, kde={:.3}, adaptive={:.3}",
-            h_hist, h_knn, h_kde, h_adaptive);
+            h_hist,
+            h_knn,
+            h_kde,
+            h_adaptive
+        );
     }
 }
 
@@ -430,8 +543,14 @@ fn test_knn_mutual_information() {
 
     // Test with correlated vectors
     let base = ContinuousHV::random(HDC_DIMENSION, 100);
-    let hv1 = ContinuousHV::weighted_bundle(&[&base, &ContinuousHV::random(HDC_DIMENSION, 101)], &[0.9, 0.1]);
-    let hv2 = ContinuousHV::weighted_bundle(&[&base, &ContinuousHV::random(HDC_DIMENSION, 102)], &[0.9, 0.1]);
+    let hv1 = ContinuousHV::weighted_bundle(
+        &[&base, &ContinuousHV::random(HDC_DIMENSION, 101)],
+        &[0.9, 0.1],
+    );
+    let hv2 = ContinuousHV::weighted_bundle(
+        &[&base, &ContinuousHV::random(HDC_DIMENSION, 102)],
+        &[0.9, 0.1],
+    );
 
     let mi = est.mutual_information_knn(&hv1, &hv2);
     assert!(mi >= 0.0, "MI should be non-negative");
@@ -448,18 +567,35 @@ fn test_knn_mi_higher_for_correlated() {
 
     // Correlated vectors
     let base = ContinuousHV::random(HDC_DIMENSION, 100);
-    let cor1 = ContinuousHV::weighted_bundle(&[&base, &ContinuousHV::random(HDC_DIMENSION, 101)], &[0.8, 0.2]);
-    let cor2 = ContinuousHV::weighted_bundle(&[&base, &ContinuousHV::random(HDC_DIMENSION, 102)], &[0.8, 0.2]);
+    let cor1 = ContinuousHV::weighted_bundle(
+        &[&base, &ContinuousHV::random(HDC_DIMENSION, 101)],
+        &[0.8, 0.2],
+    );
+    let cor2 = ContinuousHV::weighted_bundle(
+        &[&base, &ContinuousHV::random(HDC_DIMENSION, 102)],
+        &[0.8, 0.2],
+    );
     let mi_cor = est.mutual_information_knn(&cor1, &cor2);
 
-    assert!(mi_cor > mi_ind, "Correlated MI {} should exceed independent MI {}", mi_cor, mi_ind);
+    assert!(
+        mi_cor > mi_ind,
+        "Correlated MI {} should exceed independent MI {}",
+        mi_cor,
+        mi_ind
+    );
 }
 
 #[test]
 fn test_digamma_function() {
     // Known values
-    assert!((digamma(1.0) - (-0.5772156649)).abs() < 0.01, "\u{03c8}(1) \u{2248} -\u{03b3}");
-    assert!((digamma(2.0) - 0.4227843351).abs() < 0.01, "\u{03c8}(2) \u{2248} 1 - \u{03b3}");
+    assert!(
+        (digamma(1.0) - (-0.5772156649)).abs() < 0.01,
+        "\u{03c8}(1) \u{2248} -\u{03b3}"
+    );
+    assert!(
+        (digamma(2.0) - 0.4227843351).abs() < 0.01,
+        "\u{03c8}(2) \u{2248} 1 - \u{03b3}"
+    );
     assert!(digamma(10.0) > 2.0, "\u{03c8}(10) should be positive");
 }
 
@@ -491,13 +627,19 @@ fn test_iit_axiom_independent_system_zero_phi() {
 
     // Φ should be very close to 0 for independent components
     // (Some small positive value due to random correlations)
-    assert!(result.phi < 0.1,
-        "Independent system should have near-zero \u{03a6}: {:.4}", result.phi);
+    assert!(
+        result.phi < 0.1,
+        "Independent system should have near-zero \u{03a6}: {:.4}",
+        result.phi
+    );
 
     // System EI ≈ MIP EI for independent components
-    assert!((result.system_ei - result.mip_ei).abs() < 0.1,
+    assert!(
+        (result.system_ei - result.mip_ei).abs() < 0.1,
         "EI should be similar for system and MIP: sys={:.4}, mip={:.4}",
-        result.system_ei, result.mip_ei);
+        result.system_ei,
+        result.mip_ei
+    );
 }
 
 /// IIT Axiom: Φ > 0 for genuinely integrated systems
@@ -520,13 +662,19 @@ fn test_iit_axiom_integrated_system_positive_phi() {
     let result = calc.compute_true_phi(&integrated);
 
     // Φ should be significantly positive for integrated system
-    assert!(result.phi > 0.1,
-        "Integrated system should have positive \u{03a6}: {:.4}", result.phi);
+    assert!(
+        result.phi > 0.1,
+        "Integrated system should have positive \u{03a6}: {:.4}",
+        result.phi
+    );
 
     // System EI > MIP EI (this is the essence of integration)
-    assert!(result.system_ei > result.mip_ei,
+    assert!(
+        result.system_ei > result.mip_ei,
         "System EI should exceed MIP EI: sys={:.4} > mip={:.4}",
-        result.system_ei, result.mip_ei);
+        result.system_ei,
+        result.mip_ei
+    );
 }
 
 /// IIT Property: Φ decreases when system is partitioned
@@ -559,13 +707,17 @@ fn test_iit_partition_decreases_phi() {
     // Sum of partition Φs should be related to cross-partition information
     let _partition_total = phi_a.phi + phi_b.phi;
 
-    println!("Full \u{03a6}: {:.4}, Part A \u{03a6}: {:.4}, Part B \u{03a6}: {:.4}",
-        full_result.phi, phi_a.phi, phi_b.phi);
+    println!(
+        "Full \u{03a6}: {:.4}, Part A \u{03a6}: {:.4}, Part B \u{03a6}: {:.4}",
+        full_result.phi, phi_a.phi, phi_b.phi
+    );
 
     // Full system Φ includes cross-partition information
     // that is lost when partitioned
-    assert!(full_result.system_ei > phi_a.system_ei + phi_b.system_ei - 0.1,
-        "Full system EI should account for all pairwise MI");
+    assert!(
+        full_result.system_ei > phi_a.system_ei + phi_b.system_ei - 0.1,
+        "Full system EI should account for all pairwise MI"
+    );
 }
 
 /// IIT Property: Binding creates integration
@@ -592,13 +744,17 @@ fn test_iit_binding_creates_integration() {
     let bounded = vec![bound1.clone(), bound2.clone(), a.clone(), c.clone()];
     let phi_bounded = calc.compute_true_phi(&bounded);
 
-    println!("Unbounded \u{03a6}: {:.4}, Bounded \u{03a6}: {:.4}",
-        phi_unbounded.phi, phi_bounded.phi);
+    println!(
+        "Unbounded \u{03a6}: {:.4}, Bounded \u{03a6}: {:.4}",
+        phi_unbounded.phi, phi_bounded.phi
+    );
 
     // Binding should affect the information structure
     // (not necessarily increase Φ, but change the MIP)
-    assert!(phi_bounded.mip.part_a.len() > 0 && phi_bounded.mip.part_b.len() > 0,
-        "Bounded system should have non-trivial MIP");
+    assert!(
+        phi_bounded.mip.part_a.len() > 0 && phi_bounded.mip.part_b.len() > 0,
+        "Bounded system should have non-trivial MIP"
+    );
 }
 
 /// IIT Property: More components can increase Φ
@@ -627,13 +783,22 @@ fn test_iit_size_effect_on_phi() {
     let phi_small = calc.compute_true_phi(&small);
     let phi_medium = calc.compute_true_phi(&medium);
 
-    println!("Small (3) EI: {:.4}, \u{03a6}: {:.4}", phi_small.system_ei, phi_small.phi);
-    println!("Medium (5) EI: {:.4}, \u{03a6}: {:.4}", phi_medium.system_ei, phi_medium.phi);
+    println!(
+        "Small (3) EI: {:.4}, \u{03a6}: {:.4}",
+        phi_small.system_ei, phi_small.phi
+    );
+    println!(
+        "Medium (5) EI: {:.4}, \u{03a6}: {:.4}",
+        phi_medium.system_ei, phi_medium.phi
+    );
 
     // Larger integrated systems should have higher total EI
-    assert!(phi_medium.system_ei > phi_small.system_ei,
+    assert!(
+        phi_medium.system_ei > phi_small.system_ei,
         "Larger system should have higher EI: medium={:.4} > small={:.4}",
-        phi_medium.system_ei, phi_small.system_ei);
+        phi_medium.system_ei,
+        phi_small.system_ei
+    );
 }
 
 /// IIT Property: Information exclusion
@@ -648,8 +813,14 @@ fn test_iit_mip_uniqueness() {
     let result = calc.compute_true_phi(&components);
 
     // MIP should be a valid bipartition
-    assert!(!result.mip.part_a.is_empty(), "MIP part A should be non-empty");
-    assert!(!result.mip.part_b.is_empty(), "MIP part B should be non-empty");
+    assert!(
+        !result.mip.part_a.is_empty(),
+        "MIP part A should be non-empty"
+    );
+    assert!(
+        !result.mip.part_b.is_empty(),
+        "MIP part B should be non-empty"
+    );
 
     // All elements should be in exactly one part
     let total = result.mip.part_a.len() + result.mip.part_b.len();
@@ -686,11 +857,20 @@ fn test_iit_benchmark_correlation_increases_phi() {
     let phi_ind = calc.compute_true_phi(&independent);
     let phi_cor = calc.compute_true_phi(&correlated);
 
-    println!("Independent \u{03a6}: {:.4}, EI: {:.4}", phi_ind.phi, phi_ind.system_ei);
-    println!("Correlated \u{03a6}: {:.4}, EI: {:.4}", phi_cor.phi, phi_cor.system_ei);
+    println!(
+        "Independent \u{03a6}: {:.4}, EI: {:.4}",
+        phi_ind.phi, phi_ind.system_ei
+    );
+    println!(
+        "Correlated \u{03a6}: {:.4}, EI: {:.4}",
+        phi_cor.phi, phi_cor.system_ei
+    );
 
     // Correlated should have significantly higher Φ
-    assert!(phi_cor.phi > phi_ind.phi * 2.0,
+    assert!(
+        phi_cor.phi > phi_ind.phi * 2.0,
         "Correlated \u{03a6} ({:.4}) should be much higher than independent \u{03a6} ({:.4})",
-        phi_cor.phi, phi_ind.phi);
+        phi_cor.phi,
+        phi_ind.phi
+    );
 }

@@ -196,9 +196,10 @@ impl LookaheadEngine {
         // 3. Get current CfC state and combine with objective
         let current_state = self.cfc.read_state()?;
         let combined_input: Array1<f32> = Array1::from_iter(
-            objective_input.iter()
+            objective_input
+                .iter()
                 .zip(current_state.iter())
-                .map(|(a, b)| (a + b) / 2.0)
+                .map(|(a, b)| (a + b) / 2.0),
         );
 
         // 4. THE MAGIC: O(1) prediction using CfC closed-form solution
@@ -213,7 +214,8 @@ impl LookaheadEngine {
         let confidence = self.calculate_confidence();
 
         // 7. Generate recommendation
-        let recommendation = self.generate_recommendation(predicted_phi_gain, confidence, objective);
+        let recommendation =
+            self.generate_recommendation(predicted_phi_gain, confidence, objective);
 
         let prediction_time_us = start.elapsed().as_micros() as u64;
 
@@ -228,7 +230,12 @@ impl LookaheadEngine {
     }
 
     /// Estimate Φ gain from predicted CfC state using real Phi computation
-    fn estimate_phi_gain(&self, predicted_state: &Array1<f32>, current_phi: f32, _objective: &LearningObjective) -> f32 {
+    fn estimate_phi_gain(
+        &self,
+        predicted_state: &Array1<f32>,
+        current_phi: f32,
+        _objective: &LearningObjective,
+    ) -> f32 {
         // Split predicted state into virtual nodes for phi measurement
         let slice = predicted_state.as_slice().unwrap_or(&[]);
         let chunk_size = slice.len().max(1) / 4;
@@ -256,7 +263,9 @@ impl LookaheadEngine {
         }
 
         // Count accurate predictions from recent history
-        let recent: Vec<_> = self.prediction_history.iter()
+        let recent: Vec<_> = self
+            .prediction_history
+            .iter()
             .rev()
             .take(20)
             .filter_map(|r| r.accurate)
@@ -299,8 +308,7 @@ impl LookaheadEngine {
             return LearningRecommendation::Skip {
                 reason: format!(
                     "Predicted negative gain ({:+.4}) for {}",
-                    predicted_phi_gain,
-                    objective.name
+                    predicted_phi_gain, objective.name
                 ),
             };
         }
@@ -309,8 +317,7 @@ impl LookaheadEngine {
         LearningRecommendation::Defer {
             reason: format!(
                 "Low predicted gain ({:+.4}) for {}",
-                predicted_phi_gain,
-                objective.name
+                predicted_phi_gain, objective.name
             ),
         }
     }
@@ -372,12 +379,16 @@ impl LookaheadEngine {
 
     /// Get statistics about prediction accuracy
     pub fn accuracy_stats(&self) -> (f32, f32, usize) {
-        let accurate_count = self.prediction_history.iter()
+        let accurate_count = self
+            .prediction_history
+            .iter()
             .filter_map(|r| r.accurate)
             .filter(|&a| a)
             .count();
 
-        let total_with_outcome = self.prediction_history.iter()
+        let total_with_outcome = self
+            .prediction_history
+            .iter()
             .filter(|r| r.actual.is_some())
             .count();
 
@@ -399,9 +410,9 @@ impl LookaheadEngine {
 
 #[cfg(test)]
 mod tests {
+    use super::super::objective::Difficulty;
     use super::*;
     use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
-    use super::super::objective::Difficulty;
 
     fn create_test_consciousness_state() -> Vec<ContinuousHV> {
         (0..8)
@@ -439,8 +450,11 @@ mod tests {
         assert_eq!(result.objective_id, "test");
         assert!(result.prediction_time_us > 0);
         // Allow up to 500ms for evaluation (includes network clone overhead in debug builds)
-        assert!(result.prediction_time_us < 500_000,
-                "Evaluation took {}us", result.prediction_time_us);
+        assert!(
+            result.prediction_time_us < 500_000,
+            "Evaluation took {}us",
+            result.prediction_time_us
+        );
     }
 
     #[test]
@@ -498,14 +512,25 @@ mod tests {
         // Verify that doubling the horizon doesn't significantly increase time
         // (allows for some variance due to system load and clone overhead)
         // The key O(1) property is that time doesn't scale with horizon
-        let max_time = times.iter().copied().max().expect("times should not be empty");
-        let min_time = times.iter().copied().min().expect("times should not be empty");
+        let max_time = times
+            .iter()
+            .copied()
+            .max()
+            .expect("times should not be empty");
+        let min_time = times
+            .iter()
+            .copied()
+            .min()
+            .expect("times should not be empty");
 
         // In an O(1) algorithm, max should be within 10x of min (accounting for noise)
         // This is a weaker check than exact timing due to clone overhead
-        assert!(max_time < min_time.saturating_add(1) * 20,
-                "O(1) property violated: times varied from {}us to {}us",
-                min_time, max_time);
+        assert!(
+            max_time < min_time.saturating_add(1) * 20,
+            "O(1) property violated: times varied from {}us to {}us",
+            min_time,
+            max_time
+        );
     }
 
     // =========================================================================
@@ -598,7 +623,10 @@ mod tests {
 
         // Should handle gracefully
         let gain = engine.estimate_phi_gain(&single, current_phi, &obj);
-        assert_eq!(gain, 0.0, "Single element should return 0.0 gain (chunk_size=0)");
+        assert_eq!(
+            gain, 0.0,
+            "Single element should return 0.0 gain (chunk_size=0)"
+        );
     }
 
     #[test]
@@ -614,7 +642,10 @@ mod tests {
             .build();
 
         let gain = engine.estimate_phi_gain(&two, current_phi, &obj);
-        assert_eq!(gain, 0.0, "Two elements should return 0.0 gain (chunk_size=0)");
+        assert_eq!(
+            gain, 0.0,
+            "Two elements should return 0.0 gain (chunk_size=0)"
+        );
     }
 
     #[test]
@@ -630,7 +661,10 @@ mod tests {
             .build();
 
         let gain = engine.estimate_phi_gain(&three, current_phi, &obj);
-        assert_eq!(gain, 0.0, "Three elements should return 0.0 gain (chunk_size=0)");
+        assert_eq!(
+            gain, 0.0,
+            "Three elements should return 0.0 gain (chunk_size=0)"
+        );
     }
 
     #[test]
@@ -648,7 +682,11 @@ mod tests {
         // Should now compute a real phi gain (not necessarily 0)
         let gain = engine.estimate_phi_gain(&four, current_phi, &obj);
         // Gain should be clamped to [-0.1, 0.1]
-        assert!(gain >= -0.1 && gain <= 0.1, "Gain should be clamped: {}", gain);
+        assert!(
+            gain >= -0.1 && gain <= 0.1,
+            "Gain should be clamped: {}",
+            gain
+        );
     }
 
     #[test]
@@ -757,7 +795,10 @@ mod tests {
         let (accuracy, _avg_error, count) = engine.accuracy_stats();
         assert_eq!(count, 1);
         // error = 0.0001, threshold = 0.0002, so this should be accurate
-        assert!(accuracy >= 0.99, "Zero predicted with tiny error should be accurate");
+        assert!(
+            accuracy >= 0.99,
+            "Zero predicted with tiny error should be accurate"
+        );
     }
 
     #[test]
@@ -784,7 +825,10 @@ mod tests {
 
         let (accuracy, avg_error, count) = engine.accuracy_stats();
         assert_eq!(count, 1);
-        assert!(accuracy >= 0.99, "Within 5% of large prediction should be accurate");
+        assert!(
+            accuracy >= 0.99,
+            "Within 5% of large prediction should be accurate"
+        );
         assert!((avg_error - 5.0).abs() < 0.01, "Avg error should be 5.0");
     }
 
@@ -827,7 +871,10 @@ mod tests {
 
         let (accuracy, avg_error, count) = engine.accuracy_stats();
         assert_eq!(count, 1);
-        assert!(accuracy >= 0.99, "Small error on negative should be accurate");
+        assert!(
+            accuracy >= 0.99,
+            "Small error on negative should be accurate"
+        );
     }
 
     #[test]
@@ -863,15 +910,19 @@ mod tests {
         let mut engine = LookaheadEngine::new(64, 1.0, 0.01).unwrap();
 
         // Record a mix of accurate and inaccurate predictions
-        engine.record_outcome(1.0, 0.95);   // accurate (error=0.05 < 0.2)
-        engine.record_outcome(1.0, 0.5);    // inaccurate (error=0.5 > 0.2)
+        engine.record_outcome(1.0, 0.95); // accurate (error=0.05 < 0.2)
+        engine.record_outcome(1.0, 0.5); // inaccurate (error=0.5 > 0.2)
         engine.record_outcome(0.0, 0.0001); // accurate (error < 0.0002)
-        engine.record_outcome(0.0, 0.001);  // inaccurate (error=0.001 > 0.0002)
+        engine.record_outcome(0.0, 0.001); // inaccurate (error=0.001 > 0.0002)
 
         let (accuracy, _avg_error, count) = engine.accuracy_stats();
         assert_eq!(count, 4);
         // 2 accurate out of 4 = 0.5
-        assert!((accuracy - 0.5).abs() < 0.01, "Should be 50% accurate: {}", accuracy);
+        assert!(
+            (accuracy - 0.5).abs() < 0.01,
+            "Should be 50% accurate: {}",
+            accuracy
+        );
     }
 
     // =========================================================================
@@ -907,7 +958,10 @@ mod tests {
         }
 
         let confidence = engine.calculate_confidence();
-        assert!((confidence - 1.0).abs() < 0.01, "All accurate should yield confidence near 1.0");
+        assert!(
+            (confidence - 1.0).abs() < 0.01,
+            "All accurate should yield confidence near 1.0"
+        );
     }
 
     #[test]
@@ -920,7 +974,10 @@ mod tests {
         }
 
         let confidence = engine.calculate_confidence();
-        assert!(confidence.abs() < 0.01, "All inaccurate should yield confidence near 0.0");
+        assert!(
+            confidence.abs() < 0.01,
+            "All inaccurate should yield confidence near 0.0"
+        );
     }
 
     // =========================================================================
@@ -941,7 +998,10 @@ mod tests {
             .build();
 
         let recommendation = engine.generate_recommendation(0.05, 0.9, &obj);
-        assert!(matches!(recommendation, LearningRecommendation::LearnNow { .. }));
+        assert!(matches!(
+            recommendation,
+            LearningRecommendation::LearnNow { .. }
+        ));
     }
 
     #[test]
@@ -954,7 +1014,10 @@ mod tests {
 
         // Low gain (below min_phi_gain) and low confidence
         let recommendation = engine.generate_recommendation(0.005, 0.3, &obj);
-        assert!(matches!(recommendation, LearningRecommendation::Defer { .. }));
+        assert!(matches!(
+            recommendation,
+            LearningRecommendation::Defer { .. }
+        ));
     }
 
     #[test]
@@ -967,7 +1030,10 @@ mod tests {
 
         // Negative gain with high confidence = skip
         let recommendation = engine.generate_recommendation(-0.02, 0.8, &obj);
-        assert!(matches!(recommendation, LearningRecommendation::Skip { .. }));
+        assert!(matches!(
+            recommendation,
+            LearningRecommendation::Skip { .. }
+        ));
     }
 
     // =========================================================================
@@ -985,11 +1051,18 @@ mod tests {
 
         // History should be bounded to 1000
         // We can check this indirectly through prediction_count
-        assert_eq!(engine.prediction_count(), 1200, "Prediction count should be 1200");
+        assert_eq!(
+            engine.prediction_count(),
+            1200,
+            "Prediction count should be 1200"
+        );
 
         // The history vector should have been trimmed
         // We can verify through confidence calculation (uses up to 20 recent)
         let confidence = engine.calculate_confidence();
-        assert!(confidence >= 0.99, "Recent predictions should all be accurate");
+        assert!(
+            confidence >= 0.99,
+            "Recent predictions should all be accurate"
+        );
     }
 }

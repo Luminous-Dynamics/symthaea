@@ -25,9 +25,9 @@
 //! - Liquid metal core: > 303 K (Galinstan melting point)
 //! - Heat exchanger: ~350 K (optimal extraction)
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 
 /// Thermal properties of a material layer
 #[derive(Debug, Clone)]
@@ -53,11 +53,11 @@ impl ThermalProperties {
     pub fn hea_shell() -> Self {
         Self {
             name: "TiVZrNbPd HEA".to_string(),
-            conductivity: 15.0,      // W/m·K (typical HEA)
-            heat_capacity: 450.0,    // J/kg·K
-            density: 7200.0,         // kg/m³
-            expansion_coeff: 10e-6,  // 1/K
-            max_temp_k: 1200.0,      // Before phase transformation
+            conductivity: 15.0,     // W/m·K (typical HEA)
+            heat_capacity: 450.0,   // J/kg·K
+            density: 7200.0,        // kg/m³
+            expansion_coeff: 10e-6, // 1/K
+            max_temp_k: 1200.0,     // Before phase transformation
             min_temp_k: 200.0,
         }
     }
@@ -66,11 +66,11 @@ impl ThermalProperties {
     pub fn nano_laminate() -> Self {
         Self {
             name: "Zr/Nb Laminate".to_string(),
-            conductivity: 25.0,      // W/m·K
-            heat_capacity: 300.0,    // J/kg·K
-            density: 7500.0,         // kg/m³
-            expansion_coeff: 8e-6,   // 1/K
-            max_temp_k: 800.0,       // Interface stability limit
+            conductivity: 25.0,    // W/m·K
+            heat_capacity: 300.0,  // J/kg·K
+            density: 7500.0,       // kg/m³
+            expansion_coeff: 8e-6, // 1/K
+            max_temp_k: 800.0,     // Interface stability limit
             min_temp_k: 200.0,
         }
     }
@@ -92,11 +92,11 @@ impl ThermalProperties {
     pub fn max_phase() -> Self {
         Self {
             name: "Ti3SiC2".to_string(),
-            conductivity: 40.0,      // W/m·K (excellent)
-            heat_capacity: 520.0,    // J/kg·K
-            density: 4520.0,         // kg/m³
-            expansion_coeff: 9e-6,   // 1/K
-            max_temp_k: 1700.0,      // High temp stability
+            conductivity: 40.0,    // W/m·K (excellent)
+            heat_capacity: 520.0,  // J/kg·K
+            density: 4520.0,       // kg/m³
+            expansion_coeff: 9e-6, // 1/K
+            max_temp_k: 1700.0,    // High temp stability
             min_temp_k: 200.0,
         }
     }
@@ -121,12 +121,20 @@ pub struct LayerGeometry {
 impl LayerGeometry {
     /// Create spherical layer
     pub fn sphere(r_inner: f64, r_outer: f64) -> Self {
-        Self { r_inner, r_outer, length: None }
+        Self {
+            r_inner,
+            r_outer,
+            length: None,
+        }
     }
 
     /// Create cylindrical layer
     pub fn cylinder(r_inner: f64, r_outer: f64, length: f64) -> Self {
-        Self { r_inner, r_outer, length: Some(length) }
+        Self {
+            r_inner,
+            r_outer,
+            length: Some(length),
+        }
     }
 
     /// Thickness (m)
@@ -232,23 +240,24 @@ impl ThermalTransport {
         interface_geom: &LayerGeometry,
         _core: &ThermalProperties,
         core_geom: &LayerGeometry,
-        t_coolant: f64,  // Coolant temperature (K)
-        h_coolant: f64,  // Convection coefficient (W/m²·K)
+        t_coolant: f64, // Coolant temperature (K)
+        h_coolant: f64, // Convection coefficient (W/m²·K)
     ) -> TemperatureProfile {
         // Volumetric heat generation in shell
         let q_gen = power_w / shell_geom.volume();
 
         // Use spherical geometry equations (simplification)
-        let _r1 = core_geom.r_outer;      // Core-interface boundary
+        let _r1 = core_geom.r_outer; // Core-interface boundary
         let _r2 = interface_geom.r_outer; // Interface-shell boundary
-        let _r3 = shell_geom.r_outer;     // Shell outer surface
+        let _r3 = shell_geom.r_outer; // Shell outer surface
 
         // Thermal resistances
         // R_cond = (r_outer - r_inner) / (4 * pi * k * r_inner * r_outer) for spherical
         // Simplified for thin shells: R ≈ thickness / (k * area)
 
         let r_shell = shell_geom.thickness() / (shell.conductivity * shell_geom.inner_area());
-        let r_interface = interface_geom.thickness() / (interface.conductivity * interface_geom.inner_area());
+        let r_interface =
+            interface_geom.thickness() / (interface.conductivity * interface_geom.inner_area());
         let r_conv = 1.0 / (h_coolant * shell_geom.outer_area());
 
         let _r_total = r_shell + r_interface + r_conv;
@@ -321,9 +330,9 @@ impl ThermalTransport {
         profile: &TemperatureProfile,
         material: &ThermalProperties,
         geometry: &LayerGeometry,
-        youngs_modulus: f64,  // Pa
+        youngs_modulus: f64, // Pa
         poisson_ratio: f64,
-        yield_stress: f64,    // Pa
+        yield_stress: f64, // Pa
     ) -> ThermalStress {
         let alpha = material.expansion_coeff;
         let e = youngs_modulus;
@@ -340,8 +349,8 @@ impl ThermalTransport {
         let sigma_radial = sigma_hoop * 0.5;
 
         // Von Mises equivalent stress
-        let von_mises = ((sigma_hoop.powi(2) + sigma_radial.powi(2)
-            - sigma_hoop * sigma_radial).abs()).sqrt();
+        let von_mises =
+            ((sigma_hoop.powi(2) + sigma_radial.powi(2) - sigma_hoop * sigma_radial).abs()).sqrt();
 
         // Safety factor
         let safety_factor = yield_stress / von_mises;
@@ -378,7 +387,8 @@ impl ThermalTransport {
         } else if profile.t_max > shell.max_temp_k * 0.9 {
             warnings.push(format!(
                 "Shell max temp {:.0} K near limit ({:.0}% of max)",
-                profile.t_max, 100.0 * profile.t_max / shell.max_temp_k
+                profile.t_max,
+                100.0 * profile.t_max / shell.max_temp_k
             ));
         }
 
@@ -393,10 +403,7 @@ impl ThermalTransport {
         // Check for excessive gradients (can cause thermal shock)
         let max_gradient = (profile.t_max - profile.t_min) / 0.01; // K/m estimate
         if max_gradient > 1e6 {
-            warnings.push(format!(
-                "High thermal gradient: {:.2e} K/m",
-                max_gradient
-            ));
+            warnings.push(format!("High thermal gradient: {:.2e} K/m", max_gradient));
         }
 
         let is_safe = violations.is_empty();
@@ -416,8 +423,8 @@ impl ThermalTransport {
     pub fn coolant_flow_rate(
         &self,
         power_w: f64,
-        coolant_heat_capacity: f64,  // J/kg·K
-        dt_coolant: f64,              // Allowed temperature rise (K)
+        coolant_heat_capacity: f64, // J/kg·K
+        dt_coolant: f64,            // Allowed temperature rise (K)
     ) -> f64 {
         // m_dot = Q / (Cp * ΔT)
         power_w / (coolant_heat_capacity * dt_coolant)
@@ -471,10 +478,8 @@ impl SparkThermalAnalysis {
 
         // Build geometries
         let core_geom = LayerGeometry::sphere(0.0, core_radius_m);
-        let interface_geom = LayerGeometry::sphere(
-            core_radius_m,
-            core_radius_m + interface_thickness_m,
-        );
+        let interface_geom =
+            LayerGeometry::sphere(core_radius_m, core_radius_m + interface_thickness_m);
         let shell_geom = LayerGeometry::sphere(
             core_radius_m + interface_thickness_m,
             core_radius_m + interface_thickness_m + shell_thickness_m,
@@ -486,16 +491,20 @@ impl SparkThermalAnalysis {
         let core = ThermalProperties::galinstan();
 
         // Coolant conditions
-        let t_coolant = 320.0;  // K (slightly above ambient)
+        let t_coolant = 320.0; // K (slightly above ambient)
         let h_coolant = 5000.0; // W/m²·K (forced convection)
 
         // Calculate temperature profile
         let profile = thermal.steady_state_profile(
             power_w,
-            &shell, &shell_geom,
-            &interface, &interface_geom,
-            &core, &core_geom,
-            t_coolant, h_coolant,
+            &shell,
+            &shell_geom,
+            &interface,
+            &interface_geom,
+            &core,
+            &core_geom,
+            t_coolant,
+            h_coolant,
         );
 
         // Calculate thermal stress
@@ -503,9 +512,9 @@ impl SparkThermalAnalysis {
             &profile,
             &shell,
             &shell_geom,
-            200e9,   // Young's modulus ~200 GPa for HEA
-            0.3,     // Poisson's ratio
-            800e6,   // Yield stress ~800 MPa
+            200e9, // Young's modulus ~200 GPa for HEA
+            0.3,   // Poisson's ratio
+            800e6, // Yield stress ~800 MPa
         );
 
         // Check limits
@@ -567,9 +576,12 @@ mod tests {
 
         let profile = thermal.steady_state_profile(
             5000.0, // 5 kW
-            &shell, &shell_geom,
-            &interface, &interface_geom,
-            &core, &core_geom,
+            &shell,
+            &shell_geom,
+            &interface,
+            &interface_geom,
+            &core,
+            &core_geom,
             320.0,  // Coolant temp
             5000.0, // Convection coefficient
         );
@@ -596,14 +608,7 @@ mod tests {
         let shell = ThermalProperties::hea_shell();
         let geom = LayerGeometry::sphere(0.03, 0.04);
 
-        let stress = thermal.thermal_stress(
-            &profile,
-            &shell,
-            &geom,
-            200e9,
-            0.3,
-            800e6,
-        );
+        let stress = thermal.thermal_stress(&profile, &shell, &geom, 200e9, 0.3, 800e6);
 
         assert!(stress.von_mises > 0.0);
         assert!(stress.safety_factor > 0.0);
@@ -614,8 +619,7 @@ mod tests {
         let thermal = setup();
 
         let analysis = SparkThermalAnalysis::analyze(
-            &thermal,
-            5.0,    // 5 kW
+            &thermal, 5.0,    // 5 kW
             0.03,   // 3 cm core radius
             0.0002, // 0.2 mm interface
             0.01,   // 1 cm shell

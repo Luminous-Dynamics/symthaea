@@ -44,8 +44,8 @@
 //! let decoded = bridge.decode(&encoded);
 //! ```
 
-use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::config::{hdc_dim, STT_DIMENSION};
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -190,11 +190,7 @@ impl LearnedProjection {
 
     /// Forward pass with raw f32 slices (for integration with other systems)
     pub fn forward_raw(&self, input: &[f32]) -> Vec<f32> {
-        assert_eq!(
-            input.len(),
-            self.input_dim,
-            "Input dimension mismatch"
-        );
+        assert_eq!(input.len(), self.input_dim, "Input dimension mismatch");
 
         let mut output = vec![0.0f32; self.output_dim];
 
@@ -268,9 +264,11 @@ impl LearnedProjection {
         }
 
         // Update bias with Adam (if present)
-        if let (Some(ref mut bias), Some(ref mut bias_m), Some(ref mut bias_v)) =
-            (&mut self.bias, &mut self.bias_momentum, &mut self.bias_velocity)
-        {
+        if let (Some(ref mut bias), Some(ref mut bias_m), Some(ref mut bias_v)) = (
+            &mut self.bias,
+            &mut self.bias_momentum,
+            &mut self.bias_velocity,
+        ) {
             for i in 0..self.output_dim {
                 let grad = grad_output[i];
 
@@ -605,10 +603,7 @@ impl RandomProjection {
 /// Mean squared error between two vectors
 fn mse(a: &[f32], b: &[f32]) -> f32 {
     assert_eq!(a.len(), b.len());
-    let sum: f32 = a.iter()
-        .zip(b.iter())
-        .map(|(x, y)| (x - y) * (x - y))
-        .sum();
+    let sum: f32 = a.iter().zip(b.iter()).map(|(x, y)| (x - y) * (x - y)).sum();
     sum / a.len() as f32
 }
 

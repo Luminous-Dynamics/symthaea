@@ -27,12 +27,12 @@ let hdc_vec = encoder.encode_text("consciousness emerges from integration")?;
 ```
 */
 
-use std::collections::HashMap;
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
+use std::collections::HashMap;
 
-use symthaea_core::hdc::{HDC_DIMENSION, PackedBipolar};
+use symthaea_core::hdc::{PackedBipolar, HDC_DIMENSION};
 
 /// Johnson-Lindenstrauss random projector
 ///
@@ -156,7 +156,7 @@ impl NGramEncoder {
 
         // Create deterministic random vector from n-gram hash
         let mut rng = ChaCha8Rng::seed_from_u64(
-            self.seed ^ (ngram.as_bytes().iter().map(|&b| b as u64).sum::<u64>())
+            self.seed ^ (ngram.as_bytes().iter().map(|&b| b as u64).sum::<u64>()),
         );
 
         let vec: Vec<i8> = (0..self.dimension)
@@ -193,7 +193,8 @@ impl NGramEncoder {
         }
 
         // Threshold to bipolar
-        accum.into_iter()
+        accum
+            .into_iter()
             .map(|v| if v > 0 { 1i8 } else { -1i8 })
             .collect()
     }
@@ -275,7 +276,8 @@ impl SemanticEncoder {
             }
         }
 
-        accum.into_iter()
+        accum
+            .into_iter()
             .map(|v| if v > 0 { 1i8 } else { -1i8 })
             .collect()
     }
@@ -332,7 +334,11 @@ mod tests {
         let sim = pa.xor_similarity(&pb);
 
         // Similar inputs should have similar outputs
-        assert!(sim > 0.6, "Similar inputs should project to similar outputs: {}", sim);
+        assert!(
+            sim > 0.6,
+            "Similar inputs should project to similar outputs: {}",
+            sim
+        );
     }
 
     #[test]
@@ -364,8 +370,12 @@ mod tests {
         let sim_far = similar_a.xor_similarity(&different);
 
         // Similar texts should have higher similarity
-        assert!(sim_close > sim_far,
-            "Similar texts should be more similar: {} vs {}", sim_close, sim_far);
+        assert!(
+            sim_close > sim_far,
+            "Similar texts should be more similar: {} vs {}",
+            sim_close,
+            sim_far
+        );
     }
 
     #[test]
@@ -387,9 +397,16 @@ mod tests {
         let sim_similar = encoder.text_similarity("hello world", "hello earth");
         let sim_different = encoder.text_similarity("hello world", "quantum mechanics");
 
-        assert!((sim_same - 1.0).abs() < 0.001, "Same text should have 1.0 similarity");
-        assert!(sim_similar > sim_different,
-            "Similar texts should be more similar: {} vs {}", sim_similar, sim_different);
+        assert!(
+            (sim_same - 1.0).abs() < 0.001,
+            "Same text should have 1.0 similarity"
+        );
+        assert!(
+            sim_similar > sim_different,
+            "Similar texts should be more similar: {} vs {}",
+            sim_similar,
+            sim_different
+        );
     }
 
     #[test]
@@ -411,7 +428,15 @@ mod tests {
         let sim_b = packed_bundle.xor_similarity(&packed_b);
 
         // Both should have > 50% similarity (above random)
-        assert!(sim_a > 0.45, "Bundle should be similar to constituent a: {}", sim_a);
-        assert!(sim_b > 0.45, "Bundle should be similar to constituent b: {}", sim_b);
+        assert!(
+            sim_a > 0.45,
+            "Bundle should be similar to constituent a: {}",
+            sim_a
+        );
+        assert!(
+            sim_b > 0.45,
+            "Bundle should be similar to constituent b: {}",
+            sim_b
+        );
     }
 }

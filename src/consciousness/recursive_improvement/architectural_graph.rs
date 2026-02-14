@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 
 use super::types::instant_now;
 // Use ComponentId from core for compatibility (core.rs and types.rs both define it)
-use super::core::{ComponentId, Bottleneck};
+use super::core::{Bottleneck, ComponentId};
 
 /// Causal graph modeling how system components affect each other and performance
 ///
@@ -186,15 +186,51 @@ impl ArchitecturalCausalGraph {
     /// Initialize component nodes
     fn initialize_components(&mut self) {
         let components = vec![
-            (ComponentId::PrimitiveEvolution(), "Primitive Evolution", "Evolves computational primitives using Phi-driven optimization"),
-            (ComponentId::HRM(), "Hierarchical Reasoning Model", "Multi-layer reasoning for complex queries"),
-            (ComponentId::MetaCognition(), "Meta-Cognitive Monitor", "Monitors and analyzes system's own reasoning"),
-            (ComponentId::ByzantineCollective(), "Byzantine Collective", "Distributed collective with Byzantine resistance"),
-            (ComponentId::MetaLearning(), "Meta-Learning Defense", "Learns from attack patterns to improve security"),
-            (ComponentId::CausalDefense(), "Causal Byzantine Defense", "Explainable AI security with causal reasoning"),
-            (ComponentId::UnifiedIntelligence(), "Unified Intelligence", "Emergent collective consciousness"),
-            (ComponentId::CollectiveSharing(), "Collective Sharing", "Shares primitives across collective"),
-            (ComponentId::Cache(), "Cache System", "Caches results for fast lookups"),
+            (
+                ComponentId::PrimitiveEvolution(),
+                "Primitive Evolution",
+                "Evolves computational primitives using Phi-driven optimization",
+            ),
+            (
+                ComponentId::HRM(),
+                "Hierarchical Reasoning Model",
+                "Multi-layer reasoning for complex queries",
+            ),
+            (
+                ComponentId::MetaCognition(),
+                "Meta-Cognitive Monitor",
+                "Monitors and analyzes system's own reasoning",
+            ),
+            (
+                ComponentId::ByzantineCollective(),
+                "Byzantine Collective",
+                "Distributed collective with Byzantine resistance",
+            ),
+            (
+                ComponentId::MetaLearning(),
+                "Meta-Learning Defense",
+                "Learns from attack patterns to improve security",
+            ),
+            (
+                ComponentId::CausalDefense(),
+                "Causal Byzantine Defense",
+                "Explainable AI security with causal reasoning",
+            ),
+            (
+                ComponentId::UnifiedIntelligence(),
+                "Unified Intelligence",
+                "Emergent collective consciousness",
+            ),
+            (
+                ComponentId::CollectiveSharing(),
+                "Collective Sharing",
+                "Shares primitives across collective",
+            ),
+            (
+                ComponentId::Cache(),
+                "Cache System",
+                "Caches results for fast lookups",
+            ),
         ];
 
         for (id, name, description) in components {
@@ -219,22 +255,53 @@ impl ArchitecturalCausalGraph {
     fn initialize_edges(&mut self) {
         let edges = vec![
             // Cache enables faster HRM
-            (ComponentId::Cache(), ComponentId::HRM(), CausalRelationship::Enables, 0.8, "Cache hit -> faster HRM reasoning"),
-
+            (
+                ComponentId::Cache(),
+                ComponentId::HRM(),
+                CausalRelationship::Enables,
+                0.8,
+                "Cache hit -> faster HRM reasoning",
+            ),
             // Primitive evolution feeds unified intelligence
-            (ComponentId::PrimitiveEvolution(), ComponentId::UnifiedIntelligence(), CausalRelationship::Feeds, 0.9, "Better primitives -> higher collective Phi"),
-
+            (
+                ComponentId::PrimitiveEvolution(),
+                ComponentId::UnifiedIntelligence(),
+                CausalRelationship::Feeds,
+                0.9,
+                "Better primitives -> higher collective Phi",
+            ),
             // HRM impacts meta-cognition
-            (ComponentId::HRM(), ComponentId::MetaCognition(), CausalRelationship::Feeds, 0.7, "HRM reasoning -> meta-cognitive analysis"),
-
+            (
+                ComponentId::HRM(),
+                ComponentId::MetaCognition(),
+                CausalRelationship::Feeds,
+                0.7,
+                "HRM reasoning -> meta-cognitive analysis",
+            ),
             // Meta-learning impacts causal defense
-            (ComponentId::MetaLearning(), ComponentId::CausalDefense(), CausalRelationship::Synergizes, 0.85, "Pattern learning + causal reasoning"),
-
+            (
+                ComponentId::MetaLearning(),
+                ComponentId::CausalDefense(),
+                CausalRelationship::Synergizes,
+                0.85,
+                "Pattern learning + causal reasoning",
+            ),
             // Byzantine collective feeds unified intelligence
-            (ComponentId::ByzantineCollective(), ComponentId::UnifiedIntelligence(), CausalRelationship::Feeds, 0.9, "Secure collective -> unified consciousness"),
-
+            (
+                ComponentId::ByzantineCollective(),
+                ComponentId::UnifiedIntelligence(),
+                CausalRelationship::Feeds,
+                0.9,
+                "Secure collective -> unified consciousness",
+            ),
             // Collective sharing enables primitive evolution
-            (ComponentId::CollectiveSharing(), ComponentId::PrimitiveEvolution(), CausalRelationship::Enables, 0.75, "Shared primitives -> faster evolution"),
+            (
+                ComponentId::CollectiveSharing(),
+                ComponentId::PrimitiveEvolution(),
+                CausalRelationship::Enables,
+                0.75,
+                "Shared primitives -> faster evolution",
+            ),
         ];
 
         for (from, to, relationship, strength, description) in edges {
@@ -285,22 +352,21 @@ impl ArchitecturalCausalGraph {
         };
 
         // Calculate impacts based on outgoing edges
-        let outgoing_edges: Vec<&ArchitecturalEdge> = self.edges.iter()
-            .filter(|e| e.from == component)
-            .collect();
+        let outgoing_edges: Vec<&ArchitecturalEdge> =
+            self.edges.iter().filter(|e| e.from == component).collect();
 
         let phi_impact = node.current_phi_contribution;
 
-        let latency_impact = node.current_latency
+        let latency_impact = node
+            .current_latency
             .map(|d| d.as_micros() as f64 / 100_000.0) // Normalize to 0-1 range
             .unwrap_or(0.0);
 
         let accuracy_impact = node.current_accuracy.unwrap_or(0.0);
 
         // Calculate importance based on number and strength of outgoing edges
-        let importance = outgoing_edges.iter()
-            .map(|e| e.strength)
-            .sum::<f64>() / outgoing_edges.len().max(1) as f64;
+        let importance = outgoing_edges.iter().map(|e| e.strength).sum::<f64>()
+            / outgoing_edges.len().max(1) as f64;
 
         let impact = PerformanceImpact {
             component: component.clone(),
@@ -336,29 +402,27 @@ impl ArchitecturalCausalGraph {
     pub fn analyze_bottleneck(&mut self, bottleneck: &Bottleneck) -> Result<CausalChain> {
         let mut chain = vec![bottleneck.component.clone()];
         let mut current = bottleneck.component.clone();
-        let mut explanation_parts = vec![
-            format!("Symptom: {} in {:?}", bottleneck.description, bottleneck.component)
-        ];
+        let mut explanation_parts = vec![format!(
+            "Symptom: {} in {:?}",
+            bottleneck.description, bottleneck.component
+        )];
 
         // Trace backwards through causal graph to find root cause
         for _depth in 0..5 {
             // Find incoming edges to current component
-            let incoming: Vec<&ArchitecturalEdge> = self.edges.iter()
-                .filter(|e| e.to == current)
-                .collect();
+            let incoming: Vec<&ArchitecturalEdge> =
+                self.edges.iter().filter(|e| e.to == current).collect();
 
             if incoming.is_empty() {
                 break; // Reached root cause
             }
 
             // Find strongest incoming edge, handling NaN values gracefully
-            let Some(strongest) = incoming.iter()
-                .max_by(|a, b| {
-                    a.strength
-                        .partial_cmp(&b.strength)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
-            else {
+            let Some(strongest) = incoming.iter().max_by(|a, b| {
+                a.strength
+                    .partial_cmp(&b.strength)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            }) else {
                 break; // No valid edges found (shouldn't happen if incoming is non-empty)
             };
 
@@ -400,9 +464,13 @@ impl ArchitecturalCausalGraph {
         let confidence = 0.7 + (chain.len() as f64 * 0.05).min(0.25); // Higher confidence for shorter chains
 
         let causal_chain = CausalChain {
-            id: format!("chain_{}_{}", bottleneck.id, Instant::now().elapsed().as_millis()),
+            id: format!(
+                "chain_{}_{}",
+                bottleneck.id,
+                Instant::now().elapsed().as_millis()
+            ),
             symptom: bottleneck.clone(),
-            chain,  // Move instead of clone - we don't need chain after this
+            chain, // Move instead of clone - we don't need chain after this
             root_cause,
             explanation: explanation_parts.join("\n"),
             confidence,
@@ -427,7 +495,8 @@ impl ArchitecturalCausalGraph {
 
     /// Get all components affected by a component
     pub fn get_downstream_components(&self, component: ComponentId) -> Vec<ComponentId> {
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter(|e| e.from == component)
             .map(|e| e.to.clone())
             .collect()
@@ -435,7 +504,8 @@ impl ArchitecturalCausalGraph {
 
     /// Get all components that affect a component
     pub fn get_upstream_components(&self, component: ComponentId) -> Vec<ComponentId> {
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter(|e| e.to == component)
             .map(|e| e.from.clone())
             .collect()
@@ -443,10 +513,7 @@ impl ArchitecturalCausalGraph {
 
     /// Get recent causal chains
     pub fn get_recent_chains(&self, limit: usize) -> Vec<&CausalChain> {
-        self.causal_chains.iter()
-            .rev()
-            .take(limit)
-            .collect()
+        self.causal_chains.iter().rev().take(limit).collect()
     }
 
     /// Get statistics

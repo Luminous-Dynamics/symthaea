@@ -116,25 +116,35 @@ impl NetworkClient {
 
         // Fetch from gateway
         let url = format!("{}/api/k-vectors", self.gateway_url);
-        let response = self.client.get(&url).send().await
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .await
             .map_err(|e| NetworkError::RequestFailed(e.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(NetworkError::RequestFailed(
-                format!("HTTP {}", response.status())
-            ));
+            return Err(NetworkError::RequestFailed(format!(
+                "HTTP {}",
+                response.status()
+            )));
         }
 
-        let api_response: ApiResponse<Vec<KVectorEntry>> = response.json().await
+        let api_response: ApiResponse<Vec<KVectorEntry>> = response
+            .json()
+            .await
             .map_err(|e| NetworkError::ParseError(e.to_string()))?;
 
         if !api_response.success {
             return Err(NetworkError::ApiError(
-                api_response.error.unwrap_or_else(|| "Unknown error".to_string())
+                api_response
+                    .error
+                    .unwrap_or_else(|| "Unknown error".to_string()),
             ));
         }
 
-        let k_vectors: Vec<NetworkKVector> = api_response.data
+        let k_vectors: Vec<NetworkKVector> = api_response
+            .data
             .unwrap_or_default()
             .into_iter()
             .map(|entry| NetworkKVector {
@@ -268,9 +278,7 @@ impl SpectralKComputer {
         }
 
         // Compute degree matrix
-        let degrees: Vec<f64> = adjacency.iter()
-            .map(|row| row.iter().sum())
-            .collect();
+        let degrees: Vec<f64> = adjacency.iter().map(|row| row.iter().sum()).collect();
 
         // Build Laplacian: L = D - A
         let mut laplacian = vec![vec![0.0f64; n]; n];
@@ -323,7 +331,11 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
         return 0.0;
     }
 
-    let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| (*x as f64) * (*y as f64)).sum();
+    let dot: f64 = a
+        .iter()
+        .zip(b.iter())
+        .map(|(x, y)| (*x as f64) * (*y as f64))
+        .sum();
     let norm_a: f64 = a.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
     let norm_b: f64 = b.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
 
@@ -430,7 +442,10 @@ impl MycelixNetworkBridge {
 
     /// Get network coherence (0-1 normalized)
     pub fn network_coherence(&self) -> f64 {
-        self.last_result.as_ref().map(|r| r.coherence).unwrap_or(0.0)
+        self.last_result
+            .as_ref()
+            .map(|r| r.coherence)
+            .unwrap_or(0.0)
     }
 
     /// Check if network is well-connected (coherence > threshold)

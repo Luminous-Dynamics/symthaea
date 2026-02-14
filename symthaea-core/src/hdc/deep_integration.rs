@@ -20,8 +20,8 @@
 //! ```
 
 use super::adaptive_topology::CognitiveMode;
-use super::unified_consciousness_engine::ConsciousnessDimensions;
 use super::topology_synergy::ConsciousnessState;
+use super::unified_consciousness_engine::ConsciousnessDimensions;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // RESONANCE MODE MAPPING
@@ -30,23 +30,30 @@ use super::topology_synergy::ConsciousnessState;
 /// Neural frequency bands (matching consciousness_resonance)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FrequencyBand {
-    Delta,      // 0.5-4 Hz: Deep sleep
-    Theta,      // 4-8 Hz: Memory, dreaming
-    Alpha,      // 8-12 Hz: Relaxed awareness
-    Beta,       // 12-30 Hz: Active thinking
-    Gamma,      // 30-100 Hz: Conscious binding
-    HighGamma,  // >100 Hz: Peak experience
+    Delta,     // 0.5-4 Hz: Deep sleep
+    Theta,     // 4-8 Hz: Memory, dreaming
+    Alpha,     // 8-12 Hz: Relaxed awareness
+    Beta,      // 12-30 Hz: Active thinking
+    Gamma,     // 30-100 Hz: Conscious binding
+    HighGamma, // >100 Hz: Peak experience
 }
 
 impl FrequencyBand {
     /// Map Φ value to dominant frequency band
     pub fn from_phi(phi: f64) -> Self {
-        if phi < 0.15 { FrequencyBand::Delta }
-        else if phi < 0.3 { FrequencyBand::Theta }
-        else if phi < 0.45 { FrequencyBand::Alpha }
-        else if phi < 0.55 { FrequencyBand::Beta }
-        else if phi < 0.7 { FrequencyBand::Gamma }
-        else { FrequencyBand::HighGamma }
+        if phi < 0.15 {
+            FrequencyBand::Delta
+        } else if phi < 0.3 {
+            FrequencyBand::Theta
+        } else if phi < 0.45 {
+            FrequencyBand::Alpha
+        } else if phi < 0.55 {
+            FrequencyBand::Beta
+        } else if phi < 0.7 {
+            FrequencyBand::Gamma
+        } else {
+            FrequencyBand::HighGamma
+        }
     }
 
     /// Get center frequency in Hz
@@ -65,12 +72,12 @@ impl FrequencyBand {
 /// Resonance modes (compatible with consciousness_resonance)
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ResonanceMode {
-    DeepSleep,   // Delta dominant
-    Dreaming,    // Theta-alpha
-    Relaxed,     // Alpha dominant
-    Focused,     // Beta dominant
-    Conscious,   // Gamma binding
-    Peak,        // High gamma
+    DeepSleep, // Delta dominant
+    Dreaming,  // Theta-alpha
+    Relaxed,   // Alpha dominant
+    Focused,   // Beta dominant
+    Conscious, // Gamma binding
+    Peak,      // High gamma
 }
 
 impl ResonanceMode {
@@ -134,7 +141,13 @@ impl FieldState {
         let stability = dims.temporal * dims.epistemic;
         let is_standing_wave = stability > 0.6 && dims.phi > 0.4;
 
-        Self { amplitude, phase, energy, stability, is_standing_wave }
+        Self {
+            amplitude,
+            phase,
+            energy,
+            stability,
+            is_standing_wave,
+        }
     }
 
     /// Is field in resonance?
@@ -158,18 +171,26 @@ pub struct PhiTracker {
 }
 
 impl PhiTracker {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Update with new Φ
     pub fn update(&mut self, phi: f64) {
         self.current = phi;
         self.history.push(phi);
-        if self.history.len() > 100 { self.history.remove(0); }
+        if self.history.len() > 100 {
+            self.history.remove(0);
+        }
 
         // Statistics
         if !self.history.is_empty() {
             self.mean = self.history.iter().sum::<f64>() / self.history.len() as f64;
-            let var: f64 = self.history.iter().map(|x| (x - self.mean).powi(2)).sum::<f64>()
+            let var: f64 = self
+                .history
+                .iter()
+                .map(|x| (x - self.mean).powi(2))
+                .sum::<f64>()
                 / self.history.len() as f64;
             self.std_dev = var.sqrt();
 
@@ -182,8 +203,12 @@ impl PhiTracker {
         }
     }
 
-    pub fn is_improving(&self) -> bool { self.trend > 0.01 }
-    pub fn is_stable(&self) -> bool { self.std_dev < 0.1 }
+    pub fn is_improving(&self) -> bool {
+        self.trend > 0.01
+    }
+    pub fn is_stable(&self) -> bool {
+        self.std_dev < 0.1
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -207,8 +232,11 @@ impl DeepIntegrationBridge {
             resonance: ResonanceMode::Conscious,
             frequency: FrequencyBand::Gamma,
             field: FieldState {
-                amplitude: 0.0, phase: 0.0, energy: 0.0,
-                stability: 0.0, is_standing_wave: false,
+                amplitude: 0.0,
+                phase: 0.0,
+                energy: 0.0,
+                stability: 0.0,
+                is_standing_wave: false,
             },
             phi_tracker: PhiTracker::new(),
             mode: CognitiveMode::Balanced,
@@ -218,7 +246,12 @@ impl DeepIntegrationBridge {
     }
 
     /// Update all integration state
-    pub fn update(&mut self, dims: &ConsciousnessDimensions, mode: CognitiveMode, state: ConsciousnessState) {
+    pub fn update(
+        &mut self,
+        dims: &ConsciousnessDimensions,
+        mode: CognitiveMode,
+        state: ConsciousnessState,
+    ) {
         self.step += 1;
         self.mode = mode;
         self.state = state;
@@ -231,7 +264,7 @@ impl DeepIntegrationBridge {
     /// Get recommended mode
     pub fn recommend_mode(&self) -> CognitiveMode {
         if self.phi_tracker.is_improving() {
-            self.mode  // Keep if improving
+            self.mode // Keep if improving
         } else if self.field.is_resonant() {
             CognitiveMode::GlobalAwareness
         } else if !self.phi_tracker.is_stable() {
@@ -243,9 +276,9 @@ impl DeepIntegrationBridge {
 
     /// Is system optimal?
     pub fn is_optimal(&self) -> bool {
-        self.phi_tracker.current > 0.4 &&
-        self.phi_tracker.is_stable() &&
-        self.field.is_standing_wave
+        self.phi_tracker.current > 0.4
+            && self.phi_tracker.is_stable()
+            && self.field.is_standing_wave
     }
 
     /// Generate report
@@ -258,17 +291,26 @@ impl DeepIntegrationBridge {
              │ Mode: {:?} → Recommended: {:?}                            \n\
              │ Optimal: {}                                               \n\
              └───────────────────────────────────────────────────────────┘",
-            self.resonance, self.frequency, self.frequency.center_hz(),
-            self.phi_tracker.current, self.phi_tracker.mean, self.phi_tracker.trend,
-            self.field.amplitude, self.field.stability, self.field.is_resonant(),
-            self.mode, self.recommend_mode(),
+            self.resonance,
+            self.frequency,
+            self.frequency.center_hz(),
+            self.phi_tracker.current,
+            self.phi_tracker.mean,
+            self.phi_tracker.trend,
+            self.field.amplitude,
+            self.field.stability,
+            self.field.is_resonant(),
+            self.mode,
+            self.recommend_mode(),
             self.is_optimal()
         )
     }
 }
 
 impl Default for DeepIntegrationBridge {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -302,10 +344,19 @@ mod tests {
     fn test_integration_bridge() {
         let mut bridge = DeepIntegrationBridge::new();
         let dims = ConsciousnessDimensions {
-            phi: 0.55, workspace: 0.5, attention: 0.6,
-            recursion: 0.4, efficacy: 0.7, epistemic: 0.8, temporal: 0.9,
+            phi: 0.55,
+            workspace: 0.5,
+            attention: 0.6,
+            recursion: 0.4,
+            efficacy: 0.7,
+            epistemic: 0.8,
+            temporal: 0.9,
         };
-        bridge.update(&dims, CognitiveMode::Balanced, ConsciousnessState::FlowState);
+        bridge.update(
+            &dims,
+            CognitiveMode::Balanced,
+            ConsciousnessState::FlowState,
+        );
         let report = bridge.report();
         println!("{}", report);
 

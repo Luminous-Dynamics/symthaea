@@ -3,15 +3,15 @@
 //! Provides mechanisms for evolving concepts and knowledge structures
 //! over time through learning and adaptation.
 
+use crate::consciousness::epistemic_tiers::EpistemicCoordinate;
+use crate::hdc::BinaryHV;
+use anyhow::Result;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use symthaea_core::genesis::{GenesisSeed, ShakeRng};
-use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::primitive_system::PrimitiveTier;
-use crate::hdc::BinaryHV;
-use crate::consciousness::epistemic_tiers::EpistemicCoordinate;
-use anyhow::Result;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Configuration for the primitive evolver
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -272,7 +272,11 @@ impl PrimitiveEvolver {
         // Keep best individuals (elitism)
         let elite_count = (self.config.population_size as f32 * 0.1) as usize;
         let mut sorted: Vec<_> = self.population.values().cloned().collect();
-        sorted.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|a, b| {
+            b.fitness
+                .partial_cmp(&a.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         for concept in sorted.iter().take(elite_count) {
             new_population.insert(concept.id, concept.clone());
@@ -309,7 +313,11 @@ impl PrimitiveEvolver {
     /// Select individuals for reproduction
     fn select(&mut self) -> Vec<EvolvingConcept> {
         let mut candidates: Vec<_> = self.population.values().cloned().collect();
-        candidates.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.sort_by(|a, b| {
+            b.fitness
+                .partial_cmp(&a.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Tournament selection
         let tournament_size = 3;
@@ -340,7 +348,9 @@ impl PrimitiveEvolver {
     {
         self.stats.total_evolutions += 1;
 
-        let initial_best = self.population.values()
+        let initial_best = self
+            .population
+            .values()
             .map(|c| c.fitness)
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or(0.0);
@@ -353,7 +363,9 @@ impl PrimitiveEvolver {
         for _ in 0..self.config.generations {
             self.evolve_generation(fitness_fn);
 
-            let current_best = self.population.values()
+            let current_best = self
+                .population
+                .values()
                 .map(|c| c.fitness)
                 .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                 .unwrap_or(0.0);
@@ -370,7 +382,9 @@ impl PrimitiveEvolver {
             prev_best = current_best;
         }
 
-        let final_best = self.population.values()
+        let final_best = self
+            .population
+            .values()
             .map(|c| c.fitness)
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or(0.0);
@@ -388,7 +402,9 @@ impl PrimitiveEvolver {
     fn record_snapshot(&mut self) {
         let fitnesses: Vec<f64> = self.population.values().map(|c| c.fitness).collect();
 
-        let best = fitnesses.iter().copied()
+        let best = fitnesses
+            .iter()
+            .copied()
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or(0.0);
 
@@ -440,8 +456,11 @@ impl PrimitiveEvolver {
 
     /// Get best concept
     pub fn best(&self) -> Option<&EvolvingConcept> {
-        self.population.values()
-            .max_by(|a, b| a.fitness.partial_cmp(&b.fitness).unwrap_or(std::cmp::Ordering::Equal))
+        self.population.values().max_by(|a, b| {
+            a.fitness
+                .partial_cmp(&b.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// Get statistics
@@ -563,7 +582,9 @@ impl CandidatePrimitive {
     ///
     /// Uses BinaryHV::add_noise to flip bits proportional to `mutation_rate`.
     pub fn mutate(&self, mutation_rate: f64, generation: usize) -> Self {
-        let encoding = self.encoding.add_noise(mutation_rate as f32, generation as u64);
+        let encoding = self
+            .encoding
+            .add_noise(mutation_rate as f32, generation as u64);
         Self {
             name: format!("{}_mut_g{}", self.name, generation),
             tier: self.tier,
@@ -581,7 +602,11 @@ impl CandidatePrimitive {
         let b2 = &parent2.encoding.0;
         let mut child_bytes = [0u8; BinaryHV::BYTES];
         for i in 0..BinaryHV::BYTES {
-            child_bytes[i] = if (i + generation).is_multiple_of(2) { b1[i] } else { b2[i] };
+            child_bytes[i] = if (i + generation).is_multiple_of(2) {
+                b1[i]
+            } else {
+                b2[i]
+            };
         }
         Self {
             name: format!("cross_g{}", generation),
@@ -650,7 +675,11 @@ impl PrimitiveEvolution {
     }
 
     /// Create a new evolution system with deterministic RNG from a genesis seed.
-    pub fn from_genesis(config: EvolutionConfig, genesis: &GenesisSeed, label: &str) -> Result<Self> {
+    pub fn from_genesis(
+        config: EvolutionConfig,
+        genesis: &GenesisSeed,
+        label: &str,
+    ) -> Result<Self> {
         let mut system = Self {
             config,
             population: Vec::new(),
@@ -697,7 +726,9 @@ impl PrimitiveEvolution {
 
             // Sort by fitness (descending)
             self.population.sort_by(|a, b| {
-                b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal)
+                b.fitness
+                    .partial_cmp(&a.fitness)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
 
             let best_fitness = self.population.first().map(|c| c.fitness).unwrap_or(0.0);
@@ -764,7 +795,8 @@ impl PrimitiveEvolution {
     /// Perform one generation of evolution
     fn evolve_generation(&mut self) {
         // Keep elite individuals
-        let mut new_population: Vec<CandidatePrimitive> = self.population
+        let mut new_population: Vec<CandidatePrimitive> = self
+            .population
             .iter()
             .take(self.config.elitism_count)
             .cloned()

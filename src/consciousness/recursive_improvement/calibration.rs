@@ -755,7 +755,7 @@ mod tests {
     fn test_confidence_adjustment() {
         let config = CalibrationConfig {
             rolling_window: 10,
-            adjustment_rate: 0.5, // Faster adjustment for test
+            adjustment_rate: 0.5,       // Faster adjustment for test
             min_predictions_for_ece: 5, // Lower threshold so adjustment kicks in
             ..Default::default()
         };

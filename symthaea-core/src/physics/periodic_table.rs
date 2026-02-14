@@ -36,10 +36,10 @@
 //! sim(C-12, N-14) < 0.8   // Different elements are less similar
 //! ```
 
-use crate::genesis::GenesisSeed;
-use crate::hdc::unified_hv::ContinuousHV;
 use super::hadrons::Hadrons;
 use super::standard_model::{StandardModel, PHYSICS_DIM};
+use crate::genesis::GenesisSeed;
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::Serialize;
 
 /// Element data (basic properties)
@@ -48,8 +48,8 @@ pub struct ElementData {
     pub symbol: &'static str,
     pub name: &'static str,
     pub atomic_number: u8,
-    pub standard_neutrons: u8, // Most common isotope
-    pub atomic_mass: f32,      // In atomic mass units
+    pub standard_neutrons: u8,          // Most common isotope
+    pub atomic_mass: f32,               // In atomic mass units
     pub electronegativity: Option<f32>, // Pauling scale
     pub group: u8,
     pub period: u8,
@@ -161,9 +161,8 @@ impl ElementDataExtended {
 /// Data from NIST and periodic table reference sources
 const ELEMENT_PHYSICAL_PROPERTIES: [(Option<f32>, Option<f32>, Option<f32>); 118] = [
     // Period 1
-    (Some(1312.0), Some(53.0), Some(73.0)),   // H (1)
-    (Some(2372.0), Some(31.0), Some(-48.0)),  // He (2) - negative EA (endothermic)
-
+    (Some(1312.0), Some(53.0), Some(73.0)),  // H (1)
+    (Some(2372.0), Some(31.0), Some(-48.0)), // He (2) - negative EA (endothermic)
     // Period 2
     (Some(520.0), Some(167.0), Some(60.0)),   // Li (3)
     (Some(900.0), Some(112.0), Some(-48.0)),  // Be (4)
@@ -173,7 +172,6 @@ const ELEMENT_PHYSICAL_PROPERTIES: [(Option<f32>, Option<f32>, Option<f32>); 118
     (Some(1314.0), Some(73.0), Some(141.0)),  // O (8)
     (Some(1681.0), Some(71.0), Some(328.0)),  // F (9) - highest EA
     (Some(2081.0), Some(69.0), Some(-116.0)), // Ne (10)
-
     // Period 3
     (Some(496.0), Some(190.0), Some(53.0)),   // Na (11)
     (Some(738.0), Some(145.0), Some(-40.0)),  // Mg (12)
@@ -183,27 +181,25 @@ const ELEMENT_PHYSICAL_PROPERTIES: [(Option<f32>, Option<f32>, Option<f32>); 118
     (Some(1000.0), Some(102.0), Some(200.0)), // S (16)
     (Some(1251.0), Some(99.0), Some(349.0)),  // Cl (17) - highest EA among common elements
     (Some(1521.0), Some(97.0), Some(-96.0)),  // Ar (18)
-
     // Period 4
-    (Some(419.0), Some(243.0), Some(48.0)),   // K (19) - very low IE
-    (Some(590.0), Some(194.0), Some(2.0)),    // Ca (20)
-    (Some(633.0), Some(184.0), Some(18.0)),   // Sc (21)
-    (Some(659.0), Some(176.0), Some(8.0)),    // Ti (22)
-    (Some(651.0), Some(171.0), Some(51.0)),   // V (23)
-    (Some(653.0), Some(166.0), Some(65.0)),   // Cr (24)
-    (Some(717.0), Some(161.0), Some(-50.0)),  // Mn (25)
-    (Some(763.0), Some(156.0), Some(15.0)),   // Fe (26)
-    (Some(760.0), Some(152.0), Some(64.0)),   // Co (27)
-    (Some(737.0), Some(149.0), Some(112.0)),  // Ni (28)
-    (Some(745.0), Some(145.0), Some(119.0)),  // Cu (29)
-    (Some(906.0), Some(142.0), Some(-58.0)),  // Zn (30)
-    (Some(579.0), Some(136.0), Some(29.0)),   // Ga (31)
-    (Some(762.0), Some(125.0), Some(119.0)),  // Ge (32)
-    (Some(947.0), Some(114.0), Some(78.0)),   // As (33)
-    (Some(941.0), Some(103.0), Some(195.0)),  // Se (34)
-    (Some(1140.0), Some(94.0), Some(325.0)),  // Br (35)
-    (Some(1351.0), Some(88.0), Some(-96.0)),  // Kr (36)
-
+    (Some(419.0), Some(243.0), Some(48.0)), // K (19) - very low IE
+    (Some(590.0), Some(194.0), Some(2.0)),  // Ca (20)
+    (Some(633.0), Some(184.0), Some(18.0)), // Sc (21)
+    (Some(659.0), Some(176.0), Some(8.0)),  // Ti (22)
+    (Some(651.0), Some(171.0), Some(51.0)), // V (23)
+    (Some(653.0), Some(166.0), Some(65.0)), // Cr (24)
+    (Some(717.0), Some(161.0), Some(-50.0)), // Mn (25)
+    (Some(763.0), Some(156.0), Some(15.0)), // Fe (26)
+    (Some(760.0), Some(152.0), Some(64.0)), // Co (27)
+    (Some(737.0), Some(149.0), Some(112.0)), // Ni (28)
+    (Some(745.0), Some(145.0), Some(119.0)), // Cu (29)
+    (Some(906.0), Some(142.0), Some(-58.0)), // Zn (30)
+    (Some(579.0), Some(136.0), Some(29.0)), // Ga (31)
+    (Some(762.0), Some(125.0), Some(119.0)), // Ge (32)
+    (Some(947.0), Some(114.0), Some(78.0)), // As (33)
+    (Some(941.0), Some(103.0), Some(195.0)), // Se (34)
+    (Some(1140.0), Some(94.0), Some(325.0)), // Br (35)
+    (Some(1351.0), Some(88.0), Some(-96.0)), // Kr (36)
     // Period 5
     (Some(403.0), Some(265.0), Some(47.0)),   // Rb (37)
     (Some(550.0), Some(219.0), Some(5.0)),    // Sr (38)
@@ -223,26 +219,25 @@ const ELEMENT_PHYSICAL_PROPERTIES: [(Option<f32>, Option<f32>, Option<f32>); 118
     (Some(869.0), Some(123.0), Some(190.0)),  // Te (52)
     (Some(1008.0), Some(115.0), Some(295.0)), // I (53)
     (Some(1170.0), Some(108.0), Some(-77.0)), // Xe (54)
-
     // Period 6
-    (Some(376.0), Some(298.0), Some(46.0)),   // Cs (55) - lowest IE
-    (Some(503.0), Some(253.0), Some(14.0)),   // Ba (56)
+    (Some(376.0), Some(298.0), Some(46.0)), // Cs (55) - lowest IE
+    (Some(503.0), Some(253.0), Some(14.0)), // Ba (56)
     // Lanthanides (La-Lu, 57-71)
-    (Some(538.0), Some(195.0), Some(48.0)),   // La (57)
-    (Some(534.0), Some(185.0), Some(50.0)),   // Ce (58)
-    (Some(527.0), Some(247.0), Some(50.0)),   // Pr (59)
-    (Some(533.0), Some(206.0), Some(50.0)),   // Nd (60)
-    (Some(540.0), Some(205.0), Some(50.0)),   // Pm (61)
-    (Some(545.0), Some(238.0), Some(50.0)),   // Sm (62)
-    (Some(547.0), Some(231.0), Some(50.0)),   // Eu (63)
-    (Some(593.0), Some(233.0), Some(50.0)),   // Gd (64)
-    (Some(566.0), Some(225.0), Some(50.0)),   // Tb (65)
-    (Some(573.0), Some(228.0), Some(50.0)),   // Dy (66)
-    (Some(581.0), Some(226.0), Some(50.0)),   // Ho (67)
-    (Some(589.0), Some(226.0), Some(50.0)),   // Er (68)
-    (Some(597.0), Some(222.0), Some(50.0)),   // Tm (69)
-    (Some(603.0), Some(222.0), Some(50.0)),   // Yb (70)
-    (Some(524.0), Some(217.0), Some(50.0)),   // Lu (71)
+    (Some(538.0), Some(195.0), Some(48.0)), // La (57)
+    (Some(534.0), Some(185.0), Some(50.0)), // Ce (58)
+    (Some(527.0), Some(247.0), Some(50.0)), // Pr (59)
+    (Some(533.0), Some(206.0), Some(50.0)), // Nd (60)
+    (Some(540.0), Some(205.0), Some(50.0)), // Pm (61)
+    (Some(545.0), Some(238.0), Some(50.0)), // Sm (62)
+    (Some(547.0), Some(231.0), Some(50.0)), // Eu (63)
+    (Some(593.0), Some(233.0), Some(50.0)), // Gd (64)
+    (Some(566.0), Some(225.0), Some(50.0)), // Tb (65)
+    (Some(573.0), Some(228.0), Some(50.0)), // Dy (66)
+    (Some(581.0), Some(226.0), Some(50.0)), // Ho (67)
+    (Some(589.0), Some(226.0), Some(50.0)), // Er (68)
+    (Some(597.0), Some(222.0), Some(50.0)), // Tm (69)
+    (Some(603.0), Some(222.0), Some(50.0)), // Yb (70)
+    (Some(524.0), Some(217.0), Some(50.0)), // Lu (71)
     // Continue Period 6
     (Some(659.0), Some(208.0), Some(0.0)),    // Hf (72)
     (Some(761.0), Some(200.0), Some(31.0)),   // Ta (73)
@@ -259,10 +254,9 @@ const ELEMENT_PHYSICAL_PROPERTIES: [(Option<f32>, Option<f32>, Option<f32>); 118
     (Some(812.0), Some(135.0), Some(183.0)),  // Po (84)
     (Some(920.0), Some(127.0), Some(270.0)),  // At (85)
     (Some(1037.0), Some(120.0), Some(-68.0)), // Rn (86)
-
     // Period 7
-    (Some(380.0), Some(348.0), Some(44.0)),   // Fr (87)
-    (Some(509.0), Some(283.0), Some(10.0)),   // Ra (88)
+    (Some(380.0), Some(348.0), Some(44.0)), // Fr (87)
+    (Some(509.0), Some(283.0), Some(10.0)), // Ra (88)
     // Actinides (Ac-Lr, 89-103)
     (Some(499.0), Some(260.0), Some(34.0)),   // Ac (89)
     (Some(587.0), Some(237.0), Some(113.0)),  // Th (90)
@@ -280,21 +274,21 @@ const ELEMENT_PHYSICAL_PROPERTIES: [(Option<f32>, Option<f32>, Option<f32>); 118
     (Some(642.0), Some(245.0), Some(-223.0)), // No (102)
     (Some(470.0), Some(245.0), Some(-30.0)),  // Lr (103)
     // Superheavy elements (Rf-Og, 104-118) - theoretical/estimated values
-    (None, None, None),  // Rf (104)
-    (None, None, None),  // Db (105)
-    (None, None, None),  // Sg (106)
-    (None, None, None),  // Bh (107)
-    (None, None, None),  // Hs (108)
-    (None, None, None),  // Mt (109)
-    (None, None, None),  // Ds (110)
-    (None, None, None),  // Rg (111)
-    (None, None, None),  // Cn (112)
-    (None, None, None),  // Nh (113)
-    (None, None, None),  // Fl (114)
-    (None, None, None),  // Mc (115)
-    (None, None, None),  // Lv (116)
-    (None, None, None),  // Ts (117)
-    (None, None, None),  // Og (118)
+    (None, None, None), // Rf (104)
+    (None, None, None), // Db (105)
+    (None, None, None), // Sg (106)
+    (None, None, None), // Bh (107)
+    (None, None, None), // Hs (108)
+    (None, None, None), // Mt (109)
+    (None, None, None), // Ds (110)
+    (None, None, None), // Rg (111)
+    (None, None, None), // Cn (112)
+    (None, None, None), // Nh (113)
+    (None, None, None), // Fl (114)
+    (None, None, None), // Mc (115)
+    (None, None, None), // Lv (116)
+    (None, None, None), // Ts (117)
+    (None, None, None), // Og (118)
 ];
 
 /// Thermodynamic property data for elements 1-118
@@ -302,136 +296,130 @@ const ELEMENT_PHYSICAL_PROPERTIES: [(Option<f32>, Option<f32>, Option<f32>); 118
 /// Data from NIST, CRC Handbook, and periodic table reference sources
 const ELEMENT_THERMODYNAMIC_PROPERTIES: [(Option<f32>, Option<f32>, Option<f32>); 118] = [
     // Period 1
-    (Some(14.01), Some(20.28), Some(0.00009)),   // H (1)
-    (Some(0.95), Some(4.22), Some(0.00018)),     // He (2)
-
+    (Some(14.01), Some(20.28), Some(0.00009)), // H (1)
+    (Some(0.95), Some(4.22), Some(0.00018)),   // He (2)
     // Period 2
-    (Some(453.7), Some(1615.0), Some(0.534)),    // Li (3)
-    (Some(1560.0), Some(2744.0), Some(1.85)),    // Be (4)
-    (Some(2349.0), Some(4200.0), Some(2.34)),    // B (5)
-    (Some(3823.0), Some(4098.0), Some(2.27)),    // C (6) - graphite sublimes
-    (Some(63.15), Some(77.36), Some(0.00125)),   // N (7)
-    (Some(54.36), Some(90.20), Some(0.00143)),   // O (8)
-    (Some(53.53), Some(85.03), Some(0.0017)),    // F (9)
-    (Some(24.56), Some(27.07), Some(0.0009)),    // Ne (10)
-
+    (Some(453.7), Some(1615.0), Some(0.534)),  // Li (3)
+    (Some(1560.0), Some(2744.0), Some(1.85)),  // Be (4)
+    (Some(2349.0), Some(4200.0), Some(2.34)),  // B (5)
+    (Some(3823.0), Some(4098.0), Some(2.27)),  // C (6) - graphite sublimes
+    (Some(63.15), Some(77.36), Some(0.00125)), // N (7)
+    (Some(54.36), Some(90.20), Some(0.00143)), // O (8)
+    (Some(53.53), Some(85.03), Some(0.0017)),  // F (9)
+    (Some(24.56), Some(27.07), Some(0.0009)),  // Ne (10)
     // Period 3
-    (Some(370.9), Some(1156.0), Some(0.97)),     // Na (11)
-    (Some(923.0), Some(1363.0), Some(1.74)),     // Mg (12)
-    (Some(933.5), Some(2792.0), Some(2.70)),     // Al (13)
-    (Some(1687.0), Some(3538.0), Some(2.33)),    // Si (14)
-    (Some(317.3), Some(553.7), Some(1.82)),      // P (15) - white
-    (Some(388.4), Some(717.8), Some(2.07)),      // S (16)
-    (Some(171.6), Some(239.1), Some(0.0032)),    // Cl (17)
-    (Some(83.80), Some(87.30), Some(0.0018)),    // Ar (18)
-
+    (Some(370.9), Some(1156.0), Some(0.97)),  // Na (11)
+    (Some(923.0), Some(1363.0), Some(1.74)),  // Mg (12)
+    (Some(933.5), Some(2792.0), Some(2.70)),  // Al (13)
+    (Some(1687.0), Some(3538.0), Some(2.33)), // Si (14)
+    (Some(317.3), Some(553.7), Some(1.82)),   // P (15) - white
+    (Some(388.4), Some(717.8), Some(2.07)),   // S (16)
+    (Some(171.6), Some(239.1), Some(0.0032)), // Cl (17)
+    (Some(83.80), Some(87.30), Some(0.0018)), // Ar (18)
     // Period 4
-    (Some(336.5), Some(1032.0), Some(0.86)),     // K (19)
-    (Some(1115.0), Some(1757.0), Some(1.54)),    // Ca (20)
-    (Some(1814.0), Some(3109.0), Some(2.99)),    // Sc (21)
-    (Some(1941.0), Some(3560.0), Some(4.51)),    // Ti (22)
-    (Some(2183.0), Some(3680.0), Some(6.00)),    // V (23)
-    (Some(2180.0), Some(2944.0), Some(7.15)),    // Cr (24)
-    (Some(1519.0), Some(2334.0), Some(7.44)),    // Mn (25)
-    (Some(1811.0), Some(3134.0), Some(7.87)),    // Fe (26)
-    (Some(1768.0), Some(3200.0), Some(8.90)),    // Co (27)
-    (Some(1728.0), Some(3186.0), Some(8.91)),    // Ni (28)
-    (Some(1357.8), Some(2835.0), Some(8.96)),    // Cu (29)
-    (Some(692.7), Some(1180.0), Some(7.13)),     // Zn (30)
-    (Some(302.9), Some(2477.0), Some(5.91)),     // Ga (31)
-    (Some(1211.4), Some(3106.0), Some(5.32)),    // Ge (32)
-    (Some(1090.0), Some(887.0), Some(5.73)),     // As (33) - sublimes
-    (Some(494.0), Some(958.0), Some(4.81)),      // Se (34)
-    (Some(266.0), Some(332.0), Some(3.12)),      // Br (35)
-    (Some(115.8), Some(119.9), Some(0.0037)),    // Kr (36)
-
+    (Some(336.5), Some(1032.0), Some(0.86)),  // K (19)
+    (Some(1115.0), Some(1757.0), Some(1.54)), // Ca (20)
+    (Some(1814.0), Some(3109.0), Some(2.99)), // Sc (21)
+    (Some(1941.0), Some(3560.0), Some(4.51)), // Ti (22)
+    (Some(2183.0), Some(3680.0), Some(6.00)), // V (23)
+    (Some(2180.0), Some(2944.0), Some(7.15)), // Cr (24)
+    (Some(1519.0), Some(2334.0), Some(7.44)), // Mn (25)
+    (Some(1811.0), Some(3134.0), Some(7.87)), // Fe (26)
+    (Some(1768.0), Some(3200.0), Some(8.90)), // Co (27)
+    (Some(1728.0), Some(3186.0), Some(8.91)), // Ni (28)
+    (Some(1357.8), Some(2835.0), Some(8.96)), // Cu (29)
+    (Some(692.7), Some(1180.0), Some(7.13)),  // Zn (30)
+    (Some(302.9), Some(2477.0), Some(5.91)),  // Ga (31)
+    (Some(1211.4), Some(3106.0), Some(5.32)), // Ge (32)
+    (Some(1090.0), Some(887.0), Some(5.73)),  // As (33) - sublimes
+    (Some(494.0), Some(958.0), Some(4.81)),   // Se (34)
+    (Some(266.0), Some(332.0), Some(3.12)),   // Br (35)
+    (Some(115.8), Some(119.9), Some(0.0037)), // Kr (36)
     // Period 5
-    (Some(312.5), Some(961.0), Some(1.53)),      // Rb (37)
-    (Some(1050.0), Some(1655.0), Some(2.64)),    // Sr (38)
-    (Some(1799.0), Some(3609.0), Some(4.47)),    // Y (39)
-    (Some(2128.0), Some(4682.0), Some(6.52)),    // Zr (40)
-    (Some(2750.0), Some(5017.0), Some(8.57)),    // Nb (41)
-    (Some(2896.0), Some(4912.0), Some(10.22)),   // Mo (42)
-    (Some(2430.0), Some(4538.0), Some(11.0)),    // Tc (43)
-    (Some(2607.0), Some(4423.0), Some(12.1)),    // Ru (44)
-    (Some(2237.0), Some(3968.0), Some(12.4)),    // Rh (45)
-    (Some(1828.0), Some(3236.0), Some(12.0)),    // Pd (46)
-    (Some(1234.9), Some(2435.0), Some(10.5)),    // Ag (47)
-    (Some(594.2), Some(1040.0), Some(8.69)),     // Cd (48)
-    (Some(429.7), Some(2345.0), Some(7.31)),     // In (49)
-    (Some(505.1), Some(2875.0), Some(7.29)),     // Sn (50)
-    (Some(903.8), Some(1860.0), Some(6.68)),     // Sb (51)
-    (Some(722.7), Some(1261.0), Some(6.24)),     // Te (52)
-    (Some(386.9), Some(457.5), Some(4.93)),      // I (53)
-    (Some(161.4), Some(165.1), Some(0.0059)),    // Xe (54)
-
+    (Some(312.5), Some(961.0), Some(1.53)),    // Rb (37)
+    (Some(1050.0), Some(1655.0), Some(2.64)),  // Sr (38)
+    (Some(1799.0), Some(3609.0), Some(4.47)),  // Y (39)
+    (Some(2128.0), Some(4682.0), Some(6.52)),  // Zr (40)
+    (Some(2750.0), Some(5017.0), Some(8.57)),  // Nb (41)
+    (Some(2896.0), Some(4912.0), Some(10.22)), // Mo (42)
+    (Some(2430.0), Some(4538.0), Some(11.0)),  // Tc (43)
+    (Some(2607.0), Some(4423.0), Some(12.1)),  // Ru (44)
+    (Some(2237.0), Some(3968.0), Some(12.4)),  // Rh (45)
+    (Some(1828.0), Some(3236.0), Some(12.0)),  // Pd (46)
+    (Some(1234.9), Some(2435.0), Some(10.5)),  // Ag (47)
+    (Some(594.2), Some(1040.0), Some(8.69)),   // Cd (48)
+    (Some(429.7), Some(2345.0), Some(7.31)),   // In (49)
+    (Some(505.1), Some(2875.0), Some(7.29)),   // Sn (50)
+    (Some(903.8), Some(1860.0), Some(6.68)),   // Sb (51)
+    (Some(722.7), Some(1261.0), Some(6.24)),   // Te (52)
+    (Some(386.9), Some(457.5), Some(4.93)),    // I (53)
+    (Some(161.4), Some(165.1), Some(0.0059)),  // Xe (54)
     // Period 6
-    (Some(301.7), Some(944.0), Some(1.93)),      // Cs (55)
-    (Some(1000.0), Some(2170.0), Some(3.62)),    // Ba (56)
-    (Some(1193.0), Some(3737.0), Some(6.15)),    // La (57)
-    (Some(1068.0), Some(3716.0), Some(6.77)),    // Ce (58)
-    (Some(1208.0), Some(3793.0), Some(6.77)),    // Pr (59)
-    (Some(1297.0), Some(3347.0), Some(7.01)),    // Nd (60)
-    (Some(1315.0), Some(3273.0), Some(7.26)),    // Pm (61)
-    (Some(1345.0), Some(2067.0), Some(7.52)),    // Sm (62)
-    (Some(1099.0), Some(1802.0), Some(5.24)),    // Eu (63)
-    (Some(1585.0), Some(3546.0), Some(7.90)),    // Gd (64)
-    (Some(1629.0), Some(3503.0), Some(8.23)),    // Tb (65)
-    (Some(1680.0), Some(2840.0), Some(8.55)),    // Dy (66)
-    (Some(1734.0), Some(2993.0), Some(8.80)),    // Ho (67)
-    (Some(1802.0), Some(3141.0), Some(9.07)),    // Er (68)
-    (Some(1818.0), Some(2223.0), Some(9.32)),    // Tm (69)
-    (Some(1097.0), Some(1469.0), Some(6.90)),    // Yb (70)
-    (Some(1925.0), Some(3675.0), Some(9.84)),    // Lu (71)
-    (Some(2506.0), Some(4876.0), Some(13.3)),    // Hf (72)
-    (Some(3290.0), Some(5731.0), Some(16.4)),    // Ta (73)
-    (Some(3695.0), Some(5828.0), Some(19.3)),    // W (74)
-    (Some(3459.0), Some(5869.0), Some(20.8)),    // Re (75)
-    (Some(3306.0), Some(5285.0), Some(22.6)),    // Os (76)
-    (Some(2719.0), Some(4701.0), Some(22.4)),    // Ir (77)
-    (Some(2041.0), Some(4098.0), Some(21.5)),    // Pt (78)
-    (Some(1337.3), Some(3129.0), Some(19.3)),    // Au (79)
-    (Some(234.3), Some(629.9), Some(13.5)),      // Hg (80)
-    (Some(577.0), Some(1746.0), Some(11.8)),     // Tl (81)
-    (Some(600.6), Some(2022.0), Some(11.3)),     // Pb (82)
-    (Some(544.6), Some(1837.0), Some(9.79)),     // Bi (83)
-    (Some(527.0), Some(1235.0), Some(9.20)),     // Po (84)
-    (Some(575.0), Some(610.0), Some(7.0)),       // At (85) - estimated
-    (Some(202.0), Some(211.5), Some(0.0097)),    // Rn (86)
-
+    (Some(301.7), Some(944.0), Some(1.93)),   // Cs (55)
+    (Some(1000.0), Some(2170.0), Some(3.62)), // Ba (56)
+    (Some(1193.0), Some(3737.0), Some(6.15)), // La (57)
+    (Some(1068.0), Some(3716.0), Some(6.77)), // Ce (58)
+    (Some(1208.0), Some(3793.0), Some(6.77)), // Pr (59)
+    (Some(1297.0), Some(3347.0), Some(7.01)), // Nd (60)
+    (Some(1315.0), Some(3273.0), Some(7.26)), // Pm (61)
+    (Some(1345.0), Some(2067.0), Some(7.52)), // Sm (62)
+    (Some(1099.0), Some(1802.0), Some(5.24)), // Eu (63)
+    (Some(1585.0), Some(3546.0), Some(7.90)), // Gd (64)
+    (Some(1629.0), Some(3503.0), Some(8.23)), // Tb (65)
+    (Some(1680.0), Some(2840.0), Some(8.55)), // Dy (66)
+    (Some(1734.0), Some(2993.0), Some(8.80)), // Ho (67)
+    (Some(1802.0), Some(3141.0), Some(9.07)), // Er (68)
+    (Some(1818.0), Some(2223.0), Some(9.32)), // Tm (69)
+    (Some(1097.0), Some(1469.0), Some(6.90)), // Yb (70)
+    (Some(1925.0), Some(3675.0), Some(9.84)), // Lu (71)
+    (Some(2506.0), Some(4876.0), Some(13.3)), // Hf (72)
+    (Some(3290.0), Some(5731.0), Some(16.4)), // Ta (73)
+    (Some(3695.0), Some(5828.0), Some(19.3)), // W (74)
+    (Some(3459.0), Some(5869.0), Some(20.8)), // Re (75)
+    (Some(3306.0), Some(5285.0), Some(22.6)), // Os (76)
+    (Some(2719.0), Some(4701.0), Some(22.4)), // Ir (77)
+    (Some(2041.0), Some(4098.0), Some(21.5)), // Pt (78)
+    (Some(1337.3), Some(3129.0), Some(19.3)), // Au (79)
+    (Some(234.3), Some(629.9), Some(13.5)),   // Hg (80)
+    (Some(577.0), Some(1746.0), Some(11.8)),  // Tl (81)
+    (Some(600.6), Some(2022.0), Some(11.3)),  // Pb (82)
+    (Some(544.6), Some(1837.0), Some(9.79)),  // Bi (83)
+    (Some(527.0), Some(1235.0), Some(9.20)),  // Po (84)
+    (Some(575.0), Some(610.0), Some(7.0)),    // At (85) - estimated
+    (Some(202.0), Some(211.5), Some(0.0097)), // Rn (86)
     // Period 7
-    (Some(300.0), Some(950.0), Some(1.87)),      // Fr (87) - estimated
-    (Some(973.0), Some(2010.0), Some(5.0)),      // Ra (88)
-    (Some(1323.0), Some(3471.0), Some(10.1)),    // Ac (89)
-    (Some(2115.0), Some(5061.0), Some(11.7)),    // Th (90)
-    (Some(1841.0), Some(4300.0), Some(15.4)),    // Pa (91)
-    (Some(1405.3), Some(4404.0), Some(19.1)),    // U (92)
-    (Some(917.0), Some(4273.0), Some(20.2)),     // Np (93)
-    (Some(912.5), Some(3501.0), Some(19.8)),     // Pu (94)
-    (Some(1449.0), Some(2880.0), Some(12.0)),    // Am (95)
-    (Some(1613.0), Some(3383.0), Some(13.5)),    // Cm (96)
-    (Some(1259.0), Some(2900.0), Some(14.8)),    // Bk (97)
-    (Some(1173.0), Some(1743.0), Some(15.1)),    // Cf (98)
-    (Some(1133.0), Some(1269.0), Some(8.84)),    // Es (99)
-    (Some(1800.0), None, Some(9.7)),             // Fm (100)
-    (Some(1100.0), None, Some(10.3)),            // Md (101)
-    (Some(1100.0), None, Some(9.9)),             // No (102)
-    (Some(1900.0), None, Some(15.6)),            // Lr (103)
-    (None, None, Some(23.2)),                    // Rf (104) - predicted
-    (None, None, Some(29.3)),                    // Db (105) - predicted
-    (None, None, Some(35.0)),                    // Sg (106) - predicted
-    (None, None, Some(37.1)),                    // Bh (107) - predicted
-    (None, None, Some(40.7)),                    // Hs (108) - predicted
-    (None, None, Some(37.4)),                    // Mt (109) - predicted
-    (None, None, Some(34.8)),                    // Ds (110) - predicted
-    (None, None, Some(28.7)),                    // Rg (111) - predicted
-    (None, None, Some(23.7)),                    // Cn (112) - predicted
-    (None, None, Some(16.0)),                    // Nh (113) - predicted
-    (None, None, Some(14.0)),                    // Fl (114) - predicted
-    (None, None, Some(13.5)),                    // Mc (115) - predicted
-    (None, None, Some(12.9)),                    // Lv (116) - predicted
-    (None, None, Some(7.2)),                     // Ts (117) - predicted
-    (None, None, Some(5.0)),                     // Og (118) - predicted
+    (Some(300.0), Some(950.0), Some(1.87)), // Fr (87) - estimated
+    (Some(973.0), Some(2010.0), Some(5.0)), // Ra (88)
+    (Some(1323.0), Some(3471.0), Some(10.1)), // Ac (89)
+    (Some(2115.0), Some(5061.0), Some(11.7)), // Th (90)
+    (Some(1841.0), Some(4300.0), Some(15.4)), // Pa (91)
+    (Some(1405.3), Some(4404.0), Some(19.1)), // U (92)
+    (Some(917.0), Some(4273.0), Some(20.2)), // Np (93)
+    (Some(912.5), Some(3501.0), Some(19.8)), // Pu (94)
+    (Some(1449.0), Some(2880.0), Some(12.0)), // Am (95)
+    (Some(1613.0), Some(3383.0), Some(13.5)), // Cm (96)
+    (Some(1259.0), Some(2900.0), Some(14.8)), // Bk (97)
+    (Some(1173.0), Some(1743.0), Some(15.1)), // Cf (98)
+    (Some(1133.0), Some(1269.0), Some(8.84)), // Es (99)
+    (Some(1800.0), None, Some(9.7)),        // Fm (100)
+    (Some(1100.0), None, Some(10.3)),       // Md (101)
+    (Some(1100.0), None, Some(9.9)),        // No (102)
+    (Some(1900.0), None, Some(15.6)),       // Lr (103)
+    (None, None, Some(23.2)),               // Rf (104) - predicted
+    (None, None, Some(29.3)),               // Db (105) - predicted
+    (None, None, Some(35.0)),               // Sg (106) - predicted
+    (None, None, Some(37.1)),               // Bh (107) - predicted
+    (None, None, Some(40.7)),               // Hs (108) - predicted
+    (None, None, Some(37.4)),               // Mt (109) - predicted
+    (None, None, Some(34.8)),               // Ds (110) - predicted
+    (None, None, Some(28.7)),               // Rg (111) - predicted
+    (None, None, Some(23.7)),               // Cn (112) - predicted
+    (None, None, Some(16.0)),               // Nh (113) - predicted
+    (None, None, Some(14.0)),               // Fl (114) - predicted
+    (None, None, Some(13.5)),               // Mc (115) - predicted
+    (None, None, Some(12.9)),               // Lv (116) - predicted
+    (None, None, Some(7.2)),                // Ts (117) - predicted
+    (None, None, Some(5.0)),                // Og (118) - predicted
 ];
 
 /// Complete element information
@@ -463,7 +451,11 @@ impl ElectronShell {
     ///
     /// Returns a vector representing the electron arrangement.
     /// Uses aufbau principle for filling order.
-    pub fn encode_configuration(&self, electron_count: u8, base_electron: &ContinuousHV) -> ContinuousHV {
+    pub fn encode_configuration(
+        &self,
+        electron_count: u8,
+        base_electron: &ContinuousHV,
+    ) -> ContinuousHV {
         // Simplified: weight each shell by electron occupancy
         // Real version would use aufbau filling order
         let mut remaining = electron_count;
@@ -481,7 +473,8 @@ impl ElectronShell {
             remaining -= electrons_in_shell;
 
             // Bind electron to shell
-            let shell_contribution = base_electron.bind(&self.shell_vectors[i])
+            let shell_contribution = base_electron
+                .bind(&self.shell_vectors[i])
                 .scale(electrons_in_shell as f32);
             weighted_shells.push(shell_contribution);
             weights.push(electrons_in_shell as f32);
@@ -506,7 +499,8 @@ impl ElectronShell {
                     return 0; // Noble gas
                 }
                 // Find previous noble gas
-                let prev = noble_gas_configs.iter()
+                let prev = noble_gas_configs
+                    .iter()
                     .filter(|&&x| x < atomic_number)
                     .max()
                     .copied()
@@ -542,7 +536,7 @@ pub struct PeriodicTable {
     pub superheavy: ContinuousHV,
 
     /// Thermodynamic property concept vectors
-    pub thermal_stable: ContinuousHV,   // High melting/boiling points
+    pub thermal_stable: ContinuousHV, // High melting/boiling points
     pub thermal_volatile: ContinuousHV, // Low melting/boiling points
     pub phase_solid: ContinuousHV,      // Solid at STP
     pub phase_liquid: ContinuousHV,     // Liquid at STP
@@ -623,170 +617,1218 @@ impl PeriodicTable {
     fn build_all_elements(&mut self, hadrons: &Hadrons) {
         // Element data for first 36 elements (extend as needed)
         let element_data: Vec<ElementData> = vec![
-            ElementData { symbol: "H", name: "Hydrogen", atomic_number: 1, standard_neutrons: 0, atomic_mass: 1.008, electronegativity: Some(2.20), group: 1, period: 1 },
-            ElementData { symbol: "He", name: "Helium", atomic_number: 2, standard_neutrons: 2, atomic_mass: 4.003, electronegativity: None, group: 18, period: 1 },
-            ElementData { symbol: "Li", name: "Lithium", atomic_number: 3, standard_neutrons: 4, atomic_mass: 6.941, electronegativity: Some(0.98), group: 1, period: 2 },
-            ElementData { symbol: "Be", name: "Beryllium", atomic_number: 4, standard_neutrons: 5, atomic_mass: 9.012, electronegativity: Some(1.57), group: 2, period: 2 },
-            ElementData { symbol: "B", name: "Boron", atomic_number: 5, standard_neutrons: 6, atomic_mass: 10.81, electronegativity: Some(2.04), group: 13, period: 2 },
-            ElementData { symbol: "C", name: "Carbon", atomic_number: 6, standard_neutrons: 6, atomic_mass: 12.01, electronegativity: Some(2.55), group: 14, period: 2 },
-            ElementData { symbol: "N", name: "Nitrogen", atomic_number: 7, standard_neutrons: 7, atomic_mass: 14.01, electronegativity: Some(3.04), group: 15, period: 2 },
-            ElementData { symbol: "O", name: "Oxygen", atomic_number: 8, standard_neutrons: 8, atomic_mass: 16.00, electronegativity: Some(3.44), group: 16, period: 2 },
-            ElementData { symbol: "F", name: "Fluorine", atomic_number: 9, standard_neutrons: 10, atomic_mass: 19.00, electronegativity: Some(3.98), group: 17, period: 2 },
-            ElementData { symbol: "Ne", name: "Neon", atomic_number: 10, standard_neutrons: 10, atomic_mass: 20.18, electronegativity: None, group: 18, period: 2 },
-            ElementData { symbol: "Na", name: "Sodium", atomic_number: 11, standard_neutrons: 12, atomic_mass: 22.99, electronegativity: Some(0.93), group: 1, period: 3 },
-            ElementData { symbol: "Mg", name: "Magnesium", atomic_number: 12, standard_neutrons: 12, atomic_mass: 24.31, electronegativity: Some(1.31), group: 2, period: 3 },
-            ElementData { symbol: "Al", name: "Aluminum", atomic_number: 13, standard_neutrons: 14, atomic_mass: 26.98, electronegativity: Some(1.61), group: 13, period: 3 },
-            ElementData { symbol: "Si", name: "Silicon", atomic_number: 14, standard_neutrons: 14, atomic_mass: 28.09, electronegativity: Some(1.90), group: 14, period: 3 },
-            ElementData { symbol: "P", name: "Phosphorus", atomic_number: 15, standard_neutrons: 16, atomic_mass: 30.97, electronegativity: Some(2.19), group: 15, period: 3 },
-            ElementData { symbol: "S", name: "Sulfur", atomic_number: 16, standard_neutrons: 16, atomic_mass: 32.07, electronegativity: Some(2.58), group: 16, period: 3 },
-            ElementData { symbol: "Cl", name: "Chlorine", atomic_number: 17, standard_neutrons: 18, atomic_mass: 35.45, electronegativity: Some(3.16), group: 17, period: 3 },
-            ElementData { symbol: "Ar", name: "Argon", atomic_number: 18, standard_neutrons: 22, atomic_mass: 39.95, electronegativity: None, group: 18, period: 3 },
-            ElementData { symbol: "K", name: "Potassium", atomic_number: 19, standard_neutrons: 20, atomic_mass: 39.10, electronegativity: Some(0.82), group: 1, period: 4 },
-            ElementData { symbol: "Ca", name: "Calcium", atomic_number: 20, standard_neutrons: 20, atomic_mass: 40.08, electronegativity: Some(1.00), group: 2, period: 4 },
-            ElementData { symbol: "Sc", name: "Scandium", atomic_number: 21, standard_neutrons: 24, atomic_mass: 44.96, electronegativity: Some(1.36), group: 3, period: 4 },
-            ElementData { symbol: "Ti", name: "Titanium", atomic_number: 22, standard_neutrons: 26, atomic_mass: 47.87, electronegativity: Some(1.54), group: 4, period: 4 },
-            ElementData { symbol: "V", name: "Vanadium", atomic_number: 23, standard_neutrons: 28, atomic_mass: 50.94, electronegativity: Some(1.63), group: 5, period: 4 },
-            ElementData { symbol: "Cr", name: "Chromium", atomic_number: 24, standard_neutrons: 28, atomic_mass: 52.00, electronegativity: Some(1.66), group: 6, period: 4 },
-            ElementData { symbol: "Mn", name: "Manganese", atomic_number: 25, standard_neutrons: 30, atomic_mass: 54.94, electronegativity: Some(1.55), group: 7, period: 4 },
-            ElementData { symbol: "Fe", name: "Iron", atomic_number: 26, standard_neutrons: 30, atomic_mass: 55.85, electronegativity: Some(1.83), group: 8, period: 4 },
-            ElementData { symbol: "Co", name: "Cobalt", atomic_number: 27, standard_neutrons: 32, atomic_mass: 58.93, electronegativity: Some(1.88), group: 9, period: 4 },
-            ElementData { symbol: "Ni", name: "Nickel", atomic_number: 28, standard_neutrons: 30, atomic_mass: 58.69, electronegativity: Some(1.91), group: 10, period: 4 },
-            ElementData { symbol: "Cu", name: "Copper", atomic_number: 29, standard_neutrons: 34, atomic_mass: 63.55, electronegativity: Some(1.90), group: 11, period: 4 },
-            ElementData { symbol: "Zn", name: "Zinc", atomic_number: 30, standard_neutrons: 34, atomic_mass: 65.38, electronegativity: Some(1.65), group: 12, period: 4 },
-            ElementData { symbol: "Ga", name: "Gallium", atomic_number: 31, standard_neutrons: 38, atomic_mass: 69.72, electronegativity: Some(1.81), group: 13, period: 4 },
-            ElementData { symbol: "Ge", name: "Germanium", atomic_number: 32, standard_neutrons: 42, atomic_mass: 72.63, electronegativity: Some(2.01), group: 14, period: 4 },
-            ElementData { symbol: "As", name: "Arsenic", atomic_number: 33, standard_neutrons: 42, atomic_mass: 74.92, electronegativity: Some(2.18), group: 15, period: 4 },
-            ElementData { symbol: "Se", name: "Selenium", atomic_number: 34, standard_neutrons: 46, atomic_mass: 78.97, electronegativity: Some(2.55), group: 16, period: 4 },
-            ElementData { symbol: "Br", name: "Bromine", atomic_number: 35, standard_neutrons: 44, atomic_mass: 79.90, electronegativity: Some(2.96), group: 17, period: 4 },
-            ElementData { symbol: "Kr", name: "Krypton", atomic_number: 36, standard_neutrons: 48, atomic_mass: 83.80, electronegativity: Some(3.00), group: 18, period: 4 },
-
+            ElementData {
+                symbol: "H",
+                name: "Hydrogen",
+                atomic_number: 1,
+                standard_neutrons: 0,
+                atomic_mass: 1.008,
+                electronegativity: Some(2.20),
+                group: 1,
+                period: 1,
+            },
+            ElementData {
+                symbol: "He",
+                name: "Helium",
+                atomic_number: 2,
+                standard_neutrons: 2,
+                atomic_mass: 4.003,
+                electronegativity: None,
+                group: 18,
+                period: 1,
+            },
+            ElementData {
+                symbol: "Li",
+                name: "Lithium",
+                atomic_number: 3,
+                standard_neutrons: 4,
+                atomic_mass: 6.941,
+                electronegativity: Some(0.98),
+                group: 1,
+                period: 2,
+            },
+            ElementData {
+                symbol: "Be",
+                name: "Beryllium",
+                atomic_number: 4,
+                standard_neutrons: 5,
+                atomic_mass: 9.012,
+                electronegativity: Some(1.57),
+                group: 2,
+                period: 2,
+            },
+            ElementData {
+                symbol: "B",
+                name: "Boron",
+                atomic_number: 5,
+                standard_neutrons: 6,
+                atomic_mass: 10.81,
+                electronegativity: Some(2.04),
+                group: 13,
+                period: 2,
+            },
+            ElementData {
+                symbol: "C",
+                name: "Carbon",
+                atomic_number: 6,
+                standard_neutrons: 6,
+                atomic_mass: 12.01,
+                electronegativity: Some(2.55),
+                group: 14,
+                period: 2,
+            },
+            ElementData {
+                symbol: "N",
+                name: "Nitrogen",
+                atomic_number: 7,
+                standard_neutrons: 7,
+                atomic_mass: 14.01,
+                electronegativity: Some(3.04),
+                group: 15,
+                period: 2,
+            },
+            ElementData {
+                symbol: "O",
+                name: "Oxygen",
+                atomic_number: 8,
+                standard_neutrons: 8,
+                atomic_mass: 16.00,
+                electronegativity: Some(3.44),
+                group: 16,
+                period: 2,
+            },
+            ElementData {
+                symbol: "F",
+                name: "Fluorine",
+                atomic_number: 9,
+                standard_neutrons: 10,
+                atomic_mass: 19.00,
+                electronegativity: Some(3.98),
+                group: 17,
+                period: 2,
+            },
+            ElementData {
+                symbol: "Ne",
+                name: "Neon",
+                atomic_number: 10,
+                standard_neutrons: 10,
+                atomic_mass: 20.18,
+                electronegativity: None,
+                group: 18,
+                period: 2,
+            },
+            ElementData {
+                symbol: "Na",
+                name: "Sodium",
+                atomic_number: 11,
+                standard_neutrons: 12,
+                atomic_mass: 22.99,
+                electronegativity: Some(0.93),
+                group: 1,
+                period: 3,
+            },
+            ElementData {
+                symbol: "Mg",
+                name: "Magnesium",
+                atomic_number: 12,
+                standard_neutrons: 12,
+                atomic_mass: 24.31,
+                electronegativity: Some(1.31),
+                group: 2,
+                period: 3,
+            },
+            ElementData {
+                symbol: "Al",
+                name: "Aluminum",
+                atomic_number: 13,
+                standard_neutrons: 14,
+                atomic_mass: 26.98,
+                electronegativity: Some(1.61),
+                group: 13,
+                period: 3,
+            },
+            ElementData {
+                symbol: "Si",
+                name: "Silicon",
+                atomic_number: 14,
+                standard_neutrons: 14,
+                atomic_mass: 28.09,
+                electronegativity: Some(1.90),
+                group: 14,
+                period: 3,
+            },
+            ElementData {
+                symbol: "P",
+                name: "Phosphorus",
+                atomic_number: 15,
+                standard_neutrons: 16,
+                atomic_mass: 30.97,
+                electronegativity: Some(2.19),
+                group: 15,
+                period: 3,
+            },
+            ElementData {
+                symbol: "S",
+                name: "Sulfur",
+                atomic_number: 16,
+                standard_neutrons: 16,
+                atomic_mass: 32.07,
+                electronegativity: Some(2.58),
+                group: 16,
+                period: 3,
+            },
+            ElementData {
+                symbol: "Cl",
+                name: "Chlorine",
+                atomic_number: 17,
+                standard_neutrons: 18,
+                atomic_mass: 35.45,
+                electronegativity: Some(3.16),
+                group: 17,
+                period: 3,
+            },
+            ElementData {
+                symbol: "Ar",
+                name: "Argon",
+                atomic_number: 18,
+                standard_neutrons: 22,
+                atomic_mass: 39.95,
+                electronegativity: None,
+                group: 18,
+                period: 3,
+            },
+            ElementData {
+                symbol: "K",
+                name: "Potassium",
+                atomic_number: 19,
+                standard_neutrons: 20,
+                atomic_mass: 39.10,
+                electronegativity: Some(0.82),
+                group: 1,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Ca",
+                name: "Calcium",
+                atomic_number: 20,
+                standard_neutrons: 20,
+                atomic_mass: 40.08,
+                electronegativity: Some(1.00),
+                group: 2,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Sc",
+                name: "Scandium",
+                atomic_number: 21,
+                standard_neutrons: 24,
+                atomic_mass: 44.96,
+                electronegativity: Some(1.36),
+                group: 3,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Ti",
+                name: "Titanium",
+                atomic_number: 22,
+                standard_neutrons: 26,
+                atomic_mass: 47.87,
+                electronegativity: Some(1.54),
+                group: 4,
+                period: 4,
+            },
+            ElementData {
+                symbol: "V",
+                name: "Vanadium",
+                atomic_number: 23,
+                standard_neutrons: 28,
+                atomic_mass: 50.94,
+                electronegativity: Some(1.63),
+                group: 5,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Cr",
+                name: "Chromium",
+                atomic_number: 24,
+                standard_neutrons: 28,
+                atomic_mass: 52.00,
+                electronegativity: Some(1.66),
+                group: 6,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Mn",
+                name: "Manganese",
+                atomic_number: 25,
+                standard_neutrons: 30,
+                atomic_mass: 54.94,
+                electronegativity: Some(1.55),
+                group: 7,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Fe",
+                name: "Iron",
+                atomic_number: 26,
+                standard_neutrons: 30,
+                atomic_mass: 55.85,
+                electronegativity: Some(1.83),
+                group: 8,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Co",
+                name: "Cobalt",
+                atomic_number: 27,
+                standard_neutrons: 32,
+                atomic_mass: 58.93,
+                electronegativity: Some(1.88),
+                group: 9,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Ni",
+                name: "Nickel",
+                atomic_number: 28,
+                standard_neutrons: 30,
+                atomic_mass: 58.69,
+                electronegativity: Some(1.91),
+                group: 10,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Cu",
+                name: "Copper",
+                atomic_number: 29,
+                standard_neutrons: 34,
+                atomic_mass: 63.55,
+                electronegativity: Some(1.90),
+                group: 11,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Zn",
+                name: "Zinc",
+                atomic_number: 30,
+                standard_neutrons: 34,
+                atomic_mass: 65.38,
+                electronegativity: Some(1.65),
+                group: 12,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Ga",
+                name: "Gallium",
+                atomic_number: 31,
+                standard_neutrons: 38,
+                atomic_mass: 69.72,
+                electronegativity: Some(1.81),
+                group: 13,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Ge",
+                name: "Germanium",
+                atomic_number: 32,
+                standard_neutrons: 42,
+                atomic_mass: 72.63,
+                electronegativity: Some(2.01),
+                group: 14,
+                period: 4,
+            },
+            ElementData {
+                symbol: "As",
+                name: "Arsenic",
+                atomic_number: 33,
+                standard_neutrons: 42,
+                atomic_mass: 74.92,
+                electronegativity: Some(2.18),
+                group: 15,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Se",
+                name: "Selenium",
+                atomic_number: 34,
+                standard_neutrons: 46,
+                atomic_mass: 78.97,
+                electronegativity: Some(2.55),
+                group: 16,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Br",
+                name: "Bromine",
+                atomic_number: 35,
+                standard_neutrons: 44,
+                atomic_mass: 79.90,
+                electronegativity: Some(2.96),
+                group: 17,
+                period: 4,
+            },
+            ElementData {
+                symbol: "Kr",
+                name: "Krypton",
+                atomic_number: 36,
+                standard_neutrons: 48,
+                atomic_mass: 83.80,
+                electronegativity: Some(3.00),
+                group: 18,
+                period: 4,
+            },
             // Period 5 (Rb-Xe, Z=37-54)
-            ElementData { symbol: "Rb", name: "Rubidium", atomic_number: 37, standard_neutrons: 48, atomic_mass: 85.47, electronegativity: Some(0.82), group: 1, period: 5 },
-            ElementData { symbol: "Sr", name: "Strontium", atomic_number: 38, standard_neutrons: 50, atomic_mass: 87.62, electronegativity: Some(0.95), group: 2, period: 5 },
-            ElementData { symbol: "Y", name: "Yttrium", atomic_number: 39, standard_neutrons: 50, atomic_mass: 88.91, electronegativity: Some(1.22), group: 3, period: 5 },
-            ElementData { symbol: "Zr", name: "Zirconium", atomic_number: 40, standard_neutrons: 51, atomic_mass: 91.22, electronegativity: Some(1.33), group: 4, period: 5 },
-            ElementData { symbol: "Nb", name: "Niobium", atomic_number: 41, standard_neutrons: 52, atomic_mass: 92.91, electronegativity: Some(1.60), group: 5, period: 5 },
-            ElementData { symbol: "Mo", name: "Molybdenum", atomic_number: 42, standard_neutrons: 54, atomic_mass: 95.95, electronegativity: Some(2.16), group: 6, period: 5 },
-            ElementData { symbol: "Tc", name: "Technetium", atomic_number: 43, standard_neutrons: 55, atomic_mass: 98.00, electronegativity: Some(1.90), group: 7, period: 5 },
-            ElementData { symbol: "Ru", name: "Ruthenium", atomic_number: 44, standard_neutrons: 57, atomic_mass: 101.07, electronegativity: Some(2.20), group: 8, period: 5 },
-            ElementData { symbol: "Rh", name: "Rhodium", atomic_number: 45, standard_neutrons: 58, atomic_mass: 102.91, electronegativity: Some(2.28), group: 9, period: 5 },
-            ElementData { symbol: "Pd", name: "Palladium", atomic_number: 46, standard_neutrons: 60, atomic_mass: 106.42, electronegativity: Some(2.20), group: 10, period: 5 },
-            ElementData { symbol: "Ag", name: "Silver", atomic_number: 47, standard_neutrons: 60, atomic_mass: 107.87, electronegativity: Some(1.93), group: 11, period: 5 },
-            ElementData { symbol: "Cd", name: "Cadmium", atomic_number: 48, standard_neutrons: 64, atomic_mass: 112.41, electronegativity: Some(1.69), group: 12, period: 5 },
-            ElementData { symbol: "In", name: "Indium", atomic_number: 49, standard_neutrons: 66, atomic_mass: 114.82, electronegativity: Some(1.78), group: 13, period: 5 },
-            ElementData { symbol: "Sn", name: "Tin", atomic_number: 50, standard_neutrons: 69, atomic_mass: 118.71, electronegativity: Some(1.96), group: 14, period: 5 },
-            ElementData { symbol: "Sb", name: "Antimony", atomic_number: 51, standard_neutrons: 71, atomic_mass: 121.76, electronegativity: Some(2.05), group: 15, period: 5 },
-            ElementData { symbol: "Te", name: "Tellurium", atomic_number: 52, standard_neutrons: 76, atomic_mass: 127.60, electronegativity: Some(2.10), group: 16, period: 5 },
-            ElementData { symbol: "I", name: "Iodine", atomic_number: 53, standard_neutrons: 74, atomic_mass: 126.90, electronegativity: Some(2.66), group: 17, period: 5 },
-            ElementData { symbol: "Xe", name: "Xenon", atomic_number: 54, standard_neutrons: 77, atomic_mass: 131.29, electronegativity: Some(2.60), group: 18, period: 5 },
-
+            ElementData {
+                symbol: "Rb",
+                name: "Rubidium",
+                atomic_number: 37,
+                standard_neutrons: 48,
+                atomic_mass: 85.47,
+                electronegativity: Some(0.82),
+                group: 1,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Sr",
+                name: "Strontium",
+                atomic_number: 38,
+                standard_neutrons: 50,
+                atomic_mass: 87.62,
+                electronegativity: Some(0.95),
+                group: 2,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Y",
+                name: "Yttrium",
+                atomic_number: 39,
+                standard_neutrons: 50,
+                atomic_mass: 88.91,
+                electronegativity: Some(1.22),
+                group: 3,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Zr",
+                name: "Zirconium",
+                atomic_number: 40,
+                standard_neutrons: 51,
+                atomic_mass: 91.22,
+                electronegativity: Some(1.33),
+                group: 4,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Nb",
+                name: "Niobium",
+                atomic_number: 41,
+                standard_neutrons: 52,
+                atomic_mass: 92.91,
+                electronegativity: Some(1.60),
+                group: 5,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Mo",
+                name: "Molybdenum",
+                atomic_number: 42,
+                standard_neutrons: 54,
+                atomic_mass: 95.95,
+                electronegativity: Some(2.16),
+                group: 6,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Tc",
+                name: "Technetium",
+                atomic_number: 43,
+                standard_neutrons: 55,
+                atomic_mass: 98.00,
+                electronegativity: Some(1.90),
+                group: 7,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Ru",
+                name: "Ruthenium",
+                atomic_number: 44,
+                standard_neutrons: 57,
+                atomic_mass: 101.07,
+                electronegativity: Some(2.20),
+                group: 8,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Rh",
+                name: "Rhodium",
+                atomic_number: 45,
+                standard_neutrons: 58,
+                atomic_mass: 102.91,
+                electronegativity: Some(2.28),
+                group: 9,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Pd",
+                name: "Palladium",
+                atomic_number: 46,
+                standard_neutrons: 60,
+                atomic_mass: 106.42,
+                electronegativity: Some(2.20),
+                group: 10,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Ag",
+                name: "Silver",
+                atomic_number: 47,
+                standard_neutrons: 60,
+                atomic_mass: 107.87,
+                electronegativity: Some(1.93),
+                group: 11,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Cd",
+                name: "Cadmium",
+                atomic_number: 48,
+                standard_neutrons: 64,
+                atomic_mass: 112.41,
+                electronegativity: Some(1.69),
+                group: 12,
+                period: 5,
+            },
+            ElementData {
+                symbol: "In",
+                name: "Indium",
+                atomic_number: 49,
+                standard_neutrons: 66,
+                atomic_mass: 114.82,
+                electronegativity: Some(1.78),
+                group: 13,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Sn",
+                name: "Tin",
+                atomic_number: 50,
+                standard_neutrons: 69,
+                atomic_mass: 118.71,
+                electronegativity: Some(1.96),
+                group: 14,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Sb",
+                name: "Antimony",
+                atomic_number: 51,
+                standard_neutrons: 71,
+                atomic_mass: 121.76,
+                electronegativity: Some(2.05),
+                group: 15,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Te",
+                name: "Tellurium",
+                atomic_number: 52,
+                standard_neutrons: 76,
+                atomic_mass: 127.60,
+                electronegativity: Some(2.10),
+                group: 16,
+                period: 5,
+            },
+            ElementData {
+                symbol: "I",
+                name: "Iodine",
+                atomic_number: 53,
+                standard_neutrons: 74,
+                atomic_mass: 126.90,
+                electronegativity: Some(2.66),
+                group: 17,
+                period: 5,
+            },
+            ElementData {
+                symbol: "Xe",
+                name: "Xenon",
+                atomic_number: 54,
+                standard_neutrons: 77,
+                atomic_mass: 131.29,
+                electronegativity: Some(2.60),
+                group: 18,
+                period: 5,
+            },
             // Period 6 (Cs-Rn, Z=55-86) including Lanthanides
-            ElementData { symbol: "Cs", name: "Cesium", atomic_number: 55, standard_neutrons: 78, atomic_mass: 132.91, electronegativity: Some(0.79), group: 1, period: 6 },
-            ElementData { symbol: "Ba", name: "Barium", atomic_number: 56, standard_neutrons: 81, atomic_mass: 137.33, electronegativity: Some(0.89), group: 2, period: 6 },
+            ElementData {
+                symbol: "Cs",
+                name: "Cesium",
+                atomic_number: 55,
+                standard_neutrons: 78,
+                atomic_mass: 132.91,
+                electronegativity: Some(0.79),
+                group: 1,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Ba",
+                name: "Barium",
+                atomic_number: 56,
+                standard_neutrons: 81,
+                atomic_mass: 137.33,
+                electronegativity: Some(0.89),
+                group: 2,
+                period: 6,
+            },
             // Lanthanides (Z=57-71)
-            ElementData { symbol: "La", name: "Lanthanum", atomic_number: 57, standard_neutrons: 82, atomic_mass: 138.91, electronegativity: Some(1.10), group: 3, period: 6 },
-            ElementData { symbol: "Ce", name: "Cerium", atomic_number: 58, standard_neutrons: 82, atomic_mass: 140.12, electronegativity: Some(1.12), group: 3, period: 6 },
-            ElementData { symbol: "Pr", name: "Praseodymium", atomic_number: 59, standard_neutrons: 82, atomic_mass: 140.91, electronegativity: Some(1.13), group: 3, period: 6 },
-            ElementData { symbol: "Nd", name: "Neodymium", atomic_number: 60, standard_neutrons: 84, atomic_mass: 144.24, electronegativity: Some(1.14), group: 3, period: 6 },
-            ElementData { symbol: "Pm", name: "Promethium", atomic_number: 61, standard_neutrons: 84, atomic_mass: 145.00, electronegativity: Some(1.13), group: 3, period: 6 },
-            ElementData { symbol: "Sm", name: "Samarium", atomic_number: 62, standard_neutrons: 88, atomic_mass: 150.36, electronegativity: Some(1.17), group: 3, period: 6 },
-            ElementData { symbol: "Eu", name: "Europium", atomic_number: 63, standard_neutrons: 89, atomic_mass: 151.96, electronegativity: Some(1.20), group: 3, period: 6 },
-            ElementData { symbol: "Gd", name: "Gadolinium", atomic_number: 64, standard_neutrons: 93, atomic_mass: 157.25, electronegativity: Some(1.20), group: 3, period: 6 },
-            ElementData { symbol: "Tb", name: "Terbium", atomic_number: 65, standard_neutrons: 94, atomic_mass: 158.93, electronegativity: Some(1.10), group: 3, period: 6 },
-            ElementData { symbol: "Dy", name: "Dysprosium", atomic_number: 66, standard_neutrons: 97, atomic_mass: 162.50, electronegativity: Some(1.22), group: 3, period: 6 },
-            ElementData { symbol: "Ho", name: "Holmium", atomic_number: 67, standard_neutrons: 98, atomic_mass: 164.93, electronegativity: Some(1.23), group: 3, period: 6 },
-            ElementData { symbol: "Er", name: "Erbium", atomic_number: 68, standard_neutrons: 99, atomic_mass: 167.26, electronegativity: Some(1.24), group: 3, period: 6 },
-            ElementData { symbol: "Tm", name: "Thulium", atomic_number: 69, standard_neutrons: 100, atomic_mass: 168.93, electronegativity: Some(1.25), group: 3, period: 6 },
-            ElementData { symbol: "Yb", name: "Ytterbium", atomic_number: 70, standard_neutrons: 103, atomic_mass: 173.05, electronegativity: Some(1.10), group: 3, period: 6 },
-            ElementData { symbol: "Lu", name: "Lutetium", atomic_number: 71, standard_neutrons: 104, atomic_mass: 174.97, electronegativity: Some(1.27), group: 3, period: 6 },
+            ElementData {
+                symbol: "La",
+                name: "Lanthanum",
+                atomic_number: 57,
+                standard_neutrons: 82,
+                atomic_mass: 138.91,
+                electronegativity: Some(1.10),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Ce",
+                name: "Cerium",
+                atomic_number: 58,
+                standard_neutrons: 82,
+                atomic_mass: 140.12,
+                electronegativity: Some(1.12),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Pr",
+                name: "Praseodymium",
+                atomic_number: 59,
+                standard_neutrons: 82,
+                atomic_mass: 140.91,
+                electronegativity: Some(1.13),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Nd",
+                name: "Neodymium",
+                atomic_number: 60,
+                standard_neutrons: 84,
+                atomic_mass: 144.24,
+                electronegativity: Some(1.14),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Pm",
+                name: "Promethium",
+                atomic_number: 61,
+                standard_neutrons: 84,
+                atomic_mass: 145.00,
+                electronegativity: Some(1.13),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Sm",
+                name: "Samarium",
+                atomic_number: 62,
+                standard_neutrons: 88,
+                atomic_mass: 150.36,
+                electronegativity: Some(1.17),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Eu",
+                name: "Europium",
+                atomic_number: 63,
+                standard_neutrons: 89,
+                atomic_mass: 151.96,
+                electronegativity: Some(1.20),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Gd",
+                name: "Gadolinium",
+                atomic_number: 64,
+                standard_neutrons: 93,
+                atomic_mass: 157.25,
+                electronegativity: Some(1.20),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Tb",
+                name: "Terbium",
+                atomic_number: 65,
+                standard_neutrons: 94,
+                atomic_mass: 158.93,
+                electronegativity: Some(1.10),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Dy",
+                name: "Dysprosium",
+                atomic_number: 66,
+                standard_neutrons: 97,
+                atomic_mass: 162.50,
+                electronegativity: Some(1.22),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Ho",
+                name: "Holmium",
+                atomic_number: 67,
+                standard_neutrons: 98,
+                atomic_mass: 164.93,
+                electronegativity: Some(1.23),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Er",
+                name: "Erbium",
+                atomic_number: 68,
+                standard_neutrons: 99,
+                atomic_mass: 167.26,
+                electronegativity: Some(1.24),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Tm",
+                name: "Thulium",
+                atomic_number: 69,
+                standard_neutrons: 100,
+                atomic_mass: 168.93,
+                electronegativity: Some(1.25),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Yb",
+                name: "Ytterbium",
+                atomic_number: 70,
+                standard_neutrons: 103,
+                atomic_mass: 173.05,
+                electronegativity: Some(1.10),
+                group: 3,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Lu",
+                name: "Lutetium",
+                atomic_number: 71,
+                standard_neutrons: 104,
+                atomic_mass: 174.97,
+                electronegativity: Some(1.27),
+                group: 3,
+                period: 6,
+            },
             // Continue Period 6
-            ElementData { symbol: "Hf", name: "Hafnium", atomic_number: 72, standard_neutrons: 106, atomic_mass: 178.49, electronegativity: Some(1.30), group: 4, period: 6 },
-            ElementData { symbol: "Ta", name: "Tantalum", atomic_number: 73, standard_neutrons: 108, atomic_mass: 180.95, electronegativity: Some(1.50), group: 5, period: 6 },
-            ElementData { symbol: "W", name: "Tungsten", atomic_number: 74, standard_neutrons: 110, atomic_mass: 183.84, electronegativity: Some(2.36), group: 6, period: 6 },
-            ElementData { symbol: "Re", name: "Rhenium", atomic_number: 75, standard_neutrons: 111, atomic_mass: 186.21, electronegativity: Some(1.90), group: 7, period: 6 },
-            ElementData { symbol: "Os", name: "Osmium", atomic_number: 76, standard_neutrons: 114, atomic_mass: 190.23, electronegativity: Some(2.20), group: 8, period: 6 },
-            ElementData { symbol: "Ir", name: "Iridium", atomic_number: 77, standard_neutrons: 115, atomic_mass: 192.22, electronegativity: Some(2.20), group: 9, period: 6 },
-            ElementData { symbol: "Pt", name: "Platinum", atomic_number: 78, standard_neutrons: 117, atomic_mass: 195.08, electronegativity: Some(2.28), group: 10, period: 6 },
-            ElementData { symbol: "Au", name: "Gold", atomic_number: 79, standard_neutrons: 118, atomic_mass: 196.97, electronegativity: Some(2.54), group: 11, period: 6 },
-            ElementData { symbol: "Hg", name: "Mercury", atomic_number: 80, standard_neutrons: 121, atomic_mass: 200.59, electronegativity: Some(2.00), group: 12, period: 6 },
-            ElementData { symbol: "Tl", name: "Thallium", atomic_number: 81, standard_neutrons: 123, atomic_mass: 204.38, electronegativity: Some(1.62), group: 13, period: 6 },
-            ElementData { symbol: "Pb", name: "Lead", atomic_number: 82, standard_neutrons: 125, atomic_mass: 207.20, electronegativity: Some(1.87), group: 14, period: 6 },
-            ElementData { symbol: "Bi", name: "Bismuth", atomic_number: 83, standard_neutrons: 126, atomic_mass: 208.98, electronegativity: Some(2.02), group: 15, period: 6 },
-            ElementData { symbol: "Po", name: "Polonium", atomic_number: 84, standard_neutrons: 125, atomic_mass: 209.00, electronegativity: Some(2.00), group: 16, period: 6 },
-            ElementData { symbol: "At", name: "Astatine", atomic_number: 85, standard_neutrons: 125, atomic_mass: 210.00, electronegativity: Some(2.20), group: 17, period: 6 },
-            ElementData { symbol: "Rn", name: "Radon", atomic_number: 86, standard_neutrons: 136, atomic_mass: 222.00, electronegativity: None, group: 18, period: 6 },
-
+            ElementData {
+                symbol: "Hf",
+                name: "Hafnium",
+                atomic_number: 72,
+                standard_neutrons: 106,
+                atomic_mass: 178.49,
+                electronegativity: Some(1.30),
+                group: 4,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Ta",
+                name: "Tantalum",
+                atomic_number: 73,
+                standard_neutrons: 108,
+                atomic_mass: 180.95,
+                electronegativity: Some(1.50),
+                group: 5,
+                period: 6,
+            },
+            ElementData {
+                symbol: "W",
+                name: "Tungsten",
+                atomic_number: 74,
+                standard_neutrons: 110,
+                atomic_mass: 183.84,
+                electronegativity: Some(2.36),
+                group: 6,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Re",
+                name: "Rhenium",
+                atomic_number: 75,
+                standard_neutrons: 111,
+                atomic_mass: 186.21,
+                electronegativity: Some(1.90),
+                group: 7,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Os",
+                name: "Osmium",
+                atomic_number: 76,
+                standard_neutrons: 114,
+                atomic_mass: 190.23,
+                electronegativity: Some(2.20),
+                group: 8,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Ir",
+                name: "Iridium",
+                atomic_number: 77,
+                standard_neutrons: 115,
+                atomic_mass: 192.22,
+                electronegativity: Some(2.20),
+                group: 9,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Pt",
+                name: "Platinum",
+                atomic_number: 78,
+                standard_neutrons: 117,
+                atomic_mass: 195.08,
+                electronegativity: Some(2.28),
+                group: 10,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Au",
+                name: "Gold",
+                atomic_number: 79,
+                standard_neutrons: 118,
+                atomic_mass: 196.97,
+                electronegativity: Some(2.54),
+                group: 11,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Hg",
+                name: "Mercury",
+                atomic_number: 80,
+                standard_neutrons: 121,
+                atomic_mass: 200.59,
+                electronegativity: Some(2.00),
+                group: 12,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Tl",
+                name: "Thallium",
+                atomic_number: 81,
+                standard_neutrons: 123,
+                atomic_mass: 204.38,
+                electronegativity: Some(1.62),
+                group: 13,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Pb",
+                name: "Lead",
+                atomic_number: 82,
+                standard_neutrons: 125,
+                atomic_mass: 207.20,
+                electronegativity: Some(1.87),
+                group: 14,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Bi",
+                name: "Bismuth",
+                atomic_number: 83,
+                standard_neutrons: 126,
+                atomic_mass: 208.98,
+                electronegativity: Some(2.02),
+                group: 15,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Po",
+                name: "Polonium",
+                atomic_number: 84,
+                standard_neutrons: 125,
+                atomic_mass: 209.00,
+                electronegativity: Some(2.00),
+                group: 16,
+                period: 6,
+            },
+            ElementData {
+                symbol: "At",
+                name: "Astatine",
+                atomic_number: 85,
+                standard_neutrons: 125,
+                atomic_mass: 210.00,
+                electronegativity: Some(2.20),
+                group: 17,
+                period: 6,
+            },
+            ElementData {
+                symbol: "Rn",
+                name: "Radon",
+                atomic_number: 86,
+                standard_neutrons: 136,
+                atomic_mass: 222.00,
+                electronegativity: None,
+                group: 18,
+                period: 6,
+            },
             // Period 7 (Fr-Og, Z=87-118) including Actinides
-            ElementData { symbol: "Fr", name: "Francium", atomic_number: 87, standard_neutrons: 136, atomic_mass: 223.00, electronegativity: Some(0.70), group: 1, period: 7 },
-            ElementData { symbol: "Ra", name: "Radium", atomic_number: 88, standard_neutrons: 138, atomic_mass: 226.00, electronegativity: Some(0.90), group: 2, period: 7 },
+            ElementData {
+                symbol: "Fr",
+                name: "Francium",
+                atomic_number: 87,
+                standard_neutrons: 136,
+                atomic_mass: 223.00,
+                electronegativity: Some(0.70),
+                group: 1,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Ra",
+                name: "Radium",
+                atomic_number: 88,
+                standard_neutrons: 138,
+                atomic_mass: 226.00,
+                electronegativity: Some(0.90),
+                group: 2,
+                period: 7,
+            },
             // Actinides (Z=89-103)
-            ElementData { symbol: "Ac", name: "Actinium", atomic_number: 89, standard_neutrons: 138, atomic_mass: 227.00, electronegativity: Some(1.10), group: 3, period: 7 },
-            ElementData { symbol: "Th", name: "Thorium", atomic_number: 90, standard_neutrons: 142, atomic_mass: 232.04, electronegativity: Some(1.30), group: 3, period: 7 },
-            ElementData { symbol: "Pa", name: "Protactinium", atomic_number: 91, standard_neutrons: 140, atomic_mass: 231.04, electronegativity: Some(1.50), group: 3, period: 7 },
-            ElementData { symbol: "U", name: "Uranium", atomic_number: 92, standard_neutrons: 146, atomic_mass: 238.03, electronegativity: Some(1.38), group: 3, period: 7 },
-            ElementData { symbol: "Np", name: "Neptunium", atomic_number: 93, standard_neutrons: 144, atomic_mass: 237.00, electronegativity: Some(1.36), group: 3, period: 7 },
-            ElementData { symbol: "Pu", name: "Plutonium", atomic_number: 94, standard_neutrons: 150, atomic_mass: 244.00, electronegativity: Some(1.28), group: 3, period: 7 },
-            ElementData { symbol: "Am", name: "Americium", atomic_number: 95, standard_neutrons: 148, atomic_mass: 243.00, electronegativity: Some(1.30), group: 3, period: 7 },
-            ElementData { symbol: "Cm", name: "Curium", atomic_number: 96, standard_neutrons: 151, atomic_mass: 247.00, electronegativity: Some(1.30), group: 3, period: 7 },
-            ElementData { symbol: "Bk", name: "Berkelium", atomic_number: 97, standard_neutrons: 150, atomic_mass: 247.00, electronegativity: Some(1.30), group: 3, period: 7 },
-            ElementData { symbol: "Cf", name: "Californium", atomic_number: 98, standard_neutrons: 153, atomic_mass: 251.00, electronegativity: Some(1.30), group: 3, period: 7 },
-            ElementData { symbol: "Es", name: "Einsteinium", atomic_number: 99, standard_neutrons: 153, atomic_mass: 252.00, electronegativity: Some(1.30), group: 3, period: 7 },
-            ElementData { symbol: "Fm", name: "Fermium", atomic_number: 100, standard_neutrons: 157, atomic_mass: 257.00, electronegativity: Some(1.30), group: 3, period: 7 },
-            ElementData { symbol: "Md", name: "Mendelevium", atomic_number: 101, standard_neutrons: 157, atomic_mass: 258.00, electronegativity: Some(1.30), group: 3, period: 7 },
-            ElementData { symbol: "No", name: "Nobelium", atomic_number: 102, standard_neutrons: 157, atomic_mass: 259.00, electronegativity: Some(1.30), group: 3, period: 7 },
-            ElementData { symbol: "Lr", name: "Lawrencium", atomic_number: 103, standard_neutrons: 159, atomic_mass: 262.00, electronegativity: Some(1.30), group: 3, period: 7 },
+            ElementData {
+                symbol: "Ac",
+                name: "Actinium",
+                atomic_number: 89,
+                standard_neutrons: 138,
+                atomic_mass: 227.00,
+                electronegativity: Some(1.10),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Th",
+                name: "Thorium",
+                atomic_number: 90,
+                standard_neutrons: 142,
+                atomic_mass: 232.04,
+                electronegativity: Some(1.30),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Pa",
+                name: "Protactinium",
+                atomic_number: 91,
+                standard_neutrons: 140,
+                atomic_mass: 231.04,
+                electronegativity: Some(1.50),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "U",
+                name: "Uranium",
+                atomic_number: 92,
+                standard_neutrons: 146,
+                atomic_mass: 238.03,
+                electronegativity: Some(1.38),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Np",
+                name: "Neptunium",
+                atomic_number: 93,
+                standard_neutrons: 144,
+                atomic_mass: 237.00,
+                electronegativity: Some(1.36),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Pu",
+                name: "Plutonium",
+                atomic_number: 94,
+                standard_neutrons: 150,
+                atomic_mass: 244.00,
+                electronegativity: Some(1.28),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Am",
+                name: "Americium",
+                atomic_number: 95,
+                standard_neutrons: 148,
+                atomic_mass: 243.00,
+                electronegativity: Some(1.30),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Cm",
+                name: "Curium",
+                atomic_number: 96,
+                standard_neutrons: 151,
+                atomic_mass: 247.00,
+                electronegativity: Some(1.30),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Bk",
+                name: "Berkelium",
+                atomic_number: 97,
+                standard_neutrons: 150,
+                atomic_mass: 247.00,
+                electronegativity: Some(1.30),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Cf",
+                name: "Californium",
+                atomic_number: 98,
+                standard_neutrons: 153,
+                atomic_mass: 251.00,
+                electronegativity: Some(1.30),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Es",
+                name: "Einsteinium",
+                atomic_number: 99,
+                standard_neutrons: 153,
+                atomic_mass: 252.00,
+                electronegativity: Some(1.30),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Fm",
+                name: "Fermium",
+                atomic_number: 100,
+                standard_neutrons: 157,
+                atomic_mass: 257.00,
+                electronegativity: Some(1.30),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Md",
+                name: "Mendelevium",
+                atomic_number: 101,
+                standard_neutrons: 157,
+                atomic_mass: 258.00,
+                electronegativity: Some(1.30),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "No",
+                name: "Nobelium",
+                atomic_number: 102,
+                standard_neutrons: 157,
+                atomic_mass: 259.00,
+                electronegativity: Some(1.30),
+                group: 3,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Lr",
+                name: "Lawrencium",
+                atomic_number: 103,
+                standard_neutrons: 159,
+                atomic_mass: 262.00,
+                electronegativity: Some(1.30),
+                group: 3,
+                period: 7,
+            },
             // Superheavy elements (Z=104-118)
-            ElementData { symbol: "Rf", name: "Rutherfordium", atomic_number: 104, standard_neutrons: 157, atomic_mass: 267.00, electronegativity: None, group: 4, period: 7 },
-            ElementData { symbol: "Db", name: "Dubnium", atomic_number: 105, standard_neutrons: 157, atomic_mass: 268.00, electronegativity: None, group: 5, period: 7 },
-            ElementData { symbol: "Sg", name: "Seaborgium", atomic_number: 106, standard_neutrons: 160, atomic_mass: 269.00, electronegativity: None, group: 6, period: 7 },
-            ElementData { symbol: "Bh", name: "Bohrium", atomic_number: 107, standard_neutrons: 163, atomic_mass: 270.00, electronegativity: None, group: 7, period: 7 },
-            ElementData { symbol: "Hs", name: "Hassium", atomic_number: 108, standard_neutrons: 161, atomic_mass: 269.00, electronegativity: None, group: 8, period: 7 },
-            ElementData { symbol: "Mt", name: "Meitnerium", atomic_number: 109, standard_neutrons: 169, atomic_mass: 278.00, electronegativity: None, group: 9, period: 7 },
-            ElementData { symbol: "Ds", name: "Darmstadtium", atomic_number: 110, standard_neutrons: 171, atomic_mass: 281.00, electronegativity: None, group: 10, period: 7 },
-            ElementData { symbol: "Rg", name: "Roentgenium", atomic_number: 111, standard_neutrons: 171, atomic_mass: 282.00, electronegativity: None, group: 11, period: 7 },
-            ElementData { symbol: "Cn", name: "Copernicium", atomic_number: 112, standard_neutrons: 173, atomic_mass: 285.00, electronegativity: None, group: 12, period: 7 },
-            ElementData { symbol: "Nh", name: "Nihonium", atomic_number: 113, standard_neutrons: 173, atomic_mass: 286.00, electronegativity: None, group: 13, period: 7 },
-            ElementData { symbol: "Fl", name: "Flerovium", atomic_number: 114, standard_neutrons: 175, atomic_mass: 289.00, electronegativity: None, group: 14, period: 7 },
-            ElementData { symbol: "Mc", name: "Moscovium", atomic_number: 115, standard_neutrons: 175, atomic_mass: 290.00, electronegativity: None, group: 15, period: 7 },
-            ElementData { symbol: "Lv", name: "Livermorium", atomic_number: 116, standard_neutrons: 177, atomic_mass: 293.00, electronegativity: None, group: 16, period: 7 },
-            ElementData { symbol: "Ts", name: "Tennessine", atomic_number: 117, standard_neutrons: 177, atomic_mass: 294.00, electronegativity: None, group: 17, period: 7 },
-            ElementData { symbol: "Og", name: "Oganesson", atomic_number: 118, standard_neutrons: 176, atomic_mass: 294.00, electronegativity: None, group: 18, period: 7 },
+            ElementData {
+                symbol: "Rf",
+                name: "Rutherfordium",
+                atomic_number: 104,
+                standard_neutrons: 157,
+                atomic_mass: 267.00,
+                electronegativity: None,
+                group: 4,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Db",
+                name: "Dubnium",
+                atomic_number: 105,
+                standard_neutrons: 157,
+                atomic_mass: 268.00,
+                electronegativity: None,
+                group: 5,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Sg",
+                name: "Seaborgium",
+                atomic_number: 106,
+                standard_neutrons: 160,
+                atomic_mass: 269.00,
+                electronegativity: None,
+                group: 6,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Bh",
+                name: "Bohrium",
+                atomic_number: 107,
+                standard_neutrons: 163,
+                atomic_mass: 270.00,
+                electronegativity: None,
+                group: 7,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Hs",
+                name: "Hassium",
+                atomic_number: 108,
+                standard_neutrons: 161,
+                atomic_mass: 269.00,
+                electronegativity: None,
+                group: 8,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Mt",
+                name: "Meitnerium",
+                atomic_number: 109,
+                standard_neutrons: 169,
+                atomic_mass: 278.00,
+                electronegativity: None,
+                group: 9,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Ds",
+                name: "Darmstadtium",
+                atomic_number: 110,
+                standard_neutrons: 171,
+                atomic_mass: 281.00,
+                electronegativity: None,
+                group: 10,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Rg",
+                name: "Roentgenium",
+                atomic_number: 111,
+                standard_neutrons: 171,
+                atomic_mass: 282.00,
+                electronegativity: None,
+                group: 11,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Cn",
+                name: "Copernicium",
+                atomic_number: 112,
+                standard_neutrons: 173,
+                atomic_mass: 285.00,
+                electronegativity: None,
+                group: 12,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Nh",
+                name: "Nihonium",
+                atomic_number: 113,
+                standard_neutrons: 173,
+                atomic_mass: 286.00,
+                electronegativity: None,
+                group: 13,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Fl",
+                name: "Flerovium",
+                atomic_number: 114,
+                standard_neutrons: 175,
+                atomic_mass: 289.00,
+                electronegativity: None,
+                group: 14,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Mc",
+                name: "Moscovium",
+                atomic_number: 115,
+                standard_neutrons: 175,
+                atomic_mass: 290.00,
+                electronegativity: None,
+                group: 15,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Lv",
+                name: "Livermorium",
+                atomic_number: 116,
+                standard_neutrons: 177,
+                atomic_mass: 293.00,
+                electronegativity: None,
+                group: 16,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Ts",
+                name: "Tennessine",
+                atomic_number: 117,
+                standard_neutrons: 177,
+                atomic_mass: 294.00,
+                electronegativity: None,
+                group: 17,
+                period: 7,
+            },
+            ElementData {
+                symbol: "Og",
+                name: "Oganesson",
+                atomic_number: 118,
+                standard_neutrons: 176,
+                atomic_mass: 294.00,
+                electronegativity: None,
+                group: 18,
+                period: 7,
+            },
         ];
 
         for data in element_data {
-            let mut vector = self.compose_element(data.atomic_number, data.standard_neutrons, hadrons);
+            let mut vector =
+                self.compose_element(data.atomic_number, data.standard_neutrons, hadrons);
             let z = data.atomic_number;
 
             // Add noble gas character to group 18 elements
             if data.group == 18 {
-                vector = ContinuousHV::weighted_bundle(
-                    &[&vector, &self.noble],
-                    &[1.0, 0.5],
-                );
+                vector = ContinuousHV::weighted_bundle(&[&vector, &self.noble], &[1.0, 0.5]);
             }
 
             // Add lanthanide character (La=57 through Lu=71)
             if (57..=71).contains(&z) {
-                vector = ContinuousHV::weighted_bundle(
-                    &[&vector, &self.lanthanide],
-                    &[1.0, 0.4],
-                );
+                vector = ContinuousHV::weighted_bundle(&[&vector, &self.lanthanide], &[1.0, 0.4]);
             }
 
             // Add actinide character (Ac=89 through Lr=103)
             if (89..=103).contains(&z) {
-                vector = ContinuousHV::weighted_bundle(
-                    &[&vector, &self.actinide],
-                    &[1.0, 0.4],
-                );
+                vector = ContinuousHV::weighted_bundle(&[&vector, &self.actinide], &[1.0, 0.4]);
             }
 
             // Add superheavy character (Rf=104 through Og=118)
             if z >= 104 {
-                vector = ContinuousHV::weighted_bundle(
-                    &[&vector, &self.superheavy],
-                    &[1.0, 0.3],
-                );
+                vector = ContinuousHV::weighted_bundle(&[&vector, &self.superheavy], &[1.0, 0.3]);
             }
 
             self.elements.push(Element { data, vector });
@@ -801,10 +1843,7 @@ impl PeriodicTable {
         let n = neutrons as f32;
 
         // Nuclear component: weighted bundle of protons and neutrons
-        let nuclear = ContinuousHV::weighted_bundle(
-            &[&self.proton, &self.neutron],
-            &[z, n],
-        );
+        let nuclear = ContinuousHV::weighted_bundle(&[&self.proton, &self.neutron], &[z, n]);
 
         // Electronic component: electron cloud
         let electron_cloud = self.shells.encode_configuration(protons, &self.electron);
@@ -827,7 +1866,9 @@ impl PeriodicTable {
 
     /// Get element by symbol
     pub fn by_symbol(&self, symbol: &str) -> Option<&Element> {
-        self.elements.iter().find(|e| e.data.symbol.eq_ignore_ascii_case(symbol))
+        self.elements
+            .iter()
+            .find(|e| e.data.symbol.eq_ignore_ascii_case(symbol))
     }
 
     /// Create an isotope
@@ -856,10 +1897,7 @@ impl PeriodicTable {
         let n = neutrons as f32;
 
         // Nuclear component unchanged
-        let nuclear = ContinuousHV::weighted_bundle(
-            &[&self.proton, &self.neutron],
-            &[z, n],
-        );
+        let nuclear = ContinuousHV::weighted_bundle(&[&self.proton, &self.neutron], &[z, n]);
 
         // Modified electron cloud
         let electron_cloud = self.shells.encode_configuration(electrons, &self.electron);
@@ -874,7 +1912,8 @@ impl PeriodicTable {
             self.reactive.permute(charge.unsigned_abs() as usize * 1000)
         } else if charge < 0 {
             // Anion: extra electrons (negative charge)
-            self.reactive.permute(PHYSICS_DIM / 2 + charge.unsigned_abs() as usize * 1000)
+            self.reactive
+                .permute(PHYSICS_DIM / 2 + charge.unsigned_abs() as usize * 1000)
         } else {
             ContinuousHV::zero(PHYSICS_DIM)
         };
@@ -922,8 +1961,7 @@ impl PeriodicTable {
     /// Get extended element data with physical properties
     pub fn extended_data(&self, atomic_number: u8) -> Option<ElementDataExtended> {
         self.element(atomic_number).map(|e| {
-            ElementDataExtended::from_base(e.data.clone())
-                .with_physical_properties(atomic_number)
+            ElementDataExtended::from_base(e.data.clone()).with_physical_properties(atomic_number)
         })
     }
 
@@ -951,16 +1989,12 @@ impl PeriodicTable {
         let n = data.base.standard_neutrons as f32;
 
         // Nuclear component (unchanged from basic composition)
-        let nuclear = ContinuousHV::weighted_bundle(
-            &[&self.proton, &self.neutron],
-            &[z, n],
-        );
+        let nuclear = ContinuousHV::weighted_bundle(&[&self.proton, &self.neutron], &[z, n]);
 
         // Electronic component
-        let electron_cloud = self.shells.encode_configuration(
-            data.base.atomic_number,
-            &self.electron,
-        );
+        let electron_cloud = self
+            .shells
+            .encode_configuration(data.base.atomic_number, &self.electron);
 
         // Binding energy
         let binding = hadrons.compute_binding(
@@ -980,10 +2014,7 @@ impl PeriodicTable {
             )
         } else {
             // Noble gases and superheavies - neutral
-            ContinuousHV::weighted_bundle(
-                &[&self.oxidizing, &self.reducing],
-                &[0.5, 0.5],
-            )
+            ContinuousHV::weighted_bundle(&[&self.oxidizing, &self.reducing], &[0.5, 0.5])
         };
 
         // 2. Ionization energy contribution (reactivity)
@@ -1065,7 +2096,7 @@ impl PeriodicTable {
             // Range: ~0.00009 to ~22.6 g/cm³
             let d_log = (d.max(0.0001)).ln();
             let d_min_log = 0.0001_f32.ln(); // ~ -9.2
-            let d_max_log = 22.6_f32.ln();   // ~ 3.1
+            let d_max_log = 22.6_f32.ln(); // ~ 3.1
             let d_normalized = ((d_log - d_min_log) / (d_max_log - d_min_log)).clamp(0.0, 1.0);
             ContinuousHV::weighted_bundle(
                 &[&self.density_heavy, &self.density_light],
@@ -1113,28 +2144,20 @@ impl PeriodicTable {
         );
 
         // Final combination: base atom (high weight) + properties (medium weight) + binding
-        let grounded_atom = ContinuousHV::weighted_bundle(
-            &[&base_atom, &property_bundle],
-            &[1.0, 0.5],
-        );
+        let grounded_atom =
+            ContinuousHV::weighted_bundle(&[&base_atom, &property_bundle], &[1.0, 0.5]);
 
         grounded_atom.bind(&binding)
     }
 
     /// Build an element using grounded properties by atomic number
     pub fn compose_grounded(&self, atomic_number: u8, hadrons: &Hadrons) -> Option<ContinuousHV> {
-        self.extended_data(atomic_number).map(|data| {
-            self.compose_element_grounded(&data, hadrons)
-        })
+        self.extended_data(atomic_number)
+            .map(|data| self.compose_element_grounded(&data, hadrons))
     }
 
     /// Compute similarity between elements using grounded vectors
-    pub fn grounded_similarity(
-        &self,
-        z1: u8,
-        z2: u8,
-        hadrons: &Hadrons,
-    ) -> Option<f32> {
+    pub fn grounded_similarity(&self, z1: u8, z2: u8, hadrons: &Hadrons) -> Option<f32> {
         let v1 = self.compose_grounded(z1, hadrons)?;
         let v2 = self.compose_grounded(z2, hadrons)?;
         Some(v1.similarity(&v2))
@@ -1164,7 +2187,11 @@ impl PeriodicTable {
             }
         }
 
-        if count > 0 { sum / count as f32 } else { 0.0 }
+        if count > 0 {
+            sum / count as f32
+        } else {
+            0.0
+        }
     }
 
     /// Get number of elements defined
@@ -1241,19 +2268,37 @@ impl<'a> ReactionPredictor<'a> {
         let group = data.group;
 
         // Hydrogen is nonmetal
-        if z == 1 { return 0.0; }
+        if z == 1 {
+            return 0.0;
+        }
         // Noble gases
-        if group == 18 { return 0.0; }
+        if group == 18 {
+            return 0.0;
+        }
         // Alkali and alkaline earth metals (groups 1-2)
-        if group <= 2 { return 1.0; }
+        if group <= 2 {
+            return 1.0;
+        }
         // Transition metals (groups 3-12)
-        if (3..=12).contains(&group) { return 0.9; }
+        if (3..=12).contains(&group) {
+            return 0.9;
+        }
         // Post-transition metals and metalloids
-        if group == 13 { return 0.7; }
-        if group == 14 { return 0.5; }
-        if group == 15 { return 0.3; }
-        if group == 16 { return 0.15; }
-        if group == 17 { return 0.0; }
+        if group == 13 {
+            return 0.7;
+        }
+        if group == 14 {
+            return 0.5;
+        }
+        if group == 15 {
+            return 0.3;
+        }
+        if group == 16 {
+            return 0.15;
+        }
+        if group == 17 {
+            return 0.0;
+        }
         0.5 // Default
     }
 
@@ -1281,7 +2326,8 @@ impl<'a> ReactionPredictor<'a> {
         let product_sim = elem1.similarity(&elem2);
 
         // Higher product similarity to stable = more thermodynamically favorable
-        let thermodynamic_favorability = (0.5 * (stability1 + stability2) + 0.3 * (1.0 - product_sim)).clamp(0.0, 1.0);
+        let thermodynamic_favorability =
+            (0.5 * (stability1 + stability2) + 0.3 * (1.0 - product_sim)).clamp(0.0, 1.0);
 
         // Kinetic accessibility: reactants should be reactive
         let reactivity1 = elem1.similarity(&self.table.reactive);
@@ -1348,19 +2394,18 @@ impl<'a> ReactionPredictor<'a> {
             return vec![];
         }
 
-        elements.windows(2)
+        elements
+            .windows(2)
             .map(|pair| self.predict_reaction(pair[0], pair[1]))
             .collect()
     }
 
     /// Find most reactive partners for an element
     pub fn find_reactive_partners(&self, z: u8, candidates: &[u8]) -> Vec<(u8, f32)> {
-        let mut results: Vec<(u8, f32)> = candidates.iter()
+        let mut results: Vec<(u8, f32)> = candidates
+            .iter()
             .filter(|&&c| c != z)
-            .filter_map(|&c| {
-                self.predict_reaction(z, c)
-                    .map(|p| (c, p.feasibility))
-            })
+            .filter_map(|&c| self.predict_reaction(z, c).map(|p| (c, p.feasibility)))
             .collect();
 
         results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -1416,7 +2461,8 @@ impl<'a> MolecularPropertyPredictor<'a> {
             return None;
         }
 
-        let vectors: Vec<ContinuousHV> = atom_numbers.iter()
+        let vectors: Vec<ContinuousHV> = atom_numbers
+            .iter()
             .filter_map(|&z| self.table.compose_grounded(z, self.hadrons))
             .collect();
 
@@ -1462,7 +2508,8 @@ impl<'a> MolecularPropertyPredictor<'a> {
             return 0.0;
         }
 
-        let ens: Vec<f32> = atoms.iter()
+        let ens: Vec<f32> = atoms
+            .iter()
             .filter_map(|&z| self.table.element(z))
             .filter_map(|e| e.data.electronegativity)
             .collect();
@@ -1482,7 +2529,8 @@ impl<'a> MolecularPropertyPredictor<'a> {
     /// Compute hydrophilicity from polar atom content
     fn compute_hydrophilicity(&self, atoms: &[u8], mol_vector: &ContinuousHV) -> f32 {
         // Count polar atoms (O, N, S, F)
-        let polar_count = atoms.iter()
+        let polar_count = atoms
+            .iter()
             .filter(|&&z| matches!(z, 7 | 8 | 9 | 16))
             .count();
 
@@ -1514,9 +2562,11 @@ impl<'a> MolecularPropertyPredictor<'a> {
 
     /// Estimate molecular size from atomic radii
     fn estimate_size(&self, atoms: &[u8]) -> f32 {
-        let total_radius: f32 = atoms.iter()
+        let total_radius: f32 = atoms
+            .iter()
             .filter_map(|&z| {
-                ELEMENT_PHYSICAL_PROPERTIES.get((z.saturating_sub(1)) as usize)
+                ELEMENT_PHYSICAL_PROPERTIES
+                    .get((z.saturating_sub(1)) as usize)
                     .and_then(|(_, r, _)| *r)
             })
             .sum();
@@ -1663,10 +2713,12 @@ impl<'a> KineticsPredictor<'a> {
         products: &[&[u8]],
     ) -> Option<EquilibriumParameters> {
         // Bundle reactants and products
-        let reactant_vecs: Vec<ContinuousHV> = reactants.iter()
+        let reactant_vecs: Vec<ContinuousHV> = reactants
+            .iter()
             .filter_map(|atoms| self.bundle_atoms(atoms))
             .collect();
-        let product_vecs: Vec<ContinuousHV> = products.iter()
+        let product_vecs: Vec<ContinuousHV> = products
+            .iter()
             .filter_map(|atoms| self.bundle_atoms(atoms))
             .collect();
 
@@ -1704,7 +2756,8 @@ impl<'a> KineticsPredictor<'a> {
 
     /// Helper: bundle atom vectors
     fn bundle_atoms(&self, atoms: &[u8]) -> Option<ContinuousHV> {
-        let vecs: Vec<ContinuousHV> = atoms.iter()
+        let vecs: Vec<ContinuousHV> = atoms
+            .iter()
             .filter_map(|&z| self.table.compose_grounded(z, self.hadrons))
             .collect();
 
@@ -1758,13 +2811,24 @@ impl<'a> MolecularDynamics<'a> {
     }
 
     /// Create with custom parameters
-    pub fn with_params(table: &'a PeriodicTable, hadrons: &'a Hadrons, dt: f32, damping: f32) -> Self {
-        Self { table, hadrons, dt, damping }
+    pub fn with_params(
+        table: &'a PeriodicTable,
+        hadrons: &'a Hadrons,
+        dt: f32,
+        damping: f32,
+    ) -> Self {
+        Self {
+            table,
+            hadrons,
+            dt,
+            damping,
+        }
     }
 
     /// Create initial conformation from atoms
     pub fn create_conformation(&self, atoms: &[u8]) -> Option<MolecularConformation> {
-        let vecs: Vec<ContinuousHV> = atoms.iter()
+        let vecs: Vec<ContinuousHV> = atoms
+            .iter()
             .filter_map(|&z| self.table.compose_grounded(z, self.hadrons))
             .collect();
 
@@ -1813,7 +2877,11 @@ impl<'a> MolecularDynamics<'a> {
     }
 
     /// Run energy minimization
-    pub fn minimize_energy(&self, conformation: &MolecularConformation, max_steps: usize) -> MolecularConformation {
+    pub fn minimize_energy(
+        &self,
+        conformation: &MolecularConformation,
+        max_steps: usize,
+    ) -> MolecularConformation {
         let mut positions = conformation.positions.clone();
         let mut best_energy = conformation.energy;
         let mut best_positions = positions.clone();
@@ -1862,7 +2930,11 @@ impl<'a> MolecularDynamics<'a> {
     }
 
     /// Compute intermolecular interaction energy
-    pub fn interaction_energy(&self, mol1: &MolecularConformation, mol2: &MolecularConformation) -> f32 {
+    pub fn interaction_energy(
+        &self,
+        mol1: &MolecularConformation,
+        mol2: &MolecularConformation,
+    ) -> f32 {
         // Use vector similarity as proxy for interaction strength
         let similarity = mol1.vector.similarity(&mol2.vector);
 
@@ -1886,7 +2958,9 @@ impl<'a> MolecularDynamics<'a> {
 
         // Predict collision outcome based on similarity and energy
         if similarity > 0.8 {
-            CollisionResult::Repulsion { energy: interaction }
+            CollisionResult::Repulsion {
+                energy: interaction,
+            }
         } else if similarity < 0.3 && mol1.energy + mol2.energy > 5.0 {
             // High energy + low similarity = possible reaction
             let refs = [&mol1.vector, &mol2.vector];
@@ -1896,7 +2970,9 @@ impl<'a> MolecularDynamics<'a> {
                 energy_released: mol1.energy + mol2.energy - interaction.abs(),
             }
         } else {
-            CollisionResult::ElasticScattering { energy_transfer: interaction.abs() * 0.5 }
+            CollisionResult::ElasticScattering {
+                energy_transfer: interaction.abs() * 0.5,
+            }
         }
     }
 }
@@ -1917,7 +2993,10 @@ pub enum CollisionResult {
 
 impl PeriodicTable {
     /// Create a molecular property predictor
-    pub fn property_predictor<'a>(&'a self, hadrons: &'a Hadrons) -> MolecularPropertyPredictor<'a> {
+    pub fn property_predictor<'a>(
+        &'a self,
+        hadrons: &'a Hadrons,
+    ) -> MolecularPropertyPredictor<'a> {
         MolecularPropertyPredictor::new(self, hadrons)
     }
 
@@ -1982,7 +3061,8 @@ mod tests {
         assert!(
             c12_c14 > c_n,
             "Isotopes should be more similar than different elements: C12-C14={}, C-N={}",
-            c12_c14, c_n
+            c12_c14,
+            c_n
         );
     }
 
@@ -2002,7 +3082,8 @@ mod tests {
         assert!(
             c_n_sim > c_fe_sim,
             "Adjacent elements should be more similar: C-N={}, C-Fe={}",
-            c_n_sim, c_fe_sim
+            c_n_sim,
+            c_fe_sim
         );
     }
 
@@ -2060,10 +3141,7 @@ mod tests {
         let he_ne = he.vector.similarity(&ne.vector);
         let he_li = he.vector.similarity(&table.element(3).unwrap().vector);
 
-        assert!(
-            he_ne > he_li * 0.5,
-            "Noble gases should share character"
-        );
+        assert!(he_ne > he_li * 0.5, "Noble gases should share character");
     }
 
     #[test]
@@ -2097,7 +3175,12 @@ mod tests {
         let la_fe = la.vector.similarity(&fe.vector);
 
         assert!(la_ce > 0.5, "La-Ce similarity should exceed 0.5: {}", la_ce);
-        assert!(la_ce > la_fe, "Lanthanides should cluster: La-Ce={} > La-Fe={}", la_ce, la_fe);
+        assert!(
+            la_ce > la_fe,
+            "Lanthanides should cluster: La-Ce={} > La-Fe={}",
+            la_ce,
+            la_fe
+        );
     }
 
     #[test]
@@ -2112,7 +3195,12 @@ mod tests {
         let ac_pb = ac.vector.similarity(&pb.vector);
 
         assert!(ac_th > 0.5, "Ac-Th similarity should exceed 0.5: {}", ac_th);
-        assert!(ac_th > ac_pb, "Actinides should cluster: Ac-Th={} > Ac-Pb={}", ac_th, ac_pb);
+        assert!(
+            ac_th > ac_pb,
+            "Actinides should cluster: Ac-Th={} > Ac-Pb={}",
+            ac_th,
+            ac_pb
+        );
     }
 
     #[test]
@@ -2125,7 +3213,11 @@ mod tests {
 
         // Superheavy elements should share some character with each other
         let og_fl = oganesson.vector.similarity(&flerovium.vector);
-        assert!(og_fl > 0.3, "Superheavy elements should cluster: Og-Fl={}", og_fl);
+        assert!(
+            og_fl > 0.3,
+            "Superheavy elements should cluster: Og-Fl={}",
+            og_fl
+        );
 
         // Hydrogen and Oganesson are very different (opposite ends of table)
         let h_og = hydrogen.vector.similarity(&oganesson.vector);
@@ -2159,7 +3251,11 @@ mod tests {
 
         // Noble gases should share noble character
         let ne_ar = ne.vector.similarity(&ar.vector);
-        assert!(ne_ar > 0.3, "Ne and Ar should share noble character: {}", ne_ar);
+        assert!(
+            ne_ar > 0.3,
+            "Ne and Ar should share noble character: {}",
+            ne_ar
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -2177,8 +3273,11 @@ mod tests {
         assert!(carbon_ext.atomic_radius.is_some());
 
         let fluorine_ext = table.extended_data(9).unwrap();
-        assert!(fluorine_ext.first_ionization_energy.unwrap() > carbon_ext.first_ionization_energy.unwrap(),
-            "F should have higher IE than C");
+        assert!(
+            fluorine_ext.first_ionization_energy.unwrap()
+                > carbon_ext.first_ionization_energy.unwrap(),
+            "F should have higher IE than C"
+        );
     }
 
     #[test]
@@ -2210,9 +3309,12 @@ mod tests {
         println!("Li-Cl cross-group similarity: {:.4}", cross_group);
 
         // Alkali metals should cluster more than cross-group
-        assert!(alkali_avg > cross_group.abs(),
+        assert!(
+            alkali_avg > cross_group.abs(),
             "Alkali metals should cluster: intra={:.4} > cross={:.4}",
-            alkali_avg, cross_group.abs());
+            alkali_avg,
+            cross_group.abs()
+        );
     }
 
     #[test]
@@ -2226,8 +3328,11 @@ mod tests {
         println!("Halogen avg similarity: {:.4}", halogen_avg);
 
         // Halogens should have positive similarity (clustering)
-        assert!(halogen_avg > 0.3,
-            "Halogens should cluster with similarity > 0.3: {:.4}", halogen_avg);
+        assert!(
+            halogen_avg > 0.3,
+            "Halogens should cluster with similarity > 0.3: {:.4}",
+            halogen_avg
+        );
     }
 
     #[test]
@@ -2238,8 +3343,10 @@ mod tests {
         let f_ext = table.extended_data(9).unwrap();
         let fr_ext = table.extended_data(87).unwrap();
 
-        assert!(f_ext.base.electronegativity > fr_ext.base.electronegativity,
-            "F should have higher EN than Fr");
+        assert!(
+            f_ext.base.electronegativity > fr_ext.base.electronegativity,
+            "F should have higher EN than Fr"
+        );
 
         // Compose grounded vectors
         let f_vec = table.compose_grounded(9, &hadrons).unwrap();
@@ -2253,9 +3360,12 @@ mod tests {
         println!("Fr-oxidizing similarity: {:.4}", fr_oxidizing);
 
         // Fluorine should have higher oxidizing character
-        assert!(f_oxidizing > fr_oxidizing,
+        assert!(
+            f_oxidizing > fr_oxidizing,
             "F should be more oxidizing than Fr: F={:.4}, Fr={:.4}",
-            f_oxidizing, fr_oxidizing);
+            f_oxidizing,
+            fr_oxidizing
+        );
     }
 
     #[test]
@@ -2271,15 +3381,21 @@ mod tests {
 
         // They should be quite different
         println!("Na-Ar similarity: {:.4}", na_ar_sim);
-        assert!(na_ar_sim < 0.8,
-            "Na and Ar should be different (opposite ends of period): {:.4}", na_ar_sim);
+        assert!(
+            na_ar_sim < 0.8,
+            "Na and Ar should be different (opposite ends of period): {:.4}",
+            na_ar_sim
+        );
 
         // Na should be more metallic
         let na_metallic = na.similarity(&table.metallic);
         let ar_metallic = ar.similarity(&table.metallic);
-        assert!(na_metallic > ar_metallic,
+        assert!(
+            na_metallic > ar_metallic,
             "Na should be more metallic than Ar: Na={:.4}, Ar={:.4}",
-            na_metallic, ar_metallic);
+            na_metallic,
+            ar_metallic
+        );
     }
 
     #[test]
@@ -2294,7 +3410,12 @@ mod tests {
         let k_ie = k_ext.first_ionization_energy.unwrap();
         let ca_ie = ca_ext.first_ionization_energy.unwrap();
 
-        assert!(k_ie < ca_ie, "K should have lower IE than Ca: K={:.0}, Ca={:.0}", k_ie, ca_ie);
+        assert!(
+            k_ie < ca_ie,
+            "K should have lower IE than Ca: K={:.0}, Ca={:.0}",
+            k_ie,
+            ca_ie
+        );
 
         // K should be more similar to reactive character
         let k_vec = table.compose_grounded(19, &hadrons).unwrap();
@@ -2307,9 +3428,12 @@ mod tests {
         println!("Ca reactivity similarity: {:.4}", ca_reactive);
 
         // K should have higher reactive character (due to lower IE)
-        assert!(k_reactive > ca_reactive,
+        assert!(
+            k_reactive > ca_reactive,
             "K should be more reactive than Ca: K={:.4}, Ca={:.4}",
-            k_reactive, ca_reactive);
+            k_reactive,
+            ca_reactive
+        );
     }
 
     #[test]
@@ -2321,12 +3445,18 @@ mod tests {
         let c_ext = table.extended_data(6).unwrap();
         let f_ext = table.extended_data(9).unwrap();
 
-        assert!(na_ext.metallic_character > c_ext.metallic_character,
-            "Na should be more metallic than C");
-        assert!(c_ext.metallic_character > f_ext.metallic_character,
-            "C should be more metallic than F");
-        assert!(f_ext.metallic_character == 0.0,
-            "F (halogen) should have zero metallic character");
+        assert!(
+            na_ext.metallic_character > c_ext.metallic_character,
+            "Na should be more metallic than C"
+        );
+        assert!(
+            c_ext.metallic_character > f_ext.metallic_character,
+            "C should be more metallic than F"
+        );
+        assert!(
+            f_ext.metallic_character == 0.0,
+            "F (halogen) should have zero metallic character"
+        );
     }
 
     #[test]
@@ -2336,16 +3466,24 @@ mod tests {
         // Check that common elements have physical properties
         for z in [1, 6, 8, 11, 17, 26, 29, 79] {
             let ext = table.extended_data(z as u8).unwrap();
-            assert!(ext.first_ionization_energy.is_some(),
-                "Element {} should have IE", ext.base.symbol);
-            assert!(ext.atomic_radius.is_some(),
-                "Element {} should have radius", ext.base.symbol);
+            assert!(
+                ext.first_ionization_energy.is_some(),
+                "Element {} should have IE",
+                ext.base.symbol
+            );
+            assert!(
+                ext.atomic_radius.is_some(),
+                "Element {} should have radius",
+                ext.base.symbol
+            );
         }
 
         // Superheavy elements may not have measured properties
         let og_ext = table.extended_data(118).unwrap();
-        assert!(og_ext.first_ionization_energy.is_none(),
-            "Og (superheavy) may not have measured IE");
+        assert!(
+            og_ext.first_ionization_energy.is_none(),
+            "Og (superheavy) may not have measured IE"
+        );
     }
 
     #[test]
@@ -2358,8 +3496,10 @@ mod tests {
         let fe1 = table.compose_grounded(26, &hadrons).unwrap();
         let fe2 = table.compose_grounded(26, &hadrons).unwrap();
 
-        assert!(fe1.similarity(&fe2) > 0.9999,
-            "Grounded composition should be deterministic");
+        assert!(
+            fe1.similarity(&fe2) > 0.9999,
+            "Grounded composition should be deterministic"
+        );
     }
 
     // Tests for thermodynamic properties
@@ -2371,12 +3511,21 @@ mod tests {
         // Check that common elements have thermodynamic properties
         for z in [1, 6, 8, 11, 17, 26, 29, 79] {
             let ext = table.extended_data(z as u8).unwrap();
-            assert!(ext.melting_point.is_some(),
-                "Element {} should have melting point", ext.base.symbol);
-            assert!(ext.boiling_point.is_some(),
-                "Element {} should have boiling point", ext.base.symbol);
-            assert!(ext.density.is_some(),
-                "Element {} should have density", ext.base.symbol);
+            assert!(
+                ext.melting_point.is_some(),
+                "Element {} should have melting point",
+                ext.base.symbol
+            );
+            assert!(
+                ext.boiling_point.is_some(),
+                "Element {} should have boiling point",
+                ext.base.symbol
+            );
+            assert!(
+                ext.density.is_some(),
+                "Element {} should have density",
+                ext.base.symbol
+            );
         }
     }
 
@@ -2388,22 +3537,31 @@ mod tests {
         let w_ext = table.extended_data(74).unwrap();
         let w_mp = w_ext.melting_point.unwrap();
 
-        assert!(w_mp > 3600.0,
-            "W should have very high melting point: {:.0} K", w_mp);
+        assert!(
+            w_mp > 3600.0,
+            "W should have very high melting point: {:.0} K",
+            w_mp
+        );
 
         // Mercury is liquid at room temp (lowest melting point metal)
         let hg_ext = table.extended_data(80).unwrap();
         let hg_mp = hg_ext.melting_point.unwrap();
 
-        assert!(hg_mp < 300.0,
-            "Hg should have low melting point: {:.1} K", hg_mp);
+        assert!(
+            hg_mp < 300.0,
+            "Hg should have low melting point: {:.1} K",
+            hg_mp
+        );
 
         // Noble gases have very low melting points
         let he_ext = table.extended_data(2).unwrap();
         let he_mp = he_ext.melting_point.unwrap();
 
-        assert!(he_mp < 10.0,
-            "He should have lowest melting point: {:.2} K", he_mp);
+        assert!(
+            he_mp < 10.0,
+            "He should have lowest melting point: {:.2} K",
+            he_mp
+        );
     }
 
     #[test]
@@ -2416,22 +3574,32 @@ mod tests {
         let os_dens = os_ext.density.unwrap();
         let ir_dens = ir_ext.density.unwrap();
 
-        assert!(os_dens > 22.0 && ir_dens > 22.0,
-            "Os and Ir should have very high density: Os={:.1}, Ir={:.1}", os_dens, ir_dens);
+        assert!(
+            os_dens > 22.0 && ir_dens > 22.0,
+            "Os and Ir should have very high density: Os={:.1}, Ir={:.1}",
+            os_dens,
+            ir_dens
+        );
 
         // Hydrogen has lowest density
         let h_ext = table.extended_data(1).unwrap();
         let h_dens = h_ext.density.unwrap();
 
-        assert!(h_dens < 0.001,
-            "H should have very low density: {:.6} g/cm³", h_dens);
+        assert!(
+            h_dens < 0.001,
+            "H should have very low density: {:.6} g/cm³",
+            h_dens
+        );
 
         // Lithium is the lightest metal
         let li_ext = table.extended_data(3).unwrap();
         let li_dens = li_ext.density.unwrap();
 
-        assert!(li_dens < 1.0,
-            "Li should be lighter than water: {:.3} g/cm³", li_dens);
+        assert!(
+            li_dens < 1.0,
+            "Li should be lighter than water: {:.3} g/cm³",
+            li_dens
+        );
     }
 
     #[test]
@@ -2442,15 +3610,21 @@ mod tests {
         let re_ext = table.extended_data(75).unwrap();
         let re_bp = re_ext.boiling_point.unwrap();
 
-        assert!(re_bp > 5800.0,
-            "Re should have very high boiling point: {:.0} K", re_bp);
+        assert!(
+            re_bp > 5800.0,
+            "Re should have very high boiling point: {:.0} K",
+            re_bp
+        );
 
         // Helium has lowest boiling point (4.22 K)
         let he_ext = table.extended_data(2).unwrap();
         let he_bp = he_ext.boiling_point.unwrap();
 
-        assert!(he_bp < 10.0,
-            "He should have lowest boiling point: {:.2} K", he_bp);
+        assert!(
+            he_bp < 10.0,
+            "He should have lowest boiling point: {:.2} K",
+            he_bp
+        );
     }
 
     #[test]
@@ -2462,10 +3636,16 @@ mod tests {
         let na_dens = table.extended_data(11).unwrap().density.unwrap();
         let k_dens = table.extended_data(19).unwrap().density.unwrap();
 
-        assert!(na_dens > li_dens,
-            "Na should be denser than Li: Na={:.2}, Li={:.2}", na_dens, li_dens);
-        assert!(k_dens > na_dens.min(li_dens),
-            "Alkali metals generally increase in density down group");
+        assert!(
+            na_dens > li_dens,
+            "Na should be denser than Li: Na={:.2}, Li={:.2}",
+            na_dens,
+            li_dens
+        );
+        assert!(
+            k_dens > na_dens.min(li_dens),
+            "Alkali metals generally increase in density down group"
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -2487,8 +3667,14 @@ mod tests {
         let w_thermal_volatile = w_vec.similarity(&table.thermal_volatile);
         let he_thermal_volatile = he_vec.similarity(&table.thermal_volatile);
 
-        println!("W  - thermal_stable: {:.4}, thermal_volatile: {:.4}", w_thermal_stable, w_thermal_volatile);
-        println!("He - thermal_stable: {:.4}, thermal_volatile: {:.4}", he_thermal_stable, he_thermal_volatile);
+        println!(
+            "W  - thermal_stable: {:.4}, thermal_volatile: {:.4}",
+            w_thermal_stable, w_thermal_volatile
+        );
+        println!(
+            "He - thermal_stable: {:.4}, thermal_volatile: {:.4}",
+            he_thermal_stable, he_thermal_volatile
+        );
 
         // W should be more similar to thermal_stable than He, or both near zero
         // HDC encoding has limited precision for thermal property discrimination
@@ -2518,13 +3704,22 @@ mod tests {
         let os_light = os_vec.similarity(&table.density_light);
         let li_light = li_vec.similarity(&table.density_light);
 
-        println!("Os - density_heavy: {:.4}, density_light: {:.4}", os_heavy, os_light);
-        println!("Li - density_heavy: {:.4}, density_light: {:.4}", li_heavy, li_light);
+        println!(
+            "Os - density_heavy: {:.4}, density_light: {:.4}",
+            os_heavy, os_light
+        );
+        println!(
+            "Li - density_heavy: {:.4}, density_light: {:.4}",
+            li_heavy, li_light
+        );
 
         // Os should be more similar to density_heavy than Li
-        assert!(os_heavy > li_heavy,
+        assert!(
+            os_heavy > li_heavy,
             "Os should be more dense than Li: Os={:.4}, Li={:.4}",
-            os_heavy, li_heavy);
+            os_heavy,
+            li_heavy
+        );
 
         // Li should be more similar to density_light than Os
         // HDC encoding has limited precision for light-density discrimination;
@@ -2559,21 +3754,30 @@ mod tests {
         // rather than enforcing strict ordering.
         let fe_liquid = fe_vec.similarity(&table.phase_liquid);
         let hg_fe_liquid_diff = (hg_liquid - fe_liquid).abs();
-        assert!(hg_fe_liquid_diff < 0.05,
+        assert!(
+            hg_fe_liquid_diff < 0.05,
             "Hg and Fe liquid similarity should be within encoding noise: Hg={:.4}, Fe={:.4}",
-            hg_liquid, fe_liquid);
+            hg_liquid,
+            fe_liquid
+        );
 
         let fe_gas = fe_vec.similarity(&table.phase_gas);
         let n_fe_gas_diff = (n_gas - fe_gas).abs();
-        assert!(n_fe_gas_diff < 0.05,
+        assert!(
+            n_fe_gas_diff < 0.05,
             "N and Fe gas similarity should be within encoding noise: N={:.4}, Fe={:.4}",
-            n_gas, fe_gas);
+            n_gas,
+            fe_gas
+        );
 
         let n_solid = n_vec.similarity(&table.phase_solid);
         let fe_n_solid_diff = (fe_solid - n_solid).abs();
-        assert!(fe_n_solid_diff < 0.05,
+        assert!(
+            fe_n_solid_diff < 0.05,
             "Fe and N solid similarity should be within encoding noise: Fe={:.4}, N={:.4}",
-            fe_solid, n_solid);
+            fe_solid,
+            n_solid
+        );
     }
 
     #[test]
@@ -2590,7 +3794,10 @@ mod tests {
             let gas_char = vec.similarity(&table.phase_gas);
 
             let symbol = table.element(z).unwrap().data.symbol;
-            println!("{}: volatile={:.4}, stable={:.4}, gas={:.4}", symbol, volatile, stable, gas_char);
+            println!(
+                "{}: volatile={:.4}, stable={:.4}, gas={:.4}",
+                symbol, volatile, stable, gas_char
+            );
 
             // Noble gases should be more volatile than stable, or both near zero
             // (HDC encoding has limited precision for heavier noble gases)
@@ -2616,7 +3823,10 @@ mod tests {
             let solid_char = vec.similarity(&table.phase_solid);
 
             let symbol = table.element(z).unwrap().data.symbol;
-            println!("{}: stable={:.4}, volatile={:.4}, solid={:.4}", symbol, stable, volatile, solid_char);
+            println!(
+                "{}: stable={:.4}, volatile={:.4}, solid={:.4}",
+                symbol, stable, volatile, solid_char
+            );
 
             // Refractory metals should be more stable than volatile, or both near zero
             // (HDC encoding has limited precision for thermal property discrimination)
@@ -2645,7 +3855,10 @@ mod tests {
         let br_solid = br_vec.similarity(&table.phase_solid);
         let br_gas = br_vec.similarity(&table.phase_gas);
 
-        println!("Br - liquid: {:.4}, solid: {:.4}, gas: {:.4}", br_liquid, br_solid, br_gas);
+        println!(
+            "Br - liquid: {:.4}, solid: {:.4}, gas: {:.4}",
+            br_liquid, br_solid, br_gas
+        );
 
         // HDC encoding has limited precision for fine-grained phase discrimination.
         // Check that the similarities are in a reasonable range (near zero for weak signal)
@@ -2657,9 +3870,11 @@ mod tests {
 
         // Gas character should not dominate (Br is not a gas at STP)
         // Br gas value should not be significantly positive
-        assert!(br_gas < 0.02,
+        assert!(
+            br_gas < 0.02,
             "Br should not have strong gas character at STP: gas={:.4}",
-            br_gas);
+            br_gas
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -2674,13 +3889,15 @@ mod tests {
         // Alkali metals: reactivity increases down the group
         // Li(3) < Na(11) < K(19) < Rb(37) < Cs(55)
         let alkali = [3, 11, 19, 37, 55];
-        let vecs: Vec<_> = alkali.iter()
+        let vecs: Vec<_> = alkali
+            .iter()
             .filter_map(|&z| table.compose_grounded(z, &hadrons))
             .collect();
 
         // Check ionization energy trend (lower = more reactive)
         // Lower ionization energy should give lower similarity to reducing concept
-        let reactive_sims: Vec<f64> = vecs.iter()
+        let reactive_sims: Vec<f64> = vecs
+            .iter()
             .map(|v| v.similarity(&table.reactive) as f64)
             .collect();
 
@@ -2693,10 +3910,16 @@ mod tests {
         // Heavier alkali metals should be more reactive, but HDC encoding
         // has limited precision for fine-grained reactivity ordering.
         // Check that the range of values is within encoding noise.
-        let range = reactive_sims.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+        let range = reactive_sims
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max)
             - reactive_sims.iter().cloned().fold(f64::INFINITY, f64::min);
-        assert!(range < 0.1,
-            "Alkali metal reactivity values should be within encoding noise range: {:.4}", range);
+        assert!(
+            range < 0.1,
+            "Alkali metal reactivity values should be within encoding noise range: {:.4}",
+            range
+        );
     }
 
     #[test]
@@ -2706,11 +3929,13 @@ mod tests {
         // Halogens: electronegativity decreases down the group
         // F(9) > Cl(17) > Br(35) > I(53)
         let halogens = [9, 17, 35, 53];
-        let vecs: Vec<_> = halogens.iter()
+        let vecs: Vec<_> = halogens
+            .iter()
             .filter_map(|&z| table.compose_grounded(z, &hadrons))
             .collect();
 
-        let oxidizing_sims: Vec<f64> = vecs.iter()
+        let oxidizing_sims: Vec<f64> = vecs
+            .iter()
             .map(|v| v.similarity(&table.oxidizing) as f64)
             .collect();
 
@@ -2721,10 +3946,14 @@ mod tests {
         }
 
         // F should be most oxidizing
-        assert!(oxidizing_sims[0] > oxidizing_sims[2],
-            "F should be more oxidizing than Br");
-        assert!(oxidizing_sims[0] > oxidizing_sims[3],
-            "F should be more oxidizing than I");
+        assert!(
+            oxidizing_sims[0] > oxidizing_sims[2],
+            "F should be more oxidizing than Br"
+        );
+        assert!(
+            oxidizing_sims[0] > oxidizing_sims[3],
+            "F should be more oxidizing than I"
+        );
     }
 
     #[test]
@@ -2736,13 +3965,15 @@ mod tests {
         // This is because smaller atoms hold electrons more tightly
 
         let noble = [2, 10, 18, 36, 54];
-        let vecs: Vec<_> = noble.iter()
+        let vecs: Vec<_> = noble
+            .iter()
             .filter_map(|&z| table.compose_grounded(z, &hadrons))
             .collect();
 
         // Elements with high IE should have low reactive character
         // (they don't give up electrons easily)
-        let reactive_sims: Vec<f64> = vecs.iter()
+        let reactive_sims: Vec<f64> = vecs
+            .iter()
             .map(|v| v.similarity(&table.reactive) as f64)
             .collect();
 
@@ -2755,8 +3986,10 @@ mod tests {
         // He should be least reactive (highest IE)
         for i in 1..reactive_sims.len() {
             // Noble gases should all have low reactivity
-            assert!(reactive_sims[i] < 0.5,
-                "Noble gases should have low reactivity");
+            assert!(
+                reactive_sims[i] < 0.5,
+                "Noble gases should have low reactivity"
+            );
         }
     }
 
@@ -2769,10 +4002,12 @@ mod tests {
         let transition = [22, 23, 24, 25, 26, 27, 28, 29]; // Ti through Cu
         let main_group = [11, 17, 20, 35]; // Na, Cl, Ca, Br
 
-        let trans_vecs: Vec<_> = transition.iter()
+        let trans_vecs: Vec<_> = transition
+            .iter()
             .filter_map(|&z| table.compose_grounded(z, &hadrons))
             .collect();
-        let main_vecs: Vec<_> = main_group.iter()
+        let main_vecs: Vec<_> = main_group
+            .iter()
             .filter_map(|&z| table.compose_grounded(z, &hadrons))
             .collect();
 
@@ -2803,9 +4038,12 @@ mod tests {
         println!("  Avg cross-group similarity: {:.4}", avg_cross_sim);
 
         // Transition metals should be more similar to each other
-        assert!(avg_trans_sim > avg_cross_sim,
+        assert!(
+            avg_trans_sim > avg_cross_sim,
             "Transition metals should cluster together: within={:.4}, cross={:.4}",
-            avg_trans_sim, avg_cross_sim);
+            avg_trans_sim,
+            avg_cross_sim
+        );
     }
 
     #[test]
@@ -2815,7 +4053,8 @@ mod tests {
         // Period 3 trends: Na(11) -> Ar(18)
         // Atomic radius decreases, ionization energy increases
         let period3 = [11, 12, 13, 14, 15, 16, 17, 18];
-        let vecs: Vec<_> = period3.iter()
+        let vecs: Vec<_> = period3
+            .iter()
             .filter_map(|&z| table.compose_grounded(z, &hadrons))
             .collect();
 
@@ -2832,9 +4071,12 @@ mod tests {
 
         // Check that there's a size difference (exact direction depends on encoding)
         let size_range = (na_size - ar_size).abs();
-        assert!(size_range > 0.01,
+        assert!(
+            size_range > 0.01,
             "Na and Ar should have different size characteristics: Na={:.4}, Ar={:.4}",
-            na_size, ar_size);
+            na_size,
+            ar_size
+        );
     }
 
     #[test]
@@ -2846,10 +4088,12 @@ mod tests {
         // Clear nonmetals: C, N, O, F, Cl
         let nonmetals = [6, 7, 8, 9, 17];
 
-        let metal_vecs: Vec<_> = metals.iter()
+        let metal_vecs: Vec<_> = metals
+            .iter()
             .filter_map(|&z| table.compose_grounded(z, &hadrons))
             .collect();
-        let nonmetal_vecs: Vec<_> = nonmetals.iter()
+        let nonmetal_vecs: Vec<_> = nonmetals
+            .iter()
             .filter_map(|&z| table.compose_grounded(z, &hadrons))
             .collect();
 
@@ -2894,9 +4138,12 @@ mod tests {
         // Cross-group similarity should be lower than within-group
         // (at least for one of the groups)
         let min_within = avg_metal_sim.min(avg_nonmetal_sim);
-        assert!(avg_cross_sim < min_within + 0.1,
+        assert!(
+            avg_cross_sim < min_within + 0.1,
             "Metal-nonmetal should be somewhat separated: cross={:.4}, min_within={:.4}",
-            avg_cross_sim, min_within);
+            avg_cross_sim,
+            min_within
+        );
     }
 
     #[test]
@@ -2920,9 +4167,18 @@ mod tests {
         let w_stable = w_vec.similarity(&table.thermal_stable);
 
         println!("Boiling point correlations:");
-        println!("  He (bp=4K): volatile={:.4}, stable={:.4}", he_volatile, he_stable);
-        println!("  Fe (bp=3134K): volatile={:.4}, stable={:.4}", fe_volatile, fe_stable);
-        println!("  W (bp=5828K): volatile={:.4}, stable={:.4}", w_volatile, w_stable);
+        println!(
+            "  He (bp=4K): volatile={:.4}, stable={:.4}",
+            he_volatile, he_stable
+        );
+        println!(
+            "  Fe (bp=3134K): volatile={:.4}, stable={:.4}",
+            fe_volatile, fe_stable
+        );
+        println!(
+            "  W (bp=5828K): volatile={:.4}, stable={:.4}",
+            w_volatile, w_stable
+        );
 
         // He should be more volatile than W, or both near zero
         // HDC encoding has limited precision for thermal property discrimination
@@ -2933,9 +4189,13 @@ mod tests {
 
         // W should be more thermally stable than He, or both near zero
         let stable_diff = w_stable - he_stable;
-        assert!(stable_diff > -0.01,
+        assert!(
+            stable_diff > -0.01,
             "W-He stable difference should not be strongly negative: W={:.4}, He={:.4}, diff={:.4}",
-            w_stable, he_stable, stable_diff);
+            w_stable,
+            he_stable,
+            stable_diff
+        );
     }
 
     #[test]
@@ -2960,9 +4220,12 @@ mod tests {
         println!("  Os (22.6 g/cm³): dense_sim={:.4}", os_dense);
 
         // Os should have higher density similarity than Li
-        assert!(os_dense > li_dense,
+        assert!(
+            os_dense > li_dense,
             "Os should be denser than Li: Os={:.4}, Li={:.4}",
-            os_dense, li_dense);
+            os_dense,
+            li_dense
+        );
     }
 
     #[test]
@@ -2981,8 +4244,14 @@ mod tests {
         let cl_oxidizing = cl_vec.similarity(&table.oxidizing);
 
         println!("Reaction partner prediction (Na + Cl → NaCl):");
-        println!("  Na: reducing={:.4}, oxidizing={:.4}", na_reducing, na_oxidizing);
-        println!("  Cl: reducing={:.4}, oxidizing={:.4}", cl_reducing, cl_oxidizing);
+        println!(
+            "  Na: reducing={:.4}, oxidizing={:.4}",
+            na_reducing, na_oxidizing
+        );
+        println!(
+            "  Cl: reducing={:.4}, oxidizing={:.4}",
+            cl_reducing, cl_oxidizing
+        );
 
         // Na should be reducing, Cl should be oxidizing
         // HDC encoding has limited precision; check values are within noise

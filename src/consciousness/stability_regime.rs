@@ -18,15 +18,14 @@ use ndarray::Array1;
 use serde::{Deserialize, Serialize};
 
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
-use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::BinaryHV;
 
-use crate::dynamics::cfc_coherence::{CfCCoherenceBridge, CoherenceConfig};
 use crate::consciousness::primitive_consciousness::{
-    PrimitiveConsciousnessState, ActivationReason,
-    ConsciousnessPrimitiveProcessor,
+    ActivationReason, ConsciousnessPrimitiveProcessor, PrimitiveConsciousnessState,
 };
+use crate::dynamics::cfc_coherence::{CfCCoherenceBridge, CoherenceConfig};
 
 // =============================================================================
 // REGIME TRANSITIONS
@@ -41,13 +40,9 @@ pub enum RegimeTransition {
         encoding: BinaryHV,
     },
     /// Primitive has decrystallized (Crystallized -> Plastic)
-    Decrystallized {
-        primitive_name: String,
-    },
+    Decrystallized { primitive_name: String },
     /// Primitive promoted from Fluid to Plastic
-    Solidified {
-        primitive_name: String,
-    },
+    Solidified { primitive_name: String },
 }
 
 // =============================================================================
@@ -74,13 +69,13 @@ impl StabilityRegimeType {
             | PrimitiveTier::Physical
             | PrimitiveTier::Geometric => StabilityRegimeType::Crystallized,
 
-            PrimitiveTier::Strategic
-            | PrimitiveTier::MetaCognitive
-            | PrimitiveTier::Temporal => StabilityRegimeType::Plastic,
+            PrimitiveTier::Strategic | PrimitiveTier::MetaCognitive | PrimitiveTier::Temporal => {
+                StabilityRegimeType::Plastic
+            }
 
-            PrimitiveTier::Compositional
-            | PrimitiveTier::Consciousness
-            | PrimitiveTier::Code => StabilityRegimeType::Fluid,
+            PrimitiveTier::Compositional | PrimitiveTier::Consciousness | PrimitiveTier::Code => {
+                StabilityRegimeType::Fluid
+            }
         }
     }
 }
@@ -247,10 +242,7 @@ impl CfCPrimitive {
     pub fn evolve(&mut self, dt: f32, input: &ContinuousHV, params: &RegimeParams) -> f64 {
         // Blend input with attractor: blended = a*attractor + (1-a)*input
         let a = params.attractor_strength;
-        let blended = ContinuousHV::weighted_bundle(
-            &[&self.attractor, input],
-            &[a, 1.0 - a],
-        );
+        let blended = ContinuousHV::weighted_bundle(&[&self.attractor, input], &[a, 1.0 - a]);
 
         // Closed-form CfC evolution (O(1) temporal jump)
         self.neuron.evolve_closed_form(dt, &blended);
@@ -277,7 +269,8 @@ impl CfCPrimitive {
             }
             StabilityRegimeType::Fluid => {
                 // Contrastive: push toward input, away from attractor
-                self.neuron.contrastive_update(input, &self.attractor, scaled_lr);
+                self.neuron
+                    .contrastive_update(input, &self.attractor, scaled_lr);
             }
         }
     }
@@ -315,7 +308,11 @@ impl CfCPrimitive {
     /// - Fluid -> Plastic after `fluid_to_plastic_activations`
     /// - Plastic -> Crystallized after `plastic_to_crystallized_activations`
     /// - Crystallized -> Plastic if idle for `decrystallize_idle_cycles`
-    pub fn update_regime(&mut self, global_cycle: usize, config: &StabilityRegimeConfig) -> Option<RegimeTransition> {
+    pub fn update_regime(
+        &mut self,
+        global_cycle: usize,
+        config: &StabilityRegimeConfig,
+    ) -> Option<RegimeTransition> {
         match self.regime {
             StabilityRegimeType::Fluid => {
                 if self.total_activation_count >= config.fluid_to_plastic_activations {
@@ -482,11 +479,13 @@ impl StabilityRegimeProcessor {
         let mut state = PrimitiveConsciousnessState::new(timestamp);
 
         // Collect active primitives sorted by activation (descending)
-        let mut active_cfcs: Vec<&CfCPrimitive> = self.primitives.values()
-            .filter(|c| c.is_active)
-            .collect();
-        active_cfcs.sort_by(|a, b| b.activation.partial_cmp(&a.activation)
-            .unwrap_or(std::cmp::Ordering::Equal));
+        let mut active_cfcs: Vec<&CfCPrimitive> =
+            self.primitives.values().filter(|c| c.is_active).collect();
+        active_cfcs.sort_by(|a, b| {
+            b.activation
+                .partial_cmp(&a.activation)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Limit to max_active
         for cfc in active_cfcs.iter().take(self.config.max_active) {
@@ -515,7 +514,9 @@ impl StabilityRegimeProcessor {
         state.phi = self.estimate_phi(&state);
 
         // Collect tau values from active neurons for coherence
-        let tau_vecs: Vec<Array1<f32>> = self.primitives.values()
+        let tau_vecs: Vec<Array1<f32>> = self
+            .primitives
+            .values()
             .filter(|c| c.is_active)
             .map(|c| {
                 let tau = c.effective_tau(&continuous_input);
@@ -805,7 +806,10 @@ mod tests {
         // Drop below deactivation threshold
         cfc.activation = 0.20;
         cfc.update_active_status(params);
-        assert!(!cfc.is_active, "Should deactivate below deactivation threshold");
+        assert!(
+            !cfc.is_active,
+            "Should deactivate below deactivation threshold"
+        );
     }
 
     #[test]
@@ -843,6 +847,9 @@ mod tests {
         let processor = StabilityRegimeProcessor::new();
         // Inner processor should work independently
         let stats = processor.inner().primitive_stats();
-        assert!(stats.total_primitives > 0, "Inner processor should have primitives");
+        assert!(
+            stats.total_primitives > 0,
+            "Inner processor should have primitives"
+        );
     }
 }

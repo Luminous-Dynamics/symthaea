@@ -8,7 +8,7 @@ use super::types::PlannedAction;
 
 #[cfg(feature = "magi_loop")]
 use crate::consciousness::recursive_improvement::dream_feedback::{
-    DreamFeedbackBridge, DreamInsight, ActionPrior,
+    ActionPrior, DreamFeedbackBridge, DreamInsight,
 };
 
 /// Convert a dream feedback bridge's priors into MCTS action priors.
@@ -121,12 +121,7 @@ mod tests {
     #[test]
     fn test_dream_priors_applied() {
         let mut bridge = DreamFeedbackBridge::new();
-        let insight = DreamInsight::new(
-            12345,
-            vec![0.0, 0.0],
-            vec![1.0, 0.0],
-            0.2,
-        );
+        let insight = DreamInsight::new(12345, vec![0.0, 0.0], vec![1.0, 0.0], 0.2);
         bridge.process_insight(insight);
 
         let mut actions = vec![

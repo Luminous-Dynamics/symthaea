@@ -17,8 +17,8 @@ operations hold across randomly generated inputs using proptest.
 
 #![cfg(test)]
 
-use proptest::prelude::*;
 use super::binary_hv::BinaryHV;
+use proptest::prelude::*;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]

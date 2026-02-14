@@ -13,7 +13,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use symthaea_core::hdc::binary_hv::HV16;
 use symthaea_core::hdc::primitive_system::{
-    PrimitiveSystem, PrimitiveTier, CompositionCache, CompositionAlgebra,
+    CompositionAlgebra, CompositionCache, PrimitiveSystem, PrimitiveTier,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -52,29 +52,21 @@ fn bench_primitive_lookup(c: &mut Criterion) {
 
     // Single lookup
     group.bench_function("single_get", |b| {
-        b.iter(|| {
-            black_box(system.get("CAUSE"))
-        });
+        b.iter(|| black_box(system.get("CAUSE")));
     });
 
     // Miss lookup
     group.bench_function("miss_get", |b| {
-        b.iter(|| {
-            black_box(system.get("NONEXISTENT_PRIMITIVE"))
-        });
+        b.iter(|| black_box(system.get("NONEXISTENT_PRIMITIVE")));
     });
 
     // Tier query
     group.bench_function("get_tier_mathematical", |b| {
-        b.iter(|| {
-            black_box(system.get_tier(PrimitiveTier::Mathematical))
-        });
+        b.iter(|| black_box(system.get_tier(PrimitiveTier::Mathematical)));
     });
 
     group.bench_function("get_tier_consciousness", |b| {
-        b.iter(|| {
-            black_box(system.get_tier(PrimitiveTier::Consciousness))
-        });
+        b.iter(|| black_box(system.get_tier(PrimitiveTier::Consciousness)));
     });
 
     group.finish();
@@ -96,9 +88,7 @@ fn bench_composition_ops(c: &mut Criterion) {
 
     // Bind (XOR)
     group.bench_function("bind_two", |b| {
-        b.iter(|| {
-            black_box(cause.encoding.bind(&effect.encoding))
-        });
+        b.iter(|| black_box(cause.encoding.bind(&effect.encoding)));
     });
 
     // Bundle (majority vote)
@@ -108,9 +98,7 @@ fn bench_composition_ops(c: &mut Criterion) {
             energy.encoding.clone(),
             force.encoding.clone(),
         ];
-        b.iter(|| {
-            black_box(HV16::bundle(&encodings))
-        });
+        b.iter(|| black_box(HV16::bundle(&encodings)));
     });
 
     // Sequence (bind chain)
@@ -124,9 +112,7 @@ fn bench_composition_ops(c: &mut Criterion) {
 
     // Permute
     group.bench_function("permute", |b| {
-        b.iter(|| {
-            black_box(cause.encoding.permute(100))
-        });
+        b.iter(|| black_box(cause.encoding.permute(100)));
     });
 
     group.finish();
@@ -145,29 +131,21 @@ fn bench_similarity(c: &mut Criterion) {
 
     // Single similarity computation
     group.bench_function("hv16_similarity", |b| {
-        b.iter(|| {
-            black_box(cause.encoding.similarity(&effect.encoding))
-        });
+        b.iter(|| black_box(cause.encoding.similarity(&effect.encoding)));
     });
 
     // Find similar by name (brute force)
     group.bench_function("find_similar_k5", |b| {
-        b.iter(|| {
-            black_box(system.find_similar("CAUSE", 5))
-        });
+        b.iter(|| black_box(system.find_similar("CAUSE", 5)));
     });
 
     group.bench_function("find_similar_k10", |b| {
-        b.iter(|| {
-            black_box(system.find_similar("CAUSE", 10))
-        });
+        b.iter(|| black_box(system.find_similar("CAUSE", 10)));
     });
 
     // Find similar by encoding
     group.bench_function("find_similar_to_encoding_k5", |b| {
-        b.iter(|| {
-            black_box(system.find_similar_to_encoding(&cause.encoding, 5))
-        });
+        b.iter(|| black_box(system.find_similar_to_encoding(&cause.encoding, 5)));
     });
 
     group.finish();
@@ -185,37 +163,27 @@ fn bench_lsh_search(c: &mut Criterion) {
 
     // Build LSH index via system helper
     group.bench_function("lsh_build_16_bands", |b| {
-        b.iter(|| {
-            black_box(system.build_lsh_index(16, 64))
-        });
+        b.iter(|| black_box(system.build_lsh_index(16, 64)));
     });
 
     // Query LSH index (get candidates)
     let lsh = system.build_lsh_index(16, 64);
     group.bench_function("lsh_query_candidates", |b| {
-        b.iter(|| {
-            black_box(lsh.query_candidates(&cause.encoding))
-        });
+        b.iter(|| black_box(lsh.query_candidates(&cause.encoding)));
     });
 
     // Full LSH-accelerated similarity search
     group.bench_function("find_similar_lsh_k5", |b| {
-        b.iter(|| {
-            black_box(system.find_similar_lsh(&cause.encoding, 5, &lsh))
-        });
+        b.iter(|| black_box(system.find_similar_lsh(&cause.encoding, 5, &lsh)));
     });
 
     group.bench_function("find_similar_lsh_k10", |b| {
-        b.iter(|| {
-            black_box(system.find_similar_lsh(&cause.encoding, 10, &lsh))
-        });
+        b.iter(|| black_box(system.find_similar_lsh(&cause.encoding, 10, &lsh)));
     });
 
     // Compare: brute force vs LSH
     group.bench_function("brute_force_k5", |b| {
-        b.iter(|| {
-            black_box(system.find_similar_to_encoding(&cause.encoding, 5))
-        });
+        b.iter(|| black_box(system.find_similar_to_encoding(&cause.encoding, 5)));
     });
 
     group.finish();
@@ -246,9 +214,7 @@ fn bench_cache(c: &mut Criterion) {
     let _ = warm_cache.bind_cached(system, "CAUSE", "EFFECT");
 
     group.bench_function("cache_bind_hit_only", |b| {
-        b.iter(|| {
-            black_box(warm_cache.bind_cached(system, "CAUSE", "EFFECT"))
-        });
+        b.iter(|| black_box(warm_cache.bind_cached(system, "CAUSE", "EFFECT")));
     });
 
     // Bundle caching
@@ -276,9 +242,7 @@ fn bench_similarity_matrix(c: &mut Criterion) {
     let small_names: Vec<&str> = vec!["CAUSE", "EFFECT", "MASS", "ENERGY", "FORCE"];
 
     group.bench_function("matrix_5x5", |b| {
-        b.iter(|| {
-            black_box(system.similarity_matrix(&small_names))
-        });
+        b.iter(|| black_box(system.similarity_matrix(&small_names)));
     });
 
     // Medium matrix (full tier) - get names from tier
@@ -286,9 +250,7 @@ fn bench_similarity_matrix(c: &mut Criterion) {
     if !math_primitives.is_empty() {
         let math_names: Vec<&str> = math_primitives.iter().map(|p| p.name.as_str()).collect();
         group.bench_function("matrix_math_tier", |b| {
-            b.iter(|| {
-                black_box(system.similarity_matrix(&math_names))
-            });
+            b.iter(|| black_box(system.similarity_matrix(&math_names)));
         });
     }
 
@@ -317,9 +279,7 @@ fn bench_algebra(c: &mut Criterion) {
     let _ = algebra.define("CAUSALITY", "CAUSE ^ EFFECT", system);
 
     group.bench_function("algebra_get", |b| {
-        b.iter(|| {
-            black_box(algebra.get("CAUSALITY").cloned())
-        });
+        b.iter(|| black_box(algebra.get("CAUSALITY").cloned()));
     });
 
     group.finish();
@@ -333,18 +293,13 @@ fn bench_batch_ops(c: &mut Criterion) {
     let system = PrimitiveSystem::global();
 
     // Create pairs for batch_bind
-    let pairs: Vec<(&str, &str)> = vec![
-        ("CAUSE", "EFFECT"),
-        ("MASS", "ENERGY"),
-        ("BEFORE", "AFTER"),
-    ];
+    let pairs: Vec<(&str, &str)> =
+        vec![("CAUSE", "EFFECT"), ("MASS", "ENERGY"), ("BEFORE", "AFTER")];
 
     let mut group = c.benchmark_group("Batch_Operations");
 
     group.bench_function("batch_bind_3_pairs", |b| {
-        b.iter(|| {
-            black_box(system.batch_bind(&pairs))
-        });
+        b.iter(|| black_box(system.batch_bind(&pairs)));
     });
 
     // Multiple individual find_similar calls (simulating batch)

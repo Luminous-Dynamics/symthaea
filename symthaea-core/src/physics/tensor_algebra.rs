@@ -21,10 +21,10 @@
 //! - Misner, Thorne, Wheeler (1973) - "Gravitation"
 //! - Wald (1984) - "General Relativity"
 
+use super::constants::{C, G};
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::{C, G};
 use serde::{Deserialize, Serialize};
 
 /// Metric signature convention
@@ -55,7 +55,10 @@ pub struct MetricTensor {
 impl MetricTensor {
     /// Create a new metric tensor
     pub fn new(components: Matrix4, signature: Signature) -> Self {
-        Self { components, signature }
+        Self {
+            components,
+            signature,
+        }
     }
 
     /// Minkowski (flat spacetime) metric
@@ -80,7 +83,10 @@ impl MetricTensor {
             [0.0, 0.0, 0.0, s],
         ];
 
-        Self { components, signature }
+        Self {
+            components,
+            signature,
+        }
     }
 
     /// Schwarzschild metric (non-rotating black hole)
@@ -171,10 +177,20 @@ impl MetricTensor {
         let c2 = C * C;
 
         let components = [
-            [-(1.0 - r_s * r / sigma) * c2, 0.0, 0.0, -r_s * r * a * sin2_theta * C / sigma],
+            [
+                -(1.0 - r_s * r / sigma) * c2,
+                0.0,
+                0.0,
+                -r_s * r * a * sin2_theta * C / sigma,
+            ],
             [0.0, sigma / delta, 0.0, 0.0],
             [0.0, 0.0, sigma, 0.0],
-            [-r_s * r * a * sin2_theta * C / sigma, 0.0, 0.0, big_a * sin2_theta / sigma],
+            [
+                -r_s * r * a * sin2_theta * C / sigma,
+                0.0,
+                0.0,
+                big_a * sin2_theta / sigma,
+            ],
         ];
 
         Self {
@@ -416,8 +432,8 @@ impl RiemannTensor {
             for lambda in 0..4 {
                 for mu in 0..4 {
                     for nu in 0..4 {
-                        dgamma[alpha][lambda][mu][nu] =
-                            (gamma_plus.get(lambda, mu, nu) - gamma_minus.get(lambda, mu, nu))
+                        dgamma[alpha][lambda][mu][nu] = (gamma_plus.get(lambda, mu, nu)
+                            - gamma_minus.get(lambda, mu, nu))
                             / (2.0 * h);
                     }
                 }
@@ -664,15 +680,14 @@ impl SpacetimeEncoder {
     /// Encode curvature level (0 = flat, 1 = highly curved)
     pub fn encode_curvature(&self, curvature: f64) -> ContinuousHV {
         let curvature = curvature.clamp(0.0, 1.0) as f32;
-        ContinuousHV::weighted_bundle(
-            &[&self.flat, &self.curved],
-            &[1.0 - curvature, curvature],
-        )
+        ContinuousHV::weighted_bundle(&[&self.flat, &self.curved], &[1.0 - curvature, curvature])
     }
 
     /// Encode spacetime type
     pub fn encode_spacetime_type(&self, metric_type: &str) -> ContinuousHV {
-        let type_hv = self.genesis.hv(&format!("metric::{}", metric_type), PHYSICS_DIM);
+        let type_hv = self
+            .genesis
+            .hv(&format!("metric::{}", metric_type), PHYSICS_DIM);
         self.curved.bind(&type_hv)
     }
 }

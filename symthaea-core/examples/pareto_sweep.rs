@@ -5,9 +5,7 @@
 //! Run with: cargo run --example pareto_sweep --release
 
 use symthaea_core::genesis::GenesisSeed;
-use symthaea_core::physics::{
-    ParetoOptimizer, DesignSpaceMapper, FusionReaction,
-};
+use symthaea_core::physics::{DesignSpaceMapper, FusionReaction, ParetoOptimizer};
 
 fn main() {
     println!("\n");
@@ -27,11 +25,7 @@ fn main() {
     println!("  CONSUMER SCALE: D-D Fusion (1-10 kW)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    let consumer_pareto = optimizer.compute_pareto_frontier(
-        FusionReaction::DD,
-        (1.0, 10.0),
-        20,
-    );
+    let consumer_pareto = optimizer.compute_pareto_frontier(FusionReaction::DD, (1.0, 10.0), 20);
     println!("{}", optimizer.format_report(&consumer_pareto));
 
     // Design space visualization
@@ -45,11 +39,8 @@ fn main() {
     println!("  COMMERCIAL SCALE: D-D Fusion (10-100 kW)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    let commercial_pareto = optimizer.compute_pareto_frontier(
-        FusionReaction::DD,
-        (10.0, 100.0),
-        20,
-    );
+    let commercial_pareto =
+        optimizer.compute_pareto_frontier(FusionReaction::DD, (10.0, 100.0), 20);
     println!("{}", optimizer.format_report(&commercial_pareto));
 
     let commercial_sweep = mapper.sweep_power_vs_mass(FusionReaction::DD, (10.0, 100.0), 20);
@@ -62,11 +53,8 @@ fn main() {
     println!("  INDUSTRIAL SCALE: D-T Fusion (100-1000 kW)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    let industrial_pareto = optimizer.compute_pareto_frontier(
-        FusionReaction::DT,
-        (100.0, 1000.0),
-        20,
-    );
+    let industrial_pareto =
+        optimizer.compute_pareto_frontier(FusionReaction::DT, (100.0, 1000.0), 20);
     println!("{}", optimizer.format_report(&industrial_pareto));
 
     let industrial_sweep = mapper.sweep_power_vs_mass(FusionReaction::DT, (100.0, 1000.0), 20);
@@ -79,11 +67,8 @@ fn main() {
     println!("  ANEUTRONIC: D-He3 Fusion (1-100 kW)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    let aneutronic_pareto = optimizer.compute_pareto_frontier(
-        FusionReaction::DHe3,
-        (1.0, 100.0),
-        20,
-    );
+    let aneutronic_pareto =
+        optimizer.compute_pareto_frontier(FusionReaction::DHe3, (1.0, 100.0), 20);
     println!("{}", optimizer.format_report(&aneutronic_pareto));
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -94,47 +79,57 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // D-D for consumer/commercial range
-    let dd_full = optimizer.compute_pareto_frontier(
-        FusionReaction::DD,
-        (1.0, 500.0),
-        50,
-    );
+    let dd_full = optimizer.compute_pareto_frontier(FusionReaction::DD, (1.0, 500.0), 50);
 
     // D-T for higher power range
-    let dt_full = optimizer.compute_pareto_frontier(
-        FusionReaction::DT,
-        (100.0, 1000.0),
-        50,
-    );
+    let dt_full = optimizer.compute_pareto_frontier(FusionReaction::DT, (100.0, 1000.0), 50);
 
     // Summary statistics
     println!("┌────────────────────────────────────────────────────────────────────┐");
     println!("│                    FULL RANGE SUMMARY                              │");
     println!("├────────────────────────────────────────────────────────────────────┤");
     println!("│  D-D Fusion (1-500 kW):                                            │");
-    println!("│    Pareto-optimal designs: {:>3}                                    │", dd_full.frontier.len());
-    println!("│    Feasible designs:       {:>3}/50                                 │",
-             dd_full.all_designs.iter().filter(|d| d.feasible).count());
+    println!(
+        "│    Pareto-optimal designs: {:>3}                                    │",
+        dd_full.frontier.len()
+    );
+    println!(
+        "│    Feasible designs:       {:>3}/50                                 │",
+        dd_full.all_designs.iter().filter(|d| d.feasible).count()
+    );
     if let Some(ref best) = dd_full.best_by_objective.min_cost {
-        println!("│    Best cost:              ${:>6.0}/kW at {:>5.1} kW                │",
-                 best.cost_per_kw, best.power_kw);
+        println!(
+            "│    Best cost:              ${:>6.0}/kW at {:>5.1} kW                │",
+            best.cost_per_kw, best.power_kw
+        );
     }
     if let Some(ref best) = dd_full.best_by_objective.min_mass {
-        println!("│    Min mass:               {:>6.0} kg at {:>5.1} kW                 │",
-                 best.mass_kg, best.power_kw);
+        println!(
+            "│    Min mass:               {:>6.0} kg at {:>5.1} kW                 │",
+            best.mass_kg, best.power_kw
+        );
     }
     println!("├────────────────────────────────────────────────────────────────────┤");
     println!("│  D-T Fusion (100-1000 kW):                                         │");
-    println!("│    Pareto-optimal designs: {:>3}                                    │", dt_full.frontier.len());
-    println!("│    Feasible designs:       {:>3}/50                                 │",
-             dt_full.all_designs.iter().filter(|d| d.feasible).count());
+    println!(
+        "│    Pareto-optimal designs: {:>3}                                    │",
+        dt_full.frontier.len()
+    );
+    println!(
+        "│    Feasible designs:       {:>3}/50                                 │",
+        dt_full.all_designs.iter().filter(|d| d.feasible).count()
+    );
     if let Some(ref best) = dt_full.best_by_objective.min_cost {
-        println!("│    Best cost:              ${:>6.0}/kW at {:>5.1} kW               │",
-                 best.cost_per_kw, best.power_kw);
+        println!(
+            "│    Best cost:              ${:>6.0}/kW at {:>5.1} kW               │",
+            best.cost_per_kw, best.power_kw
+        );
     }
     if let Some(ref best) = dt_full.best_by_objective.min_mass {
-        println!("│    Min mass:               {:>6.0} kg at {:>5.1} kW                │",
-                 best.mass_kg, best.power_kw);
+        println!(
+            "│    Min mass:               {:>6.0} kg at {:>5.1} kW                │",
+            best.mass_kg, best.power_kw
+        );
     }
     println!("└────────────────────────────────────────────────────────────────────┘");
 
@@ -159,17 +154,22 @@ fn main() {
         };
 
         // Find closest design point
-        if let Some(design) = pareto.all_designs.iter()
-            .min_by(|a, b| (a.power_kw - power).abs().partial_cmp(&(b.power_kw - power).abs()).unwrap())
-        {
+        if let Some(design) = pareto.all_designs.iter().min_by(|a, b| {
+            (a.power_kw - power)
+                .abs()
+                .partial_cmp(&(b.power_kw - power).abs())
+                .unwrap()
+        }) {
             let feasible_str = if design.feasible { "YES" } else { "NO " };
-            println!("│  {:>8.0}    │  {:>9.0}  │  {:>5.0}  │ {:>7.0} │  {} ({})    │",
-                     design.power_kw,
-                     design.mass_kg,
-                     design.mass_kg / design.power_kw,
-                     design.cost_per_kw,
-                     feasible_str,
-                     reaction_name);
+            println!(
+                "│  {:>8.0}    │  {:>9.0}  │  {:>5.0}  │ {:>7.0} │  {} ({})    │",
+                design.power_kw,
+                design.mass_kg,
+                design.mass_kg / design.power_kw,
+                design.cost_per_kw,
+                feasible_str,
+                reaction_name
+            );
         }
     }
     println!("└────────────────────────────────────────────────────────────────────┘");

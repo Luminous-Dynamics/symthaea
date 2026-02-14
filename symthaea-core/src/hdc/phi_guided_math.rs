@@ -46,7 +46,7 @@
 //! println!("Phi delta: {:.3}", guided.phi_delta);
 //! ```
 
-use super::math_bridge::{MathValue, MathResult, UnifiedMathEngine};
+use super::math_bridge::{MathResult, MathValue, UnifiedMathEngine};
 
 // ============================================================================
 // DOMAIN CONSTANTS
@@ -268,12 +268,20 @@ impl PhiGuidedMath {
 
     /// Return the human-readable name for a domain index.
     pub fn domain_name(idx: usize) -> &'static str {
-        if idx < 5 { DOMAIN_NAMES[idx] } else { "Unknown" }
+        if idx < 5 {
+            DOMAIN_NAMES[idx]
+        } else {
+            "Unknown"
+        }
     }
 
     /// Return the Unicode label for a domain index.
     pub fn domain_label(idx: usize) -> &'static str {
-        if idx < 5 { DOMAIN_LABELS[idx] } else { "?" }
+        if idx < 5 {
+            DOMAIN_LABELS[idx]
+        } else {
+            "?"
+        }
     }
 
     // ========================================================================
@@ -331,7 +339,11 @@ impl PhiGuidedMath {
             (phi - avg) / avg
         } else {
             // First operation: treat any positive phi as above average
-            if phi > 0.0 { 1.0 } else { 0.0 }
+            if phi > 0.0 {
+                1.0
+            } else {
+                0.0
+            }
         };
 
         // Boost or attenuate the result domain
@@ -454,11 +466,8 @@ mod tests {
         let weights_before = *pgm.domain_preferences();
 
         // Now do a feedback operation with higher-phi operation (multiply produces more phi)
-        let guided = pgm.compute_with_feedback(
-            "multiply",
-            &MathValue::Natural(10),
-            &MathValue::Natural(5),
-        );
+        let guided =
+            pgm.compute_with_feedback("multiply", &MathValue::Natural(10), &MathValue::Natural(5));
 
         let weights_after = *pgm.domain_preferences();
         // Weights should have changed
@@ -476,28 +485,22 @@ mod tests {
         let mut pgm = fresh_engine();
 
         // First operation: phi_delta is the entire average (since avg was 0)
-        let r1 = pgm.compute_with_feedback(
-            "add",
-            &MathValue::Natural(1),
-            &MathValue::Natural(2),
-        );
+        let r1 = pgm.compute_with_feedback("add", &MathValue::Natural(1), &MathValue::Natural(2));
         // phi_delta should equal the new average (which is just this operation's phi)
         let expected_delta = r1.result.phi; // avg went from 0 to phi
         assert!(
             (r1.phi_delta - expected_delta).abs() < 1e-10,
             "First phi_delta should equal the phi value, got delta={} phi={}",
-            r1.phi_delta, r1.result.phi
+            r1.phi_delta,
+            r1.result.phi
         );
     }
 
     #[test]
     fn test_feedback_suggested_domain_not_empty() {
         let mut pgm = fresh_engine();
-        let guided = pgm.compute_with_feedback(
-            "add",
-            &MathValue::Real(1.5),
-            &MathValue::Integer(-3),
-        );
+        let guided =
+            pgm.compute_with_feedback("add", &MathValue::Real(1.5), &MathValue::Integer(-3));
         assert!(
             !guided.suggested_domain.is_empty(),
             "suggested_domain should be a valid domain label"
@@ -583,7 +586,9 @@ mod tests {
             assert!(
                 *w >= MIN_WEIGHT && *w <= MAX_WEIGHT,
                 "Weight {} out of bounds [{}, {}]",
-                w, MIN_WEIGHT, MAX_WEIGHT
+                w,
+                MIN_WEIGHT,
+                MAX_WEIGHT
             );
         }
     }
@@ -594,23 +599,21 @@ mod tests {
 
         // Hammer with high-phi operations (power produces high phi)
         for _ in 0..100 {
-            pgm.compute_with_feedback(
-                "power",
-                &MathValue::Natural(2),
-                &MathValue::Natural(10),
-            );
+            pgm.compute_with_feedback("power", &MathValue::Natural(2), &MathValue::Natural(10));
         }
 
         for (idx, w) in pgm.domain_preferences().iter().enumerate() {
             assert!(
                 *w >= MIN_WEIGHT,
                 "Weight for {} fell below minimum: {}",
-                DOMAIN_NAMES[idx], w
+                DOMAIN_NAMES[idx],
+                w
             );
             assert!(
                 *w <= MAX_WEIGHT,
                 "Weight for {} exceeded maximum: {}",
-                DOMAIN_NAMES[idx], w
+                DOMAIN_NAMES[idx],
+                w
             );
         }
     }
@@ -630,8 +633,7 @@ mod tests {
             pgm.compute(op, a, b);
         }
 
-        let expected_avg = pgm.phi_history().iter().sum::<f64>()
-            / pgm.phi_history().len() as f64;
+        let expected_avg = pgm.phi_history().iter().sum::<f64>() / pgm.phi_history().len() as f64;
         assert!(
             (pgm.average_phi() - expected_avg).abs() < 1e-10,
             "average_phi should match manual calculation"
@@ -652,12 +654,14 @@ mod tests {
         assert!(
             r_pow.phi > r_mul.phi,
             "power phi ({}) should exceed multiply phi ({})",
-            r_pow.phi, r_mul.phi
+            r_pow.phi,
+            r_mul.phi
         );
         assert!(
             r_mul.phi > r_add.phi,
             "multiply phi ({}) should exceed add phi ({})",
-            r_mul.phi, r_add.phi
+            r_mul.phi,
+            r_add.phi
         );
     }
 
@@ -702,11 +706,7 @@ mod tests {
         let mut pgm = fresh_engine();
 
         for _ in 0..5 {
-            pgm.compute_with_feedback(
-                "add",
-                &MathValue::Natural(1),
-                &MathValue::Natural(2),
-            );
+            pgm.compute_with_feedback("add", &MathValue::Natural(1), &MathValue::Natural(2));
         }
 
         pgm.reset_all();
@@ -723,11 +723,7 @@ mod tests {
         let mut pgm = fresh_engine();
 
         // Same-domain: Natural + Natural (no promotion)
-        let r_no_promo = pgm.compute(
-            "add",
-            &MathValue::Natural(3),
-            &MathValue::Natural(4),
-        );
+        let r_no_promo = pgm.compute("add", &MathValue::Natural(3), &MathValue::Natural(4));
 
         // Cross-domain: Complex + Natural (forces promotion to ℂ, rank jump = 4)
         let r_promo = pgm.compute(
@@ -739,7 +735,8 @@ mod tests {
         assert!(
             r_promo.phi >= r_no_promo.phi,
             "Promoted operation phi ({}) should be >= non-promoted ({})",
-            r_promo.phi, r_no_promo.phi
+            r_promo.phi,
+            r_no_promo.phi
         );
     }
 
@@ -772,8 +769,8 @@ mod tests {
         );
         let last_three: Vec<f64> = phi_averages.iter().rev().take(3).copied().collect();
         let mean = last_three.iter().sum::<f64>() / last_three.len() as f64;
-        let variance: f64 = last_three.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
-            / last_three.len() as f64;
+        let variance: f64 =
+            last_three.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / last_three.len() as f64;
 
         // Variance should be small (convergence)
         assert!(
@@ -789,16 +786,15 @@ mod tests {
     fn test_divide_by_zero_fallback() {
         let mut pgm = fresh_engine();
         // Division by zero should not panic; fallback produces a result
-        let result = pgm.compute(
-            "divide",
-            &MathValue::Natural(10),
-            &MathValue::Natural(0),
-        );
+        let result = pgm.compute("divide", &MathValue::Natural(10), &MathValue::Natural(0));
         // Should get a result (NaN fallback)
         assert!(pgm.operations_count() == 1);
         assert!(pgm.phi_history().len() == 1);
         // Phi should still be recorded
-        assert!(result.phi > 0.0 || result.phi.is_nan() || true, "Should have a phi value");
+        assert!(
+            result.phi > 0.0 || result.phi.is_nan() || true,
+            "Should have a phi value"
+        );
     }
 
     #[test]

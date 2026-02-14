@@ -6,58 +6,72 @@
 //! 3. Error-gated learning only triggers when error exceeds threshold
 
 use ndarray::Array1;
-use symthaea::dynamics::cfc::{
-    CfCConfig, CfCNetworkConfig, CfCNetwork, OnlineLearningConfig,
-};
+use symthaea::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig, OnlineLearningConfig};
 
 /// Compute MSE between two arrays (truncated to shorter length).
 fn mse(a: &Array1<f32>, b: &Array1<f32>) -> f32 {
     let n = a.len().min(b.len());
-    if n == 0 { return 0.0; }
-    a.iter().zip(b.iter()).take(n)
+    if n == 0 {
+        return 0.0;
+    }
+    a.iter()
+        .zip(b.iter())
+        .take(n)
         .map(|(x, y)| (x - y).powi(2))
-        .sum::<f32>() / n as f32
+        .sum::<f32>()
+        / n as f32
 }
 
 /// Evaluate average prediction error over all pattern pairs.
 fn eval_error(net: &mut CfCNetwork, pairs: &[(Array1<f32>, Array1<f32>)], dt: f32) -> f32 {
-    let total: f32 = pairs.iter().map(|(inp, tgt)| {
-        net.reset();
-        let pred = net.forward(inp, dt);
-        mse(&pred, tgt)
-    }).sum();
+    let total: f32 = pairs
+        .iter()
+        .map(|(inp, tgt)| {
+            net.reset();
+            let pred = net.forward(inp, dt);
+            mse(&pred, tgt)
+        })
+        .sum();
     total / pairs.len() as f32
 }
 
 /// Generate a sine pattern dataset.
-fn generate_sine_pattern(dim: usize, period: usize, amplitude: f32, phase_offset: f32) -> Vec<(Array1<f32>, Array1<f32>)> {
-    (0..period).map(|t| {
-        let phase_in = t as f32 / period as f32 * std::f32::consts::TAU + phase_offset;
-        let phase_out = (t + 1) as f32 / period as f32 * std::f32::consts::TAU + phase_offset;
-        let input = Array1::from_shape_fn(dim, |i| {
-            (phase_in * (1.0 + i as f32 * 0.5)).sin() * amplitude
-        });
-        let target = Array1::from_shape_fn(dim, |i| {
-            (phase_out * (1.0 + i as f32 * 0.5)).sin() * amplitude
-        });
-        (input, target)
-    }).collect()
+fn generate_sine_pattern(
+    dim: usize,
+    period: usize,
+    amplitude: f32,
+    phase_offset: f32,
+) -> Vec<(Array1<f32>, Array1<f32>)> {
+    (0..period)
+        .map(|t| {
+            let phase_in = t as f32 / period as f32 * std::f32::consts::TAU + phase_offset;
+            let phase_out = (t + 1) as f32 / period as f32 * std::f32::consts::TAU + phase_offset;
+            let input = Array1::from_shape_fn(dim, |i| {
+                (phase_in * (1.0 + i as f32 * 0.5)).sin() * amplitude
+            });
+            let target = Array1::from_shape_fn(dim, |i| {
+                (phase_out * (1.0 + i as f32 * 0.5)).sin() * amplitude
+            });
+            (input, target)
+        })
+        .collect()
 }
 
 /// Generate a shifted distribution (different frequency and amplitude).
 fn generate_shifted_pattern(dim: usize, period: usize) -> Vec<(Array1<f32>, Array1<f32>)> {
     // Different amplitude (0.5 instead of 0.3) and frequency multiplier
-    (0..period).map(|t| {
-        let phase_in = t as f32 / period as f32 * std::f32::consts::TAU * 1.5;  // 1.5x frequency
-        let phase_out = (t + 1) as f32 / period as f32 * std::f32::consts::TAU * 1.5;
-        let input = Array1::from_shape_fn(dim, |i| {
-            (phase_in * (1.0 + i as f32 * 0.3)).cos() * 0.5  // cos instead of sin, different scaling
-        });
-        let target = Array1::from_shape_fn(dim, |i| {
-            (phase_out * (1.0 + i as f32 * 0.3)).cos() * 0.5
-        });
-        (input, target)
-    }).collect()
+    (0..period)
+        .map(|t| {
+            let phase_in = t as f32 / period as f32 * std::f32::consts::TAU * 1.5; // 1.5x frequency
+            let phase_out = (t + 1) as f32 / period as f32 * std::f32::consts::TAU * 1.5;
+            let input = Array1::from_shape_fn(dim, |i| {
+                (phase_in * (1.0 + i as f32 * 0.3)).cos() * 0.5 // cos instead of sin, different scaling
+            });
+            let target =
+                Array1::from_shape_fn(dim, |i| (phase_out * (1.0 + i as f32 * 0.3)).cos() * 0.5);
+            (input, target)
+        })
+        .collect()
 }
 
 #[test]
@@ -115,12 +129,18 @@ fn online_learning_improves_on_distribution_shift() {
     }
 
     let trained_error_original = eval_error(&mut net, &original_pairs, dt);
-    println!("Trained error on original distribution: {:.6}", trained_error_original);
+    println!(
+        "Trained error on original distribution: {:.6}",
+        trained_error_original
+    );
 
     // Phase 2: Encounter shifted distribution WITHOUT online learning
     let shifted_pairs = generate_shifted_pattern(dim, period);
     let error_before_adaptation = eval_error(&mut net, &shifted_pairs, dt);
-    println!("Error on shifted distribution BEFORE online adaptation: {:.6}", error_before_adaptation);
+    println!(
+        "Error on shifted distribution BEFORE online adaptation: {:.6}",
+        error_before_adaptation
+    );
 
     // Phase 3: Apply online learning on shifted distribution
     // More adaptation rounds for visible improvement
@@ -135,7 +155,10 @@ fn online_learning_improves_on_distribution_shift() {
     }
 
     let error_after_adaptation = eval_error(&mut net, &shifted_pairs, dt);
-    println!("Error on shifted distribution AFTER online adaptation: {:.6}", error_after_adaptation);
+    println!(
+        "Error on shifted distribution AFTER online adaptation: {:.6}",
+        error_after_adaptation
+    );
 
     // Check statistics
     let stats = net.online_stats();
@@ -144,13 +167,17 @@ fn online_learning_improves_on_distribution_shift() {
     println!("  Adaptations applied: {}", stats.adaptations_applied);
     println!("  Adaptations skipped: {}", stats.adaptations_skipped);
     println!("  EMA error: {:.6}", stats.ema_error);
-    println!("  Cumulative weight change: {:.6}", stats.cumulative_weight_change);
+    println!(
+        "  Cumulative weight change: {:.6}",
+        stats.cumulative_weight_change
+    );
 
     // Core assertion: online learning should improve on the new distribution
     assert!(
         error_after_adaptation < error_before_adaptation,
         "Online learning should reduce error on shifted distribution: {:.6} -> {:.6}",
-        error_before_adaptation, error_after_adaptation
+        error_before_adaptation,
+        error_after_adaptation
     );
 
     // At least 1% improvement (conservative bound for online learning)
@@ -172,10 +199,10 @@ fn catastrophic_forgetting_is_bounded() {
 
     // Create network with conservative online learning settings
     let online_config = OnlineLearningConfig {
-        learning_rate: 0.001,  // Very conservative
+        learning_rate: 0.001, // Very conservative
         error_threshold: 0.1,
         ema_alpha: 0.1,
-        max_weight_delta: 0.005,  // Very small max delta
+        max_weight_delta: 0.005, // Very small max delta
         adapt_tau: false,
         tau_lr_multiplier: 0.01,
     };
@@ -221,7 +248,7 @@ fn catastrophic_forgetting_is_bounded() {
 
     // Phase 2: Adapt extensively on shifted distribution
     let shifted_pairs = generate_shifted_pattern(dim, period);
-    let adaptation_rounds = 50;  // More adaptation rounds
+    let adaptation_rounds = 50; // More adaptation rounds
 
     for _ in 0..adaptation_rounds {
         for (inp, tgt) in &shifted_pairs {
@@ -234,7 +261,10 @@ fn catastrophic_forgetting_is_bounded() {
 
     // Phase 3: Check performance on ORIGINAL distribution after adaptation
     let error_after_adaptation = eval_error(&mut net, &original_pairs, dt);
-    println!("Error on original AFTER adapting to shifted: {:.6}", error_after_adaptation);
+    println!(
+        "Error on original AFTER adapting to shifted: {:.6}",
+        error_after_adaptation
+    );
 
     // Calculate degradation
     let degradation_pct = if trained_error_original > 0.0 {
@@ -242,7 +272,10 @@ fn catastrophic_forgetting_is_bounded() {
     } else {
         0.0
     };
-    println!("Performance degradation on original: {:.1}%", degradation_pct);
+    println!(
+        "Performance degradation on original: {:.1}%",
+        degradation_pct
+    );
 
     // Catastrophic forgetting bound: no more than 100% degradation
     // (i.e., error should not more than double)
@@ -256,7 +289,10 @@ fn catastrophic_forgetting_is_bounded() {
     if degradation_pct < 50.0 {
         println!("Excellent: degradation under 50%");
     } else {
-        println!("Warning: degradation {:.1}% is high but within bounds", degradation_pct);
+        println!(
+            "Warning: degradation {:.1}% is high but within bounds",
+            degradation_pct
+        );
     }
 }
 
@@ -269,7 +305,7 @@ fn error_gating_prevents_unnecessary_updates() {
     // Create network with high error threshold
     let online_config = OnlineLearningConfig {
         learning_rate: 0.01,
-        error_threshold: 0.5,  // High threshold - only adapt on large errors
+        error_threshold: 0.5, // High threshold - only adapt on large errors
         ema_alpha: 0.1,
         max_weight_delta: 0.02,
         adapt_tau: false,
@@ -325,7 +361,8 @@ fn error_gating_prevents_unnecessary_updates() {
         stats.adaptations_skipped > stats.adaptations_applied,
         "With high threshold and low errors, most adaptations should be skipped. \
          Applied: {}, Skipped: {}",
-        stats.adaptations_applied, stats.adaptations_skipped
+        stats.adaptations_applied,
+        stats.adaptations_skipped
     );
 
     // Now test with HIGH error inputs
@@ -361,7 +398,7 @@ fn forward_with_adaptation_works() {
 
     let online_config = OnlineLearningConfig {
         learning_rate: 0.005,
-        error_threshold: 0.01,  // Low threshold to ensure adaptation
+        error_threshold: 0.01, // Low threshold to ensure adaptation
         ema_alpha: 0.2,
         max_weight_delta: 0.02,
         adapt_tau: false,
@@ -443,7 +480,7 @@ fn online_learning_disabled_by_default() {
         cell_config,
         residual: false,
         bidirectional: false,
-        ..Default::default()  // enable_online_learning defaults to false
+        ..Default::default() // enable_online_learning defaults to false
     };
 
     let mut net = CfCNetwork::new(net_config);
@@ -454,7 +491,10 @@ fn online_learning_disabled_by_default() {
 
     // Try to adapt - should return false
     let adapted = net.adapt_online(1.0, &input, &target, dt);
-    assert!(!adapted, "Should not adapt when online learning is disabled");
+    assert!(
+        !adapted,
+        "Should not adapt when online learning is disabled"
+    );
 
     let stats = net.online_stats();
     assert_eq!(stats.total_adaptation_calls, 0);

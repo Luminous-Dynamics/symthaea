@@ -1,5 +1,5 @@
 use crate::hdc::binary_hv::BinaryHV;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::engine::{ArithmeticEngine, ArithmeticOp, ArithmeticResult, ProofStep};
@@ -23,10 +23,10 @@ pub struct HybridConfig {
 impl Default for HybridConfig {
     fn default() -> Self {
         Self {
-            deep_threshold: 50,  // Full Peano for n < 50
+            deep_threshold: 50, // Full Peano for n < 50
             generate_abstract_proofs: true,
             estimate_phi: true,
-            phi_scale_factor: 0.15,  // Empirically determined
+            phi_scale_factor: 0.15, // Empirically determined
         }
     }
 }
@@ -178,33 +178,27 @@ impl HybridArithmeticEngine {
     /// Initialize base case proofs for inductive reasoning
     fn initialize_base_cases(&mut self) {
         // Addition base cases: a + 0 = a, 0 + a = a
-        self.base_case_proofs.insert(
-            "add_identity_right".to_string(),
-            self.deep_engine.add(5, 0),
-        );
-        self.base_case_proofs.insert(
-            "add_identity_left".to_string(),
-            self.deep_engine.add(0, 5),
-        );
+        self.base_case_proofs
+            .insert("add_identity_right".to_string(), self.deep_engine.add(5, 0));
+        self.base_case_proofs
+            .insert("add_identity_left".to_string(), self.deep_engine.add(0, 5));
 
         // Multiplication base cases: a × 1 = a, a × 0 = 0
-        self.base_case_proofs.insert(
-            "mul_identity".to_string(),
-            self.deep_engine.multiply(7, 1),
-        );
-        self.base_case_proofs.insert(
-            "mul_zero".to_string(),
-            self.deep_engine.multiply(7, 0),
-        );
+        self.base_case_proofs
+            .insert("mul_identity".to_string(), self.deep_engine.multiply(7, 1));
+        self.base_case_proofs
+            .insert("mul_zero".to_string(), self.deep_engine.multiply(7, 0));
 
         // Small number proofs for Φ estimation calibration
         for a in 1..=10 {
             for b in 1..=10 {
                 let result = self.deep_engine.add(a, b);
-                self.phi_cache.insert((ArithmeticOp::Add, a, b), result.total_phi);
+                self.phi_cache
+                    .insert((ArithmeticOp::Add, a, b), result.total_phi);
 
                 let result = self.deep_engine.multiply(a, b);
-                self.phi_cache.insert((ArithmeticOp::Multiply, a, b), result.total_phi);
+                self.phi_cache
+                    .insert((ArithmeticOp::Multiply, a, b), result.total_phi);
             }
         }
     }
@@ -228,12 +222,20 @@ impl HybridArithmeticEngine {
             let size_factor = match op {
                 ArithmeticOp::Add => (a + b) as f64 / (scale_a + scale_b) as f64,
                 ArithmeticOp::Multiply => (a * b) as f64 / (scale_a * scale_b).max(1) as f64,
-                ArithmeticOp::Subtract => (a.saturating_sub(b)) as f64 / scale_a.saturating_sub(scale_b).max(1) as f64,
-                ArithmeticOp::Power => (a as f64).powf(b as f64) / (scale_a as f64).powf(scale_b as f64),
+                ArithmeticOp::Subtract => {
+                    (a.saturating_sub(b)) as f64 / scale_a.saturating_sub(scale_b).max(1) as f64
+                }
+                ArithmeticOp::Power => {
+                    (a as f64).powf(b as f64) / (scale_a as f64).powf(scale_b as f64)
+                }
                 ArithmeticOp::Factorial => {
                     // Factorial grows extremely fast
-                    (1..=a).map(|x| x as f64).product::<f64>().ln() /
-                    (1..=scale_a).map(|x| x as f64).product::<f64>().ln().max(1.0)
+                    (1..=a).map(|x| x as f64).product::<f64>().ln()
+                        / (1..=scale_a)
+                            .map(|x| x as f64)
+                            .product::<f64>()
+                            .ln()
+                            .max(1.0)
                 }
             };
 
@@ -246,7 +248,13 @@ impl HybridArithmeticEngine {
     }
 
     /// Create semantic annotation for an operation
-    fn create_semantics(&self, op: ArithmeticOp, a: u64, b: u64, _result: u64) -> SemanticAnnotation {
+    fn create_semantics(
+        &self,
+        op: ArithmeticOp,
+        a: u64,
+        b: u64,
+        _result: u64,
+    ) -> SemanticAnnotation {
         match op {
             ArithmeticOp::Add => SemanticAnnotation {
                 primitives_involved: vec![
@@ -323,7 +331,9 @@ impl HybridArithmeticEngine {
                 ],
                 abstract_description: format!(
                     "Factorial {}! = {} × {} × ... × 1",
-                    a, a, a.saturating_sub(1)
+                    a,
+                    a,
+                    a.saturating_sub(1)
                 ),
                 estimated_peano_steps: (1..=a).product::<u64>(),
                 axiom_references: vec![
@@ -335,7 +345,13 @@ impl HybridArithmeticEngine {
     }
 
     /// Create an abstract proof for a fast-path operation
-    fn create_abstract_proof(&self, op: ArithmeticOp, a: u64, b: u64, result: u64) -> AbstractProof {
+    fn create_abstract_proof(
+        &self,
+        op: ArithmeticOp,
+        a: u64,
+        b: u64,
+        result: u64,
+    ) -> AbstractProof {
         match op {
             ArithmeticOp::Add => AbstractProof {
                 theorem: format!("{} + {} = {}", a, b, result),
@@ -348,7 +364,14 @@ impl HybridArithmeticEngine {
                 } else {
                     format!(
                         "By induction on b: {} + {} = {} + S({}) = S({} + {}) = S({}) = {}",
-                        a, b, a, b - 1, a, b - 1, result - 1, result
+                        a,
+                        b,
+                        a,
+                        b - 1,
+                        a,
+                        b - 1,
+                        result - 1,
+                        result
                     )
                 },
                 justification: vec![
@@ -368,8 +391,16 @@ impl HybridArithmeticEngine {
                 } else {
                     format!(
                         "By induction on b: {} × {} = {} × S({}) = {} × {} + {} = {} + {} = {}",
-                        a, b, a, b - 1, a, b - 1, a,
-                        a * (b - 1), a, result
+                        a,
+                        b,
+                        a,
+                        b - 1,
+                        a,
+                        b - 1,
+                        a,
+                        a * (b - 1),
+                        a,
+                        result
                     )
                 },
                 justification: vec![
@@ -381,9 +412,7 @@ impl HybridArithmeticEngine {
             },
             ArithmeticOp::Subtract => AbstractProof {
                 theorem: format!("{} - {} = {}", a, b, result),
-                base_cases: vec![
-                    format!("Proven: a - 0 = a (verified for a ∈ [0..10])"),
-                ],
+                base_cases: vec![format!("Proven: a - 0 = a (verified for a ∈ [0..10])")],
                 inductive_step: if b == 0 {
                     format!("Base case: {} - 0 = {} (by axiom a - 0 = a)", a, a)
                 } else if a == 0 {
@@ -391,7 +420,13 @@ impl HybridArithmeticEngine {
                 } else {
                     format!(
                         "By induction: {} - {} = P({}) - {} = {} - {} = {}",
-                        a, b, a, b - 1, a - 1, b - 1, result
+                        a,
+                        b,
+                        a,
+                        b - 1,
+                        a - 1,
+                        b - 1,
+                        result
                     )
                 },
                 justification: vec![
@@ -411,8 +446,14 @@ impl HybridArithmeticEngine {
                 } else {
                     format!(
                         "By induction on exponent: {}^{} = {}^{} × {} = {} × {} = {}",
-                        a, b, a, b - 1, a,
-                        a.pow((b - 1) as u32), a, result
+                        a,
+                        b,
+                        a,
+                        b - 1,
+                        a,
+                        a.pow((b - 1) as u32),
+                        a,
+                        result
                     )
                 },
                 justification: vec![
@@ -423,14 +464,15 @@ impl HybridArithmeticEngine {
             },
             ArithmeticOp::Factorial => AbstractProof {
                 theorem: format!("{}! = {}", a, result),
-                base_cases: vec![
-                    "Proven: 0! = 1".to_string(),
-                    "Proven: 1! = 1".to_string(),
-                ],
+                base_cases: vec!["Proven: 0! = 1".to_string(), "Proven: 1! = 1".to_string()],
                 inductive_step: format!(
                     "By induction: {}! = {} × ({}-1)! = {} × {} = {}",
-                    a, a, a, a,
-                    (1..a).product::<u64>().max(1), result
+                    a,
+                    a,
+                    a,
+                    a,
+                    (1..a).product::<u64>().max(1),
+                    result
                 ),
                 justification: vec![
                     "Definition: n! = n × (n-1)!".to_string(),
@@ -514,7 +556,12 @@ impl HybridArithmeticEngine {
                     computation_path: ComputationPath::Deep,
                     full_proof: Some(result.proof),
                     abstract_proof: None,
-                    semantics: self.create_semantics(ArithmeticOp::Multiply, a, b, result.result.value),
+                    semantics: self.create_semantics(
+                        ArithmeticOp::Multiply,
+                        a,
+                        b,
+                        result.result.value,
+                    ),
                     phi: result.total_phi,
                     phi_is_exact: true,
                     encoding: Some(result.result.encoding),
@@ -572,7 +619,12 @@ impl HybridArithmeticEngine {
                     computation_path: ComputationPath::Deep,
                     full_proof: Some(result.proof),
                     abstract_proof: None,
-                    semantics: self.create_semantics(ArithmeticOp::Subtract, a, b, result.result.value),
+                    semantics: self.create_semantics(
+                        ArithmeticOp::Subtract,
+                        a,
+                        b,
+                        result.result.value,
+                    ),
                     phi: result.total_phi,
                     phi_is_exact: true,
                     encoding: Some(result.result.encoding),
@@ -629,7 +681,12 @@ impl HybridArithmeticEngine {
                     computation_path: ComputationPath::Deep,
                     full_proof: Some(result.proof),
                     abstract_proof: None,
-                    semantics: self.create_semantics(ArithmeticOp::Power, base, exp, result.result.value),
+                    semantics: self.create_semantics(
+                        ArithmeticOp::Power,
+                        base,
+                        exp,
+                        result.result.value,
+                    ),
                     phi: result.total_phi,
                     phi_is_exact: true,
                     encoding: Some(result.result.encoding),
@@ -687,7 +744,12 @@ impl HybridArithmeticEngine {
                     computation_path: ComputationPath::Deep,
                     full_proof: Some(result.proof),
                     abstract_proof: None,
-                    semantics: self.create_semantics(ArithmeticOp::Factorial, n, 0, result.result.value),
+                    semantics: self.create_semantics(
+                        ArithmeticOp::Factorial,
+                        n,
+                        0,
+                        result.result.value,
+                    ),
                     phi: result.total_phi,
                     phi_is_exact: true,
                     encoding: Some(result.result.encoding),
@@ -864,7 +926,13 @@ impl HybridArithmeticEngine {
                         ),
                         justification: vec![
                             format!("Verify: {} × {} = {} ≤ {}", quotient, b, quotient * b, a),
-                            format!("Verify: {} × {} = {} > {}", quotient + 1, b, (quotient + 1) * b, a),
+                            format!(
+                                "Verify: {} × {} = {} > {}",
+                                quotient + 1,
+                                b,
+                                (quotient + 1) * b,
+                                a
+                            ),
                         ],
                         is_sound: true,
                     }),
@@ -950,7 +1018,10 @@ impl HybridArithmeticEngine {
                         ),
                         justification: vec![
                             format!("Verify: {} × {} + {} = {}", quotient, b, remainder, a),
-                            format!("Verify: {} < {} (remainder less than divisor)", remainder, b),
+                            format!(
+                                "Verify: {} < {} (remainder less than divisor)",
+                                remainder, b
+                            ),
                         ],
                         is_sound: true,
                     }),
@@ -999,8 +1070,10 @@ impl HybridArithmeticEngine {
 
         while y != 0 {
             let remainder = x % y;
-            steps.push(format!("gcd({}, {}) = gcd({}, {}) [since {} mod {} = {}]",
-                x, y, y, remainder, x, y, remainder));
+            steps.push(format!(
+                "gcd({}, {}) = gcd({}, {}) [since {} mod {} = {}]",
+                x, y, y, remainder, x, y, remainder
+            ));
             total_phi += self.config.phi_scale_factor;
             x = y;
             y = remainder;
@@ -1017,14 +1090,16 @@ impl HybridArithmeticEngine {
             full_proof: None,
             abstract_proof: Some(AbstractProof {
                 theorem: format!("gcd({}, {}) = {}", a, b, result),
-                base_cases: vec![
-                    "gcd(a, 0) = a".to_string(),
-                    "gcd(a, a) = a".to_string(),
-                ],
+                base_cases: vec!["gcd(a, 0) = a".to_string(), "gcd(a, a) = a".to_string()],
                 inductive_step: steps.join("\n→ "),
                 justification: vec![
                     "Euclidean Algorithm: gcd(a, b) = gcd(b, a mod b)".to_string(),
-                    format!("After {} steps, reached gcd({}, 0) = {}", steps.len(), result, result),
+                    format!(
+                        "After {} steps, reached gcd({}, 0) = {}",
+                        steps.len(),
+                        result,
+                        result
+                    ),
                 ],
                 is_sound: true,
             }),
@@ -1036,7 +1111,10 @@ impl HybridArithmeticEngine {
                 ],
                 abstract_description: format!(
                     "Euclidean algorithm: {} steps to find gcd({}, {}) = {}",
-                    steps.len(), a, b, result
+                    steps.len(),
+                    a,
+                    b,
+                    result
                 ),
                 estimated_peano_steps: steps.len() as u64 * (a.max(b) / 2),
                 axiom_references: vec![
@@ -1076,10 +1154,14 @@ impl HybridArithmeticEngine {
         }
 
         match divisor_found {
-            Some(d) => self.primality_result(n, false,
-                &format!("{} = {} × {} (composite)", n, d, n / d)),
-            None => self.primality_result(n, true,
-                &format!("No divisors found up to √{} ≈ {}", n, sqrt_n)),
+            Some(d) => {
+                self.primality_result(n, false, &format!("{} = {} × {} (composite)", n, d, n / d))
+            }
+            None => self.primality_result(
+                n,
+                true,
+                &format!("No divisors found up to √{} ≈ {}", n, sqrt_n),
+            ),
         }
     }
 

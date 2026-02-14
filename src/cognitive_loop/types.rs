@@ -2,8 +2,8 @@
 //!
 //! Extracted from `mod.rs` to reduce file size while preserving all public APIs.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 /// Result of a single cognitive cycle
 #[derive(Debug, Clone)]
@@ -170,16 +170,16 @@ impl AdaptiveBehavior {
         use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 
         // Base confidence from all sources
-        let confidence = (pattern_confidence * 0.4 + coherence * 0.3 + voice_confidence * 0.3)
-            .clamp(0.0, 1.0);
+        let confidence =
+            (pattern_confidence * 0.4 + coherence * 0.3 + voice_confidence * 0.3).clamp(0.0, 1.0);
 
         match pattern {
             ConsciousnessPattern::Focused => Self {
-                learning_rate_multiplier: 1.3 + confidence * 0.4,  // 1.3 to 1.7
-                speech_rate_multiplier: 1.05 + confidence * 0.15,  // 1.05 to 1.2
+                learning_rate_multiplier: 1.3 + confidence * 0.4, // 1.3 to 1.7
+                speech_rate_multiplier: 1.05 + confidence * 0.15, // 1.05 to 1.2
                 pause_multiplier: 0.7,
-                attention_sensitivity: 0.7,  // Less distracted
-                exploration_factor: 0.1,     // Stay on track
+                attention_sensitivity: 0.7, // Less distracted
+                exploration_factor: 0.1,    // Stay on track
                 confidence,
                 pause_learning: false,
                 action_hint: ActionHint::SpeedUp,
@@ -188,7 +188,7 @@ impl AdaptiveBehavior {
             ConsciousnessPattern::Contemplative => Self {
                 learning_rate_multiplier: 0.8,
                 speech_rate_multiplier: 0.85,
-                pause_multiplier: 1.5,       // Longer pauses for reflection
+                pause_multiplier: 1.5, // Longer pauses for reflection
                 attention_sensitivity: 1.0,
                 exploration_factor: 0.2,
                 confidence,
@@ -199,8 +199,8 @@ impl AdaptiveBehavior {
             ConsciousnessPattern::Excited => Self {
                 learning_rate_multiplier: 1.1,
                 speech_rate_multiplier: 1.15,
-                pause_multiplier: 0.6,       // Quick transitions
-                attention_sensitivity: 1.3,  // More reactive
+                pause_multiplier: 0.6,      // Quick transitions
+                attention_sensitivity: 1.3, // More reactive
                 exploration_factor: 0.4,
                 confidence,
                 pause_learning: false,
@@ -211,8 +211,8 @@ impl AdaptiveBehavior {
                 learning_rate_multiplier: 1.0,
                 speech_rate_multiplier: 0.95,
                 pause_multiplier: 1.0,
-                attention_sensitivity: 1.4,  // High sensitivity to new info
-                exploration_factor: 0.7,     // Actively explore
+                attention_sensitivity: 1.4, // High sensitivity to new info
+                exploration_factor: 0.7,    // Actively explore
                 confidence: confidence * 0.8,
                 pause_learning: false,
                 action_hint: ActionHint::Explore,
@@ -230,20 +230,20 @@ impl AdaptiveBehavior {
             },
 
             ConsciousnessPattern::Transitioning => Self {
-                learning_rate_multiplier: 0.3,  // Minimal learning during transition
+                learning_rate_multiplier: 0.3, // Minimal learning during transition
                 speech_rate_multiplier: 0.8,
-                pause_multiplier: 1.8,          // Pause to stabilize
+                pause_multiplier: 1.8, // Pause to stabilize
                 attention_sensitivity: 1.0,
                 exploration_factor: 0.3,
                 confidence: confidence * 0.5,
-                pause_learning: true,           // Pause learning
+                pause_learning: true, // Pause learning
                 action_hint: ActionHint::Stabilize,
             },
 
             ConsciousnessPattern::Uncertain => Self {
-                learning_rate_multiplier: 0.4,  // Careful learning
-                speech_rate_multiplier: 0.75,   // Slow down
-                pause_multiplier: 2.0,          // Long pauses
+                learning_rate_multiplier: 0.4, // Careful learning
+                speech_rate_multiplier: 0.75,  // Slow down
+                pause_multiplier: 2.0,         // Long pauses
                 attention_sensitivity: 1.2,
                 exploration_factor: 0.5,
                 confidence: confidence * 0.3,

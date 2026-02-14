@@ -204,7 +204,7 @@ impl Default for ExperimentConfig {
         Self {
             validation_duration: Duration::from_secs(60), // 1 minute per validation
             measurements_per_run: 100,
-            conservative: true, // Safety first!
+            conservative: true,            // Safety first!
             require_human_approval: false, // Can be automated for minor changes
         }
     }
@@ -217,7 +217,8 @@ impl SafeExperiment {
         baseline: SystemSnapshot,
         config: ExperimentConfig,
     ) -> Self {
-        let id = format!("experiment_{}_{}",
+        let id = format!(
+            "experiment_{}_{}",
             improvement.id,
             Instant::now().elapsed().as_millis()
         );
@@ -234,12 +235,14 @@ impl SafeExperiment {
         // Conservative rollback conditions
         let rollback_condition = RollbackCondition {
             min_phi: baseline.phi * 0.95, // Don't drop Phi more than 5%
-            max_latency: baseline.latencies.values()
+            max_latency: baseline
+                .latencies
+                .values()
                 .copied()
                 .max()
                 .unwrap_or(Duration::from_millis(100))
                 .mul_f64(1.20), // Don't increase latency more than 20%
-            min_accuracy: 0.75, // Never below 75%
+            min_accuracy: 0.75,           // Never below 75%
             max_consecutive_failures: 3,
         };
 
@@ -274,25 +277,33 @@ impl SafeExperiment {
         let phi_improved = phi >= self.baseline.phi + self.success_criteria.min_phi_improvement;
 
         let default_latency = Duration::from_millis(50);
-        let latency_ok = latencies.values()
-            .all(|&d| {
-                let baseline_latency = self.baseline.latencies.get(&ComponentId::Cache()).unwrap_or(&default_latency);
-                d <= baseline_latency.mul_f64(1.0 + self.success_criteria.max_latency_increase)
-            });
+        let latency_ok = latencies.values().all(|&d| {
+            let baseline_latency = self
+                .baseline
+                .latencies
+                .get(&ComponentId::Cache())
+                .unwrap_or(&default_latency);
+            d <= baseline_latency.mul_f64(1.0 + self.success_criteria.max_latency_increase)
+        });
 
-        let accuracy_ok = accuracies.values()
+        let accuracy_ok = accuracies
+            .values()
             .all(|&v| v >= self.success_criteria.min_accuracy);
 
         let passed = phi_improved && latency_ok && accuracy_ok;
 
         let reason = if passed {
-            format!("Phi improved {:.1}%, latency OK, accuracy OK",
-                (phi - self.baseline.phi) / self.baseline.phi * 100.0)
+            format!(
+                "Phi improved {:.1}%, latency OK, accuracy OK",
+                (phi - self.baseline.phi) / self.baseline.phi * 100.0
+            )
         } else {
             let mut reasons = Vec::new();
             if !phi_improved {
-                reasons.push(format!("Phi only improved {:.1}%",
-                    (phi - self.baseline.phi) / self.baseline.phi * 100.0));
+                reasons.push(format!(
+                    "Phi only improved {:.1}%",
+                    (phi - self.baseline.phi) / self.baseline.phi * 100.0
+                ));
             }
             if !latency_ok {
                 reasons.push("Latency increased too much".to_string());
@@ -331,7 +342,13 @@ impl SafeExperiment {
     }
 
     /// Measure performance with current improvement applied
-    fn measure_performance(&self) -> Result<(f64, HashMap<ComponentId, Duration>, HashMap<AccuracyMetric, f64>)> {
+    fn measure_performance(
+        &self,
+    ) -> Result<(
+        f64,
+        HashMap<ComponentId, Duration>,
+        HashMap<AccuracyMetric, f64>,
+    )> {
         // Simulate measurements
         // In real implementation, this would actually run the system
 
@@ -381,14 +398,18 @@ impl SafeExperiment {
         }
 
         // Check recent failures
-        let recent_runs: Vec<&ValidationRun> = self.validation_runs.iter()
+        let recent_runs: Vec<&ValidationRun> = self
+            .validation_runs
+            .iter()
             .rev()
             .take(self.rollback_condition.max_consecutive_failures)
             .collect();
 
         let consecutive_failures = recent_runs.iter().all(|r| !r.passed);
 
-        if consecutive_failures && recent_runs.len() >= self.rollback_condition.max_consecutive_failures {
+        if consecutive_failures
+            && recent_runs.len() >= self.rollback_condition.max_consecutive_failures
+        {
             return true;
         }
 
@@ -397,10 +418,18 @@ impl SafeExperiment {
             if latest.phi < self.rollback_condition.min_phi {
                 return true;
             }
-            if latest.latencies.values().any(|&d| d > self.rollback_condition.max_latency) {
+            if latest
+                .latencies
+                .values()
+                .any(|&d| d > self.rollback_condition.max_latency)
+            {
                 return true;
             }
-            if latest.accuracies.values().any(|&v| v < self.rollback_condition.min_accuracy) {
+            if latest
+                .accuracies
+                .values()
+                .any(|&v| v < self.rollback_condition.min_accuracy)
+            {
                 return true;
             }
         }
@@ -411,9 +440,7 @@ impl SafeExperiment {
     /// Check if experiment has succeeded
     fn has_succeeded(&self) -> bool {
         // Need minimum number of successful runs
-        let successful_runs = self.validation_runs.iter()
-            .filter(|r| r.passed)
-            .count();
+        let successful_runs = self.validation_runs.iter().filter(|r| r.passed).count();
 
         successful_runs >= self.success_criteria.min_successful_runs
     }
@@ -464,11 +491,7 @@ impl SafeExperiment {
 
         format!(
             "Experiment {}: {}\n  Runs: {}/{} passed\n  Status: {:?}",
-            self.id,
-            self.improvement.description,
-            passed,
-            total,
-            self.status
+            self.id, self.improvement.description, passed, total, self.status
         )
     }
 }
@@ -498,7 +521,10 @@ mod tests {
     fn create_test_improvement() -> ArchitecturalImprovement {
         ArchitecturalImprovement {
             id: "test_improvement".to_string(),
-            improvement_type: ImprovementType::IncreaseCacheSize { from: 1000, to: 2000 },
+            improvement_type: ImprovementType::IncreaseCacheSize {
+                from: 1000,
+                to: 2000,
+            },
             description: "Double cache size".to_string(),
             expected_phi_gain: Some(0.05),
             expected_latency_reduction: Some(0.2),

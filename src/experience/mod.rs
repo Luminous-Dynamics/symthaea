@@ -27,26 +27,28 @@
 //!
 //! Φ remains as a **monitoring metric**, not a control signal.
 
-pub mod signals;
 pub mod kosmic_state;
 pub mod memory;
+pub mod signals;
 
 #[cfg(feature = "databases_module")]
-pub mod vector_store;
+pub mod analytics;
 #[cfg(feature = "databases_module")]
 pub mod reasoning_engine;
 #[cfg(feature = "databases_module")]
-pub mod analytics;
+pub mod vector_store;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub use signals::{PrincipledSignals, SignalComputer};
-pub use kosmic_state::{KosmicSong, SevenHarmonies, HarmonicState, MoralUncertainty, GisState, GisType};
+pub use kosmic_state::{
+    GisState, GisType, HarmonicState, KosmicSong, MoralUncertainty, SevenHarmonies,
+};
 pub use memory::{EpisodicMemory, ThoughtTrace, UserEpistemicMirror};
+pub use signals::{PrincipledSignals, SignalComputer};
 
-use symthaea_core::hdc::ContinuousHV;
 use crate::wisdom::WisdomState;
+use symthaea_core::hdc::ContinuousHV;
 
 /// The central experience integration bus
 ///
@@ -224,7 +226,9 @@ impl ExperienceBus {
     /// Returns a weight multiplier for a given primitive type based on
     /// the current harmonic state. Higher values = primitive should be preferred.
     pub fn harmonic_weight_for_primitive(&self, primitive_type: &str) -> f32 {
-        self.wisdom.harmonics.combined_weight_for_primitive(primitive_type)
+        self.wisdom
+            .harmonics
+            .combined_weight_for_primitive(primitive_type)
     }
 
     /// Get the current dominant harmonic mode and its guiding question
@@ -274,7 +278,11 @@ impl ExperienceBus {
                 id: exp.id.clone(),
                 similarity: *sim,
                 input_summary: exp.input_summary.clone(),
-                outcome_success: exp.outcome.as_ref().map(|o| o.task_completion).unwrap_or(false),
+                outcome_success: exp
+                    .outcome
+                    .as_ref()
+                    .map(|o| o.task_completion)
+                    .unwrap_or(false),
             })
             .collect();
 
@@ -311,7 +319,10 @@ impl ExperienceBus {
     }
 
     /// Retrieve similar experiences from memory/database
-    fn retrieve_similar_experiences(&self, input_hdv: &ContinuousHV) -> Vec<(&EpisodicMemory, f32)> {
+    fn retrieve_similar_experiences(
+        &self,
+        input_hdv: &ContinuousHV,
+    ) -> Vec<(&EpisodicMemory, f32)> {
         let mut results = Vec::new();
 
         for exp in &self.memory_cache.experiences {
@@ -357,10 +368,7 @@ impl ExperienceBus {
         let prediction_error = if similar_experiences.is_empty() {
             1.0 // No similar experiences = high surprise
         } else {
-            let avg_similarity: f32 = similar_experiences
-                .iter()
-                .map(|(_, sim)| sim)
-                .sum::<f32>()
+            let avg_similarity: f32 = similar_experiences.iter().map(|(_, sim)| sim).sum::<f32>()
                 / similar_experiences.len() as f32;
             1.0 - avg_similarity
         };
@@ -408,13 +416,9 @@ impl ExperienceBus {
             let outcomes: Vec<f32> = experiences
                 .iter()
                 .filter_map(|(e, _)| {
-                    e.outcome.as_ref().map(|o| {
-                        if o.task_completion {
-                            1.0
-                        } else {
-                            0.0
-                        }
-                    })
+                    e.outcome
+                        .as_ref()
+                        .map(|o| if o.task_completion { 1.0 } else { 0.0 })
                 })
                 .collect();
 
@@ -480,7 +484,8 @@ impl ExperienceBus {
         // Rule 4: Low confidence + high salience → CONSULT_VALUES
         if signals.confidence < 0.5 && signals.salience > 0.7 {
             primitives.push("CONSULT_VALUES".to_string());
-            rules_applied.push("R4: confidence < 0.5 && salience > 0.7 → CONSULT_VALUES".to_string());
+            rules_applied
+                .push("R4: confidence < 0.5 && salience > 0.7 → CONSULT_VALUES".to_string());
         }
 
         // Rule 5: High moral uncertainty (deontic) → CONSULT_VALUES
@@ -531,7 +536,11 @@ impl ExperienceBus {
     /// Record an experience for learning
     pub fn record_experience(&mut self, experience: EpisodicMemory) {
         // Update primitive stats before moving experience into cache
-        let task_completed = experience.outcome.as_ref().map(|o| o.task_completion).unwrap_or(false);
+        let task_completed = experience
+            .outcome
+            .as_ref()
+            .map(|o| o.task_completion)
+            .unwrap_or(false);
         let coherence = experience.coherence;
 
         for primitive in &experience.thought_primitives {
@@ -546,8 +555,7 @@ impl ExperienceBus {
             }
             // Rolling average for coherence
             let n = stats.total_uses as f32;
-            stats.avg_coherence =
-                (stats.avg_coherence * (n - 1.0) + coherence) / n;
+            stats.avg_coherence = (stats.avg_coherence * (n - 1.0) + coherence) / n;
         }
 
         // Move experience into memory cache (no clone needed)
@@ -762,7 +770,10 @@ mod tests {
 
         // EXPLORE should be boosted by Play, REPAIR by Coherence
         // With Play at 0.9 and Coherence at 0.2, EXPLORE should dominate
-        assert!(explore_weight > 1.0, "EXPLORE should be boosted with high Play");
+        assert!(
+            explore_weight > 1.0,
+            "EXPLORE should be boosted with high Play"
+        );
     }
 
     #[test]
@@ -771,10 +782,10 @@ mod tests {
 
         // Set coherence-dominant mode by explicitly setting ALL harmonics
         // This ensures Coherence truly dominates
-        bus.wisdom.harmonics.coherence = 0.9;  // Dominant
+        bus.wisdom.harmonics.coherence = 0.9; // Dominant
         bus.wisdom.harmonics.flourishing = 0.1;
         bus.wisdom.harmonics.wisdom = 0.2;
-        bus.wisdom.harmonics.play = 0.1;       // Low - suppresses EXPLORE
+        bus.wisdom.harmonics.play = 0.1; // Low - suppresses EXPLORE
         bus.wisdom.harmonics.interconnect = 0.2;
         bus.wisdom.harmonics.reciprocity = 0.1;
         bus.wisdom.harmonics.evolution = 0.2;
@@ -794,9 +805,12 @@ mod tests {
 
         // In strong coherence mode, INTEGRATE (synthesis) should have higher weight
         // than EXPLORE (novelty-seeking)
-        assert!(integrate_weight > explore_weight,
+        assert!(
+            integrate_weight > explore_weight,
             "INTEGRATE ({:.3}) should be preferred over EXPLORE ({:.3}) in coherence mode",
-            integrate_weight, explore_weight);
+            integrate_weight,
+            explore_weight
+        );
     }
 
     #[test]
@@ -820,7 +834,9 @@ mod tests {
         println!("  LEARN: {:.3}", learn_weight);
 
         // With high prediction error and uncertainty, wisdom/learning should be boosted
-        assert!(question_weight >= 1.0 || learn_weight >= 1.0,
-            "Wisdom-related primitives should be relevant after high prediction error");
+        assert!(
+            question_weight >= 1.0 || learn_weight >= 1.0,
+            "Wisdom-related primitives should be relevant after high prediction error"
+        );
     }
 }

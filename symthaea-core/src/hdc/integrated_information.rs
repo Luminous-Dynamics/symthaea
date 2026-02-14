@@ -76,8 +76,8 @@
 //! ```
 
 use super::binary_hv::BinaryHV;
+use crate::observability::{PhiComponents, PhiMeasurementEvent, SharedObserver};
 use serde::{Deserialize, Serialize};
-use crate::observability::{SharedObserver, PhiComponents, PhiMeasurementEvent};
 
 /// Binary Shannon entropy: H(p) = -p log₂(p) - (1-p) log₂(1-p)
 ///
@@ -283,7 +283,8 @@ impl IntegratedInformation {
         // 5. Recursion: Self-referential processing (temporal continuity)
         // Compare current Φ to recent history to measure stable processing
         let recursion = if self.phi_history.len() >= 2 {
-            let recent_phi: Vec<f64> = self.phi_history
+            let recent_phi: Vec<f64> = self
+                .phi_history
                 .iter()
                 .rev()
                 .take(5)
@@ -292,9 +293,8 @@ impl IntegratedInformation {
 
             // Temporal continuity = 1 - variance (stable = high recursion)
             let mean = recent_phi.iter().sum::<f64>() / recent_phi.len() as f64;
-            let variance: f64 = recent_phi.iter()
-                .map(|v| (v - mean).powi(2))
-                .sum::<f64>() / recent_phi.len() as f64;
+            let variance: f64 = recent_phi.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
+                / recent_phi.len() as f64;
 
             (1.0 - variance.sqrt()).max(0.0)
         } else {
@@ -312,8 +312,7 @@ impl IntegratedInformation {
         // 7. Knowledge: Accumulated information over time
         // Average Φ across history (learning/memory trace)
         let knowledge = if !self.phi_history.is_empty() {
-            self.phi_history.iter().map(|m| m.phi).sum::<f64>()
-                / self.phi_history.len() as f64
+            self.phi_history.iter().map(|m| m.phi).sum::<f64>() / self.phi_history.len() as f64
         } else {
             phi // First measurement = current knowledge
         };
@@ -386,7 +385,8 @@ impl IntegratedInformation {
 
         // 7. Compute temporal continuity (if history exists)
         let temporal_continuity = if self.phi_history.len() >= 2 {
-            let recent_phi: Vec<f64> = self.phi_history
+            let recent_phi: Vec<f64> = self
+                .phi_history
                 .iter()
                 .rev()
                 .take(5)
@@ -812,7 +812,8 @@ impl IntegratedInformation {
 
         // 7. Temporal continuity
         let temporal_continuity = if self.phi_history.len() >= 2 {
-            let recent: Vec<f64> = self.phi_history
+            let recent: Vec<f64> = self
+                .phi_history
                 .iter()
                 .rev()
                 .take(5)
@@ -865,7 +866,10 @@ impl IntegratedInformation {
             };
             let info = self.entropy_partition_information(components, &partition);
             return (
-                Partition { information_loss: info, ..partition },
+                Partition {
+                    information_loss: info,
+                    ..partition
+                },
                 info,
             );
         }
@@ -928,7 +932,11 @@ impl IntegratedInformation {
 
         // 1. Similarity-based clustering
         let (part_a, part_b) = self.similarity_partition(components);
-        candidates.push(Partition { part_a, part_b, information_loss: 0.0 });
+        candidates.push(Partition {
+            part_a,
+            part_b,
+            information_loss: 0.0,
+        });
 
         // 2. Split in half
         let mid = n / 2;
@@ -1226,7 +1234,10 @@ mod tests {
 
         println!("4-component Φ computed in {:?}", duration);
         // Should be very fast with BinaryHV
-        assert!(duration.as_millis() < 100, "Should compute in <100ms (debug mode)");
+        assert!(
+            duration.as_millis() < 100,
+            "Should compute in <100ms (debug mode)"
+        );
     }
 
     #[test]
@@ -1283,15 +1294,27 @@ mod tests {
     fn test_similarity_to_mi_properties() {
         // Independent random vectors (similarity ≈ 0.5) → MI ≈ 0
         let mi_independent = similarity_to_mutual_information(0.5);
-        assert!(mi_independent < 0.01, "Independent vectors should have MI ≈ 0, got {}", mi_independent);
+        assert!(
+            mi_independent < 0.01,
+            "Independent vectors should have MI ≈ 0, got {}",
+            mi_independent
+        );
 
         // Identical vectors (similarity = 1.0) → MI = 1.0
         let mi_identical = similarity_to_mutual_information(0.999);
-        assert!(mi_identical > 0.9, "Identical vectors should have MI ≈ 1, got {}", mi_identical);
+        assert!(
+            mi_identical > 0.9,
+            "Identical vectors should have MI ≈ 1, got {}",
+            mi_identical
+        );
 
         // Anti-correlated (similarity ≈ 0.0) → MI ≈ 1.0
         let mi_anticorr = similarity_to_mutual_information(0.001);
-        assert!(mi_anticorr > 0.9, "Anti-correlated should have MI ≈ 1, got {}", mi_anticorr);
+        assert!(
+            mi_anticorr > 0.9,
+            "Anti-correlated should have MI ≈ 1, got {}",
+            mi_anticorr
+        );
 
         // Monotonic in deviation from 0.5
         let mi_55 = similarity_to_mutual_information(0.55);
@@ -1339,7 +1362,10 @@ mod tests {
         ];
         let phi_corr = phi_calc.compute_phi_entropy(&correlated);
 
-        println!("Entropy Φ: independent={:.4}, correlated={:.4}", phi_ind, phi_corr);
+        println!(
+            "Entropy Φ: independent={:.4}, correlated={:.4}",
+            phi_ind, phi_corr
+        );
 
         // Correlated system should show higher integration
         assert!(
@@ -1357,7 +1383,10 @@ mod tests {
         let phi = phi_calc.compute_phi_entropy(&components);
 
         println!("16-component Φ_entropy = {:.4}", phi);
-        assert!(phi >= 0.0, "Φ_entropy should be non-negative for large system");
+        assert!(
+            phi >= 0.0,
+            "Φ_entropy should be non-negative for large system"
+        );
     }
 
     #[test]
@@ -1366,8 +1395,11 @@ mod tests {
         let independent: Vec<BinaryHV> = (0..4).map(|i| BinaryHV::random(i as u64 + 600)).collect();
         let phi_fast = IntegratedInformation::compute_phi_fast(&independent);
 
-        assert!(phi_fast >= 0.0 && phi_fast <= 1.0,
-            "Fast Φ should be in [0, 1], got {}", phi_fast);
+        assert!(
+            phi_fast >= 0.0 && phi_fast <= 1.0,
+            "Fast Φ should be in [0, 1], got {}",
+            phi_fast
+        );
         println!("Fast Φ (4 independent): {:.4}", phi_fast);
     }
 
@@ -1392,6 +1424,9 @@ mod tests {
 
         // Cross MI between independent bundles should be relatively low
         // (random BinaryHV bundles will have sim ≈ 0.5)
-        assert!(cross_mi < 0.5, "Independent partition cross MI should be low");
+        assert!(
+            cross_mi < 0.5,
+            "Independent partition cross MI should be low"
+        );
     }
 }

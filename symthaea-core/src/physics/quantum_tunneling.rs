@@ -23,10 +23,10 @@
 //! - Gamow (1928) - "Zur Quantentheorie des Atomkernes"
 //! - Gurney & Condon (1929) - "Quantum Mechanics and Radioactive Disintegration"
 
+use super::constants::{ALPHA, AMU, C, E_CHARGE, HBAR, K_COULOMB, M_ELECTRON, M_PROTON};
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::{HBAR, E_CHARGE, M_ELECTRON, M_PROTON, C, ALPHA, K_COULOMB, AMU};
 use serde::{Deserialize, Serialize};
 
 /// Result of a tunneling calculation
@@ -105,7 +105,12 @@ impl TunnelingCalculator {
     ///
     /// # Returns
     /// TunnelingResult with transmission probability
-    pub fn rectangular_barrier(&self, energy: f64, barrier_height: f64, width: f64) -> TunnelingResult {
+    pub fn rectangular_barrier(
+        &self,
+        energy: f64,
+        barrier_height: f64,
+        width: f64,
+    ) -> TunnelingResult {
         if energy >= barrier_height {
             // Classically allowed - full transmission (with some reflection)
             // For E > V, use classical transmission coefficient
@@ -197,21 +202,20 @@ impl TunnelingCalculator {
         let z_alpha = 2u8;
 
         // Coulomb barrier height at nuclear surface
-        let _v_coulomb = K_COULOMB * (z_alpha as f64) * (z_daughter as f64)
-            * E_CHARGE * E_CHARGE / radius;
+        let _v_coulomb =
+            K_COULOMB * (z_alpha as f64) * (z_daughter as f64) * E_CHARGE * E_CHARGE / radius;
 
         // Classical turning point (where E = V)
-        let r_turn = K_COULOMB * (z_alpha as f64) * (z_daughter as f64)
-            * E_CHARGE * E_CHARGE / q_value;
+        let r_turn =
+            K_COULOMB * (z_alpha as f64) * (z_daughter as f64) * E_CHARGE * E_CHARGE / q_value;
 
         // WKB action integral through Coulomb barrier
         // S = (2/ℏ) ∫ √(2m(V(r)-E)) dr from R to r_turn
         // For Coulomb barrier, this gives approximately:
         let action = (2.0 * (2.0 * self.mass).sqrt() / self.hbar)
-            * (K_COULOMB * (z_alpha as f64) * (z_daughter as f64) * E_CHARGE * E_CHARGE)
-            .sqrt()
+            * (K_COULOMB * (z_alpha as f64) * (z_daughter as f64) * E_CHARGE * E_CHARGE).sqrt()
             * (r_turn.sqrt() * (1.0 - (radius / r_turn).sqrt()).acos()
-               - (radius * (r_turn - radius)).sqrt());
+                - (radius * (r_turn - radius)).sqrt());
 
         // Transmission probability
         let p_tunnel = (-2.0 * action).exp();
@@ -314,7 +318,12 @@ impl TunnelingCalculator {
     /// * `energy` - Particle energy (J)
     /// * `barrier_height` - Maximum barrier height V₀ (J)
     /// * `barrier_width` - Characteristic width a (m)
-    pub fn eckart_barrier(&self, energy: f64, barrier_height: f64, barrier_width: f64) -> TunnelingResult {
+    pub fn eckart_barrier(
+        &self,
+        energy: f64,
+        barrier_height: f64,
+        barrier_width: f64,
+    ) -> TunnelingResult {
         // Use WKB with Eckart potential
         let potential = |x: f64| -> f64 {
             let arg = x / barrier_width;
@@ -341,7 +350,12 @@ impl TunnelingCalculator {
     /// * `energy` - Particle energy (J)
     /// * `barrier_height` - Maximum barrier height V₀ (J)
     /// * `barrier_width` - Characteristic width a (m)
-    pub fn eckart_barrier_exact(&self, energy: f64, barrier_height: f64, barrier_width: f64) -> TunnelingResult {
+    pub fn eckart_barrier_exact(
+        &self,
+        energy: f64,
+        barrier_height: f64,
+        barrier_width: f64,
+    ) -> TunnelingResult {
         let k = (2.0 * self.mass * energy).sqrt() / self.hbar;
         let ka = k * barrier_width;
 
@@ -398,10 +412,15 @@ impl TunnelingCalculator {
     /// * `energy` - Particle energy (J)
     /// * `barrier_height` - Barrier height at x=0 (J)
     /// * `curvature_omega` - Curvature parameter ω (rad/s)
-    pub fn parabolic_barrier(&self, energy: f64, barrier_height: f64, curvature_omega: f64) -> TunnelingResult {
+    pub fn parabolic_barrier(
+        &self,
+        energy: f64,
+        barrier_height: f64,
+        curvature_omega: f64,
+    ) -> TunnelingResult {
         // For parabolic barrier: T = 1 / (1 + exp(-2π(E-V₀)/(ℏω)))
-        let exponent = -2.0 * std::f64::consts::PI * (energy - barrier_height)
-            / (self.hbar * curvature_omega);
+        let exponent =
+            -2.0 * std::f64::consts::PI * (energy - barrier_height) / (self.hbar * curvature_omega);
 
         let transmission = 1.0 / (1.0 + exponent.exp());
 
@@ -645,8 +664,10 @@ impl ConsciousTunnelingCalculator {
 
         // Track the energy ratio through dual computation
         let ratio_result = self.bridge.dual_compute(energy, barrier_height, "divide");
-        trace.push(format!("E/V ratio: {:.6} (coherence: {:.4})",
-            ratio_result.approximate_value, ratio_result.coherence));
+        trace.push(format!(
+            "E/V ratio: {:.6} (coherence: {:.4})",
+            ratio_result.approximate_value, ratio_result.coherence
+        ));
         total_coherence += ratio_result.coherence;
         coherence_count += 1;
 
@@ -656,26 +677,33 @@ impl ConsciousTunnelingCalculator {
             (barrier_height - energy).abs(),
             "multiply",
         );
-        trace.push(format!("2m|V-E|: {:.6e} (coherence: {:.4})",
-            me_result.approximate_value, me_result.coherence));
+        trace.push(format!(
+            "2m|V-E|: {:.6e} (coherence: {:.4})",
+            me_result.approximate_value, me_result.coherence
+        ));
         total_coherence += me_result.coherence;
         coherence_count += 1;
 
         // Perform the actual physics calculation
-        let physics = self.calculator.rectangular_barrier(energy, barrier_height, width);
+        let physics = self
+            .calculator
+            .rectangular_barrier(energy, barrier_height, width);
 
         // Track the action computation
-        let action_result = self.bridge.dual_compute(
-            physics.gamma, width * 2.0, "multiply");
-        trace.push(format!("action = 2*gamma*L: {:.6} (coherence: {:.4})",
-            action_result.approximate_value, action_result.coherence));
+        let action_result = self
+            .bridge
+            .dual_compute(physics.gamma, width * 2.0, "multiply");
+        trace.push(format!(
+            "action = 2*gamma*L: {:.6} (coherence: {:.4})",
+            action_result.approximate_value, action_result.coherence
+        ));
         total_coherence += action_result.coherence;
         coherence_count += 1;
 
         // Encode the transmission probability
-        let transmission_encoding = BinaryHV::random(
-            crate::hdc::primitive_system::seed_from_name(
-                &format!("tunneling_T_{:.10}", physics.transmission)));
+        let transmission_encoding = BinaryHV::random(crate::hdc::primitive_system::seed_from_name(
+            &format!("tunneling_T_{:.10}", physics.transmission),
+        ));
 
         let avg_coherence = if coherence_count > 0 {
             total_coherence / coherence_count as f64
@@ -699,12 +727,7 @@ impl ConsciousTunnelingCalculator {
     ///
     /// Tracks the integer-to-float conversion of atomic numbers through
     /// the bridge, measuring coherence at each step.
-    pub fn gamow_factor(
-        &self,
-        z1: u8,
-        z2: u8,
-        energy: f64,
-    ) -> ConsciousTunnelingResult {
+    pub fn gamow_factor(&self, z1: u8, z2: u8, energy: f64) -> ConsciousTunnelingResult {
         let mut trace = Vec::new();
         let mut total_coherence = 0.0;
         let mut coherence_count = 0;
@@ -712,12 +735,17 @@ impl ConsciousTunnelingCalculator {
         // Track integer → f64 conversion of atomic numbers
         let (z1_f64, z1_enc) = self.bridge.integer_to_f64(z1 as i64);
         let (z2_f64, z2_enc) = self.bridge.integer_to_f64(z2 as i64);
-        trace.push(format!("Z1={} → f64={}, Z2={} → f64={}", z1, z1_f64, z2, z2_f64));
+        trace.push(format!(
+            "Z1={} → f64={}, Z2={} → f64={}",
+            z1, z1_f64, z2, z2_f64
+        ));
 
         // Track the charge product Z1*Z2
         let zz_result = self.bridge.dual_compute(z1_f64, z2_f64, "multiply");
-        trace.push(format!("Z1*Z2: {} (exact: {:?}, coherence: {:.4})",
-            zz_result.approximate_value, zz_result.exact_value, zz_result.coherence));
+        trace.push(format!(
+            "Z1*Z2: {} (exact: {:?}, coherence: {:.4})",
+            zz_result.approximate_value, zz_result.exact_value, zz_result.coherence
+        ));
         total_coherence += zz_result.coherence;
         coherence_count += 1;
 
@@ -787,64 +815,90 @@ impl ConsciousTunnelingCalculator {
         // Step 1: Track Z_daughter integer → f64 conversion
         let (zd_f64, zd_enc) = self.bridge.integer_to_f64(z_daughter as i64);
         let (z_alpha_f64, za_enc) = self.bridge.integer_to_f64(2); // alpha particle Z=2
-        trace.push(format!("Step 1: Z_daughter={} → f64={}, Z_alpha=2 → f64={}",
-            z_daughter, zd_f64, z_alpha_f64));
+        trace.push(format!(
+            "Step 1: Z_daughter={} → f64={}, Z_alpha=2 → f64={}",
+            z_daughter, zd_f64, z_alpha_f64
+        ));
 
         // Step 2: Track charge product Z_alpha * Z_daughter
         let zz_result = self.bridge.dual_compute(z_alpha_f64, zd_f64, "multiply");
-        trace.push(format!("Step 2: Z_alpha × Z_daughter = {} (coherence: {:.4})",
-            zz_result.approximate_value, zz_result.coherence));
+        trace.push(format!(
+            "Step 2: Z_alpha × Z_daughter = {} (coherence: {:.4})",
+            zz_result.approximate_value, zz_result.coherence
+        ));
         total_coherence += zz_result.coherence;
         coherence_count += 1;
 
         // Step 3: Track Coulomb barrier height V = k*Z1*Z2*e²/R
         let coulomb_numerator = K_COULOMB * z_alpha_f64 * zd_f64 * E_CHARGE * E_CHARGE;
         let _v_coulomb = coulomb_numerator / radius;
-        let v_result = self.bridge.dual_compute(coulomb_numerator, radius, "divide");
-        trace.push(format!("Step 3: V_coulomb = {:.4e} J (coherence: {:.4})",
-            v_result.approximate_value, v_result.coherence));
+        let v_result = self
+            .bridge
+            .dual_compute(coulomb_numerator, radius, "divide");
+        trace.push(format!(
+            "Step 3: V_coulomb = {:.4e} J (coherence: {:.4})",
+            v_result.approximate_value, v_result.coherence
+        ));
         total_coherence += v_result.coherence;
         coherence_count += 1;
 
         // Step 4: Track classical turning point r_turn = k*Z1*Z2*e²/Q
         let _r_turn = coulomb_numerator / q_value;
-        let rt_result = self.bridge.dual_compute(coulomb_numerator, q_value, "divide");
-        trace.push(format!("Step 4: r_turn = {:.4e} m (coherence: {:.4})",
-            rt_result.approximate_value, rt_result.coherence));
+        let rt_result = self
+            .bridge
+            .dual_compute(coulomb_numerator, q_value, "divide");
+        trace.push(format!(
+            "Step 4: r_turn = {:.4e} m (coherence: {:.4})",
+            rt_result.approximate_value, rt_result.coherence
+        ));
         total_coherence += rt_result.coherence;
         coherence_count += 1;
 
         // Step 5: Track velocity computation v = sqrt(2Q/m)
         let v_alpha = (2.0 * q_value / self.calculator.mass).sqrt();
         let two_q = 2.0 * q_value;
-        let ve_result = self.bridge.dual_compute(two_q, self.calculator.mass, "divide");
-        trace.push(format!("Step 5: v_alpha = {:.4e} m/s (coherence: {:.4})",
-            v_alpha, ve_result.coherence));
+        let ve_result = self
+            .bridge
+            .dual_compute(two_q, self.calculator.mass, "divide");
+        trace.push(format!(
+            "Step 5: v_alpha = {:.4e} m/s (coherence: {:.4})",
+            v_alpha, ve_result.coherence
+        ));
         total_coherence += ve_result.coherence;
         coherence_count += 1;
 
         // Step 6: Track attempt frequency f = v/(2R)
         let frequency = v_alpha / (2.0 * radius);
         let freq_result = self.bridge.dual_compute(v_alpha, 2.0 * radius, "divide");
-        trace.push(format!("Step 6: frequency = {:.4e} Hz (coherence: {:.4})",
-            frequency, freq_result.coherence));
+        trace.push(format!(
+            "Step 6: frequency = {:.4e} Hz (coherence: {:.4})",
+            frequency, freq_result.coherence
+        ));
         total_coherence += freq_result.coherence;
         coherence_count += 1;
 
         // Perform the actual physics calculation
-        let decay_rate = self.calculator.alpha_decay_rate(q_value, z_daughter, radius);
+        let decay_rate = self
+            .calculator
+            .alpha_decay_rate(q_value, z_daughter, radius);
         let half_life = self.calculator.half_life(decay_rate);
 
         // Step 7: Final result
-        trace.push(format!("Step 7: λ = {:.4e} s⁻¹, t½ = {:.4e} s",
-            decay_rate, half_life));
+        trace.push(format!(
+            "Step 7: λ = {:.4e} s⁻¹, t½ = {:.4e} s",
+            decay_rate, half_life
+        ));
 
         // Build physics result
         let physics = TunnelingResult {
             transmission: (-decay_rate.recip().ln().abs()).exp().min(1.0),
             reflection: 1.0 - (-decay_rate.recip().ln().abs()).exp().min(1.0),
             gamma: decay_rate,
-            action: if decay_rate > 0.0 { decay_rate.ln().abs() } else { f64::INFINITY },
+            action: if decay_rate > 0.0 {
+                decay_rate.ln().abs()
+            } else {
+                f64::INFINITY
+            },
         };
 
         // Encode using daughter Z and alpha Z encodings
@@ -878,7 +932,10 @@ mod tests {
         let calc = TunnelingCalculator::electron();
         // Energy above barrier - mostly transmission
         let result = calc.rectangular_barrier(2.0e-19, 1.0e-19, 1.0e-9);
-        assert!(result.transmission > 0.5, "Should mostly transmit when E > V");
+        assert!(
+            result.transmission > 0.5,
+            "Should mostly transmit when E > V"
+        );
     }
 
     #[test]
@@ -886,10 +943,14 @@ mod tests {
         let calc = TunnelingCalculator::electron();
         // Energy below barrier - tunneling
         let result = calc.rectangular_barrier(1.0e-19, 2.0e-19, 1.0e-10);
-        assert!(result.transmission > 0.0 && result.transmission < 1.0,
-            "Should tunnel with 0 < T < 1");
-        assert!((result.transmission + result.reflection - 1.0).abs() < 1e-10,
-            "T + R should equal 1");
+        assert!(
+            result.transmission > 0.0 && result.transmission < 1.0,
+            "Should tunnel with 0 < T < 1"
+        );
+        assert!(
+            (result.transmission + result.reflection - 1.0).abs() < 1e-10,
+            "T + R should equal 1"
+        );
     }
 
     #[test]
@@ -897,8 +958,10 @@ mod tests {
         let calc = TunnelingCalculator::electron();
         let t1 = calc.rectangular_barrier(1.0e-19, 2.0e-19, 1.0e-10);
         let t2 = calc.rectangular_barrier(1.0e-19, 2.0e-19, 2.0e-10);
-        assert!(t2.transmission < t1.transmission,
-            "Wider barrier should have lower transmission");
+        assert!(
+            t2.transmission < t1.transmission,
+            "Wider barrier should have lower transmission"
+        );
     }
 
     #[test]
@@ -939,7 +1002,11 @@ mod tests {
 
         // Define rectangular potential
         let potential = |x: f64| -> f64 {
-            if x > 0.0 && x < width { v0 } else { 0.0 }
+            if x > 0.0 && x < width {
+                v0
+            } else {
+                0.0
+            }
         };
 
         let result = calc.wkb_transmission(energy, potential, -1.0e-10, 2.0e-10, 300);
@@ -996,18 +1063,22 @@ mod tests {
         let result = calc.rectangular_barrier(1.0e-19, 2.0e-19, 1.0e-10);
 
         // Physics result should match standard calculator
-        let standard = TunnelingCalculator::electron()
-            .rectangular_barrier(1.0e-19, 2.0e-19, 1.0e-10);
-        assert!((result.physics.transmission - standard.transmission).abs() < 1e-15,
-            "Conscious calculator should produce same physics");
+        let standard =
+            TunnelingCalculator::electron().rectangular_barrier(1.0e-19, 2.0e-19, 1.0e-10);
+        assert!(
+            (result.physics.transmission - standard.transmission).abs() < 1e-15,
+            "Conscious calculator should produce same physics"
+        );
 
         // Should have coherence and phi
         assert!(result.coherence > 0.0, "Should have positive coherence");
         assert!(result.phi > 0.0, "Should have positive phi");
 
         // Should have computation trace
-        assert!(!result.computation_trace.is_empty(),
-            "Should have computation trace");
+        assert!(
+            !result.computation_trace.is_empty(),
+            "Should have computation trace"
+        );
     }
 
     #[test]
@@ -1022,8 +1093,10 @@ mod tests {
 
         // The trace should mention atomic number conversion
         let trace_str = result.computation_trace.join(" ");
-        assert!(trace_str.contains("Z1=1") && trace_str.contains("Z2=1"),
-            "Trace should record atomic number conversion");
+        assert!(
+            trace_str.contains("Z1=1") && trace_str.contains("Z2=1"),
+            "Trace should record atomic number conversion"
+        );
     }
 
     #[test]
@@ -1036,19 +1109,29 @@ mod tests {
         let result = calc.alpha_decay_rate(q_value, z_daughter, radius);
 
         // Should have 7 computation trace steps
-        assert!(result.computation_trace.len() >= 7,
-            "Should have at least 7 trace steps, got {}", result.computation_trace.len());
+        assert!(
+            result.computation_trace.len() >= 7,
+            "Should have at least 7 trace steps, got {}",
+            result.computation_trace.len()
+        );
 
         // Phi should be higher than simpler calculations due to 7-step chain
-        assert!(result.phi > 2.0,
-            "Complex computation should accumulate more phi: {}", result.phi);
+        assert!(
+            result.phi > 2.0,
+            "Complex computation should accumulate more phi: {}",
+            result.phi
+        );
 
         // Should track atomic number conversion
         let trace_str = result.computation_trace.join(" ");
-        assert!(trace_str.contains("Z_daughter=82"),
-            "Should record Z_daughter conversion");
-        assert!(trace_str.contains("Z_alpha=2"),
-            "Should record Z_alpha conversion");
+        assert!(
+            trace_str.contains("Z_daughter=82"),
+            "Should record Z_daughter conversion"
+        );
+        assert!(
+            trace_str.contains("Z_alpha=2"),
+            "Should record Z_alpha conversion"
+        );
 
         // Coherence should be positive
         assert!(result.coherence > 0.0, "Should have positive coherence");
@@ -1056,8 +1139,11 @@ mod tests {
         // Cross-check: standard calc should give same decay rate
         let standard_calc = TunnelingCalculator::alpha_particle();
         let standard_rate = standard_calc.alpha_decay_rate(q_value, z_daughter, radius);
-        assert!((result.physics.gamma - standard_rate).abs() / standard_rate.max(1e-100) < 0.01,
+        assert!(
+            (result.physics.gamma - standard_rate).abs() / standard_rate.max(1e-100) < 0.01,
             "Conscious and standard decay rates should match: {} vs {}",
-            result.physics.gamma, standard_rate);
+            result.physics.gamma,
+            standard_rate
+        );
     }
 }

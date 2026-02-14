@@ -13,11 +13,11 @@
 //! The router dynamically allocates attention across modalities based on
 //! salience, consciousness level (Φ), context, and goals.
 
+use symthaea::hdc::binary_hv::BinaryHV;
 use symthaea::hdc::cross_modal_attention_router::{
-    CrossModalAttentionRouter, RouterConfig, ModalityInput,
+    CrossModalAttentionRouter, ModalityInput, RouterConfig,
 };
 use symthaea::hdc::cross_modal_binding::Modality;
-use symthaea::hdc::binary_hv::BinaryHV;
 
 // ============================================================================
 // BASIC ROUTER TESTS
@@ -72,7 +72,10 @@ fn test_single_modality_routing() {
     let result = router.route(&[input], 0.6);
 
     // Single modality should get all attention
-    assert!(!result.attention_weights.is_empty(), "Should have attention weights");
+    assert!(
+        !result.attention_weights.is_empty(),
+        "Should have attention weights"
+    );
     assert!(result.quality >= 0.0, "Quality should be non-negative");
 }
 
@@ -81,8 +84,7 @@ fn test_single_modality_with_label() {
     let mut router = CrossModalAttentionRouter::new();
 
     let hv = BinaryHV::random(123);
-    let input = ModalityInput::new(Modality::Semantic, hv, 0.9)
-        .with_label("test_semantic_input");
+    let input = ModalityInput::new(Modality::Semantic, hv, 0.9).with_label("test_semantic_input");
 
     let result = router.route(&[input], 0.7);
 
@@ -94,8 +96,7 @@ fn test_single_modality_with_confidence() {
     let mut router = CrossModalAttentionRouter::new();
 
     let hv = BinaryHV::random(456);
-    let input = ModalityInput::new(Modality::Auditory, hv, 0.5)
-        .with_confidence(0.9);
+    let input = ModalityInput::new(Modality::Auditory, hv, 0.5).with_confidence(0.9);
 
     let result = router.route(&[input], 0.5);
 
@@ -137,7 +138,10 @@ fn test_multi_modality_routing() {
     let result = router.route(&inputs, 0.8);
 
     assert!(result.quality >= 0.0, "Should produce valid result");
-    assert!(result.effective_phi > 0.0, "Should have positive effective Φ");
+    assert!(
+        result.effective_phi > 0.0,
+        "Should have positive effective Φ"
+    );
 }
 
 #[test]
@@ -178,8 +182,14 @@ fn test_low_phi_limits_integration() {
     let high_phi_result = router.route(&inputs, 0.9);
 
     // Both should be valid
-    assert!(low_phi_result.quality >= 0.0, "Low Φ result should be valid");
-    assert!(high_phi_result.quality >= 0.0, "High Φ result should be valid");
+    assert!(
+        low_phi_result.quality >= 0.0,
+        "Low Φ result should be valid"
+    );
+    assert!(
+        high_phi_result.quality >= 0.0,
+        "High Φ result should be valid"
+    );
 
     // Higher Φ generally allows more modalities to be bound
     assert!(
@@ -268,7 +278,10 @@ fn test_context_and_goal_together() {
 
     let result = router.route(&inputs, 0.75);
 
-    assert!(result.quality >= 0.0, "Combined context and goal should work");
+    assert!(
+        result.quality >= 0.0,
+        "Combined context and goal should work"
+    );
 }
 
 // ============================================================================
@@ -289,7 +302,11 @@ fn test_sequential_routing() {
         );
 
         let result = router.route(&[input], 0.6);
-        assert!(result.quality >= 0.0, "Step {} should produce valid result", i);
+        assert!(
+            result.quality >= 0.0,
+            "Step {} should produce valid result",
+            i
+        );
     }
 }
 
@@ -474,10 +491,7 @@ fn test_routing_result_has_unified_representation() {
     let result = router.route(&inputs, 0.7);
 
     // Should have a valid quality score
-    assert!(
-        result.quality >= 0.0,
-        "Should produce valid quality score"
-    );
+    assert!(result.quality >= 0.0, "Should produce valid quality score");
 }
 
 #[test]

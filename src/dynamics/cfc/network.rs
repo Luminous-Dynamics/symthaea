@@ -8,13 +8,13 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use symthaea_core::genesis::GenesisSeed;
 
-use super::types::{
-    CfCConfig, OnlineLearningConfig, NetworkOnlineLearningStats, DynamicsDiagnostic,
-    MIN_TAU, mse_loss,
-};
 use super::cell::CfCCell;
 use super::gradients::{AdamState, OutputAdamState};
-use super::phi_gated::{PhiGatedConfig, compute_phi_attention_weights, weighted_array_bundle};
+use super::phi_gated::{compute_phi_attention_weights, weighted_array_bundle, PhiGatedConfig};
+use super::types::{
+    mse_loss, CfCConfig, DynamicsDiagnostic, NetworkOnlineLearningStats, OnlineLearningConfig,
+    MIN_TAU,
+};
 
 /// Configuration for a CfC network
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,7 +120,11 @@ impl CfCNetwork {
 
         for i in 0..config.num_layers {
             let cell_config = CfCConfig {
-                input_dim: if i == 0 { config.input_dim } else { config.hidden_dim },
+                input_dim: if i == 0 {
+                    config.input_dim
+                } else {
+                    config.hidden_dim
+                },
                 hidden_dim: config.hidden_dim,
                 ..config.cell_config.clone()
             };
@@ -133,10 +137,17 @@ impl CfCNetwork {
         });
         let output_bias = Array1::zeros(config.output_dim);
 
-        let adam_states = cells.iter().map(|c| {
-            let effective_input_dim = if c.config.use_backbone { c.config.backbone_dim } else { c.config.input_dim };
-            AdamState::new(c.config.hidden_dim, effective_input_dim)
-        }).collect();
+        let adam_states = cells
+            .iter()
+            .map(|c| {
+                let effective_input_dim = if c.config.use_backbone {
+                    c.config.backbone_dim
+                } else {
+                    c.config.input_dim
+                };
+                AdamState::new(c.config.hidden_dim, effective_input_dim)
+            })
+            .collect();
 
         let adam_output = OutputAdamState::new(config.output_dim, config.hidden_dim);
 
@@ -161,7 +172,11 @@ impl CfCNetwork {
 
         for i in 0..config.num_layers {
             let cell_config = CfCConfig {
-                input_dim: if i == 0 { config.input_dim } else { config.hidden_dim },
+                input_dim: if i == 0 {
+                    config.input_dim
+                } else {
+                    config.hidden_dim
+                },
                 hidden_dim: config.hidden_dim,
                 ..config.cell_config.clone()
             };
@@ -176,10 +191,17 @@ impl CfCNetwork {
         });
         let output_bias = Array1::zeros(config.output_dim);
 
-        let adam_states = cells.iter().map(|c| {
-            let effective_input_dim = if c.config.use_backbone { c.config.backbone_dim } else { c.config.input_dim };
-            AdamState::new(c.config.hidden_dim, effective_input_dim)
-        }).collect();
+        let adam_states = cells
+            .iter()
+            .map(|c| {
+                let effective_input_dim = if c.config.use_backbone {
+                    c.config.backbone_dim
+                } else {
+                    c.config.input_dim
+                };
+                AdamState::new(c.config.hidden_dim, effective_input_dim)
+            })
+            .collect();
 
         let adam_output = OutputAdamState::new(config.output_dim, config.hidden_dim);
 
@@ -243,15 +265,12 @@ impl CfCNetwork {
     }
 
     /// Process a sequence of inputs
-    pub fn forward_sequence(
-        &mut self,
-        inputs: &[Array1<f32>],
-        dts: &[f32],
-    ) -> Vec<Array1<f32>> {
+    pub fn forward_sequence(&mut self, inputs: &[Array1<f32>], dts: &[f32]) -> Vec<Array1<f32>> {
         assert_eq!(inputs.len(), dts.len());
 
         self.reset();
-        inputs.iter()
+        inputs
+            .iter()
             .zip(dts.iter())
             .map(|(input, dt)| self.forward(input, *dt))
             .collect()
@@ -313,7 +332,10 @@ impl CfCNetwork {
             self.online_stats.ema_error * (1.0 - alpha) + prediction_error * alpha;
 
         // Check error threshold at network level
-        let threshold = self.config.online_learning_config.error_threshold
+        let threshold = self
+            .config
+            .online_learning_config
+            .error_threshold
             .max(self.online_stats.ema_error * 0.5);
 
         if prediction_error < threshold {
@@ -336,12 +358,14 @@ impl CfCNetwork {
         }
 
         // Step 2: Compute output and output gradient
-        let last_hidden = layer_inputs.last().expect("layer_inputs should not be empty after forward pass");
+        let last_hidden = layer_inputs
+            .last()
+            .expect("layer_inputs should not be empty after forward pass");
         let output = self.output_weights.dot(last_hidden) + &self.output_bias;
         let n = target.len() as f32;
-        let output_error: Array1<f32> = (0..self.config.output_dim).map(|i| {
-            2.0 * (output[i] - target[i]) / n
-        }).collect();
+        let output_error: Array1<f32> = (0..self.config.output_dim)
+            .map(|i| 2.0 * (output[i] - target[i]) / n)
+            .collect();
 
         // Step 3: Adapt output layer weights
         for i in 0..self.config.output_dim {
@@ -501,32 +525,49 @@ impl CfCNetwork {
             for i in 0..output_dim {
                 for j in 0..hidden_dim {
                     let g = clip(d_output[i] * h[j]);
-                    self.adam_output.m_w[[i, j]] = self.adam_output.beta1 * self.adam_output.m_w[[i, j]] + (1.0 - self.adam_output.beta1) * g;
-                    self.adam_output.v_w[[i, j]] = self.adam_output.beta2 * self.adam_output.v_w[[i, j]] + (1.0 - self.adam_output.beta2) * g * g;
-                    let m_hat = self.adam_output.m_w[[i, j]] / (1.0 - self.adam_output.beta1.powf(t_adam));
-                    let v_hat = self.adam_output.v_w[[i, j]] / (1.0 - self.adam_output.beta2.powf(t_adam));
-                    self.output_weights[[i, j]] -= learning_rate * m_hat / (v_hat.sqrt() + self.adam_output.eps);
+                    self.adam_output.m_w[[i, j]] = self.adam_output.beta1
+                        * self.adam_output.m_w[[i, j]]
+                        + (1.0 - self.adam_output.beta1) * g;
+                    self.adam_output.v_w[[i, j]] = self.adam_output.beta2
+                        * self.adam_output.v_w[[i, j]]
+                        + (1.0 - self.adam_output.beta2) * g * g;
+                    let m_hat =
+                        self.adam_output.m_w[[i, j]] / (1.0 - self.adam_output.beta1.powf(t_adam));
+                    let v_hat =
+                        self.adam_output.v_w[[i, j]] / (1.0 - self.adam_output.beta2.powf(t_adam));
+                    self.output_weights[[i, j]] -=
+                        learning_rate * m_hat / (v_hat.sqrt() + self.adam_output.eps);
                 }
             }
 
             for i in 0..output_dim {
                 let g = clip(d_output[i]);
-                self.adam_output.m_b[i] = self.adam_output.beta1 * self.adam_output.m_b[i] + (1.0 - self.adam_output.beta1) * g;
-                self.adam_output.v_b[i] = self.adam_output.beta2 * self.adam_output.v_b[i] + (1.0 - self.adam_output.beta2) * g * g;
+                self.adam_output.m_b[i] = self.adam_output.beta1 * self.adam_output.m_b[i]
+                    + (1.0 - self.adam_output.beta1) * g;
+                self.adam_output.v_b[i] = self.adam_output.beta2 * self.adam_output.v_b[i]
+                    + (1.0 - self.adam_output.beta2) * g * g;
                 let m_hat = self.adam_output.m_b[i] / (1.0 - self.adam_output.beta1.powf(t_adam));
                 let v_hat = self.adam_output.v_b[i] / (1.0 - self.adam_output.beta2.powf(t_adam));
-                self.output_bias[i] -= learning_rate * m_hat / (v_hat.sqrt() + self.adam_output.eps);
+                self.output_bias[i] -=
+                    learning_rate * m_hat / (v_hat.sqrt() + self.adam_output.eps);
             }
 
             let dh_last = self.output_weights.t().dot(&d_output);
 
             let mut dh = dh_last;
             for cell_idx in (0..self.cells.len()).rev() {
-                let grads = self.cells[cell_idx].backward_from_grad(&cell_inputs[cell_idx], &dh, *dt);
-                self.cells[cell_idx].apply_adam(&grads, &mut self.adam_states[cell_idx], learning_rate);
+                let grads =
+                    self.cells[cell_idx].backward_from_grad(&cell_inputs[cell_idx], &dh, *dt);
+                self.cells[cell_idx].apply_adam(
+                    &grads,
+                    &mut self.adam_states[cell_idx],
+                    learning_rate,
+                );
 
                 if cell_idx > 0 {
-                    let decay: Array1<f32> = self.cells[cell_idx].tau.mapv(|t| (-dt / t.max(MIN_TAU)).exp());
+                    let decay: Array1<f32> = self.cells[cell_idx]
+                        .tau
+                        .mapv(|t| (-dt / t.max(MIN_TAU)).exp());
                     let one_minus_decay: Array1<f32> = decay.mapv(|d| 1.0 - d);
                     let _attenuation = one_minus_decay.mean().unwrap_or(0.5);
                     dh *= _attenuation;
@@ -601,9 +642,20 @@ impl CfCNetwork {
             {
                 let h_slice = h.as_slice().expect("hidden state array not contiguous");
                 let d_out_slice = d_output.as_slice().expect("d_output array not contiguous");
-                let w_slice = self.output_weights.as_slice_mut().expect("output_weights array not contiguous");
-                let m_slice = self.adam_output.m_w.as_slice_mut().expect("adam m_w array not contiguous");
-                let v_slice = self.adam_output.v_w.as_slice_mut().expect("adam v_w array not contiguous");
+                let w_slice = self
+                    .output_weights
+                    .as_slice_mut()
+                    .expect("output_weights array not contiguous");
+                let m_slice = self
+                    .adam_output
+                    .m_w
+                    .as_slice_mut()
+                    .expect("adam m_w array not contiguous");
+                let v_slice = self
+                    .adam_output
+                    .v_w
+                    .as_slice_mut()
+                    .expect("adam v_w array not contiguous");
 
                 for i in 0..output_dim {
                     let row_offset = i * hidden_dim;
@@ -622,9 +674,20 @@ impl CfCNetwork {
 
             {
                 let d_out_slice = d_output.as_slice().expect("d_output array not contiguous");
-                let b_slice = self.output_bias.as_slice_mut().expect("output_bias array not contiguous");
-                let m_slice = self.adam_output.m_b.as_slice_mut().expect("adam m_b array not contiguous");
-                let v_slice = self.adam_output.v_b.as_slice_mut().expect("adam v_b array not contiguous");
+                let b_slice = self
+                    .output_bias
+                    .as_slice_mut()
+                    .expect("output_bias array not contiguous");
+                let m_slice = self
+                    .adam_output
+                    .m_b
+                    .as_slice_mut()
+                    .expect("adam m_b array not contiguous");
+                let v_slice = self
+                    .adam_output
+                    .v_b
+                    .as_slice_mut()
+                    .expect("adam v_b array not contiguous");
 
                 for i in 0..output_dim {
                     let g = d_out_slice[i].clamp(-0.5, 0.5);
@@ -640,8 +703,13 @@ impl CfCNetwork {
 
             let mut dh = dh_last;
             for cell_idx in (0..self.cells.len()).rev() {
-                let grads = self.cells[cell_idx].backward_from_cache(&cell_caches[cell_idx], &dh, *dt);
-                self.cells[cell_idx].apply_adam_vectorized(&grads, &mut self.adam_states[cell_idx], learning_rate);
+                let grads =
+                    self.cells[cell_idx].backward_from_cache(&cell_caches[cell_idx], &dh, *dt);
+                self.cells[cell_idx].apply_adam_vectorized(
+                    &grads,
+                    &mut self.adam_states[cell_idx],
+                    learning_rate,
+                );
 
                 if cell_idx > 0 {
                     let decay = &cell_caches[cell_idx].decay;
@@ -687,7 +755,15 @@ impl CfCNetwork {
         self.update_output_weights(input, target, dt, learning_rate, epsilon, baseline_loss);
 
         for cell_idx in 0..self.cells.len() {
-            self.update_cell_weights(cell_idx, input, target, dt, learning_rate, epsilon, baseline_loss);
+            self.update_cell_weights(
+                cell_idx,
+                input,
+                target,
+                dt,
+                learning_rate,
+                epsilon,
+                baseline_loss,
+            );
         }
 
         self.clamp_all_weights();
@@ -839,14 +915,15 @@ impl CfCNetwork {
             return 0.0;
         }
 
-        let mean_activity: f32 = states.iter()
-            .flat_map(|s| s.iter())
-            .sum::<f32>() / (states.len() * self.config.hidden_dim) as f32;
+        let mean_activity: f32 = states.iter().flat_map(|s| s.iter()).sum::<f32>()
+            / (states.len() * self.config.hidden_dim) as f32;
 
-        let variance: f32 = states.iter()
+        let variance: f32 = states
+            .iter()
             .flat_map(|s| s.iter())
             .map(|x| (x - mean_activity).powi(2))
-            .sum::<f32>() / (states.len() * self.config.hidden_dim) as f32;
+            .sum::<f32>()
+            / (states.len() * self.config.hidden_dim) as f32;
 
         1.0 / (1.0 + (-variance.sqrt() * 10.0).exp())
     }
@@ -886,7 +963,11 @@ impl CfCNetwork {
     }
 
     /// Predict forward at a specific time horizon
-    pub fn predict_forward(&mut self, input: &Array1<f32>, horizon: f32) -> anyhow::Result<Array1<f32>> {
+    pub fn predict_forward(
+        &mut self,
+        input: &Array1<f32>,
+        horizon: f32,
+    ) -> anyhow::Result<Array1<f32>> {
         Ok(self.forward(input, horizon))
     }
 
@@ -915,7 +996,8 @@ impl CfCNetwork {
 
     /// Get flattened tau values as a single vector
     pub fn flattened_tau(&self) -> Vec<f32> {
-        self.cells.iter()
+        self.cells
+            .iter()
             .flat_map(|cell| cell.tau().iter().cloned())
             .collect()
     }
@@ -963,33 +1045,55 @@ impl CfCNetwork {
         let mut pos = 0;
         for cell in &mut self.cells {
             let n = cell.w_in.len();
-            cell.w_in.as_slice_mut().expect("w_in array not contiguous").copy_from_slice(&weights[pos..pos + n]);
+            cell.w_in
+                .as_slice_mut()
+                .expect("w_in array not contiguous")
+                .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
             let n = cell.w_h.len();
-            cell.w_h.as_slice_mut().expect("w_h array not contiguous").copy_from_slice(&weights[pos..pos + n]);
+            cell.w_h
+                .as_slice_mut()
+                .expect("w_h array not contiguous")
+                .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
             let n = cell.b_h.len();
-            cell.b_h.as_slice_mut().expect("b_h array not contiguous").copy_from_slice(&weights[pos..pos + n]);
+            cell.b_h
+                .as_slice_mut()
+                .expect("b_h array not contiguous")
+                .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
             let n = cell.tau.len();
-            cell.tau.as_slice_mut().expect("tau array not contiguous").copy_from_slice(&weights[pos..pos + n]);
+            cell.tau
+                .as_slice_mut()
+                .expect("tau array not contiguous")
+                .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
             for bw in &mut cell.backbone_weights {
                 let n = bw.len();
-                bw.as_slice_mut().expect("backbone_weight array not contiguous").copy_from_slice(&weights[pos..pos + n]);
+                bw.as_slice_mut()
+                    .expect("backbone_weight array not contiguous")
+                    .copy_from_slice(&weights[pos..pos + n]);
                 pos += n;
             }
             for bb in &mut cell.backbone_biases {
                 let n = bb.len();
-                bb.as_slice_mut().expect("backbone_bias array not contiguous").copy_from_slice(&weights[pos..pos + n]);
+                bb.as_slice_mut()
+                    .expect("backbone_bias array not contiguous")
+                    .copy_from_slice(&weights[pos..pos + n]);
                 pos += n;
             }
         }
         let n = self.output_weights.len();
-        self.output_weights.as_slice_mut().expect("output_weights array not contiguous").copy_from_slice(&weights[pos..pos + n]);
+        self.output_weights
+            .as_slice_mut()
+            .expect("output_weights array not contiguous")
+            .copy_from_slice(&weights[pos..pos + n]);
         pos += n;
         let n = self.output_bias.len();
-        self.output_bias.as_slice_mut().expect("output_bias array not contiguous").copy_from_slice(&weights[pos..pos + n]);
+        self.output_bias
+            .as_slice_mut()
+            .expect("output_bias array not contiguous")
+            .copy_from_slice(&weights[pos..pos + n]);
         pos += n;
         assert_eq!(pos, weights.len(), "weight count mismatch");
     }
@@ -1123,9 +1227,287 @@ impl CfCNetwork {
             max_eigenvalue_real: max_real,
             condition_number,
             collapsed,
-            state_norm: saved_states.iter()
+            state_norm: saved_states
+                .iter()
                 .map(|s| s.iter().map(|x| x * x).sum::<f32>().sqrt())
-                .sum::<f32>() / saved_states.len() as f32,
+                .sum::<f32>()
+                / saved_states.len() as f32,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ndarray::Array1;
+
+    /// Helper: build a small network config for fast tests.
+    fn small_config() -> CfCNetworkConfig {
+        CfCNetworkConfig {
+            input_dim: 4,
+            hidden_dim: 8,
+            num_layers: 2,
+            output_dim: 3,
+            ..Default::default()
+        }
+    }
+
+    /// Helper: build a small input vector.
+    fn small_input() -> Array1<f32> {
+        Array1::from_vec(vec![0.1, 0.2, 0.3, 0.4])
+    }
+
+    // ---------------------------------------------------------------
+    // 1. Default config produces valid values
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_default_config_is_valid() {
+        let config = CfCNetworkConfig::default();
+        assert_eq!(config.input_dim, 64);
+        assert_eq!(config.hidden_dim, 128);
+        assert_eq!(config.num_layers, 2);
+        assert_eq!(config.output_dim, 32);
+        assert!(config.residual);
+        assert!(!config.bidirectional);
+        assert!(!config.enable_online_learning);
+    }
+
+    // ---------------------------------------------------------------
+    // 2. new(config) creates a network successfully
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_new_creates_network() {
+        let config = small_config();
+        let net = CfCNetwork::new(config);
+        assert_eq!(net.cells.len(), 2);
+        assert_eq!(net.config.input_dim, 4);
+        assert_eq!(net.config.output_dim, 3);
+    }
+
+    // ---------------------------------------------------------------
+    // 3. new_with_input creates a network with correct dims
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_new_with_input() {
+        let net = CfCNetwork::new_with_input(4, 8);
+        assert_eq!(net.config.input_dim, 4);
+        assert_eq!(net.config.hidden_dim, 8);
+        assert_eq!(net.cells.len(), 2); // default num_layers
+    }
+
+    // ---------------------------------------------------------------
+    // 4. forward() produces output of correct dimension
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_forward_output_dimension() {
+        let mut net = CfCNetwork::new(small_config());
+        let output = net.forward(&small_input(), 0.1);
+        assert_eq!(output.len(), 3);
+        for &v in output.iter() {
+            assert!(v.is_finite(), "output contains non-finite value: {}", v);
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // 5. forward_sequence() produces correct number of outputs
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_forward_sequence_length() {
+        let mut net = CfCNetwork::new(small_config());
+        let inputs: Vec<Array1<f32>> = (0..5).map(|_| small_input()).collect();
+        let dts = vec![0.1f32; 5];
+        let outputs = net.forward_sequence(&inputs, &dts);
+        assert_eq!(outputs.len(), 5);
+        for out in &outputs {
+            assert_eq!(out.len(), 3);
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // 6. reset() completes without panic and zeroes step counter
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_reset_does_not_panic() {
+        let mut net = CfCNetwork::new(small_config());
+        // Run a few forward passes to accumulate state
+        for _ in 0..3 {
+            net.forward(&small_input(), 0.1);
+        }
+        assert!(net.total_steps > 0);
+        net.reset();
+        assert_eq!(net.total_steps, 0);
+    }
+
+    // ---------------------------------------------------------------
+    // 7. num_parameters() returns > 0
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_num_parameters_positive() {
+        let net = CfCNetwork::new(small_config());
+        let n = net.num_parameters();
+        assert!(n > 0, "num_parameters should be > 0, got {}", n);
+
+        // Sanity-check: for 2 layers with hidden_dim=8, output_dim=3
+        // Layer 0: 4*8 + 8*8 + 8 + 8 = 112
+        // Layer 1: 8*8 + 8*8 + 8 + 8 = 144
+        // Output: 8*3 + 3 = 27
+        // Total: 283
+        assert_eq!(n, 283);
+    }
+
+    // ---------------------------------------------------------------
+    // 8. state() returns correct number of layer states
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_state_returns_correct_count() {
+        let net = CfCNetwork::new(small_config());
+        let states = net.state();
+        assert_eq!(states.len(), 2, "should have one state per layer");
+        for s in &states {
+            assert_eq!(s.len(), 8, "each state should match hidden_dim");
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // 9. train_step_bptt() returns a finite loss
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_train_step_bptt_finite_loss() {
+        let mut net = CfCNetwork::new(small_config());
+        let input = small_input();
+        let target = Array1::from_vec(vec![0.5, -0.3, 0.1]);
+        let dts = vec![0.1f32];
+        let loss = net
+            .train_step_bptt(&[input], &[target], &dts, 0.001)
+            .unwrap();
+        assert!(loss.is_finite(), "loss should be finite, got {}", loss);
+        assert!(loss >= 0.0, "MSE loss should be non-negative, got {}", loss);
+    }
+
+    // ---------------------------------------------------------------
+    // 10. adapt_online() works when online learning is enabled
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_adapt_online_enabled() {
+        let config = small_config().with_online_learning_config(OnlineLearningConfig {
+            learning_rate: 0.01,
+            error_threshold: 0.0, // always adapt
+            ema_alpha: 0.1,
+            max_weight_delta: 0.1,
+            adapt_tau: false,
+            tau_lr_multiplier: 0.01,
+        });
+        let mut net = CfCNetwork::new(config);
+        assert!(net.online_learning_enabled());
+
+        let input = small_input();
+        let target = Array1::from_vec(vec![1.0, -1.0, 0.5]);
+
+        // A large prediction error should trigger adaptation
+        let adapted = net.adapt_online(10.0, &input, &target, 0.1);
+        assert!(adapted, "adapt_online should return true when error exceeds threshold");
+
+        let stats = net.online_stats();
+        assert_eq!(stats.total_adaptation_calls, 1);
+        assert_eq!(stats.adaptations_applied, 1);
+        assert!(
+            stats.cumulative_weight_change > 0.0,
+            "should have accumulated some weight change"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // 11. adapt_online() returns false when disabled
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_adapt_online_disabled() {
+        let mut net = CfCNetwork::new(small_config());
+        assert!(!net.online_learning_enabled());
+
+        let input = small_input();
+        let target = Array1::from_vec(vec![1.0, -1.0, 0.5]);
+        let adapted = net.adapt_online(10.0, &input, &target, 0.1);
+        assert!(!adapted, "adapt_online should return false when disabled");
+    }
+
+    // ---------------------------------------------------------------
+    // 12. state_diversity() returns a finite value
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_state_diversity_finite() {
+        let mut net = CfCNetwork::new(small_config());
+        // Run forward to populate cell states
+        net.forward(&small_input(), 0.1);
+        let div = net.state_diversity();
+        assert!(div.is_finite(), "state_diversity should be finite, got {}", div);
+        assert!(div >= 0.0 && div <= 1.0, "diversity is sigmoid-scaled [0,1], got {}", div);
+    }
+
+    // ---------------------------------------------------------------
+    // 13. diagnose_dynamics() returns valid diagnostic
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_diagnose_dynamics_valid() {
+        let mut net = CfCNetwork::new(small_config());
+        let input = small_input();
+        // Warm up the network
+        net.forward(&input, 0.1);
+        let diag = net.diagnose_dynamics(&input, 0.1);
+        assert!(
+            diag.max_eigenvalue_real.is_finite(),
+            "max_eigenvalue_real should be finite"
+        );
+        assert!(
+            diag.condition_number.is_finite(),
+            "condition_number should be finite"
+        );
+        assert!(
+            diag.state_norm.is_finite(),
+            "state_norm should be finite"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // 14. get_weights() and set_weights() round-trip
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_weights_round_trip() {
+        let mut net = CfCNetwork::new(small_config());
+        let weights_orig = net.get_weights();
+        assert!(!weights_orig.is_empty(), "weights should not be empty");
+
+        // Mutate the network via forward + training
+        let input = small_input();
+        let target = Array1::from_vec(vec![0.5, -0.3, 0.1]);
+        net.train_step_bptt(&[input.clone()], &[target], &[0.1], 0.01)
+            .unwrap();
+        let weights_after_train = net.get_weights();
+
+        // Weights should have changed
+        let any_changed = weights_orig
+            .iter()
+            .zip(weights_after_train.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-10);
+        assert!(any_changed, "training should have modified at least some weights");
+
+        // Restore original weights
+        net.set_weights(&weights_orig);
+        let weights_restored = net.get_weights();
+
+        // They should match exactly
+        assert_eq!(
+            weights_orig.len(),
+            weights_restored.len(),
+            "weight vector lengths must match"
+        );
+        for (i, (a, b)) in weights_orig.iter().zip(weights_restored.iter()).enumerate() {
+            assert!(
+                (a - b).abs() < f32::EPSILON,
+                "weight mismatch at index {}: {} vs {}",
+                i,
+                a,
+                b
+            );
         }
     }
 }

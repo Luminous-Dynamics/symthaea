@@ -545,7 +545,7 @@ mod tests {
     ) -> (Vec<Vec<f64>>, Vec<f64>) {
         // n oscillators with nearest-neighbor coupling
         let mut state = vec![0.0; 2 * n]; // [x0, v0, x1, v1, ...]
-        // Initial conditions: spread out phases
+                                          // Initial conditions: spread out phases
         for i in 0..n {
             state[2 * i] = (i as f64 * std::f64::consts::PI / n as f64).sin();
             state[2 * i + 1] = (i as f64 * std::f64::consts::PI / n as f64).cos();
@@ -662,16 +662,29 @@ mod tests {
         let sim = ConsciousSimulation::observe_trajectory(&states, &times);
 
         // Verify the observer tracked Φ across the full trajectory
-        let phis: Vec<f64> = sim.observer.phi_trajectory().iter().map(|m| m.phi).collect();
+        let phis: Vec<f64> = sim
+            .observer
+            .phi_trajectory()
+            .iter()
+            .map(|m| m.phi)
+            .collect();
         assert_eq!(phis.len(), 40, "Should have one Φ measurement per state");
 
         // All Φ values should be non-negative
         for (i, &phi) in phis.iter().enumerate() {
-            assert!(phi >= 0.0, "Φ should be non-negative at step {}, got {}", i, phi);
+            assert!(
+                phi >= 0.0,
+                "Φ should be non-negative at step {}, got {}",
+                i,
+                phi
+            );
         }
 
         // Mean Φ should be reasonable
-        assert!(sim.observer.mean_phi() >= 0.0, "Mean Φ should be non-negative");
+        assert!(
+            sim.observer.mean_phi() >= 0.0,
+            "Mean Φ should be non-negative"
+        );
 
         // Phase transitions may or may not be detected depending on the
         // specific BinaryHV encoding dynamics — just verify the API works

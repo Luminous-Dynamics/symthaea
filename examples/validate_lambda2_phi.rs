@@ -56,7 +56,8 @@ fn main() {
                 let lambda2 = conn_calc.compute_lambda2(adj);
 
                 // Convert to f32 for TPM computation
-                let adj_f32: Vec<Vec<f32>> = adj.iter()
+                let adj_f32: Vec<Vec<f32>> = adj
+                    .iter()
                     .map(|row| row.iter().map(|&v| v as f32).collect())
                     .collect();
 
@@ -84,7 +85,10 @@ fn main() {
     println!("Results: λ₂ vs Exact Φ");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    println!("  {:20} │ {:>10} │ {:>10} │ {:>10}", "System", "λ₂", "Exact Φ", "λ₂/Φ ratio");
+    println!(
+        "  {:20} │ {:>10} │ {:>10} │ {:>10}",
+        "System", "λ₂", "Exact Φ", "λ₂/Φ ratio"
+    );
     println!("  {:─>20}─┼─{:─>10}─┼─{:─>10}─┼─{:─>10}", "", "", "", "");
     for i in 0..all_lambda2.len() {
         let ratio = if all_exact_phi[i].abs() > 1e-10 {
@@ -112,7 +116,10 @@ fn main() {
 
     // Pearson correlation
     let pearson = pearson_correlation(&all_lambda2, &all_exact_phi);
-    println!("  Pearson r (λ₂ vs Φ):     {:+.4} (n={})", pearson, n_samples);
+    println!(
+        "  Pearson r (λ₂ vs Φ):     {:+.4} (n={})",
+        pearson, n_samples
+    );
 
     // Spearman rank correlation
     let spearman = spearman_rank_correlation(&all_lambda2, &all_exact_phi);
@@ -172,8 +179,16 @@ fn main() {
     }
     let total_pairs = concordant + discordant + tied;
     let concordance_rate = concordant as f64 / (concordant + discordant).max(1) as f64;
-    println!("  Concordant pairs: {} ({:.1}%)", concordant, concordance_rate * 100.0);
-    println!("  Discordant pairs: {} ({:.1}%)", discordant, (1.0 - concordance_rate) * 100.0);
+    println!(
+        "  Concordant pairs: {} ({:.1}%)",
+        concordant,
+        concordance_rate * 100.0
+    );
+    println!(
+        "  Discordant pairs: {} ({:.1}%)",
+        discordant,
+        (1.0 - concordance_rate) * 100.0
+    );
     println!("  Tied pairs:       {}", tied);
     println!("  Total pairs:      {}", total_pairs);
 
@@ -186,33 +201,67 @@ fn main() {
 
     let checks = vec![
         ("λ₂ and Φ are positively correlated (r > 0)", pearson > 0.0),
-        ("Rank order mostly preserved (concordance > 60%)", concordance_rate > 0.60),
-        ("Spearman ρ > 0.3 (moderate rank correlation)", spearman > 0.3),
-        ("Correlation computed for all sizes", sizes.iter().all(|_| true)),
-        ("No NaN/Inf in results", all_lambda2.iter().all(|v| v.is_finite()) && all_exact_phi.iter().all(|v| v.is_finite())),
+        (
+            "Rank order mostly preserved (concordance > 60%)",
+            concordance_rate > 0.60,
+        ),
+        (
+            "Spearman ρ > 0.3 (moderate rank correlation)",
+            spearman > 0.3,
+        ),
+        (
+            "Correlation computed for all sizes",
+            sizes.iter().all(|_| true),
+        ),
+        (
+            "No NaN/Inf in results",
+            all_lambda2.iter().all(|v| v.is_finite())
+                && all_exact_phi.iter().all(|v| v.is_finite()),
+        ),
     ];
 
     let mut passed = 0;
     for (name, pass) in &checks {
         println!("║  {} {:50}   ║", if *pass { "PASS" } else { "FAIL" }, name);
-        if *pass { passed += 1; }
+        if *pass {
+            passed += 1;
+        }
     }
     println!("╟──────────────────────────────────────────────────────────────╢");
-    println!("║  Result: {}/{} tests passed                                 ║", passed, checks.len());
+    println!(
+        "║  Result: {}/{} tests passed                                 ║",
+        passed,
+        checks.len()
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Honest assessment
     println!("═══ Honest Assessment ═══");
     if pearson > 0.7 {
-        println!("  λ₂ is a STRONG proxy for Φ (r={:.3}). Reliable for relative ordering.", pearson);
+        println!(
+            "  λ₂ is a STRONG proxy for Φ (r={:.3}). Reliable for relative ordering.",
+            pearson
+        );
     } else if pearson > 0.4 {
-        println!("  λ₂ is a MODERATE proxy for Φ (r={:.3}). Useful for ranking, not absolute values.", pearson);
+        println!(
+            "  λ₂ is a MODERATE proxy for Φ (r={:.3}). Useful for ranking, not absolute values.",
+            pearson
+        );
     } else if pearson > 0.0 {
-        println!("  λ₂ is a WEAK proxy for Φ (r={:.3}). Directional only, not quantitatively reliable.", pearson);
+        println!(
+            "  λ₂ is a WEAK proxy for Φ (r={:.3}). Directional only, not quantitatively reliable.",
+            pearson
+        );
     } else {
-        println!("  λ₂ is NOT a valid proxy for Φ (r={:.3}). Should not be used as Phi substitute.", pearson);
+        println!(
+            "  λ₂ is NOT a valid proxy for Φ (r={:.3}). Should not be used as Phi substitute.",
+            pearson
+        );
     }
-    println!("  Concordance: {:.1}% of pairwise orderings agree.", concordance_rate * 100.0);
+    println!(
+        "  Concordance: {:.1}% of pairwise orderings agree.",
+        concordance_rate * 100.0
+    );
     println!("  Recommendation: Use λ₂ for relative comparisons within same system size.");
     println!("  Limitation: Absolute λ₂ values do not map to absolute Φ values.\n");
 
@@ -281,7 +330,9 @@ fn make_random(n: usize, density: f64, seed: u64) -> Vec<Vec<f64>> {
     let mut adj = vec![vec![0.0; n]; n];
     let mut rng = seed.wrapping_add(5555);
     let mut rand_f64 = || -> f64 {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (rng >> 33) as f64 / (1u64 << 31) as f64
     };
     for i in 0..n {
@@ -317,7 +368,9 @@ fn make_complete(n: usize) -> Vec<Vec<f64>> {
 
 fn pearson_correlation(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len() as f64;
-    if n < 2.0 { return 0.0; }
+    if n < 2.0 {
+        return 0.0;
+    }
     let mean_x = x.iter().sum::<f64>() / n;
     let mean_y = y.iter().sum::<f64>() / n;
     let mut cov = 0.0;
@@ -331,7 +384,11 @@ fn pearson_correlation(x: &[f64], y: &[f64]) -> f64 {
         var_y += dy * dy;
     }
     let denom = (var_x * var_y).sqrt();
-    if denom < 1e-15 { 0.0 } else { cov / denom }
+    if denom < 1e-15 {
+        0.0
+    } else {
+        cov / denom
+    }
 }
 
 fn spearman_rank_correlation(x: &[f64], y: &[f64]) -> f64 {

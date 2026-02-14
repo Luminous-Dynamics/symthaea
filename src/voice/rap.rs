@@ -17,9 +17,11 @@
 //! - Flow pattern selection (boom bap, triplet, double-time)
 //! - Prosodic emphasis on rhyming syllables
 
+use super::articulatory_synthesizer::{
+    ArticulatoryConfig, ArticulatorySynthesizer, FormantFrame, TimedPhoneme,
+};
 use super::beat_sync::{BeatSync, FlowPattern, SyllableTiming};
 use super::rhyme_hdc::{RhymeEncoder, RhymeScheme};
-use super::articulatory_synthesizer::{ArticulatorySynthesizer, ArticulatoryConfig, TimedPhoneme, FormantFrame};
 use super::vocoder::{FormantVocoder, VocoderConfig};
 use super::LTCPacing;
 
@@ -218,10 +220,12 @@ impl RapSynthesizer {
     pub fn parse_lyrics(&self, lyrics: &str, phoneme_dict: &impl PhonemeDict) -> Verse {
         let pattern_chars: Vec<char> = self.config.rhyme_scheme.chars().collect();
 
-        let lines: Vec<LyricLine> = lyrics.lines()
+        let lines: Vec<LyricLine> = lyrics
+            .lines()
             .enumerate()
             .map(|(i, line)| {
-                let words: Vec<WordPhonemes> = line.split_whitespace()
+                let words: Vec<WordPhonemes> = line
+                    .split_whitespace()
                     .map(|word| {
                         let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric());
                         let phonemes = phoneme_dict.lookup(clean_word);
@@ -237,7 +241,8 @@ impl RapSynthesizer {
                     })
                     .collect();
 
-                let rhyme_group = pattern_chars.get(i % pattern_chars.len())
+                let rhyme_group = pattern_chars
+                    .get(i % pattern_chars.len())
                     .copied()
                     .unwrap_or('A');
 
@@ -250,7 +255,8 @@ impl RapSynthesizer {
             })
             .collect();
 
-        let total_syllables: usize = lines.iter()
+        let total_syllables: usize = lines
+            .iter()
             .map(|l| l.words.iter().map(|w| w.syllable_count).sum::<usize>())
             .sum();
 
@@ -267,7 +273,8 @@ impl RapSynthesizer {
     /// Analyze rhymes in a verse and mark rhyming words
     pub fn analyze_rhymes(&self, verse: &mut Verse) {
         // Group lines by rhyme group
-        let mut groups: std::collections::HashMap<char, Vec<usize>> = std::collections::HashMap::new();
+        let mut groups: std::collections::HashMap<char, Vec<usize>> =
+            std::collections::HashMap::new();
         for (i, line) in verse.lines.iter().enumerate() {
             groups.entry(line.rhyme_group).or_default().push(i);
         }
@@ -279,10 +286,9 @@ impl RapSynthesizer {
             }
 
             // Get end words from each line (clone phonemes to avoid borrow issues)
-            let end_words: Vec<(usize, Vec<String>)> = line_indices.iter()
-                .filter_map(|&i| {
-                    verse.lines[i].words.last().map(|w| (i, w.phonemes.clone()))
-                })
+            let end_words: Vec<(usize, Vec<String>)> = line_indices
+                .iter()
+                .filter_map(|&i| verse.lines[i].words.last().map(|w| (i, w.phonemes.clone())))
                 .collect();
 
             // Collect rhyme scores first
@@ -328,12 +334,13 @@ impl RapSynthesizer {
         }
 
         // Convert to string syllables for beat mapping
-        let syllable_strings: Vec<String> = all_syllables.iter()
-            .map(|(p, _, _)| p.clone())
-            .collect();
+        let syllable_strings: Vec<String> =
+            all_syllables.iter().map(|(p, _, _)| p.clone()).collect();
 
         // Map to beats
-        let mut timings = self.beat_sync.map_syllables(&syllable_strings, &self.flow_pattern, 0);
+        let mut timings = self
+            .beat_sync
+            .map_syllables(&syllable_strings, &self.flow_pattern, 0);
 
         // Apply rhyme emphasis
         for (i, timing) in timings.iter_mut().enumerate() {
@@ -370,7 +377,8 @@ impl RapSynthesizer {
                         timing_idx += 1;
                     } else {
                         // Consonants get proportional duration
-                        let prev_time = timed_phonemes.last()
+                        let prev_time = timed_phonemes
+                            .last()
                             .map(|p| p.start_time + p.duration)
                             .unwrap_or(0.0);
 
@@ -407,7 +415,11 @@ impl RapSynthesizer {
     }
 
     /// Apply prosodic emphasis to rhyming syllables
-    fn apply_rhyme_prosody(&self, mut frames: Vec<FormantFrame>, timings: &[SyllableTiming]) -> Vec<FormantFrame> {
+    fn apply_rhyme_prosody(
+        &self,
+        mut frames: Vec<FormantFrame>,
+        timings: &[SyllableTiming],
+    ) -> Vec<FormantFrame> {
         for timing in timings {
             if timing.stress > 1.0 {
                 // Find frames in this syllable's time range
@@ -470,48 +482,137 @@ impl SimplePhonemeDict {
 
         // Common rap words
         entries.insert("yo".to_string(), vec!["Y".to_string(), "OW1".to_string()]);
-        entries.insert("check".to_string(), vec!["CH".to_string(), "EH1".to_string(), "K".to_string()]);
+        entries.insert(
+            "check".to_string(),
+            vec!["CH".to_string(), "EH1".to_string(), "K".to_string()],
+        );
         entries.insert("the".to_string(), vec!["DH".to_string(), "AH0".to_string()]);
-        entries.insert("mic".to_string(), vec!["M".to_string(), "AY1".to_string(), "K".to_string()]);
-        entries.insert("flow".to_string(), vec!["F".to_string(), "L".to_string(), "OW1".to_string()]);
+        entries.insert(
+            "mic".to_string(),
+            vec!["M".to_string(), "AY1".to_string(), "K".to_string()],
+        );
+        entries.insert(
+            "flow".to_string(),
+            vec!["F".to_string(), "L".to_string(), "OW1".to_string()],
+        );
         entries.insert("go".to_string(), vec!["G".to_string(), "OW1".to_string()]);
         entries.insert("know".to_string(), vec!["N".to_string(), "OW1".to_string()]);
-        entries.insert("show".to_string(), vec!["SH".to_string(), "OW1".to_string()]);
-        entries.insert("hot".to_string(), vec!["HH".to_string(), "AA1".to_string(), "T".to_string()]);
-        entries.insert("spot".to_string(), vec!["S".to_string(), "P".to_string(), "AA1".to_string(), "T".to_string()]);
-        entries.insert("beat".to_string(), vec!["B".to_string(), "IY1".to_string(), "T".to_string()]);
-        entries.insert("street".to_string(), vec!["S".to_string(), "T".to_string(), "R".to_string(), "IY1".to_string(), "T".to_string()]);
-        entries.insert("heat".to_string(), vec!["HH".to_string(), "IY1".to_string(), "T".to_string()]);
-        entries.insert("rhyme".to_string(), vec!["R".to_string(), "AY1".to_string(), "M".to_string()]);
-        entries.insert("time".to_string(), vec!["T".to_string(), "AY1".to_string(), "M".to_string()]);
+        entries.insert(
+            "show".to_string(),
+            vec!["SH".to_string(), "OW1".to_string()],
+        );
+        entries.insert(
+            "hot".to_string(),
+            vec!["HH".to_string(), "AA1".to_string(), "T".to_string()],
+        );
+        entries.insert(
+            "spot".to_string(),
+            vec![
+                "S".to_string(),
+                "P".to_string(),
+                "AA1".to_string(),
+                "T".to_string(),
+            ],
+        );
+        entries.insert(
+            "beat".to_string(),
+            vec!["B".to_string(), "IY1".to_string(), "T".to_string()],
+        );
+        entries.insert(
+            "street".to_string(),
+            vec![
+                "S".to_string(),
+                "T".to_string(),
+                "R".to_string(),
+                "IY1".to_string(),
+                "T".to_string(),
+            ],
+        );
+        entries.insert(
+            "heat".to_string(),
+            vec!["HH".to_string(), "IY1".to_string(), "T".to_string()],
+        );
+        entries.insert(
+            "rhyme".to_string(),
+            vec!["R".to_string(), "AY1".to_string(), "M".to_string()],
+        );
+        entries.insert(
+            "time".to_string(),
+            vec!["T".to_string(), "AY1".to_string(), "M".to_string()],
+        );
         entries.insert("i".to_string(), vec!["AY1".to_string()]);
         entries.insert("my".to_string(), vec!["M".to_string(), "AY1".to_string()]);
-        entries.insert("got".to_string(), vec!["G".to_string(), "AA1".to_string(), "T".to_string()]);
-        entries.insert("what".to_string(), vec!["W".to_string(), "AH1".to_string(), "T".to_string()]);
+        entries.insert(
+            "got".to_string(),
+            vec!["G".to_string(), "AA1".to_string(), "T".to_string()],
+        );
+        entries.insert(
+            "what".to_string(),
+            vec!["W".to_string(), "AH1".to_string(), "T".to_string()],
+        );
         entries.insert("up".to_string(), vec!["AH1".to_string(), "P".to_string()]);
         entries.insert("in".to_string(), vec!["IH1".to_string(), "N".to_string()]);
         entries.insert("it".to_string(), vec!["IH1".to_string(), "T".to_string()]);
         entries.insert("is".to_string(), vec!["IH1".to_string(), "Z".to_string()]);
-        entries.insert("this".to_string(), vec!["DH".to_string(), "IH1".to_string(), "S".to_string()]);
-        entries.insert("that".to_string(), vec!["DH".to_string(), "AE1".to_string(), "T".to_string()]);
-        entries.insert("like".to_string(), vec!["L".to_string(), "AY1".to_string(), "K".to_string()]);
-        entries.insert("mike".to_string(), vec!["M".to_string(), "AY1".to_string(), "K".to_string()]);
-        entries.insert("night".to_string(), vec!["N".to_string(), "AY1".to_string(), "T".to_string()]);
-        entries.insert("right".to_string(), vec!["R".to_string(), "AY1".to_string(), "T".to_string()]);
-        entries.insert("tight".to_string(), vec!["T".to_string(), "AY1".to_string(), "T".to_string()]);
-        entries.insert("fight".to_string(), vec!["F".to_string(), "AY1".to_string(), "T".to_string()]);
-        entries.insert("light".to_string(), vec!["L".to_string(), "AY1".to_string(), "T".to_string()]);
+        entries.insert(
+            "this".to_string(),
+            vec!["DH".to_string(), "IH1".to_string(), "S".to_string()],
+        );
+        entries.insert(
+            "that".to_string(),
+            vec!["DH".to_string(), "AE1".to_string(), "T".to_string()],
+        );
+        entries.insert(
+            "like".to_string(),
+            vec!["L".to_string(), "AY1".to_string(), "K".to_string()],
+        );
+        entries.insert(
+            "mike".to_string(),
+            vec!["M".to_string(), "AY1".to_string(), "K".to_string()],
+        );
+        entries.insert(
+            "night".to_string(),
+            vec!["N".to_string(), "AY1".to_string(), "T".to_string()],
+        );
+        entries.insert(
+            "right".to_string(),
+            vec!["R".to_string(), "AY1".to_string(), "T".to_string()],
+        );
+        entries.insert(
+            "tight".to_string(),
+            vec!["T".to_string(), "AY1".to_string(), "T".to_string()],
+        );
+        entries.insert(
+            "fight".to_string(),
+            vec!["F".to_string(), "AY1".to_string(), "T".to_string()],
+        );
+        entries.insert(
+            "light".to_string(),
+            vec!["L".to_string(), "AY1".to_string(), "T".to_string()],
+        );
         entries.insert("we".to_string(), vec!["W".to_string(), "IY1".to_string()]);
         entries.insert("me".to_string(), vec!["M".to_string(), "IY1".to_string()]);
         entries.insert("be".to_string(), vec!["B".to_string(), "IY1".to_string()]);
         entries.insert("see".to_string(), vec!["S".to_string(), "IY1".to_string()]);
-        entries.insert("free".to_string(), vec!["F".to_string(), "R".to_string(), "IY1".to_string()]);
+        entries.insert(
+            "free".to_string(),
+            vec!["F".to_string(), "R".to_string(), "IY1".to_string()],
+        );
         entries.insert("a".to_string(), vec!["AH0".to_string()]);
-        entries.insert("and".to_string(), vec!["AH0".to_string(), "N".to_string(), "D".to_string()]);
+        entries.insert(
+            "and".to_string(),
+            vec!["AH0".to_string(), "N".to_string(), "D".to_string()],
+        );
         entries.insert("to".to_string(), vec!["T".to_string(), "UW1".to_string()]);
         entries.insert("you".to_string(), vec!["Y".to_string(), "UW1".to_string()]);
-        entries.insert("true".to_string(), vec!["T".to_string(), "R".to_string(), "UW1".to_string()]);
-        entries.insert("crew".to_string(), vec!["K".to_string(), "R".to_string(), "UW1".to_string()]);
+        entries.insert(
+            "true".to_string(),
+            vec!["T".to_string(), "R".to_string(), "UW1".to_string()],
+        );
+        entries.insert(
+            "crew".to_string(),
+            vec!["K".to_string(), "R".to_string(), "UW1".to_string()],
+        );
         entries.insert("new".to_string(), vec!["N".to_string(), "UW1".to_string()]);
         entries.insert("do".to_string(), vec!["D".to_string(), "UW1".to_string()]);
 
@@ -528,12 +629,10 @@ impl Default for SimplePhonemeDict {
 impl PhonemeDict for SimplePhonemeDict {
     fn lookup(&self, word: &str) -> Vec<String> {
         let lower = word.to_lowercase();
-        self.entries.get(&lower)
-            .cloned()
-            .unwrap_or_else(|| {
-                // Fallback: simple letter-to-phoneme
-                fallback_phonemes(&lower)
-            })
+        self.entries.get(&lower).cloned().unwrap_or_else(|| {
+            // Fallback: simple letter-to-phoneme
+            fallback_phonemes(&lower)
+        })
     }
 }
 
@@ -579,7 +678,8 @@ fn fallback_phonemes(word: &str) -> Vec<String> {
 
 /// Count syllables from phoneme list (count vowels)
 fn count_syllables(phonemes: &[String]) -> usize {
-    phonemes.iter()
+    phonemes
+        .iter()
         .filter(|p| is_vowel(&strip_stress(p)))
         .count()
         .max(1)
@@ -587,25 +687,35 @@ fn count_syllables(phonemes: &[String]) -> usize {
 
 /// Check if phoneme is a vowel
 fn is_vowel(phoneme: &str) -> bool {
-    matches!(phoneme,
-        "AA" | "AE" | "AH" | "AO" | "AW" | "AX" | "AY" |
-        "EH" | "ER" | "EY" |
-        "IH" | "IY" |
-        "OW" | "OY" |
-        "UH" | "UW"
+    matches!(
+        phoneme,
+        "AA" | "AE"
+            | "AH"
+            | "AO"
+            | "AW"
+            | "AX"
+            | "AY"
+            | "EH"
+            | "ER"
+            | "EY"
+            | "IH"
+            | "IY"
+            | "OW"
+            | "OY"
+            | "UH"
+            | "UW"
     )
 }
 
 /// Strip stress marker from phoneme
 fn strip_stress(phoneme: &str) -> String {
-    phoneme.chars()
-        .filter(|c| !c.is_ascii_digit())
-        .collect()
+    phoneme.chars().filter(|c| !c.is_ascii_digit()).collect()
 }
 
 /// Extract stress level (0, 1, or 2) from phoneme
 fn extract_stress(phoneme: &str) -> u8 {
-    phoneme.chars()
+    phoneme
+        .chars()
         .find(|c| c.is_ascii_digit())
         .and_then(|c| c.to_digit(10))
         .map(|d| d as u8)
@@ -633,11 +743,7 @@ mod tests {
 
     #[test]
     fn test_syllable_count() {
-        let phonemes = vec![
-            "F".to_string(),
-            "L".to_string(),
-            "OW1".to_string(),
-        ];
+        let phonemes = vec!["F".to_string(), "L".to_string(), "OW1".to_string()];
         assert_eq!(count_syllables(&phonemes), 1);
 
         let phonemes2 = vec![

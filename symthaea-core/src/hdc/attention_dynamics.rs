@@ -32,8 +32,8 @@
 //!                    (binding strength)
 //! ```
 
-use super::unified_hv::ContinuousHV;
 use super::unified_consciousness_engine::ConsciousnessUpdate;
+use super::unified_hv::ContinuousHV;
 use std::collections::VecDeque;
 
 /// Attention mode
@@ -55,11 +55,11 @@ impl AttentionMode {
     /// Get the characteristic width of attention
     pub fn width(&self) -> f64 {
         match self {
-            AttentionMode::Spotlight => 0.2,    // Narrow
-            AttentionMode::Diffuse => 0.8,      // Wide
-            AttentionMode::Distributed => 0.5,   // Medium
-            AttentionMode::Switching => 0.4,     // Transitional
-            AttentionMode::Blink => 0.1,         // Minimal
+            AttentionMode::Spotlight => 0.2,   // Narrow
+            AttentionMode::Diffuse => 0.8,     // Wide
+            AttentionMode::Distributed => 0.5, // Medium
+            AttentionMode::Switching => 0.4,   // Transitional
+            AttentionMode::Blink => 0.1,       // Minimal
         }
     }
 
@@ -239,9 +239,7 @@ impl AttentionDynamics {
 
         // Softmax normalization with temperature scaling
         let max_score = competition.iter().cloned().fold(f64::MIN, f64::max);
-        let exp_scores: Vec<f64> = competition.iter()
-            .map(|s| (s - max_score).exp())
-            .collect();
+        let exp_scores: Vec<f64> = competition.iter().map(|s| (s - max_score).exp()).collect();
         let sum: f64 = exp_scores.iter().sum();
 
         if sum > 0.0 {
@@ -258,8 +256,8 @@ impl AttentionDynamics {
         for (i, target) in self.targets.iter_mut().enumerate() {
             if i < competition.len() {
                 // Move attention toward competition result
-                let new_attention = (1.0 - learning_rate) * target.attention
-                    + learning_rate * competition[i];
+                let new_attention =
+                    (1.0 - learning_rate) * target.attention + learning_rate * competition[i];
                 target.attention = new_attention;
 
                 // Update dwell time
@@ -288,7 +286,9 @@ impl AttentionDynamics {
         let entropy = self.attention_entropy();
 
         // Check for dominant target
-        let max_attention = self.targets.iter()
+        let max_attention = self
+            .targets
+            .iter()
             .map(|t| t.attention)
             .fold(0.0_f64, f64::max);
 
@@ -356,9 +356,11 @@ impl AttentionDynamics {
     /// Check for sudden attention capture
     fn check_attention_capture(&mut self) {
         // Find highest salience target
-        if let Some(max_salience_target) = self.targets.iter()
-            .max_by(|a, b| a.salience.partial_cmp(&b.salience).unwrap_or(std::cmp::Ordering::Equal))
-        {
+        if let Some(max_salience_target) = self.targets.iter().max_by(|a, b| {
+            a.salience
+                .partial_cmp(&b.salience)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        }) {
             // If a target has very high salience but low attention, capture
             if max_salience_target.salience > 0.8 && max_salience_target.attention < 0.3 {
                 // Attention capture - trigger blink
@@ -378,7 +380,9 @@ impl AttentionDynamics {
 
     /// Create allocation result
     fn create_allocation(&self) -> AttentionAllocation {
-        let attended: Vec<(usize, f64)> = self.targets.iter()
+        let attended: Vec<(usize, f64)> = self
+            .targets
+            .iter()
             .filter(|t| t.attention > 0.1)
             .map(|t| (t.id, t.attention))
             .collect();
@@ -453,23 +457,29 @@ pub struct ModulatedUpdate {
 
 impl std::fmt::Display for ModulatedUpdate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Attention[{:?}]: Φ {:.4} -> {:.4} (intensity={:.2}, width={:.2}, targets={})",
-               self.attention_mode,
-               self.base_phi,
-               self.modulated_phi,
-               self.attention_intensity,
-               self.attention_width,
-               self.num_targets)
+        write!(
+            f,
+            "Attention[{:?}]: Φ {:.4} -> {:.4} (intensity={:.2}, width={:.2}, targets={})",
+            self.attention_mode,
+            self.base_phi,
+            self.modulated_phi,
+            self.attention_intensity,
+            self.attention_width,
+            self.num_targets
+        )
     }
 }
 
 impl std::fmt::Display for AttentionAllocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Allocation[{:?}]: {} targets, total={:.2}, entropy={:.2}",
-               self.mode,
-               self.attended.len(),
-               self.total_attention,
-               self.entropy)
+        write!(
+            f,
+            "Allocation[{:?}]: {} targets, total={:.2}, entropy={:.2}",
+            self.mode,
+            self.attended.len(),
+            self.total_attention,
+            self.entropy
+        )
     }
 }
 
@@ -524,7 +534,10 @@ mod tests {
                 saw_spotlight = true;
             }
         }
-        assert!(saw_spotlight, "High salience target should trigger spotlight mode");
+        assert!(
+            saw_spotlight,
+            "High salience target should trigger spotlight mode"
+        );
     }
 
     #[test]
@@ -538,7 +551,10 @@ mod tests {
 
         for _ in 0..5 {
             let alloc = attention.step(None);
-            assert!(alloc.entropy.is_finite(), "Entropy should be finite in diffuse phase");
+            assert!(
+                alloc.entropy.is_finite(),
+                "Entropy should be finite in diffuse phase"
+            );
         }
 
         // Boost one target -> should become spotlight
@@ -547,11 +563,17 @@ mod tests {
         let mut saw_spotlight = false;
         for _ in 0..10 {
             let alloc = attention.step(None);
-            assert!(alloc.entropy.is_finite(), "Entropy should be finite after boost");
+            assert!(
+                alloc.entropy.is_finite(),
+                "Entropy should be finite after boost"
+            );
             if matches!(alloc.mode, AttentionMode::Spotlight) {
                 saw_spotlight = true;
             }
         }
-        assert!(saw_spotlight, "Boosting salience should trigger spotlight mode");
+        assert!(
+            saw_spotlight,
+            "Boosting salience should trigger spotlight mode"
+        );
     }
 }

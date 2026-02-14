@@ -26,8 +26,8 @@
 //! - Proof trace depth (more reasoning steps = more consciousness)
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
-use serde::{Serialize, Deserialize};
+use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // HELPER: GCD
@@ -85,10 +85,10 @@ pub enum NumberDomain {
 impl std::fmt::Display for NumberDomain {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NumberDomain::Natural  => write!(f, "\u{2115}"),
-            NumberDomain::Integer  => write!(f, "\u{2124}"),
+            NumberDomain::Natural => write!(f, "\u{2115}"),
+            NumberDomain::Integer => write!(f, "\u{2124}"),
             NumberDomain::Rational => write!(f, "\u{211a}"),
-            NumberDomain::Real     => write!(f, "\u{211d}"),
+            NumberDomain::Real => write!(f, "\u{211d}"),
         }
     }
 }
@@ -125,9 +125,10 @@ impl Number {
         match self {
             Number::Natural(n) => *n as f64,
             Number::Integer(n) => *n as f64,
-            Number::Rational { numerator, denominator } => {
-                *numerator as f64 / *denominator as f64
-            }
+            Number::Rational {
+                numerator,
+                denominator,
+            } => *numerator as f64 / *denominator as f64,
             Number::Real(x) => *x,
         }
     }
@@ -148,7 +149,10 @@ impl Number {
     /// and Integer(5) narrows to Natural(5).
     pub fn narrow(self) -> Self {
         match self {
-            Number::Rational { numerator, denominator } if denominator == 1 => {
+            Number::Rational {
+                numerator,
+                denominator,
+            } if denominator == 1 => {
                 if numerator >= 0 {
                     Number::Natural(numerator as u64)
                 } else {
@@ -159,7 +163,9 @@ impl Number {
             Number::Real(x) if x.fract().abs() < 1e-12 && x >= 0.0 && x <= u64::MAX as f64 => {
                 Number::Natural(x.round() as u64)
             }
-            Number::Real(x) if x.fract().abs() < 1e-12 && x >= i64::MIN as f64 && x <= i64::MAX as f64 => {
+            Number::Real(x)
+                if x.fract().abs() < 1e-12 && x >= i64::MIN as f64 && x <= i64::MAX as f64 =>
+            {
                 Number::Integer(x.round() as i64)
             }
             other => other,
@@ -170,9 +176,12 @@ impl Number {
 impl std::fmt::Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Number::Natural(n)  => write!(f, "{}", n),
-            Number::Integer(n)  => write!(f, "{}", n),
-            Number::Rational { numerator, denominator } => {
+            Number::Natural(n) => write!(f, "{}", n),
+            Number::Integer(n) => write!(f, "{}", n),
+            Number::Rational {
+                numerator,
+                denominator,
+            } => {
                 write!(f, "{}/{}", numerator, denominator)
             }
             Number::Real(x) => write!(f, "{:.10}", x),
@@ -307,7 +316,10 @@ impl NumericTower {
                 Number::Integer(num)
             }
         } else {
-            Number::Rational { numerator: num, denominator: den }
+            Number::Rational {
+                numerator: num,
+                denominator: den,
+            }
         }
     }
 
@@ -326,9 +338,10 @@ impl NumericTower {
         match number {
             Number::Natural(n) => self.encode_natural(*n),
             Number::Integer(n) => self.encode_integer(*n),
-            Number::Rational { numerator, denominator } => {
-                self.encode_rational(*numerator, *denominator)
-            }
+            Number::Rational {
+                numerator,
+                denominator,
+            } => self.encode_rational(*numerator, *denominator),
             Number::Real(x) => self.encode_real(*x),
         }
     }
@@ -336,7 +349,9 @@ impl NumericTower {
     /// Encode a natural number.
     fn encode_natural(&self, n: u64) -> BinaryHV {
         if n == 0 {
-            return self.primitives.get("ZERO")
+            return self
+                .primitives
+                .get("ZERO")
                 .expect("ZERO primitive must exist")
                 .encoding;
         }
@@ -345,10 +360,16 @@ impl NumericTower {
             // Peano-style: ZERO then n applications of SUCCESSOR with permutation.
             // Permute between each step to avoid XOR self-inverse cancellation
             // (without permute, all even numbers and all odd numbers would collide).
-            let zero = self.primitives.get("ZERO")
-                .expect("ZERO primitive must exist").encoding;
-            let succ = self.primitives.get("SUCCESSOR")
-                .expect("SUCCESSOR primitive must exist").encoding;
+            let zero = self
+                .primitives
+                .get("ZERO")
+                .expect("ZERO primitive must exist")
+                .encoding;
+            let succ = self
+                .primitives
+                .get("SUCCESSOR")
+                .expect("SUCCESSOR primitive must exist")
+                .encoding;
 
             let mut encoding = zero;
             for _ in 0..n {
@@ -369,7 +390,9 @@ impl NumericTower {
 
         // Negative: NEGATION ⊗ magnitude
         let magnitude = self.encode_natural(n.unsigned_abs());
-        let negation = self.primitives.get("NOT")
+        let negation = self
+            .primitives
+            .get("NOT")
             .or_else(|| self.primitives.get("NEGATION"))
             .expect("NOT/NEGATION primitive must exist");
         negation.encoding.bind(&magnitude)
@@ -377,8 +400,11 @@ impl NumericTower {
 
     /// Encode a rational number p/q.
     fn encode_rational(&self, numerator: i64, denominator: i64) -> BinaryHV {
-        let ratio = self.primitives.get("RATIO")
-            .expect("RATIO primitive must exist").encoding;
+        let ratio = self
+            .primitives
+            .get("RATIO")
+            .expect("RATIO primitive must exist")
+            .encoding;
         let num_enc = self.encode_integer(numerator);
         let den_enc = self.encode_natural(denominator as u64);
 
@@ -405,12 +431,12 @@ impl NumericTower {
             return 0.0;
         }
         match (from, to) {
-            (NumberDomain::Natural, NumberDomain::Integer)  => 1.0,
+            (NumberDomain::Natural, NumberDomain::Integer) => 1.0,
             (NumberDomain::Natural, NumberDomain::Rational) => 2.0,
-            (NumberDomain::Natural, NumberDomain::Real)     => 3.0,
+            (NumberDomain::Natural, NumberDomain::Real) => 3.0,
             (NumberDomain::Integer, NumberDomain::Rational) => 1.5,
-            (NumberDomain::Integer, NumberDomain::Real)     => 2.5,
-            (NumberDomain::Rational, NumberDomain::Real)    => 2.0,
+            (NumberDomain::Integer, NumberDomain::Real) => 2.5,
+            (NumberDomain::Rational, NumberDomain::Real) => 2.0,
             _ => 0.0,
         }
     }
@@ -419,11 +445,11 @@ impl NumericTower {
     fn operation_phi(op: &str) -> f64 {
         match op {
             "add" | "subtract" => 0.5,
-            "multiply"         => 1.0,
-            "divide"           => 1.5,
-            "power"            => 2.0,
-            "negate" | "abs"   => 0.3,
-            _                  => 0.1,
+            "multiply" => 1.0,
+            "divide" => 1.5,
+            "power" => 2.0,
+            "negate" | "abs" => 0.3,
+            _ => 0.1,
         }
     }
 
@@ -470,9 +496,7 @@ impl NumericTower {
     ///
     /// Stays in the narrowest domain that contains both operands and the result.
     pub fn add(&self, a: &Number, b: &Number) -> NumberResult {
-        let mut proof_trace = vec![
-            format!("Add: {} + {}", a, b),
-        ];
+        let mut proof_trace = vec![format!("Add: {} + {}", a, b)];
 
         let result = match (a, b) {
             // ℕ + ℕ → ℕ (always closed)
@@ -490,16 +514,23 @@ impl NumericTower {
             }
 
             // Mixed ℕ/ℤ: lift to ℤ
-            (Number::Natural(x), Number::Integer(y)) |
-            (Number::Integer(y), Number::Natural(x)) => {
+            (Number::Natural(x), Number::Integer(y)) | (Number::Integer(y), Number::Natural(x)) => {
                 let sum = (*x as i64).wrapping_add(*y);
                 proof_trace.push(format!("Lift to Z: {} + {} = {}", x, y, sum));
                 Self::from_i64(sum)
             }
 
             // ℚ + ℚ → ℚ: (a/b) + (c/d) = (ad + bc) / bd
-            (Number::Rational { numerator: an, denominator: ad },
-             Number::Rational { numerator: bn, denominator: bd }) => {
+            (
+                Number::Rational {
+                    numerator: an,
+                    denominator: ad,
+                },
+                Number::Rational {
+                    numerator: bn,
+                    denominator: bd,
+                },
+            ) => {
                 let num = an.wrapping_mul(*bd).wrapping_add(bn.wrapping_mul(*ad));
                 let den = ad.wrapping_mul(*bd);
                 proof_trace.push(format!(
@@ -510,8 +541,20 @@ impl NumericTower {
             }
 
             // Mixed with ℚ: lift other operand to ℚ
-            (Number::Rational { numerator: rn, denominator: rd }, other) |
-            (other, Number::Rational { numerator: rn, denominator: rd }) => {
+            (
+                Number::Rational {
+                    numerator: rn,
+                    denominator: rd,
+                },
+                other,
+            )
+            | (
+                other,
+                Number::Rational {
+                    numerator: rn,
+                    denominator: rd,
+                },
+            ) => {
                 let (on, od) = self.to_rational(other);
                 let num = rn.wrapping_mul(od).wrapping_add(on.wrapping_mul(*rd));
                 let den = rd.wrapping_mul(od);
@@ -522,7 +565,12 @@ impl NumericTower {
             // ℝ + anything → ℝ
             (Number::Real(x), other) | (other, Number::Real(x)) => {
                 let sum = x + other.to_f64();
-                proof_trace.push(format!("Real addition: {} + {} = {}", x, other.to_f64(), sum));
+                proof_trace.push(format!(
+                    "Real addition: {} + {} = {}",
+                    x,
+                    other.to_f64(),
+                    sum
+                ));
                 Self::from_f64(sum)
             }
         };
@@ -535,20 +583,24 @@ impl NumericTower {
     ///
     /// Auto-promotes ℕ → ℤ when the result is negative.
     pub fn subtract(&self, a: &Number, b: &Number) -> NumberResult {
-        let mut proof_trace = vec![
-            format!("Subtract: {} - {}", a, b),
-        ];
+        let mut proof_trace = vec![format!("Subtract: {} - {}", a, b)];
 
         let result = match (a, b) {
             // ℕ - ℕ: may promote to ℤ
             (Number::Natural(x), Number::Natural(y)) => {
                 if *x >= *y {
                     let diff = x - y;
-                    proof_trace.push(format!("Natural subtraction: {} - {} = {} (stays in N)", x, y, diff));
+                    proof_trace.push(format!(
+                        "Natural subtraction: {} - {} = {} (stays in N)",
+                        x, y, diff
+                    ));
                     Number::Natural(diff)
                 } else {
                     let diff = (*x as i64).wrapping_sub(*y as i64);
-                    proof_trace.push(format!("Promotion N -> Z: {} - {} = {} (negative result)", x, y, diff));
+                    proof_trace.push(format!(
+                        "Promotion N -> Z: {} - {} = {} (negative result)",
+                        x, y, diff
+                    ));
                     Number::Integer(diff)
                 }
             }
@@ -573,8 +625,16 @@ impl NumericTower {
             }
 
             // ℚ - ℚ
-            (Number::Rational { numerator: an, denominator: ad },
-             Number::Rational { numerator: bn, denominator: bd }) => {
+            (
+                Number::Rational {
+                    numerator: an,
+                    denominator: ad,
+                },
+                Number::Rational {
+                    numerator: bn,
+                    denominator: bd,
+                },
+            ) => {
                 let num = an.wrapping_mul(*bd).wrapping_sub(bn.wrapping_mul(*ad));
                 let den = ad.wrapping_mul(*bd);
                 proof_trace.push(format!(
@@ -585,14 +645,26 @@ impl NumericTower {
             }
 
             // Mixed with ℚ
-            (Number::Rational { numerator: rn, denominator: rd }, other) => {
+            (
+                Number::Rational {
+                    numerator: rn,
+                    denominator: rd,
+                },
+                other,
+            ) => {
                 let (on, od) = self.to_rational(other);
                 let num = rn.wrapping_mul(od).wrapping_sub(on.wrapping_mul(*rd));
                 let den = rd.wrapping_mul(od);
                 proof_trace.push(format!("Lift to Q: {}/{} - {}/{}", rn, rd, on, od));
                 Self::from_rational(num, den)
             }
-            (other, Number::Rational { numerator: rn, denominator: rd }) => {
+            (
+                other,
+                Number::Rational {
+                    numerator: rn,
+                    denominator: rd,
+                },
+            ) => {
                 let (on, od) = self.to_rational(other);
                 let num = on.wrapping_mul(*rd).wrapping_sub(rn.wrapping_mul(od));
                 let den = od.wrapping_mul(*rd);
@@ -603,12 +675,22 @@ impl NumericTower {
             // ℝ - anything → ℝ
             (Number::Real(x), other) => {
                 let diff = x - other.to_f64();
-                proof_trace.push(format!("Real subtraction: {} - {} = {}", x, other.to_f64(), diff));
+                proof_trace.push(format!(
+                    "Real subtraction: {} - {} = {}",
+                    x,
+                    other.to_f64(),
+                    diff
+                ));
                 Self::from_f64(diff)
             }
             (other, Number::Real(x)) => {
                 let diff = other.to_f64() - x;
-                proof_trace.push(format!("Real subtraction: {} - {} = {}", other.to_f64(), x, diff));
+                proof_trace.push(format!(
+                    "Real subtraction: {} - {} = {}",
+                    other.to_f64(),
+                    x,
+                    diff
+                ));
                 Self::from_f64(diff)
             }
         };
@@ -621,9 +703,7 @@ impl NumericTower {
     ///
     /// Stays in the narrowest closed domain.
     pub fn multiply(&self, a: &Number, b: &Number) -> NumberResult {
-        let mut proof_trace = vec![
-            format!("Multiply: {} * {}", a, b),
-        ];
+        let mut proof_trace = vec![format!("Multiply: {} * {}", a, b)];
 
         let result = match (a, b) {
             // ℕ * ℕ → ℕ
@@ -641,25 +721,47 @@ impl NumericTower {
             }
 
             // Mixed ℕ/ℤ
-            (Number::Natural(x), Number::Integer(y)) |
-            (Number::Integer(y), Number::Natural(x)) => {
+            (Number::Natural(x), Number::Integer(y)) | (Number::Integer(y), Number::Natural(x)) => {
                 let prod = (*x as i64).wrapping_mul(*y);
                 proof_trace.push(format!("Lift to Z: {} * {} = {}", x, y, prod));
                 Self::from_i64(prod)
             }
 
             // ℚ * ℚ → ℚ
-            (Number::Rational { numerator: an, denominator: ad },
-             Number::Rational { numerator: bn, denominator: bd }) => {
+            (
+                Number::Rational {
+                    numerator: an,
+                    denominator: ad,
+                },
+                Number::Rational {
+                    numerator: bn,
+                    denominator: bd,
+                },
+            ) => {
                 let num = an.wrapping_mul(*bn);
                 let den = ad.wrapping_mul(*bd);
-                proof_trace.push(format!("Rational multiplication: ({} * {}) / ({} * {})", an, bn, ad, bd));
+                proof_trace.push(format!(
+                    "Rational multiplication: ({} * {}) / ({} * {})",
+                    an, bn, ad, bd
+                ));
                 Self::from_rational(num, den)
             }
 
             // Mixed with ℚ
-            (Number::Rational { numerator: rn, denominator: rd }, other) |
-            (other, Number::Rational { numerator: rn, denominator: rd }) => {
+            (
+                Number::Rational {
+                    numerator: rn,
+                    denominator: rd,
+                },
+                other,
+            )
+            | (
+                other,
+                Number::Rational {
+                    numerator: rn,
+                    denominator: rd,
+                },
+            ) => {
                 let (on, od) = self.to_rational(other);
                 let num = rn.wrapping_mul(on);
                 let den = rd.wrapping_mul(od);
@@ -670,7 +772,12 @@ impl NumericTower {
             // ℝ * anything → ℝ
             (Number::Real(x), other) | (other, Number::Real(x)) => {
                 let prod = x * other.to_f64();
-                proof_trace.push(format!("Real multiplication: {} * {} = {}", x, other.to_f64(), prod));
+                proof_trace.push(format!(
+                    "Real multiplication: {} * {} = {}",
+                    x,
+                    other.to_f64(),
+                    prod
+                ));
                 Self::from_f64(prod)
             }
         };
@@ -688,20 +795,24 @@ impl NumericTower {
             return None;
         }
 
-        let mut proof_trace = vec![
-            format!("Divide: {} / {}", a, b),
-        ];
+        let mut proof_trace = vec![format!("Divide: {} / {}", a, b)];
 
         let result = match (a, b) {
             // ℕ / ℕ: exact → ℕ, otherwise → ℚ
             (Number::Natural(x), Number::Natural(y)) => {
                 if *y != 0 && *x % *y == 0 {
                     let quot = x / y;
-                    proof_trace.push(format!("Exact natural division: {} / {} = {} (stays in N)", x, y, quot));
+                    proof_trace.push(format!(
+                        "Exact natural division: {} / {} = {} (stays in N)",
+                        x, y, quot
+                    ));
                     Number::Natural(quot)
                 } else {
                     let (num, den) = normalize_rational(*x as i64, *y as i64);
-                    proof_trace.push(format!("Promotion N -> Q: {} / {} = {}/{} (not exact)", x, y, num, den));
+                    proof_trace.push(format!(
+                        "Promotion N -> Q: {} / {} = {}/{} (not exact)",
+                        x, y, num, den
+                    ));
                     Self::from_rational(num, den)
                 }
             }
@@ -710,7 +821,10 @@ impl NumericTower {
             (Number::Integer(x), Number::Integer(y)) => {
                 if *y != 0 && *x % *y == 0 {
                     let quot = x / y;
-                    proof_trace.push(format!("Exact integer division: {} / {} = {} (stays in Z)", x, y, quot));
+                    proof_trace.push(format!(
+                        "Exact integer division: {} / {} = {} (stays in Z)",
+                        x, y, quot
+                    ));
                     Self::from_i64(quot)
                 } else {
                     proof_trace.push(format!("Promotion Z -> Q: {} / {} (not exact)", x, y));
@@ -723,7 +837,10 @@ impl NumericTower {
                 let xi = *x as i64;
                 if *y != 0 && xi % *y == 0 {
                     let quot = xi / *y;
-                    proof_trace.push(format!("Exact division after lift: {} / {} = {}", x, y, quot));
+                    proof_trace.push(format!(
+                        "Exact division after lift: {} / {} = {}",
+                        x, y, quot
+                    ));
                     Self::from_i64(quot)
                 } else {
                     proof_trace.push(format!("Promotion to Q: {} / {}", x, y));
@@ -734,7 +851,10 @@ impl NumericTower {
                 let yi = *y as i64;
                 if yi != 0 && *x % yi == 0 {
                     let quot = *x / yi;
-                    proof_trace.push(format!("Exact division after lift: {} / {} = {}", x, y, quot));
+                    proof_trace.push(format!(
+                        "Exact division after lift: {} / {} = {}",
+                        x, y, quot
+                    ));
                     Self::from_i64(quot)
                 } else {
                     proof_trace.push(format!("Promotion to Q: {} / {}", x, y));
@@ -743,18 +863,34 @@ impl NumericTower {
             }
 
             // ℚ / ℚ: multiply by reciprocal
-            (Number::Rational { numerator: an, denominator: ad },
-             Number::Rational { numerator: bn, denominator: bd }) => {
+            (
+                Number::Rational {
+                    numerator: an,
+                    denominator: ad,
+                },
+                Number::Rational {
+                    numerator: bn,
+                    denominator: bd,
+                },
+            ) => {
                 // (an/ad) / (bn/bd) = (an * bd) / (ad * bn)
                 let num = an.wrapping_mul(*bd);
                 let den = ad.wrapping_mul(*bn);
-                proof_trace.push(format!("Rational division: ({}/{}) / ({}/{}) = ({} * {}) / ({} * {})",
-                    an, ad, bn, bd, an, bd, ad, bn));
+                proof_trace.push(format!(
+                    "Rational division: ({}/{}) / ({}/{}) = ({} * {}) / ({} * {})",
+                    an, ad, bn, bd, an, bd, ad, bn
+                ));
                 Self::from_rational(num, den)
             }
 
             // Mixed with ℚ
-            (Number::Rational { numerator: rn, denominator: rd }, other) => {
+            (
+                Number::Rational {
+                    numerator: rn,
+                    denominator: rd,
+                },
+                other,
+            ) => {
                 let (on, od) = self.to_rational(other);
                 // (rn/rd) / (on/od) = (rn * od) / (rd * on)
                 let num = rn.wrapping_mul(od);
@@ -762,7 +898,13 @@ impl NumericTower {
                 proof_trace.push(format!("Lift to Q: ({}/{}) / ({}/{})", rn, rd, on, od));
                 Self::from_rational(num, den)
             }
-            (other, Number::Rational { numerator: rn, denominator: rd }) => {
+            (
+                other,
+                Number::Rational {
+                    numerator: rn,
+                    denominator: rd,
+                },
+            ) => {
                 let (on, od) = self.to_rational(other);
                 // (on/od) / (rn/rd) = (on * rd) / (od * rn)
                 let num = on.wrapping_mul(*rd);
@@ -774,12 +916,22 @@ impl NumericTower {
             // ℝ / anything → ℝ
             (Number::Real(x), other) => {
                 let quot = x / other.to_f64();
-                proof_trace.push(format!("Real division: {} / {} = {}", x, other.to_f64(), quot));
+                proof_trace.push(format!(
+                    "Real division: {} / {} = {}",
+                    x,
+                    other.to_f64(),
+                    quot
+                ));
                 Self::from_f64(quot)
             }
             (other, Number::Real(x)) => {
                 let quot = other.to_f64() / x;
-                proof_trace.push(format!("Real division: {} / {} = {}", other.to_f64(), x, quot));
+                proof_trace.push(format!(
+                    "Real division: {} / {} = {}",
+                    other.to_f64(),
+                    x,
+                    quot
+                ));
                 Self::from_f64(quot)
             }
         };
@@ -794,18 +946,12 @@ impl NumericTower {
     /// For negative exponents, promotes to ℚ or ℝ.
     /// For fractional/real exponents, promotes to ℝ.
     pub fn power(&self, base: &Number, exponent: &Number) -> NumberResult {
-        let mut proof_trace = vec![
-            format!("Power: {}^{}", base, exponent),
-        ];
+        let mut proof_trace = vec![format!("Power: {}^{}", base, exponent)];
 
         let result = match exponent {
             // Integer exponent (natural or negative integer)
-            Number::Natural(exp) => {
-                self.integer_power(base, *exp as i64, &mut proof_trace)
-            }
-            Number::Integer(exp) => {
-                self.integer_power(base, *exp, &mut proof_trace)
-            }
+            Number::Natural(exp) => self.integer_power(base, *exp as i64, &mut proof_trace),
+            Number::Integer(exp) => self.integer_power(base, *exp, &mut proof_trace),
             // Rational or real exponent → always ℝ
             _ => {
                 let b = base.to_f64();
@@ -856,19 +1002,23 @@ impl NumericTower {
                         Number::Real((*b as f64).powi(exp as i32))
                     }
                 }
-                Number::Rational { numerator, denominator } => {
+                Number::Rational {
+                    numerator,
+                    denominator,
+                } => {
                     let num_pow = (*numerator as i128).pow(exp as u32);
                     let den_pow = (*denominator as i128).pow(exp as u32);
-                    if num_pow.unsigned_abs() <= i64::MAX as u128
-                        && den_pow <= i64::MAX as i128
-                    {
+                    if num_pow.unsigned_abs() <= i64::MAX as u128 && den_pow <= i64::MAX as i128 {
                         proof_trace.push(format!(
                             "Rational power: ({}/{})^{} = {}/{}",
                             numerator, denominator, exp, num_pow, den_pow
                         ));
                         Self::from_rational(num_pow as i64, den_pow as i64)
                     } else {
-                        proof_trace.push(format!("Overflow to Real: ({}/{})^{}", numerator, denominator, exp));
+                        proof_trace.push(format!(
+                            "Overflow to Real: ({}/{})^{}",
+                            numerator, denominator, exp
+                        ));
                         Number::Real((base.to_f64()).powi(exp as i32))
                     }
                 }
@@ -880,14 +1030,18 @@ impl NumericTower {
             }
         } else {
             // Negative exponent: a^(-n) = 1 / a^n
-            proof_trace.push(format!("Negative exponent: {}^{} = 1 / {}^{}", base, exp, base, -exp));
+            proof_trace.push(format!(
+                "Negative exponent: {}^{} = 1 / {}^{}",
+                base, exp, base, -exp
+            ));
             let pos_power = self.integer_power(base, -exp, proof_trace);
             match pos_power {
                 Number::Natural(n) if n != 0 => Self::from_rational(1, n as i64),
                 Number::Integer(n) if n != 0 => Self::from_rational(1, n),
-                Number::Rational { numerator, denominator } if numerator != 0 => {
-                    Self::from_rational(denominator, numerator)
-                }
+                Number::Rational {
+                    numerator,
+                    denominator,
+                } if numerator != 0 => Self::from_rational(denominator, numerator),
                 Number::Real(x) if x.abs() > 1e-15 => Number::Real(1.0 / x),
                 _ => Number::Real(f64::INFINITY),
             }
@@ -896,9 +1050,7 @@ impl NumericTower {
 
     /// Negate a number: -a
     pub fn negate(&self, a: &Number) -> NumberResult {
-        let mut proof_trace = vec![
-            format!("Negate: -({})", a),
-        ];
+        let mut proof_trace = vec![format!("Negate: -({})", a)];
 
         let result = match a {
             Number::Natural(0) => {
@@ -915,9 +1067,15 @@ impl NumericTower {
                 proof_trace.push(format!("Integer negation: -({}) = {}", n, neg));
                 Self::from_i64(neg)
             }
-            Number::Rational { numerator, denominator } => {
+            Number::Rational {
+                numerator,
+                denominator,
+            } => {
                 let neg_num = numerator.wrapping_neg();
-                proof_trace.push(format!("Rational negation: -({}/{}) = {}/{}", numerator, denominator, neg_num, denominator));
+                proof_trace.push(format!(
+                    "Rational negation: -({}/{}) = {}/{}",
+                    numerator, denominator, neg_num, denominator
+                ));
                 Self::from_rational(neg_num, *denominator)
             }
             Number::Real(x) => {
@@ -933,9 +1091,7 @@ impl NumericTower {
 
     /// Absolute value: |a|
     pub fn abs(&self, a: &Number) -> NumberResult {
-        let mut proof_trace = vec![
-            format!("Absolute value: |{}|", a),
-        ];
+        let mut proof_trace = vec![format!("Absolute value: |{}|", a)];
 
         let result = match a {
             Number::Natural(n) => {
@@ -947,9 +1103,15 @@ impl NumericTower {
                 proof_trace.push(format!("Integer absolute value: |{}| = {}", n, abs_val));
                 Number::Natural(abs_val as u64)
             }
-            Number::Rational { numerator, denominator } => {
+            Number::Rational {
+                numerator,
+                denominator,
+            } => {
                 let abs_num = numerator.checked_abs().unwrap_or(i64::MAX);
-                proof_trace.push(format!("Rational absolute value: |{}/{}| = {}/{}", numerator, denominator, abs_num, denominator));
+                proof_trace.push(format!(
+                    "Rational absolute value: |{}/{}| = {}/{}",
+                    numerator, denominator, abs_num, denominator
+                ));
                 Self::from_rational(abs_num, *denominator)
             }
             Number::Real(x) => {
@@ -973,19 +1135,23 @@ impl NumericTower {
             return None;
         }
 
-        let mut proof_trace = vec![
-            format!("Square root: sqrt({})", a),
-        ];
+        let mut proof_trace = vec![format!("Square root: sqrt({})", a)];
 
         let result = match a {
             Number::Natural(n) => {
                 let isqrt = (*n as f64).sqrt().round() as u64;
                 if isqrt.wrapping_mul(isqrt) == *n {
-                    proof_trace.push(format!("Perfect square: sqrt({}) = {} (stays in N)", n, isqrt));
+                    proof_trace.push(format!(
+                        "Perfect square: sqrt({}) = {} (stays in N)",
+                        n, isqrt
+                    ));
                     Number::Natural(isqrt)
                 } else {
                     let root = (*n as f64).sqrt();
-                    proof_trace.push(format!("Promotion N -> R: sqrt({}) = {} (irrational)", n, root));
+                    proof_trace.push(format!(
+                        "Promotion N -> R: sqrt({}) = {} (irrational)",
+                        n, root
+                    ));
                     Number::Real(root)
                 }
             }
@@ -996,15 +1162,24 @@ impl NumericTower {
                 let un = *n as u64;
                 let isqrt = (un as f64).sqrt().round() as u64;
                 if isqrt.wrapping_mul(isqrt) == un {
-                    proof_trace.push(format!("Perfect square: sqrt({}) = {} (narrows to N)", n, isqrt));
+                    proof_trace.push(format!(
+                        "Perfect square: sqrt({}) = {} (narrows to N)",
+                        n, isqrt
+                    ));
                     Number::Natural(isqrt)
                 } else {
                     let root = (un as f64).sqrt();
-                    proof_trace.push(format!("Promotion Z -> R: sqrt({}) = {} (irrational)", n, root));
+                    proof_trace.push(format!(
+                        "Promotion Z -> R: sqrt({}) = {} (irrational)",
+                        n, root
+                    ));
                     Number::Real(root)
                 }
             }
-            Number::Rational { numerator, denominator } => {
+            Number::Rational {
+                numerator,
+                denominator,
+            } => {
                 if *numerator < 0 {
                     return None;
                 }
@@ -1049,7 +1224,10 @@ impl NumericTower {
         match n {
             Number::Natural(v) => (*v as i64, 1),
             Number::Integer(v) => (*v, 1),
-            Number::Rational { numerator, denominator } => (*numerator, *denominator),
+            Number::Rational {
+                numerator,
+                denominator,
+            } => (*numerator, *denominator),
             Number::Real(x) => {
                 // Best rational approximation via continued fractions
                 self.f64_to_rational(*x, 10_000)
@@ -1156,7 +1334,13 @@ mod tests {
     fn test_from_rational_reduces() {
         let n = NumericTower::from_rational(6, 4);
         // 6/4 = 3/2
-        assert!(matches!(n, Number::Rational { numerator: 3, denominator: 2 }));
+        assert!(matches!(
+            n,
+            Number::Rational {
+                numerator: 3,
+                denominator: 2
+            }
+        ));
     }
 
     #[test]
@@ -1181,7 +1365,14 @@ mod tests {
     fn test_number_domains() {
         assert_eq!(Number::Natural(5).domain(), NumberDomain::Natural);
         assert_eq!(Number::Integer(-3).domain(), NumberDomain::Integer);
-        assert_eq!(Number::Rational { numerator: 1, denominator: 2 }.domain(), NumberDomain::Rational);
+        assert_eq!(
+            Number::Rational {
+                numerator: 1,
+                denominator: 2
+            }
+            .domain(),
+            NumberDomain::Rational
+        );
         assert_eq!(Number::Real(3.14).domain(), NumberDomain::Real);
     }
 
@@ -1189,7 +1380,16 @@ mod tests {
     fn test_number_to_f64() {
         assert!((Number::Natural(5).to_f64() - 5.0).abs() < 1e-10);
         assert!((Number::Integer(-3).to_f64() - (-3.0)).abs() < 1e-10);
-        assert!((Number::Rational { numerator: 1, denominator: 3 }.to_f64() - 1.0 / 3.0).abs() < 1e-10);
+        assert!(
+            (Number::Rational {
+                numerator: 1,
+                denominator: 3
+            }
+            .to_f64()
+                - 1.0 / 3.0)
+                .abs()
+                < 1e-10
+        );
         assert!((Number::Real(2.5).to_f64() - 2.5).abs() < 1e-10);
     }
 
@@ -1197,7 +1397,11 @@ mod tests {
     fn test_number_is_zero() {
         assert!(Number::Natural(0).is_zero());
         assert!(Number::Integer(0).is_zero());
-        assert!(Number::Rational { numerator: 0, denominator: 5 }.is_zero());
+        assert!(Number::Rational {
+            numerator: 0,
+            denominator: 5
+        }
+        .is_zero());
         assert!(Number::Real(0.0).is_zero());
         assert!(!Number::Natural(1).is_zero());
     }
@@ -1213,8 +1417,11 @@ mod tests {
         let b = NumericTower::from_u64(3);
         let r = tower.subtract(&a, &b);
 
-        assert!(matches!(r.number, Number::Natural(2)),
-            "5 - 3 = 2 should stay in N, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(2)),
+            "5 - 3 = 2 should stay in N, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1224,8 +1431,11 @@ mod tests {
         let b = NumericTower::from_u64(5);
         let r = tower.subtract(&a, &b);
 
-        assert!(matches!(r.number, Number::Integer(-2)),
-            "3 - 5 = -2 should promote to Z, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Integer(-2)),
+            "3 - 5 = -2 should promote to Z, got {:?}",
+            r.number
+        );
     }
 
     // ====================================================================
@@ -1239,8 +1449,17 @@ mod tests {
         let b = NumericTower::from_u64(2);
         let r = tower.divide(&a, &b).expect("non-zero divisor");
 
-        assert!(matches!(r.number, Number::Rational { numerator: 7, denominator: 2 }),
-            "7 / 2 should promote to Q as 7/2, got {:?}", r.number);
+        assert!(
+            matches!(
+                r.number,
+                Number::Rational {
+                    numerator: 7,
+                    denominator: 2
+                }
+            ),
+            "7 / 2 should promote to Q as 7/2, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1250,8 +1469,11 @@ mod tests {
         let b = NumericTower::from_u64(3);
         let r = tower.divide(&a, &b).expect("non-zero divisor");
 
-        assert!(matches!(r.number, Number::Natural(2)),
-            "6 / 3 = 2 should stay in N, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(2)),
+            "6 / 3 = 2 should stay in N, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1259,7 +1481,10 @@ mod tests {
         let tower = NumericTower::new();
         let a = NumericTower::from_u64(5);
         let b = NumericTower::from_u64(0);
-        assert!(tower.divide(&a, &b).is_none(), "Division by zero should return None");
+        assert!(
+            tower.divide(&a, &b).is_none(),
+            "Division by zero should return None"
+        );
     }
 
     // ====================================================================
@@ -1272,8 +1497,11 @@ mod tests {
         let a = NumericTower::from_u64(9);
         let r = tower.sqrt(&a).expect("non-negative");
 
-        assert!(matches!(r.number, Number::Natural(3)),
-            "sqrt(9) = 3 should stay in N, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(3)),
+            "sqrt(9) = 3 should stay in N, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1284,8 +1512,11 @@ mod tests {
 
         match &r.number {
             Number::Real(x) => {
-                assert!((x - std::f64::consts::SQRT_2).abs() < 1e-10,
-                    "sqrt(2) should be ~1.41421, got {}", x);
+                assert!(
+                    (x - std::f64::consts::SQRT_2).abs() < 1e-10,
+                    "sqrt(2) should be ~1.41421, got {}",
+                    x
+                );
             }
             other => panic!("sqrt(2) should promote to R, got {:?}", other),
         }
@@ -1295,7 +1526,10 @@ mod tests {
     fn test_sqrt_negative_returns_none() {
         let tower = NumericTower::new();
         let a = NumericTower::from_i64(-4);
-        assert!(tower.sqrt(&a).is_none(), "sqrt(-4) should return None (no real root)");
+        assert!(
+            tower.sqrt(&a).is_none(),
+            "sqrt(-4) should return None (no real root)"
+        );
     }
 
     // ====================================================================
@@ -1309,8 +1543,11 @@ mod tests {
         let b = NumericTower::from_u64(7);
         let r = tower.add(&a, &b);
 
-        assert!(matches!(r.number, Number::Natural(10)),
-            "3 + 7 = 10, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(10)),
+            "3 + 7 = 10, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1320,8 +1557,11 @@ mod tests {
         let b = NumericTower::from_i64(-5);
         let r = tower.add(&a, &b);
 
-        assert!(matches!(r.number, Number::Integer(-8)),
-            "-3 + -5 = -8, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Integer(-8)),
+            "-3 + -5 = -8, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1332,8 +1572,17 @@ mod tests {
         let r = tower.add(&a, &b);
 
         // 1/2 + 1/3 = 5/6
-        assert!(matches!(r.number, Number::Rational { numerator: 5, denominator: 6 }),
-            "1/2 + 1/3 = 5/6, got {:?}", r.number);
+        assert!(
+            matches!(
+                r.number,
+                Number::Rational {
+                    numerator: 5,
+                    denominator: 6
+                }
+            ),
+            "1/2 + 1/3 = 5/6, got {:?}",
+            r.number
+        );
     }
 
     // ====================================================================
@@ -1347,8 +1596,11 @@ mod tests {
         let b = NumericTower::from_u64(5);
         let r = tower.multiply(&a, &b);
 
-        assert!(matches!(r.number, Number::Natural(20)),
-            "4 * 5 = 20, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(20)),
+            "4 * 5 = 20, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1358,8 +1610,11 @@ mod tests {
         let b = NumericTower::from_u64(4);
         let r = tower.multiply(&a, &b);
 
-        assert!(matches!(r.number, Number::Integer(-12)),
-            "-3 * 4 = -12, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Integer(-12)),
+            "-3 * 4 = -12, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1370,8 +1625,17 @@ mod tests {
         let r = tower.multiply(&a, &b);
 
         // (2/3) * (3/4) = 6/12 = 1/2
-        assert!(matches!(r.number, Number::Rational { numerator: 1, denominator: 2 }),
-            "(2/3) * (3/4) = 1/2, got {:?}", r.number);
+        assert!(
+            matches!(
+                r.number,
+                Number::Rational {
+                    numerator: 1,
+                    denominator: 2
+                }
+            ),
+            "(2/3) * (3/4) = 1/2, got {:?}",
+            r.number
+        );
     }
 
     // ====================================================================
@@ -1384,8 +1648,11 @@ mod tests {
         let a = NumericTower::from_u64(5);
         let r = tower.negate(&a);
 
-        assert!(matches!(r.number, Number::Integer(-5)),
-            "-(5) should promote to Z as -5, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Integer(-5)),
+            "-(5) should promote to Z as -5, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1394,8 +1661,11 @@ mod tests {
         let a = NumericTower::from_i64(-7);
         let r = tower.negate(&a);
 
-        assert!(matches!(r.number, Number::Natural(7)),
-            "-(-7) = 7 should narrow to N, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(7)),
+            "-(-7) = 7 should narrow to N, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1404,8 +1674,11 @@ mod tests {
         let a = NumericTower::from_u64(0);
         let r = tower.negate(&a);
 
-        assert!(matches!(r.number, Number::Natural(0)),
-            "-(0) = 0, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(0)),
+            "-(0) = 0, got {:?}",
+            r.number
+        );
     }
 
     // ====================================================================
@@ -1418,8 +1691,11 @@ mod tests {
         let a = NumericTower::from_u64(5);
         let r = tower.abs(&a);
 
-        assert!(matches!(r.number, Number::Natural(5)),
-            "|5| = 5, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(5)),
+            "|5| = 5, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1428,8 +1704,11 @@ mod tests {
         let a = NumericTower::from_i64(-8);
         let r = tower.abs(&a);
 
-        assert!(matches!(r.number, Number::Natural(8)),
-            "|-8| = 8, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(8)),
+            "|-8| = 8, got {:?}",
+            r.number
+        );
     }
 
     // ====================================================================
@@ -1443,8 +1722,11 @@ mod tests {
         let exp = NumericTower::from_u64(10);
         let r = tower.power(&base, &exp);
 
-        assert!(matches!(r.number, Number::Natural(1024)),
-            "2^10 = 1024, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(1024)),
+            "2^10 = 1024, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1455,8 +1737,17 @@ mod tests {
         let r = tower.power(&base, &exp);
 
         // 2^(-1) = 1/2
-        assert!(matches!(r.number, Number::Rational { numerator: 1, denominator: 2 }),
-            "2^(-1) = 1/2, got {:?}", r.number);
+        assert!(
+            matches!(
+                r.number,
+                Number::Rational {
+                    numerator: 1,
+                    denominator: 2
+                }
+            ),
+            "2^(-1) = 1/2, got {:?}",
+            r.number
+        );
     }
 
     #[test]
@@ -1466,8 +1757,11 @@ mod tests {
         let exp = NumericTower::from_u64(0);
         let r = tower.power(&base, &exp);
 
-        assert!(matches!(r.number, Number::Natural(1)),
-            "99^0 = 1, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(1)),
+            "99^0 = 1, got {:?}",
+            r.number
+        );
     }
 
     // ====================================================================
@@ -1488,9 +1782,12 @@ mod tests {
         let b2 = NumericTower::from_u64(5);
         let r_promo = tower.subtract(&a2, &b2);
 
-        assert!(r_promo.phi > r_no_promo.phi,
+        assert!(
+            r_promo.phi > r_no_promo.phi,
             "Promotion should increase Phi: promo={}, no_promo={}",
-            r_promo.phi, r_no_promo.phi);
+            r_promo.phi,
+            r_no_promo.phi
+        );
     }
 
     #[test]
@@ -1551,8 +1848,13 @@ mod tests {
         let r = tower.divide(&a, &b).unwrap();
 
         assert!(!r.proof_trace.is_empty(), "Proof trace should not be empty");
-        assert!(r.proof_trace.iter().any(|s| s.contains("Divide") || s.contains("Promotion")),
-            "Proof trace should document the operation: {:?}", r.proof_trace);
+        assert!(
+            r.proof_trace
+                .iter()
+                .any(|s| s.contains("Divide") || s.contains("Promotion")),
+            "Proof trace should document the operation: {:?}",
+            r.proof_trace
+        );
     }
 
     #[test]
@@ -1562,8 +1864,13 @@ mod tests {
         let b = NumericTower::from_u64(5);
         let r = tower.subtract(&a, &b);
 
-        assert!(r.proof_trace.iter().any(|s| s.contains("Promotion") || s.contains("negative")),
-            "Proof trace should record promotion: {:?}", r.proof_trace);
+        assert!(
+            r.proof_trace
+                .iter()
+                .any(|s| s.contains("Promotion") || s.contains("negative")),
+            "Proof trace should record promotion: {:?}",
+            r.proof_trace
+        );
     }
 
     // ====================================================================
@@ -1572,26 +1879,41 @@ mod tests {
 
     #[test]
     fn test_narrow_rational_to_natural() {
-        let n = Number::Rational { numerator: 5, denominator: 1 };
+        let n = Number::Rational {
+            numerator: 5,
+            denominator: 1,
+        };
         let narrowed = n.narrow();
-        assert!(matches!(narrowed, Number::Natural(5)),
-            "5/1 should narrow to Natural(5), got {:?}", narrowed);
+        assert!(
+            matches!(narrowed, Number::Natural(5)),
+            "5/1 should narrow to Natural(5), got {:?}",
+            narrowed
+        );
     }
 
     #[test]
     fn test_narrow_rational_to_integer() {
-        let n = Number::Rational { numerator: -3, denominator: 1 };
+        let n = Number::Rational {
+            numerator: -3,
+            denominator: 1,
+        };
         let narrowed = n.narrow();
-        assert!(matches!(narrowed, Number::Integer(-3)),
-            "-3/1 should narrow to Integer(-3), got {:?}", narrowed);
+        assert!(
+            matches!(narrowed, Number::Integer(-3)),
+            "-3/1 should narrow to Integer(-3), got {:?}",
+            narrowed
+        );
     }
 
     #[test]
     fn test_narrow_integer_to_natural() {
         let n = Number::Integer(7);
         let narrowed = n.narrow();
-        assert!(matches!(narrowed, Number::Natural(7)),
-            "Integer(7) should narrow to Natural(7), got {:?}", narrowed);
+        assert!(
+            matches!(narrowed, Number::Natural(7)),
+            "Integer(7) should narrow to Natural(7), got {:?}",
+            narrowed
+        );
     }
 
     // ====================================================================
@@ -1634,13 +1956,22 @@ mod tests {
         // Divide to promote to Q: -5 / 3 = -5/3
         let three = NumericTower::from_u64(3);
         let r2 = tower.divide(&r1.number, &three).unwrap();
-        assert!(matches!(r2.number, Number::Rational { numerator: -5, denominator: 3 }));
+        assert!(matches!(
+            r2.number,
+            Number::Rational {
+                numerator: -5,
+                denominator: 3
+            }
+        ));
 
         // Take sqrt to promote to R: sqrt(|-5/3|) = sqrt(5/3)
         let abs_val = tower.abs(&r2.number);
         let r3 = tower.sqrt(&abs_val.number).unwrap();
-        assert!(matches!(r3.number, Number::Real(_)),
-            "sqrt(5/3) should be Real, got {:?}", r3.number);
+        assert!(
+            matches!(r3.number, Number::Real(_)),
+            "sqrt(5/3) should be Real, got {:?}",
+            r3.number
+        );
     }
 
     #[test]
@@ -1658,16 +1989,28 @@ mod tests {
         let a = NumericTower::from_u64(5);
         let b = NumericTower::from_i64(-3);
         let r = tower.add(&a, &b);
-        assert!(matches!(r.number, Number::Natural(2)),
-            "5 + (-3) = 2, got {:?}", r.number);
+        assert!(
+            matches!(r.number, Number::Natural(2)),
+            "5 + (-3) = 2, got {:?}",
+            r.number
+        );
 
         // Natural + Rational
         let c = NumericTower::from_u64(1);
         let d = NumericTower::from_rational(1, 2);
         let r2 = tower.add(&c, &d);
         // 1 + 1/2 = 3/2
-        assert!(matches!(r2.number, Number::Rational { numerator: 3, denominator: 2 }),
-            "1 + 1/2 = 3/2, got {:?}", r2.number);
+        assert!(
+            matches!(
+                r2.number,
+                Number::Rational {
+                    numerator: 3,
+                    denominator: 2
+                }
+            ),
+            "1 + 1/2 = 3/2, got {:?}",
+            r2.number
+        );
     }
 
     #[test]
@@ -1677,7 +2020,16 @@ mod tests {
         let a = NumericTower::from_rational(4, 9);
         let r = tower.sqrt(&a).expect("non-negative");
 
-        assert!(matches!(r.number, Number::Rational { numerator: 2, denominator: 3 }),
-            "sqrt(4/9) = 2/3, got {:?}", r.number);
+        assert!(
+            matches!(
+                r.number,
+                Number::Rational {
+                    numerator: 2,
+                    denominator: 3
+                }
+            ),
+            "sqrt(4/9) = 2/3, got {:?}",
+            r.number
+        );
     }
 }

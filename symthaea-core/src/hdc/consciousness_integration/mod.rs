@@ -11,10 +11,10 @@
 //! 4. **Temporal Binding** - Stream coherence with theta-phase modulation
 //! 5. **Emergent Self-Model** - Recursive higher-order thought
 
-mod types;
 mod builder;
 mod pipeline;
 mod systems;
+mod types;
 
 #[cfg(test)]
 mod tests;

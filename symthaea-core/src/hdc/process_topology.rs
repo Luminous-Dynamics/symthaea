@@ -17,9 +17,9 @@
 //! - **Strategic bridges**: ~40-45% of connections cross module boundaries
 //! - **Skip connections**: Residual-like paths for fast integration
 
-use super::unified_hv::ContinuousHV;
 use super::consciousness_topology_generators::ConsciousnessTopology;
 use super::spectral_connectivity::ConnectivityCalculator;
+use super::unified_hv::ContinuousHV;
 use std::collections::HashMap;
 
 /// A cognitive process that can be organized within the topology
@@ -43,7 +43,13 @@ pub struct TopologicalProcess {
 
 impl TopologicalProcess {
     /// Create a new process
-    pub fn new(id: usize, name: impl Into<String>, dim: usize, level: usize, module: usize) -> Self {
+    pub fn new(
+        id: usize,
+        name: impl Into<String>,
+        dim: usize,
+        level: usize,
+        module: usize,
+    ) -> Self {
         Self {
             id,
             name: name.into(),
@@ -105,15 +111,15 @@ impl ProcessTopologyOrganizer {
     /// * `seed` - Random seed for reproducibility
     pub fn new(n_total_processes: usize, dim: usize, seed: u64) -> Self {
         let n = n_total_processes.max(21); // Ensure minimum for full hierarchy
-        // Use dense network topology for high consciousness integration
+                                           // Use dense network topology for high consciousness integration
         let topology = ConsciousnessTopology::dense_network(n, dim, Some(n / 2), seed);
 
         // Standard module names based on cognitive architecture
         let module_names = vec![
-            "Perception".to_string(),   // Module 0: Visual, auditory, haptic
-            "Reasoning".to_string(),    // Module 1: Logic, inference, planning
-            "Memory".to_string(),       // Module 2: Episodic, semantic, working
-            "Action".to_string(),       // Module 3: Motor, language production
+            "Perception".to_string(), // Module 0: Visual, auditory, haptic
+            "Reasoning".to_string(),  // Module 1: Logic, inference, planning
+            "Memory".to_string(),     // Module 2: Episodic, semantic, working
+            "Action".to_string(),     // Module 3: Motor, language production
         ];
 
         let mut organizer = Self {
@@ -144,7 +150,12 @@ impl ProcessTopologyOrganizer {
             } else if i < l2_start {
                 // Module hubs
                 let module = i - l1_start;
-                let name = format!("{}_Hub", self.module_names.get(module).unwrap_or(&"Unknown".to_string()));
+                let name = format!(
+                    "{}_Hub",
+                    self.module_names
+                        .get(module)
+                        .unwrap_or(&"Unknown".to_string())
+                );
                 (1, module, name)
             } else if i < l3_start {
                 // Feature processors
@@ -223,7 +234,8 @@ impl ProcessTopologyOrganizer {
 
     /// Get all processes in a module
     pub fn module_processes(&self, module: usize) -> Vec<&TopologicalProcess> {
-        self.processes.values()
+        self.processes
+            .values()
             .filter(|p| p.module == module)
             .collect()
     }
@@ -271,14 +283,16 @@ impl ProcessTopologyOrganizer {
     /// Perform one integration step across all processes
     pub fn integrate_step(&mut self) {
         // Collect all states for integration
-        let states: HashMap<usize, ContinuousHV> = self.processes
+        let states: HashMap<usize, ContinuousHV> = self
+            .processes
             .iter()
             .map(|(&id, p)| (id, p.state.clone()))
             .collect();
 
         // Update each process based on its connections
         for (&_id, process) in self.processes.iter_mut() {
-            let connected_states: Vec<&ContinuousHV> = process.connections
+            let connected_states: Vec<&ContinuousHV> = process
+                .connections
                 .iter()
                 .filter_map(|&conn_id| states.get(&conn_id))
                 .collect();
@@ -291,7 +305,8 @@ impl ProcessTopologyOrganizer {
     /// Compute current Φ of the process network
     pub fn compute_phi(&self) -> f64 {
         // Get all active process states
-        let representations: Vec<ContinuousHV> = self.processes
+        let representations: Vec<ContinuousHV> = self
+            .processes
             .values()
             .filter(|p| p.activity > 0.1) // Only active processes
             .map(|p| p.state.clone())
@@ -299,10 +314,8 @@ impl ProcessTopologyOrganizer {
 
         if representations.len() < 2 {
             // Fall back to all processes if too few active
-            let all_reps: Vec<ContinuousHV> = self.processes
-                .values()
-                .map(|p| p.state.clone())
-                .collect();
+            let all_reps: Vec<ContinuousHV> =
+                self.processes.values().map(|p| p.state.clone()).collect();
             return self.phi_calculator.algebraic_connectivity(&all_reps);
         }
 
@@ -311,13 +324,9 @@ impl ProcessTopologyOrganizer {
 
     /// Get metrics about the current topology state
     pub fn metrics(&self) -> TopologyMetrics {
-        let active_count = self.processes.values()
-            .filter(|p| p.activity > 0.1)
-            .count();
+        let active_count = self.processes.values().filter(|p| p.activity > 0.1).count();
 
-        let total_activity: f64 = self.processes.values()
-            .map(|p| p.activity)
-            .sum();
+        let total_activity: f64 = self.processes.values().map(|p| p.activity).sum();
 
         let avg_activity = if !self.processes.is_empty() {
             total_activity / self.processes.len() as f64
@@ -431,7 +440,9 @@ mod tests {
         assert!(module_hub.activity > 0.5);
 
         // Check that some connected processes are active
-        let active_count = organizer.processes.values()
+        let active_count = organizer
+            .processes
+            .values()
             .filter(|p| p.activity > 0.1)
             .count();
         assert!(active_count > 1);

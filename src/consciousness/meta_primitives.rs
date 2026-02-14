@@ -41,11 +41,11 @@
 //! - Self-improving at the deepest architectural level
 
 use crate::consciousness::primitive_reasoning::TransformationType;
-use crate::hdc::primitive_system::Primitive;
 use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::primitive_system::Primitive;
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 
 /// Composite transformation: sequence of base transformations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,12 +79,14 @@ impl CompositeTransformation {
         let mut rng = rand::thread_rng();
         let length = rng.gen_range(min_length..=max_length);
 
-        let all_transformations = [TransformationType::Bind,
+        let all_transformations = [
+            TransformationType::Bind,
             TransformationType::Bundle,
             TransformationType::Permute,
             TransformationType::Resonate,
             TransformationType::Abstract,
-            TransformationType::Ground];
+            TransformationType::Ground,
+        ];
 
         let sequence: Vec<_> = (0..length)
             .map(|_| {
@@ -115,13 +117,9 @@ impl CompositeTransformation {
         transformation: &TransformationType,
     ) -> Result<BinaryHV> {
         match transformation {
-            TransformationType::Bind => {
-                Ok(input.bind(&primitive.encoding))
-            }
+            TransformationType::Bind => Ok(input.bind(&primitive.encoding)),
 
-            TransformationType::Bundle => {
-                Ok(BinaryHV::bundle(&[*input, primitive.encoding]))
-            }
+            TransformationType::Bundle => Ok(BinaryHV::bundle(&[*input, primitive.encoding])),
 
             TransformationType::Permute => {
                 let rotation = primitive.encoding.popcount() as usize % 16384;
@@ -160,12 +158,14 @@ impl CompositeTransformation {
             0 => {
                 // Add transformation
                 if new_sequence.len() < 8 {
-                    let all_transformations = [TransformationType::Bind,
+                    let all_transformations = [
+                        TransformationType::Bind,
                         TransformationType::Bundle,
                         TransformationType::Permute,
                         TransformationType::Resonate,
                         TransformationType::Abstract,
-                        TransformationType::Ground];
+                        TransformationType::Ground,
+                    ];
                     let idx = rng.gen_range(0..all_transformations.len());
                     let pos = rng.gen_range(0..=new_sequence.len());
                     new_sequence.insert(pos, all_transformations[idx]);
@@ -183,12 +183,14 @@ impl CompositeTransformation {
             2 => {
                 // Replace transformation
                 if !new_sequence.is_empty() {
-                    let all_transformations = [TransformationType::Bind,
+                    let all_transformations = [
+                        TransformationType::Bind,
                         TransformationType::Bundle,
                         TransformationType::Permute,
                         TransformationType::Resonate,
                         TransformationType::Abstract,
-                        TransformationType::Ground];
+                        TransformationType::Ground,
+                    ];
                     let pos = rng.gen_range(0..new_sequence.len());
                     let idx = rng.gen_range(0..all_transformations.len());
                     new_sequence[pos] = all_transformations[idx];
@@ -307,8 +309,7 @@ impl CompositeFitness {
     pub fn update_task_fitness(&mut self, improvement: f64, accuracy: f64) {
         let n = self.task_evaluations as f64;
         self.task_improvement = (self.task_improvement * n + improvement) / (n + 1.0);
-        self.classification_accuracy =
-            (self.classification_accuracy * n + accuracy) / (n + 1.0);
+        self.classification_accuracy = (self.classification_accuracy * n + accuracy) / (n + 1.0);
         self.task_evaluations += 1;
     }
 }
@@ -355,14 +356,17 @@ impl MetaPrimitiveEvolution {
     }
 
     /// Evolve for one generation
-    pub fn evolve_generation(&mut self, test_problems: &[BinaryHV], primitives: &[&Primitive]) -> Result<()> {
+    pub fn evolve_generation(
+        &mut self,
+        test_problems: &[BinaryHV],
+        primitives: &[&Primitive],
+    ) -> Result<()> {
         // Evaluate all composites on test problems
         for composite in &mut self.population {
             let phi_scores: Vec<f64> = test_problems
                 .iter()
                 .map(|problem| {
-                    Self::evaluate_composite_static(composite, problem, primitives)
-                        .unwrap_or(0.0)
+                    Self::evaluate_composite_static(composite, problem, primitives).unwrap_or(0.0)
                 })
                 .collect();
 
@@ -370,10 +374,8 @@ impl MetaPrimitiveEvolution {
 
             // Variance as measure of generalization (low variance = generalizes well)
             let mean = avg_phi;
-            let variance: f64 = phi_scores
-                .iter()
-                .map(|&x| (x - mean).powi(2))
-                .sum::<f64>() / phi_scores.len() as f64;
+            let variance: f64 = phi_scores.iter().map(|&x| (x - mean).powi(2)).sum::<f64>()
+                / phi_scores.len() as f64;
 
             let generalization = 1.0 / (1.0 + variance); // High generalization = low variance
 
@@ -387,12 +389,15 @@ impl MetaPrimitiveEvolution {
             let task_improvement = improved_count as f64 / phi_scores.len().max(1) as f64;
             let accuracy = phi_scores.iter().filter(|&&p| p > 0.0).count() as f64
                 / phi_scores.len().max(1) as f64;
-            composite.fitness.update_task_fitness(task_improvement, accuracy);
+            composite
+                .fitness
+                .update_task_fitness(task_improvement, accuracy);
         }
 
         // Sort by fitness
         self.population.sort_by(|a, b| {
-            b.fitness.composite_score()
+            b.fitness
+                .composite_score()
                 .partial_cmp(&a.fitness.composite_score())
                 .unwrap()
         });
@@ -483,7 +488,8 @@ impl MetaPrimitiveEvolution {
     pub fn get_best(&self, n: usize) -> Vec<&CompositeTransformation> {
         let mut all: Vec<_> = self.population.iter().collect();
         all.sort_by(|a, b| {
-            b.fitness.composite_score()
+            b.fitness
+                .composite_score()
                 .partial_cmp(&a.fitness.composite_score())
                 .unwrap()
         });
@@ -516,18 +522,22 @@ pub struct DiscoveryStats {
 impl MetaPrimitiveEvolution {
     /// Get statistics
     pub fn stats(&self) -> DiscoveryStats {
-        let best_fitness = self.population
+        let best_fitness = self
+            .population
             .iter()
             .map(|c| c.fitness.composite_score())
             .fold(0.0f64, |a, b| a.max(b));
 
-        let avg_fitness = self.population
+        let avg_fitness = self
+            .population
             .iter()
             .map(|c| c.fitness.composite_score())
-            .sum::<f64>() / self.population.len() as f64;
+            .sum::<f64>()
+            / self.population.len() as f64;
 
         // Measure diversity (unique sequences)
-        let unique_sequences: std::collections::HashSet<_> = self.population
+        let unique_sequences: std::collections::HashSet<_> = self
+            .population
             .iter()
             .map(|c| format!("{:?}", c.sequence))
             .collect();

@@ -3,19 +3,19 @@
 //! Contains the main `cycle()` method which implements the bidirectional
 //! HDC-CfC loop with rayon-parallelized subsystem updates.
 
-use std::time::Instant;
-use ndarray::Array1;
-use crate::consciousness::fep_active_inference::{Observation, MotorCommandType};
+use crate::consciousness::fep_active_inference::{MotorCommandType, Observation};
 use crate::consciousness::stability_regime::RegimeTransition;
-use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
+use ndarray::Array1;
 use rayon::join as rayon_join;
+use std::time::Instant;
+use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 
-use super::{
-    CognitiveLoopService, CycleResult, AdaptiveBehavior,
-    ResponseStrategy, CycleLearningResult, TrainingMethod,
-};
-use super::training::TrainingSample;
 use super::temporal_network::TemporalNetwork;
+use super::training::TrainingSample;
+use super::{
+    AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, CycleResult, ResponseStrategy,
+    TrainingMethod,
+};
 
 impl CognitiveLoopService {
     /// Run one cognitive cycle (the core loop)
@@ -52,11 +52,9 @@ impl CognitiveLoopService {
         let prior_valence = self.emotion_contagion.prosody_valence();
         let prior_error = self.stats.avg_prediction_error;
 
-        self.cognitive_depth = self.thalamic_router.route_from_cycle(
-            prior_error,
-            prior_pattern,
-            prior_valence,
-        );
+        self.cognitive_depth =
+            self.thalamic_router
+                .route_from_cycle(prior_error, prior_pattern, prior_valence);
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0.4: Moral Evaluation
@@ -85,12 +83,17 @@ impl CognitiveLoopService {
         // - Moral concerns (bias toward Supportive for ethical guidance)
 
         let prior_phi = self.unification_engine.phi;
-        let prior_reward = self.closed_learning_loop.last_result.as_ref().map(|r| r.reward);
+        let prior_reward = self
+            .closed_learning_loop
+            .last_result
+            .as_ref()
+            .map(|r| r.reward);
         let selected_strategy = if moral_concern_detected {
             // Bias toward supportive strategy when moral concerns detected
             ResponseStrategy::Supportive
         } else {
-            self.closed_learning_loop.select_strategy(prior_phi, prior_reward)
+            self.closed_learning_loop
+                .select_strategy(prior_phi, prior_reward)
         };
 
         // Strategy influences adaptive behavior
@@ -121,11 +124,14 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // Use HDC embedding to query episodic memory for context
 
-        let hdv_sample: Vec<f32> = encoding_result.hdv.as_slice()[..64.min(encoding_result.hdv.dim())].to_vec();
+        let hdv_sample: Vec<f32> =
+            encoding_result.hdv.as_slice()[..64.min(encoding_result.hdv.dim())].to_vec();
         let recalled_memories = self.episodic_memory.recall(&hdv_sample, 3, 0.3);
         let memory_context_boost = if !recalled_memories.is_empty() {
             // Recalled memories boost prediction confidence slightly (safe division with max(1))
-            recalled_memories.iter().map(|(_, sim)| sim).sum::<f32>() / recalled_memories.len().max(1) as f32 * 0.1
+            recalled_memories.iter().map(|(_, sim)| sim).sum::<f32>()
+                / recalled_memories.len().max(1) as f32
+                * 0.1
         } else {
             0.0
         };
@@ -164,10 +170,9 @@ impl CognitiveLoopService {
         );
 
         // 2. Compress HDC state for CfC (using Random Projection)
-        let compressed_state = self.encoder.compress_for_ltc(
-            &encoding_result.hdv,
-            self.config.cfc_config.input_dim
-        );
+        let compressed_state = self
+            .encoder
+            .compress_for_ltc(&encoding_result.hdv, self.config.cfc_config.input_dim);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 2a. SEMANTIC MEMORY: HDC-based similarity lookup for CfC context
@@ -180,7 +185,9 @@ impl CognitiveLoopService {
         // For HdcLtc backend: use the native HDC projection
         // For CfC backend: use the compressed state as the semantic vector
 
-        let semantic_hdc = self.temporal_network.project_to_hdc_vec(&compressed_state)
+        let semantic_hdc = self
+            .temporal_network
+            .project_to_hdc_vec(&compressed_state)
             .unwrap_or_else(|| compressed_state.clone());
         // Phi-weighted learning rate: consciousness level modulates how aggressively
         // we adjust to prediction errors on similar past inputs.
@@ -204,7 +211,9 @@ impl CognitiveLoopService {
         let prediction = self.get_multi_scale_prediction(&input_array);
 
         // 6. Get current CfC state as output
-        let output = self.temporal_network.read_state()
+        let output = self
+            .temporal_network
+            .read_state()
             .map(|arr| arr.to_vec())
             .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.num_neurons]);
 
@@ -256,10 +265,8 @@ impl CognitiveLoopService {
 
         // Consider prediction "successful" if error is below learning threshold
         let prediction_success = prediction_error < self.config.learning_threshold;
-        self.active_inference_bridge.observe_resolution(
-            self.prediction_confidence as f64,
-            prediction_success,
-        );
+        self.active_inference_bridge
+            .observe_resolution(self.prediction_confidence as f64, prediction_success);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.6 FEP Active Inference: Full perception-action loop
@@ -289,8 +296,7 @@ impl CognitiveLoopService {
             1 => {
                 // Reset sensory precision toward 1.0 to trust new observations after shift
                 let current = self.fep_agent.precision.sensory_precision;
-                self.fep_agent.precision.sensory_precision =
-                    current * 0.7 + 1.0 * 0.3;
+                self.fep_agent.precision.sensory_precision = current * 0.7 + 1.0 * 0.3;
             }
             2 => {
                 // Boost exploration -- stronger nudge when surprised
@@ -303,7 +309,8 @@ impl CognitiveLoopService {
                 if let Some(ref fe) = self.fep_agent.last_fe_components {
                     let precision_mod = (1.0 - fe.prediction_error).clamp(0.0, 1.0) as f32;
                     self.self_reflection.trust_threshold =
-                        (self.self_reflection.trust_threshold * 0.9 + precision_mod * 0.1).clamp(0.1, 0.9);
+                        (self.self_reflection.trust_threshold * 0.9 + precision_mod * 0.1)
+                            .clamp(0.1, 0.9);
                 }
             }
             _ => {}
@@ -329,19 +336,23 @@ impl CognitiveLoopService {
             self.adaptive_behavior.pause_multiplier *= 1.5;
 
             // If severe moral violation (perfect duty or consent), flag for review
-            if moral_judgment.consent_violation ||
-               moral_judgment.violations.iter().any(|v| v.contains("perfect") || v.contains("harm")) {
+            if moral_judgment.consent_violation
+                || moral_judgment
+                    .violations
+                    .iter()
+                    .any(|v| v.contains("perfect") || v.contains("harm"))
+            {
                 self.stats.moral_review_needed = true;
             }
         } else if moral_judgment.moral_score > 0.5 {
             // Positive moral alignment boosts confidence slightly
-            self.prediction_confidence =
-                (self.prediction_confidence * 1.05).clamp(0.0, 1.0);
+            self.prediction_confidence = (self.prediction_confidence * 1.05).clamp(0.0, 1.0);
         }
 
         // Surprise-gated learning rate boost: when FEP detects surprise, accelerate adaptation
         if is_surprised {
-            let surprise_boost = (self.fep_agent.current_free_energy() as f32 / 3.0).clamp(0.1, 0.5);
+            let surprise_boost =
+                (self.fep_agent.current_free_energy() as f32 / 3.0).clamp(0.1, 0.5);
             self.fep_lr_boost = (self.fep_lr_boost + surprise_boost).clamp(1.0, 2.0);
         } else {
             // Decay boost back toward 1.0 when not surprised
@@ -412,7 +423,8 @@ impl CognitiveLoopService {
         // Use learning signal to modulate other systems
         if self.fep_learning_signal > 0.5 && enhanced_result.should_learn {
             // High learning signal: increase plasticity in world model
-            self.world_model.increase_plasticity(self.fep_learning_signal);
+            self.world_model
+                .increase_plasticity(self.fep_learning_signal);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -425,11 +437,15 @@ impl CognitiveLoopService {
             let urgency = self.coherence_tracker.correction_urgency();
             // Feed urgency as a high-error observation to drive FEP learning
             let urgent_obs = Observation::from_consciousness_state(
-                urgency as f64, 0.1, 0.1, effective_lr as f64,
+                urgency as f64,
+                0.1,
+                0.1,
+                effective_lr as f64,
             );
             self.fep_agent.perceive(&urgent_obs);
             // Also signal enhanced bridge about degradation
-            self.enhanced_fep_bridge.cycle(urgency as f64, 0.1, 0.1, effective_lr as f64);
+            self.enhanced_fep_bridge
+                .cycle(urgency as f64, 0.1, 0.1, effective_lr as f64);
         }
 
         // 10e. Update flow state with adaptive thresholds from self-reflection
@@ -444,7 +460,8 @@ impl CognitiveLoopService {
         );
 
         // 10f. Update curiosity drive with adaptive boredom threshold
-        self.curiosity_drive.set_boredom_threshold(adapted_thresholds.boredom);
+        self.curiosity_drive
+            .set_boredom_threshold(adapted_thresholds.boredom);
         self.curiosity_drive.update(prediction_error);
 
         // 10g. Self-reflection for meta-learning
@@ -509,7 +526,7 @@ impl CognitiveLoopService {
                 phi: unified_phi,
                 available_budget_us: available_us,
                 available_actions: Vec::new(), // populated by external action providers
-                tool: None, // populated by shell integration
+                tool: None,                    // populated by shell integration
                 recent_utility: 0.5,
                 cycle_id: self.stats.total_cycles as u64,
             };
@@ -524,11 +541,15 @@ impl CognitiveLoopService {
         let flow_lr = self.flow_state.effective_learning_multiplier(adaptive_lr);
         // Apply semantic memory modulation: boost learning when similar inputs had high error
         let semantic_modulated_lr = flow_lr * semantic_lr_factor;
-        let effective_lr = (self.curiosity_drive.effective_learning_rate(semantic_modulated_lr) * self.fep_lr_boost)
+        let effective_lr = (self
+            .curiosity_drive
+            .effective_learning_rate(semantic_modulated_lr)
+            * self.fep_lr_boost)
             .clamp(0.0, 0.01); // Hard cap: reduced from 0.05 to 0.01 to prevent oscillation with cyclic patterns
 
         // 11. Learn if error is significant AND we have a previous state AND not paused
-        let (learning_occurred, training_loss) = if prediction_error > self.config.learning_threshold
+        let (learning_occurred, training_loss) = if prediction_error
+            > self.config.learning_threshold
             && !self.adaptive_behavior.pause_learning
         {
             self.stats.learning_cycles += 1;
@@ -563,26 +584,45 @@ impl CognitiveLoopService {
                 let result = match self.config.training_method {
                     TrainingMethod::Spsa => {
                         self.stats.spsa_fallback_steps += 1;
-                        self.temporal_network.train_step_spsa(&train_input, &train_target, delta_t, lr)
+                        self.temporal_network.train_step_spsa(
+                            &train_input,
+                            &train_target,
+                            delta_t,
+                            lr,
+                        )
                     }
                     TrainingMethod::Bptt => {
                         self.stats.bptt_steps += 1;
-                        self.temporal_network.train_step_bptt(&train_input, &train_target, delta_t, lr)
+                        self.temporal_network.train_step_bptt(
+                            &train_input,
+                            &train_target,
+                            delta_t,
+                            lr,
+                        )
                     }
                     TrainingMethod::BpttWithSpsaFallback => {
                         let old_loss = self.stats.avg_training_loss;
                         let bptt_result = self.temporal_network.train_step_bptt(
-                            &train_input, &train_target, delta_t, lr,
+                            &train_input,
+                            &train_target,
+                            delta_t,
+                            lr,
                         );
                         match bptt_result {
-                            Ok(loss) if loss.is_finite() && (old_loss <= 0.0 || loss < old_loss * 2.0) => {
+                            Ok(loss)
+                                if loss.is_finite()
+                                    && (old_loss <= 0.0 || loss < old_loss * 2.0) =>
+                            {
                                 self.stats.bptt_steps += 1;
                                 Ok(loss)
                             }
                             _ => {
                                 self.stats.spsa_fallback_steps += 1;
                                 self.temporal_network.train_step_spsa(
-                                    &train_input, &train_target, delta_t, lr,
+                                    &train_input,
+                                    &train_target,
+                                    delta_t,
+                                    lr,
                                 )
                             }
                         }
@@ -651,97 +691,101 @@ impl CognitiveLoopService {
         // Take disjoint mutable borrows for parallel processing.
         // The block scope ensures all borrows are dropped before the sequential section.
         {
-        let stability_regime = &mut self.stability_regime;
-        let discovery_service = &mut self.discovery_service;
-        let semantic_memory = &mut self.semantic_memory;
-        let causal_enhancer = &mut self.causal_enhancer;
-        let episodic_memory = &mut self.episodic_memory;
-        let primitive_belief_bridge = &mut self.primitive_belief_bridge;
-        let closed_learning_loop = &mut self.closed_learning_loop;
-        let fep_learning_signal = &mut self.fep_learning_signal;
-        let prev_primitive_state = &mut self.prev_primitive_state;
-        let prediction_confidence_ref = &mut self.prediction_confidence;
+            let stability_regime = &mut self.stability_regime;
+            let discovery_service = &mut self.discovery_service;
+            let semantic_memory = &mut self.semantic_memory;
+            let causal_enhancer = &mut self.causal_enhancer;
+            let episodic_memory = &mut self.episodic_memory;
+            let primitive_belief_bridge = &mut self.primitive_belief_bridge;
+            let closed_learning_loop = &mut self.closed_learning_loop;
+            let fep_learning_signal = &mut self.fep_learning_signal;
+            let prev_primitive_state = &mut self.prev_primitive_state;
+            let prediction_confidence_ref = &mut self.prediction_confidence;
 
-        rayon_join(
-            // -- Branch A: Stability Regime + Semantic Memory + Causal Enhancement --
-            || {
-                // Stability regime: CfC dynamics for primitives
-                // Frequently-used primitives crystallize, rarely-used stay fluid
-                let hv16_input = real_hv_to_hv16(&encoding_result.hdv);
-                let timestamp = pp_total_cycles as f64 * delta_t as f64;
-                let (_regime_state, transitions) =
-                    stability_regime.process_input(&hv16_input, delta_t, timestamp);
+            rayon_join(
+                // -- Branch A: Stability Regime + Semantic Memory + Causal Enhancement --
+                || {
+                    // Stability regime: CfC dynamics for primitives
+                    // Frequently-used primitives crystallize, rarely-used stay fluid
+                    let hv16_input = real_hv_to_hv16(&encoding_result.hdv);
+                    let timestamp = pp_total_cycles as f64 * delta_t as f64;
+                    let (_regime_state, transitions) =
+                        stability_regime.process_input(&hv16_input, delta_t, timestamp);
 
-                for transition in &transitions {
-                    if let RegimeTransition::Crystallized { primitive_name, encoding } = transition {
-                        discovery_service.seed_neighbor_exploration(primitive_name, encoding);
-                    }
-                }
-
-                // Semantic memory: store HDC vector + prediction error for future similarity lookup
-                semantic_memory.store_with_timestamp(
-                    semantic_hdc,
-                    prediction_error,
-                    None,
-                    pp_total_cycles as u64,
-                );
-
-                // Causal enhancement: track (input, output) pairs and discover structure
-                if let Some(ref mut enhancer) = causal_enhancer {
-                    enhancer.record_cycle_from_f32(&compressed_state, &output);
-
-                    if enhancer.should_discover() {
-                        let causal_graph = enhancer.run_discovery();
-
-                        if !causal_graph.is_empty() {
-                            tracing::info!(
-                                edges = causal_graph.edges.len(),
-                                cycle = pp_total_cycles,
-                                "Causal structure discovered in cognitive loop"
-                            );
-                            enhancer.log_discoveries();
+                    for transition in &transitions {
+                        if let RegimeTransition::Crystallized {
+                            primitive_name,
+                            encoding,
+                        } = transition
+                        {
+                            discovery_service.seed_neighbor_exploration(primitive_name, encoding);
                         }
                     }
-                }
-            },
-            // -- Branch B: Episodic Memory + Primitive-Belief + Closed Learning --
-            || {
-                // Episodic memory: encode significant experiences
-                if prediction_error > 0.1 || pp_in_flow {
-                    episodic_memory.encode(
-                        input,
-                        hdv_sample.clone(),
-                        pp_emotional_valence,
-                        pp_phi,
-                        pp_total_cycles,
+
+                    // Semantic memory: store HDC vector + prediction error for future similarity lookup
+                    semantic_memory.store_with_timestamp(
+                        semantic_hdc,
+                        prediction_error,
+                        None,
+                        pp_total_cycles as u64,
                     );
-                }
 
-                // Apply memory context boost to confidence
-                *prediction_confidence_ref =
-                    (*prediction_confidence_ref + memory_context_boost).clamp(0.0, 1.0);
+                    // Causal enhancement: track (input, output) pairs and discover structure
+                    if let Some(ref mut enhancer) = causal_enhancer {
+                        enhancer.record_cycle_from_f32(&compressed_state, &output);
 
-                // Primitive-Belief Bridge: map primitives to beliefs, compute TD signals
-                let prim_state = CognitiveLoopService::build_primitive_state(
-                    &encoding_result.detected_primitives,
-                    pp_smoothed_coh,
-                    pp_total_cycles as f64,
-                );
+                        if enhancer.should_discover() {
+                            let causal_graph = enhancer.run_discovery();
 
-                if let Some(ref prev_state) = prev_primitive_state {
-                    let pred_error =
-                        primitive_belief_bridge.compute_prediction_error(prev_state, &prim_state);
-                    let td_signal = primitive_belief_bridge.td_error_signal(&pred_error);
-                    *fep_learning_signal += td_signal as f32 * 0.2;
-                    *fep_learning_signal = fep_learning_signal.clamp(-1.0, 1.0);
-                }
+                            if !causal_graph.is_empty() {
+                                tracing::info!(
+                                    edges = causal_graph.edges.len(),
+                                    cycle = pp_total_cycles,
+                                    "Causal structure discovered in cognitive loop"
+                                );
+                                enhancer.log_discoveries();
+                            }
+                        }
+                    }
+                },
+                // -- Branch B: Episodic Memory + Primitive-Belief + Closed Learning --
+                || {
+                    // Episodic memory: encode significant experiences
+                    if prediction_error > 0.1 || pp_in_flow {
+                        episodic_memory.encode(
+                            input,
+                            hdv_sample.clone(),
+                            pp_emotional_valence,
+                            pp_phi,
+                            pp_total_cycles,
+                        );
+                    }
 
-                *prev_primitive_state = Some(prim_state);
+                    // Apply memory context boost to confidence
+                    *prediction_confidence_ref =
+                        (*prediction_confidence_ref + memory_context_boost).clamp(0.0, 1.0);
 
-                // Closed learning loop: update Q-values from cycle results
-                closed_learning_loop.update(cycle_learning_result);
-            },
-        );
+                    // Primitive-Belief Bridge: map primitives to beliefs, compute TD signals
+                    let prim_state = CognitiveLoopService::build_primitive_state(
+                        &encoding_result.detected_primitives,
+                        pp_smoothed_coh,
+                        pp_total_cycles as f64,
+                    );
+
+                    if let Some(ref prev_state) = prev_primitive_state {
+                        let pred_error = primitive_belief_bridge
+                            .compute_prediction_error(prev_state, &prim_state);
+                        let td_signal = primitive_belief_bridge.td_error_signal(&pred_error);
+                        *fep_learning_signal += td_signal as f32 * 0.2;
+                        *fep_learning_signal = fep_learning_signal.clamp(-1.0, 1.0);
+                    }
+
+                    *prev_primitive_state = Some(prim_state);
+
+                    // Closed learning loop: update Q-values from cycle results
+                    closed_learning_loop.update(cycle_learning_result);
+                },
+            );
         } // end parallel scope -- disjoint borrows released
 
         // Update semantic memory stats after parallel join completes
@@ -786,12 +830,9 @@ impl CognitiveLoopService {
             let coherence_summary = self.coherence_bridge.summary();
             let current_phi = coherence_summary.smoothed_coherence as f64;
 
-            let input_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(
-                compressed_state.clone()
-            );
-            let output_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(
-                output.clone()
-            );
+            let input_hv =
+                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(compressed_state.clone());
+            let output_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(output.clone());
 
             let episode = crate::memory::episodic_replay::Episode::with_metadata(
                 input_hv,
@@ -833,7 +874,8 @@ impl CognitiveLoopService {
         {
             let coord_phi = self.coherence_bridge.smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
-            self.memory_coordinator.update_signals(coord_phi, coord_coherence);
+            self.memory_coordinator
+                .update_signals(coord_phi, coord_coherence);
 
             if let Some(ref mut replay) = self.phi_episodic_replay {
                 let graduated = self.memory_coordinator.process_graduations(replay);

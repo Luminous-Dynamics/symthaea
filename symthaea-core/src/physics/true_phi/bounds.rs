@@ -37,7 +37,11 @@ impl InformationBounds {
 
     /// Check if entropy value is valid
     pub fn is_valid_entropy(&self, h: f64, use_bits: bool) -> bool {
-        let max_h = if use_bits { self.max_entropy_bits } else { self.max_entropy_nats };
+        let max_h = if use_bits {
+            self.max_entropy_bits
+        } else {
+            self.max_entropy_nats
+        };
         h >= 0.0 && h <= max_h + 1e-10 // Small tolerance for numerical precision
     }
 
@@ -107,7 +111,10 @@ impl BoundsCheckingCalculator {
         if !self.bounds.is_valid_mi(mi, h1, h2) {
             let msg = format!(
                 "MI bound violation: I = {:.6}, H1 = {:.6}, H2 = {:.6}, max = {:.6}",
-                mi, h1, h2, h1.min(h2)
+                mi,
+                h1,
+                h2,
+                h1.min(h2)
             );
             if self.strict {
                 panic!("{}", msg);
@@ -124,10 +131,7 @@ impl BoundsCheckingCalculator {
         // Check component entropies
         for (i, &h) in result.component_entropies.iter().enumerate() {
             if !self.bounds.is_valid_entropy(h, true) {
-                violations.push(format!(
-                    "Component {} entropy out of bounds: {:.6}",
-                    i, h
-                ));
+                violations.push(format!("Component {} entropy out of bounds: {:.6}", i, h));
             }
         }
 

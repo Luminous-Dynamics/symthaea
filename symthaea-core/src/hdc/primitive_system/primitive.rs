@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
-use crate::hdc::binary_hv::BinaryHV;
 use super::PrimitiveTier;
+use crate::hdc::binary_hv::BinaryHV;
+use serde::{Deserialize, Serialize};
 
 /// A primitive concept with its BinaryHV encoding
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,7 +97,11 @@ pub struct PrimitiveResult {
 
 impl PrimitiveResult {
     /// Find similar primitives to this result
-    pub fn find_similar(&self, system: &super::PrimitiveSystem, top_k: usize) -> Vec<(String, f32)> {
+    pub fn find_similar(
+        &self,
+        system: &super::PrimitiveSystem,
+        top_k: usize,
+    ) -> Vec<(String, f32)> {
         system.find_similar_to_encoding(&self.encoding, top_k)
     }
 }

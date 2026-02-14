@@ -26,7 +26,8 @@ impl CausalDAG {
 
     /// Get parents of a node.
     pub fn parents(&self, node: usize) -> Vec<usize> {
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter(|(_, c)| *c == node)
             .map(|(p, _)| *p)
             .collect()
@@ -34,7 +35,8 @@ impl CausalDAG {
 
     /// Get children of a node.
     pub fn children(&self, node: usize) -> Vec<usize> {
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter(|(p, _)| *p == node)
             .map(|(_, c)| *c)
             .collect()
@@ -124,7 +126,7 @@ impl CausalDAG {
 
         // Start from source, considering both directions
         queue.push_back((source, false)); // as if from parent
-        queue.push_back((source, true));  // as if from child
+        queue.push_back((source, true)); // as if from child
 
         while let Some((node, from_child)) = queue.pop_front() {
             if !visited.insert((node, from_child)) {
@@ -184,7 +186,8 @@ impl CausalDAG {
     /// to represent the effect of intervention do(X).
     pub fn remove_incoming(&self, nodes: &[usize]) -> CausalDAG {
         let node_set: HashSet<usize> = nodes.iter().copied().collect();
-        let new_edges: Vec<(usize, usize)> = self.edges
+        let new_edges: Vec<(usize, usize)> = self
+            .edges
             .iter()
             .filter(|(_, child)| !node_set.contains(child))
             .copied()
@@ -200,7 +203,8 @@ impl CausalDAG {
     /// This produces G_Z_ (G with arrows from Z removed), used in Rule 2.
     pub fn remove_outgoing(&self, nodes: &[usize]) -> CausalDAG {
         let node_set: HashSet<usize> = nodes.iter().copied().collect();
-        let new_edges: Vec<(usize, usize)> = self.edges
+        let new_edges: Vec<(usize, usize)> = self
+            .edges
             .iter()
             .filter(|(parent, _)| !node_set.contains(parent))
             .copied()
@@ -234,7 +238,8 @@ impl CausalDAG {
             w_ancestors.insert(w);
         }
 
-        let new_edges: Vec<(usize, usize)> = self.edges
+        let new_edges: Vec<(usize, usize)> = self
+            .edges
             .iter()
             .filter(|(parent, child)| {
                 // Remove incoming edges to X

@@ -49,8 +49,8 @@
 //! 4. **Dreams → Memory**: Counterfactual dreams consolidate memories
 //! 5. **All → Streaming**: Every significant event is broadcast
 
-use super::unified_conscious_being::UnifiedConsciousBeing;
 use super::binary_hv::BinaryHV;
+use super::unified_conscious_being::UnifiedConsciousBeing;
 
 // ============================================================================
 // INTEGRATED CONSCIOUSNESS CYCLE
@@ -133,7 +133,11 @@ impl IntegratedConsciousnessDemo {
         // Extract emotional state data in a scope to release the immutable borrow
         let (emotional_coherence, emotional_valence, emotional_response) = {
             let emotional_state = self.being.current_emotion();
-            (emotional_state.coherence, emotional_state.valence, emotional_state.describe())
+            (
+                emotional_state.coherence,
+                emotional_state.valence,
+                emotional_state.describe(),
+            )
         };
         events += 1;
 
@@ -155,7 +159,10 @@ impl IntegratedConsciousnessDemo {
             self.being.add_counterfactual_memory_with_valence(
                 input,
                 semantic_hv,
-                &format!("What if I had responded differently to: {}", &input[..input.len().min(50)]),
+                &format!(
+                    "What if I had responded differently to: {}",
+                    &input[..input.len().min(50)]
+                ),
                 counterfactual_hv,
                 emotional_coherence, // Use emotional coherence as intensity
                 emotional_valence,
@@ -280,7 +287,12 @@ impl IntegratedConsciousnessDemo {
 
         // Add some counterfactual memories
         let memories = [
-            ("career_choice", "What if I had chosen a different path?", 0.8, 0.2),
+            (
+                "career_choice",
+                "What if I had chosen a different path?",
+                0.8,
+                0.2,
+            ),
             ("relationship", "What if I had said yes?", 0.9, -0.3),
             ("opportunity", "What if I had taken that chance?", 0.7, 0.5),
         ];
@@ -360,16 +372,24 @@ impl IntegratedConsciousnessDemo {
 
     fn encode_semantic(&self, input: &str) -> BinaryHV {
         // Simple hash-based encoding for demo
-        let seed = input.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+        let seed = input
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
         BinaryHV::random(seed)
     }
 
     fn encode_emotional_context(&self, input: &str) -> BinaryHV {
         // Detect emotional keywords and encode
         let input_lower = input.to_lowercase();
-        let seed = if input_lower.contains("happy") || input_lower.contains("amazing") || input_lower.contains("great") {
+        let seed = if input_lower.contains("happy")
+            || input_lower.contains("amazing")
+            || input_lower.contains("great")
+        {
             1000 // Positive seed
-        } else if input_lower.contains("sad") || input_lower.contains("worried") || input_lower.contains("anxious") {
+        } else if input_lower.contains("sad")
+            || input_lower.contains("worried")
+            || input_lower.contains("anxious")
+        {
             2000 // Negative seed
         } else {
             3000 // Neutral seed
@@ -435,7 +455,9 @@ pub fn comprehension_counterfactual_integration(
 ) {
     // Only create counterfactual memories for significant events
     if comprehension_phi > 0.6 {
-        let seed = input.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+        let seed = input
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
         let actual_hv = BinaryHV::random(seed);
         let counterfactual_hv = actual_hv.permute(1024);
 

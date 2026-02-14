@@ -247,14 +247,16 @@ impl PhiTransfer {
         features.push(mean);
 
         // Variance
-        let variance = similarities.iter()
-            .map(|s| (s - mean).powi(2))
-            .sum::<f64>() / similarities.len() as f64;
+        let variance = similarities.iter().map(|s| (s - mean).powi(2)).sum::<f64>()
+            / similarities.len() as f64;
         features.push(variance.sqrt());
 
         // Min and max
         let min = similarities.iter().cloned().fold(f64::INFINITY, f64::min);
-        let max = similarities.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let max = similarities
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
         features.push(min);
         features.push(max);
 
@@ -305,13 +307,16 @@ impl PhiTransfer {
         features.push(mean_degree / (n - 1) as f64); // Normalized
 
         // Degree variance
-        let degree_variance = connection_counts.iter()
+        let degree_variance = connection_counts
+            .iter()
             .map(|&d| (d as f64 - mean_degree).powi(2))
-            .sum::<f64>() / n as f64;
+            .sum::<f64>()
+            / n as f64;
         features.push(degree_variance.sqrt() / (n - 1) as f64); // Normalized
 
         // Hub detection (nodes with degree > 2 * mean)
-        let hub_count = connection_counts.iter()
+        let hub_count = connection_counts
+            .iter()
             .filter(|&&d| d as f64 > 2.0 * mean_degree)
             .count();
         features.push(hub_count as f64 / n as f64);
@@ -327,7 +332,8 @@ impl PhiTransfer {
             for &d in &connection_counts {
                 degree_dist[d] += 1;
             }
-            let entropy: f64 = degree_dist.iter()
+            let entropy: f64 = degree_dist
+                .iter()
                 .filter(|&&c| c > 0)
                 .map(|&c| {
                     let p = c as f64 / n as f64;
@@ -404,15 +410,22 @@ impl PhiTransfer {
 
         // Spectral gap approximation (using trace)
         let trace: f64 = (0..n).map(|i| sim_matrix[i][i]).sum();
-        let off_diag_sum: f64 = sim_matrix.iter()
+        let off_diag_sum: f64 = sim_matrix
+            .iter()
             .enumerate()
-            .flat_map(|(i, row)| row.iter().enumerate().filter(move |(j, _)| *j != i).map(|(_, &v)| v.abs()))
+            .flat_map(|(i, row)| {
+                row.iter()
+                    .enumerate()
+                    .filter(move |(j, _)| *j != i)
+                    .map(|(_, &v)| v.abs())
+            })
             .sum();
         features.push(trace / n as f64);
         features.push(off_diag_sum / (n * (n - 1)) as f64);
 
         // Frobenius norm
-        let frob: f64 = sim_matrix.iter()
+        let frob: f64 = sim_matrix
+            .iter()
             .flat_map(|row| row.iter().map(|&v| v * v))
             .sum::<f64>()
             .sqrt();
@@ -467,9 +480,7 @@ impl PhiTransfer {
 
                 // Apply current weights
                 let transformed: Vec<f64> = (0..dim)
-                    .map(|i| {
-                        (0..dim).map(|j| weights[i][j] * source_vec[j]).sum::<f64>()
-                    })
+                    .map(|i| (0..dim).map(|j| weights[i][j] * source_vec[j]).sum::<f64>())
                     .collect();
 
                 // Loss: distance from "ideal" high-Φ pattern
@@ -526,13 +537,15 @@ impl PhiTransfer {
         let source_vec = source_sig.as_vector();
         let target_vec = target_sig.as_vector();
 
-        let transfer_vector: Vec<f64> = source_vec.iter()
+        let transfer_vector: Vec<f64> = source_vec
+            .iter()
             .zip(target_vec.iter())
             .map(|(s, t)| s - t)
             .collect();
 
         // Estimate Φ improvement based on signature similarity
-        let signature_sim: f64 = source_vec.iter()
+        let signature_sim: f64 = source_vec
+            .iter()
             .zip(target_vec.iter())
             .map(|(s, t)| s * t)
             .sum::<f64>();
@@ -586,7 +599,8 @@ impl PhiTransfer {
         let target_vec = target_sig.as_vector();
 
         // Compute cosine similarity of signatures
-        let dot: f64 = source_vec.iter()
+        let dot: f64 = source_vec
+            .iter()
             .zip(target_vec.iter())
             .map(|(s, t)| s * t)
             .sum();
@@ -610,7 +624,10 @@ impl Default for PhiTransfer {
 }
 
 /// Convenience function: quick transfer from Ring to target
-pub fn transfer_from_ring(target_components: &[ContinuousHV], target_phi: f64) -> PhiTransferResult {
+pub fn transfer_from_ring(
+    target_components: &[ContinuousHV],
+    target_phi: f64,
+) -> PhiTransferResult {
     use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
     use crate::hdc::spectral_connectivity::ConnectivityCalculator;
     use crate::hdc::HDC_DIMENSION;
@@ -638,9 +655,7 @@ pub fn transfer_from_ring(target_components: &[ContinuousHV], target_phi: f64) -
 }
 
 /// Convenience function: compute transfer matrix between topology types
-pub fn compute_transfer_matrix(
-    topologies: &[(String, Vec<ContinuousHV>, f64)],
-) -> Vec<Vec<f64>> {
+pub fn compute_transfer_matrix(topologies: &[(String, Vec<ContinuousHV>, f64)]) -> Vec<Vec<f64>> {
     let n = topologies.len();
     let mut matrix = vec![vec![0.0; n]; n];
     let transfer = PhiTransfer::new();
@@ -661,7 +676,6 @@ pub fn compute_transfer_matrix(
 
     matrix
 }
-
 
 // REVOLUTIONARY #98: Φ CAUSAL INTERVENTION ANALYSIS
 // ============================================================================
@@ -834,14 +848,12 @@ impl NodeInterventionResult {
 
     /// Check if node is critical (knockout causes major Φ drop)
     pub fn is_critical(&self) -> bool {
-        matches!(self.intervention, InterventionType::Knockout)
-            && self.percent_change < -10.0
+        matches!(self.intervention, InterventionType::Knockout) && self.percent_change < -10.0
     }
 
     /// Check if node is redundant (knockout has minimal effect)
     pub fn is_redundant(&self) -> bool {
-        matches!(self.intervention, InterventionType::Knockout)
-            && self.percent_change.abs() < 5.0
+        matches!(self.intervention, InterventionType::Knockout) && self.percent_change.abs() < 5.0
     }
 }
 
@@ -880,8 +892,8 @@ impl CausalAnalysisResult {
         if self.critical_nodes.is_empty() {
             1.0 // No critical nodes = maximally robust
         } else {
-            let critical_fraction = self.critical_nodes.len() as f64
-                / self.node_ranking.len() as f64;
+            let critical_fraction =
+                self.critical_nodes.len() as f64 / self.node_ranking.len() as f64;
             1.0 - critical_fraction
         }
     }
@@ -1015,26 +1027,20 @@ impl PhiCausalAnalyzer {
 
         // Rank nodes by causal power
         let mut node_ranking: Vec<usize> = (0..n).collect();
-        node_ranking.sort_by(|&a, &b| {
-            causal_power[b].total_cmp(&causal_power[a])
-        });
+        node_ranking.sort_by(|&a, &b| causal_power[b].total_cmp(&causal_power[a]));
 
         // Identify critical and redundant nodes
         let critical_nodes: Vec<usize> = node_results
             .iter()
             .enumerate()
-            .filter(|(_, results)| {
-                results.iter().any(|r| r.is_critical())
-            })
+            .filter(|(_, results)| results.iter().any(|r| r.is_critical()))
             .map(|(i, _)| i)
             .collect();
 
         let redundant_nodes: Vec<usize> = node_results
             .iter()
             .enumerate()
-            .filter(|(_, results)| {
-                results.iter().any(|r| r.is_redundant())
-            })
+            .filter(|(_, results)| results.iter().any(|r| r.is_redundant()))
             .map(|(i, _)| i)
             .collect();
 
@@ -1134,7 +1140,8 @@ impl PhiCausalAnalyzer {
             InterventionType::Noise => {
                 if node_idx < modified.len() {
                     let dim = modified[node_idx].values.len();
-                    modified[node_idx] = ContinuousHV::random(dim, self.config.seed + node_idx as u64);
+                    modified[node_idx] =
+                        ContinuousHV::random(dim, self.config.seed + node_idx as u64);
                 }
             }
             InterventionType::Clamp(value) => {
@@ -1190,12 +1197,7 @@ impl PhiCausalAnalyzer {
             .iter()
             .filter(|&&idx| idx < nodes.len())
             .map(|&idx| {
-                self.test_intervention(
-                    nodes,
-                    idx,
-                    InterventionType::Knockout,
-                    baseline_phi,
-                )
+                self.test_intervention(nodes, idx, InterventionType::Knockout, baseline_phi)
             })
             .collect()
     }
@@ -1238,12 +1240,16 @@ pub fn analyze_causal_interventions(node_representations: &[ContinuousHV]) -> Ca
 
 /// Convenience function: find critical nodes
 pub fn find_critical_nodes(node_representations: &[ContinuousHV]) -> Vec<usize> {
-    PhiCausalAnalyzer::new().analyze(node_representations).critical_nodes
+    PhiCausalAnalyzer::new()
+        .analyze(node_representations)
+        .critical_nodes
 }
 
 /// Convenience function: compute causal power scores
 pub fn compute_causal_power(node_representations: &[ContinuousHV]) -> Vec<f64> {
-    PhiCausalAnalyzer::new().analyze(node_representations).causal_power
+    PhiCausalAnalyzer::new()
+        .analyze(node_representations)
+        .causal_power
 }
 
 // ============================================================================
@@ -1579,8 +1585,7 @@ impl PhiModularityAnalyzer {
         let module_assignments = self.detect_modules(&sim_matrix);
 
         // Build module structures
-        let modules =
-            self.build_modules(node_representations, &module_assignments, &sim_matrix);
+        let modules = self.build_modules(node_representations, &module_assignments, &sim_matrix);
 
         // Compute modularity score Q
         let modularity_score = self.compute_modularity_q(&sim_matrix, &module_assignments);
@@ -1593,8 +1598,7 @@ impl PhiModularityAnalyzer {
         };
 
         // Classify nodes
-        let node_classifications =
-            self.classify_nodes(&sim_matrix, &module_assignments, &modules);
+        let node_classifications = self.classify_nodes(&sim_matrix, &module_assignments, &modules);
 
         // Find bridge nodes
         let bridge_nodes = node_classifications
@@ -1698,8 +1702,8 @@ impl PhiModularityAnalyzer {
             for i in 0..n {
                 let degree: f64 = sim_matrix[i].iter().sum();
                 for j in 0..n {
-                    new_fiedler[i] += (if i == j { degree } else { 0.0 } - sim_matrix[i][j])
-                        * fiedler[j];
+                    new_fiedler[i] +=
+                        (if i == j { degree } else { 0.0 } - sim_matrix[i][j]) * fiedler[j];
                 }
             }
 
@@ -1751,9 +1755,10 @@ impl PhiModularityAnalyzer {
         let mut assignments: Vec<usize> = (0..n).collect();
         let mut cluster_count = n;
 
-        let target_clusters = self.config.num_modules.unwrap_or(
-            ((n as f64).sqrt() as usize).max(2).min(n / 2)
-        );
+        let target_clusters = self
+            .config
+            .num_modules
+            .unwrap_or(((n as f64).sqrt() as usize).max(2).min(n / 2));
 
         // Merge until target
         while cluster_count > target_clusters {
@@ -1979,9 +1984,10 @@ impl PhiModularityAnalyzer {
             return vec![0; n];
         }
 
-        let k = self.config.num_modules.unwrap_or(
-            ((n as f64).sqrt() as usize).max(2).min(n / 2)
-        );
+        let k = self
+            .config
+            .num_modules
+            .unwrap_or(((n as f64).sqrt() as usize).max(2).min(n / 2));
 
         // Initialize centroids (use k-means++ style)
         let mut centroids: Vec<Vec<f64>> = Vec::with_capacity(k);
@@ -2168,11 +2174,7 @@ impl PhiModularityAnalyzer {
     }
 
     /// Compute modularity Q score
-    fn compute_modularity_q(
-        &self,
-        sim_matrix: &[Vec<f64>],
-        assignments: &[usize],
-    ) -> f64 {
+    fn compute_modularity_q(&self, sim_matrix: &[Vec<f64>], assignments: &[usize]) -> f64 {
         let n = sim_matrix.len();
         if n < 2 {
             return 0.0;
@@ -2216,11 +2218,12 @@ impl PhiModularityAnalyzer {
         for (mi, module_a) in modules.iter().enumerate() {
             for module_b in modules.iter().skip(mi + 1) {
                 // Coupling strength
-                let coupling: f64 = if let (Some(ca), Some(cb)) = (&module_a.centroid, &module_b.centroid) {
-                    ((ca.similarity(cb) + 1.0) / 2.0) as f64
-                } else {
-                    0.0f64
-                };
+                let coupling: f64 =
+                    if let (Some(ca), Some(cb)) = (&module_a.centroid, &module_b.centroid) {
+                        ((ca.similarity(cb) + 1.0) / 2.0) as f64
+                    } else {
+                        0.0f64
+                    };
 
                 // Information flow (asymmetric)
                 let mut a_to_b = 0.0;
@@ -2529,7 +2532,9 @@ impl PhiModularityAnalyzer {
 }
 
 /// Convenience function: analyze network modularity
-pub fn analyze_network_modularity(node_representations: &[ContinuousHV]) -> NetworkModularityResult {
+pub fn analyze_network_modularity(
+    node_representations: &[ContinuousHV],
+) -> NetworkModularityResult {
     PhiModularityAnalyzer::new().analyze(node_representations)
 }
 
@@ -2541,7 +2546,9 @@ pub fn detect_module_count(node_representations: &[ContinuousHV]) -> usize {
 
 /// Convenience function: get modularity Q score
 pub fn compute_modularity_score(node_representations: &[ContinuousHV]) -> f64 {
-    PhiModularityAnalyzer::new().analyze(node_representations).modularity_score
+    PhiModularityAnalyzer::new()
+        .analyze(node_representations)
+        .modularity_score
 }
 
 #[cfg(test)]
@@ -2727,4 +2734,3 @@ mod tests {
         assert!((0.0..=1.0).contains(&bal), "Balance score must be in [0,1]");
     }
 }
-

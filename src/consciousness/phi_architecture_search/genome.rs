@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use symthaea_core::hdc::HDC_DIMENSION;
 
-use super::phi_gradient::{PhiGradient, GradientVelocity};
+use super::phi_gradient::{GradientVelocity, PhiGradient};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ARCHITECTURE GENOME
@@ -194,19 +194,19 @@ impl ArchitectureGenome {
         };
 
         Self {
-            num_nodes: 8 + next_usize(&mut state, 57),  // 8-64 nodes
-            hierarchy_depth: 2 + next_usize(&mut state, 6),  // 2-7 levels
-            base_tau: 100.0 + next_f32(&mut state) * 1900.0,  // 100-2000ms
-            tau_ratio: 0.2 + next_f32(&mut state) * 0.6,  // 0.2-0.8
-            connection_density: 0.1 + next_f32(&mut state) * 0.7,  // 0.1-0.8
-            modularity: next_f32(&mut state),  // 0.0-1.0
-            num_modules: 2 + next_usize(&mut state, 7),  // 2-8 modules
-            bridge_ratio: 0.05 + next_f32(&mut state) * 0.5,  // 0.05-0.55
+            num_nodes: 8 + next_usize(&mut state, 57), // 8-64 nodes
+            hierarchy_depth: 2 + next_usize(&mut state, 6), // 2-7 levels
+            base_tau: 100.0 + next_f32(&mut state) * 1900.0, // 100-2000ms
+            tau_ratio: 0.2 + next_f32(&mut state) * 0.6, // 0.2-0.8
+            connection_density: 0.1 + next_f32(&mut state) * 0.7, // 0.1-0.8
+            modularity: next_f32(&mut state),          // 0.0-1.0
+            num_modules: 2 + next_usize(&mut state, 7), // 2-8 modules
+            bridge_ratio: 0.05 + next_f32(&mut state) * 0.5, // 0.05-0.55
             topology_type: TopologyGene::random(state),
-            binding_strength: 0.3 + next_f32(&mut state) * 0.7,  // 0.3-1.0
+            binding_strength: 0.3 + next_f32(&mut state) * 0.7, // 0.3-1.0
             bundling_mode: BundlingGene::random(state),
-            recurrence: next_f32(&mut state),  // 0.0-1.0
-            skip_connection_prob: next_f32(&mut state) * 0.3,  // 0.0-0.3
+            recurrence: next_f32(&mut state), // 0.0-1.0
+            skip_connection_prob: next_f32(&mut state) * 0.3, // 0.0-0.3
             use_attention: next_f32(&mut state) > 0.5,
             hdc_dim: HDC_DIMENSION,
             seed: state,
@@ -237,7 +237,7 @@ impl ArchitectureGenome {
         }
 
         if next_f32(&mut state) < mutation_rate {
-            self.base_tau *= 0.8 + next_f32(&mut state) * 0.4;  // +-20%
+            self.base_tau *= 0.8 + next_f32(&mut state) * 0.4; // +-20%
             self.base_tau = self.base_tau.clamp(10.0, 5000.0);
         }
 
@@ -434,12 +434,18 @@ impl ArchitectureGenome {
         learning_rate: f32,
     ) {
         // Update velocities with momentum
-        velocity.v_density = momentum * velocity.v_density + learning_rate * gradient.d_density as f32;
-        velocity.v_modularity = momentum * velocity.v_modularity + learning_rate * gradient.d_modularity as f32;
-        velocity.v_bridge_ratio = momentum * velocity.v_bridge_ratio + learning_rate * gradient.d_bridge_ratio as f32;
-        velocity.v_tau_ratio = momentum * velocity.v_tau_ratio + learning_rate * gradient.d_tau_ratio as f32;
-        velocity.v_binding_strength = momentum * velocity.v_binding_strength + learning_rate * gradient.d_binding_strength as f32;
-        velocity.v_recurrence = momentum * velocity.v_recurrence + learning_rate * gradient.d_recurrence as f32;
+        velocity.v_density =
+            momentum * velocity.v_density + learning_rate * gradient.d_density as f32;
+        velocity.v_modularity =
+            momentum * velocity.v_modularity + learning_rate * gradient.d_modularity as f32;
+        velocity.v_bridge_ratio =
+            momentum * velocity.v_bridge_ratio + learning_rate * gradient.d_bridge_ratio as f32;
+        velocity.v_tau_ratio =
+            momentum * velocity.v_tau_ratio + learning_rate * gradient.d_tau_ratio as f32;
+        velocity.v_binding_strength = momentum * velocity.v_binding_strength
+            + learning_rate * gradient.d_binding_strength as f32;
+        velocity.v_recurrence =
+            momentum * velocity.v_recurrence + learning_rate * gradient.d_recurrence as f32;
 
         // Apply velocities to parameters
         self.connection_density += velocity.v_density;
@@ -473,21 +479,77 @@ impl ArchitectureGenome {
         };
 
         Self {
-            num_nodes: if choose(&mut state) { self.num_nodes } else { other.num_nodes },
-            hierarchy_depth: if choose(&mut state) { self.hierarchy_depth } else { other.hierarchy_depth },
-            base_tau: if choose(&mut state) { self.base_tau } else { other.base_tau },
-            tau_ratio: if choose(&mut state) { self.tau_ratio } else { other.tau_ratio },
-            connection_density: if choose(&mut state) { self.connection_density } else { other.connection_density },
-            modularity: if choose(&mut state) { self.modularity } else { other.modularity },
-            num_modules: if choose(&mut state) { self.num_modules } else { other.num_modules },
-            bridge_ratio: if choose(&mut state) { self.bridge_ratio } else { other.bridge_ratio },
-            topology_type: if choose(&mut state) { self.topology_type } else { other.topology_type },
-            binding_strength: if choose(&mut state) { self.binding_strength } else { other.binding_strength },
-            bundling_mode: if choose(&mut state) { self.bundling_mode } else { other.bundling_mode },
-            recurrence: if choose(&mut state) { self.recurrence } else { other.recurrence },
-            skip_connection_prob: if choose(&mut state) { self.skip_connection_prob } else { other.skip_connection_prob },
-            use_attention: if choose(&mut state) { self.use_attention } else { other.use_attention },
-            hdc_dim: self.hdc_dim,  // Always inherit from first parent
+            num_nodes: if choose(&mut state) {
+                self.num_nodes
+            } else {
+                other.num_nodes
+            },
+            hierarchy_depth: if choose(&mut state) {
+                self.hierarchy_depth
+            } else {
+                other.hierarchy_depth
+            },
+            base_tau: if choose(&mut state) {
+                self.base_tau
+            } else {
+                other.base_tau
+            },
+            tau_ratio: if choose(&mut state) {
+                self.tau_ratio
+            } else {
+                other.tau_ratio
+            },
+            connection_density: if choose(&mut state) {
+                self.connection_density
+            } else {
+                other.connection_density
+            },
+            modularity: if choose(&mut state) {
+                self.modularity
+            } else {
+                other.modularity
+            },
+            num_modules: if choose(&mut state) {
+                self.num_modules
+            } else {
+                other.num_modules
+            },
+            bridge_ratio: if choose(&mut state) {
+                self.bridge_ratio
+            } else {
+                other.bridge_ratio
+            },
+            topology_type: if choose(&mut state) {
+                self.topology_type
+            } else {
+                other.topology_type
+            },
+            binding_strength: if choose(&mut state) {
+                self.binding_strength
+            } else {
+                other.binding_strength
+            },
+            bundling_mode: if choose(&mut state) {
+                self.bundling_mode
+            } else {
+                other.bundling_mode
+            },
+            recurrence: if choose(&mut state) {
+                self.recurrence
+            } else {
+                other.recurrence
+            },
+            skip_connection_prob: if choose(&mut state) {
+                self.skip_connection_prob
+            } else {
+                other.skip_connection_prob
+            },
+            use_attention: if choose(&mut state) {
+                self.use_attention
+            } else {
+                other.use_attention
+            },
+            hdc_dim: self.hdc_dim, // Always inherit from first parent
             seed,
         }
     }

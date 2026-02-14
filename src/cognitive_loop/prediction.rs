@@ -1,8 +1,10 @@
 //! Multi-scale prediction, primitive state building, and consolidation.
 
+use crate::consciousness::primitive_consciousness::{
+    ActivationReason, ActivePrimitive, PrimitiveConsciousnessState,
+};
 use anyhow::Result;
 use ndarray::Array1;
-use crate::consciousness::primitive_consciousness::{PrimitiveConsciousnessState, ActivePrimitive, ActivationReason};
 
 use super::CognitiveLoopService;
 
@@ -16,7 +18,9 @@ impl CognitiveLoopService {
 
         if horizons.is_empty() {
             // Fallback: single-step prediction
-            return self.temporal_network.predict_forward(input, self.config.cfc_config.delta_t)
+            return self
+                .temporal_network
+                .predict_forward(input, self.config.cfc_config.delta_t)
                 .map(|arr| arr.to_vec())
                 .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.input_dim]);
         }
@@ -80,7 +84,9 @@ impl CognitiveLoopService {
             let active = ActivePrimitive {
                 primitive,
                 activation: 1.0,
-                activation_reason: ActivationReason::BottomUp { input_similarity: 1.0 },
+                activation_reason: ActivationReason::BottomUp {
+                    input_similarity: 1.0,
+                },
                 duration: 1,
             };
             state.active_by_tier.entry(tier).or_default().push(active);
@@ -90,7 +96,9 @@ impl CognitiveLoopService {
     }
 
     /// Classify a detected primitive name into its most likely tier.
-    pub(super) fn classify_primitive_tier(name: &str) -> symthaea_core::hdc::primitive_system::PrimitiveTier {
+    pub(super) fn classify_primitive_tier(
+        name: &str,
+    ) -> symthaea_core::hdc::primitive_system::PrimitiveTier {
         use symthaea_core::hdc::primitive_system::PrimitiveTier;
 
         let lower = name.to_lowercase();
@@ -99,16 +107,30 @@ impl CognitiveLoopService {
             "addition" | "multiplication" | "implication" | "greater_than" | "less_than"
             | "equals" | "negation" => PrimitiveTier::Mathematical,
             "cause" | "effect" | "action" | "force" | "energy" => PrimitiveTier::Physical,
-            "distance" | "angle" | "rotation" | "translation" | "manifold" => PrimitiveTier::Geometric,
-            "cooperate" | "compete" | "negotiate" | "trust" | "reciprocity" => PrimitiveTier::Strategic,
-            "reflect" | "metacognition" | "introspect" | "awareness" => PrimitiveTier::MetaCognitive,
-            "before" | "after" | "during" | "meets" | "overlaps" | "starts" | "finishes" => PrimitiveTier::Temporal,
-            "sequence" | "parallel" | "conditional" | "compose" | "recurse" => PrimitiveTier::Compositional,
+            "distance" | "angle" | "rotation" | "translation" | "manifold" => {
+                PrimitiveTier::Geometric
+            }
+            "cooperate" | "compete" | "negotiate" | "trust" | "reciprocity" => {
+                PrimitiveTier::Strategic
+            }
+            "reflect" | "metacognition" | "introspect" | "awareness" => {
+                PrimitiveTier::MetaCognitive
+            }
+            "before" | "after" | "during" | "meets" | "overlaps" | "starts" | "finishes" => {
+                PrimitiveTier::Temporal
+            }
+            "sequence" | "parallel" | "conditional" | "compose" | "recurse" => {
+                PrimitiveTier::Compositional
+            }
             _ => {
                 // Fallback: try prefix matching
-                if lower.starts_with("meta") { PrimitiveTier::MetaCognitive }
-                else if lower.starts_with("time") || lower.starts_with("temporal") { PrimitiveTier::Temporal }
-                else { PrimitiveTier::NSM } // Default to NSM for unknown primitives
+                if lower.starts_with("meta") {
+                    PrimitiveTier::MetaCognitive
+                } else if lower.starts_with("time") || lower.starts_with("temporal") {
+                    PrimitiveTier::Temporal
+                } else {
+                    PrimitiveTier::NSM
+                } // Default to NSM for unknown primitives
             }
         }
     }
@@ -125,8 +147,11 @@ impl CognitiveLoopService {
 
         // Sort by importance and replay top experiences
         let mut experiences: Vec<_> = self.buffer.iter().collect();
-        experiences.sort_by(|a, b| b.importance.partial_cmp(&a.importance)
-            .unwrap_or(std::cmp::Ordering::Equal));
+        experiences.sort_by(|a, b| {
+            b.importance
+                .partial_cmp(&a.importance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let mut total_loss = 0.0;
         let replay_count = experiences.len().min(10);
@@ -142,7 +167,10 @@ impl CognitiveLoopService {
                 // Train using CfC's analytical gradient
                 let prev_array = Array1::from_vec(exp.state.clone());
                 let target_array = Array1::from_vec(next_state.clone());
-                if let Ok(loss) = self.temporal_network.train_step(&prev_array, &target_array, delta_t, lr) {
+                if let Ok(loss) =
+                    self.temporal_network
+                        .train_step(&prev_array, &target_array, delta_t, lr)
+                {
                     total_loss += loss;
                 }
             }

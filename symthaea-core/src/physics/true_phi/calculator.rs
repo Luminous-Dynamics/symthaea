@@ -2,10 +2,7 @@
 
 use crate::hdc::unified_hv::ContinuousHV;
 
-use super::{
-    EntropyConfig, TruePartition, TruePhiResult,
-    VectorDistribution, JointDistribution,
-};
+use super::{EntropyConfig, JointDistribution, TruePartition, TruePhiResult, VectorDistribution};
 
 /// Calculator for true integrated information using Shannon entropy
 #[derive(Debug, Clone)]
@@ -253,9 +250,7 @@ impl TruePhiCalculator {
         candidates.push(refined);
 
         // Strategy 4: Split by total MI (separate high-MI from low-MI components)
-        let total_mi: Vec<f64> = (0..n)
-            .map(|i| mi_matrix[i].iter().sum::<f64>())
-            .collect();
+        let total_mi: Vec<f64> = (0..n).map(|i| mi_matrix[i].iter().sum::<f64>()).collect();
         let mean_mi = total_mi.iter().sum::<f64>() / n as f64;
         let part_a: Vec<usize> = (0..n).filter(|&i| total_mi[i] >= mean_mi).collect();
         let part_b: Vec<usize> = (0..n).filter(|&i| total_mi[i] < mean_mi).collect();
@@ -330,7 +325,11 @@ impl TruePhiCalculator {
     ///
     /// The Fiedler vector reveals natural clusters in the MI graph.
     /// Components with the same sign tend to be more connected.
-    pub(crate) fn spectral_partition(&self, mi_matrix: &[Vec<f64>], n: usize) -> Option<TruePartition> {
+    pub(crate) fn spectral_partition(
+        &self,
+        mi_matrix: &[Vec<f64>],
+        n: usize,
+    ) -> Option<TruePartition> {
         if n < 3 {
             return None;
         }
@@ -363,7 +362,11 @@ impl TruePhiCalculator {
 
         if part_a.is_empty() || part_b.is_empty() {
             let mut indices: Vec<usize> = (0..n).collect();
-            indices.sort_by(|&a, &b| fiedler[a].partial_cmp(&fiedler[b]).unwrap_or(std::cmp::Ordering::Equal));
+            indices.sort_by(|&a, &b| {
+                fiedler[a]
+                    .partial_cmp(&fiedler[b])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             let mid = n / 2;
             return Some(TruePartition {
                 part_a: indices[..mid].to_vec(),
@@ -375,7 +378,12 @@ impl TruePhiCalculator {
     }
 
     /// Power iteration to find the Fiedler vector
-    pub(crate) fn power_iteration_fiedler(&self, laplacian: &[Vec<f64>], n: usize, max_iter: usize) -> Vec<f64> {
+    pub(crate) fn power_iteration_fiedler(
+        &self,
+        laplacian: &[Vec<f64>],
+        n: usize,
+        max_iter: usize,
+    ) -> Vec<f64> {
         let mut v: Vec<f64> = (0..n).map(|i| i as f64 - n as f64 / 2.0).collect();
 
         // Normalize
@@ -505,7 +513,11 @@ impl TruePhiCalculator {
     }
 
     /// Greedy bisection partition
-    pub(crate) fn greedy_bisection_partition(&self, mi_matrix: &[Vec<f64>], n: usize) -> TruePartition {
+    pub(crate) fn greedy_bisection_partition(
+        &self,
+        mi_matrix: &[Vec<f64>],
+        n: usize,
+    ) -> TruePartition {
         let mut min_mi = f64::MAX;
         let mut seed_a = 0;
         let mut seed_b = 1;

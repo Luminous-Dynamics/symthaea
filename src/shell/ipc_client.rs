@@ -19,14 +19,14 @@
 //! - Bidirectional: service pushes metrics, shell sends commands
 //! - Automatic reconnection on disconnect
 
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use tokio::net::UnixStream;
-use tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::sync::watch;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
-use anyhow::{Result, Context};
+use tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::net::UnixStream;
+use tokio::sync::watch;
 
 const IPC_PROTOCOL_VERSION: u32 = 1;
 const IPC_MAX_FRAME_BYTES: usize = 2 * 1024 * 1024;
@@ -36,8 +36,7 @@ const IPC_MAX_FRAME_BYTES: usize = 2 * 1024 * 1024;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Connection state for visual indicators
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ConnectionState {
     /// Not connected to service
     #[default]
@@ -51,7 +50,6 @@ pub enum ConnectionState {
     /// Connection lost, attempting reconnect
     Reconnecting,
 }
-
 
 impl ConnectionState {
     /// Get visual indicator for this state
@@ -170,14 +168,9 @@ pub enum IpcRequest {
         require_phi: Option<f64>,
     },
     /// Get completions for input
-    GetCompletions {
-        input: String,
-        cursor_pos: usize,
-    },
+    GetCompletions { input: String, cursor_pos: usize },
     /// Validate a command (dry run)
-    Validate {
-        command: String,
-    },
+    Validate { command: String },
     /// Get current metrics snapshot
     GetMetrics,
     /// Ping for keepalive
@@ -258,10 +251,7 @@ pub enum Request {
         context: ShellContextData,
     },
     /// Validate a command without executing
-    Validate {
-        command: String,
-        dry_run: bool,
-    },
+    Validate { command: String, dry_run: bool },
     /// Subscribe to metrics stream
     SubscribeMetrics,
     /// Unsubscribe from metrics stream
@@ -275,9 +265,7 @@ pub enum Request {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Response {
     /// Pong response to Ping request
-    Pong {
-        timestamp_ms: u64,
-    },
+    Pong { timestamp_ms: u64 },
     /// Status response with consciousness metrics
     Status {
         phi: f64,
@@ -312,10 +300,7 @@ pub enum Response {
     /// Subscription acknowledgment
     Subscribed,
     /// Error response
-    Error {
-        code: i32,
-        message: String,
-    },
+    Error { code: i32, message: String },
 }
 
 /// Safety level data for command validation
@@ -371,7 +356,10 @@ impl RequestEnvelope {
 
     /// Create a new request envelope with an ID
     pub fn with_id(id: String, request: Request) -> Self {
-        Self { id: Some(id), request }
+        Self {
+            id: Some(id),
+            request,
+        }
     }
 }
 
@@ -391,12 +379,20 @@ pub struct ResponseEnvelope {
 impl ResponseEnvelope {
     /// Create a new response envelope
     pub fn new(id: Option<String>, response: Response) -> Self {
-        Self { id, latency_ms: None, response }
+        Self {
+            id,
+            latency_ms: None,
+            response,
+        }
     }
 
     /// Create a new response envelope with latency
     pub fn with_latency(id: Option<String>, latency_ms: u64, response: Response) -> Self {
-        Self { id, latency_ms: Some(latency_ms), response }
+        Self {
+            id,
+            latency_ms: Some(latency_ms),
+            response,
+        }
     }
 }
 
@@ -412,50 +408,42 @@ pub struct WireProtocol;
 impl WireProtocol {
     /// Encode a request envelope to MessagePack bytes
     pub fn encode_request(envelope: &RequestEnvelope) -> Result<Vec<u8>> {
-        rmp_serde::to_vec(envelope)
-            .context("Failed to encode request to MessagePack")
+        rmp_serde::to_vec(envelope).context("Failed to encode request to MessagePack")
     }
 
     /// Decode a request envelope from MessagePack bytes
     pub fn decode_request(bytes: &[u8]) -> Result<RequestEnvelope> {
-        rmp_serde::from_slice(bytes)
-            .context("Failed to decode request from MessagePack")
+        rmp_serde::from_slice(bytes).context("Failed to decode request from MessagePack")
     }
 
     /// Encode a response envelope to MessagePack bytes
     pub fn encode_response(envelope: &ResponseEnvelope) -> Result<Vec<u8>> {
-        rmp_serde::to_vec(envelope)
-            .context("Failed to encode response to MessagePack")
+        rmp_serde::to_vec(envelope).context("Failed to encode response to MessagePack")
     }
 
     /// Decode a response envelope from MessagePack bytes
     pub fn decode_response(bytes: &[u8]) -> Result<ResponseEnvelope> {
-        rmp_serde::from_slice(bytes)
-            .context("Failed to decode response from MessagePack")
+        rmp_serde::from_slice(bytes).context("Failed to decode response from MessagePack")
     }
 
     /// Encode a request envelope to JSON string (for debugging)
     pub fn encode_request_json(envelope: &RequestEnvelope) -> Result<String> {
-        serde_json::to_string(envelope)
-            .context("Failed to encode request to JSON")
+        serde_json::to_string(envelope).context("Failed to encode request to JSON")
     }
 
     /// Decode a request envelope from JSON string
     pub fn decode_request_json(json: &str) -> Result<RequestEnvelope> {
-        serde_json::from_str(json)
-            .context("Failed to decode request from JSON")
+        serde_json::from_str(json).context("Failed to decode request from JSON")
     }
 
     /// Encode a response envelope to JSON string (for debugging)
     pub fn encode_response_json(envelope: &ResponseEnvelope) -> Result<String> {
-        serde_json::to_string(envelope)
-            .context("Failed to encode response to JSON")
+        serde_json::to_string(envelope).context("Failed to encode response to JSON")
     }
 
     /// Decode a response envelope from JSON string
     pub fn decode_response_json(json: &str) -> Result<ResponseEnvelope> {
-        serde_json::from_str(json)
-            .context("Failed to decode response from JSON")
+        serde_json::from_str(json).context("Failed to decode response from JSON")
     }
 }
 
@@ -597,9 +585,12 @@ impl ShellIpcClient {
     pub async fn get_status(&mut self) -> Result<(f64, f64, bool)> {
         let response = self.send_request(Request::GetStatus).await?;
         match response {
-            Response::Status { phi, coherence, is_conscious, .. } => {
-                Ok((phi, coherence, is_conscious))
-            }
+            Response::Status {
+                phi,
+                coherence,
+                is_conscious,
+                ..
+            } => Ok((phi, coherence, is_conscious)),
             Response::Error { code, message } => {
                 anyhow::bail!("GetStatus failed: {} (code {})", message, code)
             }
@@ -644,7 +635,10 @@ impl ShellIpcClient {
 
     /// Subscribe to metrics updates with specified interval
     /// Returns a watch receiver that will receive updates at the given interval
-    pub async fn subscribe_metrics_watch(&self, _interval_ms: u64) -> Result<watch::Receiver<MetricsSnapshot>> {
+    pub async fn subscribe_metrics_watch(
+        &self,
+        _interval_ms: u64,
+    ) -> Result<watch::Receiver<MetricsSnapshot>> {
         // Return a subscription to the metrics channel
         // The interval is handled by the service-side push mechanism
         Ok(self.metrics_tx.subscribe())
@@ -660,7 +654,9 @@ impl ShellIpcClient {
         self.state = ConnectionState::Connecting;
 
         // Discover socket if not configured
-        let socket_path = self.config.socket_path
+        let socket_path = self
+            .config
+            .socket_path
             .clone()
             .or_else(discover_socket)
             .context("No symthaea socket found. Is the service running?")?;
@@ -668,7 +664,8 @@ impl ShellIpcClient {
         self.socket_path = Some(socket_path.clone());
 
         // Connect to socket
-        let stream = UnixStream::connect(&socket_path).await
+        let stream = UnixStream::connect(&socket_path)
+            .await
             .with_context(|| format!("Failed to connect to {}", socket_path.display()))?;
 
         // Split the stream into read and write halves with buffering
@@ -676,8 +673,7 @@ impl ShellIpcClient {
         self.reader = Some(BufReader::new(read_half));
         self.writer = Some(BufWriter::new(write_half));
 
-        self.handshake().await
-            .context("IPC handshake failed")?;
+        self.handshake().await.context("IPC handshake failed")?;
 
         self.state = ConnectionState::Connected;
         self.reconnect_attempts = 0;
@@ -822,17 +818,43 @@ impl ShellIpcClient {
         let (ipc_request, accept_metrics) = match &request {
             Request::Ping => (IpcRequest::Ping, false),
             Request::GetStatus => (IpcRequest::GetMetrics, true),
-            Request::Execute { command, phi_required, dry_run } => {
+            Request::Execute {
+                command,
+                phi_required,
+                dry_run,
+            } => {
                 if *dry_run {
-                    (IpcRequest::Validate { command: command.clone() }, false)
+                    (
+                        IpcRequest::Validate {
+                            command: command.clone(),
+                        },
+                        false,
+                    )
                 } else {
-                    (IpcRequest::Execute { command: command.clone(), require_phi: Some(*phi_required) }, false)
+                    (
+                        IpcRequest::Execute {
+                            command: command.clone(),
+                            require_phi: Some(*phi_required),
+                        },
+                        false,
+                    )
                 }
             }
-            Request::GetIntelliSense { input, cursor_pos, .. } => {
-                (IpcRequest::GetCompletions { input: input.clone(), cursor_pos: *cursor_pos }, false)
-            }
-            Request::Validate { command, .. } => (IpcRequest::Validate { command: command.clone() }, false),
+            Request::GetIntelliSense {
+                input, cursor_pos, ..
+            } => (
+                IpcRequest::GetCompletions {
+                    input: input.clone(),
+                    cursor_pos: *cursor_pos,
+                },
+                false,
+            ),
+            Request::Validate { command, .. } => (
+                IpcRequest::Validate {
+                    command: command.clone(),
+                },
+                false,
+            ),
             Request::SubscribeMetrics => (IpcRequest::SubscribeMetrics, false),
             Request::UnsubscribeMetrics => (IpcRequest::UnsubscribeMetrics, false),
         };
@@ -854,29 +876,31 @@ impl ShellIpcClient {
     ) -> Result<IpcResponse> {
         // Write phase: borrow writer, send request, then drop the borrow
         {
-            let writer = self.writer.as_mut()
-                .context("Not connected to service")?;
+            let writer = self.writer.as_mut().context("Not connected to service")?;
 
             let data = rmp_serde::to_vec(&request)?;
             let len = (data.len() as u32).to_le_bytes();
 
-            writer.write_all(&len).await
+            writer
+                .write_all(&len)
+                .await
                 .context("Failed to write request length")?;
-            writer.write_all(&data).await
+            writer
+                .write_all(&data)
+                .await
                 .context("Failed to write request payload")?;
-            writer.flush().await
-                .context("Failed to flush request")?;
+            writer.flush().await.context("Failed to flush request")?;
         }
 
         // Read phase: re-borrow reader each iteration to avoid overlap with update_metrics
         loop {
-            let reader = self.reader.as_mut()
-                .context("Not connected to service")?;
+            let reader = self.reader.as_mut().context("Not connected to service")?;
             let response = tokio::time::timeout(
                 self.config.request_timeout,
                 Self::read_ipc_response(reader, IPC_MAX_FRAME_BYTES),
-            ).await
-                .context("IPC response timeout")??;
+            )
+            .await
+            .context("IPC response timeout")??;
             match response {
                 IpcResponse::Metrics(metrics) => {
                     self.update_metrics(metrics.clone());
@@ -890,13 +914,19 @@ impl ShellIpcClient {
     }
 
     async fn handshake(&mut self) -> Result<()> {
-        let response = self.send_ipc_request(
-            IpcRequest::Hello { version: IPC_PROTOCOL_VERSION },
-            false,
-        ).await?;
+        let response = self
+            .send_ipc_request(
+                IpcRequest::Hello {
+                    version: IPC_PROTOCOL_VERSION,
+                },
+                false,
+            )
+            .await?;
 
         match response {
-            IpcResponse::HelloAck { server_version } if server_version == IPC_PROTOCOL_VERSION => Ok(()),
+            IpcResponse::HelloAck { server_version } if server_version == IPC_PROTOCOL_VERSION => {
+                Ok(())
+            }
             IpcResponse::Error(message) => anyhow::bail!("Handshake rejected: {}", message),
             other => anyhow::bail!("Unexpected handshake response: {:?}", other),
         }
@@ -907,7 +937,9 @@ impl ShellIpcClient {
         max_size: usize,
     ) -> Result<IpcResponse> {
         let mut len_buf = [0u8; 4];
-        reader.read_exact(&mut len_buf).await
+        reader
+            .read_exact(&mut len_buf)
+            .await
             .context("Failed to read response length")?;
         let len = u32::from_le_bytes(len_buf) as usize;
         if len == 0 || len > max_size {
@@ -915,10 +947,12 @@ impl ShellIpcClient {
         }
 
         let mut buf = vec![0u8; len];
-        reader.read_exact(&mut buf).await
+        reader
+            .read_exact(&mut buf)
+            .await
             .context("Failed to read response payload")?;
-        let response = rmp_serde::from_slice::<IpcResponse>(&buf)
-            .context("Failed to decode response")?;
+        let response =
+            rmp_serde::from_slice::<IpcResponse>(&buf).context("Failed to decode response")?;
         Ok(response)
     }
 
@@ -938,7 +972,8 @@ impl ShellIpcClient {
                 uptime_secs: metrics.uptime_secs,
             },
             (Request::GetIntelliSense { .. }, IpcResponse::Completions(items)) => {
-                let confidence = items.iter()
+                let confidence = items
+                    .iter()
                     .map(|c| c.similarity)
                     .fold(0.0_f32, |a, b| a.max(b));
                 Response::IntelliSenseResult {
@@ -948,17 +983,35 @@ impl ShellIpcClient {
                     confidence,
                 }
             }
-            (Request::Validate { .. }, IpcResponse::ValidationResult { valid, safety_level, warnings, .. }) => {
-                Response::ValidationResult {
+            (
+                Request::Validate { .. },
+                IpcResponse::ValidationResult {
                     valid,
-                    safety_level: Self::safety_level_from_string(&safety_level),
-                    phi_required: 0.0,
+                    safety_level,
                     warnings,
-                }
-            }
-            (Request::Execute { dry_run: true, .. }, IpcResponse::ValidationResult { valid, safety_level: _, preview, warnings }) => {
+                    ..
+                },
+            ) => Response::ValidationResult {
+                valid,
+                safety_level: Self::safety_level_from_string(&safety_level),
+                phi_required: 0.0,
+                warnings,
+            },
+            (
+                Request::Execute { dry_run: true, .. },
+                IpcResponse::ValidationResult {
+                    valid,
+                    safety_level: _,
+                    preview,
+                    warnings,
+                },
+            ) => {
                 let output = preview.unwrap_or_else(|| warnings.join("\n"));
-                let gate_reason = if valid { Some("dry-run".to_string()) } else { Some("dry-run failed".to_string()) };
+                let gate_reason = if valid {
+                    Some("dry-run".to_string())
+                } else {
+                    Some("dry-run failed".to_string())
+                };
                 Response::ExecutionResult {
                     executed: false,
                     output,
@@ -966,8 +1019,21 @@ impl ShellIpcClient {
                     gate_reason,
                 }
             }
-            (Request::Execute { .. }, IpcResponse::ExecutionResult { success, output, phi_at_execution, vetoed, veto_reason }) => {
-                let gate_reason = if vetoed { veto_reason.or(Some("vetoed".to_string())) } else { veto_reason };
+            (
+                Request::Execute { .. },
+                IpcResponse::ExecutionResult {
+                    success,
+                    output,
+                    phi_at_execution,
+                    vetoed,
+                    veto_reason,
+                },
+            ) => {
+                let gate_reason = if vetoed {
+                    veto_reason.or(Some("vetoed".to_string()))
+                } else {
+                    veto_reason
+                };
                 Response::ExecutionResult {
                     executed: success && !vetoed,
                     output,
@@ -981,23 +1047,27 @@ impl ShellIpcClient {
                 code: 2,
                 message: format!("Unexpected hello ack (server version {})", server_version),
             },
-            (_, IpcResponse::Metrics(metrics)) => {
-                Response::Status {
-                    phi: metrics.phi,
-                    coherence: metrics.coherence,
-                    consciousness_level: metrics.consciousness_level,
-                    is_conscious: metrics.is_conscious,
-                    uptime_secs: metrics.uptime_secs,
-                }
-            }
-            (_, IpcResponse::ValidationResult { valid, safety_level, warnings, .. }) => {
-                Response::ValidationResult {
+            (_, IpcResponse::Metrics(metrics)) => Response::Status {
+                phi: metrics.phi,
+                coherence: metrics.coherence,
+                consciousness_level: metrics.consciousness_level,
+                is_conscious: metrics.is_conscious,
+                uptime_secs: metrics.uptime_secs,
+            },
+            (
+                _,
+                IpcResponse::ValidationResult {
                     valid,
-                    safety_level: Self::safety_level_from_string(&safety_level),
-                    phi_required: 0.0,
+                    safety_level,
                     warnings,
-                }
-            }
+                    ..
+                },
+            ) => Response::ValidationResult {
+                valid,
+                safety_level: Self::safety_level_from_string(&safety_level),
+                phi_required: 0.0,
+                warnings,
+            },
             (_, IpcResponse::Completions(items)) => Response::IntelliSenseResult {
                 completions: items,
                 command_preview: None,
@@ -1012,8 +1082,21 @@ impl ShellIpcClient {
                     .as_millis() as u64,
             },
             (_, IpcResponse::Subscribed) => Response::Subscribed,
-            (_, IpcResponse::ExecutionResult { success, output, phi_at_execution, vetoed, veto_reason }) => {
-                let gate_reason = if vetoed { veto_reason.or(Some("vetoed".to_string())) } else { veto_reason };
+            (
+                _,
+                IpcResponse::ExecutionResult {
+                    success,
+                    output,
+                    phi_at_execution,
+                    vetoed,
+                    veto_reason,
+                },
+            ) => {
+                let gate_reason = if vetoed {
+                    veto_reason.or(Some("vetoed".to_string()))
+                } else {
+                    veto_reason
+                };
                 Response::ExecutionResult {
                     executed: success && !vetoed,
                     output,
@@ -1026,7 +1109,10 @@ impl ShellIpcClient {
 
     fn safety_level_from_string(level: &str) -> SafetyLevelData {
         let lower = level.to_lowercase();
-        let color = if lower.contains("destructive") || lower.contains("critical") || lower.contains("red") {
+        let color = if lower.contains("destructive")
+            || lower.contains("critical")
+            || lower.contains("red")
+        {
             "red"
         } else if lower.contains("confirm") || lower.contains("yellow") || lower.contains("warn") {
             "yellow"
@@ -1056,9 +1142,12 @@ impl ShellIpcClient {
         let response = self.send_request(request).await?;
 
         match response {
-            Response::IntelliSenseResult { completions, command_preview, phi, confidence } => {
-                Ok((completions, command_preview, phi, confidence))
-            }
+            Response::IntelliSenseResult {
+                completions,
+                command_preview,
+                phi,
+                confidence,
+            } => Ok((completions, command_preview, phi, confidence)),
             Response::Error { code, message } => {
                 anyhow::bail!("IntelliSense error: {} (code {})", message, code)
             }
@@ -1082,9 +1171,12 @@ impl ShellIpcClient {
         let response = self.send_request(request).await?;
 
         match response {
-            Response::ValidationResult { valid, safety_level, phi_required, warnings } => {
-                Ok((valid, safety_level, phi_required, warnings))
-            }
+            Response::ValidationResult {
+                valid,
+                safety_level,
+                phi_required,
+                warnings,
+            } => Ok((valid, safety_level, phi_required, warnings)),
             Response::Error { code, message } => {
                 anyhow::bail!("Validation error: {} (code {})", message, code)
             }
@@ -1110,9 +1202,12 @@ impl ShellIpcClient {
         let response = self.send_request(request).await?;
 
         match response {
-            Response::ExecutionResult { executed, output, phi_at_execution, gate_reason } => {
-                Ok((executed, output, phi_at_execution, gate_reason))
-            }
+            Response::ExecutionResult {
+                executed,
+                output,
+                phi_at_execution,
+                gate_reason,
+            } => Ok((executed, output, phi_at_execution, gate_reason)),
             Response::Error { code, message } => {
                 anyhow::bail!("Execution error: {} (code {})", message, code)
             }
@@ -1169,7 +1264,10 @@ mod tests {
         let serialized = rmp_serde::to_vec(&request).unwrap();
         let deserialized: IpcRequest = rmp_serde::from_slice(&serialized).unwrap();
         match deserialized {
-            IpcRequest::Execute { command, require_phi } => {
+            IpcRequest::Execute {
+                command,
+                require_phi,
+            } => {
                 assert_eq!(command, "install nginx");
                 assert_eq!(require_phi, Some(0.5));
             }
@@ -1193,20 +1291,31 @@ mod tests {
             let mut buf = vec![0u8; len];
             server_stream.read_exact(&mut buf).await.unwrap();
             let request: IpcRequest = rmp_serde::from_slice(&buf).unwrap();
-            assert!(matches!(request, IpcRequest::Hello { version } if version == IPC_PROTOCOL_VERSION));
+            assert!(
+                matches!(request, IpcRequest::Hello { version } if version == IPC_PROTOCOL_VERSION)
+            );
 
-            let response = IpcResponse::HelloAck { server_version: IPC_PROTOCOL_VERSION };
+            let response = IpcResponse::HelloAck {
+                server_version: IPC_PROTOCOL_VERSION,
+            };
             let data = rmp_serde::to_vec(&response).unwrap();
             let len = (data.len() as u32).to_le_bytes();
             server_stream.write_all(&len).await.unwrap();
             server_stream.write_all(&data).await.unwrap();
         });
 
-        let response = client.send_ipc_request(
-            IpcRequest::Hello { version: IPC_PROTOCOL_VERSION },
-            false,
-        ).await.unwrap();
-        assert!(matches!(response, IpcResponse::HelloAck { server_version } if server_version == IPC_PROTOCOL_VERSION));
+        let response = client
+            .send_ipc_request(
+                IpcRequest::Hello {
+                    version: IPC_PROTOCOL_VERSION,
+                },
+                false,
+            )
+            .await
+            .unwrap();
+        assert!(
+            matches!(response, IpcResponse::HelloAck { server_version } if server_version == IPC_PROTOCOL_VERSION)
+        );
 
         server_task.await.unwrap();
     }

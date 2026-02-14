@@ -4,15 +4,15 @@
 //! extraction, verification, and integration. This is the main
 //! entry point for autonomous web research.
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use std::time::Duration;
 
-use super::types::{
-    WebResearchResult, WebResearchConfig,
-    EpistemicStatus, ResearchSource, ResearchStatus, VerifiedClaim,
-};
 use super::extractor::{ContentExtractor, ContentType};
-use super::verifier::{EpistemicVerifier, VerificationContext, SourceEvidence};
+use super::types::{
+    EpistemicStatus, ResearchSource, ResearchStatus, VerifiedClaim, WebResearchConfig,
+    WebResearchResult,
+};
+use super::verifier::{EpistemicVerifier, SourceEvidence, VerificationContext};
 
 /// Research orchestrator for autonomous web research
 #[derive(Debug)]
@@ -72,7 +72,8 @@ impl WebResearcher {
                             let source = SourceEvidence {
                                 url: url.clone(),
                                 domain: self.extract_domain(url),
-                                source_type: self.classify_source(url, extraction.metadata.content_type),
+                                source_type: self
+                                    .classify_source(url, extraction.metadata.content_type),
                                 relevant_text: extraction.summary.clone(),
                                 supports: Some(true), // Will be refined by verifier
                                 similarity: self.calculate_similarity(&extraction.body_text, query),
@@ -135,7 +136,9 @@ impl WebResearcher {
             url: all_sources.first().map_or(String::new(), |s| s.url.clone()),
             content: primary_content,
             summary,
-            source_type: all_sources.first().map_or(ResearchSource::Web, |s| s.source_type),
+            source_type: all_sources
+                .first()
+                .map_or(ResearchSource::Web, |s| s.source_type),
             relevance: self.calculate_average_relevance(&all_sources),
             confidence: overall_confidence,
             epistemic_status,
@@ -201,7 +204,8 @@ impl WebResearcher {
 
     /// Fetch and extract content from a URL
     async fn fetch_and_extract(&self, url: &str) -> Result<super::extractor::ExtractedContent> {
-        let response = self.client
+        let response = self
+            .client
             .get(url)
             .send()
             .await
@@ -245,8 +249,10 @@ impl WebResearcher {
             return ResearchSource::Academic;
         }
 
-        if domain.contains("docs.") || domain.contains("doc.")
-            || content_type == ContentType::Documentation {
+        if domain.contains("docs.")
+            || domain.contains("doc.")
+            || content_type == ContentType::Documentation
+        {
             return ResearchSource::Documentation;
         }
 
@@ -256,20 +262,17 @@ impl WebResearcher {
     /// Calculate text similarity (simple word overlap)
     fn calculate_similarity(&self, text: &str, query: &str) -> f32 {
         let text_lower = text.to_lowercase();
-        let text_words: std::collections::HashSet<&str> = text_lower
-            .split_whitespace()
-            .collect();
+        let text_words: std::collections::HashSet<&str> = text_lower.split_whitespace().collect();
 
         let query_lower = query.to_lowercase();
-        let query_words: Vec<&str> = query_lower
-            .split_whitespace()
-            .collect();
+        let query_words: Vec<&str> = query_lower.split_whitespace().collect();
 
         if query_words.is_empty() {
             return 0.0;
         }
 
-        let matches = query_words.iter()
+        let matches = query_words
+            .iter()
             .filter(|w| text_words.contains(*w))
             .count();
 
@@ -280,8 +283,11 @@ impl WebResearcher {
     fn detect_domain(&self, query: &str) -> String {
         let lower = query.to_lowercase();
 
-        if lower.contains("programming") || lower.contains("code")
-            || lower.contains("rust") || lower.contains("python") {
+        if lower.contains("programming")
+            || lower.contains("code")
+            || lower.contains("rust")
+            || lower.contains("python")
+        {
             return "programming".to_string();
         }
 
@@ -310,11 +316,15 @@ impl WebResearcher {
             return EpistemicStatus::InsufficientEvidence;
         }
 
-        let high_conf = claims.iter()
+        let high_conf = claims
+            .iter()
             .filter(|c| c.status == EpistemicStatus::HighConfidence)
             .count();
-        let contradicted = claims.iter()
-            .filter(|c| c.status == EpistemicStatus::Contradicted || c.status == EpistemicStatus::False)
+        let contradicted = claims
+            .iter()
+            .filter(|c| {
+                c.status == EpistemicStatus::Contradicted || c.status == EpistemicStatus::False
+            })
             .count();
 
         if contradicted > claims.len() / 3 {
@@ -325,7 +335,8 @@ impl WebResearcher {
             return EpistemicStatus::HighConfidence;
         }
 
-        let avg_confidence: f32 = claims.iter().map(|c| c.confidence).sum::<f32>() / claims.len() as f32;
+        let avg_confidence: f32 =
+            claims.iter().map(|c| c.confidence).sum::<f32>() / claims.len() as f32;
 
         if avg_confidence > 0.7 {
             EpistemicStatus::ModerateConfidence
@@ -398,7 +409,8 @@ impl Default for WebResearcher {
     /// Panics if the HTTP client cannot be created. For a non-panicking alternative,
     /// use `WebResearcher::new()` or `WebResearcher::try_default()`.
     fn default() -> Self {
-        Self::new().expect("Failed to create default WebResearcher: HTTP client initialization failed")
+        Self::new()
+            .expect("Failed to create default WebResearcher: HTTP client initialization failed")
     }
 }
 
@@ -419,7 +431,10 @@ mod tests {
     fn test_domain_detection() {
         let researcher = WebResearcher::new().unwrap();
 
-        assert_eq!(researcher.detect_domain("rust programming language"), "programming");
+        assert_eq!(
+            researcher.detect_domain("rust programming language"),
+            "programming"
+        );
         assert_eq!(researcher.detect_domain("nixos configuration"), "systems");
         assert_eq!(researcher.detect_domain("what is the weather"), "general");
     }
@@ -430,14 +445,12 @@ mod tests {
 
         let sim = researcher.calculate_similarity(
             "Rust is a systems programming language focused on safety",
-            "rust programming safety"
+            "rust programming safety",
         );
         assert!(sim > 0.5);
 
-        let sim_low = researcher.calculate_similarity(
-            "The weather is nice today",
-            "rust programming"
-        );
+        let sim_low =
+            researcher.calculate_similarity("The weather is nice today", "rust programming");
         assert!(sim_low < 0.5);
     }
 }

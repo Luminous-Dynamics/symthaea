@@ -3,9 +3,9 @@
 //! User-defined command shortcuts for common NixOS operations.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::fs;
 use std::io;
+use std::path::PathBuf;
 
 /// A command alias definition
 #[derive(Debug, Clone)]
@@ -26,9 +26,9 @@ impl Alias {
     /// Create a new alias
     pub fn new(name: impl Into<String>, expansion: impl Into<String>) -> Self {
         let expansion_str = expansion.into();
-        let accepts_args = expansion_str.contains("$1") ||
-                          expansion_str.contains("$@") ||
-                          expansion_str.contains("${");
+        let accepts_args = expansion_str.contains("$1")
+            || expansion_str.contains("$@")
+            || expansion_str.contains("${");
 
         Self {
             name: name.into(),
@@ -122,7 +122,6 @@ impl AliasManager {
             Alias::new("upgrade", "sudo nixos-rebuild switch --upgrade")
                 .with_description("Upgrade system")
                 .builtin(),
-
             // System operations
             Alias::new("rebuild", "sudo nixos-rebuild switch")
                 .with_description("Rebuild NixOS configuration")
@@ -139,7 +138,6 @@ impl AliasManager {
             Alias::new("rollback", "sudo nixos-rebuild switch --rollback")
                 .with_description("Rollback to previous generation")
                 .builtin(),
-
             // Garbage collection
             Alias::new("gc", "sudo nix-collect-garbage")
                 .with_description("Collect garbage")
@@ -150,7 +148,6 @@ impl AliasManager {
             Alias::new("optimize", "sudo nix-store --optimise")
                 .with_description("Optimize nix store")
                 .builtin(),
-
             // Shell environments
             Alias::new("shell", "nix-shell -p $@")
                 .with_description("Enter shell with packages")
@@ -161,7 +158,6 @@ impl AliasManager {
             Alias::new("develop", "nix develop")
                 .with_description("Enter development environment")
                 .builtin(),
-
             // Flakes
             Alias::new("update", "nix flake update")
                 .with_description("Update flake inputs")
@@ -172,29 +168,32 @@ impl AliasManager {
             Alias::new("show", "nix flake show")
                 .with_description("Show flake outputs")
                 .builtin(),
-
             // Information
-            Alias::new("generations", "sudo nix-env --list-generations -p /nix/var/nix/profiles/system")
-                .with_description("List system generations")
-                .builtin(),
+            Alias::new(
+                "generations",
+                "sudo nix-env --list-generations -p /nix/var/nix/profiles/system",
+            )
+            .with_description("List system generations")
+            .builtin(),
             Alias::new("version", "nixos-version")
                 .with_description("Show NixOS version")
                 .builtin(),
             Alias::new("option", "nixos-option $1")
                 .with_description("Show option documentation")
                 .builtin(),
-
             // Configuration editing
             Alias::new("edit", "sudo $EDITOR /etc/nixos/configuration.nix")
                 .with_description("Edit main configuration")
                 .builtin(),
-            Alias::new("edit-hw", "sudo $EDITOR /etc/nixos/hardware-configuration.nix")
-                .with_description("Edit hardware configuration")
-                .builtin(),
+            Alias::new(
+                "edit-hw",
+                "sudo $EDITOR /etc/nixos/hardware-configuration.nix",
+            )
+            .with_description("Edit hardware configuration")
+            .builtin(),
             Alias::new("edit-flake", "sudo $EDITOR /etc/nixos/flake.nix")
                 .with_description("Edit flake.nix")
                 .builtin(),
-
             // Channels (for non-flake systems)
             Alias::new("channels", "sudo nix-channel --list")
                 .with_description("List channels")
@@ -362,7 +361,8 @@ impl Default for AliasManager {
 pub fn format_alias_list(aliases: &[&Alias], show_builtins: bool) -> String {
     let mut output = String::new();
 
-    let filtered: Vec<_> = aliases.iter()
+    let filtered: Vec<_> = aliases
+        .iter()
         .filter(|a| show_builtins || !a.builtin)
         .collect();
 
@@ -385,7 +385,12 @@ pub fn format_alias_list(aliases: &[&Alias], show_builtins: bool) -> String {
         ));
 
         if !desc.is_empty() {
-            output.push_str(&format!("{:width$}    {}\n", "", desc, width = max_name_len));
+            output.push_str(&format!(
+                "{:width$}    {}\n",
+                "",
+                desc,
+                width = max_name_len
+            ));
         }
     }
 
@@ -405,7 +410,10 @@ mod tests {
     #[test]
     fn test_alias_expansion_multiple_args() {
         let alias = Alias::new("shell", "nix-shell -p $@");
-        assert_eq!(alias.expand(&["git", "vim", "htop"]), "nix-shell -p git vim htop");
+        assert_eq!(
+            alias.expand(&["git", "vim", "htop"]),
+            "nix-shell -p git vim htop"
+        );
     }
 
     #[test]

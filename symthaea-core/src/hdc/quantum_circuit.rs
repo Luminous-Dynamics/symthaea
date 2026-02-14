@@ -36,7 +36,7 @@
 //! or similar dependencies.
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
+use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
 
 // =============================================================================
 // COMPLEX ARITHMETIC HELPERS -- (f64, f64) = (real, imag)
@@ -151,9 +151,15 @@ impl QuantumState {
 
     /// Create a state from raw amplitudes (must be normalized).
     pub fn from_amplitudes(num_qubits: usize, amplitudes: Vec<C64>) -> Self {
-        assert_eq!(amplitudes.len(), 1 << num_qubits,
-            "Amplitude vector length must be 2^num_qubits");
-        Self { num_qubits, amplitudes }
+        assert_eq!(
+            amplitudes.len(),
+            1 << num_qubits,
+            "Amplitude vector length must be 2^num_qubits"
+        );
+        Self {
+            num_qubits,
+            amplitudes,
+        }
     }
 
     /// Total probability (should be ~1.0 for valid states).
@@ -174,8 +180,10 @@ impl QuantumState {
 
     /// Probability of measuring a specific basis state.
     pub fn probability(&self, basis_state: usize) -> f64 {
-        assert!(basis_state < self.amplitudes.len(),
-            "Basis state index out of range");
+        assert!(
+            basis_state < self.amplitudes.len(),
+            "Basis state index out of range"
+        );
         cnorm2(self.amplitudes[basis_state])
     }
 
@@ -191,9 +199,13 @@ impl QuantumState {
 
     /// Fidelity between two quantum states: |<psi|phi>|^2.
     pub fn fidelity(&self, other: &Self) -> f64 {
-        assert_eq!(self.num_qubits, other.num_qubits,
-            "States must have the same number of qubits");
-        let inner: C64 = self.amplitudes.iter()
+        assert_eq!(
+            self.num_qubits, other.num_qubits,
+            "States must have the same number of qubits"
+        );
+        let inner: C64 = self
+            .amplitudes
+            .iter()
             .zip(other.amplitudes.iter())
             .fold(CZERO, |acc, (a, b)| cadd(acc, cmul(cconj(*a), *b)));
         cnorm2(inner)
@@ -271,7 +283,11 @@ pub enum QuantumGate {
     SWAP { qubit_a: usize, qubit_b: usize },
 
     /// Toffoli (CCNOT): flips target if both controls are |1>.
-    Toffoli { control1: usize, control2: usize, target: usize },
+    Toffoli {
+        control1: usize,
+        control2: usize,
+        target: usize,
+    },
 }
 
 impl QuantumGate {
@@ -298,7 +314,11 @@ impl QuantumGate {
             }
             QuantumGate::CNOT { control, target } => apply_cnot(state, control, target),
             QuantumGate::SWAP { qubit_a, qubit_b } => apply_swap(state, qubit_a, qubit_b),
-            QuantumGate::Toffoli { control1, control2, target } => {
+            QuantumGate::Toffoli {
+                control1,
+                control2,
+                target,
+            } => {
                 apply_toffoli(state, control1, control2, target);
             }
         }
@@ -312,68 +332,46 @@ type Matrix2x2 = [C64; 4];
 
 /// Hadamard: (1/sqrt2) * [[1,1],[1,-1]]
 const HADAMARD_MATRIX: Matrix2x2 = [
-    (FRAC_1_SQRT2, 0.0), (FRAC_1_SQRT2, 0.0),
-    (FRAC_1_SQRT2, 0.0), (-FRAC_1_SQRT2, 0.0),
+    (FRAC_1_SQRT2, 0.0),
+    (FRAC_1_SQRT2, 0.0),
+    (FRAC_1_SQRT2, 0.0),
+    (-FRAC_1_SQRT2, 0.0),
 ];
 
 /// Pauli-X: [[0,1],[1,0]]
-const PAULI_X_MATRIX: Matrix2x2 = [
-    CZERO, CONE,
-    CONE, CZERO,
-];
+const PAULI_X_MATRIX: Matrix2x2 = [CZERO, CONE, CONE, CZERO];
 
 /// Pauli-Y: [[0,-i],[i,0]]
-const PAULI_Y_MATRIX: Matrix2x2 = [
-    CZERO, (0.0, -1.0),
-    (0.0, 1.0), CZERO,
-];
+const PAULI_Y_MATRIX: Matrix2x2 = [CZERO, (0.0, -1.0), (0.0, 1.0), CZERO];
 
 /// Pauli-Z: [[1,0],[0,-1]]
-const PAULI_Z_MATRIX: Matrix2x2 = [
-    CONE, CZERO,
-    CZERO, (-1.0, 0.0),
-];
+const PAULI_Z_MATRIX: Matrix2x2 = [CONE, CZERO, CZERO, (-1.0, 0.0)];
 
 /// T gate: [[1,0],[0,e^(i*pi/4)]]
 /// e^(i*pi/4) = cos(pi/4) + i*sin(pi/4) = (1/sqrt2)(1 + i)
-const T_GATE_MATRIX: Matrix2x2 = [
-    CONE, CZERO,
-    CZERO, (FRAC_1_SQRT2, FRAC_1_SQRT2),
-];
+const T_GATE_MATRIX: Matrix2x2 = [CONE, CZERO, CZERO, (FRAC_1_SQRT2, FRAC_1_SQRT2)];
 
 /// S gate: [[1,0],[0,i]]
-const S_GATE_MATRIX: Matrix2x2 = [
-    CONE, CZERO,
-    CZERO, CI,
-];
+const S_GATE_MATRIX: Matrix2x2 = [CONE, CZERO, CZERO, CI];
 
 /// Rotation around X: Rx(theta) = [[cos(t/2), -i*sin(t/2)], [-i*sin(t/2), cos(t/2)]]
 fn rx_matrix(theta: f64) -> Matrix2x2 {
     let c = (theta / 2.0).cos();
     let s = (theta / 2.0).sin();
-    [
-        (c, 0.0), (0.0, -s),
-        (0.0, -s), (c, 0.0),
-    ]
+    [(c, 0.0), (0.0, -s), (0.0, -s), (c, 0.0)]
 }
 
 /// Rotation around Y: Ry(theta) = [[cos(t/2), -sin(t/2)], [sin(t/2), cos(t/2)]]
 fn ry_matrix(theta: f64) -> Matrix2x2 {
     let c = (theta / 2.0).cos();
     let s = (theta / 2.0).sin();
-    [
-        (c, 0.0), (-s, 0.0),
-        (s, 0.0), (c, 0.0),
-    ]
+    [(c, 0.0), (-s, 0.0), (s, 0.0), (c, 0.0)]
 }
 
 /// Rotation around Z: Rz(theta) = [[e^(-it/2), 0], [0, e^(it/2)]]
 fn rz_matrix(theta: f64) -> Matrix2x2 {
     let half = theta / 2.0;
-    [
-        cpolar(1.0, -half), CZERO,
-        CZERO, cpolar(1.0, half),
-    ]
+    [cpolar(1.0, -half), CZERO, CZERO, cpolar(1.0, half)]
 }
 
 // -- Gate application functions ------------------------------------------------
@@ -384,7 +382,12 @@ fn rz_matrix(theta: f64) -> Matrix2x2 {
 /// We iterate over pairs of amplitudes that differ only in the target qubit bit.
 fn apply_single_qubit_gate(state: &mut QuantumState, target: usize, matrix: &Matrix2x2) {
     let n = state.num_qubits;
-    assert!(target < n, "Target qubit {} out of range (num_qubits={})", target, n);
+    assert!(
+        target < n,
+        "Target qubit {} out of range (num_qubits={})",
+        target,
+        n
+    );
 
     let dim = state.dimension();
     // Bit position for the target qubit (MSB = qubit 0)
@@ -410,8 +413,13 @@ fn apply_single_qubit_gate(state: &mut QuantumState, target: usize, matrix: &Mat
 /// Apply CNOT gate: flip target qubit when control qubit is |1>.
 fn apply_cnot(state: &mut QuantumState, control: usize, target: usize) {
     let n = state.num_qubits;
-    assert!(control < n && target < n && control != target,
-        "Invalid CNOT qubits: control={}, target={}, num_qubits={}", control, target, n);
+    assert!(
+        control < n && target < n && control != target,
+        "Invalid CNOT qubits: control={}, target={}, num_qubits={}",
+        control,
+        target,
+        n
+    );
 
     let dim = state.dimension();
     let control_bit = 1 << (n - 1 - control);
@@ -429,8 +437,13 @@ fn apply_cnot(state: &mut QuantumState, control: usize, target: usize) {
 /// Apply SWAP gate: exchange two qubit states.
 fn apply_swap(state: &mut QuantumState, qubit_a: usize, qubit_b: usize) {
     let n = state.num_qubits;
-    assert!(qubit_a < n && qubit_b < n && qubit_a != qubit_b,
-        "Invalid SWAP qubits: a={}, b={}, num_qubits={}", qubit_a, qubit_b, n);
+    assert!(
+        qubit_a < n && qubit_b < n && qubit_a != qubit_b,
+        "Invalid SWAP qubits: a={}, b={}, num_qubits={}",
+        qubit_a,
+        qubit_b,
+        n
+    );
 
     let dim = state.dimension();
     let bit_a = 1 << (n - 1 - qubit_a);
@@ -453,10 +466,14 @@ fn apply_swap(state: &mut QuantumState, qubit_a: usize, qubit_b: usize) {
 /// Apply Toffoli (CCNOT) gate: flip target when both controls are |1>.
 fn apply_toffoli(state: &mut QuantumState, control1: usize, control2: usize, target: usize) {
     let n = state.num_qubits;
-    assert!(control1 < n && control2 < n && target < n,
-        "Qubit index out of range");
-    assert!(control1 != control2 && control1 != target && control2 != target,
-        "All three qubits must be distinct");
+    assert!(
+        control1 < n && control2 < n && target < n,
+        "Qubit index out of range"
+    );
+    assert!(
+        control1 != control2 && control1 != target && control2 != target,
+        "All three qubits must be distinct"
+    );
 
     let dim = state.dimension();
     let c1_bit = 1 << (n - 1 - control1);
@@ -506,8 +523,11 @@ pub struct QuantumCircuit {
 impl QuantumCircuit {
     /// Create a new empty circuit for `num_qubits` qubits.
     pub fn new(num_qubits: usize) -> Self {
-        assert!(num_qubits > 0 && num_qubits <= 20,
-            "Qubit count must be in 1..=20 (got {})", num_qubits);
+        assert!(
+            num_qubits > 0 && num_qubits <= 20,
+            "Qubit count must be in 1..=20 (got {})",
+            num_qubits
+        );
         Self {
             num_qubits,
             gates: Vec::new(),
@@ -584,7 +604,11 @@ impl QuantumCircuit {
 
     /// Add a Toffoli (CCNOT) gate.
     pub fn toffoli(&mut self, control1: usize, control2: usize, target: usize) -> &mut Self {
-        self.apply(QuantumGate::Toffoli { control1, control2, target })
+        self.apply(QuantumGate::Toffoli {
+            control1,
+            control2,
+            target,
+        })
     }
 
     /// Execute the circuit, returning the final quantum state.
@@ -600,9 +624,11 @@ impl QuantumCircuit {
 
     /// Execute the circuit starting from a given initial state.
     pub fn execute_from(&self, initial: &QuantumState) -> QuantumState {
-        assert_eq!(initial.num_qubits, self.num_qubits,
+        assert_eq!(
+            initial.num_qubits, self.num_qubits,
             "Initial state qubit count ({}) must match circuit ({})",
-            initial.num_qubits, self.num_qubits);
+            initial.num_qubits, self.num_qubits
+        );
         let mut state = initial.clone();
         for gate in &self.gates {
             gate.apply(&mut state);
@@ -686,7 +712,11 @@ fn measure_state(state: &QuantumState, seed: Option<u64>) -> Vec<bool> {
 /// 1. Compute P(0) and P(1) for the target qubit.
 /// 2. Sample outcome according to the Born rule.
 /// 3. Collapse the state by zeroing incompatible amplitudes and renormalizing.
-pub fn measure_qubit(state: &QuantumState, target: usize, seed: Option<u64>) -> (bool, QuantumState) {
+pub fn measure_qubit(
+    state: &QuantumState,
+    target: usize,
+    seed: Option<u64>,
+) -> (bool, QuantumState) {
     let n = state.num_qubits;
     assert!(target < n, "Target qubit {} out of range", target);
 
@@ -705,7 +735,9 @@ pub fn measure_qubit(state: &QuantumState, target: usize, seed: Option<u64>) -> 
     let random_value = {
         let s = seed.unwrap_or(0x12345678);
         let mut x = s;
-        if x == 0 { x = 1; }
+        if x == 0 {
+            x = 1;
+        }
         x ^= x << 13;
         x ^= x >> 7;
         x ^= x << 17;
@@ -716,7 +748,11 @@ pub fn measure_qubit(state: &QuantumState, target: usize, seed: Option<u64>) -> 
     // Collapse: zero out incompatible amplitudes and renormalize
     let mut new_state = state.clone();
     let norm_factor = if outcome { prob_one } else { prob_zero };
-    let renorm = if norm_factor > 0.0 { 1.0 / norm_factor.sqrt() } else { 0.0 };
+    let renorm = if norm_factor > 0.0 {
+        1.0 / norm_factor.sqrt()
+    } else {
+        0.0
+    };
 
     for (i, amp) in new_state.amplitudes.iter_mut().enumerate() {
         let bit_set = (i & target_bit) != 0;
@@ -804,7 +840,8 @@ pub fn encode_state(state: &QuantumState) -> BinaryHV {
 /// vector if available, falling back to a deterministic seed otherwise.
 pub fn encode_state_with_system(state: &QuantumState, system: &PrimitiveSystem) -> BinaryHV {
     // Try to get the QUANTUM domain from the primitive system
-    let quantum_domain = system.get("QUANTUM")
+    let quantum_domain = system
+        .get("QUANTUM")
         .map(|p| p.encoding)
         .unwrap_or_else(|| BinaryHV::random(seed_from_name("QUANTUM_DOMAIN")));
 
@@ -905,9 +942,9 @@ pub fn expectation_z(state: &QuantumState, qubit: usize) -> f64 {
     for (i, &amp) in state.amplitudes.iter().enumerate() {
         let prob = cnorm2(amp);
         if (i & target_bit) == 0 {
-            expectation += prob;  // |0> eigenvalue: +1
+            expectation += prob; // |0> eigenvalue: +1
         } else {
-            expectation -= prob;  // |1> eigenvalue: -1
+            expectation -= prob; // |1> eigenvalue: -1
         }
     }
 
@@ -954,7 +991,10 @@ mod tests {
         assert!(
             (actual - expected).abs() < tol,
             "{}: expected {:.10}, got {:.10} (diff={:.2e})",
-            msg, expected, actual, (actual - expected).abs()
+            msg,
+            expected,
+            actual,
+            (actual - expected).abs()
         );
     }
 
@@ -963,7 +1003,11 @@ mod tests {
         assert!(
             (actual.0 - expected.0).abs() < tol && (actual.1 - expected.1).abs() < tol,
             "{}: expected ({:.10}, {:.10}), got ({:.10}, {:.10})",
-            msg, expected.0, expected.1, actual.0, actual.1
+            msg,
+            expected.0,
+            expected.1,
+            actual.0,
+            actual.1
         );
     }
 
@@ -992,10 +1036,19 @@ mod tests {
         assert_eq!(state.amplitudes.len(), 8);
         assert_camp(state.amplitudes[0], CONE, TOLERANCE, "|000> amplitude");
         for i in 1..8 {
-            assert_camp(state.amplitudes[i], CZERO, TOLERANCE,
-                &format!("|{:03b}> amplitude", i));
+            assert_camp(
+                state.amplitudes[i],
+                CZERO,
+                TOLERANCE,
+                &format!("|{:03b}> amplitude", i),
+            );
         }
-        assert_approx(state.total_probability(), 1.0, TOLERANCE, "total probability");
+        assert_approx(
+            state.total_probability(),
+            1.0,
+            TOLERANCE,
+            "total probability",
+        );
     }
 
     // -- Pauli-X gate ----------------------------------------------------------
@@ -1019,8 +1072,18 @@ mod tests {
         circuit.x(0);
         let state = circuit.execute();
 
-        assert_camp(state.amplitudes[0], CONE, TOLERANCE, "X^2|0>: |0> amplitude");
-        assert_camp(state.amplitudes[1], CZERO, TOLERANCE, "X^2|0>: |1> amplitude");
+        assert_camp(
+            state.amplitudes[0],
+            CONE,
+            TOLERANCE,
+            "X^2|0>: |0> amplitude",
+        );
+        assert_camp(
+            state.amplitudes[1],
+            CZERO,
+            TOLERANCE,
+            "X^2|0>: |1> amplitude",
+        );
     }
 
     // -- Hadamard gate ---------------------------------------------------------
@@ -1032,20 +1095,40 @@ mod tests {
         circuit.h(0);
         let state = circuit.execute();
 
-        assert_camp(state.amplitudes[0], (FRAC_1_SQRT2, 0.0), TOLERANCE, "H|0>: |0>");
-        assert_camp(state.amplitudes[1], (FRAC_1_SQRT2, 0.0), TOLERANCE, "H|0>: |1>");
+        assert_camp(
+            state.amplitudes[0],
+            (FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "H|0>: |0>",
+        );
+        assert_camp(
+            state.amplitudes[1],
+            (FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "H|0>: |1>",
+        );
     }
 
     #[test]
     fn test_hadamard_on_one() {
         // H|1> = (|0> - |1>) / sqrt(2)
         let mut circuit = QuantumCircuit::new(1);
-        circuit.x(0);  // Prepare |1>
-        circuit.h(0);   // Apply H
+        circuit.x(0); // Prepare |1>
+        circuit.h(0); // Apply H
         let state = circuit.execute();
 
-        assert_camp(state.amplitudes[0], (FRAC_1_SQRT2, 0.0), TOLERANCE, "H|1>: |0>");
-        assert_camp(state.amplitudes[1], (-FRAC_1_SQRT2, 0.0), TOLERANCE, "H|1>: |1>");
+        assert_camp(
+            state.amplitudes[0],
+            (FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "H|1>: |0>",
+        );
+        assert_camp(
+            state.amplitudes[1],
+            (-FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "H|1>: |1>",
+        );
     }
 
     #[test]
@@ -1077,8 +1160,8 @@ mod tests {
     fn test_pauli_z_on_one() {
         // Z|1> = -|1>
         let mut circuit = QuantumCircuit::new(1);
-        circuit.x(0);  // Prepare |1>
-        circuit.z(0);   // Apply Z
+        circuit.x(0); // Prepare |1>
+        circuit.z(0); // Apply Z
         let state = circuit.execute();
 
         assert_camp(state.amplitudes[0], CZERO, TOLERANCE, "Z|1>: |0>");
@@ -1093,8 +1176,18 @@ mod tests {
         circuit.z(0);
         let state = circuit.execute();
 
-        assert_camp(state.amplitudes[0], (FRAC_1_SQRT2, 0.0), TOLERANCE, "ZH|0>: |0>");
-        assert_camp(state.amplitudes[1], (-FRAC_1_SQRT2, 0.0), TOLERANCE, "ZH|0>: |1>");
+        assert_camp(
+            state.amplitudes[0],
+            (FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "ZH|0>: |0>",
+        );
+        assert_camp(
+            state.amplitudes[1],
+            (-FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "ZH|0>: |1>",
+        );
     }
 
     // -- Pauli-Y gate ----------------------------------------------------------
@@ -1121,13 +1214,28 @@ mod tests {
         let state = circuit.execute();
 
         // |00> and |11> should each have amplitude 1/sqrt(2)
-        assert_camp(state.amplitudes[0], (FRAC_1_SQRT2, 0.0), TOLERANCE, "Bell |00>");
+        assert_camp(
+            state.amplitudes[0],
+            (FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "Bell |00>",
+        );
         assert_camp(state.amplitudes[1], CZERO, TOLERANCE, "Bell |01>");
         assert_camp(state.amplitudes[2], CZERO, TOLERANCE, "Bell |10>");
-        assert_camp(state.amplitudes[3], (FRAC_1_SQRT2, 0.0), TOLERANCE, "Bell |11>");
+        assert_camp(
+            state.amplitudes[3],
+            (FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "Bell |11>",
+        );
 
         // Verify normalization
-        assert_approx(state.total_probability(), 1.0, TOLERANCE, "Bell state normalization");
+        assert_approx(
+            state.total_probability(),
+            1.0,
+            TOLERANCE,
+            "Bell state normalization",
+        );
     }
 
     #[test]
@@ -1140,10 +1248,20 @@ mod tests {
         circuit.cnot(0, 1);
         let state = circuit.execute();
 
-        assert_camp(state.amplitudes[0], (FRAC_1_SQRT2, 0.0), TOLERANCE, "Phi-: |00>");
+        assert_camp(
+            state.amplitudes[0],
+            (FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "Phi-: |00>",
+        );
         assert_camp(state.amplitudes[1], CZERO, TOLERANCE, "Phi-: |01>");
         assert_camp(state.amplitudes[2], CZERO, TOLERANCE, "Phi-: |10>");
-        assert_camp(state.amplitudes[3], (-FRAC_1_SQRT2, 0.0), TOLERANCE, "Phi-: |11>");
+        assert_camp(
+            state.amplitudes[3],
+            (-FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "Phi-: |11>",
+        );
     }
 
     #[test]
@@ -1174,7 +1292,12 @@ mod tests {
         let state = QuantumState::zero_state(1);
         for seed in 0..100 {
             let bits = measure_state(&state, Some(seed));
-            assert_eq!(bits, vec![false], "Seed {}: |0> must always measure 0", seed);
+            assert_eq!(
+                bits,
+                vec![false],
+                "Seed {}: |0> must always measure 0",
+                seed
+            );
         }
     }
 
@@ -1202,8 +1325,11 @@ mod tests {
 
         for seed in 1..200 {
             let bits = measure_state(&state, Some(seed));
-            assert_eq!(bits[0], bits[1],
-                "Seed {}: Bell state qubits must be correlated (got {:?})", seed, bits);
+            assert_eq!(
+                bits[0], bits[1],
+                "Seed {}: Bell state qubits must be correlated (got {:?})",
+                seed, bits
+            );
         }
     }
 
@@ -1226,7 +1352,8 @@ mod tests {
         let ratio = count_zero as f64 / num_trials as f64;
         assert!(
             (ratio - 0.5).abs() < 0.05,
-            "H|0> measurement ratio should be ~0.5, got {:.4}", ratio
+            "H|0> measurement ratio should be ~0.5, got {:.4}",
+            ratio
         );
     }
 
@@ -1242,18 +1369,32 @@ mod tests {
         circuit.cnot(1, 2);
         let state = circuit.execute();
 
-        assert_approx(state.total_probability(), 1.0, TOLERANCE,
-            "Normalization after multi-gate circuit");
+        assert_approx(
+            state.total_probability(),
+            1.0,
+            TOLERANCE,
+            "Normalization after multi-gate circuit",
+        );
     }
 
     #[test]
     fn test_normalize_unnormalized_state() {
         let mut state = QuantumState::from_amplitudes(1, vec![(3.0, 0.0), (4.0, 0.0)]);
         // Total probability: 9 + 16 = 25 (not normalized)
-        assert_approx(state.total_probability(), 25.0, TOLERANCE, "Before normalization");
+        assert_approx(
+            state.total_probability(),
+            25.0,
+            TOLERANCE,
+            "Before normalization",
+        );
 
         state.normalize();
-        assert_approx(state.total_probability(), 1.0, TOLERANCE, "After normalization");
+        assert_approx(
+            state.total_probability(),
+            1.0,
+            TOLERANCE,
+            "After normalization",
+        );
         assert_approx(cnorm(state.amplitudes[0]), 0.6, TOLERANCE, "Normalized |0>");
         assert_approx(cnorm(state.amplitudes[1]), 0.8, TOLERANCE, "Normalized |1>");
     }
@@ -1268,8 +1409,18 @@ mod tests {
         let state = circuit.execute();
 
         // Rx(pi)|0> = -i|1>
-        assert_approx(cnorm2(state.amplitudes[0]), 0.0, TOLERANCE, "Rx(pi)|0>: P(0)");
-        assert_approx(cnorm2(state.amplitudes[1]), 1.0, TOLERANCE, "Rx(pi)|0>: P(1)");
+        assert_approx(
+            cnorm2(state.amplitudes[0]),
+            0.0,
+            TOLERANCE,
+            "Rx(pi)|0>: P(0)",
+        );
+        assert_approx(
+            cnorm2(state.amplitudes[1]),
+            1.0,
+            TOLERANCE,
+            "Rx(pi)|0>: P(1)",
+        );
     }
 
     #[test]
@@ -1279,8 +1430,18 @@ mod tests {
         circuit.ry(0, PI);
         let state = circuit.execute();
 
-        assert_approx(cnorm2(state.amplitudes[0]), 0.0, TOLERANCE, "Ry(pi)|0>: P(0)");
-        assert_approx(cnorm2(state.amplitudes[1]), 1.0, TOLERANCE, "Ry(pi)|0>: P(1)");
+        assert_approx(
+            cnorm2(state.amplitudes[0]),
+            0.0,
+            TOLERANCE,
+            "Ry(pi)|0>: P(0)",
+        );
+        assert_approx(
+            cnorm2(state.amplitudes[1]),
+            1.0,
+            TOLERANCE,
+            "Ry(pi)|0>: P(1)",
+        );
     }
 
     #[test]
@@ -1291,8 +1452,18 @@ mod tests {
         let state = circuit.execute();
 
         // Probability should be unchanged
-        assert_approx(cnorm2(state.amplitudes[0]), 1.0, TOLERANCE, "Rz on |0>: P(0)");
-        assert_approx(cnorm2(state.amplitudes[1]), 0.0, TOLERANCE, "Rz on |0>: P(1)");
+        assert_approx(
+            cnorm2(state.amplitudes[0]),
+            1.0,
+            TOLERANCE,
+            "Rz on |0>: P(0)",
+        );
+        assert_approx(
+            cnorm2(state.amplitudes[1]),
+            0.0,
+            TOLERANCE,
+            "Rz on |0>: P(1)",
+        );
     }
 
     // -- T and S gates ---------------------------------------------------------
@@ -1301,7 +1472,7 @@ mod tests {
     fn test_t_gate_phase() {
         // T|1> = e^(i*pi/4)|1>
         let mut circuit = QuantumCircuit::new(1);
-        circuit.x(0);  // Prepare |1>
+        circuit.x(0); // Prepare |1>
         circuit.t(0);
         let state = circuit.execute();
 
@@ -1338,8 +1509,18 @@ mod tests {
         circuit_z.z(0);
         let state_z = circuit_z.execute();
 
-        assert_camp(state_s2.amplitudes[0], state_z.amplitudes[0], TOLERANCE, "S^2=Z: |0>");
-        assert_camp(state_s2.amplitudes[1], state_z.amplitudes[1], TOLERANCE, "S^2=Z: |1>");
+        assert_camp(
+            state_s2.amplitudes[0],
+            state_z.amplitudes[0],
+            TOLERANCE,
+            "S^2=Z: |0>",
+        );
+        assert_camp(
+            state_s2.amplitudes[1],
+            state_z.amplitudes[1],
+            TOLERANCE,
+            "S^2=Z: |1>",
+        );
     }
 
     // -- SWAP gate -------------------------------------------------------------
@@ -1348,8 +1529,8 @@ mod tests {
     fn test_swap_gate() {
         // Prepare |10>, SWAP should give |01>
         let mut circuit = QuantumCircuit::new(2);
-        circuit.x(0);           // |10>
-        circuit.swap(0, 1);     // SWAP -> |01>
+        circuit.x(0); // |10>
+        circuit.swap(0, 1); // SWAP -> |01>
         let state = circuit.execute();
 
         assert_camp(state.amplitudes[0], CZERO, TOLERANCE, "SWAP: |00>");
@@ -1373,8 +1554,12 @@ mod tests {
         // |111> = index 7
         assert_camp(state.amplitudes[7], CONE, TOLERANCE, "Toffoli |110>->|111>");
         for i in 0..7 {
-            assert_camp(state.amplitudes[i], CZERO, TOLERANCE,
-                &format!("Toffoli: |{:03b}> should be zero", i));
+            assert_camp(
+                state.amplitudes[i],
+                CZERO,
+                TOLERANCE,
+                &format!("Toffoli: |{:03b}> should be zero", i),
+            );
         }
     }
 
@@ -1387,7 +1572,12 @@ mod tests {
         let state = circuit.execute();
 
         // |100> = index 4
-        assert_camp(state.amplitudes[4], CONE, TOLERANCE, "Toffoli with one control: stays |100>");
+        assert_camp(
+            state.amplitudes[4],
+            CONE,
+            TOLERANCE,
+            "Toffoli with one control: stays |100>",
+        );
     }
 
     // -- Multi-qubit circuits --------------------------------------------------
@@ -1401,13 +1591,27 @@ mod tests {
         circuit.cnot(0, 2);
         let state = circuit.execute();
 
-        assert_camp(state.amplitudes[0], (FRAC_1_SQRT2, 0.0), TOLERANCE, "GHZ |000>");
-        assert_camp(state.amplitudes[7], (FRAC_1_SQRT2, 0.0), TOLERANCE, "GHZ |111>");
+        assert_camp(
+            state.amplitudes[0],
+            (FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "GHZ |000>",
+        );
+        assert_camp(
+            state.amplitudes[7],
+            (FRAC_1_SQRT2, 0.0),
+            TOLERANCE,
+            "GHZ |111>",
+        );
 
         // All other amplitudes should be zero
         for i in 1..7 {
-            assert_camp(state.amplitudes[i], CZERO, TOLERANCE,
-                &format!("GHZ |{:03b}> should be zero", i));
+            assert_camp(
+                state.amplitudes[i],
+                CZERO,
+                TOLERANCE,
+                &format!("GHZ |{:03b}> should be zero", i),
+            );
         }
     }
 
@@ -1427,7 +1631,12 @@ mod tests {
         circuit.x(0);
         let state1 = circuit.execute();
 
-        assert_approx(state0.fidelity(&state1), 0.0, TOLERANCE, "Orthogonal fidelity");
+        assert_approx(
+            state0.fidelity(&state1),
+            0.0,
+            TOLERANCE,
+            "Orthogonal fidelity",
+        );
     }
 
     // -- Entropy ---------------------------------------------------------------
@@ -1482,8 +1691,11 @@ mod tests {
         let hv = encode_state(&state);
         // Encoding should be non-trivial (not all zeros or all ones)
         let density = hv.density();
-        assert!(density > 0.3 && density < 0.7,
-            "Zero state encoding density should be near 0.5 (got {:.4})", density);
+        assert!(
+            density > 0.3 && density < 0.7,
+            "Zero state encoding density should be near 0.5 (got {:.4})",
+            density
+        );
     }
 
     #[test]
@@ -1506,8 +1718,11 @@ mod tests {
         let hv_one = encode_state(&one_state);
 
         let sim = hv_zero.similarity(&hv_one);
-        assert!(sim < 0.7,
-            "Different quantum states should have < 0.7 similarity (got {:.4})", sim);
+        assert!(
+            sim < 0.7,
+            "Different quantum states should have < 0.7 similarity (got {:.4})",
+            sim
+        );
     }
 
     #[test]
@@ -1522,10 +1737,17 @@ mod tests {
         // uses majority vote where ties (differing bits) break toward 0, so density
         // is expected around 0.25 (both bits set). This is valid HDC encoding.
         let density = hv.density();
-        assert!(density > 0.1 && density < 0.8,
-            "Bell state encoding should produce non-trivial density (got {:.4})", density);
+        assert!(
+            density > 0.1 && density < 0.8,
+            "Bell state encoding should produce non-trivial density (got {:.4})",
+            density
+        );
         // Most importantly: it should NOT be all zeros
-        assert_ne!(hv, BinaryHV::zero(), "Bell state encoding should not be zero");
+        assert_ne!(
+            hv,
+            BinaryHV::zero(),
+            "Bell state encoding should not be zero"
+        );
     }
 
     // -- Dirac notation --------------------------------------------------------
@@ -1544,8 +1766,16 @@ mod tests {
         circuit.cnot(0, 1);
         let state = circuit.execute();
         let dirac = state.to_dirac_string();
-        assert!(dirac.contains("|00>"), "Bell state dirac should contain |00>: {}", dirac);
-        assert!(dirac.contains("|11>"), "Bell state dirac should contain |11>: {}", dirac);
+        assert!(
+            dirac.contains("|00>"),
+            "Bell state dirac should contain |00>: {}",
+            dirac
+        );
+        assert!(
+            dirac.contains("|11>"),
+            "Bell state dirac should contain |11>: {}",
+            dirac
+        );
     }
 
     // -- Circuit builder API ---------------------------------------------------
@@ -1564,7 +1794,7 @@ mod tests {
         // Prepare |1> state, then execute circuit starting from it
         let initial = QuantumState::from_amplitudes(1, vec![CZERO, CONE]);
         let mut circuit = QuantumCircuit::new(1);
-        circuit.x(0);  // X|1> = |0>
+        circuit.x(0); // X|1> = |0>
         let state = circuit.execute_from(&initial);
 
         assert_camp(state.amplitudes[0], CONE, TOLERANCE, "X|1> = |0>");
@@ -1578,6 +1808,11 @@ mod tests {
         let state = QuantumState::zero_state(2);
         let (outcome, post) = measure_qubit(&state, 0, Some(42));
         assert!(!outcome, "Qubit 0 of |00> must measure 0");
-        assert_approx(post.total_probability(), 1.0, TOLERANCE, "Post-measurement normalization");
+        assert_approx(
+            post.total_probability(),
+            1.0,
+            TOLERANCE,
+            "Post-measurement normalization",
+        );
     }
 }

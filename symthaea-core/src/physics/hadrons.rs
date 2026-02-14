@@ -36,16 +36,16 @@
 //!
 //! This naturally emerges from shared quark content.
 
+use super::standard_model::{StandardModel, PHYSICS_DIM};
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::{StandardModel, PHYSICS_DIM};
 use serde::{Deserialize, Serialize};
 
 /// Baryon types (3-quark composite particles)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Baryon {
-    Proton,   // uud
-    Neutron,  // udd
+    Proton,        // uud
+    Neutron,       // udd
     DeltaPlusPlus, // uuu
     DeltaPlus,     // uud (excited)
     DeltaZero,     // udd (excited)
@@ -65,10 +65,12 @@ impl Baryon {
         match self {
             Baryon::DeltaPlusPlus => 2,
             Baryon::Proton | Baryon::DeltaPlus | Baryon::SigmaPlus => 1,
-            Baryon::Neutron | Baryon::DeltaZero | Baryon::Lambda |
-            Baryon::SigmaZero | Baryon::XiZero => 0,
-            Baryon::DeltaMinus | Baryon::SigmaMinus | Baryon::XiMinus |
-            Baryon::Omega => -1,
+            Baryon::Neutron
+            | Baryon::DeltaZero
+            | Baryon::Lambda
+            | Baryon::SigmaZero
+            | Baryon::XiZero => 0,
+            Baryon::DeltaMinus | Baryon::SigmaMinus | Baryon::XiMinus | Baryon::Omega => -1,
         }
     }
 
@@ -77,8 +79,9 @@ impl Baryon {
         match self {
             Baryon::Proton => 938.272,
             Baryon::Neutron => 939.565,
-            Baryon::DeltaPlusPlus | Baryon::DeltaPlus |
-            Baryon::DeltaZero | Baryon::DeltaMinus => 1232.0,
+            Baryon::DeltaPlusPlus | Baryon::DeltaPlus | Baryon::DeltaZero | Baryon::DeltaMinus => {
+                1232.0
+            }
             Baryon::Lambda => 1115.683,
             Baryon::SigmaPlus => 1189.37,
             Baryon::SigmaZero => 1192.642,
@@ -92,11 +95,13 @@ impl Baryon {
     /// Strangeness quantum number
     pub fn strangeness(&self) -> i8 {
         match self {
-            Baryon::Proton | Baryon::Neutron |
-            Baryon::DeltaPlusPlus | Baryon::DeltaPlus |
-            Baryon::DeltaZero | Baryon::DeltaMinus => 0,
-            Baryon::Lambda | Baryon::SigmaPlus |
-            Baryon::SigmaZero | Baryon::SigmaMinus => -1,
+            Baryon::Proton
+            | Baryon::Neutron
+            | Baryon::DeltaPlusPlus
+            | Baryon::DeltaPlus
+            | Baryon::DeltaZero
+            | Baryon::DeltaMinus => 0,
+            Baryon::Lambda | Baryon::SigmaPlus | Baryon::SigmaZero | Baryon::SigmaMinus => -1,
             Baryon::XiZero | Baryon::XiMinus => -2,
             Baryon::Omega => -3,
         }
@@ -106,14 +111,14 @@ impl Baryon {
 /// Meson types (quark-antiquark pairs)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Meson {
-    PionPlus,   // u + d̄
-    PionZero,   // (uū - dd̄)/√2
-    PionMinus,  // d + ū
-    KaonPlus,   // u + s̄
-    KaonZero,   // d + s̄
-    KaonMinus,  // s + ū
-    Eta,        // (uū + dd̄ - 2ss̄)/√6
-    EtaPrime,   // (uū + dd̄ + ss̄)/√3
+    PionPlus,  // u + d̄
+    PionZero,  // (uū - dd̄)/√2
+    PionMinus, // d + ū
+    KaonPlus,  // u + s̄
+    KaonZero,  // d + s̄
+    KaonMinus, // s + ū
+    Eta,       // (uū + dd̄ - 2ss̄)/√6
+    EtaPrime,  // (uū + dd̄ + ss̄)/√3
 }
 
 impl Meson {
@@ -121,8 +126,7 @@ impl Meson {
     pub fn charge(&self) -> i8 {
         match self {
             Meson::PionPlus | Meson::KaonPlus => 1,
-            Meson::PionZero | Meson::KaonZero |
-            Meson::Eta | Meson::EtaPrime => 0,
+            Meson::PionZero | Meson::KaonZero | Meson::Eta | Meson::EtaPrime => 0,
             Meson::PionMinus | Meson::KaonMinus => -1,
         }
     }
@@ -181,68 +185,40 @@ impl Hadrons {
     pub fn from_model(model: &StandardModel, genesis: &GenesisSeed) -> Self {
         // Nucleons: the building blocks of all atoms
         // Proton = Bundle(Up, Up, Down)
-        let proton = Self::compose_baryon(&[
-            &model.up_quark,
-            &model.up_quark,
-            &model.down_quark,
-        ]);
+        let proton = Self::compose_baryon(&[&model.up_quark, &model.up_quark, &model.down_quark]);
 
         // Neutron = Bundle(Up, Down, Down)
-        let neutron = Self::compose_baryon(&[
-            &model.up_quark,
-            &model.down_quark,
-            &model.down_quark,
-        ]);
+        let neutron =
+            Self::compose_baryon(&[&model.up_quark, &model.down_quark, &model.down_quark]);
 
         // Delta baryons (excited states)
-        let delta_plus_plus = Self::compose_baryon(&[
-            &model.up_quark,
-            &model.up_quark,
-            &model.up_quark,
-        ]);
+        let delta_plus_plus =
+            Self::compose_baryon(&[&model.up_quark, &model.up_quark, &model.up_quark]);
 
-        let delta_plus = Self::compose_baryon(&[
-            &model.up_quark,
-            &model.up_quark,
-            &model.down_quark,
-        ]).bind(&genesis.hv("hadron::delta_excited", PHYSICS_DIM));
+        let delta_plus =
+            Self::compose_baryon(&[&model.up_quark, &model.up_quark, &model.down_quark])
+                .bind(&genesis.hv("hadron::delta_excited", PHYSICS_DIM));
 
-        let delta_zero = Self::compose_baryon(&[
-            &model.up_quark,
-            &model.down_quark,
-            &model.down_quark,
-        ]).bind(&genesis.hv("hadron::delta_excited", PHYSICS_DIM));
+        let delta_zero =
+            Self::compose_baryon(&[&model.up_quark, &model.down_quark, &model.down_quark])
+                .bind(&genesis.hv("hadron::delta_excited", PHYSICS_DIM));
 
-        let delta_minus = Self::compose_baryon(&[
-            &model.down_quark,
-            &model.down_quark,
-            &model.down_quark,
-        ]);
+        let delta_minus =
+            Self::compose_baryon(&[&model.down_quark, &model.down_quark, &model.down_quark]);
 
         // Strange baryons
-        let lambda = Self::compose_baryon(&[
-            &model.up_quark,
-            &model.down_quark,
-            &model.strange_quark,
-        ]);
+        let lambda =
+            Self::compose_baryon(&[&model.up_quark, &model.down_quark, &model.strange_quark]);
 
-        let sigma_plus = Self::compose_baryon(&[
-            &model.up_quark,
-            &model.up_quark,
-            &model.strange_quark,
-        ]);
+        let sigma_plus =
+            Self::compose_baryon(&[&model.up_quark, &model.up_quark, &model.strange_quark]);
 
-        let sigma_zero = Self::compose_baryon(&[
-            &model.up_quark,
-            &model.down_quark,
-            &model.strange_quark,
-        ]).bind(&genesis.hv("hadron::sigma_state", PHYSICS_DIM));
+        let sigma_zero =
+            Self::compose_baryon(&[&model.up_quark, &model.down_quark, &model.strange_quark])
+                .bind(&genesis.hv("hadron::sigma_state", PHYSICS_DIM));
 
-        let sigma_minus = Self::compose_baryon(&[
-            &model.down_quark,
-            &model.down_quark,
-            &model.strange_quark,
-        ]);
+        let sigma_minus =
+            Self::compose_baryon(&[&model.down_quark, &model.down_quark, &model.strange_quark]);
 
         // Mesons (quark + antiquark)
         let anti_down = model.antiparticle(&model.down_quark);
@@ -402,11 +378,7 @@ mod tests {
         let sim = hadrons.nucleon_similarity();
 
         // They should have significant similarity (share 2 quarks)
-        assert!(
-            sim > 0.3,
-            "Proton and neutron should be related: {}",
-            sim
-        );
+        assert!(sim > 0.3, "Proton and neutron should be related: {}", sim);
     }
 
     #[test]
@@ -440,7 +412,8 @@ mod tests {
         assert!(
             lambda_proton < proton_neutron,
             "Strange baryons should be less similar to proton: lambda={}, nucleon={}",
-            lambda_proton, proton_neutron
+            lambda_proton,
+            proton_neutron
         );
     }
 
@@ -454,11 +427,7 @@ mod tests {
         let sim = hadrons.pion_plus.similarity(&hadrons.pion_minus);
 
         // They should be dissimilar (different quark content)
-        assert!(
-            sim < 0.5,
-            "Pion+ and pion- should be distinct: {}",
-            sim
-        );
+        assert!(sim < 0.5, "Pion+ and pion- should be distinct: {}", sim);
     }
 
     #[test]

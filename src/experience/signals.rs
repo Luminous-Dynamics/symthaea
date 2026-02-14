@@ -197,9 +197,8 @@ impl PrincipledSignals {
     /// Higher = more to learn from this interaction
     pub fn learning_potential(&self) -> f32 {
         // High prediction error + high salience = valuable learning
-        let potential = (self.prediction_error * 0.4)
-            + (self.salience * 0.3)
-            + (self.uncertainty * 0.3);
+        let potential =
+            (self.prediction_error * 0.4) + (self.salience * 0.3) + (self.uncertainty * 0.3);
 
         potential.clamp(0.0, 1.0)
     }
@@ -318,11 +317,8 @@ impl SignalComputer {
         }
 
         let mean = activations.iter().sum::<f32>() / activations.len() as f32;
-        let variance: f32 = activations
-            .iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f32>()
-            / activations.len() as f32;
+        let variance: f32 =
+            activations.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / activations.len() as f32;
 
         // Low variance = high coherence (harmonies agree)
         1.0 - variance.sqrt()

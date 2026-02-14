@@ -23,7 +23,7 @@
 //! - **Dark Spot DHT**: Reports self-identified blind spots to network
 
 use std::collections::{HashMap, VecDeque};
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 
 /// Epistemic Mirror - Self-reflective knowledge monitoring system
 #[derive(Debug)]
@@ -69,18 +69,22 @@ impl EpistemicMirror {
         confidence: f32,
         depth: KnowledgeDepth,
     ) {
-        let assessment = self.domains
+        let assessment = self
+            .domains
             .entry(domain.to_string())
             .or_insert_with(|| DomainAssessment::new(domain));
 
-        assessment.topics.insert(topic.to_string(), TopicKnowledge {
-            confidence: confidence.clamp(0.0, 1.0),
-            depth,
-            last_updated: SystemTime::now(),
-            times_used: 0,
-            times_verified: 0,
-            times_wrong: 0,
-        });
+        assessment.topics.insert(
+            topic.to_string(),
+            TopicKnowledge {
+                confidence: confidence.clamp(0.0, 1.0),
+                depth,
+                last_updated: SystemTime::now(),
+                times_used: 0,
+                times_verified: 0,
+                times_wrong: 0,
+            },
+        );
 
         self.stats.total_topics += 1;
     }
@@ -119,7 +123,9 @@ impl EpistemicMirror {
     ///
     /// Returns the calibration error (difference between confidence and accuracy).
     pub fn verify_prediction(&mut self, prediction_id: &str, was_correct: bool) -> Option<f32> {
-        let record = self.predictions.iter_mut()
+        let record = self
+            .predictions
+            .iter_mut()
             .find(|p| p.id == prediction_id)?;
 
         record.outcome = Some(was_correct);
@@ -146,7 +152,9 @@ impl EpistemicMirror {
     ///
     /// Returns a CalibrationReport showing how well confidence matches accuracy.
     pub fn calculate_calibration(&self) -> CalibrationReport {
-        let verified: Vec<_> = self.predictions.iter()
+        let verified: Vec<_> = self
+            .predictions
+            .iter()
             .filter(|p| p.outcome.is_some())
             .collect();
 
@@ -171,14 +179,19 @@ impl EpistemicMirror {
         let mut total_log_score = 0.0f32;
 
         for pred in &verified {
-            let actual = if pred.outcome.unwrap_or(false) { 1.0 } else { 0.0 };
+            let actual = if pred.outcome.unwrap_or(false) {
+                1.0
+            } else {
+                0.0
+            };
 
             // Brier score: (confidence - actual)^2
             total_brier_score += (pred.confidence - actual).powi(2);
 
             // Log score: actual * log(confidence) + (1-actual) * log(1-confidence)
             let conf_clamped = pred.confidence.clamp(0.001, 0.999);
-            total_log_score += actual * conf_clamped.ln() + (1.0 - actual) * (1.0 - conf_clamped).ln();
+            total_log_score +=
+                actual * conf_clamped.ln() + (1.0 - actual) * (1.0 - conf_clamped).ln();
         }
 
         let brier_score = total_brier_score / verified.len() as f32;
@@ -225,10 +238,14 @@ impl EpistemicMirror {
             CalibrationDiagnosis::WellCalibrated
         } else if ece > 0.15 {
             // Check direction
-            let overconfident_buckets = self.predictions.iter()
+            let overconfident_buckets = self
+                .predictions
+                .iter()
                 .filter(|p| p.outcome == Some(false) && p.confidence > 0.7)
                 .count();
-            let underconfident_buckets = self.predictions.iter()
+            let underconfident_buckets = self
+                .predictions
+                .iter()
                 .filter(|p| p.outcome == Some(true) && p.confidence < 0.3)
                 .count();
 
@@ -240,7 +257,8 @@ impl EpistemicMirror {
             } else if underconfident_buckets > overconfident_buckets {
                 CalibrationDiagnosis::Underconfident {
                     severity: (ece - 0.1).max(0.0),
-                    recommendation: "Your predictions are better than your confidence suggests".to_string(),
+                    recommendation: "Your predictions are better than your confidence suggests"
+                        .to_string(),
                 }
             } else {
                 CalibrationDiagnosis::Miscalibrated {
@@ -249,9 +267,7 @@ impl EpistemicMirror {
             }
         } else {
             CalibrationDiagnosis::Adequate {
-                improvement_areas: vec![
-                    "Continue tracking predictions for more data".to_string(),
-                ],
+                improvement_areas: vec!["Continue tracking predictions for more data".to_string()],
             }
         }
     }
@@ -295,15 +311,15 @@ impl EpistemicMirror {
 
     fn detect_confirmation_bias(&self) -> Option<BiasAlert> {
         // Look for pattern: high confidence maintained despite incorrect predictions
-        let recent_wrong: Vec<_> = self.predictions.iter()
+        let recent_wrong: Vec<_> = self
+            .predictions
+            .iter()
             .filter(|p| p.outcome == Some(false))
             .filter(|p| p.confidence > 0.7)
             .collect();
 
         if recent_wrong.len() >= 3 {
-            let domains: Vec<_> = recent_wrong.iter()
-                .map(|p| p.domain.clone())
-                .collect();
+            let domains: Vec<_> = recent_wrong.iter().map(|p| p.domain.clone()).collect();
 
             return Some(BiasAlert {
                 bias_type: BiasType::Confirmation,
@@ -329,11 +345,15 @@ impl EpistemicMirror {
         // Check if recent predictions are weighted much higher than older ones
         let cutoff = SystemTime::now() - Duration::from_secs(7 * 24 * 3600); // 1 week
 
-        let recent: Vec<_> = self.predictions.iter()
+        let recent: Vec<_> = self
+            .predictions
+            .iter()
             .filter(|p| p.predicted_at > cutoff)
             .collect();
 
-        let older: Vec<_> = self.predictions.iter()
+        let older: Vec<_> = self
+            .predictions
+            .iter()
             .filter(|p| p.predicted_at <= cutoff)
             .collect();
 
@@ -341,8 +361,10 @@ impl EpistemicMirror {
             return None;
         }
 
-        let recent_avg_conf: f32 = recent.iter().map(|p| p.confidence).sum::<f32>() / recent.len() as f32;
-        let older_avg_conf: f32 = older.iter().map(|p| p.confidence).sum::<f32>() / older.len() as f32;
+        let recent_avg_conf: f32 =
+            recent.iter().map(|p| p.confidence).sum::<f32>() / recent.len() as f32;
+        let older_avg_conf: f32 =
+            older.iter().map(|p| p.confidence).sum::<f32>() / older.len() as f32;
 
         // If recent predictions have significantly higher confidence
         if recent_avg_conf > older_avg_conf + 0.15 {
@@ -375,7 +397,9 @@ impl EpistemicMirror {
             let accuracy = domain.correct_predictions as f32 / total as f32;
 
             // Get average confidence in this domain
-            let domain_preds: Vec<_> = self.predictions.iter()
+            let domain_preds: Vec<_> = self
+                .predictions
+                .iter()
                 .filter(|p| &p.domain == domain_name)
                 .collect();
 
@@ -383,9 +407,8 @@ impl EpistemicMirror {
                 continue;
             }
 
-            let avg_confidence: f32 = domain_preds.iter()
-                .map(|p| p.confidence)
-                .sum::<f32>() / domain_preds.len() as f32;
+            let avg_confidence: f32 =
+                domain_preds.iter().map(|p| p.confidence).sum::<f32>() / domain_preds.len() as f32;
 
             // Significant overconfidence: confidence much higher than accuracy
             if avg_confidence > accuracy + 0.2 {
@@ -400,7 +423,11 @@ impl EpistemicMirror {
                     ),
                     domain: Some(domain_name.clone()),
                     mitigation: vec![
-                        format!("Lower confidence in '{}' claims by {:.0}%", domain_name, (avg_confidence - accuracy) * 100.0),
+                        format!(
+                            "Lower confidence in '{}' claims by {:.0}%",
+                            domain_name,
+                            (avg_confidence - accuracy) * 100.0
+                        ),
                         "Seek external verification before high-confidence claims".to_string(),
                     ],
                 });
@@ -413,7 +440,9 @@ impl EpistemicMirror {
     fn detect_anchoring_bias(&self) -> Option<BiasAlert> {
         // Look for pattern: confidence doesn't change much despite new evidence
         // This is simplified - would need revision history for full implementation
-        let verified_wrong: Vec<_> = self.predictions.iter()
+        let verified_wrong: Vec<_> = self
+            .predictions
+            .iter()
             .filter(|p| p.outcome == Some(false))
             .collect();
 
@@ -425,7 +454,9 @@ impl EpistemicMirror {
         let mut same_domain_unchanged = 0;
 
         for wrong in &verified_wrong {
-            let later_same_domain: Vec<_> = self.predictions.iter()
+            let later_same_domain: Vec<_> = self
+                .predictions
+                .iter()
                 .filter(|p| p.domain == wrong.domain)
                 .filter(|p| p.predicted_at > wrong.predicted_at)
                 .collect();
@@ -461,7 +492,9 @@ impl EpistemicMirror {
     pub fn health_report(&self) -> EpistemicHealthReport {
         let calibration = self.calculate_calibration();
 
-        let domain_health: Vec<_> = self.domains.iter()
+        let domain_health: Vec<_> = self
+            .domains
+            .iter()
             .map(|(name, domain)| {
                 let total = domain.correct_predictions + domain.incorrect_predictions;
                 let accuracy = if total > 0 {
@@ -486,9 +519,12 @@ impl EpistemicMirror {
             overall_health,
             calibration,
             domain_health,
-            active_biases: self.detected_biases.iter()
+            active_biases: self
+                .detected_biases
+                .iter()
                 .filter(|b| {
-                    SystemTime::now().duration_since(b.detected_at)
+                    SystemTime::now()
+                        .duration_since(b.detected_at)
                         .map(|d| d < Duration::from_secs(7 * 24 * 3600))
                         .unwrap_or(false)
                 })
@@ -500,14 +536,17 @@ impl EpistemicMirror {
     fn estimate_domain_coverage(&self, domain: &DomainAssessment) -> f32 {
         // Estimate based on topic diversity and depth
         let topic_count = domain.topics.len() as f32;
-        let avg_depth = domain.topics.values()
+        let avg_depth = domain
+            .topics
+            .values()
             .map(|t| match t.depth {
                 KnowledgeDepth::Surface => 0.3,
                 KnowledgeDepth::Working => 0.5,
                 KnowledgeDepth::Deep => 0.8,
                 KnowledgeDepth::Expert => 1.0,
             })
-            .sum::<f32>() / topic_count.max(1.0);
+            .sum::<f32>()
+            / topic_count.max(1.0);
 
         (topic_count / 20.0).min(1.0) * avg_depth
     }
@@ -516,7 +555,9 @@ impl EpistemicMirror {
         let now = SystemTime::now();
         let one_year = Duration::from_secs(365 * 24 * 3600);
 
-        let total_staleness: f32 = domain.topics.values()
+        let total_staleness: f32 = domain
+            .topics
+            .values()
             .map(|t| {
                 now.duration_since(t.last_updated)
                     .map(|d| (d.as_secs_f32() / one_year.as_secs_f32()).min(1.0))
@@ -527,16 +568,22 @@ impl EpistemicMirror {
         total_staleness / domain.topics.len().max(1) as f32
     }
 
-    fn calculate_overall_health(&self, calibration: &CalibrationReport, domains: &[DomainHealth]) -> f32 {
+    fn calculate_overall_health(
+        &self,
+        calibration: &CalibrationReport,
+        domains: &[DomainHealth],
+    ) -> f32 {
         // Combine metrics into overall health score (0-1)
         let calibration_score = 1.0 - calibration.expected_calibration_error.min(0.5) * 2.0;
 
         let avg_domain_health = if domains.is_empty() {
             0.5
         } else {
-            domains.iter()
+            domains
+                .iter()
                 .map(|d| d.accuracy * (1.0 - d.staleness) * d.coverage.sqrt())
-                .sum::<f32>() / domains.len() as f32
+                .sum::<f32>()
+                / domains.len() as f32
         };
 
         let bias_penalty = (self.detected_biases.len() as f32 * 0.05).min(0.3);
@@ -548,11 +595,13 @@ impl EpistemicMirror {
         let mut recommendations = Vec::new();
 
         if *health < 0.5 {
-            recommendations.push("Critical: Epistemic health is low. Focus on calibration.".to_string());
+            recommendations
+                .push("Critical: Epistemic health is low. Focus on calibration.".to_string());
         }
 
         if self.stats.predictions_verified < 10 {
-            recommendations.push("Record more predictions to improve calibration tracking.".to_string());
+            recommendations
+                .push("Record more predictions to improve calibration tracking.".to_string());
         }
 
         if !self.detected_biases.is_empty() {
@@ -562,7 +611,9 @@ impl EpistemicMirror {
             ));
         }
 
-        let stale_domains: Vec<_> = self.domains.iter()
+        let stale_domains: Vec<_> = self
+            .domains
+            .iter()
             .filter(|(_, d)| self.calculate_domain_staleness(d) > 0.5)
             .map(|(n, _)| n.clone())
             .collect();
@@ -598,7 +649,8 @@ impl EpistemicMirror {
             }
 
             let accuracy = if d.correct_predictions + d.incorrect_predictions > 0 {
-                d.correct_predictions as f32 / (d.correct_predictions + d.incorrect_predictions) as f32
+                d.correct_predictions as f32
+                    / (d.correct_predictions + d.incorrect_predictions) as f32
             } else {
                 0.5
             };
@@ -606,7 +658,8 @@ impl EpistemicMirror {
             if accuracy < 0.7 {
                 questions.push(format!(
                     "My accuracy in {} is {:.0}%. What am I systematically getting wrong?",
-                    domain, accuracy * 100.0
+                    domain,
+                    accuracy * 100.0
                 ));
             }
         }
@@ -841,12 +894,7 @@ mod tests {
     fn test_knowledge_registration() {
         let mut mirror = EpistemicMirror::new();
 
-        mirror.register_knowledge(
-            "physics",
-            "thermodynamics",
-            0.8,
-            KnowledgeDepth::Working,
-        );
+        mirror.register_knowledge("physics", "thermodynamics", 0.8, KnowledgeDepth::Working);
 
         assert!(mirror.domains.contains_key("physics"));
         assert_eq!(mirror.stats.total_topics, 1);

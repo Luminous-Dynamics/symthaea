@@ -154,17 +154,21 @@ impl MeditationCategory {
 
     /// Is this a desirable meditation state?
     pub fn is_meditative(&self) -> bool {
-        matches!(self,
-            MeditationCategory::Flow |
-            MeditationCategory::Absorption |
-            MeditationCategory::Focused |
-            MeditationCategory::OpenAwareness
+        matches!(
+            self,
+            MeditationCategory::Flow
+                | MeditationCategory::Absorption
+                | MeditationCategory::Focused
+                | MeditationCategory::OpenAwareness
         )
     }
 
     /// Is this a peak state?
     pub fn is_peak(&self) -> bool {
-        matches!(self, MeditationCategory::Flow | MeditationCategory::Absorption)
+        matches!(
+            self,
+            MeditationCategory::Flow | MeditationCategory::Absorption
+        )
     }
 
     /// Emoji representation
@@ -196,7 +200,7 @@ impl MeditationCategory {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MeditationChannel {
     // Frontal (attention, executive function)
-    Fz,  // Frontal midline - KEY for focused attention
+    Fz, // Frontal midline - KEY for focused attention
     F3,
     F4,
     Fp1,
@@ -333,7 +337,9 @@ fn compute_band_power(data: &[f64], sample_rate: f64, low_freq: f64, high_freq: 
     }
 
     // Apply Hann window
-    let windowed: Vec<f64> = data.iter().enumerate()
+    let windowed: Vec<f64> = data
+        .iter()
+        .enumerate()
         .map(|(i, &x)| {
             let window = 0.5 * (1.0 - (2.0 * PI * i as f64 / (n - 1) as f64).cos());
             x * window
@@ -640,7 +646,8 @@ impl MeditationSentinel {
 
     /// Current category
     pub fn current_category(&self) -> MeditationCategory {
-        self.history.last()
+        self.history
+            .last()
             .map(|s| s.classify())
             .unwrap_or(MeditationCategory::Wandering)
     }
@@ -692,10 +699,15 @@ impl MeditationSimulator {
 
         // Generate each channel
         let channels = [
-            MeditationChannel::Fz, MeditationChannel::Cz, MeditationChannel::Pz,
-            MeditationChannel::F3, MeditationChannel::F4,
-            MeditationChannel::P3, MeditationChannel::P4,
-            MeditationChannel::O1, MeditationChannel::O2,
+            MeditationChannel::Fz,
+            MeditationChannel::Cz,
+            MeditationChannel::Pz,
+            MeditationChannel::F3,
+            MeditationChannel::F4,
+            MeditationChannel::P3,
+            MeditationChannel::P4,
+            MeditationChannel::O1,
+            MeditationChannel::O2,
             MeditationChannel::Oz,
         ];
 
@@ -707,7 +719,12 @@ impl MeditationSimulator {
         eeg
     }
 
-    fn generate_channel(&mut self, channel: MeditationChannel, target: MeditationCategory, n: usize) -> Vec<f64> {
+    fn generate_channel(
+        &mut self,
+        channel: MeditationChannel,
+        target: MeditationCategory,
+        n: usize,
+    ) -> Vec<f64> {
         let mut data = vec![0.0; n];
 
         // State-specific power levels
@@ -721,14 +738,28 @@ impl MeditationSimulator {
         };
 
         // Channel-specific modulation
-        let theta_mod = if matches!(channel, MeditationChannel::Fz) { 1.5 } else { 1.0 };
-        let alpha_mod = if matches!(channel, MeditationChannel::Oz | MeditationChannel::O1 | MeditationChannel::O2) { 1.5 } else { 1.0 };
+        let theta_mod = if matches!(channel, MeditationChannel::Fz) {
+            1.5
+        } else {
+            1.0
+        };
+        let alpha_mod = if matches!(
+            channel,
+            MeditationChannel::Oz | MeditationChannel::O1 | MeditationChannel::O2
+        ) {
+            1.5
+        } else {
+            1.0
+        };
 
         for i in 0..n {
             let t = i as f64 / self.sample_rate;
 
             // Noise
-            self.rng_seed = self.rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            self.rng_seed = self
+                .rng_seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1);
             let noise = (self.rng_seed as f64 / u64::MAX as f64 - 0.5) * 0.1;
 
             // Frequency components

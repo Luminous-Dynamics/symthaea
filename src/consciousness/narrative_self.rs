@@ -192,7 +192,8 @@ impl CoreSelf {
             duration_secs: 0.0,
         });
         // Keep goals sorted by priority
-        self.goals.sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap());
+        self.goals
+            .sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap());
     }
 
     /// Update context with new information
@@ -241,12 +242,16 @@ impl CoreSelf {
             let mut total_sim = 0.0;
             let mut count = 0;
             for i in 0..items.len() {
-                for j in (i+1)..items.len() {
+                for j in (i + 1)..items.len() {
                     total_sim += items[i].similarity(items[j]) as f64;
                     count += 1;
                 }
             }
-            if count > 0 { total_sim / count as f64 } else { 0.5 }
+            if count > 0 {
+                total_sim / count as f64
+            } else {
+                0.5
+            }
         } else {
             0.5
         };
@@ -366,7 +371,9 @@ impl AutobiographicalSelf {
         let encoding = BinaryHV::random(self.life_story.len() as u64);
 
         // Find causal links to recent episodes
-        let causal_links: Vec<usize> = self.life_story.iter()
+        let causal_links: Vec<usize> = self
+            .life_story
+            .iter()
             .enumerate()
             .rev()
             .take(5)
@@ -385,10 +392,8 @@ impl AutobiographicalSelf {
 
         // Update self-concept by integrating significant episodes
         if significance > 0.5 {
-            self.self_concept = BinaryHV::bundle(&[
-                self.self_concept,
-                self.life_story.last().unwrap().encoding
-            ]);
+            self.self_concept =
+                BinaryHV::bundle(&[self.self_concept, self.life_story.last().unwrap().encoding]);
         }
 
         // Update narrative coherence
@@ -436,14 +441,17 @@ impl AutobiographicalSelf {
             }
         }
 
-        self.narrative_coherence = (link_density / 3.0 + consistency / (total_links + 1) as f64) / 2.0;
+        self.narrative_coherence =
+            (link_density / 3.0 + consistency / (total_links + 1) as f64) / 2.0;
         self.narrative_coherence = self.narrative_coherence.clamp(0.0, 1.0);
     }
 
     /// Project future self based on current trajectory
     pub fn project_future(&mut self, time_horizon_secs: f64) {
         // Future self is blend of current self-concept and strongest values
-        let value_encodings: Vec<BinaryHV> = self.values.iter()
+        let value_encodings: Vec<BinaryHV> = self
+            .values
+            .iter()
             .filter(|v| v.importance > 0.5)
             .map(|v| v.encoding)
             .collect();
@@ -468,7 +476,11 @@ impl AutobiographicalSelf {
         let trait_coherence = if self.traits.is_empty() {
             0.5
         } else {
-            self.traits.iter().map(|t| t.strength * t.consistency).sum::<f64>() / self.traits.len() as f64
+            self.traits
+                .iter()
+                .map(|t| t.strength * t.consistency)
+                .sum::<f64>()
+                / self.traits.len() as f64
         };
 
         let value_coherence = if self.values.is_empty() {
@@ -477,7 +489,8 @@ impl AutobiographicalSelf {
             self.values.iter().map(|v| v.importance).sum::<f64>() / self.values.len() as f64
         };
 
-        (self.identity_stability + self.narrative_coherence + trait_coherence + value_coherence) / 4.0
+        (self.identity_stability + self.narrative_coherence + trait_coherence + value_coherence)
+            / 4.0
     }
 }
 
@@ -663,7 +676,11 @@ impl NarrativeSelfModel {
         self.core.update_context(input);
 
         // Determine valence from success
-        let valence = if success { 0.3 + significance * 0.4 } else { -0.2 - significance * 0.3 };
+        let valence = if success {
+            0.3 + significance * 0.4
+        } else {
+            -0.2 - significance * 0.3
+        };
 
         // Record significant episodes
         if significance >= self.config.episode_threshold {
@@ -680,7 +697,7 @@ impl NarrativeSelfModel {
         self.stats.total_updates += 1;
         self.stats.avg_coherence =
             (self.stats.avg_coherence * (self.stats.total_updates - 1) as f64 + self.coherence())
-            / self.stats.total_updates as f64;
+                / self.stats.total_updates as f64;
     }
 
     /// Add a goal to the core self
@@ -736,13 +753,17 @@ impl NarrativeSelfModel {
         // Self-Φ is based on how well-integrated the three self-levels are
         let proto_core_sim = self.proto.sensory_now.similarity(&self.core.context) as f64;
         let core_autobio_sim = self.core.context.similarity(&self.autobio.self_concept) as f64;
-        let proto_autobio_sim = self.proto.sensory_now.similarity(&self.autobio.self_concept) as f64;
+        let proto_autobio_sim = self
+            .proto
+            .sensory_now
+            .similarity(&self.autobio.self_concept) as f64;
 
         // Integration = geometric mean of pairwise similarities
-        let integration = (proto_core_sim * core_autobio_sim * proto_autobio_sim).powf(1.0/3.0);
+        let integration = (proto_core_sim * core_autobio_sim * proto_autobio_sim).powf(1.0 / 3.0);
 
         // Modulate by coherence of each level
-        let level_coherence = (self.proto.coherence() + self.core.coherence() + self.autobio.coherence()) / 3.0;
+        let level_coherence =
+            (self.proto.coherence() + self.core.coherence() + self.autobio.coherence()) / 3.0;
 
         self.self_phi = integration * level_coherence;
         self.stats.self_phi_history.push(self.self_phi);
@@ -760,10 +781,10 @@ impl NarrativeSelfModel {
         let autobio_coh = self.autobio.coherence();
 
         // Weighted average using config weights
-        (self.config.proto_weight * proto_coh +
-         self.config.core_weight * core_coh +
-         self.config.autobio_weight * autobio_coh) /
-        (self.config.proto_weight + self.config.core_weight + self.config.autobio_weight)
+        (self.config.proto_weight * proto_coh
+            + self.config.core_weight * core_coh
+            + self.config.autobio_weight * autobio_coh)
+            / (self.config.proto_weight + self.config.core_weight + self.config.autobio_weight)
     }
 
     /// Get self-Φ
@@ -788,15 +809,19 @@ impl NarrativeSelfModel {
 
     /// Get current active goals with their vector representations
     pub fn current_goals(&self) -> Vec<(String, &BinaryHV)> {
-        self.core.goals.iter()
-            .filter(|g| g.progress < 1.0)  // Active = not yet completed
+        self.core
+            .goals
+            .iter()
+            .filter(|g| g.progress < 1.0) // Active = not yet completed
             .map(|g| (g.description.clone(), &g.encoding))
             .collect()
     }
 
     /// Get core values with their vector representations
     pub fn core_values(&self) -> Vec<(String, &BinaryHV)> {
-        self.autobio.values.iter()
+        self.autobio
+            .values
+            .iter()
             .map(|v| (v.name.clone(), &v.encoding))
             .collect()
     }

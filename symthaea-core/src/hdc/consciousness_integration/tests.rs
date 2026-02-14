@@ -52,7 +52,11 @@ fn test_process_method() {
     let mut pipeline = ConsciousnessPipeline::new(config);
     pipeline.set_embodiment(0.8);
 
-    let input = vec![BinaryHV::random(1), BinaryHV::random(2), BinaryHV::random(3)];
+    let input = vec![
+        BinaryHV::random(1),
+        BinaryHV::random(2),
+        BinaryHV::random(3),
+    ];
     let priorities = vec![0.9, 0.7, 0.5];
 
     let state = pipeline.process(input, &priorities);
@@ -114,7 +118,7 @@ fn test_binding_calculation_with_bound_objects() {
     pipeline.state.bound_objects = vec![
         BoundObject {
             representation: BinaryHV::random(1),
-            synchrony: 0.9,      // High synchrony
+            synchrony: 0.9,        // High synchrony
             binding_strength: 0.8, // Strong binding
             conscious: true,
             level: BindingLevel::Feature,
@@ -126,7 +130,7 @@ fn test_binding_calculation_with_bound_objects() {
         },
         BoundObject {
             representation: BinaryHV::random(2),
-            synchrony: 0.7,      // Medium synchrony
+            synchrony: 0.7,        // Medium synchrony
             binding_strength: 0.6, // Medium binding
             conscious: true,
             level: BindingLevel::Feature,
@@ -138,7 +142,7 @@ fn test_binding_calculation_with_bound_objects() {
         },
         BoundObject {
             representation: BinaryHV::random(3),
-            synchrony: 0.5,      // Lower synchrony
+            synchrony: 0.5,        // Lower synchrony
             binding_strength: 0.4, // Weaker binding
             conscious: false,
             level: BindingLevel::Feature,
@@ -154,8 +158,10 @@ fn test_binding_calculation_with_bound_objects() {
     let assessment = pipeline.assess_integration();
 
     // Verify binding is NOT zero (was the bug before fix)
-    assert!(assessment.component_scores.get("binding").unwrap() > &0.0,
-        "Binding should be > 0 with bound objects");
+    assert!(
+        assessment.component_scores.get("binding").unwrap() > &0.0,
+        "Binding should be > 0 with bound objects"
+    );
 
     // Calculate expected binding:
     // Object 1: 0.9 * 0.8 = 0.72
@@ -166,10 +172,16 @@ fn test_binding_calculation_with_bound_objects() {
     // bound_fraction = min(3, 10) / 10 = 0.3
     // binding_score = 0.4467 * 0.7 + 0.3 * 0.3 = 0.3127 + 0.09 = 0.4027
     let binding_score = *assessment.component_scores.get("binding").unwrap();
-    assert!((binding_score - 0.4027).abs() < 0.01,
-        "Expected binding ~0.40, got {}", binding_score);
+    assert!(
+        (binding_score - 0.4027).abs() < 0.01,
+        "Expected binding ~0.40, got {}",
+        binding_score
+    );
 
-    println!("✅ Binding calculation with bound objects: {:.4}", binding_score);
+    println!(
+        "✅ Binding calculation with bound objects: {:.4}",
+        binding_score
+    );
 }
 
 #[test]
@@ -179,8 +191,11 @@ fn test_binding_calculation_empty() {
     let assessment = pipeline.assess_integration();
 
     let binding_score = *assessment.component_scores.get("binding").unwrap();
-    assert!((binding_score - 0.0).abs() < 1e-10,
-        "Binding should be 0 with no bound objects, got {}", binding_score);
+    assert!(
+        (binding_score - 0.0).abs() < 1e-10,
+        "Binding should be 0 with no bound objects, got {}",
+        binding_score
+    );
 
     println!("✅ Binding calculation empty: {:.4}", binding_score);
 }
@@ -195,21 +210,21 @@ fn test_workspace_calculation_with_broadcasting() {
             content: BinaryHV::random(1),
             activation: 0.9,
             source: "visual".to_string(),
-            is_broadcasting: true,  // Broadcasting
+            is_broadcasting: true, // Broadcasting
             duration_ms: 100,
         },
         WorkspaceItem {
             content: BinaryHV::random(2),
             activation: 0.7,
             source: "auditory".to_string(),
-            is_broadcasting: true,  // Broadcasting
+            is_broadcasting: true, // Broadcasting
             duration_ms: 50,
         },
         WorkspaceItem {
             content: BinaryHV::random(3),
             activation: 0.5,
             source: "touch".to_string(),
-            is_broadcasting: false,  // Not broadcasting
+            is_broadcasting: false, // Not broadcasting
             duration_ms: 30,
         },
     ];
@@ -221,10 +236,16 @@ fn test_workspace_calculation_with_broadcasting() {
     // broadcast_activation = (0.9 + 0.7) / 2 = 0.8
     // access_ratio = 2/3 = 0.667
     // workspace = 0.8 * (0.5 + 0.5 * 0.667) = 0.8 * 0.833 = 0.667
-    assert!(workspace_score > 0.6 && workspace_score < 0.75,
-        "Expected workspace ~0.67, got {}", workspace_score);
+    assert!(
+        workspace_score > 0.6 && workspace_score < 0.75,
+        "Expected workspace ~0.67, got {}",
+        workspace_score
+    );
 
-    println!("✅ Workspace calculation with broadcasting: {:.4}", workspace_score);
+    println!(
+        "✅ Workspace calculation with broadcasting: {:.4}",
+        workspace_score
+    );
 }
 
 #[test]
@@ -237,16 +258,16 @@ fn test_hot_calculation_with_meta_awareness() {
             about: "thinking".to_string(),
             target: "cognition".to_string(),
             intensity: 0.8,
-            confidence: 0.9,  // High confidence
-            order: 1,         // First-order meta
+            confidence: 0.9, // High confidence
+            order: 1,        // First-order meta
             representation: BinaryHV::random(1),
         },
         MetaThought {
             about: "aware of thinking".to_string(),
             target: "meta_cognition".to_string(),
             intensity: 0.7,
-            confidence: 0.7,  // Medium confidence
-            order: 2,         // Second-order meta
+            confidence: 0.7, // Medium confidence
+            order: 2,        // Second-order meta
             representation: BinaryHV::random(2),
         },
     ];
@@ -260,8 +281,7 @@ fn test_hot_calculation_with_meta_awareness() {
     // base = 2.06 / 2.6 = 0.792
     // depth_bonus = min(2/3, 0.2) = 0.2
     // hot = 0.792 + 0.2 = 0.992 (clamped to 1.0)
-    assert!(hot_score > 0.9,
-        "Expected HOT ~0.99, got {}", hot_score);
+    assert!(hot_score > 0.9, "Expected HOT ~0.99, got {}", hot_score);
 
     println!("✅ HOT calculation with meta-awareness: {:.4}", hot_score);
 }
@@ -278,24 +298,36 @@ fn test_process_creates_bound_objects() {
         BinaryHV::random(101),
         BinaryHV::random(102),
     ];
-    let priorities = vec![0.8, 0.7, 0.6];  // All above 0.5 threshold
+    let priorities = vec![0.8, 0.7, 0.6]; // All above 0.5 threshold
 
     // Process inputs
     let state = pipeline.process(inputs, &priorities);
 
     // Should have created bound objects
-    assert!(!state.bound_objects.is_empty(),
-        "Expected bound objects to be created, but got none");
+    assert!(
+        !state.bound_objects.is_empty(),
+        "Expected bound objects to be created, but got none"
+    );
 
     // Verify bound object properties
     let bound = &state.bound_objects[0];
-    assert!(bound.synchrony >= 0.0 && bound.synchrony <= 1.0,
-        "Synchrony should be in [0,1], got {}", bound.synchrony);
-    assert!(bound.binding_strength > 0.5,
-        "Binding strength should be > 0.5 for high-priority inputs, got {}", bound.binding_strength);
+    assert!(
+        bound.synchrony >= 0.0 && bound.synchrony <= 1.0,
+        "Synchrony should be in [0,1], got {}",
+        bound.synchrony
+    );
+    assert!(
+        bound.binding_strength > 0.5,
+        "Binding strength should be > 0.5 for high-priority inputs, got {}",
+        bound.binding_strength
+    );
 
-    println!("✅ process() creates bound objects: {} objects with synchrony={:.4}, strength={:.4}",
-        state.bound_objects.len(), bound.synchrony, bound.binding_strength);
+    println!(
+        "✅ process() creates bound objects: {} objects with synchrony={:.4}, strength={:.4}",
+        state.bound_objects.len(),
+        bound.synchrony,
+        bound.binding_strength
+    );
 }
 
 #[test]
@@ -310,8 +342,10 @@ fn test_process_no_binding_for_single_input() {
     let state = pipeline.process(inputs, &priorities);
 
     // Single input should not create bound objects (need >= 2 for binding)
-    assert!(state.bound_objects.is_empty(),
-        "Single input should not create bound objects");
+    assert!(
+        state.bound_objects.is_empty(),
+        "Single input should not create bound objects"
+    );
 
     println!("✅ process() correctly skips binding for single input");
 }
@@ -327,13 +361,15 @@ fn test_process_no_binding_for_low_priority() {
         BinaryHV::random(301),
         BinaryHV::random(302),
     ];
-    let priorities = vec![0.3, 0.2, 0.4];  // All below 0.5 threshold
+    let priorities = vec![0.3, 0.2, 0.4]; // All below 0.5 threshold
 
     let state = pipeline.process(inputs, &priorities);
 
     // Low priority inputs should not create bound objects
-    assert!(state.bound_objects.is_empty(),
-        "Low-priority inputs should not create bound objects");
+    assert!(
+        state.bound_objects.is_empty(),
+        "Low-priority inputs should not create bound objects"
+    );
 
     println!("✅ process() correctly skips binding for low-priority inputs");
 }
@@ -350,10 +386,7 @@ fn test_process_binding_integrates_with_assessment() {
     assert_eq!(baseline_binding, 0.0, "Baseline binding should be 0");
 
     // Process inputs to create binding
-    let inputs = vec![
-        BinaryHV::random(400),
-        BinaryHV::random(401),
-    ];
+    let inputs = vec![BinaryHV::random(400), BinaryHV::random(401)];
     let priorities = vec![0.8, 0.9];
 
     pipeline.process(inputs, &priorities);
@@ -362,10 +395,16 @@ fn test_process_binding_integrates_with_assessment() {
     let assessment = pipeline.assess_integration();
     let binding_score = *assessment.component_scores.get("binding").unwrap();
 
-    assert!(binding_score > 0.0,
-        "Binding score should be > 0 after processing, got {}", binding_score);
+    assert!(
+        binding_score > 0.0,
+        "Binding score should be > 0 after processing, got {}",
+        binding_score
+    );
 
-    println!("✅ process() binding integrates with assessment: binding={:.4}", binding_score);
+    println!(
+        "✅ process() binding integrates with assessment: binding={:.4}",
+        binding_score
+    );
 }
 
 #[test]
@@ -376,7 +415,7 @@ fn test_bound_object_synchrony_calculation() {
 
     // Create similar HVs (should have higher synchrony)
     let base_hv = BinaryHV::random(500);
-    let similar_hv = base_hv.clone();  // Identical = max similarity
+    let similar_hv = base_hv.clone(); // Identical = max similarity
 
     let inputs = vec![base_hv, similar_hv];
     let priorities = vec![0.9, 0.9];
@@ -388,10 +427,16 @@ fn test_bound_object_synchrony_calculation() {
     let bound = &state.bound_objects[0];
 
     // similarity of identical HVs should be 1.0, so synchrony >= 0.5 (our minimum)
-    assert!(bound.synchrony >= 0.5,
-        "Synchrony for similar HVs should be >= 0.5, got {}", bound.synchrony);
+    assert!(
+        bound.synchrony >= 0.5,
+        "Synchrony for similar HVs should be >= 0.5, got {}",
+        bound.synchrony
+    );
 
-    println!("✅ Synchrony calculated from HV similarity: {:.4}", bound.synchrony);
+    println!(
+        "✅ Synchrony calculated from HV similarity: {:.4}",
+        bound.synchrony
+    );
 }
 
 #[test]
@@ -403,20 +448,25 @@ fn test_multiple_bound_objects_clustering() {
     // Create 4 inputs: 2 similar pairs, each pair dissimilar to the other
     // Similar HVs should cluster together
     let hv1 = BinaryHV::random(600);
-    let hv2 = hv1.clone();  // Similar to hv1
-    let hv3 = BinaryHV::random(700);  // Different from hv1/hv2
-    let hv4 = hv3.clone();  // Similar to hv3
+    let hv2 = hv1.clone(); // Similar to hv1
+    let hv3 = BinaryHV::random(700); // Different from hv1/hv2
+    let hv4 = hv3.clone(); // Similar to hv3
 
     let inputs = vec![hv1, hv2, hv3, hv4];
-    let priorities = vec![0.8, 0.85, 0.9, 0.75];  // All high priority
+    let priorities = vec![0.8, 0.85, 0.9, 0.75]; // All high priority
 
     let state = pipeline.process(inputs, &priorities);
 
     // Should have at least 1 bound object (may be more depending on clustering)
-    assert!(!state.bound_objects.is_empty(),
-        "Should have at least one bound object");
+    assert!(
+        !state.bound_objects.is_empty(),
+        "Should have at least one bound object"
+    );
 
-    println!("✅ Clustering created {} bound objects", state.bound_objects.len());
+    println!(
+        "✅ Clustering created {} bound objects",
+        state.bound_objects.len()
+    );
 }
 
 #[test]
@@ -430,21 +480,31 @@ fn test_binding_persistence_decay() {
     let priorities = vec![0.8, 0.9];
     let state1 = pipeline.process(inputs, &priorities);
 
-    assert!(!state1.bound_objects.is_empty(), "Should have bound objects after first cycle");
+    assert!(
+        !state1.bound_objects.is_empty(),
+        "Should have bound objects after first cycle"
+    );
     let initial_strength = state1.bound_objects[0].binding_strength;
 
     // Second cycle: process empty or different inputs
     // Bound objects should still exist but be decayed
-    let new_inputs = vec![BinaryHV::random(900)];  // Only 1 input, no new binding
-    let new_priorities = vec![0.3];  // Low priority
+    let new_inputs = vec![BinaryHV::random(900)]; // Only 1 input, no new binding
+    let new_priorities = vec![0.3]; // Low priority
     let state2 = pipeline.process(new_inputs, &new_priorities);
 
     // Previous bound objects should still exist but decayed
     if !state2.bound_objects.is_empty() {
         let decayed_strength = state2.bound_objects[0].binding_strength;
-        assert!(decayed_strength < initial_strength,
-            "Binding strength should decay: {} < {}", decayed_strength, initial_strength);
-        println!("✅ Binding decayed from {:.4} to {:.4}", initial_strength, decayed_strength);
+        assert!(
+            decayed_strength < initial_strength,
+            "Binding strength should decay: {} < {}",
+            decayed_strength,
+            initial_strength
+        );
+        println!(
+            "✅ Binding decayed from {:.4} to {:.4}",
+            initial_strength, decayed_strength
+        );
     } else {
         // If object was removed due to decay, that's also valid
         println!("✅ Bound object was removed due to decay (strength below threshold)");
@@ -466,29 +526,46 @@ fn test_binding_reinforcement() {
     let priorities = vec![0.8, 0.9];
     pipeline.process(inputs1, &priorities);
 
-    let strength_after_1 = pipeline.state.bound_objects.first()
-        .map(|o| o.binding_strength).unwrap_or(0.0);
+    let strength_after_1 = pipeline
+        .state
+        .bound_objects
+        .first()
+        .map(|o| o.binding_strength)
+        .unwrap_or(0.0);
 
     // Second cycle with similar inputs (should reinforce)
     let inputs2 = vec![base1.clone(), base2.clone()];
     pipeline.process(inputs2, &priorities);
 
-    let strength_after_2 = pipeline.state.bound_objects.first()
-        .map(|o| o.binding_strength).unwrap_or(0.0);
+    let strength_after_2 = pipeline
+        .state
+        .bound_objects
+        .first()
+        .map(|o| o.binding_strength)
+        .unwrap_or(0.0);
 
     // Third cycle
     let inputs3 = vec![base1.clone(), base2.clone()];
     pipeline.process(inputs3, &priorities);
 
-    let strength_after_3 = pipeline.state.bound_objects.first()
-        .map(|o| o.binding_strength).unwrap_or(0.0);
+    let strength_after_3 = pipeline
+        .state
+        .bound_objects
+        .first()
+        .map(|o| o.binding_strength)
+        .unwrap_or(0.0);
 
-    println!("Binding strength: cycle1={:.4}, cycle2={:.4}, cycle3={:.4}",
-        strength_after_1, strength_after_2, strength_after_3);
+    println!(
+        "Binding strength: cycle1={:.4}, cycle2={:.4}, cycle3={:.4}",
+        strength_after_1, strength_after_2, strength_after_3
+    );
 
     // Reinforcement should counter decay, maintaining or increasing strength
     // (Note: exact behavior depends on decay rate vs reinforcement amount)
-    assert!(strength_after_3 > 0.0, "Binding should persist after reinforcement");
+    assert!(
+        strength_after_3 > 0.0,
+        "Binding should persist after reinforcement"
+    );
     println!("✅ Binding reinforcement maintains persistence");
 }
 
@@ -506,10 +583,16 @@ fn test_max_bound_objects_limit() {
     let state = pipeline.process(inputs, &priorities);
 
     // Should be capped at MAX_BOUND_OBJECTS (10)
-    assert!(state.bound_objects.len() <= 10,
-        "Bound objects should be limited to 10, got {}", state.bound_objects.len());
+    assert!(
+        state.bound_objects.len() <= 10,
+        "Bound objects should be limited to 10, got {}",
+        state.bound_objects.len()
+    );
 
-    println!("✅ Bound objects limited to {} (max 10)", state.bound_objects.len());
+    println!(
+        "✅ Bound objects limited to {} (max 10)",
+        state.bound_objects.len()
+    );
 }
 
 // === INTEGRATED CONSCIOUSNESS SYSTEMS TESTS ===
@@ -520,8 +603,10 @@ fn test_enable_integrated_systems() {
     let mut pipeline = ConsciousnessPipeline::default();
 
     // Initially disabled
-    assert!(!pipeline.has_integrated_systems(),
-        "Integrated systems should be disabled by default");
+    assert!(
+        !pipeline.has_integrated_systems(),
+        "Integrated systems should be disabled by default"
+    );
     assert!(pipeline.metacognitive_monitor.is_none());
     assert!(pipeline.cross_modal_binder.is_none());
     assert!(pipeline.temporal_binder.is_none());
@@ -530,8 +615,10 @@ fn test_enable_integrated_systems() {
     pipeline.enable_integrated_systems();
 
     // Now enabled
-    assert!(pipeline.has_integrated_systems(),
-        "Integrated systems should be enabled after enable_integrated_systems()");
+    assert!(
+        pipeline.has_integrated_systems(),
+        "Integrated systems should be enabled after enable_integrated_systems()"
+    );
     assert!(pipeline.metacognitive_monitor.is_some());
     assert!(pipeline.cross_modal_binder.is_some());
     assert!(pipeline.temporal_binder.is_some());
@@ -556,25 +643,37 @@ fn test_integrated_systems_processing() {
     let state = pipeline.get_state();
 
     // Metacognitive metrics should be updated
-    assert!(state.metacognitive_confidence >= 0.0 && state.metacognitive_confidence <= 1.0,
-        "Metacognitive confidence should be in [0,1], got {}", state.metacognitive_confidence);
+    assert!(
+        state.metacognitive_confidence >= 0.0 && state.metacognitive_confidence <= 1.0,
+        "Metacognitive confidence should be in [0,1], got {}",
+        state.metacognitive_confidence
+    );
 
     // Predictive mode should be set
     assert!(
-        state.inference_mode == PredictiveMode::Exploring ||
-        state.inference_mode == PredictiveMode::Exploiting ||
-        state.inference_mode == PredictiveMode::Balanced,
+        state.inference_mode == PredictiveMode::Exploring
+            || state.inference_mode == PredictiveMode::Exploiting
+            || state.inference_mode == PredictiveMode::Balanced,
         "Inference mode should be valid"
     );
 
     // Theta phase should be advancing
-    assert!(state.theta_phase >= 0.0, "Theta phase should be non-negative");
+    assert!(
+        state.theta_phase >= 0.0,
+        "Theta phase should be non-negative"
+    );
 
     println!("✅ Integrated systems processing works:");
-    println!("   - Metacognitive confidence: {:.4}", state.metacognitive_confidence);
+    println!(
+        "   - Metacognitive confidence: {:.4}",
+        state.metacognitive_confidence
+    );
     println!("   - Inference mode: {:?}", state.inference_mode);
     println!("   - Theta phase: {:.4}", state.theta_phase);
-    println!("   - Cross-modal coherence: {:.4}", state.cross_modal_coherence);
+    println!(
+        "   - Cross-modal coherence: {:.4}",
+        state.cross_modal_coherence
+    );
     println!("   - Narrative coherence: {:.4}", state.narrative_coherence);
 }
 
@@ -588,7 +687,7 @@ fn test_predictive_mode_transitions() {
     // Process high-quality inputs (should lead to exploiting mode)
     for _ in 0..10 {
         let inputs = vec![BinaryHV::random(4000), BinaryHV::random(4001)];
-        let priorities = vec![0.95, 0.95];  // High priorities = high consciousness = high accuracy
+        let priorities = vec![0.95, 0.95]; // High priorities = high consciousness = high accuracy
         pipeline.process(inputs, &priorities);
     }
 
@@ -596,8 +695,11 @@ fn test_predictive_mode_transitions() {
 
     // With high prediction accuracy, should be in exploiting mode
     if state.prediction_accuracy > 0.7 {
-        assert_eq!(state.inference_mode, PredictiveMode::Exploiting,
-            "High prediction accuracy should trigger Exploiting mode");
+        assert_eq!(
+            state.inference_mode,
+            PredictiveMode::Exploiting,
+            "High prediction accuracy should trigger Exploiting mode"
+        );
     }
 
     println!("✅ Predictive mode transitions work:");
@@ -615,7 +717,7 @@ fn test_phi_trend_prediction() {
     // Process several cycles with increasing quality (should create positive trend)
     let mut inputs_quality = 0.5;
     for i in 0..7 {
-        inputs_quality += 0.05;  // Increasing quality
+        inputs_quality += 0.05; // Increasing quality
         let inputs = vec![BinaryHV::random(5000 + i), BinaryHV::random(5100 + i)];
         let priorities = vec![inputs_quality, inputs_quality];
         pipeline.process(inputs, &priorities);
@@ -653,21 +755,21 @@ fn test_cross_modal_coherence() {
     pipeline.state.conscious_contents.push(WorkspaceItem {
         content: BinaryHV::random(6000),
         activation: 0.9,
-        source: "visual_cortex".to_string(),  // Contains "visual"
+        source: "visual_cortex".to_string(), // Contains "visual"
         is_broadcasting: true,
         duration_ms: 100,
     });
     pipeline.state.conscious_contents.push(WorkspaceItem {
         content: BinaryHV::random(6001),
         activation: 0.8,
-        source: "audio_processing".to_string(),  // Contains "audio"
+        source: "audio_processing".to_string(), // Contains "audio"
         is_broadcasting: true,
         duration_ms: 100,
     });
     pipeline.state.conscious_contents.push(WorkspaceItem {
         content: BinaryHV::random(6002),
         activation: 0.7,
-        source: "motor_planning".to_string(),  // Contains "motor"
+        source: "motor_planning".to_string(), // Contains "motor"
         is_broadcasting: true,
         duration_ms: 100,
     });
@@ -680,15 +782,26 @@ fn test_cross_modal_coherence() {
     let state = pipeline.get_state();
 
     // With 3 modalities, should have higher cross-modal coherence
-    assert!(state.active_modalities.len() >= 2,
-        "Should detect multiple modalities, got {}", state.active_modalities.len());
-    assert!(state.cross_modal_coherence > 0.5,
+    assert!(
+        state.active_modalities.len() >= 2,
+        "Should detect multiple modalities, got {}",
+        state.active_modalities.len()
+    );
+    assert!(
+        state.cross_modal_coherence > 0.5,
         "Multi-modal integration should boost coherence above 0.5, got {}",
-        state.cross_modal_coherence);
+        state.cross_modal_coherence
+    );
 
-    println!("✅ Cross-modal coherence with {} modalities:", state.active_modalities.len());
+    println!(
+        "✅ Cross-modal coherence with {} modalities:",
+        state.active_modalities.len()
+    );
     println!("   - Active modalities: {:?}", state.active_modalities);
-    println!("   - Cross-modal coherence: {:.4}", state.cross_modal_coherence);
+    println!(
+        "   - Cross-modal coherence: {:.4}",
+        state.cross_modal_coherence
+    );
 }
 
 // === Φ-GUIDED TOPOLOGY OPTIMIZATION TESTS ===
@@ -698,8 +811,10 @@ fn test_enable_phi_optimization() {
     let mut pipeline = ConsciousnessPipeline::default();
 
     // Initially disabled
-    assert!(!pipeline.has_phi_optimization(),
-        "Φ optimization should be disabled by default");
+    assert!(
+        !pipeline.has_phi_optimization(),
+        "Φ optimization should be disabled by default"
+    );
     assert!(pipeline.phi_optimizer.is_none());
     assert!(pipeline.consciousness_network.is_none());
 
@@ -707,8 +822,10 @@ fn test_enable_phi_optimization() {
     pipeline.enable_phi_optimization(8, 10);
 
     // Now enabled
-    assert!(pipeline.has_phi_optimization(),
-        "Φ optimization should be enabled after enable_phi_optimization()");
+    assert!(
+        pipeline.has_phi_optimization(),
+        "Φ optimization should be enabled after enable_phi_optimization()"
+    );
     assert!(pipeline.phi_optimizer.is_some());
     assert!(pipeline.consciousness_network.is_some());
 
@@ -717,8 +834,11 @@ fn test_enable_phi_optimization() {
     assert_eq!(network.node_count(), 8);
     assert!(network.edge_count() > 0, "Ring topology should have edges");
 
-    println!("✅ Φ optimization enabled: {} nodes, {} edges",
-        network.node_count(), network.edge_count());
+    println!(
+        "✅ Φ optimization enabled: {} nodes, {} edges",
+        network.node_count(),
+        network.edge_count()
+    );
 }
 
 #[test]
@@ -761,7 +881,12 @@ fn test_phi_optimization_multiple_steps() {
 
     println!("✅ Multi-step Φ optimization:");
     for (i, r) in results.iter().enumerate() {
-        println!("   Step {}: Φ = {:.4} (Δ = {:+.4})", i + 1, r.phi, r.phi_delta);
+        println!(
+            "   Step {}: Φ = {:.4} (Δ = {:+.4})",
+            i + 1,
+            r.phi,
+            r.phi_delta
+        );
     }
 }
 
@@ -788,12 +913,17 @@ fn test_phi_optimization_during_processing() {
         println!("✅ Φ optimization during processing:");
         println!("   - Last optimization step: {}", last_opt.step);
         println!("   - Final Φ: {:.4}", last_opt.phi);
-        println!("   - Topological unity: {:.4}", pipeline.state.topological_unity);
+        println!(
+            "   - Topological unity: {:.4}",
+            pipeline.state.topological_unity
+        );
     }
 
     // Topological unity should be updated
-    assert!(pipeline.state.topological_unity > 0.0,
-        "Topological unity should be positive after optimization");
+    assert!(
+        pipeline.state.topological_unity > 0.0,
+        "Topological unity should be positive after optimization"
+    );
 }
 
 #[test]
@@ -858,8 +988,11 @@ fn test_phi_trend_with_optimization() {
     println!("   - Topological unity: {:.4}", state.topological_unity);
 
     // Φ trend should be within reasonable bounds
-    assert!(state.phi_trend >= -0.1 && state.phi_trend <= 0.1,
-        "Φ trend should be bounded, got {}", state.phi_trend);
+    assert!(
+        state.phi_trend >= -0.1 && state.phi_trend <= 0.1,
+        "Φ trend should be bounded, got {}",
+        state.phi_trend
+    );
 }
 
 #[test]
@@ -885,8 +1018,14 @@ fn test_all_systems_integration() {
 
     println!("✅ Full system integration:");
     println!("   - Φ: {:.4}", state.phi);
-    println!("   - Metacognitive confidence: {:.4}", state.metacognitive_confidence);
-    println!("   - Cross-modal coherence: {:.4}", state.cross_modal_coherence);
+    println!(
+        "   - Metacognitive confidence: {:.4}",
+        state.metacognitive_confidence
+    );
+    println!(
+        "   - Cross-modal coherence: {:.4}",
+        state.cross_modal_coherence
+    );
     println!("   - Topological unity: {:.4}", state.topological_unity);
     println!("   - Narrative coherence: {:.4}", state.narrative_coherence);
     println!("   - Consciousness level: {:.4}", state.consciousness_level);
@@ -927,14 +1066,17 @@ fn test_emotional_prediction() {
 
     // Record enough emotional states to build prediction history (need >= 5)
     for i in 0..5 {
-        let valence = 0.5 + (i as f64 * 0.1);  // Gradually increasing valence
+        let valence = 0.5 + (i as f64 * 0.1); // Gradually increasing valence
         let arousal = 0.5;
         pipeline.update_emotional_prediction(valence, arousal);
     }
 
     // Now get a prediction (should work with sufficient history)
     let prediction = pipeline.update_emotional_prediction(0.8, 0.5);
-    assert!(prediction.is_some(), "Should return a prediction after building history");
+    assert!(
+        prediction.is_some(),
+        "Should return a prediction after building history"
+    );
 
     let pred = prediction.unwrap();
     println!("✅ Emotional prediction:");
@@ -961,13 +1103,20 @@ fn test_emotional_prediction_generates_intervention() {
 
     // Check if intervention is recommended
     let prediction = pipeline.current_prediction();
-    assert!(prediction.is_some(), "prediction should exist after 10 emotional updates");
+    assert!(
+        prediction.is_some(),
+        "prediction should exist after 10 emotional updates"
+    );
     let pred = prediction.unwrap();
     println!("✅ Emotional prediction after decline:");
     println!("   - Predicted valence: {:.4}", pred.predicted_valence);
     println!("   - Predicted arousal: {:.4}", pred.predicted_arousal);
     // After a declining valence trajectory, predicted valence should be low
-    assert!(pred.predicted_valence < 0.5, "predicted valence should reflect decline, got {}", pred.predicted_valence);
+    assert!(
+        pred.predicted_valence < 0.5,
+        "predicted valence should reflect decline, got {}",
+        pred.predicted_valence
+    );
 }
 
 #[test]
@@ -991,7 +1140,10 @@ fn test_apply_intervention() {
     }
 
     // Pipeline should still have feedback dynamics enabled after intervention attempt
-    assert!(pipeline.has_feedback_dynamics(), "feedback dynamics should remain enabled after apply_intervention");
+    assert!(
+        pipeline.has_feedback_dynamics(),
+        "feedback dynamics should remain enabled after apply_intervention"
+    );
 }
 
 #[test]
@@ -1075,8 +1227,14 @@ fn test_all_systems_with_feedback_dynamics() {
 
     println!("✅ Full system integration with feedback dynamics:");
     println!("   - Φ: {:.4}", state.phi);
-    println!("   - Metacognitive confidence: {:.4}", state.metacognitive_confidence);
-    println!("   - Cross-modal coherence: {:.4}", state.cross_modal_coherence);
+    println!(
+        "   - Metacognitive confidence: {:.4}",
+        state.metacognitive_confidence
+    );
+    println!(
+        "   - Cross-modal coherence: {:.4}",
+        state.cross_modal_coherence
+    );
     println!("   - Topological unity: {:.4}", state.topological_unity);
     println!("   - Narrative coherence: {:.4}", state.narrative_coherence);
     println!("   - Consciousness level: {:.4}", state.consciousness_level);
@@ -1124,9 +1282,18 @@ fn test_introspection() {
     println!("✅ Introspection report:");
     println!("   - Believed Φ: {:.4}", report.believed_phi);
     println!("   - Believed mode: {:?}", report.believed_mode);
-    println!("   - Self-model confidence: {:.4}", report.self_model_confidence);
-    println!("   - Self-model accuracy: {:.4}", report.self_model_accuracy);
-    println!("   - Self-awareness level: {:.4}", report.self_awareness_level);
+    println!(
+        "   - Self-model confidence: {:.4}",
+        report.self_model_confidence
+    );
+    println!(
+        "   - Self-model accuracy: {:.4}",
+        report.self_model_accuracy
+    );
+    println!(
+        "   - Self-awareness level: {:.4}",
+        report.self_awareness_level
+    );
 }
 
 #[test]
@@ -1146,7 +1313,10 @@ fn test_process_self_aware() {
     println!("   - Base Φ: {:.4}", update.base_update.phi);
     println!("   - Predicted Φ: {:.4}", update.self_model.predicted_phi);
     println!("   - Prediction error: {:.4}", update.prediction_error);
-    println!("   - Self-awareness level: {:.4}", update.self_awareness_level);
+    println!(
+        "   - Self-awareness level: {:.4}",
+        update.self_awareness_level
+    );
 
     // Self-model should now be cached
     assert!(pipeline.current_self_model().is_some());
@@ -1169,8 +1339,14 @@ fn test_self_awareness_prediction_learning() {
     }
 
     println!("✅ Self-awareness learning:");
-    println!("   - Initial prediction error: {:.4}", prediction_errors.first().unwrap_or(&1.0));
-    println!("   - Final prediction error: {:.4}", prediction_errors.last().unwrap_or(&1.0));
+    println!(
+        "   - Initial prediction error: {:.4}",
+        prediction_errors.first().unwrap_or(&1.0)
+    );
+    println!(
+        "   - Final prediction error: {:.4}",
+        prediction_errors.last().unwrap_or(&1.0)
+    );
     println!("   - Number of updates: {}", prediction_errors.len());
 
     // Check that we have a self-model
@@ -1201,8 +1377,14 @@ fn test_self_awareness_during_processing() {
     println!("✅ Self-awareness during processing:");
     println!("   - Φ: {:.4}", state.phi);
     println!("   - Consciousness level: {:.4}", state.consciousness_level);
-    println!("   - Metacognitive confidence: {:.4}", state.metacognitive_confidence);
-    println!("   - Self-awareness level: {:.4}", pipeline.self_awareness_level());
+    println!(
+        "   - Metacognitive confidence: {:.4}",
+        state.metacognitive_confidence
+    );
+    println!(
+        "   - Self-awareness level: {:.4}",
+        pipeline.self_awareness_level()
+    );
 
     // Self-awareness should have affected metacognitive confidence
     assert!(pipeline.has_self_awareness());
@@ -1227,7 +1409,10 @@ fn test_meta_cognitive_assessment() {
     let assessment = assessment.unwrap();
     println!("✅ Meta-cognitive assessment:");
     println!("   - Clarity: {:.4}", assessment.clarity);
-    println!("   - Mode appropriateness: {:.4}", assessment.mode_appropriateness);
+    println!(
+        "   - Mode appropriateness: {:.4}",
+        assessment.mode_appropriateness
+    );
     println!("   - Φ optimality: {:.4}", assessment.phi_optimality);
     println!("   - Change recommended: {}", assessment.change_recommended);
     println!("   - Reasoning: {}", assessment.reasoning);
@@ -1261,17 +1446,29 @@ fn test_complete_integration_all_systems() {
 
     println!("✅ COMPLETE INTEGRATION - All 8 systems working together:");
     println!("   - Φ: {:.4}", state.phi);
-    println!("   - Metacognitive confidence: {:.4}", state.metacognitive_confidence);
-    println!("   - Cross-modal coherence: {:.4}", state.cross_modal_coherence);
+    println!(
+        "   - Metacognitive confidence: {:.4}",
+        state.metacognitive_confidence
+    );
+    println!(
+        "   - Cross-modal coherence: {:.4}",
+        state.cross_modal_coherence
+    );
     println!("   - Topological unity: {:.4}", state.topological_unity);
     println!("   - Narrative coherence: {:.4}", state.narrative_coherence);
     println!("   - Consciousness level: {:.4}", state.consciousness_level);
-    println!("   - Self-awareness level: {:.4}", pipeline.self_awareness_level());
+    println!(
+        "   - Self-awareness level: {:.4}",
+        pipeline.self_awareness_level()
+    );
 
     // Introspection
     if let Some(report) = pipeline.introspect() {
         println!("   - Believed Φ: {:.4}", report.believed_phi);
-        println!("   - Self-model accuracy: {:.4}", report.self_model_accuracy);
+        println!(
+            "   - Self-model accuracy: {:.4}",
+            report.self_model_accuracy
+        );
     }
 
     // All metrics should be valid
@@ -1349,7 +1546,10 @@ fn test_optimization_recommendations() {
 
     // With low embodiment (0.3), we should get at least one recommendation
     println!("   Total recommendations: {}", recommendations.len());
-    assert!(!recommendations.is_empty(), "low embodiment (0.3) should produce at least one optimization recommendation");
+    assert!(
+        !recommendations.is_empty(),
+        "low embodiment (0.3) should produce at least one optimization recommendation"
+    );
 }
 
 #[test]
@@ -1383,10 +1583,10 @@ fn test_enable_full_consciousness_with_config() {
 
     // Enable with custom configuration
     pipeline.enable_full_consciousness_with_config(
-        16,    // phi_nodes
-        3,     // phi_frequency
-        2048,  // hdc_dim
-        32,    // n_processes
+        16,   // phi_nodes
+        3,    // phi_frequency
+        2048, // hdc_dim
+        32,   // n_processes
     );
 
     assert!(pipeline.has_full_consciousness());
@@ -1415,7 +1615,10 @@ fn test_full_consciousness_processing_pipeline() {
         // Periodically run optimization
         if i % 10 == 9 {
             let summary = pipeline.run_optimization_cycle();
-            println!("Cycle {}: Φ = {:.4} → {:.4}", i, summary.phi_before, summary.phi_after);
+            println!(
+                "Cycle {}: Φ = {:.4} → {:.4}",
+                i, summary.phi_before, summary.phi_after
+            );
         }
     }
 
@@ -1433,7 +1636,7 @@ fn test_full_consciousness_processing_pipeline() {
 #[test]
 fn test_orchestrator_recommendations_display() {
     use crate::hdc::consciousness_integration::{
-        RecommendationPriority, OptimizationRecommendation,
+        OptimizationRecommendation, RecommendationPriority,
     };
 
     let recommendations = vec![
@@ -1462,9 +1665,16 @@ fn test_orchestrator_recommendations_display() {
         println!("   {}", rec);
     }
 
-    assert_eq!(recommendations.len(), 3, "should have exactly 3 recommendations");
+    assert_eq!(
+        recommendations.len(),
+        3,
+        "should have exactly 3 recommendations"
+    );
     assert_eq!(recommendations[0].system, "phi");
-    assert!(recommendations[0].suggested_action.is_some(), "high-priority recommendation should have a suggested action");
+    assert!(
+        recommendations[0].suggested_action.is_some(),
+        "high-priority recommendation should have a suggested action"
+    );
 }
 
 // ==========================================
@@ -1532,14 +1742,20 @@ fn test_verification_runs_periodically() {
 
     // Run 6 cycles (should trigger verification at cycles 3 and 6)
     for i in 0..6 {
-        let inputs = vec![BinaryHV::random(700 + i as u64), BinaryHV::random(800 + i as u64)];
+        let inputs = vec![
+            BinaryHV::random(700 + i as u64),
+            BinaryHV::random(800 + i as u64),
+        ];
         let priorities = vec![0.8, 0.75];
         pipeline.process(inputs, &priorities);
     }
 
     // Verification should have been produced
     let report = pipeline.latest_verification();
-    assert!(report.is_some(), "Verification report should exist after 6 cycles with interval=3");
+    assert!(
+        report.is_some(),
+        "Verification report should exist after 6 cycles with interval=3"
+    );
 
     let report = report.unwrap();
     assert!(report.confidence >= 0.0 && report.confidence <= 1.0);
@@ -1550,18 +1766,26 @@ fn test_verification_runs_periodically() {
 fn test_register_subsystem() {
     use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
 
-    struct TestSubsystem { call_count: usize }
+    struct TestSubsystem {
+        call_count: usize,
+    }
 
     impl ConsciousnessSubsystem for TestSubsystem {
-        fn name(&self) -> &str { "test" }
-        fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
-            -> Result<(), SubsystemError>
-        {
+        fn name(&self) -> &str {
+            "test"
+        }
+        fn process_cycle(
+            &mut self,
+            state: &mut ConsciousnessState,
+            _inputs: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
             self.call_count += 1;
             state.phi = (state.phi + 0.001).min(1.0);
             Ok(())
         }
-        fn is_enabled(&self) -> bool { true }
+        fn is_enabled(&self) -> bool {
+            true
+        }
     }
 
     let mut pipeline = ConsciousnessPipeline::default();
@@ -1595,7 +1819,10 @@ fn test_subsystem_replaces_inline_processing() {
 
     // Process — should not panic and should use the subsystem
     for i in 0..5 {
-        let inputs = vec![BinaryHV::random(950 + i as u64), BinaryHV::random(960 + i as u64)];
+        let inputs = vec![
+            BinaryHV::random(950 + i as u64),
+            BinaryHV::random(960 + i as u64),
+        ];
         let priorities = vec![0.8, 0.75];
         pipeline.process(inputs, &priorities);
     }
@@ -1619,7 +1846,11 @@ fn test_ring_buffer_history_cap() {
     }
 
     // History should be capped at 10
-    assert!(pipeline.history.len() <= 10, "History should be bounded, got {}", pipeline.history.len());
+    assert!(
+        pipeline.history.len() <= 10,
+        "History should be bounded, got {}",
+        pipeline.history.len()
+    );
 }
 
 #[test]
@@ -1628,22 +1859,37 @@ fn test_subsystem_panic_safety() {
 
     struct PanickingSubsystem;
     impl ConsciousnessSubsystem for PanickingSubsystem {
-        fn name(&self) -> &str { "panicker" }
-        fn process_cycle(&mut self, _state: &mut ConsciousnessState, _inputs: &[BinaryHV])
-            -> Result<(), SubsystemError> { panic!("intentional test panic"); }
-        fn is_enabled(&self) -> bool { true }
+        fn name(&self) -> &str {
+            "panicker"
+        }
+        fn process_cycle(
+            &mut self,
+            _state: &mut ConsciousnessState,
+            _inputs: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
+            panic!("intentional test panic");
+        }
+        fn is_enabled(&self) -> bool {
+            true
+        }
     }
 
     struct GoodSubsystem;
     impl ConsciousnessSubsystem for GoodSubsystem {
-        fn name(&self) -> &str { "good" }
-        fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
-            -> Result<(), SubsystemError>
-        {
+        fn name(&self) -> &str {
+            "good"
+        }
+        fn process_cycle(
+            &mut self,
+            state: &mut ConsciousnessState,
+            _inputs: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
             state.phi = (state.phi + 0.01).min(1.0);
             Ok(())
         }
-        fn is_enabled(&self) -> bool { true }
+        fn is_enabled(&self) -> bool {
+            true
+        }
     }
 
     let mut pipeline = ConsciousnessPipeline::default();
@@ -1666,13 +1912,22 @@ fn test_subsystem_error_collection() {
 
     struct FailingSubsystem;
     impl ConsciousnessSubsystem for FailingSubsystem {
-        fn name(&self) -> &str { "failer" }
-        fn process_cycle(&mut self, _state: &mut ConsciousnessState, _inputs: &[BinaryHV])
-            -> Result<(), SubsystemError>
-        {
-            Err(SubsystemError { subsystem: "failer".into(), message: "test error".into() })
+        fn name(&self) -> &str {
+            "failer"
         }
-        fn is_enabled(&self) -> bool { true }
+        fn process_cycle(
+            &mut self,
+            _state: &mut ConsciousnessState,
+            _inputs: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
+            Err(SubsystemError {
+                subsystem: "failer".into(),
+                message: "test error".into(),
+            })
+        }
+        fn is_enabled(&self) -> bool {
+            true
+        }
     }
 
     let mut pipeline = ConsciousnessPipeline::default();
@@ -1699,17 +1954,29 @@ fn test_subsystem_priority_ordering() {
 
     let order: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
 
-    struct OrderTracker { name: String, prio: i32, order: Arc<Mutex<Vec<String>>> }
+    struct OrderTracker {
+        name: String,
+        prio: i32,
+        order: Arc<Mutex<Vec<String>>>,
+    }
     impl ConsciousnessSubsystem for OrderTracker {
-        fn name(&self) -> &str { &self.name }
-        fn process_cycle(&mut self, _state: &mut ConsciousnessState, _inputs: &[BinaryHV])
-            -> Result<(), SubsystemError>
-        {
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn process_cycle(
+            &mut self,
+            _state: &mut ConsciousnessState,
+            _inputs: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
             self.order.lock().unwrap().push(self.name.clone());
             Ok(())
         }
-        fn is_enabled(&self) -> bool { true }
-        fn priority(&self) -> i32 { self.prio }
+        fn is_enabled(&self) -> bool {
+            true
+        }
+        fn priority(&self) -> i32 {
+            self.prio
+        }
     }
 
     let mut pipeline = ConsciousnessPipeline::default();
@@ -1717,13 +1984,19 @@ fn test_subsystem_priority_ordering() {
 
     // Register in non-priority order
     pipeline.register_subsystem(Box::new(OrderTracker {
-        name: "low".into(), prio: -10, order: order.clone()
+        name: "low".into(),
+        prio: -10,
+        order: order.clone(),
     }));
     pipeline.register_subsystem(Box::new(OrderTracker {
-        name: "high".into(), prio: 100, order: order.clone()
+        name: "high".into(),
+        prio: 100,
+        order: order.clone(),
     }));
     pipeline.register_subsystem(Box::new(OrderTracker {
-        name: "mid".into(), prio: 0, order: order.clone()
+        name: "mid".into(),
+        prio: 0,
+        order: order.clone(),
     }));
 
     let inputs = vec![BinaryHV::random(1300)];
@@ -1756,8 +2029,10 @@ fn test_checkpoint_save_restore() {
 
     // Restore
     pipeline.restore_checkpoint(checkpoint);
-    assert!((pipeline.get_state().phi - saved_phi).abs() < 1e-15,
-        "Phi should be restored exactly");
+    assert!(
+        (pipeline.get_state().phi - saved_phi).abs() < 1e-15,
+        "Phi should be restored exactly"
+    );
     assert_eq!(pipeline.current_cycle, saved_cycle);
 }
 
@@ -1775,9 +2050,7 @@ fn test_builder_default() {
 
 #[test]
 fn test_builder_with_embodiment() {
-    let pipeline = ConsciousnessPipelineBuilder::new()
-        .embodiment(0.9)
-        .build();
+    let pipeline = ConsciousnessPipelineBuilder::new().embodiment(0.9).build();
     assert!((pipeline.embodiment_level - 0.9).abs() < 1e-10);
 }
 
@@ -1811,10 +2084,19 @@ fn test_builder_with_subsystem() {
 
     struct BuilderTestSub;
     impl ConsciousnessSubsystem for BuilderTestSub {
-        fn name(&self) -> &str { "builder_test" }
-        fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError> { Ok(()) }
-        fn is_enabled(&self) -> bool { true }
+        fn name(&self) -> &str {
+            "builder_test"
+        }
+        fn process_cycle(
+            &mut self,
+            _s: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
+            Ok(())
+        }
+        fn is_enabled(&self) -> bool {
+            true
+        }
     }
 
     let pipeline = ConsciousnessPipelineBuilder::new()
@@ -1864,12 +2146,23 @@ fn test_on_register_called() {
 
     let registered = Arc::new(Mutex::new(false));
 
-    struct LifecycleSub { registered: Arc<Mutex<bool>> }
+    struct LifecycleSub {
+        registered: Arc<Mutex<bool>>,
+    }
     impl ConsciousnessSubsystem for LifecycleSub {
-        fn name(&self) -> &str { "lifecycle" }
-        fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError> { Ok(()) }
-        fn is_enabled(&self) -> bool { true }
+        fn name(&self) -> &str {
+            "lifecycle"
+        }
+        fn process_cycle(
+            &mut self,
+            _s: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
+            Ok(())
+        }
+        fn is_enabled(&self) -> bool {
+            true
+        }
         fn on_register(&mut self) {
             *self.registered.lock().unwrap() = true;
         }
@@ -1878,8 +2171,13 @@ fn test_on_register_called() {
     let mut pipeline = ConsciousnessPipeline::default();
     assert!(!*registered.lock().unwrap());
 
-    pipeline.register_subsystem(Box::new(LifecycleSub { registered: registered.clone() }));
-    assert!(*registered.lock().unwrap(), "on_register should be called during register_subsystem");
+    pipeline.register_subsystem(Box::new(LifecycleSub {
+        registered: registered.clone(),
+    }));
+    assert!(
+        *registered.lock().unwrap(),
+        "on_register should be called during register_subsystem"
+    );
 }
 
 #[test]
@@ -1889,23 +2187,39 @@ fn test_on_shutdown_called() {
 
     let shutdown = Arc::new(Mutex::new(false));
 
-    struct ShutdownSub { shutdown: Arc<Mutex<bool>> }
+    struct ShutdownSub {
+        shutdown: Arc<Mutex<bool>>,
+    }
     impl ConsciousnessSubsystem for ShutdownSub {
-        fn name(&self) -> &str { "shutdown_test" }
-        fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError> { Ok(()) }
-        fn is_enabled(&self) -> bool { true }
+        fn name(&self) -> &str {
+            "shutdown_test"
+        }
+        fn process_cycle(
+            &mut self,
+            _s: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
+            Ok(())
+        }
+        fn is_enabled(&self) -> bool {
+            true
+        }
         fn on_shutdown(&mut self) {
             *self.shutdown.lock().unwrap() = true;
         }
     }
 
     let mut pipeline = ConsciousnessPipeline::default();
-    pipeline.register_subsystem(Box::new(ShutdownSub { shutdown: shutdown.clone() }));
+    pipeline.register_subsystem(Box::new(ShutdownSub {
+        shutdown: shutdown.clone(),
+    }));
     assert!(!*shutdown.lock().unwrap());
 
     pipeline.clear();
-    assert!(*shutdown.lock().unwrap(), "on_shutdown should be called during clear()");
+    assert!(
+        *shutdown.lock().unwrap(),
+        "on_shutdown should be called during clear()"
+    );
 }
 
 #[test]
@@ -1915,23 +2229,33 @@ fn test_checkpoint_restore_with_subsystems() {
 
     let call_count = Arc::new(Mutex::new(0usize));
 
-    struct CountingSub { calls: Arc<Mutex<usize>> }
+    struct CountingSub {
+        calls: Arc<Mutex<usize>>,
+    }
     impl ConsciousnessSubsystem for CountingSub {
-        fn name(&self) -> &str { "counter" }
-        fn process_cycle(&mut self, state: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError>
-        {
+        fn name(&self) -> &str {
+            "counter"
+        }
+        fn process_cycle(
+            &mut self,
+            state: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
             *self.calls.lock().unwrap() += 1;
             state.phi = (state.phi + 0.01).min(1.0);
             Ok(())
         }
-        fn is_enabled(&self) -> bool { true }
+        fn is_enabled(&self) -> bool {
+            true
+        }
     }
 
     // Build pipeline with subsystem, run some cycles
     let mut pipeline = ConsciousnessPipelineBuilder::new()
         .embodiment(0.8)
-        .subsystem(Box::new(CountingSub { calls: call_count.clone() }))
+        .subsystem(Box::new(CountingSub {
+            calls: call_count.clone(),
+        }))
         .build();
 
     for i in 0..5 {
@@ -1950,7 +2274,11 @@ fn test_checkpoint_restore_with_subsystems() {
     // Restore checkpoint — state should revert, subsystem stays registered
     pipeline.restore_checkpoint(checkpoint);
     assert!((pipeline.get_state().phi - saved_phi).abs() < 1e-15);
-    assert_eq!(pipeline.subsystem_count(), 1, "Subsystem should survive checkpoint restore");
+    assert_eq!(
+        pipeline.subsystem_count(),
+        1,
+        "Subsystem should survive checkpoint restore"
+    );
 
     // Subsystem should still work after restore
     pipeline.process(vec![BinaryHV::random(3200)], &[0.8]);
@@ -1961,12 +2289,18 @@ fn test_checkpoint_restore_with_subsystems() {
 fn test_subsystem_state_after_panic() {
     use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
 
-    struct PanicOnceSub { panicked: bool }
+    struct PanicOnceSub {
+        panicked: bool,
+    }
     impl ConsciousnessSubsystem for PanicOnceSub {
-        fn name(&self) -> &str { "panic_once" }
-        fn process_cycle(&mut self, state: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError>
-        {
+        fn name(&self) -> &str {
+            "panic_once"
+        }
+        fn process_cycle(
+            &mut self,
+            state: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
             if !self.panicked {
                 self.panicked = true;
                 panic!("first call panic");
@@ -1974,7 +2308,9 @@ fn test_subsystem_state_after_panic() {
             state.phi = (state.phi + 0.05).min(1.0);
             Ok(())
         }
-        fn is_enabled(&self) -> bool { true }
+        fn is_enabled(&self) -> bool {
+            true
+        }
     }
 
     let mut pipeline = ConsciousnessPipeline::default();
@@ -2011,8 +2347,8 @@ fn test_checkpoint_serialization_roundtrip() {
     assert!(!json.is_empty());
 
     // Deserialize back
-    let restored: PipelineCheckpoint = serde_json::from_str(&json)
-        .expect("checkpoint should deserialize");
+    let restored: PipelineCheckpoint =
+        serde_json::from_str(&json).expect("checkpoint should deserialize");
     assert!((restored.state.phi - checkpoint.state.phi).abs() < 1e-15);
     assert_eq!(restored.current_cycle, checkpoint.current_cycle);
 }
@@ -2027,22 +2363,37 @@ fn test_subsystem_cycle_reports() {
 
     struct SlowSub;
     impl ConsciousnessSubsystem for SlowSub {
-        fn name(&self) -> &str { "slow" }
-        fn process_cycle(&mut self, state: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError>
-        {
+        fn name(&self) -> &str {
+            "slow"
+        }
+        fn process_cycle(
+            &mut self,
+            state: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
             state.phi = (state.phi + 0.05).min(1.0);
             Ok(())
         }
-        fn is_enabled(&self) -> bool { true }
+        fn is_enabled(&self) -> bool {
+            true
+        }
     }
 
     struct DisabledSub;
     impl ConsciousnessSubsystem for DisabledSub {
-        fn name(&self) -> &str { "disabled" }
-        fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError> { Ok(()) }
-        fn is_enabled(&self) -> bool { false }
+        fn name(&self) -> &str {
+            "disabled"
+        }
+        fn process_cycle(
+            &mut self,
+            _s: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
+            Ok(())
+        }
+        fn is_enabled(&self) -> bool {
+            false
+        }
     }
 
     let mut pipeline = ConsciousnessPipelineBuilder::new()
@@ -2072,14 +2423,30 @@ fn test_subsystem_cycle_reports() {
 fn test_subsystem_names() {
     use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
 
-    struct Sub { n: &'static str }
+    struct Sub {
+        n: &'static str,
+    }
     impl ConsciousnessSubsystem for Sub {
-        fn name(&self) -> &str { self.n }
-        fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError> { Ok(()) }
-        fn is_enabled(&self) -> bool { true }
+        fn name(&self) -> &str {
+            self.n
+        }
+        fn process_cycle(
+            &mut self,
+            _s: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
+            Ok(())
+        }
+        fn is_enabled(&self) -> bool {
+            true
+        }
         fn priority(&self) -> i32 {
-            match self.n { "alpha" => 10, "beta" => 5, "gamma" => 0, _ => 0 }
+            match self.n {
+                "alpha" => 10,
+                "beta" => 5,
+                "gamma" => 0,
+                _ => 0,
+            }
         }
     }
 
@@ -2099,13 +2466,22 @@ fn test_subsystem_error_in_report() {
 
     struct FailSub;
     impl ConsciousnessSubsystem for FailSub {
-        fn name(&self) -> &str { "fail_report" }
-        fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError>
-        {
-            Err(SubsystemError { subsystem: "fail_report".into(), message: "oops".into() })
+        fn name(&self) -> &str {
+            "fail_report"
         }
-        fn is_enabled(&self) -> bool { true }
+        fn process_cycle(
+            &mut self,
+            _s: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
+            Err(SubsystemError {
+                subsystem: "fail_report".into(),
+                message: "oops".into(),
+            })
+        }
+        fn is_enabled(&self) -> bool {
+            true
+        }
     }
 
     let mut pipeline = ConsciousnessPipelineBuilder::new()
@@ -2128,17 +2504,32 @@ fn test_subsystem_error_in_report() {
 
 #[test]
 fn test_subsystem_context_data_passing() {
-    use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError, SubsystemContext};
+    use crate::hdc::consciousness_subsystem::{
+        ConsciousnessSubsystem, SubsystemContext, SubsystemError,
+    };
 
     struct Producer;
     impl ConsciousnessSubsystem for Producer {
-        fn name(&self) -> &str { "producer" }
-        fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError> { Ok(()) }
-        fn is_enabled(&self) -> bool { true }
-        fn priority(&self) -> i32 { 100 } // runs first
+        fn name(&self) -> &str {
+            "producer"
+        }
+        fn process_cycle(
+            &mut self,
+            _s: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
+            Ok(())
+        }
+        fn is_enabled(&self) -> bool {
+            true
+        }
+        fn priority(&self) -> i32 {
+            100
+        } // runs first
         fn process_cycle_with_context(
-            &mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV],
+            &mut self,
+            state: &mut ConsciousnessState,
+            inputs: &[BinaryHV],
             context: &mut SubsystemContext,
         ) -> Result<(), SubsystemError> {
             context.set("shared_value", 42.0_f64);
@@ -2146,15 +2537,30 @@ fn test_subsystem_context_data_passing() {
         }
     }
 
-    struct Consumer { received: Option<f64> }
+    struct Consumer {
+        received: Option<f64>,
+    }
     impl ConsciousnessSubsystem for Consumer {
-        fn name(&self) -> &str { "consumer" }
-        fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError> { Ok(()) }
-        fn is_enabled(&self) -> bool { true }
-        fn priority(&self) -> i32 { 0 } // runs second
+        fn name(&self) -> &str {
+            "consumer"
+        }
+        fn process_cycle(
+            &mut self,
+            _s: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
+            Ok(())
+        }
+        fn is_enabled(&self) -> bool {
+            true
+        }
+        fn priority(&self) -> i32 {
+            0
+        } // runs second
         fn process_cycle_with_context(
-            &mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV],
+            &mut self,
+            state: &mut ConsciousnessState,
+            inputs: &[BinaryHV],
             context: &mut SubsystemContext,
         ) -> Result<(), SubsystemError> {
             self.received = context.get::<f64>("shared_value").copied();
@@ -2178,16 +2584,29 @@ fn test_subsystem_context_data_passing() {
 
 #[test]
 fn test_subsystem_context_cleared_each_cycle() {
-    use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError, SubsystemContext};
+    use crate::hdc::consciousness_subsystem::{
+        ConsciousnessSubsystem, SubsystemContext, SubsystemError,
+    };
 
     struct Writer;
     impl ConsciousnessSubsystem for Writer {
-        fn name(&self) -> &str { "writer" }
-        fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
-            -> Result<(), SubsystemError> { Ok(()) }
-        fn is_enabled(&self) -> bool { true }
+        fn name(&self) -> &str {
+            "writer"
+        }
+        fn process_cycle(
+            &mut self,
+            _s: &mut ConsciousnessState,
+            _i: &[BinaryHV],
+        ) -> Result<(), SubsystemError> {
+            Ok(())
+        }
+        fn is_enabled(&self) -> bool {
+            true
+        }
         fn process_cycle_with_context(
-            &mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV],
+            &mut self,
+            state: &mut ConsciousnessState,
+            inputs: &[BinaryHV],
             context: &mut SubsystemContext,
         ) -> Result<(), SubsystemError> {
             context.set("cycle_data", "hello".to_string());

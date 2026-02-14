@@ -30,6 +30,14 @@
 
 #![warn(missing_docs)]
 #![allow(clippy::needless_range_loop)]
+#![allow(clippy::manual_clamp)]
+#![allow(clippy::new_without_default)]
+#![allow(clippy::wrong_self_convention)]
+#![allow(clippy::if_same_then_else)]
+#![allow(clippy::manual_memcpy)]
+#![allow(clippy::only_used_in_recursion)]
+#![allow(clippy::redundant_guards)]
+#![allow(clippy::map_or_default)]
 // Suppress test-harness-generated deprecated warnings for phi_real module tests.
 // phi_real is #![deprecated] (renamed to spectral_connectivity), but the linter
 // hook restores its tests; the test harness references deprecated test constants

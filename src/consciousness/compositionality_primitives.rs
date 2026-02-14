@@ -53,16 +53,16 @@
 //! This transforms the primitive system from a toolkit to a **generative grammar**
 //! for reasoning.
 
+use crate::consciousness::harmonics::{FiduciaryHarmonic, HarmonicField};
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{PrimitiveTier, Primitive, PrimitiveSystem};
-use crate::consciousness::harmonics::{HarmonicField, FiduciaryHarmonic};
-use anyhow::{Result, Context};
+use crate::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use std::fmt;
 
 /// Helper: Convert text to BinaryHV using deterministic hash-based encoding
 fn text_to_hv16(text: &str) -> BinaryHV {
@@ -263,10 +263,27 @@ impl CompositionalityEngine {
         let operators = [
             (CompositionType::Sequential, 7001),
             (CompositionType::Parallel, 7002),
-            (CompositionType::Conditional { pattern: String::new(), threshold: 500 }, 7003),
-            (CompositionType::FixedPoint { max_iterations: 100, convergence_threshold: 990 }, 7004),
+            (
+                CompositionType::Conditional {
+                    pattern: String::new(),
+                    threshold: 500,
+                },
+                7003,
+            ),
+            (
+                CompositionType::FixedPoint {
+                    max_iterations: 100,
+                    convergence_threshold: 990,
+                },
+                7004,
+            ),
             (CompositionType::HigherOrder, 7005),
-            (CompositionType::Fallback { confidence_threshold: 500 }, 7006),
+            (
+                CompositionType::Fallback {
+                    confidence_threshold: 500,
+                },
+                7006,
+            ),
         ];
 
         for (op_type, seed) in operators {
@@ -275,15 +292,15 @@ impl CompositionalityEngine {
                 CompositionType::Parallel => CompositionType::Parallel,
                 CompositionType::Conditional { .. } => CompositionType::Conditional {
                     pattern: String::new(),
-                    threshold: 0
+                    threshold: 0,
                 },
                 CompositionType::FixedPoint { .. } => CompositionType::FixedPoint {
                     max_iterations: 0,
-                    convergence_threshold: 0
+                    convergence_threshold: 0,
                 },
                 CompositionType::HigherOrder => CompositionType::HigherOrder,
                 CompositionType::Fallback { .. } => CompositionType::Fallback {
-                    confidence_threshold: 0
+                    confidence_threshold: 0,
                 },
             };
             self.operator_encodings.insert(key, BinaryHV::random(seed));
@@ -306,7 +323,9 @@ impl CompositionalityEngine {
         // Get encodings
         let f_enc = self.get_encoding(f_id)?;
         let g_enc = self.get_encoding(g_id)?;
-        let op_enc = self.operator_encodings.get(&CompositionType::Sequential)
+        let op_enc = self
+            .operator_encodings
+            .get(&CompositionType::Sequential)
             .context("Missing sequential operator encoding")?;
 
         // Compose: bind(op, bind(f, g))
@@ -355,7 +374,9 @@ impl CompositionalityEngine {
 
         let f_enc = self.get_encoding(f_id)?;
         let g_enc = self.get_encoding(g_id)?;
-        let op_enc = self.operator_encodings.get(&CompositionType::Parallel)
+        let op_enc = self
+            .operator_encodings
+            .get(&CompositionType::Parallel)
             .context("Missing parallel operator encoding")?;
 
         // Compose: bind(op, bundle([f, g]))
@@ -396,7 +417,12 @@ impl CompositionalityEngine {
         pattern: &str,
         threshold: f32,
     ) -> Result<ComposedPrimitive> {
-        let id = format!("cond_{}_{}_{}", f_id, g_id, pattern.chars().take(8).collect::<String>());
+        let id = format!(
+            "cond_{}_{}_{}",
+            f_id,
+            g_id,
+            pattern.chars().take(8).collect::<String>()
+        );
 
         if let Some(cached) = self.composed_primitives.get(&id) {
             return Ok(cached.clone());
@@ -405,10 +431,13 @@ impl CompositionalityEngine {
         let f_enc = self.get_encoding(f_id)?;
         let g_enc = self.get_encoding(g_id)?;
         let pattern_enc = text_to_hv16(pattern);
-        let op_enc = self.operator_encodings.get(&CompositionType::Conditional {
-            pattern: String::new(),
-            threshold: 0
-        }).context("Missing conditional operator encoding")?;
+        let op_enc = self
+            .operator_encodings
+            .get(&CompositionType::Conditional {
+                pattern: String::new(),
+                threshold: 0,
+            })
+            .context("Missing conditional operator encoding")?;
 
         // Compose: bind(op, bundle([f, g, pattern]))
         // The pattern is included so similarity checks can be done
@@ -430,7 +459,10 @@ impl CompositionalityEngine {
                 depth: self.get_depth(f_id).max(self.get_depth(g_id)) + 1,
                 base_count: self.get_base_count(f_id) + self.get_base_count(g_id),
                 expected_phi_contribution: 0.04,
-                description: format!("If input matches '{}', use {}, else {}", pattern, f_id, g_id),
+                description: format!(
+                    "If input matches '{}', use {}, else {}",
+                    pattern, f_id, g_id
+                ),
                 tags: vec!["conditional".to_string(), "branching".to_string()],
             },
         };
@@ -457,10 +489,13 @@ impl CompositionalityEngine {
         }
 
         let f_enc = self.get_encoding(f_id)?;
-        let op_enc = self.operator_encodings.get(&CompositionType::FixedPoint {
-            max_iterations: 0,
-            convergence_threshold: 0,
-        }).context("Missing fixed-point operator encoding")?;
+        let op_enc = self
+            .operator_encodings
+            .get(&CompositionType::FixedPoint {
+                max_iterations: 0,
+                convergence_threshold: 0,
+            })
+            .context("Missing fixed-point operator encoding")?;
 
         // For fixed point, we permute the encoding to represent "self-application"
         // Each iteration applies a permutation, so μf = bundle of all permutations
@@ -486,8 +521,15 @@ impl CompositionalityEngine {
                 depth: self.get_depth(f_id) + 1,
                 base_count: self.get_base_count(f_id),
                 expected_phi_contribution: 0.10, // High Φ from recursive integration
-                description: format!("Apply {} repeatedly until convergence (max {} iterations)", f_id, max_iter),
-                tags: vec!["fixed-point".to_string(), "recursive".to_string(), "convergent".to_string()],
+                description: format!(
+                    "Apply {} repeatedly until convergence (max {} iterations)",
+                    f_id, max_iter
+                ),
+                tags: vec![
+                    "fixed-point".to_string(),
+                    "recursive".to_string(),
+                    "convergent".to_string(),
+                ],
             },
         };
 
@@ -498,7 +540,11 @@ impl CompositionalityEngine {
     /// Create a higher-order composition: ↑f transforms another primitive g
     ///
     /// **Meta-reasoning**: A primitive that modifies how another primitive works!
-    pub fn compose_higher_order(&mut self, transformer_id: &str, target_id: &str) -> Result<ComposedPrimitive> {
+    pub fn compose_higher_order(
+        &mut self,
+        transformer_id: &str,
+        target_id: &str,
+    ) -> Result<ComposedPrimitive> {
         let id = format!("ho_{}_{}", transformer_id, target_id);
 
         if let Some(cached) = self.composed_primitives.get(&id) {
@@ -507,7 +553,9 @@ impl CompositionalityEngine {
 
         let t_enc = self.get_encoding(transformer_id)?;
         let target_enc = self.get_encoding(target_id)?;
-        let op_enc = self.operator_encodings.get(&CompositionType::HigherOrder)
+        let op_enc = self
+            .operator_encodings
+            .get(&CompositionType::HigherOrder)
             .context("Missing higher-order operator encoding")?;
 
         // Higher-order: bind the transformer with a permuted target
@@ -528,7 +576,11 @@ impl CompositionalityEngine {
                 base_count: self.get_base_count(transformer_id) + self.get_base_count(target_id),
                 expected_phi_contribution: 0.15, // Highest Φ from meta-cognition
                 description: format!("{} transforms how {} operates", transformer_id, target_id),
-                tags: vec!["higher-order".to_string(), "meta".to_string(), "transformer".to_string()],
+                tags: vec![
+                    "higher-order".to_string(),
+                    "meta".to_string(),
+                    "transformer".to_string(),
+                ],
             },
         };
 
@@ -551,9 +603,12 @@ impl CompositionalityEngine {
 
         let p_enc = self.get_encoding(primary_id)?;
         let f_enc = self.get_encoding(fallback_id)?;
-        let op_enc = self.operator_encodings.get(&CompositionType::Fallback {
-            confidence_threshold: 0
-        }).context("Missing fallback operator encoding")?;
+        let op_enc = self
+            .operator_encodings
+            .get(&CompositionType::Fallback {
+                confidence_threshold: 0,
+            })
+            .context("Missing fallback operator encoding")?;
 
         // Fallback uses weighted bundle - primary is weighted higher
         // We simulate this by bundling primary twice
@@ -574,8 +629,10 @@ impl CompositionalityEngine {
                 depth: self.get_depth(primary_id).max(self.get_depth(fallback_id)) + 1,
                 base_count: self.get_base_count(primary_id) + self.get_base_count(fallback_id),
                 expected_phi_contribution: 0.03,
-                description: format!("Try {} (threshold={}), fallback to {}",
-                    primary_id, confidence_threshold, fallback_id),
+                description: format!(
+                    "Try {} (threshold={}), fallback to {}",
+                    primary_id, confidence_threshold, fallback_id
+                ),
                 tags: vec!["fallback".to_string(), "robust".to_string()],
             },
         };
@@ -607,13 +664,18 @@ impl CompositionalityEngine {
         }
 
         // Get composed primitive
-        let composed = self.composed_primitives.get(composition_id)
+        let composed = self
+            .composed_primitives
+            .get(composition_id)
             .context(format!("Unknown composition: {}", composition_id))?;
 
         match &composed.composition_type {
             CompositionType::Sequential => {
                 // Execute g first, then f
-                let g_id = composed.operand_b.as_ref().context("Missing second operand")?;
+                let g_id = composed
+                    .operand_b
+                    .as_ref()
+                    .context("Missing second operand")?;
                 let g_result = self.execute(g_id, input)?;
                 let f_result = self.execute(&composed.operand_a, &g_result.output)?;
 
@@ -631,7 +693,10 @@ impl CompositionalityEngine {
 
             CompositionType::Parallel => {
                 // Execute both and bundle
-                let g_id = composed.operand_b.as_ref().context("Missing second operand")?;
+                let g_id = composed
+                    .operand_b
+                    .as_ref()
+                    .context("Missing second operand")?;
                 let f_result = self.execute(&composed.operand_a, input)?;
                 let g_result = self.execute(g_id, input)?;
 
@@ -660,17 +725,22 @@ impl CompositionalityEngine {
                 };
 
                 let mut result = self.execute(chosen_id, input)?;
-                result.execution_path.insert(0, format!("cond(sim={:.3})", similarity));
+                result
+                    .execution_path
+                    .insert(0, format!("cond(sim={:.3})", similarity));
                 Ok(result)
             }
 
-            CompositionType::FixedPoint { max_iterations, convergence_threshold } => {
+            CompositionType::FixedPoint {
+                max_iterations,
+                convergence_threshold,
+            } => {
                 let threshold_f = *convergence_threshold as f32 / 1000.0;
                 let mut current = *input;
                 let mut iterations = 0;
 
                 for i in 0..*max_iterations {
-                    let prev = current;  // Loop-local: save current before transforming
+                    let prev = current; // Loop-local: save current before transforming
                     let result = self.execute(&composed.operand_a, &current)?;
                     current = result.output;
                     iterations = i + 1;
@@ -713,7 +783,9 @@ impl CompositionalityEngine {
                 })
             }
 
-            CompositionType::Fallback { confidence_threshold } => {
+            CompositionType::Fallback {
+                confidence_threshold,
+            } => {
                 let threshold_f = *confidence_threshold as f32 / 1000.0;
 
                 // Try primary
@@ -725,8 +797,10 @@ impl CompositionalityEngine {
                     // Use fallback
                     let fallback_id = composed.operand_b.as_ref().context("Missing fallback")?;
                     let mut fallback_result = self.execute(fallback_id, input)?;
-                    fallback_result.execution_path.insert(0,
-                        format!("fallback(primary_conf={:.3})", primary_result.confidence));
+                    fallback_result.execution_path.insert(
+                        0,
+                        format!("fallback(primary_conf={:.3})", primary_result.confidence),
+                    );
                     Ok(fallback_result)
                 }
             }
@@ -801,7 +875,8 @@ impl CompositionalityEngine {
 
         // Update average depth
         let n = self.stats.total_compositions as f32;
-        self.stats.avg_depth = ((n - 1.0) * self.stats.avg_depth + composed.metadata.depth as f32) / n;
+        self.stats.avg_depth =
+            ((n - 1.0) * self.stats.avg_depth + composed.metadata.depth as f32) / n;
 
         // Enforce cache limit
         if self.composed_primitives.len() >= self.config.max_cache_size {
@@ -811,7 +886,8 @@ impl CompositionalityEngine {
             }
         }
 
-        self.composed_primitives.insert(composed.id.clone(), composed);
+        self.composed_primitives
+            .insert(composed.id.clone(), composed);
     }
 
     /// Get statistics
@@ -832,12 +908,19 @@ impl CompositionalityEngine {
             // - Resonant Coherence (integrated structures)
             // - Evolutionary Progression (self-improvement via fixed points)
 
-            field.adjust_level(FiduciaryHarmonic::IntegralWisdom,
-                (composed.metadata.expected_phi_contribution * 0.4) as f64);
-            field.adjust_level(FiduciaryHarmonic::ResonantCoherence,
-                (composed.metadata.expected_phi_contribution * 0.3) as f64);
+            field.adjust_level(
+                FiduciaryHarmonic::IntegralWisdom,
+                (composed.metadata.expected_phi_contribution * 0.4) as f64,
+            );
+            field.adjust_level(
+                FiduciaryHarmonic::ResonantCoherence,
+                (composed.metadata.expected_phi_contribution * 0.3) as f64,
+            );
 
-            if matches!(composed.composition_type, CompositionType::FixedPoint { .. }) {
+            if matches!(
+                composed.composition_type,
+                CompositionType::FixedPoint { .. }
+            ) {
                 field.adjust_level(FiduciaryHarmonic::EvolutionaryProgression, 0.1);
             }
 
@@ -922,7 +1005,9 @@ mod tests {
     fn test_parallel_composition() {
         let mut engine = create_test_engine();
 
-        let composed = engine.compose_parallel("fast_path", "accurate_path").unwrap();
+        let composed = engine
+            .compose_parallel("fast_path", "accurate_path")
+            .unwrap();
 
         assert_eq!(composed.composition_type, CompositionType::Parallel);
         assert!(composed.name.contains("||"));
@@ -932,7 +1017,9 @@ mod tests {
     fn test_fixed_point_composition() {
         let mut engine = create_test_engine();
 
-        let composed = engine.compose_fixed_point("refine", Some(50), Some(0.99)).unwrap();
+        let composed = engine
+            .compose_fixed_point("refine", Some(50), Some(0.99))
+            .unwrap();
 
         match &composed.composition_type {
             CompositionType::FixedPoint { max_iterations, .. } => {
@@ -947,7 +1034,9 @@ mod tests {
     fn test_higher_order_composition() {
         let mut engine = create_test_engine();
 
-        let composed = engine.compose_higher_order("optimizer", "reasoner").unwrap();
+        let composed = engine
+            .compose_higher_order("optimizer", "reasoner")
+            .unwrap();
 
         assert_eq!(composed.composition_type, CompositionType::HigherOrder);
         assert!(composed.name.contains("↑"));
@@ -958,12 +1047,9 @@ mod tests {
     fn test_conditional_composition() {
         let mut engine = create_test_engine();
 
-        let composed = engine.compose_conditional(
-            "deep_analysis",
-            "quick_scan",
-            "complex_query",
-            0.7,
-        ).unwrap();
+        let composed = engine
+            .compose_conditional("deep_analysis", "quick_scan", "complex_query", 0.7)
+            .unwrap();
 
         match &composed.composition_type {
             CompositionType::Conditional { pattern, threshold } => {
@@ -1012,7 +1098,10 @@ mod tests {
         let result = engine.execute(&composed.id, &input).unwrap();
 
         // Execution should produce valid results
-        assert!(result.confidence >= 0.0, "Confidence should be non-negative");
+        assert!(
+            result.confidence >= 0.0,
+            "Confidence should be non-negative"
+        );
         assert!(result.iterations >= 1, "Should have at least one iteration");
         // Execution path may or may not be populated depending on tracing config
     }
@@ -1021,7 +1110,9 @@ mod tests {
     fn test_fixed_point_execution() {
         let mut engine = create_test_engine();
 
-        let composed = engine.compose_fixed_point("refine", Some(10), Some(0.99)).unwrap();
+        let composed = engine
+            .compose_fixed_point("refine", Some(10), Some(0.99))
+            .unwrap();
         let input = BinaryHV::random(42);
 
         let result = engine.execute(&composed.id, &input).unwrap();

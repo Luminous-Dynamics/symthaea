@@ -70,7 +70,13 @@ impl PhiToEpistemicMapper {
     /// Classify a conscious output
     ///
     /// Takes raw Symthaea output metrics and produces a full E/N/M classification.
-    pub fn classify(&self, phi: f32, scope: WorkspaceScope, importance: f32, is_reproducible: bool) -> EpistemicClassification {
+    pub fn classify(
+        &self,
+        phi: f32,
+        scope: WorkspaceScope,
+        importance: f32,
+        is_reproducible: bool,
+    ) -> EpistemicClassification {
         EpistemicClassification {
             empirical: self.phi_to_empirical(phi, is_reproducible),
             normative: NormativeLevel::from_scope(scope),
@@ -87,18 +93,24 @@ impl PhiToEpistemicMapper {
         importance: f32,
         is_reproducible: bool,
     ) -> ClassifiedConsciousOutput {
-        let mut output = ClassifiedConsciousOutput::new(content, phi, scope, importance, is_reproducible);
+        let mut output =
+            ClassifiedConsciousOutput::new(content, phi, scope, importance, is_reproducible);
         output.classification = self.classify(phi, scope, importance, is_reproducible);
         output
     }
 
     /// Suggest classification improvements based on evidence
-    pub fn suggest_improvements(&self, output: &ClassifiedConsciousOutput) -> Vec<ClassificationSuggestion> {
+    pub fn suggest_improvements(
+        &self,
+        output: &ClassifiedConsciousOutput,
+    ) -> Vec<ClassificationSuggestion> {
         let mut suggestions = Vec::new();
 
         // If low E-level but has strong evidence, suggest upgrade
         if output.classification.empirical < EmpiricalLevel::CryptographicallyVerifiable {
-            let crypto_evidence_count = output.evidence.iter()
+            let crypto_evidence_count = output
+                .evidence
+                .iter()
                 .filter(|e| e.evidence_type == EvidenceType::CryptographicProof)
                 .count();
 
@@ -109,36 +121,51 @@ impl PhiToEpistemicMapper {
                         empirical: EmpiricalLevel::CryptographicallyVerifiable,
                         ..output.classification
                     },
-                    reason: format!("Has {} cryptographic proof(s), can upgrade to E3", crypto_evidence_count),
+                    reason: format!(
+                        "Has {} cryptographic proof(s), can upgrade to E3",
+                        crypto_evidence_count
+                    ),
                 });
             }
         }
 
         // If high importance but low materiality, suggest upgrade
-        if output.importance > 0.8 && output.classification.materiality < MaterialityLevel::Permanent {
+        if output.importance > 0.8
+            && output.classification.materiality < MaterialityLevel::Permanent
+        {
             suggestions.push(ClassificationSuggestion {
                 current: output.classification,
                 suggested: EpistemicClassification {
                     materiality: MaterialityLevel::Permanent,
                     ..output.classification
                 },
-                reason: format!("High importance ({:.2}) suggests permanent storage", output.importance),
+                reason: format!(
+                    "High importance ({:.2}) suggests permanent storage",
+                    output.importance
+                ),
             });
         }
 
         // If consensus evidence, suggest higher E-level
-        let consensus_count = output.evidence.iter()
+        let consensus_count = output
+            .evidence
+            .iter()
             .filter(|e| e.evidence_type == EvidenceType::Consensus)
             .count();
 
-        if consensus_count >= 3 && output.classification.empirical < EmpiricalLevel::PrivatelyVerifiable {
+        if consensus_count >= 3
+            && output.classification.empirical < EmpiricalLevel::PrivatelyVerifiable
+        {
             suggestions.push(ClassificationSuggestion {
                 current: output.classification,
                 suggested: EpistemicClassification {
                     empirical: EmpiricalLevel::PrivatelyVerifiable,
                     ..output.classification
                 },
-                reason: format!("Consensus from {} sources supports E2 minimum", consensus_count),
+                reason: format!(
+                    "Consensus from {} sources supports E2 minimum",
+                    consensus_count
+                ),
             });
         }
 
@@ -179,7 +206,12 @@ pub trait EpistemicallyClassifiable {
 
     /// Classify using a mapper
     fn classify(&self, mapper: &PhiToEpistemicMapper) -> EpistemicClassification {
-        mapper.classify(self.phi(), self.scope(), self.importance(), self.is_reproducible())
+        mapper.classify(
+            self.phi(),
+            self.scope(),
+            self.importance(),
+            self.is_reproducible(),
+        )
     }
 }
 
@@ -191,28 +223,44 @@ mod tests {
     fn test_phi_mapping() {
         let mapper = PhiToEpistemicMapper::new();
 
-        assert_eq!(mapper.phi_to_empirical(0.05, false), EmpiricalLevel::Subjective);
-        assert_eq!(mapper.phi_to_empirical(0.15, false), EmpiricalLevel::Testimonial);
-        assert_eq!(mapper.phi_to_empirical(0.25, false), EmpiricalLevel::PrivatelyVerifiable);
-        assert_eq!(mapper.phi_to_empirical(0.35, false), EmpiricalLevel::CryptographicallyVerifiable);
+        assert_eq!(
+            mapper.phi_to_empirical(0.05, false),
+            EmpiricalLevel::Subjective
+        );
+        assert_eq!(
+            mapper.phi_to_empirical(0.15, false),
+            EmpiricalLevel::Testimonial
+        );
+        assert_eq!(
+            mapper.phi_to_empirical(0.25, false),
+            EmpiricalLevel::PrivatelyVerifiable
+        );
+        assert_eq!(
+            mapper.phi_to_empirical(0.35, false),
+            EmpiricalLevel::CryptographicallyVerifiable
+        );
 
         // E4 requires reproducibility
-        assert_eq!(mapper.phi_to_empirical(0.45, false), EmpiricalLevel::CryptographicallyVerifiable);
-        assert_eq!(mapper.phi_to_empirical(0.45, true), EmpiricalLevel::PubliclyReproducible);
+        assert_eq!(
+            mapper.phi_to_empirical(0.45, false),
+            EmpiricalLevel::CryptographicallyVerifiable
+        );
+        assert_eq!(
+            mapper.phi_to_empirical(0.45, true),
+            EmpiricalLevel::PubliclyReproducible
+        );
     }
 
     #[test]
     fn test_full_classification() {
         let mapper = PhiToEpistemicMapper::new();
 
-        let classification = mapper.classify(
-            0.35,
-            WorkspaceScope::Network,
-            0.6,
-            false,
-        );
+        let classification = mapper.classify(0.35, WorkspaceScope::Network, 0.6, false);
 
-        assert_eq!(classification.empirical, EmpiricalLevel::CryptographicallyVerifiable);
+        assert_eq!(
+            classification.empirical,
+            EmpiricalLevel::CryptographicallyVerifiable
+        );
         assert_eq!(classification.normative, NormativeLevel::Network);
         assert_eq!(classification.materiality, MaterialityLevel::MediumTerm);
         assert_eq!(classification.code(), "E3/N2/M2");
@@ -244,9 +292,15 @@ mod tests {
 
         let suggestions = mapper.suggest_improvements(&output);
         // Should suggest E3 upgrade (M3 already satisfied by importance 0.9)
-        assert!(!suggestions.is_empty(), "Should have at least one suggestion");
-        assert!(suggestions.iter().any(|s|
-            s.suggested.empirical == EmpiricalLevel::CryptographicallyVerifiable
-        ), "Should suggest E3 upgrade based on crypto evidence");
+        assert!(
+            !suggestions.is_empty(),
+            "Should have at least one suggestion"
+        );
+        assert!(
+            suggestions
+                .iter()
+                .any(|s| s.suggested.empirical == EmpiricalLevel::CryptographicallyVerifiable),
+            "Should suggest E3 upgrade based on crypto evidence"
+        );
     }
 }

@@ -3,7 +3,7 @@
 //! Provides memory encoding, recall, consolidation, and decay for cognitive cycles.
 //! Can be connected to the full HippocampusActor for persistence.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Episodic memory trace for the cognitive loop
 ///
@@ -34,7 +34,12 @@ impl EpisodicMemory {
         if self.embedding.len() != query.len() {
             return 0.0;
         }
-        let dot: f32 = self.embedding.iter().zip(query.iter()).map(|(a, b)| a * b).sum();
+        let dot: f32 = self
+            .embedding
+            .iter()
+            .zip(query.iter())
+            .map(|(a, b)| a * b)
+            .sum();
         let mag_self: f32 = self.embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
         let mag_query: f32 = query.iter().map(|x| x * x).sum::<f32>().sqrt();
         if mag_self > 0.0 && mag_query > 0.0 {
@@ -124,9 +129,15 @@ impl EpisodicMemoryBridge {
                     // Trim long-term if needed
                     if self.long_term.len() > self.max_long_term {
                         // Remove weakest memory
-                        if let Some(min_idx) = self.long_term.iter()
+                        if let Some(min_idx) = self
+                            .long_term
+                            .iter()
                             .enumerate()
-                            .min_by(|a, b| a.1.strength.partial_cmp(&b.1.strength).unwrap_or(std::cmp::Ordering::Equal))
+                            .min_by(|a, b| {
+                                a.1.strength
+                                    .partial_cmp(&b.1.strength)
+                                    .unwrap_or(std::cmp::Ordering::Equal)
+                            })
                             .map(|(i, _)| i)
                         {
                             self.long_term.remove(min_idx);
@@ -143,7 +154,12 @@ impl EpisodicMemoryBridge {
     }
 
     /// Recall memories similar to query embedding
-    pub fn recall(&mut self, query: &[f32], top_k: usize, min_similarity: f32) -> Vec<(EpisodicMemory, f32)> {
+    pub fn recall(
+        &mut self,
+        query: &[f32],
+        top_k: usize,
+        min_similarity: f32,
+    ) -> Vec<(EpisodicMemory, f32)> {
         let mut results: Vec<(EpisodicMemory, f32)> = Vec::new();
 
         // Search both short-term and long-term
@@ -174,8 +190,8 @@ impl EpisodicMemoryBridge {
 
         if !results.is_empty() {
             self.stats.total_recalled += 1;
-            self.stats.avg_recall_similarity = results.iter().map(|(_, s)| s).sum::<f32>()
-                / results.len() as f32;
+            self.stats.avg_recall_similarity =
+                results.iter().map(|(_, s)| s).sum::<f32>() / results.len() as f32;
         }
 
         results
@@ -209,8 +225,10 @@ impl EpisodicMemoryBridge {
     /// This forces consolidation of high-strength short-term memories.
     pub fn consolidate_recent(&mut self) {
         // Find strong short-term memories and move to long-term
-        let strong_memories: Vec<EpisodicMemory> = self.short_term.iter()
-            .filter(|m| m.strength >= self.consolidation_threshold * 0.8)  // Slightly lower threshold
+        let strong_memories: Vec<EpisodicMemory> = self
+            .short_term
+            .iter()
+            .filter(|m| m.strength >= self.consolidation_threshold * 0.8) // Slightly lower threshold
             .cloned()
             .collect();
 
@@ -229,9 +247,15 @@ impl EpisodicMemoryBridge {
 
         // Trim long-term if needed
         while self.long_term.len() > self.max_long_term {
-            if let Some(min_idx) = self.long_term.iter()
+            if let Some(min_idx) = self
+                .long_term
+                .iter()
                 .enumerate()
-                .min_by(|a, b| a.1.strength.partial_cmp(&b.1.strength).unwrap_or(std::cmp::Ordering::Equal))
+                .min_by(|a, b| {
+                    a.1.strength
+                        .partial_cmp(&b.1.strength)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|(i, _)| i)
             {
                 self.long_term.remove(min_idx);

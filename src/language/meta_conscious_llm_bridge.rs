@@ -13,10 +13,7 @@ use anyhow::Result;
 
 use crate::hdc::meta_conscious_conversation::MetaConversationCore;
 use crate::language::consciousness_prompts::{
-    ConsciousnessContext,
-    ConsciousnessPromptGenerator,
-    SevenHarmonies,
-    RelationshipMode,
+    ConsciousnessContext, ConsciousnessPromptGenerator, RelationshipMode, SevenHarmonies,
 };
 use crate::language::llm_organ::{LlmOrgan, LlmRequest, LlmResponse, Message, Role};
 
@@ -61,7 +58,11 @@ impl MetaConsciousLlmBridge {
         &mut self,
         user_input: &str,
         history: Vec<Message>,
-    ) -> Result<(crate::hdc::meta_consciousness::MetaConsciousnessState, LlmRequest, ConsciousnessContext)> {
+    ) -> Result<(
+        crate::hdc::meta_consciousness::MetaConsciousnessState,
+        LlmRequest,
+        ConsciousnessContext,
+    )> {
         let meta_state = self.core.reflect_on_text(user_input)?;
 
         // Map Φ and meta-Φ into a ConsciousnessContext for prompt augmentation.
@@ -79,7 +80,9 @@ impl MetaConsciousLlmBridge {
 
         let system_prompt = {
             let mut base = self.prompt_generator.generate(&ctx);
-            base.push_str("\n\nMETA-CONSCIOUS SUMMARY (for the translator, not to be repeated verbatim):\n");
+            base.push_str(
+                "\n\nMETA-CONSCIOUS SUMMARY (for the translator, not to be repeated verbatim):\n",
+            );
             base.push_str(&meta_state.explanation);
             base
         };
@@ -115,7 +118,10 @@ impl MetaConsciousLlmBridge {
         llm: &mut LlmOrgan,
         user_input: &str,
         history: Vec<Message>,
-    ) -> Result<(crate::hdc::meta_consciousness::MetaConsciousnessState, LlmResponse)> {
+    ) -> Result<(
+        crate::hdc::meta_consciousness::MetaConsciousnessState,
+        LlmResponse,
+    )> {
         let (meta_state, request, _ctx) = self.build_request(user_input, history)?;
         let phi = meta_state.phi as f32;
 
@@ -131,12 +137,10 @@ mod tests {
     #[test]
     fn test_build_request_includes_meta_summary_and_phi() {
         let mut bridge = MetaConsciousLlmBridge::new(4).expect("bridge should initialize");
-        let history = vec![
-            Message {
-                role: Role::User,
-                content: "Hello".to_string(),
-            },
-        ];
+        let history = vec![Message {
+            role: Role::User,
+            content: "Hello".to_string(),
+        }];
 
         let (meta_state, request, ctx) = bridge
             .build_request("Explain meta-consciousness in simple terms.", history)
@@ -161,4 +165,3 @@ mod tests {
         );
     }
 }
-

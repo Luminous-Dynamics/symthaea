@@ -3,7 +3,7 @@
 //! Contains `init_derived_primitives` which creates complex primitives
 //! by composing base primitives via two-pass dependency-aware resolution.
 
-use super::{PrimitiveSystem, DomainManifold, PrimitiveTier, Primitive, BindingRule};
+use super::{BindingRule, DomainManifold, Primitive, PrimitiveSystem, PrimitiveTier};
 
 impl PrimitiveSystem {
     /// Initialize derived primitives using dependency-aware two-pass resolution.
@@ -19,30 +19,36 @@ impl PrimitiveSystem {
         let uncertainty_domain = DomainManifold::new(
             "uncertainty",
             PrimitiveTier::Mathematical,
-            "Probabilistic reasoning and uncertainty quantification"
+            "Probabilistic reasoning and uncertainty quantification",
         );
-        self.domains.insert("uncertainty".to_string(), uncertainty_domain.clone());
+        self.domains
+            .insert("uncertainty".to_string(), uncertainty_domain.clone());
 
         let physics_ext_domain = DomainManifold::new(
             "physics_extended",
             PrimitiveTier::Physical,
-            "Advanced physical concepts for embodied reasoning"
+            "Advanced physical concepts for embodied reasoning",
         );
-        self.domains.insert("physics_extended".to_string(), physics_ext_domain.clone());
+        self.domains
+            .insert("physics_extended".to_string(), physics_ext_domain.clone());
 
         let info_domain = DomainManifold::new(
             "information_theory",
             PrimitiveTier::Mathematical,
-            "Quantitative theory of information and communication"
+            "Quantitative theory of information and communication",
         );
-        self.domains.insert("information_theory".to_string(), info_domain.clone());
+        self.domains
+            .insert("information_theory".to_string(), info_domain.clone());
 
         let consciousness_domain = DomainManifold::new(
             "consciousness_derived",
             PrimitiveTier::MetaCognitive,
-            "Derived primitives for consciousness measurement"
+            "Derived primitives for consciousness measurement",
         );
-        self.domains.insert("consciousness_derived".to_string(), consciousness_domain.clone());
+        self.domains.insert(
+            "consciousness_derived".to_string(),
+            consciousness_domain.clone(),
+        );
 
         // === DERIVATION SPECS ===
         // Collect all derivations with their parent dependencies
@@ -209,7 +215,9 @@ impl PrimitiveSystem {
             let mut still_pending = Vec::new();
 
             for spec in pending {
-                let all_parents_available = spec.parents.iter()
+                let all_parents_available = spec
+                    .parents
+                    .iter()
                     .all(|p| self.primitives.contains_key(*p));
 
                 if all_parents_available {
@@ -223,7 +231,10 @@ impl PrimitiveSystem {
                         spec.derivation_expr,
                     );
                     self.primitives.insert(spec.name.to_string(), primitive);
-                    self.by_tier.entry(spec.tier).or_default().push(spec.name.to_string());
+                    self.by_tier
+                        .entry(spec.tier)
+                        .or_default()
+                        .push(spec.name.to_string());
                     resolved_this_round.push(spec.name);
                 } else {
                     still_pending.push(spec);
@@ -233,7 +244,9 @@ impl PrimitiveSystem {
             if resolved_this_round.is_empty() {
                 // No progress -- log unresolved specs as warnings
                 for spec in &still_pending {
-                    let missing: Vec<&&str> = spec.parents.iter()
+                    let missing: Vec<&&str> = spec
+                        .parents
+                        .iter()
                         .filter(|p| !self.primitives.contains_key(**p))
                         .collect();
                     eprintln!(

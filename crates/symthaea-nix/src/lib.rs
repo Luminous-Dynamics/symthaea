@@ -17,6 +17,7 @@
 //! 8. **TUI** — Terminal UI with consciousness visualization
 
 #![allow(deprecated)]
+#![allow(rustdoc::broken_intra_doc_links)]
 
 /// Local trait and type definitions for symthaea-nix.
 ///

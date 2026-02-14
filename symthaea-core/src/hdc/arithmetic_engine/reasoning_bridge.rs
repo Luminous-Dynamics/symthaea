@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use super::hybrid::{AbstractProof, HybridArithmeticEngine};
 use super::discovery::MathDiscovery;
+use super::hybrid::{AbstractProof, HybridArithmeticEngine};
 use super::theorems::TheoremProver;
 
 /// Mathematical concept types for reasoning
@@ -264,7 +264,9 @@ impl MathReasoningBridge {
             "commutativity_add" if params.len() >= 2 => {
                 let result = prover.prove_addition_commutative(params[0], params[1]);
                 if result.verified {
-                    let proof_strings: Vec<String> = result.proof_steps.iter()
+                    let proof_strings: Vec<String> = result
+                        .proof_steps
+                        .iter()
                         .map(|s| format!("{:?}", s.result.value))
                         .collect();
                     let assertion = MathAssertion {
@@ -275,14 +277,19 @@ impl MathReasoningBridge {
                         phi: result.total_phi,
                         proof_source: None,
                     };
-                    self.proven_theorems.insert(theorem.to_string(), AbstractProof {
-                        theorem: format!("Commutativity: {} + {} = {} + {}",
-                            params[0], params[1], params[1], params[0]),
-                        base_cases: proof_strings.clone(),
-                        inductive_step: "Addition is commutative by construction".to_string(),
-                        justification: proof_strings,
-                        is_sound: true,
-                    });
+                    self.proven_theorems.insert(
+                        theorem.to_string(),
+                        AbstractProof {
+                            theorem: format!(
+                                "Commutativity: {} + {} = {} + {}",
+                                params[0], params[1], params[1], params[0]
+                            ),
+                            base_cases: proof_strings.clone(),
+                            inductive_step: "Addition is commutative by construction".to_string(),
+                            justification: proof_strings,
+                            is_sound: true,
+                        },
+                    );
                     self.assertions.push(assertion.clone());
                     return Some(assertion);
                 }
@@ -305,14 +312,20 @@ impl MathReasoningBridge {
                         phi: total_phi,
                         proof_source: None,
                     };
-                    self.proven_theorems.insert(theorem.to_string(), AbstractProof {
-                        theorem: format!("Commutativity: {} × {} = {} × {}",
-                            params[0], params[1], params[1], params[0]),
-                        base_cases: proof_strings.clone(),
-                        inductive_step: "Multiplication is commutative by construction".to_string(),
-                        justification: proof_strings,
-                        is_sound: true,
-                    });
+                    self.proven_theorems.insert(
+                        theorem.to_string(),
+                        AbstractProof {
+                            theorem: format!(
+                                "Commutativity: {} × {} = {} × {}",
+                                params[0], params[1], params[1], params[0]
+                            ),
+                            base_cases: proof_strings.clone(),
+                            inductive_step: "Multiplication is commutative by construction"
+                                .to_string(),
+                            justification: proof_strings,
+                            is_sound: true,
+                        },
+                    );
                     self.assertions.push(assertion.clone());
                     return Some(assertion);
                 }
@@ -320,7 +333,9 @@ impl MathReasoningBridge {
             "associativity" if params.len() >= 3 => {
                 let result = prover.prove_addition_associative(params[0], params[1], params[2]);
                 if result.verified {
-                    let proof_strings: Vec<String> = result.proof_steps.iter()
+                    let proof_strings: Vec<String> = result
+                        .proof_steps
+                        .iter()
                         .map(|s| format!("{:?}", s.result.value))
                         .collect();
                     let assertion = MathAssertion {
@@ -331,14 +346,19 @@ impl MathReasoningBridge {
                         phi: result.total_phi,
                         proof_source: None,
                     };
-                    self.proven_theorems.insert(theorem.to_string(), AbstractProof {
-                        theorem: format!("Associativity: ({} + {}) + {} = {} + ({} + {})",
-                            params[0], params[1], params[2], params[0], params[1], params[2]),
-                        base_cases: proof_strings.clone(),
-                        inductive_step: "Addition is associative by construction".to_string(),
-                        justification: proof_strings,
-                        is_sound: true,
-                    });
+                    self.proven_theorems.insert(
+                        theorem.to_string(),
+                        AbstractProof {
+                            theorem: format!(
+                                "Associativity: ({} + {}) + {} = {} + ({} + {})",
+                                params[0], params[1], params[2], params[0], params[1], params[2]
+                            ),
+                            base_cases: proof_strings.clone(),
+                            inductive_step: "Addition is associative by construction".to_string(),
+                            justification: proof_strings,
+                            is_sound: true,
+                        },
+                    );
                     self.assertions.push(assertion.clone());
                     return Some(assertion);
                 }
@@ -346,26 +366,41 @@ impl MathReasoningBridge {
             "distributive" if params.len() >= 3 => {
                 let result = prover.prove_distributive(params[0], params[1], params[2]);
                 if result.verified {
-                    let proof_strings: Vec<String> = result.proof_steps.iter()
+                    let proof_strings: Vec<String> = result
+                        .proof_steps
+                        .iter()
                         .map(|s| format!("{:?}", s.result.value))
                         .collect();
                     let assertion = MathAssertion {
                         subject: format!("{} × ({} + {})", params[0], params[1], params[2]),
                         relation: MathRelation::Equals,
-                        object: format!("({} × {}) + ({} × {})",
-                            params[0], params[1], params[0], params[2]),
+                        object: format!(
+                            "({} × {}) + ({} × {})",
+                            params[0], params[1], params[0], params[2]
+                        ),
                         confidence: 1.0,
                         phi: result.total_phi,
                         proof_source: None,
                     };
-                    self.proven_theorems.insert(theorem.to_string(), AbstractProof {
-                        theorem: format!("Distributive: {} × ({} + {}) = ({} × {}) + ({} × {})",
-                            params[0], params[1], params[2], params[0], params[1], params[0], params[2]),
-                        base_cases: proof_strings.clone(),
-                        inductive_step: "Multiplication distributes over addition".to_string(),
-                        justification: proof_strings,
-                        is_sound: true,
-                    });
+                    self.proven_theorems.insert(
+                        theorem.to_string(),
+                        AbstractProof {
+                            theorem: format!(
+                                "Distributive: {} × ({} + {}) = ({} × {}) + ({} × {})",
+                                params[0],
+                                params[1],
+                                params[2],
+                                params[0],
+                                params[1],
+                                params[0],
+                                params[2]
+                            ),
+                            base_cases: proof_strings.clone(),
+                            inductive_step: "Multiplication distributes over addition".to_string(),
+                            justification: proof_strings,
+                            is_sound: true,
+                        },
+                    );
                     self.assertions.push(assertion.clone());
                     return Some(assertion);
                 }
@@ -381,7 +416,12 @@ impl MathReasoningBridge {
     // ========================================================================
 
     /// Chain reasoning: If a | b and b | c, then a | c
-    pub fn reason_transitive_divisibility(&mut self, a: u64, b: u64, c: u64) -> Option<MathAssertion> {
+    pub fn reason_transitive_divisibility(
+        &mut self,
+        a: u64,
+        b: u64,
+        c: u64,
+    ) -> Option<MathAssertion> {
         let a_divides_b = self.assert_divides(a, b);
         if a_divides_b.confidence < 1.0 {
             return None;
@@ -405,10 +445,7 @@ impl MathReasoningBridge {
             phi: total_phi,
             proof_source: Some(AbstractProof {
                 theorem: format!("{} divides {} by transitivity", a, c),
-                base_cases: vec![
-                    format!("{} | {}", a, b),
-                    format!("{} | {}", b, c),
-                ],
+                base_cases: vec![format!("{} | {}", a, b), format!("{} | {}", b, c)],
                 inductive_step: "Divisibility is transitive: a|b ∧ b|c → a|c".to_string(),
                 justification: vec![
                     format!("∃k: b = {}k", a),
@@ -493,7 +530,8 @@ impl MathReasoningBridge {
 
     /// Get all assertions of a specific relation type
     pub fn query_by_relation(&self, relation: &MathRelation) -> Vec<&MathAssertion> {
-        self.assertions.iter()
+        self.assertions
+            .iter()
             .filter(|a| &a.relation == relation)
             .collect()
     }
@@ -501,15 +539,19 @@ impl MathReasoningBridge {
     /// Get assertions involving a specific number
     pub fn query_involving(&self, n: u64) -> Vec<&MathAssertion> {
         let n_str = n.to_string();
-        self.assertions.iter()
+        self.assertions
+            .iter()
             .filter(|a| a.subject.contains(&n_str) || a.object.contains(&n_str))
             .collect()
     }
 
     /// Get highest Φ assertion
     pub fn highest_phi_assertion(&self) -> Option<&MathAssertion> {
-        self.assertions.iter()
-            .max_by(|a, b| a.phi.partial_cmp(&b.phi).unwrap_or(std::cmp::Ordering::Equal))
+        self.assertions.iter().max_by(|a, b| {
+            a.phi
+                .partial_cmp(&b.phi)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// Get total accumulated Φ from all reasoning
@@ -543,4 +585,3 @@ impl Default for MathReasoningBridge {
         Self::new()
     }
 }
-

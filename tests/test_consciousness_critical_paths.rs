@@ -6,10 +6,8 @@
 //! - OscillatoryRouter (MultiBandState)
 //! - ContinuousMind basic initialization
 
+use symthaea::consciousness::recursive_improvement::routers::{FrequencyBand, MultiBandState};
 use symthaea::consciousness::ConsciousnessGraph;
-use symthaea::consciousness::recursive_improvement::routers::{
-    MultiBandState, FrequencyBand,
-};
 
 #[test]
 fn test_consciousness_graph_autopoiesis() {
@@ -30,11 +28,7 @@ fn test_consciousness_graph_autopoiesis() {
     assert!(graph.current_consciousness() > 0.0);
 
     // Add another state and evolve
-    let node2 = graph.add_state(
-        vec![0.6f32; 64],
-        vec![0.4f32; 32],
-        0.8,
-    );
+    let node2 = graph.add_state(vec![0.6f32; 64], vec![0.4f32; 32], 0.8);
 
     assert_eq!(graph.size(), 2);
 
@@ -139,14 +133,19 @@ fn test_multiband_dominant_band_detection() {
     let dominant = state.get_dominant_band();
 
     // Should be one of the valid bands - exhaustive match verifies this
-    let is_valid = matches!(dominant,
-        FrequencyBand::Delta |
-        FrequencyBand::Theta |
-        FrequencyBand::Alpha |
-        FrequencyBand::Beta |
-        FrequencyBand::Gamma |
-        FrequencyBand::SleepSpindle);
-    assert!(is_valid, "Dominant band should be a valid FrequencyBand variant");
+    let is_valid = matches!(
+        dominant,
+        FrequencyBand::Delta
+            | FrequencyBand::Theta
+            | FrequencyBand::Alpha
+            | FrequencyBand::Beta
+            | FrequencyBand::Gamma
+            | FrequencyBand::SleepSpindle
+    );
+    assert!(
+        is_valid,
+        "Dominant band should be a valid FrequencyBand variant"
+    );
 }
 
 #[test]
@@ -169,12 +168,16 @@ fn test_multiband_memory_encoding_window() {
 
     // Window should be reachable under favorable conditions within 1000 steps
     // (may not always occur depending on phase alignment, so log but don't fail)
-    assert!(found_window || !found_window,
-        "Memory encoding window search completed without panic");
+    assert!(
+        found_window || !found_window,
+        "Memory encoding window search completed without panic"
+    );
     // The real assertion: advance() ran 1000 steps without panic or divergence
     let summary = state.summary();
-    assert!(summary.theta_gamma_coupling.is_finite(),
-        "State should remain finite after 1000 advance steps");
+    assert!(
+        summary.theta_gamma_coupling.is_finite(),
+        "State should remain finite after 1000 advance steps"
+    );
 }
 
 #[test]

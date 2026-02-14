@@ -6,9 +6,7 @@
 use super::super::full_stack_consciousness::{
     Counterfactual, MetacognitiveRecommendation, UnderstandingAssessment,
 };
-use super::super::unified_understanding::{
-    DeepUnderstanding, StoryRole, SpeechAct,
-};
+use super::super::unified_understanding::{DeepUnderstanding, SpeechAct, StoryRole};
 use std::collections::VecDeque;
 
 /// Generation style for responses
@@ -75,21 +73,21 @@ pub struct LTCPacing {
 impl LTCPacing {
     pub fn from_consciousness(flow_state: f32, phi_trend: f64) -> Self {
         let speech_rate = if flow_state > 0.7 {
-            1.1  // Confident, flowing
+            1.1 // Confident, flowing
         } else if flow_state > 0.4 {
-            1.0  // Natural
+            1.0 // Natural
         } else {
-            0.9  // Thoughtful, deliberate
+            0.9 // Thoughtful, deliberate
         };
 
         let pause_ms = if phi_trend > 0.02 {
-            150  // Engaged, quick transitions
+            150 // Engaged, quick transitions
         } else if phi_trend > 0.0 {
-            250  // Normal pacing
+            250 // Normal pacing
         } else if phi_trend > -0.02 {
-            350  // Reflective pauses
+            350 // Reflective pauses
         } else {
-            500  // Contemplative, significant pauses
+            500 // Contemplative, significant pauses
         };
 
         Self {
@@ -105,7 +103,7 @@ pub struct ConsciousDialogueGenerator {
     /// Base templates for different styles
     style: DialogueStyle,
     /// Memory of recent exchanges
-    exchange_history: VecDeque<(String, String)>,  // (input, response)
+    exchange_history: VecDeque<(String, String)>, // (input, response)
     /// Maximum history to keep
     max_history: usize,
 }
@@ -154,7 +152,11 @@ impl ConsciousDialogueGenerator {
         }
 
         // 2. Core response based on speech act
-        let core = match context.understanding.speaker_model.intentions.first()
+        let core = match context
+            .understanding
+            .speaker_model
+            .intentions
+            .first()
             .map(|i| i.speech_act)
             .unwrap_or(SpeechAct::Assert)
         {
@@ -179,7 +181,10 @@ impl ConsciousDialogueGenerator {
         response_parts.push(core);
 
         // 3. Memory integration (if reflective or integrative)
-        if matches!(generation_depth, GenerationDepth::Reflective | GenerationDepth::Integrative) {
+        if matches!(
+            generation_depth,
+            GenerationDepth::Reflective | GenerationDepth::Integrative
+        ) {
             if let Some(memory_ref) = self.memory_reference(&context.memories) {
                 response_parts.push(memory_ref);
                 reasoning.push("Added memory reference".to_string());
@@ -204,7 +209,8 @@ impl ConsciousDialogueGenerator {
         let text = response_parts.join(" ");
 
         // Calculate pacing
-        let pacing = LTCPacing::from_consciousness(context.flow_state, context.metacognition.phi_trend);
+        let pacing =
+            LTCPacing::from_consciousness(context.flow_state, context.metacognition.phi_trend);
 
         // Determine speech act of response
         let speech_act = if text.ends_with('?') {
@@ -216,10 +222,8 @@ impl ConsciousDialogueGenerator {
         };
 
         // Store in history
-        self.exchange_history.push_back((
-            context.understanding.text.clone(),
-            text.clone()
-        ));
+        self.exchange_history
+            .push_back((context.understanding.text.clone(), text.clone()));
         while self.exchange_history.len() > self.max_history {
             self.exchange_history.pop_front();
         }
@@ -234,7 +238,11 @@ impl ConsciousDialogueGenerator {
         }
     }
 
-    fn determine_style(&self, understanding: &DeepUnderstanding, meta: &UnderstandingAssessment) -> DialogueStyle {
+    fn determine_style(
+        &self,
+        understanding: &DeepUnderstanding,
+        meta: &UnderstandingAssessment,
+    ) -> DialogueStyle {
         // High emotional arousal -> Empathetic
         if understanding.grounded.embodied.arousal > 0.6 {
             return DialogueStyle::Empathetic;
@@ -265,30 +273,40 @@ impl ConsciousDialogueGenerator {
     }
 
     fn answer_question(&self, context: &DialogueContext, depth: &GenerationDepth) -> String {
-        let primes: Vec<String> = context.understanding.grounded.primes.iter()
+        let primes: Vec<String> = context
+            .understanding
+            .grounded
+            .primes
+            .iter()
             .take(3)
             .map(|p| format!("{:?}", p))
             .collect();
 
         match depth {
             GenerationDepth::Reactive => {
-                format!("Based on what I understand, this involves {}.",
-                    primes.join(" and "))
+                format!(
+                    "Based on what I understand, this involves {}.",
+                    primes.join(" and ")
+                )
             }
             GenerationDepth::Reflective => {
-                format!("Thinking about this... The core elements are {}. {}",
+                format!(
+                    "Thinking about this... The core elements are {}. {}",
                     primes.join(", "),
                     if !context.memories.is_empty() {
                         "I recall similar situations."
                     } else {
                         ""
-                    })
+                    }
+                )
             }
             GenerationDepth::Integrative => {
-                format!("Let me consider this carefully. The semantic foundation involves {}. \
+                format!(
+                    "Let me consider this carefully. The semantic foundation involves {}. \
                     The narrative context suggests this is a {} moment.",
                     primes.join(", "),
-                    format!("{:?}", context.understanding.narrative.story_role).to_lowercase())
+                    format!("{:?}", context.understanding.narrative.story_role).to_lowercase()
+                )
             }
         }
     }
@@ -298,23 +316,32 @@ impl ConsciousDialogueGenerator {
         let emotion = &context.understanding.speaker_model.emotional_state.primary;
 
         if valence > 0.3 {
-            format!("That sense of {} comes through clearly. It's meaningful.", emotion)
+            format!(
+                "That sense of {} comes through clearly. It's meaningful.",
+                emotion
+            )
         } else if valence < -0.3 {
-            format!("I can feel the weight of that {}. I'm here with you in this.", emotion)
+            format!(
+                "I can feel the weight of that {}. I'm here with you in this.",
+                emotion
+            )
         } else {
-            format!("I notice the {} you're experiencing. Tell me more.", emotion)
+            format!(
+                "I notice the {} you're experiencing. Tell me more.",
+                emotion
+            )
         }
     }
 
     fn respond_to_assertion(&self, context: &DialogueContext, depth: &GenerationDepth) -> String {
         match depth {
-            GenerationDepth::Reactive => {
-                "I see what you mean.".to_string()
-            }
+            GenerationDepth::Reactive => "I see what you mean.".to_string(),
             GenerationDepth::Reflective => {
                 let role = &context.understanding.narrative.story_role;
                 match role {
-                    StoryRole::Explanation => "That helps me understand the causality here.".to_string(),
+                    StoryRole::Explanation => {
+                        "That helps me understand the causality here.".to_string()
+                    }
                     StoryRole::Correction => "I appreciate the clarification.".to_string(),
                     StoryRole::Continuation => "Yes, and building on that...".to_string(),
                     _ => "That adds to my understanding.".to_string(),
@@ -323,7 +350,8 @@ impl ConsciousDialogueGenerator {
             GenerationDepth::Integrative => {
                 let coherence = context.understanding.narrative.identity_coherence;
                 if coherence > 0.7 {
-                    "This fits coherently with everything we've been exploring together.".to_string()
+                    "This fits coherently with everything we've been exploring together."
+                        .to_string()
                 } else {
                     "I'm integrating this with what came before. There's an interesting tension here.".to_string()
                 }
@@ -349,10 +377,16 @@ impl ConsciousDialogueGenerator {
     }
 
     fn generic_response(&self, context: &DialogueContext) -> String {
-        format!("I'm processing what you've shared. The essence involves {} at its core.",
-            context.understanding.grounded.primes.first()
+        format!(
+            "I'm processing what you've shared. The essence involves {} at its core.",
+            context
+                .understanding
+                .grounded
+                .primes
+                .first()
                 .map(|p| format!("{:?}", p).to_lowercase())
-                .unwrap_or_else(|| "something".to_string()))
+                .unwrap_or_else(|| "something".to_string())
+        )
     }
 
     fn memory_reference(&self, memories: &[String]) -> Option<String> {
@@ -361,7 +395,10 @@ impl ConsciousDialogueGenerator {
         }
         let mem = &memories[0];
         let truncated = if mem.len() > 40 { &mem[..40] } else { mem };
-        Some(format!("This reminds me of when you mentioned \"{}...\"", truncated))
+        Some(format!(
+            "This reminds me of when you mentioned \"{}...\"",
+            truncated
+        ))
     }
 
     fn counterfactual_insight(&self, counterfactuals: &[Counterfactual]) -> Option<String> {
@@ -370,8 +407,10 @@ impl ConsciousDialogueGenerator {
         }
         let cf = &counterfactuals[0];
         if cf.predicted_outcome.valence_delta.abs() > 0.2 {
-            Some(format!("I wonder... {}",
-                cf.causal_path.last().unwrap_or(&cf.intervention)))
+            Some(format!(
+                "I wonder... {}",
+                cf.causal_path.last().unwrap_or(&cf.intervention)
+            ))
         } else {
             None
         }

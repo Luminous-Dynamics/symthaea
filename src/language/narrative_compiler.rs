@@ -310,7 +310,13 @@ mod tests {
     use crate::dynamics::narrative_dynamics::NarrativeSignal;
     use crate::hdc::narrative_algebra::ArcPhase;
 
-    fn make_signal(energy: f32, surprise: f32, valence: f32, tension: f32, momentum: f32) -> NarrativeSignal {
+    fn make_signal(
+        energy: f32,
+        surprise: f32,
+        valence: f32,
+        tension: f32,
+        momentum: f32,
+    ) -> NarrativeSignal {
         NarrativeSignal {
             energy,
             surprise,

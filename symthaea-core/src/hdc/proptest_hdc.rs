@@ -16,9 +16,9 @@ operations hold across randomly generated inputs.
 
 #![cfg(test)]
 
-use proptest::prelude::*;
-use super::HdcContext;
 use super::native_similarity::PackedBipolar;
+use super::HdcContext;
+use proptest::prelude::*;
 
 /// Generate random bipolar vector of given dimension
 fn arbitrary_bipolar(dim: usize) -> impl Strategy<Value = Vec<i8>> {
@@ -34,10 +34,7 @@ fn arbitrary_hdc_vector() -> impl Strategy<Value = Vec<i8>> {
 /// Compute Hamming similarity between two bipolar vectors
 fn hamming_similarity(a: &[i8], b: &[i8]) -> f32 {
     assert_eq!(a.len(), b.len());
-    let matches: usize = a.iter()
-        .zip(b.iter())
-        .filter(|(x, y)| x == y)
-        .count();
+    let matches: usize = a.iter().zip(b.iter()).filter(|(x, y)| x == y).count();
     matches as f32 / a.len() as f32
 }
 
@@ -55,10 +52,16 @@ fn bundle(vectors: &[&[i8]]) -> Vec<i8> {
     let dim = vectors[0].len();
     let threshold = vectors.len() as i32 / 2;
 
-    (0..dim).map(|i| {
-        let sum: i32 = vectors.iter().map(|v| v[i] as i32).sum();
-        if sum > threshold { 1 } else { -1 }
-    }).collect()
+    (0..dim)
+        .map(|i| {
+            let sum: i32 = vectors.iter().map(|v| v[i] as i32).sum();
+            if sum > threshold {
+                1
+            } else {
+                -1
+            }
+        })
+        .collect()
 }
 
 /// Circular permute (shift right)

@@ -7,9 +7,7 @@
 //! - Suggested fixes
 //! - Affected configuration paths
 
-use crate::language::{
-    NixErrorDiagnoser, ErrorDiagnosis, NixErrorCategory, FixRiskLevel,
-};
+use crate::language::{ErrorDiagnosis, FixRiskLevel, NixErrorCategory, NixErrorDiagnoser};
 
 /// Error explanation result for shell display
 #[derive(Debug, Clone)]
@@ -67,11 +65,11 @@ pub struct ShellFix {
 /// Risk level for fixes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FixRisk {
-    Safe,        // No side effects
-    Low,         // Minor side effects, reversible
-    Medium,      // May require confirmation
-    High,        // Significant changes
-    Critical,    // Could affect system stability
+    Safe,     // No side effects
+    Low,      // Minor side effects, reversible
+    Medium,   // May require confirmation
+    High,     // Significant changes
+    Critical, // Could affect system stability
 }
 
 impl FixRisk {
@@ -140,15 +138,15 @@ impl ErrorExplainer {
     /// Check if output looks like an error
     pub fn is_error_output(output: &str) -> bool {
         let lower = output.to_lowercase();
-        lower.contains("error:") ||
-        lower.contains("failed") ||
-        lower.contains("cannot ") ||
-        lower.contains("permission denied") ||
-        lower.contains("assertion") ||
-        lower.contains("undefined") ||
-        lower.contains("syntax error") ||
-        lower.contains("hash mismatch") ||
-        lower.contains("infinite recursion")
+        lower.contains("error:")
+            || lower.contains("failed")
+            || lower.contains("cannot ")
+            || lower.contains("permission denied")
+            || lower.contains("assertion")
+            || lower.contains("undefined")
+            || lower.contains("syntax error")
+            || lower.contains("hash mismatch")
+            || lower.contains("infinite recursion")
     }
 
     /// Explain an error from command output
@@ -161,14 +159,16 @@ impl ErrorExplainer {
     fn format_diagnosis(&self, diagnosis: ErrorDiagnosis) -> ErrorExplanation {
         let (icon, color) = self.category_style(diagnosis.category);
 
-        let fixes: Vec<ShellFix> = diagnosis.fixes.iter().map(|f| {
-            ShellFix {
+        let fixes: Vec<ShellFix> = diagnosis
+            .fixes
+            .iter()
+            .map(|f| ShellFix {
                 description: f.description.clone(),
                 command: f.command.clone(),
                 risk: f.risk.into(),
                 primary: f.primary,
-            }
-        }).collect();
+            })
+            .collect();
 
         ErrorExplanation {
             category: diagnosis.category.name().to_string(),
@@ -200,7 +200,9 @@ impl ErrorExplainer {
 
     /// Generate a one-line summary
     fn generate_summary(&self, diagnosis: &ErrorDiagnosis) -> String {
-        let location_hint = diagnosis.location.as_ref()
+        let location_hint = diagnosis
+            .location
+            .as_ref()
             .map(|l| format!(" at {}", l))
             .unwrap_or_default();
 
@@ -219,10 +221,7 @@ impl ErrorExplainer {
         // Header
         lines.push(format!(
             "{} {} ({} confidence: {}%)",
-            explanation.icon,
-            explanation.summary,
-            explanation.category,
-            explanation.confidence
+            explanation.icon, explanation.summary, explanation.category, explanation.confidence
         ));
 
         // Explanation
@@ -276,7 +275,9 @@ impl ErrorExplainer {
 
     /// Get just the fix commands for quick action
     pub fn get_fix_commands(&self, explanation: &ErrorExplanation) -> Vec<String> {
-        explanation.fixes.iter()
+        explanation
+            .fixes
+            .iter()
             .filter_map(|f| f.command.clone())
             .collect()
     }
@@ -287,21 +288,39 @@ pub fn quick_error_check(output: &str) -> Option<(&'static str, &'static str)> {
     let lower = output.to_lowercase();
 
     if lower.contains("infinite recursion") {
-        Some(("Infinite Recursion", "Check for circular module imports or self-references"))
+        Some((
+            "Infinite Recursion",
+            "Check for circular module imports or self-references",
+        ))
     } else if lower.contains("undefined variable") {
-        Some(("Undefined Variable", "Variable is not in scope - check imports and let bindings"))
+        Some((
+            "Undefined Variable",
+            "Variable is not in scope - check imports and let bindings",
+        ))
     } else if lower.contains("attribute") && lower.contains("missing") {
         Some(("Missing Attribute", "Required attribute not found in set"))
     } else if lower.contains("hash mismatch") {
-        Some(("Hash Mismatch", "Source hash doesn't match - run nix flake update"))
+        Some((
+            "Hash Mismatch",
+            "Source hash doesn't match - run nix flake update",
+        ))
     } else if lower.contains("permission denied") {
         Some(("Permission Error", "Try with sudo or check file ownership"))
     } else if lower.contains("connection refused") || lower.contains("fetch failed") {
-        Some(("Network Error", "Check internet connection or try --offline"))
+        Some((
+            "Network Error",
+            "Check internet connection or try --offline",
+        ))
     } else if lower.contains("syntax error") {
-        Some(("Syntax Error", "Check for missing semicolons, brackets, or quotes"))
+        Some((
+            "Syntax Error",
+            "Check for missing semicolons, brackets, or quotes",
+        ))
     } else if lower.contains("assertion") && lower.contains("failed") {
-        Some(("Assertion Failed", "Configuration check failed - review option values"))
+        Some((
+            "Assertion Failed",
+            "Configuration check failed - review option values",
+        ))
     } else {
         None
     }
@@ -313,7 +332,9 @@ mod tests {
 
     #[test]
     fn test_is_error_output() {
-        assert!(ErrorExplainer::is_error_output("error: undefined variable 'foo'"));
+        assert!(ErrorExplainer::is_error_output(
+            "error: undefined variable 'foo'"
+        ));
         assert!(ErrorExplainer::is_error_output("build failed"));
         assert!(!ErrorExplainer::is_error_output("Build succeeded!"));
     }
@@ -328,7 +349,8 @@ mod tests {
     #[test]
     fn test_explain_error() {
         let explainer = ErrorExplainer::new();
-        let explanation = explainer.explain("error: undefined variable 'foo' at /etc/nixos/configuration.nix:42:5");
+        let explanation = explainer
+            .explain("error: undefined variable 'foo' at /etc/nixos/configuration.nix:42:5");
 
         assert!(!explanation.summary.is_empty());
         assert_eq!(explanation.color, ErrorColor::Red); // Evaluation error

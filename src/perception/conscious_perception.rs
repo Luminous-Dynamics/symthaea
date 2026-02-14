@@ -51,18 +51,17 @@ use image::DynamicImage;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use symthaea_core::hdc::causal_mind::{CausalMind, GroundedCausalLearning};
-use crate::perception::{
-    SemanticVision, VisionConfig, ImageEmbedding, ImageCaption,
-    OcrSystem,
-    MultiModalPerception, MultiModalConfig, ModalityType, PerceptionInput,
-    VisualCortex, VisualCortexConfig, VisualFeatures,
-};
-use symthaea_core::hdc::ContinuousHV as HdcVector;
 use super::resilience::{
-    ResilienceManager, ResilienceConfig, Availability,
-    PerceptionCapabilities, ResilientResult, ResilienceStats,
+    Availability, PerceptionCapabilities, ResilienceConfig, ResilienceManager, ResilienceStats,
+    ResilientResult,
 };
+use crate::perception::{
+    ImageCaption, ImageEmbedding, ModalityType, MultiModalConfig, MultiModalPerception, OcrSystem,
+    PerceptionInput, SemanticVision, VisionConfig, VisualCortex, VisualCortexConfig,
+    VisualFeatures,
+};
+use symthaea_core::hdc::causal_mind::{CausalMind, GroundedCausalLearning};
+use symthaea_core::hdc::ContinuousHV as HdcVector;
 
 /// Configuration for the conscious perception system
 #[derive(Debug, Clone)]
@@ -138,7 +137,6 @@ pub struct PerceptionResult {
     pub phi: f64,
 
     // === Resilience Information ===
-
     /// Whether any fallback was used
     pub used_fallback: bool,
 
@@ -207,7 +205,6 @@ pub struct PerceptionStats {
     pub causal_links: usize,
 
     // === Resilience Stats ===
-
     /// Caption fallbacks used (Moondream unavailable)
     pub caption_fallbacks: u64,
 
@@ -250,7 +247,11 @@ fn image_stats(image: &DynamicImage) -> (f32, f32, f32, f32, f32, f32) {
     let mut g_sum = 0.0f32;
     let mut b_sum = 0.0f32;
     for chunk in pixels.chunks(3) {
-        let (r, g, b) = (chunk[0] as f32 / 255.0, chunk[1] as f32 / 255.0, chunk[2] as f32 / 255.0);
+        let (r, g, b) = (
+            chunk[0] as f32 / 255.0,
+            chunk[1] as f32 / 255.0,
+            chunk[2] as f32 / 255.0,
+        );
         brightness_sum += 0.299 * r + 0.587 * g + 0.114 * b;
         r_sum += r;
         g_sum += g;
@@ -274,12 +275,18 @@ fn image_stats(image: &DynamicImage) -> (f32, f32, f32, f32, f32, f32) {
         60.0 * ((r_avg - g_avg) / (max_c - min_c) + 4.0)
     };
 
-    let saturation = if max_c > 0.0 { (max_c - min_c) / max_c } else { 0.0 };
+    let saturation = if max_c > 0.0 {
+        (max_c - min_c) / max_c
+    } else {
+        0.0
+    };
 
     // Color variance (simple proxy for contrast)
     let mut var_sum = 0.0f32;
     for chunk in pixels.chunks(3) {
-        let lum = 0.299 * (chunk[0] as f32 / 255.0) + 0.587 * (chunk[1] as f32 / 255.0) + 0.114 * (chunk[2] as f32 / 255.0);
+        let lum = 0.299 * (chunk[0] as f32 / 255.0)
+            + 0.587 * (chunk[1] as f32 / 255.0)
+            + 0.114 * (chunk[2] as f32 / 255.0);
         let diff = lum - brightness;
         var_sum += diff * diff;
     }
@@ -295,13 +302,26 @@ fn image_stats(image: &DynamicImage) -> (f32, f32, f32, f32, f32, f32) {
             let r = rgb.get_pixel((x + 1) as u32, y as u32)[0] as i32;
             let d = rgb.get_pixel(x as u32, (y + 1) as u32)[0] as i32;
             let grad = ((c - r).abs() + (c - d).abs()) as f32 / 255.0;
-            if grad > 0.1 { edge_count += 1; }
+            if grad > 0.1 {
+                edge_count += 1;
+            }
             edge_total += 1;
         }
     }
-    let edge_density = if edge_total > 0 { edge_count as f32 / edge_total as f32 } else { 0.0 };
+    let edge_density = if edge_total > 0 {
+        edge_count as f32 / edge_total as f32
+    } else {
+        0.0
+    };
 
-    (brightness, hue, saturation, color_variance, edge_density, aspect_ratio)
+    (
+        brightness,
+        hue,
+        saturation,
+        color_variance,
+        edge_density,
+        aspect_ratio,
+    )
 }
 
 impl ConsciousPerception {
@@ -348,11 +368,15 @@ impl ConsciousPerception {
     /// This method sets up availability tracking for the resilience layer.
     pub fn initialize(&mut self) -> Result<()> {
         // HDC-based vision, OCR, and visual cortex are always available (pure Rust)
-        self.resilience.set_capability("image_embedding", Availability::Full);
-        self.resilience.set_capability("image_captioning", Availability::Full);
+        self.resilience
+            .set_capability("image_embedding", Availability::Full);
+        self.resilience
+            .set_capability("image_captioning", Availability::Full);
         self.resilience.set_capability("ocr", Availability::Full);
-        self.resilience.set_capability("visual_features", Availability::Full);
-        self.resilience.set_capability("multi_modal", Availability::Full);
+        self.resilience
+            .set_capability("visual_features", Availability::Full);
+        self.resilience
+            .set_capability("multi_modal", Availability::Full);
 
         // Mark loading complete
         self.resilience.loader.start_loading("siglip");
@@ -374,11 +398,23 @@ impl ConsciousPerception {
         let image_bytes = image_to_bytes(image);
 
         // Step 0: Always extract visual features (pure Rust, always available)
-        let input_hv = HdcVector::from_slice(&image_bytes.iter().take(self.dim).map(|&b| b as f32 / 255.0).collect::<Vec<_>>());
+        let input_hv = HdcVector::from_slice(
+            &image_bytes
+                .iter()
+                .take(self.dim)
+                .map(|&b| b as f32 / 255.0)
+                .collect::<Vec<_>>(),
+        );
         let cortex_result = self.visual_cortex.process(&input_hv);
         // Create VisualFeatures from extracted data
         let visual_features = Some(VisualFeatures::from_vectors(
-            cortex_result.final_features.as_slice().iter().take(64).copied().collect(),
+            cortex_result
+                .final_features
+                .as_slice()
+                .iter()
+                .take(64)
+                .copied()
+                .collect(),
             vec![], // color histogram placeholder
             vec![], // texture placeholder
         ));
@@ -488,16 +524,16 @@ impl ConsciousPerception {
     }
 
     /// Embed image with resilience (HDC-based, always succeeds)
-    fn perceive_image_embedding_resilient(&mut self, image_bytes: &[u8]) -> ResilientResult<ImageEmbedding> {
+    fn perceive_image_embedding_resilient(
+        &mut self,
+        image_bytes: &[u8],
+    ) -> ResilientResult<ImageEmbedding> {
         let start = Instant::now();
 
         // Check if embedding capability is available
         let caps = self.resilience.capabilities();
         if !caps.image_embedding.is_usable() {
-            return ResilientResult::fallback(
-                self.stub_embedding(),
-                "Image embedding unavailable",
-            );
+            return ResilientResult::fallback(self.stub_embedding(), "Image embedding unavailable");
         }
 
         // HDC embedding always succeeds (pure Rust, no external models)
@@ -552,7 +588,8 @@ impl ConsciousPerception {
         }
 
         let (caption_text, confidence) = if let Some(img) = image {
-            let (brightness, hue, saturation, contrast, edge_density, aspect_ratio) = image_stats(img);
+            let (brightness, hue, saturation, contrast, edge_density, aspect_ratio) =
+                image_stats(img);
             self.resilience.fallback_caption(
                 brightness,
                 hue,
@@ -565,14 +602,14 @@ impl ConsciousPerception {
             ("Image content (features unavailable)".to_string(), 0.2)
         };
 
-        ResilientResult::fallback(
-            ImageCaption::new(caption_text, confidence),
-            reason,
-        )
+        ResilientResult::fallback(ImageCaption::new(caption_text, confidence), reason)
     }
 
     /// OCR with resilience
-    fn perceive_ocr_resilient(&mut self, visual_features: Option<&VisualFeatures>) -> ResilientResult<String> {
+    fn perceive_ocr_resilient(
+        &mut self,
+        visual_features: Option<&VisualFeatures>,
+    ) -> ResilientResult<String> {
         let caps = self.resilience.capabilities();
         if !caps.ocr.is_usable() {
             return ResilientResult::fallback(String::new(), "OCR unavailable");
@@ -593,7 +630,8 @@ impl ConsciousPerception {
         let mut capabilities_used = vec!["text_encoding".to_string()];
 
         // Step 1: Project text to HDC space via multi-modal perception
-        let perception_input = PerceptionInput::new("text", ModalityType::Textual, text.as_bytes().to_vec());
+        let perception_input =
+            PerceptionInput::new("text", ModalityType::Textual, text.as_bytes().to_vec());
         let hdc_encoding = self.multi_modal.process_input(perception_input);
         capabilities_used.push("multi_modal".to_string());
 
@@ -634,8 +672,7 @@ impl ConsciousPerception {
 
     /// Process an image file
     pub fn perceive_image_file(&mut self, path: &Path) -> Result<PerceptionResult> {
-        let image = image::open(path)
-            .context(format!("Failed to open image: {:?}", path))?;
+        let image = image::open(path).context(format!("Failed to open image: {:?}", path))?;
         self.perceive_image(&image)
     }
 
@@ -646,7 +683,8 @@ impl ConsciousPerception {
 
     /// Query why something happened (causal explanation)
     pub fn query_why(&self, concept: &str) -> Vec<String> {
-        self.causal_mind.query_why(concept)
+        self.causal_mind
+            .query_why(concept)
             .iter()
             .map(|e| e.explanation.clone())
             .collect()
@@ -654,7 +692,8 @@ impl ConsciousPerception {
 
     /// Query what would happen if something occurred
     pub fn query_what_if(&self, concept: &str) -> Vec<String> {
-        self.causal_mind.query_what_if(concept)
+        self.causal_mind
+            .query_what_if(concept)
             .iter()
             .map(|p| p.prediction.clone())
             .collect()
@@ -741,11 +780,7 @@ mod tests {
     fn create_colorful_test_image() -> DynamicImage {
         let mut img = RgbImage::new(100, 100);
         for (x, y, pixel) in img.enumerate_pixels_mut() {
-            *pixel = Rgb([
-                ((x * 255) / 100) as u8,
-                ((y * 255) / 100) as u8,
-                128,
-            ]);
+            *pixel = Rgb([((x * 255) / 100) as u8, ((y * 255) / 100) as u8, 128]);
         }
         DynamicImage::ImageRgb8(img)
     }
@@ -768,13 +803,17 @@ mod tests {
         let config = ConsciousPerceptionConfig::default();
         let mut perception = ConsciousPerception::new(config);
 
-        let result = perception.perceive_text("The rain caused the flood").unwrap();
+        let result = perception
+            .perceive_text("The rain caused the flood")
+            .unwrap();
 
         assert_eq!(result.modality, ModalityType::Textual);
         assert!(result.text.is_some());
         assert_eq!(perception.stats.texts_processed, 1);
         assert!(!result.used_fallback);
-        assert!(result.capabilities_used.contains(&"text_encoding".to_string()));
+        assert!(result
+            .capabilities_used
+            .contains(&"text_encoding".to_string()));
     }
 
     #[test]
@@ -782,9 +821,9 @@ mod tests {
         let config = ConsciousPerceptionConfig::default();
         let mut perception = ConsciousPerception::new(config);
 
-        let result = perception.perceive_text(
-            "The server crashed because memory was exhausted"
-        ).unwrap();
+        let result = perception
+            .perceive_text("The server crashed because memory was exhausted")
+            .unwrap();
 
         if let Some(ref learning) = result.causal_learning {
             assert!(learning.links_added > 0);
@@ -846,8 +885,12 @@ mod tests {
         let result = perception.perceive_image(&image).unwrap();
 
         assert!(!result.capabilities_used.is_empty());
-        assert!(result.capabilities_used.contains(&"visual_features".to_string()));
-        assert!(result.capabilities_used.contains(&"image_embedding".to_string()));
+        assert!(result
+            .capabilities_used
+            .contains(&"visual_features".to_string()));
+        assert!(result
+            .capabilities_used
+            .contains(&"image_embedding".to_string()));
         assert!(result.coherence_score.is_some());
     }
 

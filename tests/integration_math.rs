@@ -35,8 +35,14 @@ fn test_hdc_iit_phi_consistency() {
     let weak_result = validate_phi_proxy(&weak_adj, noise);
     let strong_result = validate_phi_proxy(&strong_adj, noise);
 
-    println!("  Weak  - approx: {:.6}, exact: {:.6}", weak_result.approx_phi, weak_result.exact_phi);
-    println!("  Strong - approx: {:.6}, exact: {:.6}", strong_result.approx_phi, strong_result.exact_phi);
+    println!(
+        "  Weak  - approx: {:.6}, exact: {:.6}",
+        weak_result.approx_phi, weak_result.exact_phi
+    );
+    println!(
+        "  Strong - approx: {:.6}, exact: {:.6}",
+        strong_result.approx_phi, strong_result.exact_phi
+    );
 
     // The approximate proxy should assign higher integration to the
     // fully connected topology (if it captures connectivity at all).
@@ -60,8 +66,8 @@ fn test_hdc_iit_phi_consistency() {
 
 #[test]
 fn test_cfc_rk4_stability() {
-    use symthaea::dynamics::{CfCNetwork, CfCNetworkConfig, CfCConfig};
     use ndarray::Array1;
+    use symthaea::dynamics::{CfCConfig, CfCNetwork, CfCNetworkConfig};
 
     let config = CfCNetworkConfig {
         input_dim: 4,
@@ -112,12 +118,11 @@ fn test_cfc_rk4_stability() {
 
 #[test]
 fn test_stochastic_spectral_hfe() {
-    use symthaea::dynamics::{
-        OrnsteinUhlenbeck, SimpleRng,
-        SpectralAnalyzer, SpectralConfig, WindowType,
-    };
     use symthaea::consciousness::hierarchical_free_energy::{
-        HierarchicalFreeEnergy, HierarchicalFEConfig,
+        HierarchicalFEConfig, HierarchicalFreeEnergy,
+    };
+    use symthaea::dynamics::{
+        OrnsteinUhlenbeck, SimpleRng, SpectralAnalyzer, SpectralConfig, WindowType,
     };
 
     // Generate OU process
@@ -157,14 +162,21 @@ fn test_stochastic_spectral_hfe() {
     let mut hfe = HierarchicalFreeEnergy::new(hfe_config);
 
     // Normalize observation to prevent numerical instability
-    let obs_max = observation.iter().cloned().fold(f64::NEG_INFINITY, f64::max).max(1e-12);
+    let obs_max = observation
+        .iter()
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max)
+        .max(1e-12);
     let normalized_obs: Vec<f64> = observation.iter().map(|x| x / obs_max).collect();
 
     // Feed normalized observation repeatedly and track total prediction error
     let mut errors = Vec::new();
     for _ in 0..50 {
         let updates = hfe.update_beliefs(&normalized_obs);
-        let total_error: f64 = updates.iter().map(|u| u.prediction_error.iter().map(|e| e.powi(2)).sum::<f64>()).sum();
+        let total_error: f64 = updates
+            .iter()
+            .map(|u| u.prediction_error.iter().map(|e| e.powi(2)).sum::<f64>())
+            .sum();
         errors.push(total_error);
     }
 
@@ -173,7 +185,10 @@ fn test_stochastic_spectral_hfe() {
 
     println!("  First total PE:  {:.6}", first_error);
     println!("  Last total PE:   {:.6}", last_error);
-    println!("  Reduction:       {:.1}%", (1.0 - last_error / first_error.max(1e-12)) * 100.0);
+    println!(
+        "  Reduction:       {:.1}%",
+        (1.0 - last_error / first_error.max(1e-12)) * 100.0
+    );
 
     // With normalized inputs and small learning rate, HFE should converge
     // or at least not diverge dramatically
@@ -196,7 +211,7 @@ fn test_stochastic_spectral_hfe() {
 #[test]
 fn test_causal_factor_hodge() {
     use symthaea::consciousness::causal_calculus::CausalDAG;
-    use symthaea::consciousness::hodge_laplacian::{SimplicialComplex, HodgeLaplacian};
+    use symthaea::consciousness::hodge_laplacian::{HodgeLaplacian, SimplicialComplex};
 
     // Build a 5-node causal DAG with a cycle structure:
     //   0 → 1 → 2 → 3 → 4
@@ -243,10 +258,7 @@ fn test_causal_factor_hodge() {
     println!("  Betti numbers: {:?}", betti.numbers);
 
     // B0 = 1 means the complex is connected (all 5 vertices reachable)
-    assert!(
-        !betti.numbers.is_empty(),
-        "Should have at least B0"
-    );
+    assert!(!betti.numbers.is_empty(), "Should have at least B0");
     assert_eq!(
         betti.numbers[0], 1,
         "B0 should be 1 (connected): got {}",
@@ -286,112 +298,197 @@ fn test_phi_proxy_multi_topology_validation() {
     let mut results: Vec<(String, f64, f64)> = Vec::new(); // (name, approx, exact)
 
     // 1. Chain (3 nodes): A→B→C — minimal integration
-    results.push(("chain_3".into(), {
-        let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.0],
-            vec![0.0, 0.0, 0.8],
-            vec![0.0, 0.0, 0.0]], noise);
-        (r.approx_phi, r.exact_phi)
-    }.0, results.last().map(|_| 0.0).unwrap_or(0.0)));
+    results.push((
+        "chain_3".into(),
+        {
+            let r = validate_phi_proxy(
+                &[
+                    vec![0.0, 0.8, 0.0],
+                    vec![0.0, 0.0, 0.8],
+                    vec![0.0, 0.0, 0.0],
+                ],
+                noise,
+            );
+            (r.approx_phi, r.exact_phi)
+        }
+        .0,
+        results.last().map(|_| 0.0).unwrap_or(0.0),
+    ));
 
     // Re-do properly with tuples
     results.clear();
 
     // 1. Chain 3
-    let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.0],
-        vec![0.0, 0.0, 0.8],
-        vec![0.0, 0.0, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.8, 0.0],
+            vec![0.0, 0.0, 0.8],
+            vec![0.0, 0.0, 0.0],
+        ],
+        noise,
+    );
     results.push(("chain_3".into(), r.approx_phi, r.exact_phi));
 
     // 2. Chain 4
-    let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.0, 0.0],
-        vec![0.0, 0.0, 0.8, 0.0],
-        vec![0.0, 0.0, 0.0, 0.8],
-        vec![0.0, 0.0, 0.0, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.8, 0.0, 0.0],
+            vec![0.0, 0.0, 0.8, 0.0],
+            vec![0.0, 0.0, 0.0, 0.8],
+            vec![0.0, 0.0, 0.0, 0.0],
+        ],
+        noise,
+    );
     results.push(("chain_4".into(), r.approx_phi, r.exact_phi));
 
     // 3. Ring 3: A→B→C→A — cycle adds integration
-    let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.0],
-        vec![0.0, 0.0, 0.8],
-        vec![0.8, 0.0, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.8, 0.0],
+            vec![0.0, 0.0, 0.8],
+            vec![0.8, 0.0, 0.0],
+        ],
+        noise,
+    );
     results.push(("ring_3".into(), r.approx_phi, r.exact_phi));
 
     // 4. Ring 4
-    let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.0, 0.0],
-        vec![0.0, 0.0, 0.8, 0.0],
-        vec![0.0, 0.0, 0.0, 0.8],
-        vec![0.8, 0.0, 0.0, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.8, 0.0, 0.0],
+            vec![0.0, 0.0, 0.8, 0.0],
+            vec![0.0, 0.0, 0.0, 0.8],
+            vec![0.8, 0.0, 0.0, 0.0],
+        ],
+        noise,
+    );
     results.push(("ring_4".into(), r.approx_phi, r.exact_phi));
 
     // 5. Star 4: center→all, no return
-    let r = validate_phi_proxy(&[vec![0.0, 0.8, 0.8, 0.8],
-        vec![0.0, 0.0, 0.0, 0.0],
-        vec![0.0, 0.0, 0.0, 0.0],
-        vec![0.0, 0.0, 0.0, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.8, 0.8, 0.8],
+            vec![0.0, 0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 0.0, 0.0],
+        ],
+        noise,
+    );
     results.push(("star_4_out".into(), r.approx_phi, r.exact_phi));
 
     // 6. Star 4: all→center — feedforward convergence
-    let r = validate_phi_proxy(&[vec![0.0, 0.0, 0.0, 0.0],
-        vec![0.8, 0.0, 0.0, 0.0],
-        vec![0.8, 0.0, 0.0, 0.0],
-        vec![0.8, 0.0, 0.0, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.0, 0.0, 0.0],
+            vec![0.8, 0.0, 0.0, 0.0],
+            vec![0.8, 0.0, 0.0, 0.0],
+            vec![0.8, 0.0, 0.0, 0.0],
+        ],
+        noise,
+    );
     results.push(("star_4_in".into(), r.approx_phi, r.exact_phi));
 
     // 7. Bidirectional ring 3
-    let r = validate_phi_proxy(&[vec![0.0, 0.7, 0.7],
-        vec![0.7, 0.0, 0.7],
-        vec![0.7, 0.7, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.7, 0.7],
+            vec![0.7, 0.0, 0.7],
+            vec![0.7, 0.7, 0.0],
+        ],
+        noise,
+    );
     results.push(("bidir_ring_3".into(), r.approx_phi, r.exact_phi));
 
     // 8. Fully connected 3
-    let r = validate_phi_proxy(&[vec![0.0, 0.9, 0.9],
-        vec![0.9, 0.0, 0.9],
-        vec![0.9, 0.9, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.9, 0.9],
+            vec![0.9, 0.0, 0.9],
+            vec![0.9, 0.9, 0.0],
+        ],
+        noise,
+    );
     results.push(("full_3".into(), r.approx_phi, r.exact_phi));
 
     // 9. Fully connected 4
-    let r = validate_phi_proxy(&[vec![0.0, 0.7, 0.6, 0.5],
-        vec![0.7, 0.0, 0.7, 0.6],
-        vec![0.6, 0.7, 0.0, 0.7],
-        vec![0.5, 0.6, 0.7, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.7, 0.6, 0.5],
+            vec![0.7, 0.0, 0.7, 0.6],
+            vec![0.6, 0.7, 0.0, 0.7],
+            vec![0.5, 0.6, 0.7, 0.0],
+        ],
+        noise,
+    );
     results.push(("full_4".into(), r.approx_phi, r.exact_phi));
 
     // 10. Modular 4: two pairs weakly coupled
-    let r = validate_phi_proxy(&[vec![0.0, 0.9, 0.1, 0.0],
-        vec![0.9, 0.0, 0.0, 0.1],
-        vec![0.1, 0.0, 0.0, 0.9],
-        vec![0.0, 0.1, 0.9, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.9, 0.1, 0.0],
+            vec![0.9, 0.0, 0.0, 0.1],
+            vec![0.1, 0.0, 0.0, 0.9],
+            vec![0.0, 0.1, 0.9, 0.0],
+        ],
+        noise,
+    );
     results.push(("modular_4".into(), r.approx_phi, r.exact_phi));
 
     // 11. Sparse random 4
-    let r = validate_phi_proxy(&[vec![0.0, 0.3, 0.0, 0.5],
-        vec![0.0, 0.0, 0.6, 0.0],
-        vec![0.4, 0.0, 0.0, 0.0],
-        vec![0.0, 0.7, 0.0, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.3, 0.0, 0.5],
+            vec![0.0, 0.0, 0.6, 0.0],
+            vec![0.4, 0.0, 0.0, 0.0],
+            vec![0.0, 0.7, 0.0, 0.0],
+        ],
+        noise,
+    );
     results.push(("sparse_4".into(), r.approx_phi, r.exact_phi));
 
     // 12. Dense random 3
-    let r = validate_phi_proxy(&[vec![0.0, 0.5, 0.3],
-        vec![0.4, 0.0, 0.6],
-        vec![0.7, 0.2, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.5, 0.3],
+            vec![0.4, 0.0, 0.6],
+            vec![0.7, 0.2, 0.0],
+        ],
+        noise,
+    );
     results.push(("dense_random_3".into(), r.approx_phi, r.exact_phi));
 
     // 13. Disconnected 3 (no edges)
-    let r = validate_phi_proxy(&[vec![0.0, 0.0, 0.0],
-        vec![0.0, 0.0, 0.0],
-        vec![0.0, 0.0, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 0.0],
+        ],
+        noise,
+    );
     results.push(("disconnected_3".into(), r.approx_phi, r.exact_phi));
 
     // 14. Single strong edge 3
-    let r = validate_phi_proxy(&[vec![0.0, 0.95, 0.0],
-        vec![0.0, 0.0, 0.0],
-        vec![0.0, 0.0, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.95, 0.0],
+            vec![0.0, 0.0, 0.0],
+            vec![0.0, 0.0, 0.0],
+        ],
+        noise,
+    );
     results.push(("single_edge_3".into(), r.approx_phi, r.exact_phi));
 
     // 15. Hierarchical 4
-    let r = validate_phi_proxy(&[vec![0.0, 0.9, 0.9, 0.0],
-        vec![0.0, 0.0, 0.0, 0.8],
-        vec![0.0, 0.0, 0.0, 0.8],
-        vec![0.0, 0.0, 0.0, 0.0]], noise);
+    let r = validate_phi_proxy(
+        &[
+            vec![0.0, 0.9, 0.9, 0.0],
+            vec![0.0, 0.0, 0.0, 0.8],
+            vec![0.0, 0.0, 0.0, 0.8],
+            vec![0.0, 0.0, 0.0, 0.0],
+        ],
+        noise,
+    );
     results.push(("hierarchical_4".into(), r.approx_phi, r.exact_phi));
 
     // Print results table
@@ -407,7 +504,9 @@ fn test_phi_proxy_multi_topology_validation() {
     let approx_ranks: Vec<f64> = rank_values(&results.iter().map(|r| r.1).collect::<Vec<_>>());
     let exact_ranks: Vec<f64> = rank_values(&results.iter().map(|r| r.2).collect::<Vec<_>>());
 
-    let d_squared_sum: f64 = approx_ranks.iter().zip(exact_ranks.iter())
+    let d_squared_sum: f64 = approx_ranks
+        .iter()
+        .zip(exact_ranks.iter())
         .map(|(a, e)| (a - e).powi(2))
         .sum();
     let spearman = 1.0 - (6.0 * d_squared_sum) / (n * (n * n - 1.0));
@@ -423,18 +522,21 @@ fn test_phi_proxy_multi_topology_validation() {
     );
 
     // Disconnected should have lowest approximate Phi
-    let disconnected_approx = results.iter()
+    let disconnected_approx = results
+        .iter()
         .find(|r| r.0 == "disconnected_3")
         .map(|r| r.1)
         .unwrap();
-    let min_other_approx = results.iter()
+    let min_other_approx = results
+        .iter()
         .filter(|r| r.0 != "disconnected_3")
         .map(|r| r.1)
         .fold(f64::INFINITY, f64::min);
     assert!(
         disconnected_approx <= min_other_approx,
         "Disconnected should have lowest proxy Phi: {} vs {}",
-        disconnected_approx, min_other_approx
+        disconnected_approx,
+        min_other_approx
     );
 }
 

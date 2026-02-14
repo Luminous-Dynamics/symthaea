@@ -10,15 +10,19 @@
 
 #![cfg(feature = "shell")]
 
-use std::process::{Command, Stdio};
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use std::time::Duration;
 
 /// Get the path to the built binary
 fn binary_path() -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("target");
-    path.push(if cfg!(debug_assertions) { "debug" } else { "release" });
+    path.push(if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    });
     path.push("symthaea-shell");
     path
 }
@@ -55,10 +59,14 @@ mod cli_tests {
         // Note: Some TUI apps may not have --help if they don't use clap
         if output.status.success() {
             assert!(
-                combined.contains("shell") || combined.contains("Shell") ||
-                combined.contains("symthaea") || combined.contains("Symthaea") ||
-                combined.contains("Usage") || combined.contains("usage"),
-                "Help output should contain relevant info: {}", combined
+                combined.contains("shell")
+                    || combined.contains("Shell")
+                    || combined.contains("symthaea")
+                    || combined.contains("Symthaea")
+                    || combined.contains("Usage")
+                    || combined.contains("usage"),
+                "Help output should contain relevant info: {}",
+                combined
             );
         } else {
             // If --help isn't supported, verify the binary at least runs
@@ -81,9 +89,13 @@ mod cli_tests {
         // Version should succeed or be gracefully handled
         if output.status.success() {
             assert!(
-                stdout.contains("0.") || stdout.contains("symthaea") ||
-                stderr.contains("0.") || stderr.contains("symthaea"),
-                "Version output should contain version: stdout={}, stderr={}", stdout, stderr
+                stdout.contains("0.")
+                    || stdout.contains("symthaea")
+                    || stderr.contains("0.")
+                    || stderr.contains("symthaea"),
+                "Version output should contain version: stdout={}, stderr={}",
+                stdout,
+                stderr
             );
         } else {
             eprintln!("[Info] Shell may not support --version flag");
@@ -100,7 +112,10 @@ mod cli_tests {
             .expect("Failed to execute binary");
 
         // Should fail with non-zero exit code
-        assert!(!output.status.success(), "Invalid argument should cause failure");
+        assert!(
+            !output.status.success(),
+            "Invalid argument should cause failure"
+        );
 
         let stderr = String::from_utf8_lossy(&output.stderr);
         // Should have some error output
@@ -122,7 +137,7 @@ mod initialization_tests {
         // Run without a TTY (which is the case in automated tests)
         // The shell should detect this and exit gracefully
         let mut child = Command::new(binary_path())
-            .stdin(Stdio::null())  // No stdin
+            .stdin(Stdio::null()) // No stdin
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -172,8 +187,8 @@ mod initialization_tests {
 mod component_tests {
     //! Tests for shell components that can be tested without a full TUI
 
-    use symthaea::shell::{ShellContext, IntelliSenseEngine, PhiGate};
     use symthaea::action::DestructivenessLevel;
+    use symthaea::shell::{IntelliSenseEngine, PhiGate, ShellContext};
 
     #[test]
     fn test_shell_context_creation() {
@@ -192,7 +207,10 @@ mod component_tests {
         let completions = engine.complete(input, input.len());
 
         // Completions should be a valid (possibly empty) list
-        assert!(completions.len() < 10_000, "Unreasonable number of completions");
+        assert!(
+            completions.len() < 10_000,
+            "Unreasonable number of completions"
+        );
     }
 
     #[test]
@@ -201,7 +219,10 @@ mod component_tests {
 
         // ReadOnly commands should be allowed
         let decision = gate.evaluate("search vim", DestructivenessLevel::ReadOnly);
-        assert!(decision.is_allowed(), "ReadOnly search should be allowed by PhiGate");
+        assert!(
+            decision.is_allowed(),
+            "ReadOnly search should be allowed by PhiGate"
+        );
     }
 
     #[test]
@@ -218,34 +239,46 @@ mod component_tests {
 
         // Read-only commands (Nix-focused classifier)
         let search_level = classify_command_destructiveness("nix search vim");
-        assert_eq!(search_level, DestructivenessLevel::ReadOnly, "nix search should be read-only");
+        assert_eq!(
+            search_level,
+            DestructivenessLevel::ReadOnly,
+            "nix search should be read-only"
+        );
 
         let query_level = classify_command_destructiveness("nix-env -q");
-        assert_eq!(query_level, DestructivenessLevel::ReadOnly, "nix-env -q should be read-only");
+        assert_eq!(
+            query_level,
+            DestructivenessLevel::ReadOnly,
+            "nix-env -q should be read-only"
+        );
 
         // NeedsConfirmation commands
         let install_level = classify_command_destructiveness("nix-env -i vim");
         assert_eq!(
-            install_level, DestructivenessLevel::NeedsConfirmation,
+            install_level,
+            DestructivenessLevel::NeedsConfirmation,
             "nix-env -i should need confirmation"
         );
 
         let rebuild_level = classify_command_destructiveness("nixos-rebuild switch");
         assert_eq!(
-            rebuild_level, DestructivenessLevel::NeedsConfirmation,
+            rebuild_level,
+            DestructivenessLevel::NeedsConfirmation,
             "nixos-rebuild should need confirmation"
         );
 
         // Destructive commands
         let rm_level = classify_command_destructiveness("rm -rf /");
         assert_eq!(
-            rm_level, DestructivenessLevel::Destructive,
+            rm_level,
+            DestructivenessLevel::Destructive,
             "rm -rf should be destructive"
         );
 
         let gc_level = classify_command_destructiveness("nix-collect-garbage -d");
         assert_eq!(
-            gc_level, DestructivenessLevel::Destructive,
+            gc_level,
+            DestructivenessLevel::Destructive,
             "nix-collect-garbage should be destructive"
         );
     }
@@ -256,19 +289,27 @@ mod component_tests {
 
         // ReadOnly commands should be allowed
         let readonly_decision = gate.evaluate("nix search vim", DestructivenessLevel::ReadOnly);
-        assert!(readonly_decision.is_allowed(), "ReadOnly search should be allowed");
+        assert!(
+            readonly_decision.is_allowed(),
+            "ReadOnly search should be allowed"
+        );
 
         // NeedsConfirmation commands should trigger confirmation
-        let destructive_decision = gate.evaluate("nixos-rebuild switch", DestructivenessLevel::NeedsConfirmation);
-        assert!(destructive_decision.needs_confirmation(),
-            "NeedsConfirmation commands should require confirmation");
+        let destructive_decision = gate.evaluate(
+            "nixos-rebuild switch",
+            DestructivenessLevel::NeedsConfirmation,
+        );
+        assert!(
+            destructive_decision.needs_confirmation(),
+            "NeedsConfirmation commands should require confirmation"
+        );
     }
 }
 
 mod ipc_tests {
     //! Tests for IPC client functionality
 
-    use symthaea::shell::ipc_client::{ShellIpcClient, ConnectionState};
+    use symthaea::shell::ipc_client::{ConnectionState, ShellIpcClient};
 
     #[test]
     fn test_ipc_client_creation() {
@@ -277,7 +318,11 @@ mod ipc_tests {
 
         // Check initial state - use state() method
         let state = client.state();
-        assert_eq!(state, ConnectionState::Disconnected, "Should start disconnected");
+        assert_eq!(
+            state,
+            ConnectionState::Disconnected,
+            "Should start disconnected"
+        );
     }
 
     #[test]
@@ -289,7 +334,10 @@ mod ipc_tests {
 
         // If a socket was found, it should be a valid path
         if let Some(ref path) = socket {
-            assert!(!path.as_os_str().is_empty(), "Socket path should not be empty");
+            assert!(
+                !path.as_os_str().is_empty(),
+                "Socket path should not be empty"
+            );
         }
         // Not finding a socket is also valid in test environments
     }

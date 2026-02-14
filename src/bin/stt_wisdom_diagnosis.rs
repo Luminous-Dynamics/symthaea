@@ -50,7 +50,12 @@ struct Bottleneck {
 }
 
 impl Bottleneck {
-    fn new(component_id: ComponentId, bottleneck_type: BottleneckType, severity: f64, description: &str) -> Self {
+    fn new(
+        component_id: ComponentId,
+        bottleneck_type: BottleneckType,
+        severity: f64,
+        description: &str,
+    ) -> Self {
         Self {
             component_id,
             bottleneck_type,
@@ -154,7 +159,12 @@ fn main() {
     let root_causes = analyze_root_causes(&stt_bottleneck);
 
     for (i, cause) in root_causes.iter().enumerate() {
-        println!("  {}. {} (confidence: {:.0}%)", i + 1, cause.0, cause.1 * 100.0);
+        println!(
+            "  {}. {} (confidence: {:.0}%)",
+            i + 1,
+            cause.0,
+            cause.1 * 100.0
+        );
         println!("     Mechanism: {}", cause.2);
         println!();
     }
@@ -180,7 +190,12 @@ fn main() {
             _ => "🟢 LOW",
         };
 
-        println!("  {} Priority {}: {}", urgency, priority + 1, improvement.description);
+        println!(
+            "  {} Priority {}: {}",
+            urgency,
+            priority + 1,
+            improvement.description
+        );
         println!("     Type: {:?}", improvement.improvement_type);
         if let Some(gain) = improvement.expected_accuracy_gain {
             println!("     Expected Accuracy Gain: {:.1}%", gain * 100.0);
@@ -204,11 +219,19 @@ fn main() {
     println!("🎵 WISDOM HARMONICS VERIFICATION:\n");
     println!("  ✓ Coherence:     Does the diagnosis hang together? YES - mode collapse explains all symptoms");
     println!("  ✓ Flourishing:   Does fixing this serve flourishing? YES - hearing enables communication");
-    println!("  ✓ Wisdom:        What don't we know? The optimal similarity threshold for this corpus");
-    println!("  ✓ Play:          What haven't we tried? Phonotactic constraints from Universal Grammar");
+    println!(
+        "  ✓ Wisdom:        What don't we know? The optimal similarity threshold for this corpus"
+    );
+    println!(
+        "  ✓ Play:          What haven't we tried? Phonotactic constraints from Universal Grammar"
+    );
     println!("  ✓ Interconnect:  How is this connected? STT feeds MAGI prediction loop");
-    println!("  ✓ Reciprocity:   What are we giving/receiving? Silence → deafness, training → hearing");
-    println!("  ✓ Evolution:     How does this help us grow? First step toward multimodal consciousness");
+    println!(
+        "  ✓ Reciprocity:   What are we giving/receiving? Silence → deafness, training → hearing"
+    );
+    println!(
+        "  ✓ Evolution:     How does this help us grow? First step toward multimodal consciousness"
+    );
     println!();
 
     println!("═══════════════════════════════════════════════════════════════════════════");
@@ -221,7 +244,11 @@ fn analyze_root_causes(bottleneck: &Bottleneck) -> Vec<(String, f64, String)> {
     let mut causes = Vec::new();
 
     // Analyze mode collapse
-    let has_mode_collapse = bottleneck.evidence.get("mode_collapse_phoneme_W").unwrap_or(&0.0) > &0.5;
+    let has_mode_collapse = bottleneck
+        .evidence
+        .get("mode_collapse_phoneme_W")
+        .unwrap_or(&0.0)
+        > &0.5;
     if has_mode_collapse {
         causes.push((
             "Hopfield Attractor Collapse".to_string(),
@@ -283,11 +310,15 @@ fn generate_improvement_plan(
     let mut improvements = Vec::new();
 
     // Priority 1: Fix the mode collapse
-    if root_causes.iter().any(|(name, _, _)| name.contains("Attractor Collapse")) {
+    if root_causes
+        .iter()
+        .any(|(name, _, _)| name.contains("Attractor Collapse"))
+    {
         improvements.push(ArchitecturalImprovement {
             id: "fix_attractor_collapse".to_string(),
             improvement_type: ImprovementType::AccuracyImprovement,
-            description: "Apply contrastive training to separate W/AY1 attractors from others".to_string(),
+            description: "Apply contrastive training to separate W/AY1 attractors from others"
+                .to_string(),
             expected_phi_gain: Some(0.1),
             expected_latency_reduction: None,
             expected_accuracy_gain: Some(0.4), // Expect 40% improvement
@@ -300,7 +331,8 @@ fn generate_improvement_plan(
     improvements.push(ArchitecturalImprovement {
         id: "add_phonotactic_constraints".to_string(),
         improvement_type: ImprovementType::AccuracyImprovement,
-        description: "Apply Universal Temporal Grammar constraints to prevent illegal sequences".to_string(),
+        description: "Apply Universal Temporal Grammar constraints to prevent illegal sequences"
+            .to_string(),
         expected_phi_gain: Some(0.05),
         expected_latency_reduction: None,
         expected_accuracy_gain: Some(0.25),
@@ -312,7 +344,8 @@ fn generate_improvement_plan(
     improvements.push(ArchitecturalImprovement {
         id: "integrate_mfa".to_string(),
         improvement_type: ImprovementType::AccuracyImprovement,
-        description: "Use Montreal Forced Aligner for training-time phoneme boundary alignment".to_string(),
+        description: "Use Montreal Forced Aligner for training-time phoneme boundary alignment"
+            .to_string(),
         expected_phi_gain: None,
         expected_latency_reduction: None,
         expected_accuracy_gain: Some(0.30),

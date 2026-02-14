@@ -161,7 +161,10 @@ impl CrossDomainFrame {
     }
 
     /// Check if all required slots are present in bindings
-    pub fn validate_bindings(&self, bindings: &HashMap<String, BinaryHV>) -> Result<(), Vec<String>> {
+    pub fn validate_bindings(
+        &self,
+        bindings: &HashMap<String, BinaryHV>,
+    ) -> Result<(), Vec<String>> {
         let missing: Vec<String> = self
             .slots
             .iter()
@@ -224,7 +227,9 @@ impl FrameInstance {
 
     /// Extract a filler from the instance encoding (approximate unbinding)
     pub fn extract(&self, frame: &CrossDomainFrame, slot_name: &str) -> Option<BinaryHV> {
-        frame.get_slot(slot_name).map(|slot| self.encoding.bind(&slot.role_marker))
+        frame
+            .get_slot(slot_name)
+            .map(|slot| self.encoding.bind(&slot.role_marker))
     }
 
     /// Check similarity to another instance

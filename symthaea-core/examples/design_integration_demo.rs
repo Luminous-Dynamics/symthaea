@@ -6,8 +6,7 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    CoupledPhysicsEngine, OperatingConditions, FusionReaction,
-    DesignIntegrationEngine,
+    CoupledPhysicsEngine, DesignIntegrationEngine, FusionReaction, OperatingConditions,
 };
 
 fn main() {
@@ -47,15 +46,17 @@ fn main() {
 
         let feasible_str = if result.feasible { "YES" } else { "NO " };
 
-        println!("│ {:>5.0}   {:>5.0}   {:>6.1}    {}       {:.3}     {:.3}     {:.3}    {:.3} │",
-                 power,
-                 result.geometry_shielding.total_mass_kg,
-                 result.pulse_thermal.lifetime_years.min(100.0),
-                 feasible_str,
-                 metrics.thermal_coherence,
-                 metrics.damage_healing_balance,
-                 metrics.geometry_harmony,
-                 metrics.overall_integration);
+        println!(
+            "│ {:>5.0}   {:>5.0}   {:>6.1}    {}       {:.3}     {:.3}     {:.3}    {:.3} │",
+            power,
+            result.geometry_shielding.total_mass_kg,
+            result.pulse_thermal.lifetime_years.min(100.0),
+            feasible_str,
+            metrics.thermal_coherence,
+            metrics.damage_healing_balance,
+            metrics.geometry_harmony,
+            metrics.overall_integration
+        );
 
         results.push((power, metrics.overall_integration, result.feasible));
     }
@@ -63,12 +64,16 @@ fn main() {
     println!("└────────────────────────────────────────────────────────────────────────┘");
 
     // Find optimal integration
-    let (best_power, best_i, _) = results.iter()
+    let (best_power, best_i, _) = results
+        .iter()
         .filter(|(_, _, feasible)| *feasible)
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
         .unwrap();
 
-    println!("\n  Highest integration: {:.3} at {} kW", best_i, best_power);
+    println!(
+        "\n  Highest integration: {:.3} at {} kW",
+        best_i, best_power
+    );
 
     // ═══════════════════════════════════════════════════════════════════════════
     // REACTION TYPE COMPARISON
@@ -99,12 +104,14 @@ fn main() {
 
         let feasible_str = if result.feasible { "YES" } else { "NO " };
 
-        println!("│  {:20} {:>8.0}   {:>6.2} m     {:.4}         {}      │",
-                 name,
-                 result.geometry_shielding.total_mass_kg,
-                 result.geometry_shielding.shielding.thickness_m,
-                 metrics.overall_integration,
-                 feasible_str);
+        println!(
+            "│  {:20} {:>8.0}   {:>6.2} m     {:.4}         {}      │",
+            name,
+            result.geometry_shielding.total_mass_kg,
+            result.geometry_shielding.shielding.thickness_m,
+            metrics.overall_integration,
+            feasible_str
+        );
     }
 
     println!("└────────────────────────────────────────────────────────────────────────┘");
@@ -122,14 +129,35 @@ fn main() {
     println!("┌────────────────────────────────────────────────────────────────────────┐");
     println!("│  INTEGRATION COMPONENTS                                               │");
     println!("├────────────────────────────────────────────────────────────────────────┤");
-    println!("│  Coupling Index:       {:>8.4}  (HDC similarity pattern)            │", consumer_metrics.coupling_index);
-    println!("│  Design Integration:   {:>8.4}  (internal coherence)                │", consumer_metrics.design_integration);
-    println!("│  Thermal Coherence:    {:>8.4}  (temperature profile smoothness)    │", consumer_metrics.thermal_coherence);
-    println!("│  Damage-Healing:       {:>8.4}  (equilibrium balance)               │", consumer_metrics.damage_healing_balance);
-    println!("│  Geometry Harmony:     {:>8.4}  (mass efficiency)                   │", consumer_metrics.geometry_harmony);
+    println!(
+        "│  Coupling Index:       {:>8.4}  (HDC similarity pattern)            │",
+        consumer_metrics.coupling_index
+    );
+    println!(
+        "│  Design Integration:   {:>8.4}  (internal coherence)                │",
+        consumer_metrics.design_integration
+    );
+    println!(
+        "│  Thermal Coherence:    {:>8.4}  (temperature profile smoothness)    │",
+        consumer_metrics.thermal_coherence
+    );
+    println!(
+        "│  Damage-Healing:       {:>8.4}  (equilibrium balance)               │",
+        consumer_metrics.damage_healing_balance
+    );
+    println!(
+        "│  Geometry Harmony:     {:>8.4}  (mass efficiency)                   │",
+        consumer_metrics.geometry_harmony
+    );
     println!("├────────────────────────────────────────────────────────────────────────┤");
-    println!("│  OVERALL INTEGRATION:  {:>8.4}                                       │", consumer_metrics.overall_integration);
-    println!("│  Binding Advantage:    {:>8.4}  (bind vs bundle difference)         │", consumer_metrics.binding_advantage);
+    println!(
+        "│  OVERALL INTEGRATION:  {:>8.4}                                       │",
+        consumer_metrics.overall_integration
+    );
+    println!(
+        "│  Binding Advantage:    {:>8.4}  (bind vs bundle difference)         │",
+        consumer_metrics.binding_advantage
+    );
     println!("└────────────────────────────────────────────────────────────────────────┘");
 
     // ═══════════════════════════════════════════════════════════════════════════

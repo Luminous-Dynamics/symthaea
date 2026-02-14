@@ -281,19 +281,26 @@ mod tests {
         // Ascending sequence = perfectly predictable = low entropy
         let ascending: Vec<f64> = (0..100).map(|x| x as f64).collect();
         let pe = permutation_entropy_order3(&ascending, 1);
-        assert!(pe < 0.1, "Monotonic signal should have near-zero entropy, got {}", pe);
+        assert!(
+            pe < 0.1,
+            "Monotonic signal should have near-zero entropy, got {}",
+            pe
+        );
     }
 
     #[test]
     fn test_random_high_entropy() {
         // Pseudo-random sequence = high entropy
         let random: Vec<f64> = vec![
-            0.5, 0.2, 0.8, 0.1, 0.9, 0.3, 0.7, 0.4, 0.6, 0.25,
-            0.75, 0.15, 0.85, 0.35, 0.65, 0.45, 0.55, 0.28, 0.72, 0.18,
-            0.82, 0.38, 0.62, 0.48, 0.52, 0.22, 0.78, 0.12, 0.88, 0.32,
+            0.5, 0.2, 0.8, 0.1, 0.9, 0.3, 0.7, 0.4, 0.6, 0.25, 0.75, 0.15, 0.85, 0.35, 0.65, 0.45,
+            0.55, 0.28, 0.72, 0.18, 0.82, 0.38, 0.62, 0.48, 0.52, 0.22, 0.78, 0.12, 0.88, 0.32,
         ];
         let pe = permutation_entropy_order3(&random, 1);
-        assert!(pe > 0.7, "Random signal should have high entropy, got {}", pe);
+        assert!(
+            pe > 0.7,
+            "Random signal should have high entropy, got {}",
+            pe
+        );
     }
 
     #[test]
@@ -304,13 +311,21 @@ mod tests {
             .map(|x| (2.0 * PI * x as f64 / 20.0).sin())
             .collect();
         let pe = permutation_entropy_order3(&sine, 1);
-        assert!(pe > 0.3 && pe < 0.8, "Sine wave should have medium entropy, got {}", pe);
+        assert!(
+            pe > 0.3 && pe < 0.8,
+            "Sine wave should have medium entropy, got {}",
+            pe
+        );
     }
 
     #[test]
     fn test_normalized_range() {
         let signal: Vec<f64> = (0..50).map(|x| (x as f64).sin()).collect();
         let pe = permutation_entropy_order3(&signal, 1);
-        assert!((0.0..=1.0).contains(&pe), "PE should be in [0,1], got {}", pe);
+        assert!(
+            (0.0..=1.0).contains(&pe),
+            "PE should be in [0,1], got {}",
+            pe
+        );
     }
 }

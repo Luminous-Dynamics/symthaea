@@ -33,7 +33,7 @@
 //! ```
 
 use super::binary_hv::BinaryHV;
-use super::lsh_similarity::adaptive_batch_find_most_similar;  // Session 7C: Revolutionary batch-aware LSH
+use super::lsh_similarity::adaptive_batch_find_most_similar; // Session 7C: Revolutionary batch-aware LSH
 use rayon::prelude::*;
 
 // Helper functions using BinaryHV's native methods (replacement for incompatible simd_hv)
@@ -94,9 +94,7 @@ fn simd_find_most_similar(query: &BinaryHV, targets: &[BinaryHV]) -> Option<(usi
 /// ```
 #[inline]
 pub fn parallel_batch_bind(vectors: &[BinaryHV], key: &BinaryHV) -> Vec<BinaryHV> {
-    vectors.par_iter()
-        .map(|v| simd_bind(v, key))
-        .collect()
+    vectors.par_iter().map(|v| simd_bind(v, key)).collect()
 }
 
 /// Parallel batch bind with custom keys for each vector
@@ -108,9 +106,7 @@ pub fn parallel_batch_bind(vectors: &[BinaryHV], key: &BinaryHV) -> Vec<BinaryHV
 /// - Near-perfect scalability
 #[inline]
 pub fn parallel_batch_bind_pairs(pairs: &[(&BinaryHV, &BinaryHV)]) -> Vec<BinaryHV> {
-    pairs.par_iter()
-        .map(|(a, b)| simd_bind(a, b))
-        .collect()
+    pairs.par_iter().map(|(a, b)| simd_bind(a, b)).collect()
 }
 
 // ============================================================================
@@ -140,7 +136,8 @@ pub fn parallel_batch_bind_pairs(pairs: &[(&BinaryHV, &BinaryHV)]) -> Vec<Binary
 /// ```
 #[inline]
 pub fn parallel_batch_similarity(query: &BinaryHV, targets: &[BinaryHV]) -> Vec<f32> {
-    targets.par_iter()
+    targets
+        .par_iter()
         .map(|t| simd_similarity(query, t))
         .collect()
 }
@@ -156,9 +153,11 @@ pub fn parallel_batch_similarity(query: &BinaryHV, targets: &[BinaryHV]) -> Vec<
 /// - **Use case**: Clustering, pattern discovery
 #[inline]
 pub fn parallel_all_pairs_similarity(vectors: &[BinaryHV]) -> Vec<Vec<f32>> {
-    vectors.par_iter()
+    vectors
+        .par_iter()
         .map(|v| {
-            vectors.iter()
+            vectors
+                .iter()
                 .map(|other| simd_similarity(v, other))
                 .collect()
         })
@@ -192,17 +191,13 @@ pub fn parallel_all_pairs_similarity(vectors: &[BinaryHV]) -> Vec<Vec<f32>> {
 /// ```
 #[inline]
 pub fn parallel_batch_bundle(vector_sets: &[Vec<BinaryHV>]) -> Vec<BinaryHV> {
-    vector_sets.par_iter()
-        .map(|set| simd_bundle(set))
-        .collect()
+    vector_sets.par_iter().map(|set| simd_bundle(set)).collect()
 }
 
 /// Parallel bundling with slices (zero-copy)
 #[inline]
 pub fn parallel_batch_bundle_slices(vector_sets: &[&[BinaryHV]]) -> Vec<BinaryHV> {
-    vector_sets.par_iter()
-        .map(|set| simd_bundle(set))
-        .collect()
+    vector_sets.par_iter().map(|set| simd_bundle(set)).collect()
 }
 
 // ============================================================================
@@ -269,19 +264,20 @@ pub fn parallel_batch_find_top_k(
     memory: &[BinaryHV],
     k: usize,
 ) -> Vec<Vec<(usize, f32)>> {
-    queries.par_iter()
+    queries
+        .par_iter()
         .map(|q| {
-            let mut scored: Vec<(usize, f32)> = memory.iter()
+            let mut scored: Vec<(usize, f32)> = memory
+                .iter()
                 .enumerate()
                 .map(|(i, m)| (i, simd_similarity(q, m)))
                 .collect();
 
             // Partial sort for top-k
             let k_clamped = k.min(scored.len());
-            scored.select_nth_unstable_by(
-                k_clamped.saturating_sub(1),
-                |a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-            );
+            scored.select_nth_unstable_by(k_clamped.saturating_sub(1), |a, b| {
+                b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             scored.truncate(k_clamped);
             scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -311,7 +307,8 @@ pub fn parallel_find_similar_pairs(
     vectors: &[BinaryHV],
     similarity_threshold: f32,
 ) -> Vec<(usize, usize, f32)> {
-    (0..vectors.len()).into_par_iter()
+    (0..vectors.len())
+        .into_par_iter()
         .flat_map(|i| {
             let v = &vectors[i];
             (i + 1..vectors.len())
@@ -354,9 +351,11 @@ pub fn parallel_chunked_similarity(
     targets: &[BinaryHV],
     chunk_size: usize,
 ) -> Vec<f32> {
-    targets.par_chunks(chunk_size)
+    targets
+        .par_chunks(chunk_size)
         .flat_map(|chunk| {
-            chunk.iter()
+            chunk
+                .iter()
                 .map(|t| simd_similarity(query, t))
                 .collect::<Vec<_>>()
         })
@@ -386,9 +385,7 @@ pub fn adaptive_batch_similarity(query: &BinaryHV, targets: &[BinaryHV]) -> Vec<
 
     if targets.len() < PARALLEL_THRESHOLD {
         // Sequential for small workloads
-        targets.iter()
-            .map(|t| simd_similarity(query, t))
-            .collect()
+        targets.iter().map(|t| simd_similarity(query, t)).collect()
     } else if targets.len() < CHUNKED_THRESHOLD {
         // Simple parallel for medium workloads
         parallel_batch_similarity(query, targets)
@@ -418,7 +415,7 @@ pub fn get_parallelism_info() -> ParallelismInfo {
     let threads = rayon::current_num_threads();
     ParallelismInfo {
         num_threads: threads,
-        max_threads: threads,  // Rayon auto-configures to available CPUs
+        max_threads: threads, // Rayon auto-configures to available CPUs
     }
 }
 
@@ -434,8 +431,7 @@ impl std::fmt::Display for ParallelismInfo {
         write!(
             f,
             "Rayon: {} threads (max: {} cores)",
-            self.num_threads,
-            self.max_threads
+            self.num_threads, self.max_threads
         )
     }
 }
@@ -468,7 +464,10 @@ mod tests {
     fn test_parallel_bind_empty() {
         let key = BinaryHV::random(42);
         let result = parallel_batch_bind(&[], &key);
-        assert!(result.is_empty(), "Parallel bind of empty input should be empty");
+        assert!(
+            result.is_empty(),
+            "Parallel bind of empty input should be empty"
+        );
     }
 
     #[test]
@@ -507,7 +506,10 @@ mod tests {
 
         assert_eq!(sequential.len(), parallel.len());
         for (seq, par) in sequential.iter().zip(parallel.iter()) {
-            assert!((seq - par).abs() < 0.001, "Parallel similarity must match sequential");
+            assert!(
+                (seq - par).abs() < 0.001,
+                "Parallel similarity must match sequential"
+            );
         }
     }
 
@@ -515,7 +517,10 @@ mod tests {
     fn test_parallel_similarity_empty() {
         let query = BinaryHV::random(42);
         let result = parallel_batch_similarity(&query, &[]);
-        assert!(result.is_empty(), "Parallel similarity of empty targets should be empty");
+        assert!(
+            result.is_empty(),
+            "Parallel similarity of empty targets should be empty"
+        );
     }
 
     #[test]
@@ -525,8 +530,11 @@ mod tests {
         let sims = parallel_batch_similarity(&query, &targets);
 
         assert_eq!(sims.len(), 3);
-        assert!((sims[1] - 1.0).abs() < 0.001,
-            "Self-similarity in batch should be 1.0, got {}", sims[1]);
+        assert!(
+            (sims[1] - 1.0).abs() < 0.001,
+            "Self-similarity in batch should be 1.0, got {}",
+            sims[1]
+        );
     }
 
     // ===== All-Pairs Similarity =====
@@ -543,15 +551,20 @@ mod tests {
 
         // Diagonal should be 1.0 (self-similarity)
         for i in 0..10 {
-            assert!((matrix[i][i] - 1.0).abs() < 0.001,
-                "Self-similarity should be 1.0, got {}", matrix[i][i]);
+            assert!(
+                (matrix[i][i] - 1.0).abs() < 0.001,
+                "Self-similarity should be 1.0, got {}",
+                matrix[i][i]
+            );
         }
 
         // Should be symmetric
         for i in 0..10 {
-            for j in i+1..10 {
-                assert!((matrix[i][j] - matrix[j][i]).abs() < 0.001,
-                    "Similarity matrix should be symmetric");
+            for j in i + 1..10 {
+                assert!(
+                    (matrix[i][j] - matrix[j][i]).abs() < 0.001,
+                    "Similarity matrix should be symmetric"
+                );
             }
         }
     }
@@ -575,8 +588,11 @@ mod tests {
 
         for (i, result) in parallel_results.iter().enumerate() {
             let expected = simd_bundle(&sets[i]);
-            assert_eq!(result.0, expected.0,
-                "Parallel bundle set {} must match sequential", i);
+            assert_eq!(
+                result.0, expected.0,
+                "Parallel bundle set {} must match sequential",
+                i
+            );
         }
     }
 
@@ -637,9 +653,16 @@ mod tests {
 
         let pairs = parallel_find_similar_pairs(&vectors, 0.99);
         // The pair (0, 1) should have sim=1.0 and be found
-        assert!(!pairs.is_empty(), "Should find identical vectors as similar pair");
-        assert!(pairs.iter().any(|&(i, j, sim)| i == 0 && j == 1 && sim > 0.99),
-            "Should find pair (0,1) with sim=1.0");
+        assert!(
+            !pairs.is_empty(),
+            "Should find identical vectors as similar pair"
+        );
+        assert!(
+            pairs
+                .iter()
+                .any(|&(i, j, sim)| i == 0 && j == 1 && sim > 0.99),
+            "Should find pair (0,1) with sim=1.0"
+        );
     }
 
     #[test]
@@ -695,7 +718,10 @@ mod tests {
 
         assert_eq!(chunked.len(), sequential.len());
         for (c, s) in chunked.iter().zip(sequential.iter()) {
-            assert!((c - s).abs() < 0.001, "Chunked result must match sequential");
+            assert!(
+                (c - s).abs() < 0.001,
+                "Chunked result must match sequential"
+            );
         }
     }
 

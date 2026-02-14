@@ -2,8 +2,8 @@
 //!
 //! Sphere, Torus, KleinBottle, Lattice, SmallWorld, Möbius, Hyperbolic.
 
-use super::types::{ConsciousnessTopology, TopologyType};
 use super::super::unified_hv::ContinuousHV;
+use super::types::{ConsciousnessTopology, TopologyType};
 
 impl ConsciousnessTopology {
     /// Generate a sphere (icosahedron) topology - 2-MANIFOLD S²
@@ -31,16 +31,40 @@ impl ConsciousnessTopology {
         // Vertices arranged: 1 top, 5 upper pentagon, 5 lower pentagon, 1 bottom
         let edges = vec![
             // Top vertex (0) to upper pentagon (1-5)
-            (0, 1), (0, 2), (0, 3), (0, 4), (0, 5),
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (0, 4),
+            (0, 5),
             // Upper pentagon connections
-            (1, 2), (2, 3), (3, 4), (4, 5), (5, 1),
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (4, 5),
+            (5, 1),
             // Upper to lower connections
-            (1, 6), (2, 6), (2, 7), (3, 7), (3, 8),
-            (4, 8), (4, 9), (5, 9), (5, 10), (1, 10),
+            (1, 6),
+            (2, 6),
+            (2, 7),
+            (3, 7),
+            (3, 8),
+            (4, 8),
+            (4, 9),
+            (5, 9),
+            (5, 10),
+            (1, 10),
             // Lower pentagon connections
-            (6, 7), (7, 8), (8, 9), (9, 10), (10, 6),
+            (6, 7),
+            (7, 8),
+            (8, 9),
+            (9, 10),
+            (10, 6),
             // Lower pentagon (6-10) to bottom vertex (11)
-            (6, 11), (7, 11), (8, 11), (9, 11), (10, 11),
+            (6, 11),
+            (7, 11),
+            (8, 11),
+            (9, 11),
+            (10, 11),
         ];
 
         let mut node_representations = Vec::with_capacity(n_nodes);
@@ -133,7 +157,6 @@ impl ConsciousnessTopology {
         // Deduplicate edges
         edges.sort_unstable();
         edges.dedup();
-
 
         Self {
             n_nodes,
@@ -333,14 +356,19 @@ impl ConsciousnessTopology {
     /// * `seed` - Random seed for reproducibility
     pub fn small_world(n_nodes: usize, dim: usize, k: usize, p: f64, seed: u64) -> Self {
         assert!(n_nodes > k, "Need n_nodes >= k+1 for small-world");
-        assert!(k.is_multiple_of(2), "k must be even for symmetric ring lattice");
+        assert!(
+            k.is_multiple_of(2),
+            "k must be even for symmetric ring lattice"
+        );
         assert!(k >= 2, "Need at least k=2 neighbors");
-        assert!((0.0..=1.0).contains(&p), "Rewiring probability p must be in [0, 1]");
+        assert!(
+            (0.0..=1.0).contains(&p),
+            "Rewiring probability p must be in [0, 1]"
+        );
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         // Build initial k-regular ring lattice edges
         // Use min/max to handle wraparound edges correctly, then deduplicate
@@ -355,8 +383,8 @@ impl ConsciousnessTopology {
         edges.dedup();
 
         // Rewire edges with probability p
-        use rand::{Rng, SeedableRng};
         use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
         let mut rng = StdRng::seed_from_u64(seed);
 
         let mut final_edges = Vec::new();
@@ -366,7 +394,9 @@ impl ConsciousnessTopology {
                 let mut new_target = rng.gen_range(0..n_nodes);
 
                 // Avoid self-loops and duplicate edges
-                while new_target == i || final_edges.contains(&(i.min(new_target), i.max(new_target))) {
+                while new_target == i
+                    || final_edges.contains(&(i.min(new_target), i.max(new_target)))
+                {
                     new_target = rng.gen_range(0..n_nodes);
                 }
 
@@ -425,12 +455,14 @@ impl ConsciousnessTopology {
     /// * `seed` - Random seed for reproducibility
     pub fn mobius_strip(n_nodes: usize, dim: usize, _seed: u64) -> Self {
         assert!(n_nodes >= 4, "Möbius strip needs at least 4 nodes");
-        assert!(n_nodes.is_multiple_of(2), "Möbius strip needs even number of nodes for twist");
+        assert!(
+            n_nodes.is_multiple_of(2),
+            "Möbius strip needs even number of nodes for twist"
+        );
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
 
@@ -465,7 +497,6 @@ impl ConsciousnessTopology {
             }
         }
 
-
         Self {
             n_nodes,
             dim,
@@ -495,9 +526,8 @@ impl ConsciousnessTopology {
 
         let n_nodes = grid_size * grid_size;
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
         let mut edges = Vec::new();
@@ -558,9 +588,8 @@ impl ConsciousnessTopology {
 
         let n_nodes = grid_size * grid_size;
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
         let mut edges = Vec::new();
@@ -592,8 +621,12 @@ impl ConsciousnessTopology {
             };
 
             // Add edges (only add if i < neighbor to avoid duplicates)
-            if i < down { edges.push((i, down)); }
-            if i < right { edges.push((i, right)); }
+            if i < down {
+                edges.push((i, down));
+            }
+            if i < right {
+                edges.push((i, right));
+            }
 
             // Bind connections
             let conn_up = node_identities[i].bind(&node_identities[up]);
@@ -635,9 +668,8 @@ impl ConsciousnessTopology {
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
         // Build a tree structure with lateral connections at each level
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         // Build adjacency list
         let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
@@ -656,7 +688,9 @@ impl ConsciousnessTopology {
         let mut depth_start = 0;
 
         while depth_start < n_nodes {
-            let depth_size = branching.pow(current_depth as u32).min(n_nodes - depth_start);
+            let depth_size = branching
+                .pow(current_depth as u32)
+                .min(n_nodes - depth_start);
             let depth_end = (depth_start + depth_size).min(n_nodes);
 
             let nodes_at_depth: Vec<usize> = (depth_start..depth_end).collect();
@@ -710,5 +744,4 @@ impl ConsciousnessTopology {
             edges,
         }
     }
-
 }

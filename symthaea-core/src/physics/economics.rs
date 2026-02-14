@@ -233,7 +233,7 @@ impl EnergyComparison {
     pub fn grid_electricity() -> Self {
         Self {
             name: "Grid Electricity (US avg)".to_string(),
-            lcoe_usd_mwh: 120.0, // ~$0.12/kWh
+            lcoe_usd_mwh: 120.0,  // ~$0.12/kWh
             capacity_factor: 1.0, // On demand
             dispatchable: true,
             co2_kg_mwh: 400.0, // Mix of sources
@@ -293,7 +293,7 @@ impl EnergyComparison {
     pub fn battery_storage() -> Self {
         Self {
             name: "Battery Storage (4hr)".to_string(),
-            lcoe_usd_mwh: 150.0, // Adds to generation cost
+            lcoe_usd_mwh: 150.0,   // Adds to generation cost
             capacity_factor: 0.15, // Limited by cycles
             dispatchable: true,
             co2_kg_mwh: 50.0, // Manufacturing
@@ -493,38 +493,69 @@ impl EconomicEngine {
         println!("\n");
         println!("┌────────────────────────────────────────────────────────────────────┐");
         println!("│              ECONOMIC VIABILITY ANALYSIS                           │");
-        println!("│              {}                                            │", name);
+        println!(
+            "│              {}                                            │",
+            name
+        );
         println!("├────────────────────────────────────────────────────────────────────┤");
         println!("│                                                                    │");
         println!("│  LCOE BREAKDOWN                                                    │");
         println!("│  ─────────────────────────────────────────────────────────────     │");
-        println!("│  Capital:     ${:>8.1}/MWh  ({:>4.1}%)                            │",
-                 result.capital_component,
-                 result.capital_component / result.lcoe_usd_mwh * 100.0);
-        println!("│  O&M:         ${:>8.1}/MWh  ({:>4.1}%)                            │",
-                 result.om_component,
-                 result.om_component / result.lcoe_usd_mwh * 100.0);
-        println!("│  Fuel:        ${:>8.2}/MWh  ({:>4.1}%)                            │",
-                 result.fuel_component,
-                 result.fuel_component / result.lcoe_usd_mwh * 100.0);
+        println!(
+            "│  Capital:     ${:>8.1}/MWh  ({:>4.1}%)                            │",
+            result.capital_component,
+            result.capital_component / result.lcoe_usd_mwh * 100.0
+        );
+        println!(
+            "│  O&M:         ${:>8.1}/MWh  ({:>4.1}%)                            │",
+            result.om_component,
+            result.om_component / result.lcoe_usd_mwh * 100.0
+        );
+        println!(
+            "│  Fuel:        ${:>8.2}/MWh  ({:>4.1}%)                            │",
+            result.fuel_component,
+            result.fuel_component / result.lcoe_usd_mwh * 100.0
+        );
         println!("│  ─────────────────────────────────────────────────────────────     │");
-        println!("│  TOTAL LCOE:  ${:>8.1}/MWh  (${:.3}/kWh)                        │",
-                 result.lcoe_usd_mwh, result.lcoe_usd_kwh);
+        println!(
+            "│  TOTAL LCOE:  ${:>8.1}/MWh  (${:.3}/kWh)                        │",
+            result.lcoe_usd_mwh, result.lcoe_usd_kwh
+        );
         println!("│                                                                    │");
         println!("│  FINANCIAL METRICS                                                 │");
         println!("│  ─────────────────────────────────────────────────────────────     │");
-        println!("│  Lifetime cost:      ${:>12.0}                              │", result.lifetime_cost_usd);
-        println!("│  Lifetime energy:    {:>12.0} MWh                            │", result.lifetime_energy_mwh);
-        println!("│  Payback (vs grid):  {:>8.1} years                              │", result.payback_years);
-        println!("│  NPV:                ${:>12.0}                              │", result.npv_usd);
-        println!("│  IRR:                {:>8.1}%                                   │", result.irr_percent);
+        println!(
+            "│  Lifetime cost:      ${:>12.0}                              │",
+            result.lifetime_cost_usd
+        );
+        println!(
+            "│  Lifetime energy:    {:>12.0} MWh                            │",
+            result.lifetime_energy_mwh
+        );
+        println!(
+            "│  Payback (vs grid):  {:>8.1} years                              │",
+            result.payback_years
+        );
+        println!(
+            "│  NPV:                ${:>12.0}                              │",
+            result.npv_usd
+        );
+        println!(
+            "│  IRR:                {:>8.1}%                                   │",
+            result.irr_percent
+        );
         println!("│                                                                    │");
         println!("│  SENSITIVITY ANALYSIS                                              │");
         println!("│  ─────────────────────────────────────────────────────────────     │");
         for (param, change_pct, new_lcoe) in sensitivities {
             let direction = if *change_pct > 0.0 { "↑" } else { "↓" };
-            println!("│  {:25} {} {:>5.1}% → ${:.1}/MWh           │",
-                     param, direction, change_pct.abs(), new_lcoe);
+            println!(
+                "│  {:25} {} {:>5.1}% → ${:.1}/MWh           │",
+                param,
+                direction,
+                change_pct.abs(),
+                new_lcoe
+            );
         }
         println!("│                                                                    │");
         println!("└────────────────────────────────────────────────────────────────────┘");
@@ -545,24 +576,35 @@ impl EconomicEngine {
         println!("│              COMPARISON WITH ALTERNATIVES                          │");
         println!("├────────────────────────────────────────────────────────────────────┤");
         println!("│                                                                    │");
-        println!("│  {:25} {:>10} {:>8} {:>10} {:>8}   │",
-                 "Source", "LCOE", "CF", "CO2", "Dispatch");
-        println!("│  {:25} {:>10} {:>8} {:>10} {:>8}   │",
-                 "", "$/MWh", "%", "kg/MWh", "");
+        println!(
+            "│  {:25} {:>10} {:>8} {:>10} {:>8}   │",
+            "Source", "LCOE", "CF", "CO2", "Dispatch"
+        );
+        println!(
+            "│  {:25} {:>10} {:>8} {:>10} {:>8}   │",
+            "", "$/MWh", "%", "kg/MWh", ""
+        );
         println!("│  ─────────────────────────────────────────────────────────────     │");
 
-        println!("│  {:25} {:>10.1} {:>7.0}% {:>10.0} {:>8}   │",
-                 "★ Spark Engine (D-D)",
-                 spark_lcoe,
-                 self.capacity_factor * 100.0,
-                 0.0, // Zero CO2
-                 "Yes");
+        println!(
+            "│  {:25} {:>10.1} {:>7.0}% {:>10.0} {:>8}   │",
+            "★ Spark Engine (D-D)",
+            spark_lcoe,
+            self.capacity_factor * 100.0,
+            0.0, // Zero CO2
+            "Yes"
+        );
 
         for alt in &alternatives {
             let dispatch = if alt.dispatchable { "Yes" } else { "No" };
-            println!("│  {:25} {:>10.1} {:>7.0}% {:>10.0} {:>8}   │",
-                     alt.name, alt.lcoe_usd_mwh, alt.capacity_factor * 100.0,
-                     alt.co2_kg_mwh, dispatch);
+            println!(
+                "│  {:25} {:>10.1} {:>7.0}% {:>10.0} {:>8}   │",
+                alt.name,
+                alt.lcoe_usd_mwh,
+                alt.capacity_factor * 100.0,
+                alt.co2_kg_mwh,
+                dispatch
+            );
         }
 
         println!("│                                                                    │");
@@ -720,8 +762,16 @@ impl EconomicEngine {
             }
 
             if increasing {
-                if lcoe_mid > target { hi = mid; } else { lo = mid; }
-            } else if lcoe_mid > target { lo = mid; } else { hi = mid; }
+                if lcoe_mid > target {
+                    hi = mid;
+                } else {
+                    lo = mid;
+                }
+            } else if lcoe_mid > target {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
         }
 
         (lo + hi) / 2.0
@@ -841,55 +891,59 @@ impl ScaleAwareComparison {
         power_levels: &[f64],
         lcf_points: &[(f64, f64, f64)],
     ) -> Vec<ScaleAwareComparison> {
-        power_levels.iter().map(|&power_w| {
-            let mut technologies = Vec::new();
+        power_levels
+            .iter()
+            .map(|&power_w| {
+                let mut technologies = Vec::new();
 
-            // Find closest LCF data point
-            if let Some(&(_, cost_usd, lcoe)) = lcf_points.iter()
-                .min_by(|a, b| (a.0 - power_w).abs().total_cmp(&(b.0 - power_w).abs()))
-            {
-                technologies.push(ScaleCostPoint {
-                    technology: "LCF Reactor".to_string(),
-                    cost_per_w: cost_usd / power_w,
-                    lcoe_usd_mwh: lcoe,
-                });
-            }
+                // Find closest LCF data point
+                if let Some(&(_, cost_usd, lcoe)) = lcf_points
+                    .iter()
+                    .min_by(|a, b| (a.0 - power_w).abs().total_cmp(&(b.0 - power_w).abs()))
+                {
+                    technologies.push(ScaleCostPoint {
+                        technology: "LCF Reactor".to_string(),
+                        cost_per_w: cost_usd / power_w,
+                        lcoe_usd_mwh: lcoe,
+                    });
+                }
 
-            // Competing technologies with power-law $/W scaling
-            // Format: (name, ref_cost_per_w at 1kW, scaling_exponent, base_lcoe)
-            let competitors: Vec<(&str, f64, f64, f64)> = vec![
-                // Solar + battery: $3/W at 1kW, improves at scale
-                ("Solar + Battery", 3.0, -0.15, 80.0),
-                // Diesel generator: $0.50/W at 1kW
-                ("Diesel Generator", 0.50, -0.10, 250.0),
-                // Grid connection: $0.01/W at 1kW (just connection cost)
-                ("Grid Connection", 0.01, -0.05, 120.0),
-                // RTG: $300/W at 1kW (extremely expensive)
-                ("Pu-238 RTG", 300.0, -0.05, 50_000.0),
-                // PEM fuel cell: $5/W at 1kW
-                ("PEM Fuel Cell", 5.0, -0.20, 200.0),
-                // Micro-nuclear (SMR): $20/W at 1MW reference
-                ("Micro-Nuclear (SMR)", 20.0, -0.30, 90.0),
-            ];
+                // Competing technologies with power-law $/W scaling
+                // Format: (name, ref_cost_per_w at 1kW, scaling_exponent, base_lcoe)
+                let competitors: Vec<(&str, f64, f64, f64)> = vec![
+                    // Solar + battery: $3/W at 1kW, improves at scale
+                    ("Solar + Battery", 3.0, -0.15, 80.0),
+                    // Diesel generator: $0.50/W at 1kW
+                    ("Diesel Generator", 0.50, -0.10, 250.0),
+                    // Grid connection: $0.01/W at 1kW (just connection cost)
+                    ("Grid Connection", 0.01, -0.05, 120.0),
+                    // RTG: $300/W at 1kW (extremely expensive)
+                    ("Pu-238 RTG", 300.0, -0.05, 50_000.0),
+                    // PEM fuel cell: $5/W at 1kW
+                    ("PEM Fuel Cell", 5.0, -0.20, 200.0),
+                    // Micro-nuclear (SMR): $20/W at 1MW reference
+                    ("Micro-Nuclear (SMR)", 20.0, -0.30, 90.0),
+                ];
 
-            let power_kw = power_w / 1000.0;
-            for (name, ref_cpw, exp, base_lcoe) in competitors {
-                // Power-law: $/W = ref × (P/1kW)^exp
-                let cost_per_w = ref_cpw * (power_kw).powf(exp);
-                // LCOE also scales (very roughly) with size
-                let lcoe = base_lcoe * (power_kw / 1.0).powf(exp * 0.5);
-                technologies.push(ScaleCostPoint {
-                    technology: name.to_string(),
-                    cost_per_w,
-                    lcoe_usd_mwh: lcoe,
-                });
-            }
+                let power_kw = power_w / 1000.0;
+                for (name, ref_cpw, exp, base_lcoe) in competitors {
+                    // Power-law: $/W = ref × (P/1kW)^exp
+                    let cost_per_w = ref_cpw * (power_kw).powf(exp);
+                    // LCOE also scales (very roughly) with size
+                    let lcoe = base_lcoe * (power_kw / 1.0).powf(exp * 0.5);
+                    technologies.push(ScaleCostPoint {
+                        technology: name.to_string(),
+                        cost_per_w,
+                        lcoe_usd_mwh: lcoe,
+                    });
+                }
 
-            ScaleAwareComparison {
-                power_w,
-                technologies,
-            }
-        }).collect()
+                ScaleAwareComparison {
+                    power_w,
+                    technologies,
+                }
+            })
+            .collect()
     }
 }
 
@@ -1079,7 +1133,8 @@ mod tests {
             assert!(
                 r.improvement_factor > 0.0,
                 "Improvement factor for {} should be positive, got {}",
-                r.parameter, r.improvement_factor
+                r.parameter,
+                r.improvement_factor
             );
             assert_eq!(r.target_lcoe, 120.0);
         }
@@ -1117,17 +1172,25 @@ mod tests {
         assert_eq!(ragone.data_points.len(), 11);
 
         // LCF points should have correct category
-        let lcf_points: Vec<_> = ragone.data_points.iter()
+        let lcf_points: Vec<_> = ragone
+            .data_points
+            .iter()
             .filter(|p| p.category == "LCF Reactor")
             .collect();
         assert_eq!(lcf_points.len(), 2);
 
         // All points should have positive specific power and energy density
         for point in &ragone.data_points {
-            assert!(point.specific_power_w_kg > 0.0,
-                "{} should have positive specific power", point.name);
-            assert!(point.energy_density_wh_kg > 0.0,
-                "{} should have positive energy density", point.name);
+            assert!(
+                point.specific_power_w_kg > 0.0,
+                "{} should have positive specific power",
+                point.name
+            );
+            assert!(
+                point.energy_density_wh_kg > 0.0,
+                "{} should have positive energy density",
+                point.name
+            );
         }
     }
 
@@ -1145,15 +1208,27 @@ mod tests {
 
         for comp in &comparisons {
             // Should have LCF + 6 competitors = 7 technologies
-            assert_eq!(comp.technologies.len(), 7,
-                "Should have 7 technologies at {:.0}W", comp.power_w);
+            assert_eq!(
+                comp.technologies.len(),
+                7,
+                "Should have 7 technologies at {:.0}W",
+                comp.power_w
+            );
 
             // All should have positive cost per watt
             for tech in &comp.technologies {
-                assert!(tech.cost_per_w > 0.0,
-                    "{} at {:.0}W should have positive $/W", tech.technology, comp.power_w);
-                assert!(tech.lcoe_usd_mwh > 0.0,
-                    "{} at {:.0}W should have positive LCOE", tech.technology, comp.power_w);
+                assert!(
+                    tech.cost_per_w > 0.0,
+                    "{} at {:.0}W should have positive $/W",
+                    tech.technology,
+                    comp.power_w
+                );
+                assert!(
+                    tech.lcoe_usd_mwh > 0.0,
+                    "{} at {:.0}W should have positive LCOE",
+                    tech.technology,
+                    comp.power_w
+                );
             }
         }
     }
@@ -1161,8 +1236,11 @@ mod tests {
     #[test]
     fn test_readiness_trl_in_range() {
         let lcf = ReadinessComparison::lcf_assessment();
-        assert!(lcf.trl >= 1 && lcf.trl <= 9,
-            "LCF TRL should be in [1,9], got {}", lcf.trl);
+        assert!(
+            lcf.trl >= 1 && lcf.trl <= 9,
+            "LCF TRL should be in [1,9], got {}",
+            lcf.trl
+        );
         assert!(!lcf.key_risks.is_empty());
         assert!(lcf.years_to_deployment > 0.0);
         assert!(lcf.rd_funding_needed_usd > 0.0);
@@ -1170,8 +1248,12 @@ mod tests {
         let competitors = ReadinessComparison::competing_technologies();
         assert!(!competitors.is_empty());
         for comp in &competitors {
-            assert!(comp.trl >= 1 && comp.trl <= 9,
-                "{} TRL should be in [1,9], got {}", comp.technology, comp.trl);
+            assert!(
+                comp.trl >= 1 && comp.trl <= 9,
+                "{} TRL should be in [1,9], got {}",
+                comp.technology,
+                comp.trl
+            );
             assert!(!comp.key_risks.is_empty());
         }
     }
@@ -1184,13 +1266,17 @@ mod tests {
         assert_eq!(ragone.data_points.len(), 9);
 
         // RTG should have highest energy density (long lifetime)
-        let rtg = ragone.data_points.iter()
+        let rtg = ragone
+            .data_points
+            .iter()
             .find(|p| p.name.contains("RTG"))
             .expect("Should have RTG");
         assert!(rtg.energy_density_wh_kg > 100_000.0);
 
         // Supercapacitor should have highest specific power
-        let supercap = ragone.data_points.iter()
+        let supercap = ragone
+            .data_points
+            .iter()
             .find(|p| p.name.contains("Supercapacitor"))
             .expect("Should have Supercapacitor");
         assert!(supercap.specific_power_w_kg > 5_000.0);
@@ -1211,14 +1297,21 @@ mod tests {
         let large = &comparisons[1];
 
         // Solar should be cheaper per watt at larger scale
-        let solar_small = small.technologies.iter()
+        let solar_small = small
+            .technologies
+            .iter()
             .find(|t| t.technology.contains("Solar"))
             .unwrap();
-        let solar_large = large.technologies.iter()
+        let solar_large = large
+            .technologies
+            .iter()
             .find(|t| t.technology.contains("Solar"))
             .unwrap();
-        assert!(solar_large.cost_per_w < solar_small.cost_per_w,
+        assert!(
+            solar_large.cost_per_w < solar_small.cost_per_w,
             "Solar $/W should decrease with scale: {:.2} vs {:.2}",
-            solar_large.cost_per_w, solar_small.cost_per_w);
+            solar_large.cost_per_w,
+            solar_small.cost_per_w
+        );
     }
 }

@@ -22,7 +22,6 @@
 //! 4. **Conversation** - Social interaction patterns
 //! 5. **Epistemics** - Knowledge about knowledge itself
 
-
 /// Domain knowledge entry with label and semantic content
 #[derive(Debug, Clone)]
 pub struct KnowledgeEntry {
@@ -219,7 +218,16 @@ impl DomainKnowledge {
 
     /// Get all category names
     pub fn categories() -> Vec<&'static str> {
-        vec!["logic", "math", "system", "nixos", "self", "social", "epistemic", "knowledge"]
+        vec![
+            "logic",
+            "math",
+            "system",
+            "nixos",
+            "self",
+            "social",
+            "epistemic",
+            "knowledge",
+        ]
     }
 
     // =========================================================================
@@ -360,7 +368,11 @@ mod tests {
     fn test_all_categories_have_entries() {
         for category in DomainKnowledge::categories() {
             let entries = DomainKnowledge::get_by_category(category);
-            assert!(!entries.is_empty(), "Category '{}' should have entries", category);
+            assert!(
+                !entries.is_empty(),
+                "Category '{}' should have entries",
+                category
+            );
             println!("Category '{}': {} entries", category, entries.len());
         }
     }
@@ -371,7 +383,8 @@ mod tests {
             assert!(
                 entry.confidence >= 0.0 && entry.confidence <= 1.0,
                 "Entry '{}' has invalid confidence: {}",
-                entry.label, entry.confidence
+                entry.label,
+                entry.confidence
             );
         }
     }

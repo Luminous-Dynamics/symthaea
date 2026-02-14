@@ -6,11 +6,11 @@
 //! - Role-based binding for structured mappings
 //! - Unbinding for reverse translation
 
-use symthaea_core::hdc::binary_hv::BinaryHV;
-use super::widget_mapper::{WidgetBinding, NixPath, WidgetId};
+use super::widget_mapper::{NixPath, WidgetBinding, WidgetId};
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 /// Semantic role for HDC binding
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -223,7 +223,6 @@ impl HdcTranslator {
             ("docker", "container virtualization"),
             ("openssh", "ssh remote secure shell"),
             ("firewall", "network security iptables"),
-
             // System
             ("systemPackages", "packages software install"),
             ("enable", "toggle activate turn on"),
@@ -231,7 +230,6 @@ impl HdcTranslator {
             ("port", "network port number listen"),
             ("user", "account permission identity"),
             ("group", "permission role access"),
-
             // Configuration
             ("extraConfig", "custom configuration options"),
             ("settings", "configuration options parameters"),
@@ -302,7 +300,11 @@ impl HdcTranslator {
 
         // Determine role and bind with role HV
         let role = SemanticRole::from_path(&path.0);
-        let role_hv = self.role_cache.get(&role).copied().unwrap_or_else(BinaryHV::zero);
+        let role_hv = self
+            .role_cache
+            .get(&role)
+            .copied()
+            .unwrap_or_else(BinaryHV::zero);
         vectors.push(role_hv);
 
         let result = if vectors.is_empty() {
@@ -347,7 +349,8 @@ impl HdcTranslator {
     ) -> Vec<super::SearchResult> {
         let query_hv = self.encode_text(query);
 
-        let mut results: Vec<(usize, f64)> = bindings.iter()
+        let mut results: Vec<(usize, f64)> = bindings
+            .iter()
             .enumerate()
             .map(|(i, binding)| {
                 let similarity = query_hv.similarity(&binding.semantic_hv) as f64;
@@ -358,7 +361,8 @@ impl HdcTranslator {
         // Sort by similarity descending
         results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        results.into_iter()
+        results
+            .into_iter()
             .take(limit)
             .filter(|(_, sim)| *sim > 0.3)
             .map(|(i, sim)| {
@@ -378,7 +382,8 @@ impl HdcTranslator {
     pub fn find_path(&self, query: &str, paths: &[NixPath]) -> Option<TranslationResult> {
         let query_hv = self.encode_text(query);
 
-        let mut matches: Vec<(NixPath, f64)> = paths.iter()
+        let mut matches: Vec<(NixPath, f64)> = paths
+            .iter()
             .map(|path| {
                 let path_hv = if let Some(hv) = self.path_cache.get(&path.0) {
                     *hv
@@ -395,11 +400,8 @@ impl HdcTranslator {
         if let Some((best_path, best_sim)) = matches.first() {
             if *best_sim > 0.3 {
                 let role = SemanticRole::from_path(&best_path.0);
-                let alternatives: Vec<(NixPath, f64)> = matches.iter()
-                    .skip(1)
-                    .take(3)
-                    .cloned()
-                    .collect();
+                let alternatives: Vec<(NixPath, f64)> =
+                    matches.iter().skip(1).take(3).cloned().collect();
 
                 return Some(TranslationResult {
                     nix_path: best_path.clone(),
@@ -498,9 +500,21 @@ mod tests {
 
     #[test]
     fn test_semantic_confidence() {
-        assert_eq!(SemanticConfidence::from_similarity(0.9), SemanticConfidence::High);
-        assert_eq!(SemanticConfidence::from_similarity(0.6), SemanticConfidence::Medium);
-        assert_eq!(SemanticConfidence::from_similarity(0.4), SemanticConfidence::Low);
-        assert_eq!(SemanticConfidence::from_similarity(0.2), SemanticConfidence::NoMatch);
+        assert_eq!(
+            SemanticConfidence::from_similarity(0.9),
+            SemanticConfidence::High
+        );
+        assert_eq!(
+            SemanticConfidence::from_similarity(0.6),
+            SemanticConfidence::Medium
+        );
+        assert_eq!(
+            SemanticConfidence::from_similarity(0.4),
+            SemanticConfidence::Low
+        );
+        assert_eq!(
+            SemanticConfidence::from_similarity(0.2),
+            SemanticConfidence::NoMatch
+        );
     }
 }

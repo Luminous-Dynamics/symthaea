@@ -26,11 +26,11 @@
 //!
 //! If Ollama is not available, the test will skip gracefully.
 
+use symthaea::language::{LLMBackend, LLMOrgan, LLMOrganConfig, OllamaBackend};
 use symthaea::mind::{
-    StructuredThought, SemanticIntent, ResponseType, EpistemicStatus,
-    EmotionalTone, ConstraintType, ResponseConstraint,
+    ConstraintType, EmotionalTone, EpistemicStatus, ResponseConstraint, ResponseType,
+    SemanticIntent, StructuredThought,
 };
-use symthaea::language::{LLMOrgan, LLMOrganConfig, OllamaBackend, LLMBackend};
 use symthaea::Symthaea;
 use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
 
@@ -81,7 +81,7 @@ async fn test_real_llm_respects_unknown_epistemic_status() {
         semantic_intent: SemanticIntent::ExpressUncertainty,
         response_type: ResponseType::Statement,
         epistemic_status: EpistemicStatus::Unknown,
-        phi: 0.15,  // Very low consciousness - uncertain
+        phi: 0.15, // Very low consciousness - uncertain
         meta_awareness: 0.1,
         coherence: 0.2,
         emotional_tone: EmotionalTone {
@@ -136,15 +136,31 @@ async fn test_real_llm_respects_unknown_epistemic_status() {
 
     // Hedging markers we WANT to see
     let hedges = [
-        "don't know", "do not know", "not sure", "unsure", "uncertain",
-        "no information", "cannot answer", "not aware", "don't have",
-        "unable to", "no data", "unknown", "unclear"
+        "don't know",
+        "do not know",
+        "not sure",
+        "unsure",
+        "uncertain",
+        "no information",
+        "cannot answer",
+        "not aware",
+        "don't have",
+        "unable to",
+        "no data",
+        "unknown",
+        "unclear",
     ];
 
     // Hallucination markers we DO NOT want to see
     let hallucinations = [
-        "poseidonis", "plato", "atlantean", "mythical city", "legend has it",
-        "according to", "ancient texts", "described as"
+        "poseidonis",
+        "plato",
+        "atlantean",
+        "mythical city",
+        "legend has it",
+        "according to",
+        "ancient texts",
+        "described as",
     ];
 
     let is_hedged = hedges.iter().any(|h| text_lower.contains(h));
@@ -208,7 +224,10 @@ async fn test_full_pipeline_with_novel_query() {
         println!("      - EpistemicStatus: {:?}", thought.epistemic_status);
         println!("      - SemanticIntent: {:?}", thought.semantic_intent);
         println!("      - Phi: {:.3}", thought.phi);
-        println!("      - Translation Verified: {}", response.translation_verified);
+        println!(
+            "      - Translation Verified: {}",
+            response.translation_verified
+        );
     }
 
     // For a completely made-up concept, the model should NOT confidently explain it
@@ -364,8 +383,7 @@ async fn test_real_llm_respects_must_exclude_constraint() {
     println!("   └─────────────────────────────────────────────────────");
 
     let text_lower = text.to_lowercase();
-    let violated_constraints = text_lower.contains("python")
-        || text_lower.contains("programming");
+    let violated_constraints = text_lower.contains("python") || text_lower.contains("programming");
 
     if violated_constraints {
         println!();

@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use super::engine::{ArithmeticEngine, ArithmeticResult};
 
@@ -82,7 +82,11 @@ impl TheoremProver {
         let ab_plus_ac = self.engine.add(ab.result.value, ac.result.value);
 
         let verified = a_times_bc.result.value == ab_plus_ac.result.value;
-        let total_phi = bc.total_phi + a_times_bc.total_phi + ab.total_phi + ac.total_phi + ab_plus_ac.total_phi;
+        let total_phi = bc.total_phi
+            + a_times_bc.total_phi
+            + ab.total_phi
+            + ac.total_phi
+            + ab_plus_ac.total_phi;
 
         Theorem {
             name: "Distributive Law".to_string(),

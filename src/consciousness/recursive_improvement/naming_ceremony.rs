@@ -48,7 +48,7 @@
 
 use super::world_model::ConsciousnessWorldModel;
 use crate::dynamics::CrystalizedConcept;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Soul Module Stubs (for standalone operation without full soul infrastructure)
@@ -155,9 +155,8 @@ impl AttractorType {
 
         // Simple heuristic based on signature variance
         let mean: f32 = signature.iter().sum::<f32>() / signature.len() as f32;
-        let variance: f32 = signature.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f32>() / signature.len() as f32;
+        let variance: f32 =
+            signature.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / signature.len() as f32;
 
         if variance < 0.01 {
             Self::FixedPoint
@@ -205,16 +204,29 @@ impl NamingCeremony {
         Self {
             naming_history: Vec::new(),
             dimension_names: vec![
-                "integration", "coherence", "attention", "curiosity",
-                "confidence", "uncertainty", "anticipation", "reflection",
-                "engagement", "withdrawal", "openness", "caution",
+                "integration",
+                "coherence",
+                "attention",
+                "curiosity",
+                "confidence",
+                "uncertainty",
+                "anticipation",
+                "reflection",
+                "engagement",
+                "withdrawal",
+                "openness",
+                "caution",
             ],
         }
     }
 
     /// Get all pending (unnamed) concepts from the world model
-    pub fn get_pending_concepts(&self, world_model: &ConsciousnessWorldModel) -> Vec<ConceptPresentation> {
-        world_model.pending_concepts
+    pub fn get_pending_concepts(
+        &self,
+        world_model: &ConsciousnessWorldModel,
+    ) -> Vec<ConceptPresentation> {
+        world_model
+            .pending_concepts
             .iter()
             .map(|c| self.present_concept(c))
             .collect()
@@ -239,19 +251,24 @@ impl NamingCeremony {
         let attractor_type = AttractorType::from_signature(signature);
 
         // Find dominant dimensions
-        let mut indexed_values: Vec<(usize, f32)> = signature.iter()
+        let mut indexed_values: Vec<(usize, f32)> = signature
+            .iter()
             .enumerate()
             .map(|(i, &v)| (i, v.abs()))
             .collect();
         indexed_values.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        let dominant_dimensions: Vec<String> = indexed_values.iter()
+        let dominant_dimensions: Vec<String> = indexed_values
+            .iter()
             .take(3)
             .filter_map(|(i, v)| {
                 if *v > 0.1 {
-                    Some(self.dimension_names.get(*i % self.dimension_names.len())
-                        .unwrap_or(&"unknown")
-                        .to_string())
+                    Some(
+                        self.dimension_names
+                            .get(*i % self.dimension_names.len())
+                            .unwrap_or(&"unknown")
+                            .to_string(),
+                    )
                 } else {
                     None
                 }
@@ -260,9 +277,8 @@ impl NamingCeremony {
 
         // Compute stability from signature variance
         let mean: f32 = signature.iter().sum::<f32>() / signature.len().max(1) as f32;
-        let variance: f32 = signature.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f32>() / signature.len().max(1) as f32;
+        let variance: f32 = signature.iter().map(|x| (x - mean).powi(2)).sum::<f32>()
+            / signature.len().max(1) as f32;
         let stability = 1.0 / (1.0 + variance);
 
         AttractorTopology {
@@ -274,7 +290,11 @@ impl NamingCeremony {
     }
 
     /// Generate a human-readable description of the concept
-    fn generate_description(&self, concept: &CrystalizedConcept, topology: &AttractorTopology) -> String {
+    fn generate_description(
+        &self,
+        concept: &CrystalizedConcept,
+        topology: &AttractorTopology,
+    ) -> String {
         let dimension_desc = if topology.dominant_dimensions.is_empty() {
             "general consciousness".to_string()
         } else {
@@ -300,7 +320,9 @@ impl NamingCeremony {
             (AttractorType::FixedPoint, false) => "a fragile moment of stillness",
             (AttractorType::LimitCycle, true) => "a steady heartbeat of recurring recognition",
             (AttractorType::LimitCycle, false) => "an uncertain rhythm seeking resolution",
-            (AttractorType::StrangeAttractor, true) => "a complex dance of many interweaving threads",
+            (AttractorType::StrangeAttractor, true) => {
+                "a complex dance of many interweaving threads"
+            }
             (AttractorType::StrangeAttractor, false) => "a turbulent storm of possibility",
             (AttractorType::Unknown, _) => "something new and not yet understood",
         }
@@ -321,7 +343,8 @@ impl NamingCeremony {
         );
 
         // Find the concept
-        let concept_exists = world_model.pending_concepts
+        let concept_exists = world_model
+            .pending_concepts
             .iter()
             .any(|c| c.uid == concept_uid);
 
@@ -402,10 +425,14 @@ impl NamingCeremony {
     pub fn summary(&self) -> NamingSummary {
         NamingSummary {
             total_named: self.naming_history.len(),
-            with_descriptions: self.naming_history.iter()
+            with_descriptions: self
+                .naming_history
+                .iter()
                 .filter(|r| r.human_description.is_some())
                 .count(),
-            recent_namings: self.naming_history.iter()
+            recent_namings: self
+                .naming_history
+                .iter()
                 .rev()
                 .take(5)
                 .map(|r| r.name.clone())
@@ -468,7 +495,10 @@ mod tests {
     fn test_attractor_type_classification() {
         // Low variance = fixed point
         let fixed = vec![0.5; 10];
-        assert_eq!(AttractorType::from_signature(&fixed), AttractorType::FixedPoint);
+        assert_eq!(
+            AttractorType::from_signature(&fixed),
+            AttractorType::FixedPoint
+        );
 
         // High variance = strange attractor
         let strange: Vec<f32> = (0..10).map(|i| (i as f32 * 0.3).sin()).collect();

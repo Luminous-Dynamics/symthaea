@@ -16,19 +16,19 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod cfc;
+pub mod cfc_coherence;
 pub mod cfc_gpu;
 pub mod hierarchical_cfc;
-pub mod cfc_coherence;
 pub mod temporal_signatures;
 pub mod world_model;
 
 // Sparse LTC, differentiable HDC, resonator networks, concept crystallization
 // (Ported from crates/symthaea-dynamics 2026-02-06)
-pub mod ltc;
-pub mod differentiable_hdc;
-pub mod resonator;
 pub mod crate_world_model;
 pub mod crystallization;
+pub mod differentiable_hdc;
+pub mod ltc;
+pub mod resonator;
 
 // CfC/LTC stability analysis: Jacobian, Lyapunov exponents, bifurcations
 pub mod stability_analysis;
@@ -168,7 +168,8 @@ impl CrystalizedConcept {
 
     /// Add an association to another concept
     pub fn add_association(&mut self, other_id: u64, strength: f32) {
-        self.associations.insert(other_id, strength.clamp(-1.0, 1.0));
+        self.associations
+            .insert(other_id, strength.clamp(-1.0, 1.0));
     }
 
     /// Get association strength with another concept
@@ -188,7 +189,9 @@ impl CrystalizedConcept {
             return 0.0;
         }
 
-        let dot: f32 = self.embedding.iter()
+        let dot: f32 = self
+            .embedding
+            .iter()
             .zip(other.embedding.iter())
             .map(|(a, b)| a * b)
             .sum();
@@ -248,63 +251,68 @@ pub enum DynamicsError {
 
 // Re-export key types
 pub use cfc::{
-    CfCNetwork, CfCCell, CfCConfig, CfCNetworkConfig,
-    OnlineLearningConfig, OnlineLearningStats, NetworkOnlineLearningStats,
-    // Phi-gated attention
-    PhiGatedConfig, compute_phi_attention_weights,
+    compute_phi_attention_weights,
     // Activation types
     ActivationType,
+    CfCCell,
+    CfCConfig,
+    CfCNetwork,
+    CfCNetworkConfig,
+    NetworkOnlineLearningStats,
+    OnlineLearningConfig,
+    OnlineLearningStats,
+    // Phi-gated attention
+    PhiGatedConfig,
 };
 pub use cfc_coherence::{
-    CfCCoherenceBridge, CoherenceConfig, TemporalCoherenceMetrics, CoherenceSummary
+    CfCCoherenceBridge, CoherenceConfig, CoherenceSummary, TemporalCoherenceMetrics,
+};
+pub use cfc_gpu::{GpuBackend, GpuCfcConfig, GpuCfcNetwork, GpuCfcStats};
+pub use hierarchical_cfc::{
+    HierarchicalCfC, HierarchicalCfCConfig, HierarchicalOutput, DEFAULT_TIME_CONSTANTS,
 };
 pub use temporal_signatures::{
-    TemporalSignatureEncoder, SignatureConfig, ConsciousnessPattern,
-    TrajectoryFeatures, TemporalStateSummary
+    ConsciousnessPattern, SignatureConfig, TemporalSignatureEncoder, TemporalStateSummary,
+    TrajectoryFeatures,
 };
 pub use world_model::{HierarchicalCfCWorldModel, WorldModelConfig, WorldModelLayer};
-pub use hierarchical_cfc::{
-    HierarchicalCfC, HierarchicalCfCConfig, HierarchicalOutput,
-    DEFAULT_TIME_CONSTANTS
-};
-pub use cfc_gpu::{GpuCfcNetwork, GpuCfcConfig, GpuCfcStats, GpuBackend};
 
 // Ported from crates/symthaea-dynamics (2026-02-06)
-pub use ltc::{LiquidNetwork, LiquidNetworkConfig, CsrMatrix, IntegrationMethod};
-pub use differentiable_hdc::{DifferentiableHDCEncoder, DifferentiableHDCConfig, HDCEncoder};
-pub use resonator::{ResonatorNetwork, ResonatorConfig, ResonatorMemory, Codebook, Episode};
 pub use crystallization::{
-    ConceptCrystallizer, CrystallizationConfig,
-    CrystalizedConcept as AttractorConcept,  // Alias to avoid conflict with existing CrystalizedConcept
-    RecurrenceAnalyzer, UnifiedLearningMind, StepResult,
+    ConceptCrystallizer,
+    CrystalizedConcept as AttractorConcept, // Alias to avoid conflict with existing CrystalizedConcept
+    CrystallizationConfig,
+    RecurrenceAnalyzer,
+    StepResult,
+    UnifiedLearningMind,
 };
+pub use differentiable_hdc::{DifferentiableHDCConfig, DifferentiableHDCEncoder, HDCEncoder};
+pub use ltc::{CsrMatrix, IntegrationMethod, LiquidNetwork, LiquidNetworkConfig};
+pub use resonator::{Codebook, Episode, ResonatorConfig, ResonatorMemory, ResonatorNetwork};
 
 // Stability analysis for CfC/LTC dynamics
 pub use stability_analysis::{
-    StabilityAnalyzer, StabilityConfig, JacobianResult, LyapunovResult,
-    FixedPoint, FixedPointType, BifurcationPoint, BifurcationType,
+    BifurcationPoint, BifurcationType, FixedPoint, FixedPointType, JacobianResult, LyapunovResult,
+    StabilityAnalyzer, StabilityConfig,
 };
 
 // ODE solvers for continuous-time neural dynamics
-pub use ode_solvers::{
-    OdeSolver, OdeConfig, OdeResult, OdeSolverEngine, OdeSystem, newton_solve,
-};
+pub use ode_solvers::{newton_solve, OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem};
 
 // Frequency-domain spectral analysis
 pub use spectral_analysis::{
-    SpectralAnalyzer, SpectralConfig, WindowType, Complex,
-    FrequencySpectrum, CoherenceResult, BandPower,
+    BandPower, CoherenceResult, Complex, FrequencySpectrum, SpectralAnalyzer, SpectralConfig,
+    WindowType,
 };
 
 // Stochastic differential equations
 pub use stochastic_dynamics::{
-    SdeSystem, SdeConfig, SdeSolver, SdeResult, SdeStatistics,
-    OrnsteinUhlenbeck, StochasticCfC, FokkerPlanckSolver, LangevinDynamics,
-    SimpleRng,
+    FokkerPlanckSolver, LangevinDynamics, OrnsteinUhlenbeck, SdeConfig, SdeResult, SdeSolver,
+    SdeStatistics, SdeSystem, SimpleRng, StochasticCfC,
 };
 
 // Narrative arc dynamics
-pub use narrative_dynamics::{StoryArcDynamics, StoryArcConfig, NarrativeSignal};
+pub use narrative_dynamics::{NarrativeSignal, StoryArcConfig, StoryArcDynamics};
 
 #[cfg(test)]
 mod tests {
@@ -355,10 +363,18 @@ mod tests {
         };
         let msg = err.to_string();
         assert!(!msg.is_empty());
-        assert!(msg.contains("256"), "display should include expected dimension");
-        assert!(msg.contains("32"), "display should include actual dimension");
-        assert!(msg.contains("mismatch") || msg.contains("Mismatch"),
-            "display should mention mismatch");
+        assert!(
+            msg.contains("256"),
+            "display should include expected dimension"
+        );
+        assert!(
+            msg.contains("32"),
+            "display should include actual dimension"
+        );
+        assert!(
+            msg.contains("mismatch") || msg.contains("Mismatch"),
+            "display should mention mismatch"
+        );
     }
 
     #[test]
@@ -367,8 +383,10 @@ mod tests {
         let err = DynamicsError::InvalidConfig(inner.to_string());
         let msg = err.to_string();
         assert!(!msg.is_empty());
-        assert!(msg.contains(inner),
-            "display should include the inner message");
+        assert!(
+            msg.contains(inner),
+            "display should include the inner message"
+        );
     }
 
     #[test]
@@ -377,8 +395,10 @@ mod tests {
         let err = DynamicsError::ComputationError(inner.to_string());
         let msg = err.to_string();
         assert!(!msg.is_empty());
-        assert!(msg.contains(inner),
-            "display should include the inner message");
+        assert!(
+            msg.contains(inner),
+            "display should include the inner message"
+        );
     }
 
     #[test]
@@ -429,14 +449,20 @@ mod tests {
         let err = DynamicsError::InvalidConfig(String::new());
         // Display should still produce something (the prefix at minimum)
         let msg = err.to_string();
-        assert!(!msg.is_empty(), "even with empty inner, display has a prefix");
+        assert!(
+            !msg.is_empty(),
+            "even with empty inner, display has a prefix"
+        );
     }
 
     #[test]
     fn computation_error_with_empty_string() {
         let err = DynamicsError::ComputationError(String::new());
         let msg = err.to_string();
-        assert!(!msg.is_empty(), "even with empty inner, display has a prefix");
+        assert!(
+            !msg.is_empty(),
+            "even with empty inner, display has a prefix"
+        );
     }
 
     // ── Dimension mismatch with equal values ────────────────────────
@@ -463,8 +489,10 @@ mod tests {
         let debug = format!("{:?}", err);
         let display = format!("{}", err);
         // Debug includes variant name with struct syntax; Display is human-readable
-        assert_ne!(debug, display,
-            "Debug and Display should produce different output");
+        assert_ne!(
+            debug, display,
+            "Debug and Display should produce different output"
+        );
     }
 
     #[test]
@@ -473,7 +501,9 @@ mod tests {
         let debug = format!("{:?}", err);
         let display = format!("{}", err);
         // Debug is "NotInitialized", Display is "Not initialized"
-        assert_ne!(debug, display,
-            "Debug and Display should produce different output");
+        assert_ne!(
+            debug, display,
+            "Debug and Display should produce different output"
+        );
     }
 }

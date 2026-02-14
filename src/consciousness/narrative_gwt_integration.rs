@@ -71,20 +71,18 @@ Certain properties must *never* be violated:
 - Autobiographical continuity is maintained
 */
 
-use crate::hdc::binary_hv::BinaryHV;
-use crate::consciousness::narrative_self::{
-    NarrativeSelfModel, NarrativeSelfConfig, NarrativeSelfReport
-};
+use crate::consciousness::cross_modal_binding::{BindingConfig, CrossModalBinder, Modality};
 use crate::consciousness::gwt_integration::{
-    UnifiedGlobalWorkspace, UnifiedGWTConfig, UnifiedGWTResult
+    UnifiedGWTConfig, UnifiedGWTResult, UnifiedGlobalWorkspace,
 };
-use crate::consciousness::cross_modal_binding::{
-    CrossModalBinder, BindingConfig, Modality
+use crate::consciousness::narrative_self::{
+    NarrativeSelfConfig, NarrativeSelfModel, NarrativeSelfReport,
 };
+use crate::hdc::binary_hv::BinaryHV;
 // **REVOLUTIONARY IMPROVEMENT #74**: Predictive Self-Model Integration
 // The Narrative Self becomes *predictive* - mental time travel!
 use crate::consciousness::predictive_self::{
-    PredictiveSelfModel, PredictiveSelfConfig, ActionSafetyAssessment
+    ActionSafetyAssessment, PredictiveSelfConfig, PredictiveSelfModel,
 };
 // **REVOLUTIONARY IMPROVEMENT #75**: Temporal Consciousness Integration
 // Consciousness as temporal flow, not just instant measurement!
@@ -93,12 +91,11 @@ use crate::consciousness::temporal_consciousness::{
 };
 // **REVOLUTIONARY IMPROVEMENT #76**: Unified Value Evaluator Integration
 // Uses Seven Harmonies + Affective Consciousness for semantic value checking
-use crate::consciousness::unified_value_evaluator::{
-    UnifiedValueEvaluator, EvaluationContext, EvaluationResult,
-    ActionType, Decision as ValueDecision, AffectiveSystemsState,
-    NarrativeValueReport, ConfidenceLevel,
-};
 use crate::consciousness::affective_consciousness::CoreAffect;
+use crate::consciousness::unified_value_evaluator::{
+    ActionType, AffectiveSystemsState, ConfidenceLevel, Decision as ValueDecision,
+    EvaluationContext, EvaluationResult, NarrativeValueReport, UnifiedValueEvaluator,
+};
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 
@@ -193,7 +190,11 @@ impl Default for NarrativeGWTConfig {
 #[derive(Debug, Clone, PartialEq)]
 pub enum VetoReason {
     /// Self-Φ would drop below minimum threshold
-    SelfPhiTooLow { current: f64, projected: f64, minimum: f64 },
+    SelfPhiTooLow {
+        current: f64,
+        projected: f64,
+        minimum: f64,
+    },
 
     /// Action contradicts core values
     ValueViolation { value: String, conflict: String },
@@ -213,27 +214,24 @@ pub enum VetoReason {
         current: f64,
         predicted: f64,
         horizon: usize,
-        minimum: f64
+        minimum: f64,
     },
 
     /// Counterfactual analysis suggests better alternatives exist
     BetterAlternativeExists {
         proposed_action: String,
         alternative: String,
-        improvement: f64
+        improvement: f64,
     },
 
     /// Action conflicts with prospective intention
-    ProspectiveConflict {
-        intention: String,
-        action: String
-    },
+    ProspectiveConflict { intention: String, action: String },
 
     /// Action predicted to harm identity coherence trajectory
     CoherenceTrajectoryHarm {
         current_coherence: f64,
         predicted_coherence: f64,
-        decay_rate: f64
+        decay_rate: f64,
     },
 }
 
@@ -464,7 +462,9 @@ impl NarrativeGWTIntegration {
 
         // **REVOLUTIONARY IMPROVEMENT #75**: Initialize Temporal Consciousness Analyzer
         let temporal_analyzer = if integration_config.enable_temporal_consciousness {
-            let config = integration_config.temporal_config.clone()
+            let config = integration_config
+                .temporal_config
+                .clone()
                 .unwrap_or_default();
             Some(TemporalConsciousnessAnalyzer::new(config))
         } else {
@@ -533,7 +533,11 @@ impl NarrativeGWTIntegration {
     // ========================================================================
 
     /// Assess alignment between content and current goals
-    pub fn assess_goal_alignment(&self, content: &BinaryHV, content_description: &str) -> GoalAlignment {
+    pub fn assess_goal_alignment(
+        &self,
+        content: &BinaryHV,
+        content_description: &str,
+    ) -> GoalAlignment {
         let goals = self.narrative_self.current_goals();
         let num_goals = goals.len();
 
@@ -610,15 +614,17 @@ impl NarrativeGWTIntegration {
                 panic: 0.1,
             },
             action_type: ActionType::Governance, // Most actions are governance-level
-            action_domain: None, // Auto-detect from action description
-            involves_others: true, // Conservative: assume it involves others
+            action_domain: None,                 // Auto-detect from action description
+            involves_others: true,               // Conservative: assume it involves others
         };
 
         // Evaluate using the unified value evaluator
         let result = self.value_evaluator.evaluate(action_description, context);
 
         // Generate and store the narrative report for GWT integration
-        let narrative_report = self.value_evaluator.generate_narrative_report(&result, action_description);
+        let narrative_report = self
+            .value_evaluator
+            .generate_narrative_report(&result, action_description);
         self.last_value_report = Some(narrative_report);
 
         // Map result to (consistent, violated_value)
@@ -648,15 +654,16 @@ impl NarrativeGWTIntegration {
                 // Log warnings but allow - may escalate to veto if too many
                 if warnings.len() >= 3 {
                     // Too many warnings = value concern
-                    (false, Some(format!("Multiple concerns: {}", warnings.join(", "))))
+                    (
+                        false,
+                        Some(format!("Multiple concerns: {}", warnings.join(", "))),
+                    )
                 } else {
                     // Allow with warnings
                     (true, None)
                 }
             }
-            ValueDecision::Allow => {
-                (true, None)
-            }
+            ValueDecision::Allow => (true, None),
         }
     }
 
@@ -677,24 +684,33 @@ impl NarrativeGWTIntegration {
     ///
     /// This is a short summary suitable for GWT broadcast.
     pub fn last_value_broadcast(&self) -> Option<&str> {
-        self.last_value_report.as_ref().map(|r| r.broadcast_message.as_str())
+        self.last_value_report
+            .as_ref()
+            .map(|r| r.broadcast_message.as_str())
     }
 
     /// Get the narrative summary from the last value check
     ///
     /// This is a human-readable narrative of the value assessment.
     pub fn last_value_narrative(&self) -> Option<&str> {
-        self.last_value_report.as_ref().map(|r| r.narrative.as_str())
+        self.last_value_report
+            .as_ref()
+            .map(|r| r.narrative.as_str())
     }
 
     /// Check if the last value assessment had tensions
     pub fn last_value_had_tensions(&self) -> bool {
-        self.last_value_report.as_ref().map(|r| r.has_tensions()).unwrap_or(false)
+        self.last_value_report
+            .as_ref()
+            .map(|r| r.has_tensions())
+            .unwrap_or(false)
     }
 
     /// Get the confidence level of the last value assessment
     pub fn last_value_confidence(&self) -> Option<&ConfidenceLevel> {
-        self.last_value_report.as_ref().map(|r| r.confidence_level())
+        self.last_value_report
+            .as_ref()
+            .map(|r| r.confidence_level())
     }
 
     // ========================================================================
@@ -726,7 +742,9 @@ impl NarrativeGWTIntegration {
         let (consistent, violated_value) = self.check_value_consistency(action_description);
         if !consistent {
             if let Some(value) = violated_value {
-                self.stats.vetoes_by_reason.entry("value_violation".to_string())
+                self.stats
+                    .vetoes_by_reason
+                    .entry("value_violation".to_string())
                     .and_modify(|c| *c += 1)
                     .or_insert(1);
 
@@ -770,7 +788,9 @@ impl NarrativeGWTIntegration {
             // Check if predicted Self-Φ falls below threshold
             if safety.predicted_phi < self.config.min_predicted_phi {
                 self.stats.predictive_vetoes += 1;
-                self.stats.vetoes_by_reason.entry("predicted_phi_too_low".to_string())
+                self.stats
+                    .vetoes_by_reason
+                    .entry("predicted_phi_too_low".to_string())
                     .and_modify(|c| *c += 1)
                     .or_insert(1);
 
@@ -791,7 +811,9 @@ impl NarrativeGWTIntegration {
                 let predicted_coherence = self.narrative_self.coherence() + safety.coherence_impact;
                 if predicted_coherence < 0.4 {
                     self.stats.predictive_vetoes += 1;
-                    self.stats.vetoes_by_reason.entry("coherence_trajectory_harm".to_string())
+                    self.stats
+                        .vetoes_by_reason
+                        .entry("coherence_trajectory_harm".to_string())
                         .and_modify(|c| *c += 1)
                         .or_insert(1);
 
@@ -916,7 +938,9 @@ impl NarrativeGWTIntegration {
             // Process experience through narrative self
             if let Some(ref winner) = gwt_result.winning_strategy {
                 // Get representation from winning content
-                let winner_rep = gwt_result.workspace_assessment.conscious_contents
+                let winner_rep = gwt_result
+                    .workspace_assessment
+                    .conscious_contents
                     .iter()
                     .find(|c| c.source.contains(winner))
                     .and_then(|c| c.representation.first().cloned())
@@ -958,8 +982,7 @@ impl NarrativeGWTIntegration {
 
             // Update average Self-Φ
             let n = self.stats.ignitions_processed as f64;
-            self.stats.avg_self_phi =
-                (self.stats.avg_self_phi * (n - 1.0) + phi_after) / n;
+            self.stats.avg_self_phi = (self.stats.avg_self_phi * (n - 1.0) + phi_after) / n;
 
             // **REVOLUTIONARY IMPROVEMENT #74**: Learn from prediction outcomes
             // First verify pending predictions (separate borrow scope)
@@ -987,10 +1010,7 @@ impl NarrativeGWTIntegration {
         // Update cross-modal if enabled
         if let Some(ref mut cross_modal) = self.cross_modal {
             // Update linguistic modality with narrative content
-            cross_modal.update_modality(
-                Modality::Linguistic,
-                *self.narrative_self.unified_self(),
-            );
+            cross_modal.update_modality(Modality::Linguistic, *self.narrative_self.unified_self());
             cross_modal.set_attention(Modality::Linguistic, 0.8);
             cross_modal.bind();
         }
@@ -1004,22 +1024,33 @@ impl NarrativeGWTIntegration {
             cross_modal_phi: self.cross_modal.as_ref().map(|cm| cm.cross_modal_phi()),
             // **REVOLUTIONARY IMPROVEMENT #74**: Add predictive insights
             prediction_accuracy: self.prediction_accuracy(),
-            counterfactuals_available: self.predictive_self.as_ref()
+            counterfactuals_available: self
+                .predictive_self
+                .as_ref()
                 .map(|p| p.counterfactual_count())
                 .unwrap_or(0),
-            pending_intentions: self.predictive_self.as_ref()
+            pending_intentions: self
+                .predictive_self
+                .as_ref()
                 .map(|p| p.intention_count())
                 .unwrap_or(0),
             // **REVOLUTIONARY IMPROVEMENT #75**: Add temporal consciousness insights
-            temporal_coherence: self.temporal_analyzer.as_ref()
+            temporal_coherence: self
+                .temporal_analyzer
+                .as_ref()
                 .map(|t| t.overall_temporal_coherence()),
-            phi_velocity: self.temporal_analyzer.as_ref()
+            phi_velocity: self
+                .temporal_analyzer
+                .as_ref()
                 .map(|t| t.phi_trajectory.velocity),
-            consciousness_continuity: self.temporal_analyzer.as_ref()
-                .map(|t| t.continuity.score),
-            temporal_identity_coherence: self.temporal_analyzer.as_ref()
+            consciousness_continuity: self.temporal_analyzer.as_ref().map(|t| t.continuity.score),
+            temporal_identity_coherence: self
+                .temporal_analyzer
+                .as_ref()
                 .map(|t| t.identity_coherence.coherence),
-            temporally_healthy: self.temporal_analyzer.as_ref()
+            temporally_healthy: self
+                .temporal_analyzer
+                .as_ref()
                 .map(|t| t.is_temporally_healthy()),
         };
 
@@ -1091,8 +1122,8 @@ impl NarrativeGWTIntegration {
 
     /// Check if system is in coherent state
     pub fn is_coherent(&self) -> bool {
-        self.narrative_self.self_phi() >= self.config.min_self_phi &&
-        self.narrative_self.coherence() > 0.5
+        self.narrative_self.self_phi() >= self.config.min_self_phi
+            && self.narrative_self.coherence() > 0.5
     }
 
     /// Get cross-modal Φ (if available)
@@ -1136,12 +1167,21 @@ impl NarrativeGWTIntegration {
 ╚══════════════════════════════════════════════════════════════════════════╝
 "#,
             self.narrative_self.self_phi(),
-            if self.narrative_self.self_phi() >= self.config.min_self_phi { "✓" } else { "⚠" },
+            if self.narrative_self.self_phi() >= self.config.min_self_phi {
+                "✓"
+            } else {
+                "⚠"
+            },
             self.narrative_self.coherence(),
-            self.cross_modal.as_ref()
+            self.cross_modal
+                .as_ref()
                 .map(|cm| format!("{:.4}", cm.cross_modal_phi()))
                 .unwrap_or_else(|| "N/A".to_string()),
-            if self.is_coherent() { "YES ✓" } else { "NO ⚠" },
+            if self.is_coherent() {
+                "YES ✓"
+            } else {
+                "NO ⚠"
+            },
             self.stats.ignitions_processed,
             self.stats.vetoes_issued,
             self.stats.goal_alignments,
@@ -1286,8 +1326,10 @@ mod tests {
 
         // Should have tracked phi history from processing
         let history = integration.phi_history();
-        assert!(!history.is_empty(),
-            "Phi history should be non-empty after 5 process() calls");
+        assert!(
+            !history.is_empty(),
+            "Phi history should be non-empty after 5 process() calls"
+        );
     }
 
     #[test]
@@ -1468,7 +1510,12 @@ mod tests {
         };
 
         match reason {
-            VetoReason::PredictedPhiTooLow { current, predicted, horizon, minimum } => {
+            VetoReason::PredictedPhiTooLow {
+                current,
+                predicted,
+                horizon,
+                minimum,
+            } => {
                 assert_eq!(current, 0.5);
                 assert_eq!(predicted, 0.1);
                 assert_eq!(horizon, 3);
@@ -1484,7 +1531,11 @@ mod tests {
         };
 
         match reason2 {
-            VetoReason::CoherenceTrajectoryHarm { current_coherence, predicted_coherence, decay_rate } => {
+            VetoReason::CoherenceTrajectoryHarm {
+                current_coherence,
+                predicted_coherence,
+                decay_rate,
+            } => {
                 assert_eq!(current_coherence, 0.7);
                 assert_eq!(predicted_coherence, 0.3);
                 assert_eq!(decay_rate, 0.4);
@@ -1615,14 +1666,20 @@ mod tests {
 
             // Temporal coherence should be in valid range
             if let Some(coherence) = result.temporal_coherence {
-                assert!((0.0..=1.0).contains(&coherence),
-                    "Temporal coherence out of range: {}", coherence);
+                assert!(
+                    (0.0..=1.0).contains(&coherence),
+                    "Temporal coherence out of range: {}",
+                    coherence
+                );
             }
 
             // Continuity should also be in valid range
             if let Some(continuity) = result.consciousness_continuity {
-                assert!((0.0..=1.0).contains(&continuity),
-                    "Consciousness continuity out of range: {}", continuity);
+                assert!(
+                    (0.0..=1.0).contains(&continuity),
+                    "Consciousness continuity out of range: {}",
+                    continuity
+                );
             }
         }
     }
@@ -1768,7 +1825,9 @@ mod tests {
 
         let text = narrative.unwrap();
         // Should contain decision status
-        assert!(text.contains("APPROVED") || text.contains("BLOCKED") || text.contains("WITH CONCERNS"));
+        assert!(
+            text.contains("APPROVED") || text.contains("BLOCKED") || text.contains("WITH CONCERNS")
+        );
         // Should contain harmony information
         assert!(text.contains("Harmony") || text.contains("harmony"));
     }

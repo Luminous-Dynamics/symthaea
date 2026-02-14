@@ -110,9 +110,8 @@ impl ConceptualStructureCalculator {
                 mechanisms_considered += 1;
 
                 // Get the mechanism components
-                let mech_components: Vec<&ContinuousHV> = mechanism.iter()
-                    .map(|&i| &components[i])
-                    .collect();
+                let mech_components: Vec<&ContinuousHV> =
+                    mechanism.iter().map(|&i| &components[i]).collect();
 
                 // Compute cause-effect information for this mechanism
                 let concept = self.compute_concept(&mechanism, &mech_components, components);
@@ -165,7 +164,8 @@ impl ConceptualStructureCalculator {
         let mech_bundle = ContinuousHV::bundle(mech_components);
 
         // Get purview (context) - all components not in mechanism
-        let purview: Vec<ContinuousHV> = all_components.iter()
+        let purview: Vec<ContinuousHV> = all_components
+            .iter()
             .enumerate()
             .filter(|(i, _)| !mechanism.contains(i))
             .map(|(_, c)| c.clone())
@@ -200,7 +200,7 @@ impl ConceptualStructureCalculator {
                 ContinuousHV::bundle(&refs)
             } else {
                 mech_bundle.clone()
-            }
+            },
         );
         let effect_info = cause_info; // Simplified: symmetric for static analysis
 
@@ -247,20 +247,24 @@ impl ConceptualStructureCalculator {
     }
 
     /// Get concepts sorted by phi (highest first)
-    pub fn top_concepts<'a>(&self, structure: &'a ConceptualStructure, limit: usize) -> Vec<&'a Concept> {
+    pub fn top_concepts<'a>(
+        &self,
+        structure: &'a ConceptualStructure,
+        limit: usize,
+    ) -> Vec<&'a Concept> {
         let mut sorted: Vec<&'a Concept> = structure.concepts.iter().collect();
-        sorted.sort_by(|a, b| b.phi.partial_cmp(&a.phi).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|a, b| {
+            b.phi
+                .partial_cmp(&a.phi)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         sorted.into_iter().take(limit).collect()
     }
 
     /// Compute conceptual distance between two structures
     ///
     /// Uses Earth Mover's Distance-like metric over concept constellations.
-    pub fn conceptual_distance(
-        &self,
-        s1: &ConceptualStructure,
-        s2: &ConceptualStructure,
-    ) -> f64 {
+    pub fn conceptual_distance(&self, s1: &ConceptualStructure, s2: &ConceptualStructure) -> f64 {
         // Simple metric: absolute difference in total φ
         // (A more rigorous implementation would use EMD over concept space)
         let phi_diff = (s1.total_phi - s2.total_phi).abs();

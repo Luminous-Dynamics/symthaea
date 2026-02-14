@@ -330,7 +330,10 @@ impl ModernHopfieldNetwork {
         let similarities = self.compute_similarities(state);
 
         // Energy = -log Σₖ exp(β sim(x, ξₖ))
-        let max_sim = similarities.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let max_sim = similarities
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
 
         let sum_exp: f64 = similarities
             .iter()
@@ -620,7 +623,11 @@ mod tests {
         let sim_low = pattern.similarity(&recovered_low);
         let sim_high = pattern.similarity(&recovered_high);
 
-        println!("Beta=1.0: {:.1}%, Beta=10.0: {:.1}%", sim_low * 100.0, sim_high * 100.0);
+        println!(
+            "Beta=1.0: {:.1}%, Beta=10.0: {:.1}%",
+            sim_low * 100.0,
+            sim_high * 100.0
+        );
 
         assert!(
             sim_high >= sim_low,

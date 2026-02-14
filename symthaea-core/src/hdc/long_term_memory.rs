@@ -92,8 +92,8 @@ impl MemoryType {
     /// Typical retention duration (seconds)
     pub fn typical_retention(&self) -> f64 {
         match self {
-            MemoryType::Episodic => 86400.0 * 365.0 * 10.0,  // ~10 years (vivid memories)
-            MemoryType::Semantic => 86400.0 * 365.0 * 50.0,  // ~50 years (facts last longer)
+            MemoryType::Episodic => 86400.0 * 365.0 * 10.0, // ~10 years (vivid memories)
+            MemoryType::Semantic => 86400.0 * 365.0 * 50.0, // ~50 years (facts last longer)
             MemoryType::Procedural => 86400.0 * 365.0 * 70.0, // ~70 years (never forget how to ride bike!)
         }
     }
@@ -374,11 +374,17 @@ impl LongTermMemory {
     }
 
     /// Retrieve memories by similarity to cue
-    pub fn retrieve(&mut self, cue: &RetrievalCue, current_time: f64, top_k: usize) -> Vec<RetrievedMemory> {
+    pub fn retrieve(
+        &mut self,
+        cue: &RetrievalCue,
+        current_time: f64,
+        top_k: usize,
+    ) -> Vec<RetrievedMemory> {
         self.total_retrievals += 1;
 
         // First pass: compute relevance scores (immutable borrow)
-        let mut scored_memories: Vec<RetrievedMemory> = self.memories
+        let mut scored_memories: Vec<RetrievedMemory> = self
+            .memories
             .values()
             .filter(|exp| {
                 // Filter by memory type if specified
@@ -390,7 +396,8 @@ impl LongTermMemory {
             })
             .map(|exp| {
                 // Compute relevance score
-                let content_similarity = Self::compute_similarity_static(&cue.content, &exp.content);
+                let content_similarity =
+                    Self::compute_similarity_static(&cue.content, &exp.content);
 
                 // Context similarity (if cue has context)
                 let context_similarity = if let Some(ref cue_context) = cue.context {
@@ -400,7 +407,9 @@ impl LongTermMemory {
                 };
 
                 // Location similarity (if cue has location)
-                let location_similarity = if let (Some(ref cue_loc), Some(ref exp_loc)) = (&cue.location, &exp.location) {
+                let location_similarity = if let (Some(ref cue_loc), Some(ref exp_loc)) =
+                    (&cue.location, &exp.location)
+                {
                     Self::compute_similarity_static(cue_loc, exp_loc)
                 } else {
                     0.5 // Neutral if no location
@@ -422,7 +431,8 @@ impl LongTermMemory {
                     content_similarity * 0.5 +      // Content is most important
                     context_similarity * 0.2 +       // Context helps
                     location_similarity * 0.1 +      // Location helps a bit
-                    strength * 0.2                   // Strong memories more accessible
+                    strength * 0.2
+                    // Strong memories more accessible
                 ) * temporal_bonus;
 
                 RetrievedMemory {
@@ -433,7 +443,11 @@ impl LongTermMemory {
             .collect();
 
         // Sort by relevance (highest first)
-        scored_memories.sort_by(|a, b| b.relevance.partial_cmp(&a.relevance).unwrap_or(std::cmp::Ordering::Equal));
+        scored_memories.sort_by(|a, b| {
+            b.relevance
+                .partial_cmp(&a.relevance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Second pass: mark retrieved memories (mutable borrow)
         for retrieved in &scored_memories.iter().take(top_k).collect::<Vec<_>>() {
@@ -477,7 +491,9 @@ impl LongTermMemory {
 
     /// Consolidate memories (call during sleep or with time passage)
     pub fn consolidate_memories(&mut self, is_sleeping: bool, duration: f64) {
-        let amount = self.consolidation.consolidation_amount(is_sleeping, duration);
+        let amount = self
+            .consolidation
+            .consolidation_amount(is_sleeping, duration);
 
         for experience in self.memories.values_mut() {
             experience.consolidate(amount);
@@ -496,7 +512,8 @@ impl LongTermMemory {
 
     /// Count memories by type
     pub fn count_by_type(&self, memory_type: MemoryType) -> usize {
-        self.memories.values()
+        self.memories
+            .values()
             .filter(|exp| exp.memory_type == memory_type)
             .count()
     }
@@ -512,9 +529,7 @@ impl LongTermMemory {
             return 0.0;
         }
 
-        let sum: f64 = self.memories.values()
-            .map(|exp| exp.consolidation)
-            .sum();
+        let sum: f64 = self.memories.values().map(|exp| exp.consolidation).sum();
 
         sum / self.memories.len() as f64
     }
@@ -670,13 +685,19 @@ impl QdrantConfig {
     /// Validate configuration
     pub fn validate(&self) -> Result<(), QdrantMemoryError> {
         if self.url.is_empty() {
-            return Err(QdrantMemoryError::ConfigError("URL cannot be empty".to_string()));
+            return Err(QdrantMemoryError::ConfigError(
+                "URL cannot be empty".to_string(),
+            ));
         }
         if self.collection_name.is_empty() {
-            return Err(QdrantMemoryError::ConfigError("Collection name cannot be empty".to_string()));
+            return Err(QdrantMemoryError::ConfigError(
+                "Collection name cannot be empty".to_string(),
+            ));
         }
         if self.vector_dim == 0 {
-            return Err(QdrantMemoryError::ConfigError("Vector dimension must be positive".to_string()));
+            return Err(QdrantMemoryError::ConfigError(
+                "Vector dimension must be positive".to_string(),
+            ));
         }
         Ok(())
     }
@@ -757,8 +778,9 @@ impl QdrantMemoryStore {
                     last_error = Some(e);
                     if attempt < self.config.max_retries - 1 {
                         tokio::time::sleep(Duration::from_millis(
-                            self.config.retry_delay_ms * (attempt as u64 + 1)
-                        )).await;
+                            self.config.retry_delay_ms * (attempt as u64 + 1),
+                        ))
+                        .await;
                     }
                 }
             }
@@ -787,9 +809,7 @@ impl QdrantMemoryStore {
 
     /// Ensure the collection exists, creating it if necessary
     async fn ensure_collection(&self) -> Result<(), QdrantMemoryError> {
-        use qdrant_client::qdrant::{
-            CreateCollectionBuilder, Distance, VectorParamsBuilder,
-        };
+        use qdrant_client::qdrant::{CreateCollectionBuilder, Distance, VectorParamsBuilder};
 
         let client = self.get_client()?;
 
@@ -810,11 +830,9 @@ impl QdrantMemoryStore {
 
             client
                 .create_collection(
-                    CreateCollectionBuilder::new(&self.config.collection_name)
-                        .vectors_config(VectorParamsBuilder::new(
-                            self.config.vector_dim as u64,
-                            distance,
-                        )),
+                    CreateCollectionBuilder::new(&self.config.collection_name).vectors_config(
+                        VectorParamsBuilder::new(self.config.vector_dim as u64, distance),
+                    ),
                 )
                 .await
                 .map_err(|e| QdrantMemoryError::CollectionError(e.to_string()))?;
@@ -825,12 +843,9 @@ impl QdrantMemoryStore {
 
     /// Get the client, returning an error if not connected
     fn get_client(&self) -> Result<&qdrant_client::Qdrant, QdrantMemoryError> {
-        self.client
-            .as_ref()
-            .map(|arc| arc.as_ref())
-            .ok_or_else(|| QdrantMemoryError::ConnectionFailed(
-                "Not connected. Call connect() first.".to_string()
-            ))
+        self.client.as_ref().map(|arc| arc.as_ref()).ok_or_else(|| {
+            QdrantMemoryError::ConnectionFailed("Not connected. Call connect() first.".to_string())
+        })
     }
 
     /// Store a single experience to Qdrant
@@ -850,8 +865,7 @@ impl QdrantMemoryStore {
         // Upsert with wait for consistency
         client
             .upsert_points(
-                UpsertPointsBuilder::new(&self.config.collection_name, vec![point])
-                    .wait(true),
+                UpsertPointsBuilder::new(&self.config.collection_name, vec![point]).wait(true),
             )
             .await
             .map_err(|e| QdrantMemoryError::StoreError(e.to_string()))?;
@@ -919,12 +933,8 @@ impl QdrantMemoryStore {
         // Search for similar points
         let results = client
             .search_points(
-                SearchPointsBuilder::new(
-                    &self.config.collection_name,
-                    query_vector,
-                    limit as u64,
-                )
-                .with_payload(true),
+                SearchPointsBuilder::new(&self.config.collection_name, query_vector, limit as u64)
+                    .with_payload(true),
             )
             .await
             .map_err(|e| QdrantMemoryError::RetrievalError(e.to_string()))?;
@@ -955,9 +965,7 @@ impl QdrantMemoryStore {
         min_timestamp: Option<f64>,
         max_timestamp: Option<f64>,
     ) -> Result<Vec<ScoredExperience>, QdrantMemoryError> {
-        use qdrant_client::qdrant::{
-            Condition, Filter, Range, SearchPointsBuilder,
-        };
+        use qdrant_client::qdrant::{Condition, Filter, Range, SearchPointsBuilder};
 
         let client = self.get_client()?;
         let query_vector = self.bundle_to_f32_vector(query);
@@ -995,12 +1003,9 @@ impl QdrantMemoryStore {
         }
 
         // Build search request
-        let mut search_builder = SearchPointsBuilder::new(
-            &self.config.collection_name,
-            query_vector,
-            limit as u64,
-        )
-        .with_payload(true);
+        let mut search_builder =
+            SearchPointsBuilder::new(&self.config.collection_name, query_vector, limit as u64)
+                .with_payload(true);
 
         if !conditions.is_empty() {
             search_builder = search_builder.filter(Filter::must(conditions));
@@ -1087,17 +1092,15 @@ impl QdrantMemoryStore {
             .map_err(|e| QdrantMemoryError::RetrievalError(e.to_string()))?;
 
         if let Some(point) = results.result.into_iter().next() {
-            let scored = self.point_to_scored_experience(
-                qdrant_client::qdrant::ScoredPoint {
-                    id: point.id,
-                    payload: point.payload,
-                    score: 1.0,
-                    vectors: point.vectors,
-                    version: 0,
-                    shard_key: None,
-                    order_value: None,
-                }
-            )?;
+            let scored = self.point_to_scored_experience(qdrant_client::qdrant::ScoredPoint {
+                id: point.id,
+                payload: point.payload,
+                score: 1.0,
+                vectors: point.vectors,
+                version: 0,
+                shard_key: None,
+                order_value: None,
+            })?;
             Ok(Some(scored.experience))
         } else {
             Ok(None)
@@ -1113,7 +1116,10 @@ impl QdrantMemoryStore {
             .await
             .map_err(|e| QdrantMemoryError::CollectionError(e.to_string()))?;
 
-        Ok(info.result.map(|r| r.points_count.unwrap_or(0)).unwrap_or(0))
+        Ok(info
+            .result
+            .map(|r| r.points_count.unwrap_or(0))
+            .unwrap_or(0))
     }
 
     /// Check if connected to Qdrant
@@ -1150,14 +1156,18 @@ impl QdrantMemoryStore {
     }
 
     /// Convert experience metadata to Qdrant payload
-    fn experience_to_payload(&self, exp: &Experience) -> Result<qdrant_client::Payload, QdrantMemoryError> {
+    fn experience_to_payload(
+        &self,
+        exp: &Experience,
+    ) -> Result<qdrant_client::Payload, QdrantMemoryError> {
         use qdrant_client::Payload;
         use serde_json::json;
 
         // Serialize location and context as JSON strings for storage
-        let location_json = exp.location.as_ref().map(|loc| {
-            serde_json::to_string(loc).unwrap_or_default()
-        });
+        let location_json = exp
+            .location
+            .as_ref()
+            .map(|loc| serde_json::to_string(loc).unwrap_or_default());
 
         let context_json = serde_json::to_string(&exp.context)
             .map_err(|e| QdrantMemoryError::SerializationError(e.to_string()))?;
@@ -1241,9 +1251,7 @@ impl QdrantMemoryStore {
             .and_then(|v| v.as_integer())
             .unwrap_or(0) as usize;
 
-        let last_retrieved = payload
-            .get("last_retrieved")
-            .and_then(|v| v.as_double());
+        let last_retrieved = payload.get("last_retrieved").and_then(|v| v.as_double());
 
         let consolidation = payload
             .get("consolidation")
@@ -1368,7 +1376,11 @@ impl QdrantMemoryStore {
     }
 
     /// Retrieve similar (stub - returns error without qdrant feature)
-    pub fn retrieve_similar(&self, _query: &[BinaryHV], _limit: usize) -> Result<Vec<Experience>, String> {
+    pub fn retrieve_similar(
+        &self,
+        _query: &[BinaryHV],
+        _limit: usize,
+    ) -> Result<Vec<Experience>, String> {
         Err("Qdrant feature not enabled. Add 'qdrant' to features in Cargo.toml".to_string())
     }
 
@@ -1423,7 +1435,8 @@ impl MockQdrantMemoryStore {
 
     /// Simulate connection
     pub async fn connect(&self) -> Result<(), QdrantMemoryError> {
-        self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
@@ -1434,18 +1447,22 @@ impl MockQdrantMemoryStore {
 
     /// Disconnect
     pub fn disconnect(&self) {
-        self.connected.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(false, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Store experience
     pub async fn store_experience(&self, experience: &Experience) -> Result<(), QdrantMemoryError> {
         if !self.is_connected() {
-            return Err(QdrantMemoryError::ConnectionFailed("Not connected".to_string()));
+            return Err(QdrantMemoryError::ConnectionFailed(
+                "Not connected".to_string(),
+            ));
         }
 
-        let mut store = self.experiences.write().map_err(|_| {
-            QdrantMemoryError::StoreError("Lock poisoned".to_string())
-        })?;
+        let mut store = self
+            .experiences
+            .write()
+            .map_err(|_| QdrantMemoryError::StoreError("Lock poisoned".to_string()))?;
 
         store.insert(experience.id.clone(), experience.clone());
         Ok(())
@@ -1469,12 +1486,15 @@ impl MockQdrantMemoryStore {
         limit: usize,
     ) -> Result<Vec<ScoredExperience>, QdrantMemoryError> {
         if !self.is_connected() {
-            return Err(QdrantMemoryError::ConnectionFailed("Not connected".to_string()));
+            return Err(QdrantMemoryError::ConnectionFailed(
+                "Not connected".to_string(),
+            ));
         }
 
-        let store = self.experiences.read().map_err(|_| {
-            QdrantMemoryError::RetrievalError("Lock poisoned".to_string())
-        })?;
+        let store = self
+            .experiences
+            .read()
+            .map_err(|_| QdrantMemoryError::RetrievalError("Lock poisoned".to_string()))?;
 
         // Compute similarity for each experience
         let mut scored: Vec<ScoredExperience> = store
@@ -1489,7 +1509,11 @@ impl MockQdrantMemoryStore {
             .collect();
 
         // Sort by score descending
-        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Take top limit
         scored.truncate(limit);
@@ -1499,12 +1523,15 @@ impl MockQdrantMemoryStore {
     /// Delete experience
     pub async fn delete_experience(&self, id: &str) -> Result<(), QdrantMemoryError> {
         if !self.is_connected() {
-            return Err(QdrantMemoryError::ConnectionFailed("Not connected".to_string()));
+            return Err(QdrantMemoryError::ConnectionFailed(
+                "Not connected".to_string(),
+            ));
         }
 
-        let mut store = self.experiences.write().map_err(|_| {
-            QdrantMemoryError::DeleteError("Lock poisoned".to_string())
-        })?;
+        let mut store = self
+            .experiences
+            .write()
+            .map_err(|_| QdrantMemoryError::DeleteError("Lock poisoned".to_string()))?;
 
         store.remove(id);
         Ok(())
@@ -1521,21 +1548,25 @@ impl MockQdrantMemoryStore {
     /// Get experience by ID
     pub async fn get_experience(&self, id: &str) -> Result<Option<Experience>, QdrantMemoryError> {
         if !self.is_connected() {
-            return Err(QdrantMemoryError::ConnectionFailed("Not connected".to_string()));
+            return Err(QdrantMemoryError::ConnectionFailed(
+                "Not connected".to_string(),
+            ));
         }
 
-        let store = self.experiences.read().map_err(|_| {
-            QdrantMemoryError::RetrievalError("Lock poisoned".to_string())
-        })?;
+        let store = self
+            .experiences
+            .read()
+            .map_err(|_| QdrantMemoryError::RetrievalError("Lock poisoned".to_string()))?;
 
         Ok(store.get(id).cloned())
     }
 
     /// Count experiences
     pub async fn count_experiences(&self) -> Result<u64, QdrantMemoryError> {
-        let store = self.experiences.read().map_err(|_| {
-            QdrantMemoryError::CollectionError("Lock poisoned".to_string())
-        })?;
+        let store = self
+            .experiences
+            .read()
+            .map_err(|_| QdrantMemoryError::CollectionError("Lock poisoned".to_string()))?;
 
         Ok(store.len() as u64)
     }
@@ -1597,8 +1628,8 @@ mod tests {
             MemoryType::Episodic,
             content,
             1000.0,
-            0.8,  // Positive valence
-            0.6,  // Medium arousal
+            0.8, // Positive valence
+            0.6, // Medium arousal
         );
 
         assert_eq!(exp.id, "exp1");
@@ -1615,9 +1646,16 @@ mod tests {
         let location = vec![BinaryHV::random(100)];
         let context = vec![BinaryHV::random(200)];
 
-        let exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5)
-            .with_location(location.clone())
-            .with_context(context.clone());
+        let exp = Experience::new(
+            "exp1".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.5,
+            0.5,
+        )
+        .with_location(location.clone())
+        .with_context(context.clone());
 
         assert!(exp.location.is_some());
         assert_eq!(exp.context.len(), 1);
@@ -1627,8 +1665,15 @@ mod tests {
     fn test_forgetting_curve() {
         let content = vec![BinaryHV::random(1)];
         // Use 0.0 emotional arousal for simple test (no emotional bonus)
-        let exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.0, 0.0)
-            .with_encoding_strength(1.0);
+        let exp = Experience::new(
+            "exp1".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.0,
+            0.0,
+        )
+        .with_encoding_strength(1.0);
 
         // Immediately after encoding: strength ≈ 1.0 (base × consolidation × reactivation × emotional)
         // = 1.0 × 1.0 × 1.0 × 1.0 = 1.0
@@ -1645,8 +1690,15 @@ mod tests {
     #[test]
     fn test_consolidation_strengthens_memory() {
         let content = vec![BinaryHV::random(1)];
-        let mut exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5)
-            .with_encoding_strength(0.5);
+        let mut exp = Experience::new(
+            "exp1".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.5,
+            0.5,
+        )
+        .with_encoding_strength(0.5);
 
         let one_year = 86400.0 * 365.0;
 
@@ -1665,7 +1717,14 @@ mod tests {
     #[test]
     fn test_retrieval_strengthens_memory() {
         let content = vec![BinaryHV::random(1)];
-        let mut exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
+        let mut exp = Experience::new(
+            "exp1".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.5,
+            0.5,
+        );
 
         let one_year = 86400.0 * 365.0;
 
@@ -1688,10 +1747,24 @@ mod tests {
         let content = vec![BinaryHV::random(1)];
 
         // Neutral emotion
-        let exp_neutral = Experience::new("exp1".to_string(), MemoryType::Episodic, content.clone(), 1000.0, 0.0, 0.0);
+        let exp_neutral = Experience::new(
+            "exp1".to_string(),
+            MemoryType::Episodic,
+            content.clone(),
+            1000.0,
+            0.0,
+            0.0,
+        );
 
         // High arousal emotion
-        let exp_emotional = Experience::new("exp2".to_string(), MemoryType::Episodic, content, 1000.0, 0.8, 1.0);
+        let exp_emotional = Experience::new(
+            "exp2".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.8,
+            1.0,
+        );
 
         let one_year = 86400.0 * 365.0;
 
@@ -1715,7 +1788,14 @@ mod tests {
         let mut ltm = LongTermMemory::new();
 
         let content = vec![BinaryHV::random(1), BinaryHV::random(2)];
-        let exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content.clone(), 1000.0, 0.5, 0.5);
+        let exp = Experience::new(
+            "exp1".to_string(),
+            MemoryType::Episodic,
+            content.clone(),
+            1000.0,
+            0.5,
+            0.5,
+        );
 
         ltm.store(exp);
 
@@ -1737,19 +1817,32 @@ mod tests {
 
         // Store episodic
         let content1 = vec![BinaryHV::random(1)];
-        let exp1 = Experience::new("episodic".to_string(), MemoryType::Episodic, content1, 1000.0, 0.5, 0.5);
+        let exp1 = Experience::new(
+            "episodic".to_string(),
+            MemoryType::Episodic,
+            content1,
+            1000.0,
+            0.5,
+            0.5,
+        );
         ltm.store(exp1);
 
         // Store semantic
         let content2 = vec![BinaryHV::random(2)];
-        let exp2 = Experience::new("semantic".to_string(), MemoryType::Semantic, content2, 1000.0, 0.5, 0.5);
+        let exp2 = Experience::new(
+            "semantic".to_string(),
+            MemoryType::Semantic,
+            content2,
+            1000.0,
+            0.5,
+            0.5,
+        );
         ltm.store(exp2);
 
         assert_eq!(ltm.total_memories(), 2);
 
         // Retrieve only episodic
-        let cue = RetrievalCue::content(vec![BinaryHV::random(3)])
-            .with_type(MemoryType::Episodic);
+        let cue = RetrievalCue::content(vec![BinaryHV::random(3)]).with_type(MemoryType::Episodic);
         let retrieved = ltm.retrieve(&cue, 1100.0, 10);
 
         assert_eq!(retrieved.len(), 1);
@@ -1761,7 +1854,14 @@ mod tests {
         let mut ltm = LongTermMemory::new();
 
         let content = vec![BinaryHV::random(1)];
-        let exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
+        let exp = Experience::new(
+            "exp1".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.5,
+            0.5,
+        );
         ltm.store(exp);
 
         // Check consolidation before sleep
@@ -1795,14 +1895,28 @@ mod tests {
         // Store 2 episodic
         for i in 0..2 {
             let content = vec![BinaryHV::random(i)];
-            let exp = Experience::new(format!("episodic_{}", i), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
+            let exp = Experience::new(
+                format!("episodic_{}", i),
+                MemoryType::Episodic,
+                content,
+                1000.0,
+                0.5,
+                0.5,
+            );
             ltm.store(exp);
         }
 
         // Store 3 semantic
         for i in 0..3 {
             let content = vec![BinaryHV::random(100 + i)];
-            let exp = Experience::new(format!("semantic_{}", i), MemoryType::Semantic, content, 1000.0, 0.5, 0.5);
+            let exp = Experience::new(
+                format!("semantic_{}", i),
+                MemoryType::Semantic,
+                content,
+                1000.0,
+                0.5,
+                0.5,
+            );
             ltm.store(exp);
         }
 
@@ -1856,7 +1970,14 @@ mod tests {
         let mut ltm = LongTermMemory::new();
 
         let content = vec![BinaryHV::random(1)];
-        let exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
+        let exp = Experience::new(
+            "exp1".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.5,
+            0.5,
+        );
         ltm.store(exp);
 
         assert_eq!(ltm.total_memories(), 1);
@@ -1882,7 +2003,14 @@ mod tests {
     #[test]
     fn test_scored_experience() {
         let content = vec![BinaryHV::random(1)];
-        let exp = Experience::new("test".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
+        let exp = Experience::new(
+            "test".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.5,
+            0.5,
+        );
 
         let scored = ScoredExperience {
             experience: exp.clone(),
@@ -1913,12 +2041,22 @@ mod tests {
     async fn test_mock_store_requires_connection() {
         let store = MockQdrantMemoryStore::new();
         let content = vec![BinaryHV::random(1)];
-        let exp = Experience::new("test".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
+        let exp = Experience::new(
+            "test".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.5,
+            0.5,
+        );
 
         // Should fail without connection
         let result = store.store_experience(&exp).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), QdrantMemoryError::ConnectionFailed(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            QdrantMemoryError::ConnectionFailed(_)
+        ));
 
         // Should succeed after connection
         store.connect().await.unwrap();
@@ -1933,10 +2071,24 @@ mod tests {
 
         // Create and store experiences with different content
         let content1 = vec![BinaryHV::random(1)];
-        let exp1 = Experience::new("exp1".to_string(), MemoryType::Episodic, content1.clone(), 1000.0, 0.8, 0.7);
+        let exp1 = Experience::new(
+            "exp1".to_string(),
+            MemoryType::Episodic,
+            content1.clone(),
+            1000.0,
+            0.8,
+            0.7,
+        );
 
         let content2 = vec![BinaryHV::random(2)];
-        let exp2 = Experience::new("exp2".to_string(), MemoryType::Semantic, content2.clone(), 2000.0, 0.3, 0.2);
+        let exp2 = Experience::new(
+            "exp2".to_string(),
+            MemoryType::Semantic,
+            content2.clone(),
+            2000.0,
+            0.3,
+            0.2,
+        );
 
         store.store_experience(&exp1).await.unwrap();
         store.store_experience(&exp2).await.unwrap();
@@ -1989,7 +2141,14 @@ mod tests {
         store.connect().await.unwrap();
 
         let content = vec![BinaryHV::random(42)];
-        let exp = Experience::new("unique_id".to_string(), MemoryType::Semantic, content, 1500.0, 0.6, 0.4);
+        let exp = Experience::new(
+            "unique_id".to_string(),
+            MemoryType::Semantic,
+            content,
+            1500.0,
+            0.6,
+            0.4,
+        );
 
         store.store_experience(&exp).await.unwrap();
 
@@ -2012,7 +2171,14 @@ mod tests {
         store.connect().await.unwrap();
 
         let content = vec![BinaryHV::random(1)];
-        let exp = Experience::new("to_delete".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
+        let exp = Experience::new(
+            "to_delete".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.5,
+            0.5,
+        );
 
         store.store_experience(&exp).await.unwrap();
         assert_eq!(store.count_experiences().await.unwrap(), 1);
@@ -2032,7 +2198,14 @@ mod tests {
         // Store multiple experiences
         for i in 0..5 {
             let content = vec![BinaryHV::random(i as u64)];
-            let exp = Experience::new(format!("exp_{}", i), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
+            let exp = Experience::new(
+                format!("exp_{}", i),
+                MemoryType::Episodic,
+                content,
+                1000.0,
+                0.5,
+                0.5,
+            );
             store.store_experience(&exp).await.unwrap();
         }
 
@@ -2113,7 +2286,14 @@ mod tests {
         store.connect().await.unwrap();
 
         let content = vec![BinaryHV::random(1)];
-        let mut exp = Experience::new("update_me".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
+        let mut exp = Experience::new(
+            "update_me".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.5,
+            0.5,
+        );
 
         store.store_experience(&exp).await.unwrap();
 
@@ -2137,7 +2317,14 @@ mod tests {
         store.connect().await.unwrap();
 
         let content = vec![BinaryHV::random(1)];
-        let exp = Experience::new("test".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
+        let exp = Experience::new(
+            "test".to_string(),
+            MemoryType::Episodic,
+            content,
+            1000.0,
+            0.5,
+            0.5,
+        );
         store.store_experience(&exp).await.unwrap();
 
         // Query with empty vector should return results with 0 similarity

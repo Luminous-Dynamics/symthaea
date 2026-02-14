@@ -21,10 +21,10 @@
 //! Ensembles (Microcanonical, Canonical, Grand Canonical) are encoded with their
 //! partition functions and probability distributions.
 
+use super::constants::{K_BOLTZMANN, P_STANDARD, R_GAS};
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::{K_BOLTZMANN, R_GAS, P_STANDARD};
 use serde::{Deserialize, Serialize};
 
 /// Thermodynamic state
@@ -117,14 +117,17 @@ impl ThermoEncoder {
         // Normalize to reasonable scale (divide by k_B to get dimensionless)
         let s_normalized = microstates.ln() as f32 / 100.0;
 
-        self.entropy.bind(&self.microstates).scale(s_normalized.clamp(0.01, 10.0))
+        self.entropy
+            .bind(&self.microstates)
+            .scale(s_normalized.clamp(0.01, 10.0))
     }
 
     /// Shannon entropy: H = -Σ p_i log(p_i)
     ///
     /// Information-theoretic entropy in bits
     pub fn shannon_entropy(&self, probabilities: &[f64]) -> ContinuousHV {
-        let h: f64 = probabilities.iter()
+        let h: f64 = probabilities
+            .iter()
             .filter(|&&p| p > 0.0 && p <= 1.0)
             .map(|&p| -p * p.log2())
             .sum();
@@ -203,7 +206,11 @@ impl ThermoEncoder {
     /// Free energy principle (Friston): minimize variational free energy
     ///
     /// Returns a measure of prediction error
-    pub fn variational_free_energy(&self, prediction: &ContinuousHV, observation: &ContinuousHV) -> f64 {
+    pub fn variational_free_energy(
+        &self,
+        prediction: &ContinuousHV,
+        observation: &ContinuousHV,
+    ) -> f64 {
         // F = -ln P(o|m) + D_KL(Q||P)
         // Approximated by prediction error (1 - similarity)
         1.0 - prediction.similarity(observation) as f64
@@ -330,7 +337,8 @@ impl ThermoEncoder {
         chemical_potential: f64,
     ) -> Ensemble {
         let beta = 1.0 / (K_BOLTZMANN * temp_k);
-        let xi: f64 = energies.iter()
+        let xi: f64 = energies
+            .iter()
             .zip(particle_numbers.iter())
             .map(|(&e, &n)| (-beta * (e - chemical_potential * n as f64)).exp())
             .sum();
@@ -389,9 +397,8 @@ impl ThermoEncoder {
         }
 
         let beta = 1.0 / (K_BOLTZMANN * temp_k);
-        let avg_exp_w: f64 = work_samples.iter()
-            .map(|&w| (-beta * w).exp())
-            .sum::<f64>() / work_samples.len() as f64;
+        let avg_exp_w: f64 = work_samples.iter().map(|&w| (-beta * w).exp()).sum::<f64>()
+            / work_samples.len() as f64;
 
         // ΔF = -k_B T ln(<exp(-βW)>)
         -avg_exp_w.ln() / beta
@@ -464,7 +471,10 @@ mod tests {
         let s2 = encoder.boltzmann_entropy(1000.0);
 
         // s2 should have larger scale
-        assert!(s2.norm() > s1.norm() * 0.5, "More microstates should give more entropy");
+        assert!(
+            s2.norm() > s1.norm() * 0.5,
+            "More microstates should give more entropy"
+        );
     }
 
     #[test]
@@ -478,7 +488,10 @@ mod tests {
         let h_uniform = encoder.shannon_entropy(&uniform);
         let h_peaked = encoder.shannon_entropy(&peaked);
 
-        assert!(h_uniform.norm() > h_peaked.norm(), "Uniform should have higher entropy");
+        assert!(
+            h_uniform.norm() > h_peaked.norm(),
+            "Uniform should have higher entropy"
+        );
     }
 
     #[test]
@@ -490,7 +503,10 @@ mod tests {
 
         // Should be about 2.87e-21 J
         let expected = K_BOLTZMANN * 300.0 * 2.0_f64.ln();
-        assert!((limit - expected).abs() < 1e-25, "Landauer limit should be k_B T ln(2)");
+        assert!(
+            (limit - expected).abs() < 1e-25,
+            "Landauer limit should be k_B T ln(2)"
+        );
     }
 
     #[test]
@@ -533,7 +549,10 @@ mod tests {
         let ensemble = encoder.canonical_ensemble(&energies, 300.0);
 
         assert_eq!(ensemble.ensemble_type, EnsembleType::Canonical);
-        assert!(ensemble.partition_function > 1.0, "Z should be > 1 for multiple states");
+        assert!(
+            ensemble.partition_function > 1.0,
+            "Z should be > 1 for multiple states"
+        );
     }
 
     #[test]

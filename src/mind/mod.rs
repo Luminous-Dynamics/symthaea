@@ -13,10 +13,15 @@ mod tick;
 mod utils;
 
 pub use config::*;
-pub use utils::{EPSILON, EPSILON_F32, float_eq, float_eq_f32, is_zero, is_zero_f32, is_nonzero, is_nonzero_f32};
-pub use intent::{IntentClassifier, IntentClassification, EpistemicAssessment, IntentScores, ConceptLabel, ConceptPrototype};
+pub use intent::{
+    ConceptLabel, ConceptPrototype, EpistemicAssessment, IntentClassification, IntentClassifier,
+    IntentScores,
+};
 pub use knowledge::{DomainKnowledge, KnowledgeEntry, SeedingResult};
 pub use structured_thought::*;
+pub use utils::{
+    float_eq, float_eq_f32, is_nonzero, is_nonzero_f32, is_zero, is_zero_f32, EPSILON, EPSILON_F32,
+};
 
 use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
@@ -126,7 +131,12 @@ impl ContinuousMind {
     }
 
     /// Set a goal
-    pub fn set_goal(&mut self, description: impl Into<String>, embedding: ContinuousHV, priority: f32) {
+    pub fn set_goal(
+        &mut self,
+        description: impl Into<String>,
+        embedding: ContinuousHV,
+        priority: f32,
+    ) {
         let mut metadata = HashMap::new();
         metadata.insert("description".to_string(), description.into());
 
@@ -195,8 +205,8 @@ impl ContinuousMind {
         state.phi = state.consciousness_level;
         state.total_cycles = state.tick;
         state.time_awake_ms = self.awaken_time.elapsed().as_millis() as u64;
-        state.meta_awareness = (state.consciousness_level * 0.7
-            + state.memory_utilization as f64 * 0.3).min(1.0);
+        state.meta_awareness =
+            (state.consciousness_level * 0.7 + state.memory_utilization as f64 * 0.3).min(1.0);
         state.cognitive_load = state.memory_utilization as f64;
         state.is_conscious = state.consciousness_level >= self.config.min_consciousness;
         state
@@ -221,10 +231,7 @@ impl ContinuousMind {
     /// Enable federated learning with initial weights.
     pub fn enable_federated(&mut self, weights: Vec<f32>) {
         use crate::swarm::FederatedAggregator;
-        self.federated = Some(
-            FederatedAggregator::new(weights)
-                .with_byzantine_tolerance(0.1)
-        );
+        self.federated = Some(FederatedAggregator::new(weights).with_byzantine_tolerance(0.1));
     }
 
     /// Receive a gradient message from a network peer.
@@ -428,7 +435,9 @@ impl ContinuousMind {
     fn determine_epistemic_status(&self, state: &MindState) -> EpistemicStatus {
         // If we have input text, use HDC classification
         if let Some(ref text) = self.last_input_text {
-            let assessment = self.intent_classifier.assess_epistemic_text(text, &self.working_memory);
+            let assessment = self
+                .intent_classifier
+                .assess_epistemic_text(text, &self.working_memory);
 
             // Modulate by consciousness level
             let phi = state.consciousness_level;
@@ -575,9 +584,7 @@ impl ContinuousMind {
         }
 
         // If goals suggest questions
-        let asking_question = self.goals.iter().any(|g| {
-            g.description.ends_with('?')
-        });
+        let asking_question = self.goals.iter().any(|g| g.description.ends_with('?'));
 
         if asking_question {
             return ResponseType::Question;

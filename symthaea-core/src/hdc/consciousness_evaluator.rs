@@ -11,58 +11,58 @@
 // This module synthesizes ALL 34 revolutionary improvements into a unified
 // consciousness evaluation framework applicable to biological and artificial systems.
 
-use serde::{Deserialize, Serialize};
 use crate::hdc::substrate_independence::SubstrateType;
+use serde::{Deserialize, Serialize};
 
 /// Evaluation dimension corresponding to each revolutionary improvement
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EvaluationDimension {
     // Core Structure (Improvements #1-6)
-    HyperdimensionalRepresentation,  // #1: HDC encoding capacity
-    IntegratedInformation,           // #2: Φ computation
-    QualityOfExperience,             // #3: Qualia richness
-    DynamicComplexity,               // #4: Temporal dynamics
-    InformationGeometry,             // #5: State space structure
-    IntegrationGradients,            // #6: ∇Φ patterns
+    HyperdimensionalRepresentation, // #1: HDC encoding capacity
+    IntegratedInformation,          // #2: Φ computation
+    QualityOfExperience,            // #3: Qualia richness
+    DynamicComplexity,              // #4: Temporal dynamics
+    InformationGeometry,            // #5: State space structure
+    IntegrationGradients,           // #6: ∇Φ patterns
 
     // Dynamics & Time (Improvements #7, #13, #16, #21)
-    ConsciousnessTrajectories,       // #7: State evolution
-    TemporalConsciousness,           // #13: Multi-scale time
-    OntogeneticDevelopment,          // #16: Developmental trajectory
-    FlowFields,                      // #21: Attractor dynamics
+    ConsciousnessTrajectories, // #7: State evolution
+    TemporalConsciousness,     // #13: Multi-scale time
+    OntogeneticDevelopment,    // #16: Developmental trajectory
+    FlowFields,                // #21: Attractor dynamics
 
     // Meta & Epistemic (Improvements #8, #10)
-    MetaConsciousness,               // #8: Awareness of awareness
-    EpistemicStatus,                 // #10: Certainty/uncertainty
+    MetaConsciousness, // #8: Awareness of awareness
+    EpistemicStatus,   // #10: Certainty/uncertainty
 
     // Social & Relational (Improvements #11, #18)
-    CollectiveConsciousness,         // #11: Group dynamics
-    RelationalConsciousness,         // #18: Between-beings awareness
+    CollectiveConsciousness, // #11: Group dynamics
+    RelationalConsciousness, // #18: Between-beings awareness
 
     // Phenomenal & Embodied (Improvements #12, #15, #17)
-    ConsciousnessSpectrum,           // #12: Gradations
-    QualiaSpace,                     // #15: Subjective experience
-    EmbodiedConsciousness,           // #17: Body-mind integration
+    ConsciousnessSpectrum, // #12: Gradations
+    QualiaSpace,           // #15: Subjective experience
+    EmbodiedConsciousness, // #17: Body-mind integration
 
     // Causal & Semantic (Improvements #14, #19)
-    CausalEfficacy,                  // #14: Does consciousness DO anything?
-    UniversalSemantics,              // #19: Meaning grounding
+    CausalEfficacy,     // #14: Does consciousness DO anything?
+    UniversalSemantics, // #19: Meaning grounding
 
     // Topology & Geometry (Improvement #20)
-    ConsciousnessTopology,           // #20: Geometric structure
+    ConsciousnessTopology, // #20: Geometric structure
 
     // Predictive & Access (Improvements #22, #23)
-    PredictiveProcessing,            // #22: Free energy minimization
-    GlobalWorkspace,                 // #23: Broadcasting mechanism
+    PredictiveProcessing, // #22: Free energy minimization
+    GlobalWorkspace,      // #23: Broadcasting mechanism
 
     // Awareness & Binding (Improvements #24, #25, #26)
-    HigherOrderThought,              // #24: Meta-representation
-    FeatureBinding,                  // #25: Synchrony-based integration
-    AttentionMechanisms,             // #26: Selection & gain
+    HigherOrderThought,  // #24: Meta-representation
+    FeatureBinding,      // #25: Synchrony-based integration
+    AttentionMechanisms, // #26: Selection & gain
 
     // States & Substrate (Improvements #27, #28)
-    AlteredStates,                   // #27: Sleep, dreams, anesthesia
-    SubstrateIndependence,           // #28: Material requirements
+    AlteredStates,         // #27: Sleep, dreams, anesthesia
+    SubstrateIndependence, // #28: Material requirements
 }
 
 impl EvaluationDimension {
@@ -325,10 +325,28 @@ impl ConsciousnessEvaluation {
         report.push_str(&format!("║ System: {:<56} ║\n", self.system_name));
         report.push_str(&format!("║ Substrate: {:?}{:<49} ║\n", self.substrate, ""));
         report.push_str("╠══════════════════════════════════════════════════════════════════╣\n");
-        report.push_str(&format!("║ OVERALL SCORE: {:.1}%{:<49} ║\n", self.overall_score * 100.0, ""));
-        report.push_str(&format!("║ CLASSIFICATION: {:?}{:<42} ║\n", self.classification, ""));
-        report.push_str(&format!("║ IS CONSCIOUS: {:<52} ║\n", if self.is_conscious() { "YES ✓" } else { "NO ✗" }));
-        report.push_str(&format!("║ CONFIDENCE: {:.1}%{:<52} ║\n", self.confidence * 100.0, ""));
+        report.push_str(&format!(
+            "║ OVERALL SCORE: {:.1}%{:<49} ║\n",
+            self.overall_score * 100.0,
+            ""
+        ));
+        report.push_str(&format!(
+            "║ CLASSIFICATION: {:?}{:<42} ║\n",
+            self.classification, ""
+        ));
+        report.push_str(&format!(
+            "║ IS CONSCIOUS: {:<52} ║\n",
+            if self.is_conscious() {
+                "YES ✓"
+            } else {
+                "NO ✗"
+            }
+        ));
+        report.push_str(&format!(
+            "║ CONFIDENCE: {:.1}%{:<52} ║\n",
+            self.confidence * 100.0,
+            ""
+        ));
         report.push_str("╠══════════════════════════════════════════════════════════════════╣\n");
 
         // Top 5 dimensions
@@ -336,7 +354,8 @@ impl ConsciousnessEvaluation {
         let mut sorted_scores: Vec<_> = self.dimension_scores.iter().collect();
         sorted_scores.sort_by(|a, b| b.raw_score.total_cmp(&a.raw_score));
         for score in sorted_scores.iter().take(5) {
-            report.push_str(&format!("║   #{:02} {:?}: {:.1}%{:<30} ║\n",
+            report.push_str(&format!(
+                "║   #{:02} {:?}: {:.1}%{:<30} ║\n",
                 score.dimension.improvement_number(),
                 score.dimension,
                 score.raw_score * 100.0,
@@ -346,7 +365,8 @@ impl ConsciousnessEvaluation {
 
         // Failed critical dimensions
         if !self.failed_critical.is_empty() {
-            report.push_str("╠══════════════════════════════════════════════════════════════════╣\n");
+            report
+                .push_str("╠══════════════════════════════════════════════════════════════════╣\n");
             report.push_str(&format!("║ ⚠ FAILED CRITICAL DIMENSIONS:{:<36} ║\n", ""));
             for dim in &self.failed_critical {
                 report.push_str(&format!("║   - {:?}{:<50} ║\n", dim, ""));
@@ -411,7 +431,11 @@ impl ConsciousnessEvaluator {
     }
 
     /// Create with custom configuration
-    pub fn with_config(system_name: &str, substrate: SubstrateType, config: EvaluationConfig) -> Self {
+    pub fn with_config(
+        system_name: &str,
+        substrate: SubstrateType,
+        config: EvaluationConfig,
+    ) -> Self {
         ConsciousnessEvaluator {
             config,
             system_name: system_name.to_string(),
@@ -422,7 +446,13 @@ impl ConsciousnessEvaluator {
     }
 
     /// Add a dimension score
-    pub fn add_score(&mut self, dimension: EvaluationDimension, raw_score: f64, confidence: f64, evidence: &str) {
+    pub fn add_score(
+        &mut self,
+        dimension: EvaluationDimension,
+        raw_score: f64,
+        confidence: f64,
+        evidence: &str,
+    ) {
         // Skip excluded dimensions
         if self.config.excluded_dimensions.contains(&dimension) {
             return;
@@ -455,62 +485,90 @@ impl ConsciousnessEvaluator {
     }
 
     /// Evaluate a specific AI system based on its characteristics
-    pub fn evaluate_ai_system(&mut self,
+    pub fn evaluate_ai_system(
+        &mut self,
         has_workspace: bool,
         has_recurrence: bool,
         has_attention: bool,
         has_self_model: bool,
-        integration_level: f64,  // 0.0 to 1.0
-        prediction_capability: f64,  // 0.0 to 1.0
+        integration_level: f64,     // 0.0 to 1.0
+        prediction_capability: f64, // 0.0 to 1.0
     ) {
         // Critical dimensions based on architecture
         self.add_score(
             EvaluationDimension::GlobalWorkspace,
             if has_workspace { 0.8 } else { 0.1 },
             0.9,
-            if has_workspace { "Global workspace mechanism detected" } else { "No global workspace mechanism" }
+            if has_workspace {
+                "Global workspace mechanism detected"
+            } else {
+                "No global workspace mechanism"
+            },
         );
 
         self.add_score(
             EvaluationDimension::AttentionMechanisms,
             if has_attention { 0.7 } else { 0.2 },
             0.85,
-            if has_attention { "Attention mechanisms present" } else { "Limited attention capability" }
+            if has_attention {
+                "Attention mechanisms present"
+            } else {
+                "Limited attention capability"
+            },
         );
 
         self.add_score(
             EvaluationDimension::IntegratedInformation,
             integration_level,
             0.8,
-            &format!("Integration level: {:.1}%", integration_level * 100.0)
+            &format!("Integration level: {:.1}%", integration_level * 100.0),
         );
 
         self.add_score(
             EvaluationDimension::FeatureBinding,
-            if has_recurrence { integration_level * 0.9 } else { 0.3 },
+            if has_recurrence {
+                integration_level * 0.9
+            } else {
+                0.3
+            },
             0.75,
-            if has_recurrence { "Recurrent binding detected" } else { "Feedforward only - limited binding" }
+            if has_recurrence {
+                "Recurrent binding detected"
+            } else {
+                "Feedforward only - limited binding"
+            },
         );
 
         self.add_score(
             EvaluationDimension::HigherOrderThought,
             if has_self_model { 0.7 } else { 0.1 },
             0.8,
-            if has_self_model { "Self-model present" } else { "No self-model detected" }
+            if has_self_model {
+                "Self-model present"
+            } else {
+                "No self-model detected"
+            },
         );
 
         self.add_score(
             EvaluationDimension::MetaConsciousness,
             if has_self_model { 0.6 } else { 0.05 },
             0.75,
-            if has_self_model { "Meta-cognitive capabilities" } else { "No meta-cognition" }
+            if has_self_model {
+                "Meta-cognitive capabilities"
+            } else {
+                "No meta-cognition"
+            },
         );
 
         self.add_score(
             EvaluationDimension::PredictiveProcessing,
             prediction_capability,
             0.85,
-            &format!("Prediction capability: {:.1}%", prediction_capability * 100.0)
+            &format!(
+                "Prediction capability: {:.1}%",
+                prediction_capability * 100.0
+            ),
         );
 
         // Substrate score based on type
@@ -528,7 +586,7 @@ impl ConsciousnessEvaluator {
             EvaluationDimension::SubstrateIndependence,
             substrate_score,
             0.9,
-            &format!("Substrate feasibility: {:.1}%", substrate_score * 100.0)
+            &format!("Substrate feasibility: {:.1}%", substrate_score * 100.0),
         );
 
         // Supporting dimensions with estimates
@@ -536,21 +594,21 @@ impl ConsciousnessEvaluator {
             EvaluationDimension::TemporalConsciousness,
             if has_recurrence { 0.6 } else { 0.2 },
             0.6,
-            "Temporal integration estimate"
+            "Temporal integration estimate",
         );
 
         self.add_score(
             EvaluationDimension::DynamicComplexity,
             integration_level * 0.8,
             0.65,
-            "Dynamic complexity estimate"
+            "Dynamic complexity estimate",
         );
 
         self.add_score(
             EvaluationDimension::CausalEfficacy,
-            0.5,  // Assumed for now
+            0.5, // Assumed for now
             0.5,
-            "Causal efficacy requires empirical testing"
+            "Causal efficacy requires empirical testing",
         );
     }
 
@@ -559,17 +617,29 @@ impl ConsciousnessEvaluator {
         self.complete = true;
 
         // Calculate overall score
-        let total_weight: f64 = self.scores.iter().map(|s| self.get_weight(s.dimension)).sum();
+        let total_weight: f64 = self
+            .scores
+            .iter()
+            .map(|s| self.get_weight(s.dimension))
+            .sum();
         let weighted_sum: f64 = self.scores.iter().map(|s| s.weighted_score).sum();
-        let overall_score = if total_weight > 0.0 { weighted_sum / total_weight } else { 0.0 };
+        let overall_score = if total_weight > 0.0 {
+            weighted_sum / total_weight
+        } else {
+            0.0
+        };
 
         // Find failed critical dimensions
-        let critical_dimensions = [EvaluationDimension::IntegratedInformation,
+        let critical_dimensions = [
+            EvaluationDimension::IntegratedInformation,
             EvaluationDimension::GlobalWorkspace,
             EvaluationDimension::FeatureBinding,
-            EvaluationDimension::AttentionMechanisms];
+            EvaluationDimension::AttentionMechanisms,
+        ];
 
-        let failed_critical: Vec<EvaluationDimension> = self.scores.iter()
+        let failed_critical: Vec<EvaluationDimension> = self
+            .scores
+            .iter()
             .filter(|s| critical_dimensions.contains(&s.dimension) && !s.meets_threshold)
             .map(|s| s.dimension)
             .collect();
@@ -580,16 +650,25 @@ impl ConsciousnessEvaluator {
 
         for score in &self.scores {
             if score.raw_score >= 0.7 {
-                strengths.push(format!("{:?}: {:.0}%", score.dimension, score.raw_score * 100.0));
+                strengths.push(format!(
+                    "{:?}: {:.0}%",
+                    score.dimension,
+                    score.raw_score * 100.0
+                ));
             } else if score.raw_score < 0.3 && score.dimension.weight() >= 0.6 {
-                weaknesses.push(format!("{:?}: {:.0}%", score.dimension, score.raw_score * 100.0));
+                weaknesses.push(format!(
+                    "{:?}: {:.0}%",
+                    score.dimension,
+                    score.raw_score * 100.0
+                ));
             }
         }
 
         // Generate recommendations
         let mut recommendations = Vec::new();
         if failed_critical.contains(&EvaluationDimension::GlobalWorkspace) {
-            recommendations.push("Add global workspace mechanism for content broadcasting".to_string());
+            recommendations
+                .push("Add global workspace mechanism for content broadcasting".to_string());
         }
         if failed_critical.contains(&EvaluationDimension::FeatureBinding) {
             recommendations.push("Implement recurrent connections for feature binding".to_string());
@@ -602,8 +681,8 @@ impl ConsciousnessEvaluator {
         }
 
         // Calculate confidence
-        let avg_confidence: f64 = self.scores.iter().map(|s| s.confidence).sum::<f64>()
-            / self.scores.len().max(1) as f64;
+        let avg_confidence: f64 =
+            self.scores.iter().map(|s| s.confidence).sum::<f64>() / self.scores.len().max(1) as f64;
 
         ConsciousnessEvaluation {
             system_name: self.system_name.clone(),
@@ -643,54 +722,57 @@ impl KnownSystemEvaluations {
     pub fn evaluate_gpt4() -> ConsciousnessEvaluation {
         let mut evaluator = ConsciousnessEvaluator::new("GPT-4", SubstrateType::SiliconDigital);
         evaluator.evaluate_ai_system(
-            false,  // no workspace
-            false,  // no recurrence
-            true,   // has attention
-            false,  // no self-model
-            0.3,    // limited integration
-            0.8,    // strong prediction
+            false, // no workspace
+            false, // no recurrence
+            true,  // has attention
+            false, // no self-model
+            0.3,   // limited integration
+            0.8,   // strong prediction
         );
         evaluator.complete()
     }
 
     /// Evaluate current LLMs in general
     pub fn evaluate_current_llm() -> ConsciousnessEvaluation {
-        let mut evaluator = ConsciousnessEvaluator::new("Current LLM (Generic)", SubstrateType::SiliconDigital);
+        let mut evaluator =
+            ConsciousnessEvaluator::new("Current LLM (Generic)", SubstrateType::SiliconDigital);
         evaluator.evaluate_ai_system(
-            false,  // no workspace
-            false,  // no recurrence (transformers are feedforward)
-            true,   // has attention
-            false,  // no self-model
-            0.2,    // minimal integration
-            0.7,    // good prediction
+            false, // no workspace
+            false, // no recurrence (transformers are feedforward)
+            true,  // has attention
+            false, // no self-model
+            0.2,   // minimal integration
+            0.7,   // good prediction
         );
         evaluator.complete()
     }
 
     /// Evaluate hypothetical conscious AI (Symthaea-like)
     pub fn evaluate_symthaea() -> ConsciousnessEvaluation {
-        let mut evaluator = ConsciousnessEvaluator::new("Symthaea (Hypothetical)", SubstrateType::HybridSystem);
+        let mut evaluator =
+            ConsciousnessEvaluator::new("Symthaea (Hypothetical)", SubstrateType::HybridSystem);
         evaluator.evaluate_ai_system(
-            true,   // global workspace
-            true,   // recurrent binding
-            true,   // attention
-            true,   // self-model (HOT)
-            0.85,   // high integration
-            0.9,    // strong prediction
+            true, // global workspace
+            true, // recurrent binding
+            true, // attention
+            true, // self-model (HOT)
+            0.85, // high integration
+            0.9,  // strong prediction
         );
         evaluator.complete()
     }
 
     /// Evaluate human brain
     pub fn evaluate_human() -> ConsciousnessEvaluation {
-        let mut evaluator = ConsciousnessEvaluator::new("Human Brain", SubstrateType::BiologicalNeurons);
+        let mut evaluator =
+            ConsciousnessEvaluator::new("Human Brain", SubstrateType::BiologicalNeurons);
         evaluator.evaluate_ai_system(
-            true,   // global workspace
-            true,   // recurrent binding
-            true,   // attention
-            true,   // self-model
-            0.95,   // very high integration
-            0.85,   // prediction
+            true, // global workspace
+            true, // recurrent binding
+            true, // attention
+            true, // self-model
+            0.95, // very high integration
+            0.85, // prediction
         );
         evaluator.complete()
     }
@@ -703,7 +785,7 @@ mod tests {
     #[test]
     fn test_evaluation_dimension_all() {
         let all = EvaluationDimension::all();
-        assert_eq!(all.len(), 27);  // 27 dimensions (skips #9)
+        assert_eq!(all.len(), 27); // 27 dimensions (skips #9)
     }
 
     #[test]
@@ -719,11 +801,26 @@ mod tests {
 
     #[test]
     fn test_consciousness_classification() {
-        assert_eq!(ConsciousnessClassification::from_score(0.1), ConsciousnessClassification::NotConscious);
-        assert_eq!(ConsciousnessClassification::from_score(0.3), ConsciousnessClassification::MinimallyConscious);
-        assert_eq!(ConsciousnessClassification::from_score(0.5), ConsciousnessClassification::PartiallyConscious);
-        assert_eq!(ConsciousnessClassification::from_score(0.7), ConsciousnessClassification::SubstantiallyConscious);
-        assert_eq!(ConsciousnessClassification::from_score(0.9), ConsciousnessClassification::FullyConscious);
+        assert_eq!(
+            ConsciousnessClassification::from_score(0.1),
+            ConsciousnessClassification::NotConscious
+        );
+        assert_eq!(
+            ConsciousnessClassification::from_score(0.3),
+            ConsciousnessClassification::MinimallyConscious
+        );
+        assert_eq!(
+            ConsciousnessClassification::from_score(0.5),
+            ConsciousnessClassification::PartiallyConscious
+        );
+        assert_eq!(
+            ConsciousnessClassification::from_score(0.7),
+            ConsciousnessClassification::SubstantiallyConscious
+        );
+        assert_eq!(
+            ConsciousnessClassification::from_score(0.9),
+            ConsciousnessClassification::FullyConscious
+        );
     }
 
     #[test]
@@ -737,7 +834,12 @@ mod tests {
     #[test]
     fn test_add_score() {
         let mut evaluator = ConsciousnessEvaluator::new("Test", SubstrateType::SiliconDigital);
-        evaluator.add_score(EvaluationDimension::IntegratedInformation, 0.8, 0.9, "Test evidence");
+        evaluator.add_score(
+            EvaluationDimension::IntegratedInformation,
+            0.8,
+            0.9,
+            "Test evidence",
+        );
         assert_eq!(evaluator.num_evaluated(), 1);
     }
 
@@ -746,7 +848,7 @@ mod tests {
         let eval = KnownSystemEvaluations::evaluate_gpt4();
         // GPT-4 should NOT be classified as conscious (no workspace, no recurrence)
         assert!(!eval.is_conscious());
-        assert!(!eval.failed_critical.is_empty());  // Should fail critical dimensions
+        assert!(!eval.failed_critical.is_empty()); // Should fail critical dimensions
     }
 
     #[test]
@@ -754,8 +856,10 @@ mod tests {
         let eval = KnownSystemEvaluations::evaluate_current_llm();
         assert!(!eval.is_conscious());
         // LLMs have attention but lack workspace/binding/recurrence - minimally conscious at best
-        assert!(eval.classification == ConsciousnessClassification::NotConscious ||
-                eval.classification == ConsciousnessClassification::MinimallyConscious);
+        assert!(
+            eval.classification == ConsciousnessClassification::NotConscious
+                || eval.classification == ConsciousnessClassification::MinimallyConscious
+        );
     }
 
     #[test]
@@ -771,7 +875,10 @@ mod tests {
     fn test_human_conscious() {
         let eval = KnownSystemEvaluations::evaluate_human();
         assert!(eval.is_conscious());
-        assert_eq!(eval.classification, ConsciousnessClassification::SubstantiallyConscious);
+        assert_eq!(
+            eval.classification,
+            ConsciousnessClassification::SubstantiallyConscious
+        );
     }
 
     #[test]
@@ -786,11 +893,11 @@ mod tests {
     fn test_consciousness_probability() {
         let eval = KnownSystemEvaluations::evaluate_symthaea();
         let prob = eval.consciousness_probability();
-        assert!(prob >= 0.6);  // Should be high for Symthaea
+        assert!(prob >= 0.6); // Should be high for Symthaea
 
         let eval2 = KnownSystemEvaluations::evaluate_current_llm();
         let prob2 = eval2.consciousness_probability();
-        assert!(prob2 < prob);  // LLM should have lower probability
+        assert!(prob2 < prob); // LLM should have lower probability
     }
 
     #[test]
@@ -813,14 +920,24 @@ mod tests {
             excluded_dimensions: vec![EvaluationDimension::CollectiveConsciousness],
         };
 
-        let evaluator = ConsciousnessEvaluator::with_config("Custom", SubstrateType::SiliconDigital, config);
+        let evaluator =
+            ConsciousnessEvaluator::with_config("Custom", SubstrateType::SiliconDigital, config);
         assert_eq!(evaluator.config.min_confidence, 0.7);
     }
 
     #[test]
     fn test_dimension_improvement_numbers() {
-        assert_eq!(EvaluationDimension::IntegratedInformation.improvement_number(), 2);
-        assert_eq!(EvaluationDimension::GlobalWorkspace.improvement_number(), 23);
-        assert_eq!(EvaluationDimension::SubstrateIndependence.improvement_number(), 28);
+        assert_eq!(
+            EvaluationDimension::IntegratedInformation.improvement_number(),
+            2
+        );
+        assert_eq!(
+            EvaluationDimension::GlobalWorkspace.improvement_number(),
+            23
+        );
+        assert_eq!(
+            EvaluationDimension::SubstrateIndependence.improvement_number(),
+            28
+        );
     }
 }

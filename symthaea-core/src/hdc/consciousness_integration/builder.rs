@@ -108,9 +108,18 @@ impl ConsciousnessPipelineBuilder {
     /// Enable all consciousness systems (delegates to enable_full_consciousness)
     pub fn full_consciousness(self) -> Self {
         // Mark as full; build() will use enable_full_consciousness()
-        Self { integrated_systems: true, phi_feedback: true, creativity: true,
-               fractal: true, meta_consciousness: true, temporal_consciousness: true,
-               phase_transitions: true, epistemic: true, collective: true, ..self }
+        Self {
+            integrated_systems: true,
+            phi_feedback: true,
+            creativity: true,
+            fractal: true,
+            meta_consciousness: true,
+            temporal_consciousness: true,
+            phase_transitions: true,
+            epistemic: true,
+            collective: true,
+            ..self
+        }
     }
 
     pub fn build(self) -> ConsciousnessPipeline {
@@ -118,9 +127,15 @@ impl ConsciousnessPipelineBuilder {
         pipeline.embodiment_level = self.embodiment_level;
 
         // If all systems requested, use the pipeline's full setup (includes phi_optimization etc.)
-        let is_full = self.integrated_systems && self.phi_feedback && self.creativity
-            && self.fractal && self.meta_consciousness && self.temporal_consciousness
-            && self.phase_transitions && self.epistemic && self.collective;
+        let is_full = self.integrated_systems
+            && self.phi_feedback
+            && self.creativity
+            && self.fractal
+            && self.meta_consciousness
+            && self.temporal_consciousness
+            && self.phase_transitions
+            && self.epistemic
+            && self.collective;
 
         if is_full {
             pipeline.enable_full_consciousness();

@@ -6,8 +6,8 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use super::endocrine::HormoneState;
 use super::coherence::{CoherenceState, TaskComplexity};
+use super::endocrine::HormoneState;
 
 /// A beacon broadcasting coherence state to peers
 #[derive(Debug, Clone, Default)]
@@ -181,9 +181,11 @@ impl SocialCoherenceField {
     pub fn get_alignment_vector(&self, _local_coherence: f32, local_resonance: f32) -> (f32, f32) {
         let target_coherence = self.field_strength as f32;
         let avg_resonance = if !self.active_beacons.is_empty() {
-            self.active_beacons.iter()
+            self.active_beacons
+                .iter()
                 .map(|b| b.resonance_frequency as f32)
-                .sum::<f32>() / self.active_beacons.len() as f32
+                .sum::<f32>()
+                / self.active_beacons.len() as f32
         } else {
             local_resonance
         };
@@ -192,8 +194,13 @@ impl SocialCoherenceField {
 
     /// Apply synchronization, returning deltas
     /// Returns (coherence_delta, resonance_delta)
-    pub fn apply_synchronization(&mut self, local_coherence: f32, local_resonance: f32) -> (f32, f32) {
-        let (target_coherence, target_resonance) = self.get_alignment_vector(local_coherence, local_resonance);
+    pub fn apply_synchronization(
+        &mut self,
+        local_coherence: f32,
+        local_resonance: f32,
+    ) -> (f32, f32) {
+        let (target_coherence, target_resonance) =
+            self.get_alignment_vector(local_coherence, local_resonance);
 
         // Gradual alignment (10% per step)
         let coherence_delta = (target_coherence - local_coherence) * 0.1;
@@ -247,9 +254,10 @@ impl CoherenceLendingProtocol {
     /// Check if we can lend the specified amount
     pub fn can_lend(&self, amount: f32, current_coherence: f32) -> bool {
         // Can lend if we have enough coherence and not too much lent out
-        current_coherence > 0.5 &&
-        self.total_lent + amount < current_coherence * 0.5 &&
-        amount > 0.0 && amount < 0.3
+        current_coherence > 0.5
+            && self.total_lent + amount < current_coherence * 0.5
+            && amount > 0.0
+            && amount < 0.3
     }
 
     /// Grant a loan to a peer
@@ -281,7 +289,7 @@ impl CoherenceLendingProtocol {
     /// Returns (coherence_returned, coherence_lost)
     pub fn process_repayments(&mut self, dt: Duration) -> (f32, f32) {
         let mut returned = 0.0;
-        let lost = 0.0;  // Currently unused, reserved for future default/timeout scenarios
+        let lost = 0.0; // Currently unused, reserved for future default/timeout scenarios
 
         // Update each loan
         for loan in &mut self.active_loans {
@@ -320,14 +328,16 @@ impl CoherenceLendingProtocol {
 
     /// Repay a loan
     pub fn repay(&mut self, borrower_id: &str) {
-        self.active_loans.retain(|loan| loan.borrower_id != borrower_id);
+        self.active_loans
+            .retain(|loan| loan.borrower_id != borrower_id);
     }
 
     /// Update trust score for a peer
     pub fn update_trust(&mut self, peer_id: impl Into<String>, delta: f32) {
         let peer_id = peer_id.into();
         let current = self.trust_scores.get(&peer_id).copied().unwrap_or(0.5);
-        self.trust_scores.insert(peer_id, (current + delta).clamp(0.0, 1.0));
+        self.trust_scores
+            .insert(peer_id, (current + delta).clamp(0.0, 1.0));
     }
 
     /// Accept an incoming loan from another peer (borrowing)
@@ -386,7 +396,8 @@ impl CollectiveLearning {
         }
 
         // Find the minimum coherence that led to success
-        let successful: Vec<f32> = observations.iter()
+        let successful: Vec<f32> = observations
+            .iter()
             .filter(|(_, success)| *success)
             .map(|(coherence, _)| *coherence)
             .collect();
@@ -432,7 +443,8 @@ impl CollectiveLearning {
     /// Merge knowledge from another CollectiveLearning instance
     pub fn merge_from(&mut self, other: &CollectiveLearning) {
         // Merge knowledge pool
-        self.knowledge_pool.extend(other.knowledge_pool.iter().cloned());
+        self.knowledge_pool
+            .extend(other.knowledge_pool.iter().cloned());
 
         // Merge threshold observations
         for (complexity, observations) in &other.threshold_observations {
@@ -443,7 +455,9 @@ impl CollectiveLearning {
         }
 
         // Update participant count and synergy
-        self.participant_count = self.participant_count.saturating_add(other.participant_count);
+        self.participant_count = self
+            .participant_count
+            .saturating_add(other.participant_count);
         self.synergy = (self.participant_count as f64).ln().max(0.0);
         self.collective_boost = 1.0 + 0.1 * self.synergy + 0.01 * other.knowledge_pool.len() as f64;
     }
@@ -457,10 +471,7 @@ impl CollectiveLearning {
     /// Returns (task_types_count, total_observations, total_contributors)
     pub fn get_stats(&self) -> (usize, usize, usize) {
         let task_types = self.threshold_observations.len();
-        let total_observations: usize = self.threshold_observations
-            .values()
-            .map(|v| v.len())
-            .sum();
+        let total_observations: usize = self.threshold_observations.values().map(|v| v.len()).sum();
         (task_types, total_observations, self.participant_count)
     }
 }
@@ -523,21 +534,28 @@ impl CollectivePrimitiveEvolution {
 
         // Keep pool manageable (top 1000 by score)
         if self.primitives.len() > 1000 {
-            self.primitives.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            self.primitives
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             self.primitives.truncate(1000);
         }
     }
 
     /// Query top primitives of a given tier
-    pub fn query_top_primitives(&self, tier: PrimitiveTier, count: usize) -> Vec<CandidatePrimitive> {
-        let mut matching: Vec<_> = self.primitives
+    pub fn query_top_primitives(
+        &self,
+        tier: PrimitiveTier,
+        count: usize,
+    ) -> Vec<CandidatePrimitive> {
+        let mut matching: Vec<_> = self
+            .primitives
             .iter()
             .filter(|(p, _)| p.tier == tier)
             .collect();
 
         matching.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        matching.into_iter()
+        matching
+            .into_iter()
             .take(count)
             .map(|(p, _)| p.clone())
             .collect()
@@ -553,7 +571,8 @@ impl CollectivePrimitiveEvolution {
 
         // Deduplicate and keep top
         if self.primitives.len() > 1000 {
-            self.primitives.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            self.primitives
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             self.primitives.truncate(1000);
         }
     }

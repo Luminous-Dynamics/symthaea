@@ -13,9 +13,8 @@
 //! not pattern matching. Each test validates this foundational approach.
 
 use symthaea::hdc::arithmetic_engine::{
-    ArithmeticEngine, HdcNumber, TheoremProver,
-    HybridArithmeticEngine, SymbolicExpr, SymbolicAlgebra,
-    MultiPathVerifier, MathReasoningBridge,
+    ArithmeticEngine, HdcNumber, HybridArithmeticEngine, MathReasoningBridge, MultiPathVerifier,
+    SymbolicAlgebra, SymbolicExpr, TheoremProver,
 };
 use symthaea::hdc::primitive_system::PrimitiveSystem;
 
@@ -29,8 +28,15 @@ fn test_zero_construction() {
     let zero = HdcNumber::zero(&primitives);
 
     assert_eq!(zero.value, 0, "Zero should have value 0");
-    assert_eq!(zero.construction.len(), 1, "Zero should have single construction step");
-    assert_eq!(zero.construction[0], "ZERO", "Zero construction should be ZERO");
+    assert_eq!(
+        zero.construction.len(),
+        1,
+        "Zero should have single construction step"
+    );
+    assert_eq!(
+        zero.construction[0], "ZERO",
+        "Zero construction should be ZERO"
+    );
 }
 
 #[test]
@@ -182,9 +188,12 @@ fn test_subtraction_basic() {
         let result = engine.subtract(a, b);
         assert!(result.is_some(), "{} - {} should be valid", a, b);
         assert_eq!(
-            result.unwrap().result.value, expected,
+            result.unwrap().result.value,
+            expected,
             "{} - {} should equal {}",
-            a, b, expected
+            a,
+            b,
+            expected
         );
     }
 
@@ -196,7 +205,8 @@ fn test_subtraction_basic() {
         assert!(
             result.is_none(),
             "{} - {} should be None (undefined in naturals)",
-            a, b
+            a,
+            b
         );
     }
 }
@@ -285,7 +295,10 @@ fn test_hybrid_engine_small_numbers() {
 
     assert_eq!(result.value, 7);
     // Result should have computation info
-    assert!(result.full_proof.is_some() || result.abstract_proof.is_some(), "Result should have proof");
+    assert!(
+        result.full_proof.is_some() || result.abstract_proof.is_some(),
+        "Result should have proof"
+    );
 }
 
 #[test]
@@ -361,7 +374,10 @@ fn test_symbolic_algebra_simplification() {
     let simplified = algebra.simplify(&sum, &primitives);
 
     // The simplification should recognize x + 0 = x
-    assert!(simplified.phi >= 0.0, "Simplified expression should have non-negative Phi");
+    assert!(
+        simplified.phi >= 0.0,
+        "Simplified expression should have non-negative Phi"
+    );
 }
 
 // ============================================================================
@@ -374,8 +390,14 @@ fn test_multi_path_simple_addition() {
 
     let result = verifier.verify_addition_commutative(3, 4);
 
-    assert!(result.paths_agree, "All paths should agree on 3 + 4 = 4 + 3");
-    assert!(!result.valid_paths().is_empty(), "Should have at least one valid path");
+    assert!(
+        result.paths_agree,
+        "All paths should agree on 3 + 4 = 4 + 3"
+    );
+    assert!(
+        !result.valid_paths().is_empty(),
+        "Should have at least one valid path"
+    );
 }
 
 #[test]
@@ -384,7 +406,10 @@ fn test_multi_path_multiplication() {
 
     let result = verifier.verify_multiplication_commutative(4, 5);
 
-    assert!(result.paths_agree, "All paths should agree on 4 * 5 = 5 * 4");
+    assert!(
+        result.paths_agree,
+        "All paths should agree on 4 * 5 = 5 * 4"
+    );
 }
 
 #[test]
@@ -420,7 +445,10 @@ fn test_reasoning_bridge_number_assertions() {
     // Should be able to assert properties about numbers
     let assertion = bridge.assert_prime(7);
 
-    assert!(assertion.phi > 0.0, "Prime assertion should have positive Phi");
+    assert!(
+        assertion.phi > 0.0,
+        "Prime assertion should have positive Phi"
+    );
 }
 
 // ============================================================================

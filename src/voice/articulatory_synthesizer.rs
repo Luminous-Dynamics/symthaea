@@ -39,7 +39,7 @@
 //! coarticulation: faster transitions for rapid speech, slower
 //! for careful articulation. The tau is modulated by LTCPacing.
 
-use crate::voice::formant_targets::{FormantTarget, FormantDatabase};
+use crate::voice::formant_targets::{FormantDatabase, FormantTarget};
 use crate::voice::phoneme_hdc::PhonemeHdcCodec;
 use crate::voice::LTCPacing;
 use serde::{Deserialize, Serialize};
@@ -78,8 +78,12 @@ impl FormantFrame {
     /// Create a silent frame
     pub fn silent(time: f32) -> Self {
         Self {
-            f1: 0.0, f2: 0.0, f3: 0.0,
-            b1: 60.0, b2: 90.0, b3: 150.0,
+            f1: 0.0,
+            f2: 0.0,
+            f3: 0.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
             f0: 0.0,
             energy: 0.0,
             voicing: 0.0,
@@ -248,13 +252,13 @@ pub struct ArticulatoryConfig {
 impl Default for ArticulatoryConfig {
     fn default() -> Self {
         Self {
-            frame_rate: 200.0,  // 5ms per frame
-            base_tau: 0.05,     // 50ms default transition
-            base_f0: 120.0,     // Male voice default
-            f0_range: 12.0,     // One octave range
+            frame_rate: 200.0, // 5ms per frame
+            base_tau: 0.05,    // 50ms default transition
+            base_f0: 120.0,    // Male voice default
+            f0_range: 12.0,    // One octave range
             coarticulation: true,
             lookahead: 2,
-            hdc_coarticulation: true,  // Enable HDC-driven coarticulation
+            hdc_coarticulation: true, // Enable HDC-driven coarticulation
         }
     }
 }
@@ -287,7 +291,7 @@ impl ArticulatorySynthesizer {
     /// Create with custom configuration
     pub fn with_config(config: ArticulatoryConfig) -> Self {
         let formants = FormantDatabase::new();
-        let initial_target = formants.lookup_or_default("AX");  // Start at schwa
+        let initial_target = formants.lookup_or_default("AX"); // Start at schwa
 
         Self {
             cfc: CfCState::new(
@@ -321,10 +325,7 @@ impl ArticulatorySynthesizer {
     /// Reset synthesizer state
     pub fn reset(&mut self) {
         let initial = self.formants.lookup_or_default("AX");
-        self.cfc = CfCState::new(
-            [initial.f1, initial.f2, initial.f3],
-            self.config.base_tau,
-        );
+        self.cfc = CfCState::new([initial.f1, initial.f2, initial.f3], self.config.base_tau);
         self.current_time = 0.0;
     }
 
@@ -364,13 +365,17 @@ impl ArticulatorySynthesizer {
 
         // Similar phonemes: blend earlier and more (easier coarticulation)
         // Dissimilar phonemes: blend later and less (harder coarticulation)
-        let sim_factor = 0.5 + similarity * 0.5;  // 0.5 to 1.0
+        let sim_factor = 0.5 + similarity * 0.5; // 0.5 to 1.0
 
         (base_blend * sim_factor).min(0.5)
     }
 
     /// Synthesize formant frames from phoneme sequence
-    pub fn synthesize(&mut self, phonemes: &[TimedPhoneme], pacing: &LTCPacing) -> Vec<FormantFrame> {
+    pub fn synthesize(
+        &mut self,
+        phonemes: &[TimedPhoneme],
+        pacing: &LTCPacing,
+    ) -> Vec<FormantFrame> {
         if phonemes.is_empty() {
             return Vec::new();
         }
@@ -378,9 +383,7 @@ impl ArticulatorySynthesizer {
         self.reset();
 
         // Calculate total duration
-        let total_duration: f32 = phonemes.iter()
-            .map(|p| p.duration)
-            .sum();
+        let total_duration: f32 = phonemes.iter().map(|p| p.duration).sum();
 
         // Calculate number of frames
         let frame_duration = 1.0 / self.config.frame_rate;
@@ -396,9 +399,7 @@ impl ArticulatorySynthesizer {
             let time = frame_idx as f32 * frame_duration;
 
             // Find current phoneme
-            while phoneme_idx < phonemes.len() - 1
-                && time >= phonemes[phoneme_idx].end_time()
-            {
+            while phoneme_idx < phonemes.len() - 1 && time >= phonemes[phoneme_idx].end_time() {
                 phoneme_idx += 1;
                 time_in_phoneme = 0.0;
             }
@@ -410,15 +411,14 @@ impl ArticulatorySynthesizer {
             let next_phoneme = phonemes.get(phoneme_idx + 1);
 
             // Compute HDC-modulated tau
-            let hdc_tau_mod = self.hdc_tau_modifier(
-                &current.phoneme,
-                next_phoneme.map(|p| p.phoneme.as_str()),
-            );
+            let hdc_tau_mod =
+                self.hdc_tau_modifier(&current.phoneme, next_phoneme.map(|p| p.phoneme.as_str()));
             let tau_modifier = pacing.tau * hdc_tau_mod;
             self.cfc.set_tau(self.config.base_tau * tau_modifier);
 
             // Apply coarticulation from next phoneme
-            let effective_target = if self.config.coarticulation && phoneme_idx + 1 < phonemes.len() {
+            let effective_target = if self.config.coarticulation && phoneme_idx + 1 < phonemes.len()
+            {
                 let next = &phonemes[phoneme_idx + 1];
                 let next_target = self.formants.lookup_or_default(&next.phoneme);
 
@@ -432,7 +432,11 @@ impl ArticulatorySynthesizer {
             };
 
             // Update CfC target
-            self.cfc.set_target([effective_target.f1, effective_target.f2, effective_target.f3]);
+            self.cfc.set_target([
+                effective_target.f1,
+                effective_target.f2,
+                effective_target.f3,
+            ]);
 
             // Step CfC
             let formants = self.cfc.step(frame_duration);
@@ -441,12 +445,8 @@ impl ArticulatorySynthesizer {
             let f0 = self.compute_f0(time, total_duration, current.stress, pacing);
 
             // Compute energy envelope
-            let energy = self.compute_energy(
-                time_in_phoneme,
-                current.duration,
-                current.stress,
-                pacing,
-            );
+            let energy =
+                self.compute_energy(time_in_phoneme, current.duration, current.stress, pacing);
 
             // Create frame
             frames.push(FormantFrame {
@@ -484,7 +484,7 @@ impl ArticulatorySynthesizer {
             let (phoneme, stress) = if let Some(last) = token.chars().last() {
                 if last.is_ascii_digit() {
                     let stress = last.to_digit(10).unwrap_or(0) as u8;
-                    (&token[..token.len()-1], stress)
+                    (&token[..token.len() - 1], stress)
                 } else {
                     (token, 0)
                 }
@@ -494,7 +494,7 @@ impl ArticulatorySynthesizer {
 
             // Get duration from formant database
             let target = self.formants.lookup_or_default(phoneme);
-            let duration = target.duration_ms / 1000.0;  // Convert to seconds
+            let duration = target.duration_ms / 1000.0; // Convert to seconds
 
             phonemes.push(TimedPhoneme {
                 phoneme: phoneme.to_string(),
@@ -524,10 +524,10 @@ impl ArticulatorySynthesizer {
         };
 
         // Emotional modulation from pacing
-        let emotional_shift = pacing.emotional_valence * 0.1;  // ±10%
+        let emotional_shift = pacing.emotional_valence * 0.1; // ±10%
 
         // Arousal affects pitch range
-        let arousal_range = 1.0 + pacing.arousal * 0.2;  // Up to 20% more range
+        let arousal_range = 1.0 + pacing.arousal * 0.2; // Up to 20% more range
 
         base * declination * stress_boost * (1.0 + emotional_shift) * arousal_range
     }
@@ -599,9 +599,9 @@ fn anticipatory_blend(progress: f32) -> f32 {
     if progress < 0.7 {
         0.0
     } else {
-        let x = (progress - 0.7) / 0.3;  // 0 to 1 in last 30%
-        // Smooth sigmoid-like curve
-        x * x * (3.0 - 2.0 * x)  // Smoothstep
+        let x = (progress - 0.7) / 0.3; // 0 to 1 in last 30%
+                                        // Smooth sigmoid-like curve
+        x * x * (3.0 - 2.0 * x) // Smoothstep
     }
 }
 
@@ -616,14 +616,28 @@ mod tests {
     #[test]
     fn test_formant_frame_interpolation() {
         let a = FormantFrame {
-            f1: 300.0, f2: 2000.0, f3: 3000.0,
-            b1: 60.0, b2: 90.0, b3: 150.0,
-            f0: 120.0, energy: 1.0, voicing: 1.0, time: 0.0,
+            f1: 300.0,
+            f2: 2000.0,
+            f3: 3000.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 120.0,
+            energy: 1.0,
+            voicing: 1.0,
+            time: 0.0,
         };
         let b = FormantFrame {
-            f1: 700.0, f2: 1000.0, f3: 2500.0,
-            b1: 80.0, b2: 120.0, b3: 200.0,
-            f0: 100.0, energy: 0.5, voicing: 0.0, time: 1.0,
+            f1: 700.0,
+            f2: 1000.0,
+            f3: 2500.0,
+            b1: 80.0,
+            b2: 120.0,
+            b3: 200.0,
+            f0: 100.0,
+            energy: 0.5,
+            voicing: 0.0,
+            time: 1.0,
         };
 
         let mid = a.lerp(&b, 0.5);
@@ -703,9 +717,7 @@ mod tests {
     fn test_pacing_affects_synthesis() {
         let mut synth = ArticulatorySynthesizer::new();
 
-        let phonemes = vec![
-            TimedPhoneme::new("AH", 0.1).with_stress(1),
-        ];
+        let phonemes = vec![TimedPhoneme::new("AH", 0.1).with_stress(1)];
 
         let calm = LTCPacing::calm();
         let excited = LTCPacing::excited();
@@ -718,6 +730,6 @@ mod tests {
         let calm_energy: f32 = calm_frames.iter().map(|f| f.energy).sum();
         let excited_energy: f32 = excited_frames.iter().map(|f| f.energy).sum();
 
-        assert!(excited_energy > calm_energy * 0.9);  // Allow some variance
+        assert!(excited_energy > calm_energy * 0.9); // Allow some variance
     }
 }

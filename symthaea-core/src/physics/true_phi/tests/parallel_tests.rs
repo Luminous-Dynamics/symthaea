@@ -20,11 +20,18 @@ fn test_parallel_entropy_batch() {
         let parallel_h = parallel_results[i];
 
         let diff = (serial_h - parallel_h).abs();
-        assert!(diff < 1e-10,
-            "Parallel entropy should match serial: {:.6} vs {:.6}", parallel_h, serial_h);
+        assert!(
+            diff < 1e-10,
+            "Parallel entropy should match serial: {:.6} vs {:.6}",
+            parallel_h,
+            serial_h
+        );
     }
 
-    println!("Parallel entropy batch: {} vectors processed", vectors.len());
+    println!(
+        "Parallel entropy batch: {} vectors processed",
+        vectors.len()
+    );
 }
 
 #[test]
@@ -46,14 +53,25 @@ fn test_parallel_mi_matrix() {
                 // Diagonal should be entropy
                 let expected = serial.entropy(&vectors[i]);
                 let diff = (matrix[i][j] - expected).abs();
-                assert!(diff < 1e-10,
-                    "Diagonal should be entropy: {:.6} vs {:.6}", matrix[i][j], expected);
+                assert!(
+                    diff < 1e-10,
+                    "Diagonal should be entropy: {:.6} vs {:.6}",
+                    matrix[i][j],
+                    expected
+                );
             } else {
                 // Off-diagonal should be symmetric
                 let diff = (matrix[i][j] - matrix[j][i]).abs();
-                assert!(diff < 1e-10,
+                assert!(
+                    diff < 1e-10,
                     "MI matrix should be symmetric: [{},{}]={:.6}, [{},{}]={:.6}",
-                    i, j, matrix[i][j], j, i, matrix[j][i]);
+                    i,
+                    j,
+                    matrix[i][j],
+                    j,
+                    i,
+                    matrix[j][i]
+                );
             }
         }
     }
@@ -74,8 +92,12 @@ fn test_parallel_effective_information() {
     let serial_ei = serial.effective_information(&vectors);
 
     let diff = (parallel_ei - serial_ei).abs();
-    assert!(diff < 1e-6,
-        "Parallel EI should match serial: {:.6} vs {:.6}", parallel_ei, serial_ei);
+    assert!(
+        diff < 1e-6,
+        "Parallel EI should match serial: {:.6} vs {:.6}",
+        parallel_ei,
+        serial_ei
+    );
 
     println!("Parallel EI: {:.6}", parallel_ei);
 }
@@ -97,6 +119,8 @@ fn test_parallel_true_phi() {
     assert_eq!(parallel_result.component_entropies.len(), 4);
     assert_eq!(parallel_result.mutual_information_matrix.len(), 4);
 
-    println!("Parallel \u{03a6}: {:.6}, Serial \u{03a6}: {:.6}",
-        parallel_result.phi, serial_result.phi);
+    println!(
+        "Parallel \u{03a6}: {:.6}, Serial \u{03a6}: {:.6}",
+        parallel_result.phi, serial_result.phi
+    );
 }

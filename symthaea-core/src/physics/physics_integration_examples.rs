@@ -13,9 +13,7 @@
 use super::chaos_dynamics::{systems, AttractorAnalyzer, LyapunovCalculator};
 use super::constants::{C, G};
 use super::decoherence::DensityMatrix;
-use super::nonequilibrium::{
-    FluctuationDissipation, JarzynskiEstimator, OnsagerCoefficients,
-};
+use super::nonequilibrium::{FluctuationDissipation, JarzynskiEstimator, OnsagerCoefficients};
 use super::quantum_tunneling::TunnelingCalculator;
 use super::tensor_algebra::{GeodesicSolver, MetricTensor};
 
@@ -51,7 +49,9 @@ impl TunnelingWithDecoherence {
         time: f64,
     ) -> (f64, f64, f64) {
         // Coherent tunneling probability
-        let result = self.tunneling.rectangular_barrier(energy, barrier_height, barrier_width);
+        let result = self
+            .tunneling
+            .rectangular_barrier(energy, barrier_height, barrier_width);
         let coherent_prob = result.transmission;
 
         // Decoherence reduces off-diagonal elements
@@ -201,7 +201,8 @@ impl ClimateChaosDynamics {
     pub fn lyapunov_exponent(&self) -> f64 {
         let (sigma, rho, beta) = self.lorenz_params;
         let system = move |state: &[f64]| systems::lorenz(state, sigma, rho, beta).to_vec();
-        self.lyapunov_calc.maximal_lyapunov(system, &[1.0, 1.0, 1.0], 1e-8)
+        self.lyapunov_calc
+            .maximal_lyapunov(system, &[1.0, 1.0, 1.0], 1e-8)
     }
 
     /// Analyze attractor dimension
@@ -359,22 +360,26 @@ impl NonequilibriumFreeEnergy {
     /// Estimate free energy from work measurements
     /// Works for any nonequilibrium process, no matter how fast
     pub fn estimate_free_energy(&self, work_samples: &[f64]) -> f64 {
-        self.estimator.free_energy_difference(work_samples, self.temperature)
+        self.estimator
+            .free_energy_difference(work_samples, self.temperature)
     }
 
     /// Estimate with bootstrap error bars
     pub fn estimate_with_error(&self, work_samples: &[f64], n_bootstrap: usize) -> (f64, f64) {
-        self.estimator.free_energy_with_error(work_samples, self.temperature, n_bootstrap)
+        self.estimator
+            .free_energy_with_error(work_samples, self.temperature, n_bootstrap)
     }
 
     /// Use Crooks fluctuation theorem for bidirectional estimate
     pub fn bidirectional_estimate(&self, forward_work: &[f64], reverse_work: &[f64]) -> f64 {
-        self.estimator.crooks_free_energy(forward_work, reverse_work, self.temperature)
+        self.estimator
+            .crooks_free_energy(forward_work, reverse_work, self.temperature)
     }
 
     /// Calculate dissipated work: W_diss = <W> - ΔF
     pub fn dissipated_work(&self, work_samples: &[f64]) -> f64 {
-        self.estimator.dissipated_work(work_samples, self.temperature)
+        self.estimator
+            .dissipated_work(work_samples, self.temperature)
     }
 }
 

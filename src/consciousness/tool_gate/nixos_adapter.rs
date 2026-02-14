@@ -4,9 +4,9 @@
 //! `shell::context::GateDecision`, ensuring backward compatibility
 //! with the existing PhiGate system while adding the new tool gate.
 
-use crate::shell::context::GateDecision as ShellGateDecision;
 use super::types::{GateDecision as ToolGateDecision, GateResult, RiskLevel, ToolDescriptor};
 use crate::action::DestructivenessLevel;
+use crate::shell::context::GateDecision as ShellGateDecision;
 
 /// Convert a tool gate decision to a shell gate decision.
 impl From<&GateResult> for ShellGateDecision {
@@ -88,7 +88,10 @@ fn get_nixos_rollback(command: &str) -> Option<String> {
     } else if cmd.contains("nix-env -i") || cmd.contains("nix profile install") {
         let pkg = cmd.split_whitespace().last().unwrap_or("package");
         Some(format!("nix-env -e {} || nix profile remove {}", pkg, pkg))
-    } else if cmd.starts_with("nix build") || cmd.starts_with("nix develop") || cmd.starts_with("nix shell") {
+    } else if cmd.starts_with("nix build")
+        || cmd.starts_with("nix develop")
+        || cmd.starts_with("nix shell")
+    {
         Some("exit".to_string()) // nix environments are ephemeral
     } else if cmd.starts_with("systemctl restart") || cmd.starts_with("systemctl stop") {
         let svc = cmd.split_whitespace().last().unwrap_or("service");
@@ -120,7 +123,10 @@ mod tests {
     #[test]
     fn test_gate_result_to_shell_vetoed() {
         let result = GateResult {
-            decision: ToolGateDecision::InsufficientPhi { current: 0.1, required: 0.7 },
+            decision: ToolGateDecision::InsufficientPhi {
+                current: 0.1,
+                required: 0.7,
+            },
             required_phi: 0.7,
             required_confidence: 0.6,
             actual_phi_eff: 0.1,
@@ -134,8 +140,14 @@ mod tests {
 
     #[test]
     fn test_destructiveness_to_risk_level() {
-        assert_eq!(RiskLevel::from(DestructivenessLevel::ReadOnly), RiskLevel::ReadOnly);
-        assert_eq!(RiskLevel::from(DestructivenessLevel::Destructive), RiskLevel::Critical);
+        assert_eq!(
+            RiskLevel::from(DestructivenessLevel::ReadOnly),
+            RiskLevel::ReadOnly
+        );
+        assert_eq!(
+            RiskLevel::from(DestructivenessLevel::Destructive),
+            RiskLevel::Critical
+        );
     }
 
     #[test]
@@ -147,7 +159,10 @@ mod tests {
 
     #[test]
     fn test_tool_descriptor_from_shell() {
-        let td = tool_descriptor_from_shell_command("nix search nixpkgs firefox", DestructivenessLevel::ReadOnly);
+        let td = tool_descriptor_from_shell_command(
+            "nix search nixpkgs firefox",
+            DestructivenessLevel::ReadOnly,
+        );
         assert!(td.is_read_only);
         assert_eq!(td.domain, Some("nixos".to_string()));
     }

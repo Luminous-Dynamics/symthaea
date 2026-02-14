@@ -213,9 +213,8 @@ impl WindowType {
             WindowType::Hamming => 0.54 - 0.46 * (2.0 * PI * n_f / nm1).cos(),
             WindowType::Blackman => {
                 // Clamp to 0.0 to avoid tiny negative values from floating point
-                (0.42 - 0.5 * (2.0 * PI * n_f / nm1).cos()
-                    + 0.08 * (4.0 * PI * n_f / nm1).cos())
-                .max(0.0)
+                (0.42 - 0.5 * (2.0 * PI * n_f / nm1).cos() + 0.08 * (4.0 * PI * n_f / nm1).cos())
+                    .max(0.0)
             }
         }
     }
@@ -415,7 +414,11 @@ impl SpectralAnalyzer {
     /// PSD is defined as S(f) = |X(f)|^2 / N, giving power per frequency bin.
     /// Only non-negative frequencies are returned (N/2 + 1 points).
     pub fn psd(&self, signal: &[f64]) -> FrequencySpectrum {
-        let _n = self.config.window_size.max(signal.len()).next_power_of_two();
+        let _n = self
+            .config
+            .window_size
+            .max(signal.len())
+            .next_power_of_two();
 
         // Apply window
         let window = self.config.window_type.generate(signal.len());
@@ -448,11 +451,7 @@ impl SpectralAnalyzer {
             let mag = spectrum[k].norm();
             let phase = spectrum[k].arg();
             // One-sided PSD: double power for non-DC, non-Nyquist bins
-            let scale = if k == 0 || k == n_fft / 2 {
-                1.0
-            } else {
-                2.0
-            };
+            let scale = if k == 0 || k == n_fft / 2 { 1.0 } else { 2.0 };
             let p = scale * spectrum[k].norm_sqr() / n_fft as f64 * correction;
 
             frequencies.push(freq);
@@ -518,11 +517,7 @@ impl SpectralAnalyzer {
             let spectrum = Self::fft(&windowed);
 
             for k in 0..n_pos {
-                let scale = if k == 0 || k == n_fft / 2 {
-                    1.0
-                } else {
-                    2.0
-                };
+                let scale = if k == 0 || k == n_fft / 2 { 1.0 } else { 2.0 };
                 avg_psd[k] += scale * spectrum[k].norm_sqr() / n_fft as f64 * correction;
             }
 
@@ -565,11 +560,7 @@ impl SpectralAnalyzer {
     ///
     /// Both signals must be the same length; panics otherwise.
     pub fn coherence(&self, x: &[f64], y: &[f64]) -> CoherenceResult {
-        assert_eq!(
-            x.len(),
-            y.len(),
-            "Coherence requires equal-length signals"
-        );
+        assert_eq!(x.len(), y.len(), "Coherence requires equal-length signals");
 
         let win_len = self.config.window_size.min(x.len());
         let step = ((1.0 - self.config.overlap.clamp(0.0, 0.99)) * win_len as f64) as usize;
@@ -964,10 +955,7 @@ mod tests {
         for (i, &c) in result.coherence.iter().enumerate() {
             if c > 0.01 {
                 // only check bins with non-negligible power
-                assert!(
-                    c > 0.99,
-                    "Self-coherence at bin {i} = {c}, expected ~1.0"
-                );
+                assert!(c > 0.99, "Self-coherence at bin {i} = {c}, expected ~1.0");
             }
         }
     }

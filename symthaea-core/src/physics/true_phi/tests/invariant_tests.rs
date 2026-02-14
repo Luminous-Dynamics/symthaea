@@ -12,7 +12,12 @@ fn test_invariant_entropy_non_negative() {
     for seed in 0..10 {
         let hv = ContinuousHV::random(HDC_DIMENSION, seed);
         let h = est.entropy(&hv);
-        assert!(h >= 0.0, "Entropy must be non-negative: H = {:.6} for seed {}", h, seed);
+        assert!(
+            h >= 0.0,
+            "Entropy must be non-negative: H = {:.6} for seed {}",
+            h,
+            seed
+        );
     }
 }
 
@@ -29,8 +34,12 @@ fn test_invariant_mi_symmetric() {
         let mi_ba = est.mutual_information_fast(&b, &a);
 
         let diff = (mi_ab - mi_ba).abs();
-        assert!(diff < 1e-10,
-            "MI should be symmetric: I(A;B)={:.6}, I(B;A)={:.6}", mi_ab, mi_ba);
+        assert!(
+            diff < 1e-10,
+            "MI should be symmetric: I(A;B)={:.6}, I(B;A)={:.6}",
+            mi_ab,
+            mi_ba
+        );
     }
 }
 
@@ -45,8 +54,12 @@ fn test_invariant_phi_non_negative() {
             .collect();
 
         let result = calc.compute_true_phi(&components);
-        assert!(result.phi >= 0.0,
-            "\u{03a6} must be non-negative: {:.6} for seed {}", result.phi, seed);
+        assert!(
+            result.phi >= 0.0,
+            "\u{03a6} must be non-negative: {:.6} for seed {}",
+            result.phi,
+            seed
+        );
     }
 }
 
@@ -63,12 +76,21 @@ fn test_invariant_partition_complete() {
         let result = calc.compute_true_phi(&components);
         let total = result.mip.part_a.len() + result.mip.part_b.len();
 
-        assert_eq!(total, n,
-            "MIP should partition all {} elements, got {}", n, total);
-        assert!(!result.mip.part_a.is_empty(),
-            "MIP part A should not be empty for n={}", n);
-        assert!(!result.mip.part_b.is_empty(),
-            "MIP part B should not be empty for n={}", n);
+        assert_eq!(
+            total, n,
+            "MIP should partition all {} elements, got {}",
+            n, total
+        );
+        assert!(
+            !result.mip.part_a.is_empty(),
+            "MIP part A should not be empty for n={}",
+            n
+        );
+        assert!(
+            !result.mip.part_b.is_empty(),
+            "MIP part B should not be empty for n={}",
+            n
+        );
     }
 }
 
@@ -82,8 +104,11 @@ fn test_invariant_system_ei_geq_mip_ei() {
         let components: Vec<ContinuousHV> = (0..4)
             .map(|i| {
                 ContinuousHV::weighted_bundle(
-                    &[&base, &ContinuousHV::random(HDC_DIMENSION, seed * 1000 + 100 + i)],
-                    &[0.8, 0.2]
+                    &[
+                        &base,
+                        &ContinuousHV::random(HDC_DIMENSION, seed * 1000 + 100 + i),
+                    ],
+                    &[0.8, 0.2],
                 )
             })
             .collect();
@@ -92,9 +117,12 @@ fn test_invariant_system_ei_geq_mip_ei() {
 
         // Φ = system_ei - mip_ei, so system_ei should be >= mip_ei
         // (allowing small numerical tolerance)
-        assert!(result.system_ei >= result.mip_ei - 1e-10,
+        assert!(
+            result.system_ei >= result.mip_ei - 1e-10,
             "System EI ({:.6}) should be >= MIP EI ({:.6})",
-            result.system_ei, result.mip_ei);
+            result.system_ei,
+            result.mip_ei
+        );
     }
 }
 
@@ -111,6 +139,9 @@ fn test_invariant_binding_reversibility() {
     let sim = a.similarity(&recovered);
 
     // Should have high similarity (binding is self-inverse)
-    assert!(sim > 0.5,
-        "Binding should be approximately reversible: similarity = {:.4}", sim);
+    assert!(
+        sim > 0.5,
+        "Binding should be approximately reversible: similarity = {:.4}",
+        sim
+    );
 }

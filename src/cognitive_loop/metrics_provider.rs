@@ -3,9 +3,9 @@
 //! Bridges the cognitive loop's internal state to the IPC metrics system,
 //! enabling the shell TUI and external tools to observe consciousness state.
 
-use crate::shell::ipc_server::MetricsProvider;
-use crate::shell::ipc_client::MetricsSnapshot;
 use super::CognitiveLoopService;
+use crate::shell::ipc_client::MetricsSnapshot;
+use crate::shell::ipc_server::MetricsProvider;
 
 impl MetricsProvider for CognitiveLoopService {
     fn get_metrics(&self) -> MetricsSnapshot {

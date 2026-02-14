@@ -43,7 +43,7 @@ impl ChaosDetector {
             history: Vec::with_capacity(max_history),
             max_history,
             lyapunov_estimate: 0.0,
-            embedding_dim: 3,  // Standard for low-dimensional chaos
+            embedding_dim: 3, // Standard for low-dimensional chaos
             time_delay: 1,
             confidence: 0.0,
         }
@@ -110,7 +110,8 @@ impl ChaosDetector {
                     ];
 
                     // Euclidean distance in embedded space
-                    let dist: f64 = state_i.iter()
+                    let dist: f64 = state_i
+                        .iter()
                         .zip(state_j.iter())
                         .map(|(a, b)| (a - b).powi(2))
                         .sum::<f64>()
@@ -124,7 +125,10 @@ impl ChaosDetector {
             }
 
             // Compute divergence after evolution
-            if min_dist < f64::MAX && min_idx + window + embedding_lag < n && i + window + embedding_lag < n {
+            if min_dist < f64::MAX
+                && min_idx + window + embedding_lag < n
+                && i + window + embedding_lag < n
+            {
                 let state_i_evolved = [
                     self.history[i + window],
                     self.history[(i + window).saturating_sub(embedding_lag)],
@@ -136,7 +140,8 @@ impl ChaosDetector {
                     self.history[(min_idx + window).saturating_sub(embedding_lag * 2)],
                 ];
 
-                let evolved_dist: f64 = state_i_evolved.iter()
+                let evolved_dist: f64 = state_i_evolved
+                    .iter()
                     .zip(state_j_evolved.iter())
                     .map(|(a, b)| (a - b).powi(2))
                     .sum::<f64>()
@@ -155,9 +160,8 @@ impl ChaosDetector {
 
             // Confidence based on consistency of estimates
             let mean = self.lyapunov_estimate;
-            let variance: f64 = divergences.iter()
-                .map(|x| (x - mean).powi(2))
-                .sum::<f64>() / divergences.len() as f64;
+            let variance: f64 = divergences.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
+                / divergences.len() as f64;
             let std_dev = variance.sqrt();
 
             // Higher confidence if estimates are consistent
@@ -176,9 +180,7 @@ impl ChaosDetector {
         let mean: f64 = self.history.iter().sum::<f64>() / n as f64;
 
         // Compute variance
-        let variance: f64 = self.history.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / n as f64;
+        let variance: f64 = self.history.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64;
 
         if variance < 1e-10 {
             return 1.0; // Constant signal is maximally periodic
@@ -248,9 +250,7 @@ impl ChaosDetector {
         //   EEG signals show Lyapunov 0.36-0.39 due to noise, true chaos is 0.40+
         // - High confidence (>0.5)
         // - Sufficient history
-        self.lyapunov_estimate > 0.40 &&
-        self.confidence > 0.5 &&
-        self.history.len() >= 100
+        self.lyapunov_estimate > 0.40 && self.confidence > 0.5 && self.history.len() >= 100
     }
 
     /// Get chaos metrics
@@ -275,20 +275,17 @@ impl ChaosDetector {
         }
 
         // Current state vector
-        let current: Vec<f64> = (0..d)
-            .map(|i| self.history[n - 1 - i * tau])
-            .collect();
+        let current: Vec<f64> = (0..d).map(|i| self.history[n - 1 - i * tau]).collect();
 
         // Find k nearest neighbors in embedded space
         let k = 5;
         let mut neighbors: Vec<(usize, f64)> = Vec::new();
 
         for i in (d * tau)..(n - tau - 1) {
-            let state: Vec<f64> = (0..d)
-                .map(|j| self.history[i - j * tau])
-                .collect();
+            let state: Vec<f64> = (0..d).map(|j| self.history[i - j * tau]).collect();
 
-            let dist: f64 = current.iter()
+            let dist: f64 = current
+                .iter()
                 .zip(state.iter())
                 .map(|(a, b)| (a - b).powi(2))
                 .sum::<f64>()
@@ -361,10 +358,10 @@ impl AdaptiveWeightManager {
             weights: vec![initial_weight; n_branches],
             cumulative_rewards: vec![0.0; n_branches],
             counts: vec![0; n_branches],
-            temperature: 2.0,      // Start with high exploration
-            temp_decay: 0.995,     // Gradual annealing
-            min_temperature: 0.1,  // Minimum exploration
-            ema_alpha: 0.1,        // EMA smoothing factor
+            temperature: 2.0,     // Start with high exploration
+            temp_decay: 0.995,    // Gradual annealing
+            min_temperature: 0.1, // Minimum exploration
+            ema_alpha: 0.1,       // EMA smoothing factor
         }
     }
 
@@ -376,24 +373,28 @@ impl AdaptiveWeightManager {
         }
 
         // Convert errors to rewards (lower error = higher reward)
-        let rewards: Vec<f64> = branch_errors.iter()
+        let rewards: Vec<f64> = branch_errors
+            .iter()
             .map(|e| 1.0 - e.clamp(0.0, 1.0))
             .collect();
 
         // Update cumulative rewards with EMA
         for i in 0..n {
             self.cumulative_rewards[i] =
-                (1.0 - self.ema_alpha) * self.cumulative_rewards[i] +
-                self.ema_alpha * rewards[i];
+                (1.0 - self.ema_alpha) * self.cumulative_rewards[i] + self.ema_alpha * rewards[i];
             self.counts[i] += 1;
         }
 
         // Compute softmax weights with temperature
-        let max_reward = self.cumulative_rewards.iter()
+        let max_reward = self
+            .cumulative_rewards
+            .iter()
             .cloned()
             .fold(f64::NEG_INFINITY, f64::max);
 
-        let exp_rewards: Vec<f64> = self.cumulative_rewards.iter()
+        let exp_rewards: Vec<f64> = self
+            .cumulative_rewards
+            .iter()
             .map(|r| ((r - max_reward) / self.temperature).exp())
             .collect();
 
@@ -451,7 +452,7 @@ pub struct MemoryHorizon {
     /// History buffer for validation
     history: Vec<bool>,
     /// Pending predictions awaiting validation
-    pending: Vec<Vec<(bool, f64)>>,  // pending[horizon] = [(prediction, confidence), ...]
+    pending: Vec<Vec<(bool, f64)>>, // pending[horizon] = [(prediction, confidence), ...]
 }
 
 impl MemoryHorizon {
@@ -471,11 +472,15 @@ impl MemoryHorizon {
     pub fn predict(&mut self, base_prediction: bool, base_confidence: f64) {
         // Generate predictions with confidence decay
         for h in 0..self.max_horizon {
-            let decay = 0.9_f64.powi(h as i32);  // 10% decay per step
+            let decay = 0.9_f64.powi(h as i32); // 10% decay per step
             let conf = base_confidence * decay;
 
             // For longer horizons, reduce certainty
-            let pred = if conf > 0.5 { base_prediction } else { !base_prediction };
+            let pred = if conf > 0.5 {
+                base_prediction
+            } else {
+                !base_prediction
+            };
 
             self.predictions[h] = Some(pred);
             self.confidences[h] = conf;
@@ -508,7 +513,8 @@ impl MemoryHorizon {
 
     /// Get accuracy for each horizon
     pub fn horizon_accuracies(&self) -> Vec<f64> {
-        self.horizon_correct.iter()
+        self.horizon_correct
+            .iter()
             .zip(self.horizon_total.iter())
             .map(|(&correct, &total)| {
                 if total > 0 {
@@ -542,7 +548,7 @@ impl MemoryHorizon {
         (
             self.predictions.get(best_horizon).copied().flatten(),
             self.confidences.get(best_horizon).copied().unwrap_or(0.5),
-            best_horizon
+            best_horizon,
         )
     }
 }
@@ -572,7 +578,7 @@ impl AmplitudeWeightedLearner {
             mean_amplitude: 1.0,
             std_amplitude: 1.0,
             base_lr,
-            sensitivity: 0.5,  // 50% modulation range
+            sensitivity: 0.5, // 50% modulation range
         }
     }
 
@@ -585,9 +591,12 @@ impl AmplitudeWeightedLearner {
 
         if self.amplitudes.len() > 10 {
             let mean: f64 = self.amplitudes.iter().sum::<f64>() / self.amplitudes.len() as f64;
-            let variance: f64 = self.amplitudes.iter()
+            let variance: f64 = self
+                .amplitudes
+                .iter()
                 .map(|x| (x - mean).powi(2))
-                .sum::<f64>() / self.amplitudes.len() as f64;
+                .sum::<f64>()
+                / self.amplitudes.len() as f64;
 
             self.mean_amplitude = mean;
             self.std_amplitude = variance.sqrt().max(0.01);
@@ -665,7 +674,8 @@ impl AdvancedCincinnatiEngine {
         let confidence = enhanced_pred.multi_scale.confidence;
 
         // Update memory horizon
-        self.memory_horizon.predict(final_prediction, confidence as f64);
+        self.memory_horizon
+            .predict(final_prediction, confidence as f64);
         self.memory_horizon.observe(enhanced_pred.binary_value);
 
         // Track accuracy
@@ -701,8 +711,10 @@ impl AdvancedCincinnatiEngine {
                 None
             },
             lr_multiplier: lr_multiplier as f32,
-            temperature: 1.0,  // Not using temperature in wrapper mode
-            horizon_accuracies: self.memory_horizon.horizon_accuracies()
+            temperature: 1.0, // Not using temperature in wrapper mode
+            horizon_accuracies: self
+                .memory_horizon
+                .horizon_accuracies()
                 .into_iter()
                 .map(|a| a as f32)
                 .collect(),
@@ -724,7 +736,9 @@ impl AdvancedCincinnatiEngine {
             weights,
             temperature: 1.0,
             chaos_metrics: self.chaos_detector.metrics(),
-            horizon_accuracies: self.memory_horizon.horizon_accuracies()
+            horizon_accuracies: self
+                .memory_horizon
+                .horizon_accuracies()
                 .into_iter()
                 .map(|a| a as f32)
                 .collect(),
@@ -782,12 +796,16 @@ mod tests {
         }
 
         let metrics = detector.metrics();
-        println!("Logistic r=3.8: Lyapunov={:.4}, is_chaotic={}",
-                 metrics.lyapunov_exponent, metrics.is_chaotic);
+        println!(
+            "Logistic r=3.8: Lyapunov={:.4}, is_chaotic={}",
+            metrics.lyapunov_exponent, metrics.is_chaotic
+        );
 
         // Should detect positive Lyapunov (chaos)
-        assert!(metrics.lyapunov_exponent > 0.0,
-                "Expected positive Lyapunov for chaotic signal");
+        assert!(
+            metrics.lyapunov_exponent > 0.0,
+            "Expected positive Lyapunov for chaotic signal"
+        );
     }
 
     #[test]
@@ -803,17 +821,21 @@ mod tests {
         }
 
         let metrics = detector.metrics();
-        println!("Sine wave: Lyapunov={:.4}, is_chaotic={}, confidence={:.4}",
-                 metrics.lyapunov_exponent, metrics.is_chaotic, metrics.confidence);
+        println!(
+            "Sine wave: Lyapunov={:.4}, is_chaotic={}, confidence={:.4}",
+            metrics.lyapunov_exponent, metrics.is_chaotic, metrics.confidence
+        );
 
         // For periodic signals, the detector should either:
         // 1. Report is_chaotic=false, OR
         // 2. Report Lyapunov significantly lower than for chaotic signals (which are > 1.0)
         // The algorithm's Lyapunov estimate may not be exactly 0 due to numerical effects,
         // but should be distinctly non-chaotic (< 0.7, vs > 1.0 for true chaos)
-        assert!(!metrics.is_chaotic || metrics.lyapunov_exponent < 0.7,
-                "Expected non-chaotic detection for periodic signal, got Lyapunov={:.4}",
-                metrics.lyapunov_exponent);
+        assert!(
+            !metrics.is_chaotic || metrics.lyapunov_exponent < 0.7,
+            "Expected non-chaotic detection for periodic signal, got Lyapunov={:.4}",
+            metrics.lyapunov_exponent
+        );
     }
 
     #[test]
@@ -822,15 +844,17 @@ mod tests {
 
         // Simulate branch 0 being consistently better
         for _ in 0..100 {
-            manager.update(&[0.1, 0.4, 0.5]);  // Branch 0 has lowest error
+            manager.update(&[0.1, 0.4, 0.5]); // Branch 0 has lowest error
         }
 
         let weights = manager.weights();
         println!("Weights after 100 updates: {:?}", weights);
 
         // Branch 0 should have highest weight
-        assert!(weights[0] > weights[1] && weights[0] > weights[2],
-                "Best branch should have highest weight");
+        assert!(
+            weights[0] > weights[1] && weights[0] > weights[2],
+            "Best branch should have highest weight"
+        );
     }
 
     #[test]
@@ -855,7 +879,11 @@ mod tests {
         // Horizon 0 validation starts after 1 observation
         // Horizon h validation starts after h+1 observations (due to len > h condition)
         // After 100 iterations, all horizons should have high accuracy
-        assert!(accs[0] >= 0.9, "Horizon 0 should be accurate for constant pattern, got {:.2}", accs[0]);
+        assert!(
+            accs[0] >= 0.9,
+            "Horizon 0 should be accurate for constant pattern, got {:.2}",
+            accs[0]
+        );
 
         // Also test with alternating pattern but check that system tracks it
         let mut horizon2 = MemoryHorizon::new(5);
@@ -871,8 +899,12 @@ mod tests {
 
         // For alternating pattern, even horizons (0, 2, 4) predict same parity
         // Verify we get reasonable tracking (not all zeros or all ones)
-        let variance: f64 = accs2.iter().map(|&a| (a - 0.5).powi(2)).sum::<f64>() / accs2.len() as f64;
-        assert!(variance > 0.1, "Horizon accuracies should show differentiation");
+        let variance: f64 =
+            accs2.iter().map(|&a| (a - 0.5).powi(2)).sum::<f64>() / accs2.len() as f64;
+        assert!(
+            variance > 0.1,
+            "Horizon accuracies should show differentiation"
+        );
     }
 
     #[test]
@@ -905,17 +937,22 @@ mod tests {
 
         for _ in 0..300 {
             x = r * x * (1.0 - x);
-            let amplitude = (x - 0.5) * 2.0;  // Scale to [-1, 1]
+            let amplitude = (x - 0.5) * 2.0; // Scale to [-1, 1]
             engine.process(amplitude);
         }
 
         let stats = engine.stats();
         println!("Chaotic signal accuracy: {:.1}%", stats.accuracy * 100.0);
         println!("Chaos detected: {}", stats.chaos_metrics.is_chaotic);
-        println!("Lyapunov estimate: {:.4}", stats.chaos_metrics.lyapunov_exponent);
+        println!(
+            "Lyapunov estimate: {:.4}",
+            stats.chaos_metrics.lyapunov_exponent
+        );
 
         // Should detect chaos
-        assert!(stats.chaos_metrics.is_chaotic || stats.chaos_metrics.lyapunov_exponent > 0.0,
-                "Should detect chaotic signal");
+        assert!(
+            stats.chaos_metrics.is_chaotic || stats.chaos_metrics.lyapunov_exponent > 0.0,
+            "Should detect chaotic signal"
+        );
     }
 }

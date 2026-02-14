@@ -50,6 +50,16 @@
 // TODO: Add comprehensive documentation before 1.0 release
 #![allow(missing_docs)]
 #![allow(rustdoc::missing_crate_level_docs)]
+#![allow(rustdoc::broken_intra_doc_links)]
+#![allow(rustdoc::invalid_html_tags)]
+#![allow(rustdoc::bare_urls)]
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::manual_clamp)]
+#![allow(clippy::new_without_default)]
+#![allow(clippy::redundant_closure)]
+#![allow(clippy::field_reassign_with_default)]
+#![allow(clippy::inherent_to_string)]
+#![allow(clippy::if_same_then_else)]
 
 pub mod adaptation;
 pub mod alignment_loader;

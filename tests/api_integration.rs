@@ -149,7 +149,10 @@ async fn test_leaderboard() {
     let json: serde_json::Value = serde_json::from_slice(&body).expect("parse JSON");
 
     assert!(json.get("entries").is_some(), "Expected entries field");
-    assert!(json.get("total_submissions").is_some(), "Expected total_submissions field");
+    assert!(
+        json.get("total_submissions").is_some(),
+        "Expected total_submissions field"
+    );
 }
 
 #[tokio::test]
@@ -227,7 +230,10 @@ async fn test_submit_with_valid_payload() {
         .expect("body bytes");
     let json: serde_json::Value = serde_json::from_slice(&body).expect("parse JSON");
 
-    assert!(json.get("submission_id").is_some(), "Expected submission_id field");
+    assert!(
+        json.get("submission_id").is_some(),
+        "Expected submission_id field"
+    );
     assert!(
         json["status"] == "processing" || json["status"] == "completed",
         "Expected status to be processing or completed, got: {}",

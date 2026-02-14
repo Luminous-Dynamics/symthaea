@@ -55,7 +55,13 @@ impl ApproximateMIPFinder {
     ) -> (TruePartition, f64) {
         let n = components.len();
         if n < 2 {
-            return (TruePartition { part_a: vec![0], part_b: vec![] }, 0.0);
+            return (
+                TruePartition {
+                    part_a: vec![0],
+                    part_b: vec![],
+                },
+                0.0,
+            );
         }
 
         let mut best_partition = self.random_partition(n);
@@ -149,17 +155,20 @@ impl ApproximateMIPFinder {
             new_b.push(new_a.pop().unwrap());
         }
 
-        TruePartition { part_a: new_a, part_b: new_b }
+        TruePartition {
+            part_a: new_a,
+            part_b: new_b,
+        }
     }
 
     /// Find MIP using greedy graph cut
-    pub fn find_mip_graph_cut(
-        &self,
-        mi_matrix: &[Vec<f64>],
-    ) -> TruePartition {
+    pub fn find_mip_graph_cut(&self, mi_matrix: &[Vec<f64>]) -> TruePartition {
         let n = mi_matrix.len();
         if n < 2 {
-            return TruePartition { part_a: (0..n).collect(), part_b: vec![] };
+            return TruePartition {
+                part_a: (0..n).collect(),
+                part_b: vec![],
+            };
         }
 
         // Build weighted adjacency from MI matrix

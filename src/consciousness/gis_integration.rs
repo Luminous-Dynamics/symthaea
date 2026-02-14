@@ -40,10 +40,8 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use crate::mycelix::gis::{
-    GracefulIgnoranceSystem,
-    IgnoranceType, IgnoranceDetection, GracefulResponse,
-    Uncertainty3D, Domain,
-    DarkSpotDHT, KnowledgeMatch,
+    DarkSpotDHT, Domain, GracefulIgnoranceSystem, GracefulResponse, IgnoranceDetection,
+    IgnoranceType, KnowledgeMatch, Uncertainty3D,
 };
 
 // ============================================================================
@@ -76,8 +74,8 @@ impl ConsciousUncertaintyState {
     /// Create from Φ measurement and GIS detection
     pub fn from_phi_and_detection(phi: f32, detection: &IgnoranceDetection) -> Self {
         let epistemic_confidence = 1.0 - detection.uncertainty.total().min(1.0);
-        let is_grounded = detection.ignorance_type == IgnoranceType::None
-            || epistemic_confidence > 0.7;
+        let is_grounded =
+            detection.ignorance_type == IgnoranceType::None || epistemic_confidence > 0.7;
 
         Self {
             phi,
@@ -114,10 +112,7 @@ pub enum EpistemicDecision {
     Proceed { confidence: f32 },
 
     /// Proceed but with caveats
-    ProceedWithCaveat {
-        confidence: f32,
-        caveat: String,
-    },
+    ProceedWithCaveat { confidence: f32, caveat: String },
 
     /// Defer decision - need more information
     Defer {
@@ -132,10 +127,7 @@ pub enum EpistemicDecision {
     },
 
     /// Request human guidance
-    RequestGuidance {
-        question: String,
-        context: String,
-    },
+    RequestGuidance { question: String, context: String },
 }
 
 /// Gate decisions through epistemic evaluation
@@ -184,7 +176,8 @@ impl EpistemicDecisionGate {
         let decision = self.map_response_to_decision(response, &detection, action_risk);
 
         // Record for learning
-        self.decision_history.push((decision.clone(), SystemTime::now()));
+        self.decision_history
+            .push((decision.clone(), SystemTime::now()));
 
         decision
     }
@@ -214,14 +207,19 @@ impl EpistemicDecisionGate {
                 }
             }
 
-            GracefulResponse::Deferred { reason, resolution_hint } => {
-                EpistemicDecision::Defer {
-                    reason,
-                    suggested_queries: resolution_hint.into_iter().collect(),
-                }
-            }
+            GracefulResponse::Deferred {
+                reason,
+                resolution_hint,
+            } => EpistemicDecision::Defer {
+                reason,
+                suggested_queries: resolution_hint.into_iter().collect(),
+            },
 
-            GracefulResponse::Uncertain { confidence: conf, uncertainty_breakdown, caveat } => {
+            GracefulResponse::Uncertain {
+                confidence: conf,
+                uncertainty_breakdown,
+                caveat,
+            } => {
                 if conf >= self.defer_threshold {
                     EpistemicDecision::ProceedWithCaveat {
                         confidence: conf,
@@ -244,11 +242,16 @@ impl EpistemicDecisionGate {
                 }
             }
 
-            GracefulResponse::Unknown { explanation, could_be_wrong, request_for_context } => {
+            GracefulResponse::Unknown {
+                explanation,
+                could_be_wrong,
+                request_for_context,
+            } => {
                 if could_be_wrong {
                     EpistemicDecision::RequestGuidance {
-                        question: request_for_context.unwrap_or_else(||
-                            "I'm uncertain about this. Can you help clarify?".to_string()),
+                        question: request_for_context.unwrap_or_else(|| {
+                            "I'm uncertain about this. Can you help clarify?".to_string()
+                        }),
                         context: explanation,
                     }
                 } else {
@@ -259,12 +262,13 @@ impl EpistemicDecisionGate {
                 }
             }
 
-            GracefulResponse::OutOfDomain { reason, suggestions } => {
-                EpistemicDecision::OutOfDomain {
-                    explanation: reason,
-                    alternatives: suggestions,
-                }
-            }
+            GracefulResponse::OutOfDomain {
+                reason,
+                suggestions,
+            } => EpistemicDecision::OutOfDomain {
+                explanation: reason,
+                alternatives: suggestions,
+            },
         }
     }
 
@@ -289,11 +293,31 @@ impl EpistemicDecisionGate {
 
         EpistemicGateStats {
             total_decisions: total,
-            proceed_rate: if total > 0 { proceed_count as f32 / total as f32 } else { 0.0 },
-            caveat_rate: if total > 0 { caveat_count as f32 / total as f32 } else { 0.0 },
-            defer_rate: if total > 0 { defer_count as f32 / total as f32 } else { 0.0 },
-            out_of_domain_rate: if total > 0 { ood_count as f32 / total as f32 } else { 0.0 },
-            guidance_rate: if total > 0 { guidance_count as f32 / total as f32 } else { 0.0 },
+            proceed_rate: if total > 0 {
+                proceed_count as f32 / total as f32
+            } else {
+                0.0
+            },
+            caveat_rate: if total > 0 {
+                caveat_count as f32 / total as f32
+            } else {
+                0.0
+            },
+            defer_rate: if total > 0 {
+                defer_count as f32 / total as f32
+            } else {
+                0.0
+            },
+            out_of_domain_rate: if total > 0 {
+                ood_count as f32 / total as f32
+            } else {
+                0.0
+            },
+            guidance_rate: if total > 0 {
+                guidance_count as f32 / total as f32
+            } else {
+                0.0
+            },
         }
     }
 }
@@ -379,18 +403,22 @@ impl ConsciousDarkSpotNetwork {
     /// Try to resolve ignorance through network
     pub fn try_resolve(&mut self, detection: &IgnoranceDetection) -> Option<KnowledgeMatch> {
         // Create signature for matching
-        let signature = self.dht.create_signature(
-            &detection.query,
-            &detection.domain.to_string(),
-            detection.eig,
-        ).ok()?;
+        let signature = self
+            .dht
+            .create_signature(
+                &detection.query,
+                &detection.domain.to_string(),
+                detection.eig,
+            )
+            .ok()?;
 
         // Search for matches
         let matches = self.dht.find_matches(&signature);
 
         if let Some(best_match) = matches.into_iter().next() {
             self.stats.resolved_count += 1;
-            self.resolved.insert(detection.query.clone(), best_match.clone());
+            self.resolved
+                .insert(detection.query.clone(), best_match.clone());
             Some(best_match)
         } else {
             None
@@ -405,13 +433,15 @@ impl ConsciousDarkSpotNetwork {
         category: String,
         confidence: f32,
     ) {
-        self.dht.add_knowledge(claim_id, content, category, confidence);
+        self.dht
+            .add_knowledge(claim_id, content, category, confidence);
         self.stats.contributed_count += 1;
     }
 
     /// Get network blind spots (collective ignorance)
     pub fn collective_blind_spots(&self) -> Vec<CollectiveBlindSpot> {
-        self.dht.detect_blind_spots()
+        self.dht
+            .detect_blind_spots()
             .into_iter()
             .map(|bs| CollectiveBlindSpot {
                 category: bs.category,
@@ -514,11 +544,11 @@ impl EpistemicBidContext {
     /// Should this bid be boosted or suppressed based on epistemic state?
     pub fn attention_modifier(&self) -> f32 {
         match self.ignorance_type {
-            IgnoranceType::None => 1.0,           // Full confidence
-            IgnoranceType::Known => 0.9,          // Slight reduction
-            IgnoranceType::KnownUnknown => 0.7,   // Moderate reduction
-            IgnoranceType::Unknown => 0.5,        // Significant reduction
-            IgnoranceType::Impossible => 0.1,     // Heavy suppression
+            IgnoranceType::None => 1.0,         // Full confidence
+            IgnoranceType::Known => 0.9,        // Slight reduction
+            IgnoranceType::KnownUnknown => 0.7, // Moderate reduction
+            IgnoranceType::Unknown => 0.5,      // Significant reduction
+            IgnoranceType::Impossible => 0.1,   // Heavy suppression
         }
     }
 }
@@ -561,21 +591,23 @@ mod tests {
         // Test simple question - should get some epistemic decision
         let decision = gate.evaluate("What is 2 + 2?", 0.1);
         // With stub, will return Uncertain/Unknown response mapped to valid decision
-        assert!(matches!(decision,
-            EpistemicDecision::Proceed { .. } |
-            EpistemicDecision::ProceedWithCaveat { .. } |
-            EpistemicDecision::Defer { .. } |
-            EpistemicDecision::RequestGuidance { .. }
+        assert!(matches!(
+            decision,
+            EpistemicDecision::Proceed { .. }
+                | EpistemicDecision::ProceedWithCaveat { .. }
+                | EpistemicDecision::Defer { .. }
+                | EpistemicDecision::RequestGuidance { .. }
         ));
 
         // Test high-risk question
         let decision = gate.evaluate("What is the capital of Mars?", 0.9);
         // High risk + uncertainty should defer or request guidance
-        assert!(matches!(decision,
-            EpistemicDecision::OutOfDomain { .. } |
-            EpistemicDecision::Defer { .. } |
-            EpistemicDecision::RequestGuidance { .. } |
-            EpistemicDecision::ProceedWithCaveat { .. }
+        assert!(matches!(
+            decision,
+            EpistemicDecision::OutOfDomain { .. }
+                | EpistemicDecision::Defer { .. }
+                | EpistemicDecision::RequestGuidance { .. }
+                | EpistemicDecision::ProceedWithCaveat { .. }
         ));
     }
 

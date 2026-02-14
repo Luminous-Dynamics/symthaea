@@ -61,11 +61,7 @@ impl SensorimotorContingency {
         // Generate HDC encoding by binding action and context encodings
         let encoding = action.encoding.bind(&context.encoding);
 
-        let id = format!(
-            "smc_{:?}_{}",
-            action.action_type,
-            rand::random::<u32>()
-        );
+        let id = format!("smc_{:?}_{}", action.action_type, rand::random::<u32>());
 
         Self {
             id,
@@ -102,8 +98,7 @@ impl SensorimotorContingency {
 
     /// Check if matches action-context pair
     pub fn matches(&self, action: &ActionDescriptor, context: &ContextDescriptor) -> bool {
-        self.action.action_type == action.action_type
-            && self.context.similarity(context) > 0.7
+        self.action.action_type == action.action_type && self.context.similarity(context) > 0.7
     }
 
     /// Predict sensory change
@@ -276,7 +271,11 @@ impl ContextDescriptor {
                 count += 1.0;
             }
         }
-        let feature_sim = if count > 0.0 { feature_sim / count } else { 0.5 };
+        let feature_sim = if count > 0.0 {
+            feature_sim / count
+        } else {
+            0.5
+        };
 
         // Combine
         hdc_sim * 0.6 + feature_sim * 0.4
@@ -491,8 +490,7 @@ impl ContingencyLearner {
                 self.stats.accurate_predictions += 1;
             }
 
-            self.stats.avg_prediction_error =
-                self.stats.avg_prediction_error * 0.99 + error * 0.01;
+            self.stats.avg_prediction_error = self.stats.avg_prediction_error * 0.99 + error * 0.01;
 
             error
         } else {
@@ -537,12 +535,11 @@ impl ContingencyLearner {
         context: ContextDescriptor,
         outcome: SensoryChange,
     ) -> SensorimotorContingency {
-        let contingencies = self.contingencies
-            .entry(action.action_type)
-            .or_default();
+        let contingencies = self.contingencies.entry(action.action_type).or_default();
 
         // Find matching
-        let matching = contingencies.iter_mut()
+        let matching = contingencies
+            .iter_mut()
             .find(|c| c.matches(&action, &context));
 
         if let Some(c) = matching {
@@ -552,10 +549,10 @@ impl ContingencyLearner {
             let contingency = SensorimotorContingency::new(action.clone(), context, outcome);
 
             if contingencies.len() >= self.config.max_contingencies_per_action {
-                if let Some(idx) = contingencies.iter()
+                if let Some(idx) = contingencies
+                    .iter()
                     .enumerate()
-                    .min_by(|(_, a), (_, b)|
-                        a.confidence.total_cmp(&b.confidence))
+                    .min_by(|(_, a), (_, b)| a.confidence.total_cmp(&b.confidence))
                     .map(|(i, _)| i)
                 {
                     contingencies.remove(idx);
@@ -570,10 +567,15 @@ impl ContingencyLearner {
     }
 
     /// Predict sensory change
-    pub fn predict(&self, action: &ActionDescriptor, context: &ContextDescriptor) -> Option<PredictedChange> {
+    pub fn predict(
+        &self,
+        action: &ActionDescriptor,
+        context: &ContextDescriptor,
+    ) -> Option<PredictedChange> {
         let contingencies = self.contingencies.get(&action.action_type)?;
 
-        let best = contingencies.iter()
+        let best = contingencies
+            .iter()
             .filter(|c| c.context.similarity(context) >= self.config.context_match_threshold)
             .max_by(|a, b| {
                 let sim_a = a.context.similarity(context) * a.confidence;
@@ -717,8 +719,7 @@ impl EnactivistPerception {
         let clarity = self.calculate_clarity(&context);
 
         // Update stats
-        self.stats.avg_active_contingencies =
-            self.stats.avg_active_contingencies * 0.95
+        self.stats.avg_active_contingencies = self.stats.avg_active_contingencies * 0.95
             + self.active_contingencies.len() as f64 * 0.05;
         self.stats.total_readiness = self.motor_readiness.values().sum();
         self.stats.mastery = self.learner.prediction_accuracy();
@@ -733,9 +734,14 @@ impl EnactivistPerception {
         }
     }
 
-    fn update_active_contingencies(&mut self, action_type: &ActionType, context: &ContextDescriptor) {
+    fn update_active_contingencies(
+        &mut self,
+        action_type: &ActionType,
+        context: &ContextDescriptor,
+    ) {
         if let Some(contingencies) = self.learner.get_contingencies(*action_type) {
-            self.active_contingencies = contingencies.iter()
+            self.active_contingencies = contingencies
+                .iter()
                 .filter(|c| {
                     c.confidence >= self.config.activation_threshold
                         && c.context.similarity(context) > 0.5
@@ -778,7 +784,9 @@ impl EnactivistPerception {
 
     /// Get ready actions
     pub fn get_ready_actions(&self) -> Vec<(ActionType, f64)> {
-        let mut actions: Vec<_> = self.motor_readiness.iter()
+        let mut actions: Vec<_> = self
+            .motor_readiness
+            .iter()
             .filter(|(_, &r)| r > 0.3)
             .map(|(&a, &r)| (a, r))
             .collect();
@@ -788,7 +796,11 @@ impl EnactivistPerception {
     }
 
     /// Imagine action
-    pub fn imagine_action(&self, action: &ActionDescriptor, context: &ContextDescriptor) -> Option<PredictedChange> {
+    pub fn imagine_action(
+        &self,
+        action: &ActionDescriptor,
+        context: &ContextDescriptor,
+    ) -> Option<PredictedChange> {
         self.learner.predict(action, context)
     }
 
@@ -915,10 +927,11 @@ impl AffordanceDetector {
             }
         }
 
-        self.current_affordances.sort_by(|a, b|
-            b.attractiveness().total_cmp(&a.attractiveness()));
+        self.current_affordances
+            .sort_by(|a, b| b.attractiveness().total_cmp(&a.attractiveness()));
 
-        self.current_affordances.truncate(self.config.max_affordances);
+        self.current_affordances
+            .truncate(self.config.max_affordances);
 
         self.current_affordances.clone()
     }
@@ -935,7 +948,8 @@ impl AffordanceDetector {
         context: ContextDescriptor,
         outcome: SensoryChange,
     ) -> PerceptionResult {
-        self.perception.perceive_through_action(action, context, outcome)
+        self.perception
+            .perceive_through_action(action, context, outcome)
     }
 
     /// Get perception
@@ -1024,8 +1038,8 @@ mod tests {
 
         let action = ActionDescriptor::new(ActionType::Reach);
         let context = ContextDescriptor::new("test", SensoryModality::Visual);
-        let outcome = SensoryChange::new(SensoryModality::Tactile)
-            .with_vector(vec![0.8, 0.2, 0.0, 0.0]);
+        let outcome =
+            SensoryChange::new(SensoryModality::Tactile).with_vector(vec![0.8, 0.2, 0.0, 0.0]);
 
         let result = learner.learn(action.clone(), context.clone(), outcome);
 
@@ -1037,7 +1051,7 @@ mod tests {
             learner.learn(
                 action.clone(),
                 context.clone(),
-                SensoryChange::new(SensoryModality::Tactile).with_vector(vec![0.8, 0.2, 0.0, 0.0])
+                SensoryChange::new(SensoryModality::Tactile).with_vector(vec![0.8, 0.2, 0.0, 0.0]),
             );
         }
 
@@ -1050,20 +1064,24 @@ mod tests {
 
         let action = ActionDescriptor::new(ActionType::Push);
         let context = ContextDescriptor::new("ball", SensoryModality::Visual);
-        let normal = SensoryChange::new(SensoryModality::Visual)
-            .with_vector(vec![0.5, 0.0, 0.0, 0.0]);
+        let normal =
+            SensoryChange::new(SensoryModality::Visual).with_vector(vec![0.5, 0.0, 0.0, 0.0]);
 
         for _ in 0..10 {
             learner.learn(action.clone(), context.clone(), normal.clone());
         }
 
         // Surprising outcome - use different modality for maximum surprise
-        let surprising = SensoryChange::new(SensoryModality::Auditory)
-            .with_vector(vec![-0.5, 1.0, 0.0, 0.0]);
+        let surprising =
+            SensoryChange::new(SensoryModality::Auditory).with_vector(vec![-0.5, 1.0, 0.0, 0.0]);
 
         let result = learner.learn(action, context, surprising);
         // With different modality, distance should be 1.0 (max surprise)
-        assert!(result.surprise > 0.2, "Expected surprise > 0.2, got {}", result.surprise);
+        assert!(
+            result.surprise > 0.2,
+            "Expected surprise > 0.2, got {}",
+            result.surprise
+        );
     }
 
     #[test]
@@ -1072,8 +1090,8 @@ mod tests {
 
         let action = ActionDescriptor::new(ActionType::SaccadeLeft);
         let context = ContextDescriptor::new("scene", SensoryModality::Visual);
-        let outcome = SensoryChange::new(SensoryModality::Visual)
-            .with_vector(vec![0.3, 0.0, 0.0, 0.0]);
+        let outcome =
+            SensoryChange::new(SensoryModality::Visual).with_vector(vec![0.3, 0.0, 0.0, 0.0]);
 
         for _ in 0..10 {
             perception.perceive_through_action(action.clone(), context.clone(), outcome.clone());
@@ -1089,8 +1107,8 @@ mod tests {
 
         let action = ActionDescriptor::new(ActionType::Grasp);
         let context = ContextDescriptor::new("object", SensoryModality::Visual);
-        let outcome = SensoryChange::new(SensoryModality::Tactile)
-            .with_vector(vec![0.9, 0.5, 0.0, 0.0]);
+        let outcome =
+            SensoryChange::new(SensoryModality::Tactile).with_vector(vec![0.9, 0.5, 0.0, 0.0]);
 
         for _ in 0..15 {
             detector.process_action(action.clone(), context.clone(), outcome.clone());
@@ -1106,8 +1124,8 @@ mod tests {
 
         let action = ActionDescriptor::new(ActionType::Touch);
         let context = ContextDescriptor::new("test", SensoryModality::Tactile);
-        let outcome = SensoryChange::new(SensoryModality::Tactile)
-            .with_vector(vec![0.7, 0.0, 0.0, 0.0]);
+        let outcome =
+            SensoryChange::new(SensoryModality::Tactile).with_vector(vec![0.7, 0.0, 0.0, 0.0]);
 
         for _ in 0..20 {
             detector.process_action(action.clone(), context.clone(), outcome.clone());

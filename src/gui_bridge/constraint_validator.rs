@@ -280,11 +280,15 @@ impl ConstraintValidator {
         );
 
         // Common type hints
-        self.known_types.insert("services.*.enable".to_string(), NixType::Bool);
-        self.known_types.insert("networking.firewall.enable".to_string(), NixType::Bool);
-        self.known_types.insert("boot.loader.grub.enable".to_string(), NixType::Bool);
+        self.known_types
+            .insert("services.*.enable".to_string(), NixType::Bool);
+        self.known_types
+            .insert("networking.firewall.enable".to_string(), NixType::Bool);
+        self.known_types
+            .insert("boot.loader.grub.enable".to_string(), NixType::Bool);
         self.known_types.insert("*.port".to_string(), NixType::Int);
-        self.known_types.insert("*.ports".to_string(), NixType::List);
+        self.known_types
+            .insert("*.ports".to_string(), NixType::List);
     }
 
     /// Add constraint for a specific path
@@ -322,7 +326,8 @@ impl ConstraintValidator {
         // Get pattern-matched constraints
         let pattern_constraints = self.get_pattern_constraints(&path.0);
 
-        let all_constraints: Vec<Constraint> = exact_constraints.into_iter()
+        let all_constraints: Vec<Constraint> = exact_constraints
+            .into_iter()
             .chain(pattern_constraints)
             .collect();
 
@@ -438,15 +443,17 @@ impl ConstraintValidator {
 
             ConstraintKind::Range { min, max } => {
                 if let Ok(num) = value.trim().parse::<i64>() {
-                    let in_range = min.is_none_or(|m| num >= m)
-                        && max.is_none_or(|m| num <= m);
+                    let in_range = min.is_none_or(|m| num >= m) && max.is_none_or(|m| num <= m);
                     (in_range, None)
                 } else {
-                    (false, Some(Suggestion {
-                        message: "Expected a number".to_string(),
-                        suggested_value: min.map(|m| m.to_string()),
-                        related_path: None,
-                    }))
+                    (
+                        false,
+                        Some(Suggestion {
+                            message: "Expected a number".to_string(),
+                            suggested_value: min.map(|m| m.to_string()),
+                            related_path: None,
+                        }),
+                    )
                 }
             }
 
@@ -475,8 +482,8 @@ impl ConstraintValidator {
             ConstraintKind::ValidPath => {
                 let path_str = value.trim().trim_matches('"');
                 // Basic path validation
-                let valid = !path_str.contains("..") &&
-                           (path_str.starts_with('/') || path_str.starts_with("./"));
+                let valid = !path_str.contains("..")
+                    && (path_str.starts_with('/') || path_str.starts_with("./"));
                 (valid, None)
             }
 
@@ -484,11 +491,14 @@ impl ConstraintValidator {
                 if let Ok(port) = value.trim().parse::<u16>() {
                     (port >= 1, None)
                 } else {
-                    (false, Some(Suggestion {
-                        message: "Port must be 1-65535".to_string(),
-                        suggested_value: Some("80".to_string()),
-                        related_path: None,
-                    }))
+                    (
+                        false,
+                        Some(Suggestion {
+                            message: "Port must be 1-65535".to_string(),
+                            suggested_value: Some("80".to_string()),
+                            related_path: None,
+                        }),
+                    )
                 }
             }
 

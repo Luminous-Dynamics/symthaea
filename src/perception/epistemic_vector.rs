@@ -44,10 +44,7 @@ pub enum UncertaintySource {
     },
 
     /// Embedding norm deviated from expected
-    EmbeddingNorm {
-        norm: f32,
-        expected: f32,
-    },
+    EmbeddingNorm { norm: f32, expected: f32 },
 
     /// Text was very short (< N tokens)
     ShortText {
@@ -62,10 +59,7 @@ pub enum UncertaintySource {
     },
 
     /// Out-of-distribution detected (unusual embedding)
-    OutOfDistribution {
-        score: f32,
-        threshold: f32,
-    },
+    OutOfDistribution { score: f32, threshold: f32 },
 
     /// Polysemy detected (multiple meanings)
     Polysemy {
@@ -74,27 +68,23 @@ pub enum UncertaintySource {
     },
 
     /// Model confidence was low
-    ModelConfidence {
-        score: f32,
-    },
+    ModelConfidence { score: f32 },
 
     /// Paraphrase instability detected
-    ParaphraseInstability {
-        variation_score: f32,
-    },
+    ParaphraseInstability { variation_score: f32 },
 
     /// Custom uncertainty source
-    Custom {
-        name: String,
-        value: f32,
-    },
+    Custom { name: String, value: f32 },
 }
 
 impl UncertaintySource {
     /// Get a human-readable description of this uncertainty source
     pub fn describe(&self) -> String {
         match self {
-            Self::ProjectionMargin { avg_margin, low_margin_ratio } => {
+            Self::ProjectionMargin {
+                avg_margin,
+                low_margin_ratio,
+            } => {
                 format!(
                     "Projection margin: {:.1}% of dimensions near decision boundary (avg margin: {:.3})",
                     low_margin_ratio * 100.0,
@@ -107,13 +97,19 @@ impl UncertaintySource {
                     norm, expected
                 )
             }
-            Self::ShortText { token_count, min_recommended } => {
+            Self::ShortText {
+                token_count,
+                min_recommended,
+            } => {
                 format!(
                     "Short text: {} tokens (recommend ≥{})",
                     token_count, min_recommended
                 )
             }
-            Self::Truncated { original_tokens, max_tokens } => {
+            Self::Truncated {
+                original_tokens,
+                max_tokens,
+            } => {
                 format!(
                     "Text truncated: {} → {} tokens",
                     original_tokens, max_tokens
@@ -125,7 +121,10 @@ impl UncertaintySource {
                     score, threshold
                 )
             }
-            Self::Polysemy { num_senses, dominant_sense_weight } => {
+            Self::Polysemy {
+                num_senses,
+                dominant_sense_weight,
+            } => {
                 format!(
                     "Polysemous: {} senses, dominant={:.1}%",
                     num_senses,
@@ -150,16 +149,23 @@ impl UncertaintySource {
     /// Get the uncertainty contribution (0.0-1.0)
     pub fn contribution(&self) -> f32 {
         match self {
-            Self::ProjectionMargin { low_margin_ratio, .. } => *low_margin_ratio,
+            Self::ProjectionMargin {
+                low_margin_ratio, ..
+            } => *low_margin_ratio,
             Self::EmbeddingNorm { norm, expected } => ((norm - expected).abs() / expected).min(1.0),
-            Self::ShortText { token_count, min_recommended } => {
-                1.0 - (*token_count as f32 / *min_recommended as f32).min(1.0)
-            }
-            Self::Truncated { original_tokens, max_tokens } => {
-                1.0 - (*max_tokens as f32 / *original_tokens as f32)
-            }
+            Self::ShortText {
+                token_count,
+                min_recommended,
+            } => 1.0 - (*token_count as f32 / *min_recommended as f32).min(1.0),
+            Self::Truncated {
+                original_tokens,
+                max_tokens,
+            } => 1.0 - (*max_tokens as f32 / *original_tokens as f32),
             Self::OutOfDistribution { score, .. } => *score,
-            Self::Polysemy { dominant_sense_weight, .. } => 1.0 - dominant_sense_weight,
+            Self::Polysemy {
+                dominant_sense_weight,
+                ..
+            } => 1.0 - dominant_sense_weight,
             Self::ModelConfidence { score } => 1.0 - score,
             Self::ParaphraseInstability { variation_score } => *variation_score,
             Self::Custom { value, .. } => *value,
@@ -413,7 +419,11 @@ pub fn consensus_bundle(
             result[i] = -1;
         } else {
             // No consensus - random tiebreak based on majority
-            result[i] = if votes_positive[i] > total_confidence / 2.0 { 1 } else { -1 };
+            result[i] = if votes_positive[i] > total_confidence / 2.0 {
+                1
+            } else {
+                -1
+            };
         }
     }
 
@@ -498,7 +508,9 @@ mod tests {
     #[test]
     fn test_weighted_similarity() {
         // Create a non-empty vector for meaningful similarity
-        let continuous: Vec<f32> = (0..HDC_DIMENSION).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect();
+        let continuous: Vec<f32> = (0..HDC_DIMENSION)
+            .map(|i| if i % 2 == 0 { 1.0 } else { -1.0 })
+            .collect();
         let packed = PackedBipolar::from_continuous(&continuous);
 
         let high_conf = EpistemicSemanticVector::with_confidence(packed.clone(), 1.0);

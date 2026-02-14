@@ -5,10 +5,10 @@
 //! validating that dangerous inputs are blocked and safe inputs are allowed
 //! across all input modalities (Query, Command, Action).
 
-use symthaea::safety::{SafetyGateway, SafetyCheck, SafetyDecision};
-use symthaea::action::ActionIR;
-use std::path::PathBuf;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
+use symthaea::action::ActionIR;
+use symthaea::safety::{SafetyCheck, SafetyDecision, SafetyGateway};
 
 // =============================================================================
 // AMYGDALA PATTERN DETECTION (via Gateway)
@@ -39,7 +39,10 @@ fn test_gateway_handles_rm_rf_no_preserve_root() {
     }
     // At minimum, the standard form must still be blocked
     let standard = gw.check(SafetyCheck::Command("rm -rf /"));
-    assert!(!standard.allowed, "Standard 'rm -rf /' must always be blocked");
+    assert!(
+        !standard.allowed,
+        "Standard 'rm -rf /' must always be blocked"
+    );
 }
 
 #[test]
@@ -188,7 +191,10 @@ fn test_gateway_blocks_dangerous_sequence() {
         },
     ]);
     let result = gw.check(SafetyCheck::Action(&action));
-    assert!(!result.allowed, "Sequence containing dangerous action must be blocked");
+    assert!(
+        !result.allowed,
+        "Sequence containing dangerous action must be blocked"
+    );
 }
 
 // =============================================================================
@@ -198,7 +204,10 @@ fn test_gateway_blocks_dangerous_sequence() {
 #[test]
 fn test_guardrails_dimension_matches() {
     let gw = SafetyGateway::new();
-    assert!(gw.guardrails().dimension() > 0, "Guardrails dimension should be positive");
+    assert!(
+        gw.guardrails().dimension() > 0,
+        "Guardrails dimension should be positive"
+    );
 }
 
 #[test]
@@ -220,7 +229,8 @@ fn test_amygdala_compile_failures_zero_on_default() {
     use symthaea::safety::AmygdalaActor;
     let actor = AmygdalaActor::new();
     assert_eq!(
-        actor.compile_failures(), 0,
+        actor.compile_failures(),
+        0,
         "Default AmygdalaActor should compile all patterns successfully"
     );
 }

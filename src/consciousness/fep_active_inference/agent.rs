@@ -2,18 +2,14 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::types::{
-    ActiveInferenceAgentStats, ActiveInferenceSummary,
-    ActionOutcome, ActionSelectionResult, FreeEnergyComponents, HiddenState,
-    Observation, PerceptionResult,
-};
+use super::free_energy::{ExpectedFreeEnergyComputer, FreeEnergyCalculator, PrecisionEstimator};
 use super::generative_model::GenerativeModel;
-use super::free_energy::{
-    FreeEnergyCalculator, PrecisionEstimator,
-    ExpectedFreeEnergyComputer,
-};
 use super::td_learning::{
     TemporalDifferenceLearner, TemporalDifferenceLearningConfig, TemporalDifferenceLearningStats,
+};
+use super::types::{
+    ActionOutcome, ActionSelectionResult, ActiveInferenceAgentStats, ActiveInferenceSummary,
+    FreeEnergyComponents, HiddenState, Observation, PerceptionResult,
 };
 
 // =============================================================================
@@ -149,11 +145,14 @@ impl ActiveInferenceAgent {
         }
 
         // Compute free energy
-        let fe_components = self.free_energy_calc.compute(&self.belief, observation, &self.model);
+        let fe_components = self
+            .free_energy_calc
+            .compute(&self.belief, observation, &self.model);
         self.last_fe_components = Some(fe_components.clone());
 
         // Update precision based on prediction error
-        self.precision.update_from_error(fe_components.prediction_error, self.timestamp);
+        self.precision
+            .update_from_error(fe_components.prediction_error, self.timestamp);
 
         // Temporal difference learning: if we have a previous state and action
         if let (Some(ref prev_state), Some(action)) = (&self.previous_state, self.last_action) {
@@ -181,7 +180,8 @@ impl ActiveInferenceAgent {
                 // Update stats
                 self.stats.td_updates += 1;
                 let n = self.stats.td_updates as f64;
-                self.stats.avg_td_error = (self.stats.avg_td_error * (n - 1.0) + td_error.abs()) / n;
+                self.stats.avg_td_error =
+                    (self.stats.avg_td_error * (n - 1.0) + td_error.abs()) / n;
                 self.stats.transition_accuracy = td_learner.avg_prediction_accuracy;
             }
         }
@@ -189,7 +189,8 @@ impl ActiveInferenceAgent {
         // Also use direct model learning (Hebbian-like), but only if TD learning is not active
         // to avoid conflicting updates to the same matrices
         if self.config.enable_model_learning && self.td_learner.is_none() {
-            self.model.learn(&self.belief, observation, self.last_action);
+            self.model
+                .learn(&self.belief, observation, self.last_action);
             self.stats.model_updates += 1;
         }
 
@@ -199,9 +200,12 @@ impl ActiveInferenceAgent {
         // Update stats
         self.stats.perception_cycles += 1;
         let n = self.stats.perception_cycles as f64;
-        self.stats.avg_free_energy = (self.stats.avg_free_energy * (n - 1.0) + fe_components.total) / n;
-        self.stats.avg_prediction_error = (self.stats.avg_prediction_error * (n - 1.0) + fe_components.prediction_error) / n;
-        self.stats.avg_precision = (self.stats.avg_precision * (n - 1.0) + self.precision.perceptual_precision()) / n;
+        self.stats.avg_free_energy =
+            (self.stats.avg_free_energy * (n - 1.0) + fe_components.total) / n;
+        self.stats.avg_prediction_error =
+            (self.stats.avg_prediction_error * (n - 1.0) + fe_components.prediction_error) / n;
+        self.stats.avg_precision =
+            (self.stats.avg_precision * (n - 1.0) + self.precision.perceptual_precision()) / n;
 
         PerceptionResult {
             updated_belief: self.belief.clone(),
@@ -218,7 +222,8 @@ impl ActiveInferenceAgent {
         let prediction_error = self.model.prediction_error(&self.belief, observation);
 
         // Compute precision-weighted error
-        let weighted_error: Vec<f64> = prediction_error.iter()
+        let weighted_error: Vec<f64> = prediction_error
+            .iter()
             .map(|e| e * self.precision.sensory_precision)
             .collect();
 
@@ -228,7 +233,9 @@ impl ActiveInferenceAgent {
             // Aggregate error from likelihood matrix
             let mut grad = 0.0;
             for j in 0..weighted_error.len() {
-                if i < self.model.likelihood_matrix.len() && j < self.model.likelihood_matrix[i].len() {
+                if i < self.model.likelihood_matrix.len()
+                    && j < self.model.likelihood_matrix[i].len()
+                {
                     grad += self.model.likelihood_matrix[i][j] * weighted_error[j];
                 }
             }
@@ -246,7 +253,11 @@ impl ActiveInferenceAgent {
 
         // Update belief precision based on prediction accuracy
         for i in 0..self.belief.precision.len() {
-            let error_i = if i < prediction_error.len() { prediction_error[i].abs() } else { 0.5 };
+            let error_i = if i < prediction_error.len() {
+                prediction_error[i].abs()
+            } else {
+                0.5
+            };
             // Higher error → lower precision
             let new_precision = 1.0 / (1.0 + error_i);
             self.belief.precision[i] = 0.9 * self.belief.precision[i] + 0.1 * new_precision;
@@ -268,15 +279,20 @@ impl ActiveInferenceAgent {
         }
 
         // Softmax action selection
-        let max_efe = efe_results.iter().map(|r| -r.total).fold(f64::NEG_INFINITY, f64::max);
-        let exp_values: Vec<f64> = efe_results.iter()
+        let max_efe = efe_results
+            .iter()
+            .map(|r| -r.total)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let exp_values: Vec<f64> = efe_results
+            .iter()
             .map(|r| ((-r.total - max_efe) / self.config.action_temperature).exp())
             .collect();
         let sum_exp: f64 = exp_values.iter().sum();
         let probabilities: Vec<f64> = exp_values.iter().map(|e| e / sum_exp).collect();
 
         // Select action with highest probability (greedy for now)
-        let selected_idx = probabilities.iter()
+        let selected_idx = probabilities
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
@@ -292,7 +308,8 @@ impl ActiveInferenceAgent {
 
         // Update stats
         self.stats.actions_taken += 1;
-        self.stats.exploration_rate = self.stats.epistemic_actions as f64 / self.stats.actions_taken as f64;
+        self.stats.exploration_rate =
+            self.stats.epistemic_actions as f64 / self.stats.actions_taken as f64;
 
         ActionSelectionResult {
             action: selected.action,
@@ -334,14 +351,16 @@ impl ActiveInferenceAgent {
 
         // Update generative model with action information
         if self.config.enable_model_learning {
-            self.model.learn(&self.belief, actual_observation, Some(action));
+            self.model
+                .learn(&self.belief, actual_observation, Some(action));
         }
 
         // Update action precision
         let expected = self.model.predict_observation(&self.belief);
         let expected_phi = expected.first().copied().unwrap_or(0.5);
         let actual_phi = actual_observation.values.first().copied().unwrap_or(0.5);
-        self.precision.update_from_action(expected_phi, actual_phi, self.timestamp);
+        self.precision
+            .update_from_action(expected_phi, actual_phi, self.timestamp);
     }
 
     /// Observe a full transition (old_state, action, new_state, observation)
@@ -385,7 +404,8 @@ impl ActiveInferenceAgent {
             Some(td_error)
         } else {
             // Fallback: use direct model learning
-            self.model.learn_transition(old_state, action, new_state, observation);
+            self.model
+                .learn_transition(old_state, action, new_state, observation);
             None
         }
     }
@@ -410,7 +430,10 @@ impl ActiveInferenceAgent {
 
     /// Get current free energy
     pub fn current_free_energy(&self) -> f64 {
-        self.last_fe_components.as_ref().map(|c| c.total).unwrap_or(0.0)
+        self.last_fe_components
+            .as_ref()
+            .map(|c| c.total)
+            .unwrap_or(0.0)
     }
 
     /// Check if agent is in surprised state (high free energy)

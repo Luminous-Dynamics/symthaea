@@ -15,10 +15,12 @@ use std::path::{Path, PathBuf};
 
 use symthaea_core::hdc::ContinuousHV;
 
-use crate::consciousness::code_primitives::{CodePrimitiveExecutor, CodeOperation, CodeExecutionResult};
-use crate::hdc::code_encoder::CodeHDEncoder;
+use crate::consciousness::code_primitives::{
+    CodeExecutionResult, CodeOperation, CodePrimitiveExecutor,
+};
 use crate::hdc::code_algebra::CodeAlgebra;
-use crate::hdc::code_memory::{CodebaseMemory, CodeMatch};
+use crate::hdc::code_encoder::CodeHDEncoder;
+use crate::hdc::code_memory::{CodeMatch, CodebaseMemory};
 use crate::language::code_parser::{EntityKind, ParsedCode};
 
 /// A self-model of the codebase
@@ -116,7 +118,10 @@ impl SelfAnalyzer {
 
     /// What patterns does this codebase use most?
     /// Returns (pattern_name, frequency) sorted by frequency descending
-    pub fn introspect_patterns(&self, parsed_files: &[(PathBuf, ParsedCode)]) -> Vec<(String, usize)> {
+    pub fn introspect_patterns(
+        &self,
+        parsed_files: &[(PathBuf, ParsedCode)],
+    ) -> Vec<(String, usize)> {
         let mut kind_counts: HashMap<String, usize> = HashMap::new();
 
         for (_path, parsed) in parsed_files {
@@ -138,7 +143,9 @@ impl SelfAnalyzer {
     /// Higher score = more integrated (analogous to higher Phi).
     pub fn consciousness_map(&self) -> HashMap<PathBuf, f32> {
         let mut scores = HashMap::new();
-        let module_hvs: Vec<(&Path, &ContinuousHV)> = self.memory.module_paths()
+        let module_hvs: Vec<(&Path, &ContinuousHV)> = self
+            .memory
+            .module_paths()
             .into_iter()
             .filter_map(|p| self.memory.module_hv(p).map(|hv| (p, hv)))
             .collect();
@@ -163,7 +170,11 @@ impl SelfAnalyzer {
                 }
             }
 
-            let integration = if count > 0 { total_sim / count as f32 } else { 0.0 };
+            let integration = if count > 0 {
+                total_sim / count as f32
+            } else {
+                0.0
+            };
             scores.insert(path.to_path_buf(), integration);
         }
 
@@ -173,10 +184,12 @@ impl SelfAnalyzer {
     /// Find the most and least integrated modules
     pub fn integration_extremes(&self) -> (Option<(PathBuf, f32)>, Option<(PathBuf, f32)>) {
         let map = self.consciousness_map();
-        let most = map.iter()
+        let most = map
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(k, v)| (k.clone(), *v));
-        let least = map.iter()
+        let least = map
+            .iter()
             .min_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(k, v)| (k.clone(), *v));
         (most, least)
@@ -208,19 +221,29 @@ impl SelfAnalyzer {
         let debug_result = self.primitive_executor.execute(CodeOperation::Debug);
 
         // Get integration score from consciousness map
-        let integration = self.consciousness_map()
-            .get(path)
-            .copied()
-            .unwrap_or(0.0);
+        let integration = self.consciousness_map().get(path).copied().unwrap_or(0.0);
 
         ModuleInsight {
             path: path.to_path_buf(),
             complexity: explain_result.phi,
             integration,
-            analysis_primitives: explain_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
-            potential_issues: debug_result.primitives.iter()
-                .filter(|p| p.primitive.name.contains("DEBUG") || p.primitive.name.contains("VERIFY"))
-                .map(|p| format!("Primitive {} suggests verification needed", p.primitive.name))
+            analysis_primitives: explain_result
+                .primitives
+                .iter()
+                .map(|p| p.primitive.name.clone())
+                .collect(),
+            potential_issues: debug_result
+                .primitives
+                .iter()
+                .filter(|p| {
+                    p.primitive.name.contains("DEBUG") || p.primitive.name.contains("VERIFY")
+                })
+                .map(|p| {
+                    format!(
+                        "Primitive {} suggests verification needed",
+                        p.primitive.name
+                    )
+                })
                 .collect(),
         }
     }
@@ -229,12 +252,18 @@ impl SelfAnalyzer {
     ///
     /// This helps identify modules that may need refactoring for better cohesion.
     pub fn find_least_integrated(&self) -> Vec<ModuleInsight> {
-        let mut insights: Vec<ModuleInsight> = self.memory.module_paths()
+        let mut insights: Vec<ModuleInsight> = self
+            .memory
+            .module_paths()
             .iter()
             .map(|p| self.introspect_module(p))
             .collect();
 
-        insights.sort_by(|a, b| a.integration.partial_cmp(&b.integration).unwrap_or(std::cmp::Ordering::Equal));
+        insights.sort_by(|a, b| {
+            a.integration
+                .partial_cmp(&b.integration)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         insights
     }
 
@@ -278,19 +307,26 @@ mod tests {
 
     fn test_span() -> Span {
         Span {
-            start_byte: 0, end_byte: 10,
-            start_line: 0, start_col: 0,
-            end_line: 0, end_col: 10,
+            start_byte: 0,
+            end_byte: 10,
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 10,
         }
     }
 
     fn make_parsed(funcs: &[&str], types: &[&str]) -> ParsedCode {
         let mut parsed = ParsedCode::new("", "rust");
         for f in funcs {
-            parsed.entities.push(CodeEntity::new(EntityKind::Function, *f, test_span()));
+            parsed
+                .entities
+                .push(CodeEntity::new(EntityKind::Function, *f, test_span()));
         }
         for t in types {
-            parsed.entities.push(CodeEntity::new(EntityKind::Struct, *t, test_span()));
+            parsed
+                .entities
+                .push(CodeEntity::new(EntityKind::Struct, *t, test_span()));
         }
         parsed
     }
@@ -338,7 +374,10 @@ mod tests {
         let analyzer = SelfAnalyzer::default_dim();
 
         let files = vec![
-            (PathBuf::from("a.rs"), make_parsed(&["f1", "f2", "f3"], &["T1"])),
+            (
+                PathBuf::from("a.rs"),
+                make_parsed(&["f1", "f2", "f3"], &["T1"]),
+            ),
             (PathBuf::from("b.rs"), make_parsed(&["g1"], &["T2", "T3"])),
         ];
 
@@ -348,8 +387,16 @@ mod tests {
         assert!(patterns.iter().any(|(name, _)| name == "Struct"));
 
         // Function should appear more (4 times) than Struct (3 times)
-        let fn_count = patterns.iter().find(|(n, _)| n == "Function").map(|(_, c)| *c).unwrap_or(0);
-        let struct_count = patterns.iter().find(|(n, _)| n == "Struct").map(|(_, c)| *c).unwrap_or(0);
+        let fn_count = patterns
+            .iter()
+            .find(|(n, _)| n == "Function")
+            .map(|(_, c)| *c)
+            .unwrap_or(0);
+        let struct_count = patterns
+            .iter()
+            .find(|(n, _)| n == "Struct")
+            .map(|(_, c)| *c)
+            .unwrap_or(0);
         assert!(fn_count > struct_count);
     }
 

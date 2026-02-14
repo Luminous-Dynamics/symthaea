@@ -304,7 +304,7 @@ impl SparseHV {
         // Count occurrences of each position
         let mut counts: std::collections::HashMap<u16, usize> =
             std::collections::HashMap::with_capacity(
-                vectors.iter().map(|v| v.active_indices.len()).sum()
+                vectors.iter().map(|v| v.active_indices.len()).sum(),
             );
 
         for v in vectors {
@@ -338,7 +338,8 @@ impl SparseHV {
     pub fn permute(&self, shift: usize) -> Self {
         let shift = (shift % Self::DIM) as u16;
 
-        let mut new_indices: Vec<u16> = self.active_indices
+        let mut new_indices: Vec<u16> = self
+            .active_indices
             .iter()
             .map(|&pos| (pos + shift) % Self::DIM as u16)
             .collect();
@@ -385,7 +386,11 @@ mod tests {
     fn test_from_hv16_zero() {
         let zero = BinaryHV::zero();
         let sparse = SparseHV::from_hv16(&zero);
-        assert_eq!(sparse.popcount(), 0, "Zero vector should have 0 active bits");
+        assert_eq!(
+            sparse.popcount(),
+            0,
+            "Zero vector should have 0 active bits"
+        );
         assert_eq!(sparse.density(), 0.0);
     }
 
@@ -393,8 +398,11 @@ mod tests {
     fn test_from_hv16_ones() {
         let ones = BinaryHV::ones();
         let sparse = SparseHV::from_hv16(&ones);
-        assert_eq!(sparse.popcount(), SparseHV::DIM,
-            "All-ones vector should have DIM active bits");
+        assert_eq!(
+            sparse.popcount(),
+            SparseHV::DIM,
+            "All-ones vector should have DIM active bits"
+        );
         assert!((sparse.density() - 1.0).abs() < 0.001);
     }
 
@@ -404,8 +412,11 @@ mod tests {
         let sparse = SparseHV::from_hv16(&hv);
 
         let density = sparse.density();
-        assert!(density > 0.45 && density < 0.55,
-                "Random vector density should be ~0.5, got {}", density);
+        assert!(
+            density > 0.45 && density < 0.55,
+            "Random vector density should be ~0.5, got {}",
+            density
+        );
     }
 
     #[test]
@@ -414,8 +425,12 @@ mod tests {
             let sparse = SparseHV::random(42, target);
             let actual = sparse.density();
             // Allow some tolerance because of discrete bit positions
-            assert!((actual - target).abs() < 0.05,
-                "Target density {}, got {}", target, actual);
+            assert!(
+                (actual - target).abs() < 0.05,
+                "Target density {}, got {}",
+                target,
+                actual
+            );
         }
     }
 
@@ -464,7 +479,10 @@ mod tests {
         let hamming_sim = a.similarity(&b);
         let jaccard_sim = sparse_a.similarity_jaccard(&sparse_b);
 
-        assert!(jaccard_sim >= 0.0 && jaccard_sim <= 1.0, "Jaccard should be in [0, 1]");
+        assert!(
+            jaccard_sim >= 0.0 && jaccard_sim <= 1.0,
+            "Jaccard should be in [0, 1]"
+        );
         // For random ~50% vectors, Jaccard < Hamming
         println!("Hamming: {}, Jaccard: {}", hamming_sim, jaccard_sim);
     }
@@ -475,7 +493,10 @@ mod tests {
         let b = SparseHV::random(2, 0.5);
 
         let lsh = a.similarity_lsh(&b);
-        assert!(lsh >= 0.0 && lsh <= 1.0, "LSH similarity should be in [0, 1]");
+        assert!(
+            lsh >= 0.0 && lsh <= 1.0,
+            "LSH similarity should be in [0, 1]"
+        );
     }
 
     #[test]
@@ -511,8 +532,11 @@ mod tests {
         let b = SparseHV::random(2, 0.3);
 
         let bound = a.bind(&b);
-        assert!(bound.density() > 0.1 && bound.density() < 0.9,
-                "Bound density {} should be reasonable", bound.density());
+        assert!(
+            bound.density() > 0.1 && bound.density() < 0.9,
+            "Bound density {} should be reasonable",
+            bound.density()
+        );
     }
 
     #[test]
@@ -527,8 +551,10 @@ mod tests {
         let a = SparseHV::random(42, 0.3);
         let zero = SparseHV::zero();
         let result = a.bind(&zero);
-        assert_eq!(result.active_indices, a.active_indices,
-            "Bind with zero should return original");
+        assert_eq!(
+            result.active_indices, a.active_indices,
+            "Bind with zero should return original"
+        );
     }
 
     #[test]
@@ -538,8 +564,10 @@ mod tests {
 
         let ab = a.bind(&b);
         let ba = b.bind(&a);
-        assert_eq!(ab.active_indices, ba.active_indices,
-            "Sparse bind should be commutative");
+        assert_eq!(
+            ab.active_indices, ba.active_indices,
+            "Sparse bind should be commutative"
+        );
     }
 
     #[test]
@@ -553,21 +581,24 @@ mod tests {
         let sparse_result = a_sparse.bind(&b_sparse).to_hv16();
         let dense_result = a_dense.bind(&b_dense);
 
-        assert_eq!(sparse_result, dense_result,
-            "Sparse bind should match dense bind");
+        assert_eq!(
+            sparse_result, dense_result,
+            "Sparse bind should match dense bind"
+        );
     }
 
     // ===== Bundle =====
 
     #[test]
     fn test_bundle_sparse() {
-        let vectors: Vec<SparseHV> = (0..5)
-            .map(|i| SparseHV::random(i, 0.3))
-            .collect();
+        let vectors: Vec<SparseHV> = (0..5).map(|i| SparseHV::random(i, 0.3)).collect();
 
         let bundled = SparseHV::bundle(&vectors);
-        assert!(bundled.density() > 0.0 && bundled.density() < 1.0,
-                "Bundled density {} should be reasonable", bundled.density());
+        assert!(
+            bundled.density() > 0.0 && bundled.density() < 1.0,
+            "Bundled density {} should be reasonable",
+            bundled.density()
+        );
     }
 
     #[test]
@@ -580,8 +611,10 @@ mod tests {
     fn test_bundle_single() {
         let v = SparseHV::random(42, 0.3);
         let result = SparseHV::bundle(&[v.clone()]);
-        assert_eq!(result.active_indices, v.active_indices,
-            "Bundle of single should return same vector");
+        assert_eq!(
+            result.active_indices, v.active_indices,
+            "Bundle of single should return same vector"
+        );
     }
 
     // ===== Permute =====
@@ -591,32 +624,41 @@ mod tests {
         let original = SparseHV::random(42, 0.3);
         let permuted = original.permute(100);
 
-        assert_eq!(original.popcount(), permuted.popcount(),
-                   "Permute should preserve popcount");
+        assert_eq!(
+            original.popcount(),
+            permuted.popcount(),
+            "Permute should preserve popcount"
+        );
     }
 
     #[test]
     fn test_permute_changes_positions() {
         let original = SparseHV::random(42, 0.3);
         let permuted = original.permute(100);
-        assert_ne!(original.active_indices, permuted.active_indices,
-                   "Permute should change positions");
+        assert_ne!(
+            original.active_indices, permuted.active_indices,
+            "Permute should change positions"
+        );
     }
 
     #[test]
     fn test_permute_full_rotation() {
         let original = SparseHV::random(42, 0.3);
         let full_rotate = original.permute(SparseHV::DIM);
-        assert_eq!(original.active_indices, full_rotate.active_indices,
-                   "Permute by DIM should return to original");
+        assert_eq!(
+            original.active_indices, full_rotate.active_indices,
+            "Permute by DIM should return to original"
+        );
     }
 
     #[test]
     fn test_permute_zero_shift() {
         let original = SparseHV::random(42, 0.3);
         let not_shifted = original.permute(0);
-        assert_eq!(original.active_indices, not_shifted.active_indices,
-                   "Permute by 0 should return original");
+        assert_eq!(
+            original.active_indices, not_shifted.active_indices,
+            "Permute by 0 should return original"
+        );
     }
 
     // ===== Memory Efficiency =====
@@ -626,8 +668,11 @@ mod tests {
         let sparse = SparseHV::random(42, 0.01);
         let memory_bytes = sparse.active_indices.len() * 2;
 
-        assert!(memory_bytes < 500,
-                "1% density should use <500 bytes, got {}", memory_bytes);
+        assert!(
+            memory_bytes < 500,
+            "1% density should use <500 bytes, got {}",
+            memory_bytes
+        );
         println!("1% density uses {} bytes (vs 2048 for dense)", memory_bytes);
     }
 
@@ -635,7 +680,12 @@ mod tests {
     fn test_indices_are_sorted() {
         let sparse = SparseHV::random(42, 0.5);
         for w in sparse.active_indices.windows(2) {
-            assert!(w[0] < w[1], "Active indices should be sorted, found {} >= {}", w[0], w[1]);
+            assert!(
+                w[0] < w[1],
+                "Active indices should be sorted, found {} >= {}",
+                w[0],
+                w[1]
+            );
         }
     }
 
@@ -643,8 +693,12 @@ mod tests {
     fn test_indices_within_bounds() {
         let sparse = SparseHV::random(42, 0.5);
         for &idx in &sparse.active_indices {
-            assert!((idx as usize) < SparseHV::DIM,
-                "Index {} should be < DIM={}", idx, SparseHV::DIM);
+            assert!(
+                (idx as usize) < SparseHV::DIM,
+                "Index {} should be < DIM={}",
+                idx,
+                SparseHV::DIM
+            );
         }
     }
 }

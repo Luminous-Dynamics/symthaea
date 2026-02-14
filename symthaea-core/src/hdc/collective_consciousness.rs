@@ -471,8 +471,12 @@ impl CollectiveConsciousness {
             degrees.insert(id.clone(), 0);
         }
         for (from, to) in adjacency.keys() {
-            if let Some(d) = degrees.get_mut(from) { *d += 1; }
-            if let Some(d) = degrees.get_mut(to) { *d += 1; }
+            if let Some(d) = degrees.get_mut(from) {
+                *d += 1;
+            }
+            if let Some(d) = degrees.get_mut(to) {
+                *d += 1;
+            }
         }
 
         let avg_degree = degrees.values().sum::<usize>() as f64 / n as f64;
@@ -544,13 +548,16 @@ impl CollectiveConsciousness {
             for start in &agent_ids {
                 // BFS from start node
                 let mut visited: HashMap<&String, usize> = HashMap::new();
-                let mut queue: std::collections::VecDeque<&String> = std::collections::VecDeque::new();
+                let mut queue: std::collections::VecDeque<&String> =
+                    std::collections::VecDeque::new();
 
                 visited.insert(start, 0);
                 queue.push_back(start);
 
                 while let Some(current) = queue.pop_front() {
-                    let current_dist = *visited.get(current).expect("node was inserted into visited before being enqueued");
+                    let current_dist = *visited
+                        .get(current)
+                        .expect("node was inserted into visited before being enqueued");
 
                     // Find all neighbors
                     for neighbor in &agent_ids {
@@ -596,11 +603,7 @@ impl CollectiveConsciousness {
         // Collective meta-consciousness = average of individual meta-Φ
         // weighted by communication strength
 
-        let meta_phis: Vec<f64> = self
-            .agents
-            .values()
-            .filter_map(|a| a.meta_phi)
-            .collect();
+        let meta_phis: Vec<f64> = self.agents.values().filter_map(|a| a.meta_phi).collect();
 
         if meta_phis.is_empty() {
             return 0.0;
@@ -742,7 +745,7 @@ mod tests {
         let assessment = collective.assess();
         assert_eq!(assessment.num_agents, 3);
         assert!((assessment.phi_sum - 1.2).abs() < 0.001); // Floating point tolerance
-        // No communication = no integration boost
+                                                           // No communication = no integration boost
         assert!(assessment.phi_collective <= 1.3);
         assert!(assessment.emergence <= 1.1);
     }
@@ -824,10 +827,7 @@ mod tests {
 
         let assessment = collective.assess();
         assert!(assessment.emergence > 1.0, "Should show emergence");
-        assert!(
-            assessment.integration > 0.7,
-            "Should have high integration"
-        );
+        assert!(assessment.integration > 0.7, "Should have high integration");
     }
 
     #[test]

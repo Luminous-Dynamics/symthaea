@@ -3,9 +3,9 @@
 //! Temporal backend selection (CfC vs HdcLtcUnified), training methods,
 //! and the main `CognitiveLoopConfig` builder.
 
-use serde::{Serialize, Deserialize};
-pub use symthaea_core::hdc::predictive_encoder::PredictiveEncoderConfig;
 use crate::hdc_ltc_bridge::HdcLtcBridgeConfig;
+use serde::{Deserialize, Serialize};
+pub use symthaea_core::hdc::predictive_encoder::PredictiveEncoderConfig;
 
 // TEMPORAL BACKEND SELECTION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -71,9 +71,9 @@ impl Default for CfCConfig {
     fn default() -> Self {
         Self {
             num_neurons: 256,
-            input_dim: 256,  // Must match num_neurons for train_step compatibility
+            input_dim: 256, // Must match num_neurons for train_step compatibility
             learning_rate: 0.001,
-            delta_t: 0.02,  // 50Hz base rate
+            delta_t: 0.02, // 50Hz base rate
             // Multi-scale prediction: t+1, t+5, t+10 steps
             prediction_horizons: vec![0.02, 0.1, 0.2],
         }

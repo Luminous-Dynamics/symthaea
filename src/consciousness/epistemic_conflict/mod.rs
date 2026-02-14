@@ -9,17 +9,16 @@
 //! - **Calibration** with bounded updates (INV-9)
 //! - **Ground-truth anchors** for epistemic actions (INV-10)
 
-pub mod types;
-pub mod detector;
 pub mod calibrator;
+pub mod detector;
 pub mod phi_integration;
+pub mod types;
 
 // Re-export key types for ergonomic use
-pub use types::{
-    TheoryId, ConflictKind, AnchorKind, EpistemicAction,
-    ConflictScore, ConflictMatrix, MultiTheoryMetrics,
-    TheoryCalibration, TheoryCalibrations,
-};
+pub use calibrator::{soft_min, TheoryCalibrator};
 pub use detector::ConflictDetector;
-pub use calibrator::{TheoryCalibrator, soft_min};
-pub use phi_integration::{effective_phi, compute_phi_eff, PhiEffResult, thresholds};
+pub use phi_integration::{compute_phi_eff, effective_phi, thresholds, PhiEffResult};
+pub use types::{
+    AnchorKind, ConflictKind, ConflictMatrix, ConflictScore, EpistemicAction, MultiTheoryMetrics,
+    TheoryCalibration, TheoryCalibrations, TheoryId,
+};

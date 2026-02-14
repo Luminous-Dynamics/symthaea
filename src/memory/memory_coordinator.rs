@@ -20,7 +20,7 @@
 //!                                                  └───────────────┘
 //! ```
 
-use crate::memory::episodic_replay::{EpisodicMemory, Episode};
+use crate::memory::episodic_replay::{Episode, EpisodicMemory};
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
@@ -205,7 +205,7 @@ impl MemoryCoordinator {
                 adjusted_phi,
                 self.signals.step,
                 1.0 - event.final_activation as f32, // Low activation → high surprise
-                0.0,                                  // Neutral valence
+                0.0,                                 // Neutral valence
                 event.coherence_at_graduation as f32,
             );
 
@@ -229,7 +229,10 @@ impl MemoryCoordinator {
 
     /// Get the retrieval count for a memory (by content hash)
     pub fn retrieval_count(&self, content_hash: u64) -> u32 {
-        self.retrieval_counts.get(&content_hash).copied().unwrap_or(0)
+        self.retrieval_counts
+            .get(&content_hash)
+            .copied()
+            .unwrap_or(0)
     }
 
     /// Compute enriched episodic priority score incorporating cross-tier signals.

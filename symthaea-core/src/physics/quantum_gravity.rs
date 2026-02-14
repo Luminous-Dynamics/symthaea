@@ -30,9 +30,9 @@
 //! - Bekenstein-Hawking entropy: S = A/(4l_P²)
 //! - ER = EPR: wormholes from entanglement
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 
@@ -98,7 +98,7 @@ pub struct QuantumGravityEncoder {
     pub duality: ContinuousHV,
 
     // Constants
-    pub immirzi_parameter: f64,  // γ ≈ 0.2375
+    pub immirzi_parameter: f64, // γ ≈ 0.2375
 }
 
 impl QuantumGravityEncoder {
@@ -175,7 +175,8 @@ impl QuantumGravityEncoder {
     /// Create a spin network edge
     pub fn create_edge(&self, spin_j: f64) -> SpinNetworkEdge {
         let area = self.area_quantum(spin_j);
-        let vector = self.spin_network
+        let vector = self
+            .spin_network
             .permute((spin_j * 1000.0) as usize)
             .scale(spin_j as f32)
             .bind(&self.area_quantization);
@@ -189,9 +190,7 @@ impl QuantumGravityEncoder {
 
     /// Create a spin network from spins
     pub fn create_spin_network(&self, spins: &[f64]) -> SpinNetwork {
-        let edges: Vec<SpinNetworkEdge> = spins.iter()
-            .map(|&j| self.create_edge(j))
-            .collect();
+        let edges: Vec<SpinNetworkEdge> = spins.iter().map(|&j| self.create_edge(j)).collect();
 
         let total_area: f64 = edges.iter().map(|e| e.area_quanta).sum();
 
@@ -262,7 +261,7 @@ impl QuantumGravityEncoder {
             oscillator_modes: vec![],
             winding: 0,
             momentum: 0,
-            mass_squared: 0.0,  // Massless ground state (graviton)
+            mass_squared: 0.0, // Massless ground state (graviton)
             vector: self.string.clone(),
         }
     }
@@ -271,7 +270,8 @@ impl QuantumGravityEncoder {
     pub fn excited_string(&self, modes: &[i32]) -> StringState {
         let n: i32 = modes.iter().sum();
 
-        let vector = self.string
+        let vector = self
+            .string
             .scale(n as f32)
             .permute((n.unsigned_abs() as usize) * 100);
 
@@ -280,7 +280,7 @@ impl QuantumGravityEncoder {
             oscillator_modes: modes.to_vec(),
             winding: 0,
             momentum: 0,
-            mass_squared: n as f64,  // M² = N/α' in string units
+            mass_squared: n as f64, // M² = N/α' in string units
             vector,
         }
     }
@@ -297,7 +297,7 @@ impl QuantumGravityEncoder {
             oscillator_modes: state.oscillator_modes.clone(),
             winding: state.momentum,
             momentum: state.winding,
-            mass_squared: state.mass_squared,  // Mass unchanged under T-duality
+            mass_squared: state.mass_squared, // Mass unchanged under T-duality
             vector: state.vector.permute(PHYSICS_DIM / 4).bind(&self.duality),
         }
     }
@@ -395,7 +395,7 @@ impl QuantumGravityEncoder {
 
     /// Schwarzschild radius: r_s = 2GM/c²
     pub fn schwarzschild_radius(&self, mass_kg: f64) -> f64 {
-        use super::constants::{G, C};
+        use super::constants::{C, G};
         2.0 * G * mass_kg / (C * C)
     }
 }
@@ -435,7 +435,7 @@ impl QuantumGravityEncoder {
         EmergentSpacetime {
             pre_geometric: pre_geo.clone(),
             geometric,
-            emergence_scale: self.planck.length_m * 1000.0,  // ~1000 Planck lengths
+            emergence_scale: self.planck.length_m * 1000.0, // ~1000 Planck lengths
             vector: pre_geo.bind(&self.spacetime).bind(&self.emergence),
         }
     }
@@ -444,7 +444,7 @@ impl QuantumGravityEncoder {
     pub fn spacetime_is_emergent(&self, emergent: &EmergentSpacetime) -> bool {
         // Check that geometric differs from pre-geometric
         let sim = emergent.pre_geometric.similarity(&emergent.geometric);
-        sim < 0.9  // Some transformation occurred
+        sim < 0.9 // Some transformation occurred
     }
 }
 
@@ -556,7 +556,7 @@ mod tests {
     fn test_s_duality() {
         let (encoder, _) = setup();
 
-        let g = 0.1;  // Weak coupling
+        let g = 0.1; // Weak coupling
         let g_dual = encoder.s_duality(g);
 
         assert!((g_dual - 10.0).abs() < 0.001);
@@ -568,7 +568,7 @@ mod tests {
         let (encoder, _) = setup();
 
         // Solar mass black hole
-        let m_solar = 2e30;  // kg
+        let m_solar = 2e30; // kg
         let r_s = encoder.schwarzschild_radius(m_solar);
         let area = 4.0 * PI * r_s * r_s;
 
@@ -590,7 +590,7 @@ mod tests {
 
         assert_eq!(d0.dimension, 0);
         assert_eq!(d3.dimension, 3);
-        assert!(d0.tension > d3.tension);  // Lower dimension = higher tension
+        assert!(d0.tension > d3.tension); // Lower dimension = higher tension
     }
 
     #[test]
@@ -598,7 +598,7 @@ mod tests {
         let (encoder, genesis) = setup();
 
         let bulk = genesis.hv("test::bulk", PHYSICS_DIM);
-        let hologram = encoder.ads_cft(&bulk, 4);  // 4D boundary
+        let hologram = encoder.ads_cft(&bulk, 4); // 4D boundary
 
         assert_eq!(hologram.cft_dimension, 4);
         assert!(hologram.vector.norm() > 0.0);

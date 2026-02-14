@@ -442,8 +442,7 @@ pub trait ConsciousnessDatabase: Send + Sync {
 // ============================================================================
 
 /// Which database backend to use for persistent consciousness memory.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub enum DatabaseBackend {
     /// SQLite — battle-tested, single-file, always available.
     #[default]
@@ -454,17 +453,14 @@ pub enum DatabaseBackend {
     Lance,
 }
 
-
 /// Configuration for the consciousness database layer.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct DatabaseConfig {
     /// Which backend to use.
     pub backend: DatabaseBackend,
     /// Path for persistent storage. If None, uses in-memory.
     pub path: Option<String>,
 }
-
 
 /// Create a database instance from configuration.
 pub async fn create_database(config: &DatabaseConfig) -> DbResult<Box<dyn ConsciousnessDatabase>> {

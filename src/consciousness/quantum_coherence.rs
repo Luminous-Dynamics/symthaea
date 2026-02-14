@@ -346,7 +346,6 @@ impl QuantumCoherenceAnalyzer {
         if p <= 0.0 || p >= 1.0 {
             0.0
         } else {
-            
             -p * p.log2() - (1.0 - p) * (1.0 - p).log2() // Normalized to [0, 1]
         }
     }
@@ -367,7 +366,13 @@ impl QuantumCoherenceAnalyzer {
 
         if sudden_change || phi_collapse {
             let richness_now = self.richness_history.back().copied().unwrap_or(0.5);
-            let richness_prev = self.richness_history.iter().rev().nth(1).copied().unwrap_or(0.5);
+            let richness_prev = self
+                .richness_history
+                .iter()
+                .rev()
+                .nth(1)
+                .copied()
+                .unwrap_or(0.5);
 
             let event = DecoherenceEvent {
                 timestep: self.stats.observations,
@@ -439,7 +444,8 @@ impl QuantumCoherenceAnalyzer {
         let combined_phi = (current.phi + past_state.phi) / 2.0;
 
         // Measure interference visibility using popcount
-        let individual_sum = current.state.popcount() as usize + past_state.state.popcount() as usize;
+        let individual_sum =
+            current.state.popcount() as usize + past_state.state.popcount() as usize;
         let combined_count = combined.popcount() as usize * 2; // Scale for comparison
 
         let visibility = if individual_sum > 0 {
@@ -594,13 +600,17 @@ impl QuantumCoherenceAnalyzer {
     pub fn coherence_report(&self) -> QuantumCoherenceReport {
         let last_entanglement = if self.config.estimate_entanglement {
             self.history.back().and_then(|obs| {
-                obs.components.as_ref().map(|comps| self.estimate_entanglement(comps))
+                obs.components
+                    .as_ref()
+                    .map(|comps| self.estimate_entanglement(comps))
             })
         } else {
             None
         };
 
-        let dominant_interference = self.interference_patterns.iter()
+        let dominant_interference = self
+            .interference_patterns
+            .iter()
             .max_by(|a, b| a.visibility.partial_cmp(&b.visibility).unwrap())
             .cloned();
 
@@ -667,7 +677,8 @@ impl QuantumCoherenceAnalyzer {
                 priority: 1,
                 category: RecommendationCategory::Decoherence,
                 message: "High decoherence rate - consciousness unstable".to_string(),
-                action: "Reduce sudden state transitions, implement smoother processing".to_string(),
+                action: "Reduce sudden state transitions, implement smoother processing"
+                    .to_string(),
             });
         }
 
@@ -759,11 +770,22 @@ mod tests {
         let richness2 = analyzer.estimate_superposition_richness(&state2);
 
         // Richness must be in valid range [0, 1]
-        assert!((0.0..=1.0).contains(&richness1), "richness1 out of range: {}", richness1);
-        assert!((0.0..=1.0).contains(&richness2), "richness2 out of range: {}", richness2);
+        assert!(
+            (0.0..=1.0).contains(&richness1),
+            "richness1 out of range: {}",
+            richness1
+        );
+        assert!(
+            (0.0..=1.0).contains(&richness2),
+            "richness2 out of range: {}",
+            richness2
+        );
 
         // Different seeds should produce measurable richness (not all zeros or all ones)
-        assert!(richness1 > 0.0 || richness2 > 0.0, "At least one state should have non-zero richness");
+        assert!(
+            richness1 > 0.0 || richness2 > 0.0,
+            "At least one state should have non-zero richness"
+        );
     }
 
     #[test]

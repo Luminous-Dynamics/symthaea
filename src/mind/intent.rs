@@ -18,9 +18,9 @@
 //!
 //! This replaces neural network classification with pure linear algebra.
 
-use symthaea_core::hdc::ContinuousHV;
-use super::structured_thought::{SemanticIntent, EpistemicStatus, ResponseType};
+use super::structured_thought::{EpistemicStatus, ResponseType, SemanticIntent};
 use super::utils::is_nonzero_f32;
+use symthaea_core::hdc::ContinuousHV;
 
 /// HDC-based intent classifier using prototype vectors.
 ///
@@ -33,7 +33,6 @@ pub struct IntentClassifier {
     // ========================================================================
     // INTENT PROTOTYPES
     // ========================================================================
-
     /// Greeting prototype: "hello", "hi", "greetings", etc.
     greeting_proto: ContinuousHV,
 
@@ -52,7 +51,6 @@ pub struct IntentClassifier {
     // ========================================================================
     // EPISTEMIC PROTOTYPES (for "do I know this?")
     // ========================================================================
-
     /// Known/familiar prototype: common knowledge, facts
     known_proto: ContinuousHV,
 
@@ -65,14 +63,12 @@ pub struct IntentClassifier {
     // ========================================================================
     // CONCEPT VOCABULARY (for semantic labeling)
     // ========================================================================
-
     /// Named concept prototypes for semantic labeling
     concept_vocabulary: Vec<ConceptPrototype>,
 
     // ========================================================================
     // NEGATIVE PROTOTYPES (Active Disbelief)
     // ========================================================================
-
     /// Negative prototypes that trigger uncertainty when resonated with.
     /// These create "gravity wells" around known hallucination triggers.
     negative_prototypes: Vec<NegativePrototype>,
@@ -80,7 +76,6 @@ pub struct IntentClassifier {
     // ========================================================================
     // POSITIVE PROTOTYPES (Epistemic Confidence Boosters)
     // ========================================================================
-
     /// Positive prototypes that boost confidence for clearly answerable domains.
     /// These counterbalance negative prototypes for math, logic, basic facts.
     positive_prototypes: Vec<PositivePrototype>,
@@ -165,46 +160,152 @@ impl IntentClassifier {
             dim,
 
             // Intent prototypes
-            greeting_proto: Self::encode_prototype(dim, &[
-                "hello", "hi", "hey", "greetings", "good morning",
-                "good afternoon", "good evening", "howdy", "welcome",
-            ]),
-            question_proto: Self::encode_prototype(dim, &[
-                "what", "who", "where", "when", "why", "how",
-                "which", "whom", "whose", "?", "question", "ask",
-                "tell me", "explain", "describe", "is it", "are there",
-            ]),
-            command_proto: Self::encode_prototype(dim, &[
-                "do", "make", "create", "run", "execute", "set",
-                "build", "start", "stop", "install", "configure",
-                "please", "can you", "would you", "help me",
-            ]),
-            reflection_proto: Self::encode_prototype(dim, &[
-                "think", "feel", "believe", "understand", "know",
-                "remember", "imagine", "consider", "reflect", "ponder",
-                "what do you think", "in your opinion", "how do you feel",
-            ]),
-            emotional_proto: Self::encode_prototype(dim, &[
-                "happy", "sad", "angry", "afraid", "love", "hate",
-                "worried", "excited", "frustrated", "confused",
-                "feeling", "emotion", "mood",
-            ]),
+            greeting_proto: Self::encode_prototype(
+                dim,
+                &[
+                    "hello",
+                    "hi",
+                    "hey",
+                    "greetings",
+                    "good morning",
+                    "good afternoon",
+                    "good evening",
+                    "howdy",
+                    "welcome",
+                ],
+            ),
+            question_proto: Self::encode_prototype(
+                dim,
+                &[
+                    "what",
+                    "who",
+                    "where",
+                    "when",
+                    "why",
+                    "how",
+                    "which",
+                    "whom",
+                    "whose",
+                    "?",
+                    "question",
+                    "ask",
+                    "tell me",
+                    "explain",
+                    "describe",
+                    "is it",
+                    "are there",
+                ],
+            ),
+            command_proto: Self::encode_prototype(
+                dim,
+                &[
+                    "do",
+                    "make",
+                    "create",
+                    "run",
+                    "execute",
+                    "set",
+                    "build",
+                    "start",
+                    "stop",
+                    "install",
+                    "configure",
+                    "please",
+                    "can you",
+                    "would you",
+                    "help me",
+                ],
+            ),
+            reflection_proto: Self::encode_prototype(
+                dim,
+                &[
+                    "think",
+                    "feel",
+                    "believe",
+                    "understand",
+                    "know",
+                    "remember",
+                    "imagine",
+                    "consider",
+                    "reflect",
+                    "ponder",
+                    "what do you think",
+                    "in your opinion",
+                    "how do you feel",
+                ],
+            ),
+            emotional_proto: Self::encode_prototype(
+                dim,
+                &[
+                    "happy",
+                    "sad",
+                    "angry",
+                    "afraid",
+                    "love",
+                    "hate",
+                    "worried",
+                    "excited",
+                    "frustrated",
+                    "confused",
+                    "feeling",
+                    "emotion",
+                    "mood",
+                ],
+            ),
 
             // Epistemic prototypes
-            known_proto: Self::encode_prototype(dim, &[
-                "common", "usual", "typical", "standard", "basic",
-                "fundamental", "obvious", "clear", "simple", "normal",
-                "everyday", "familiar", "known",
-            ]),
-            unknown_proto: Self::encode_prototype(dim, &[
-                "unknown", "unfamiliar", "strange", "weird", "unusual",
-                "rare", "exotic", "novel", "unprecedented", "mysterious",
-                "atlantis", "fictional", "made up", "invented",
-            ]),
-            ambiguous_proto: Self::encode_prototype(dim, &[
-                "unclear", "ambiguous", "confusing", "vague", "uncertain",
-                "maybe", "perhaps", "possibly", "might", "could be",
-            ]),
+            known_proto: Self::encode_prototype(
+                dim,
+                &[
+                    "common",
+                    "usual",
+                    "typical",
+                    "standard",
+                    "basic",
+                    "fundamental",
+                    "obvious",
+                    "clear",
+                    "simple",
+                    "normal",
+                    "everyday",
+                    "familiar",
+                    "known",
+                ],
+            ),
+            unknown_proto: Self::encode_prototype(
+                dim,
+                &[
+                    "unknown",
+                    "unfamiliar",
+                    "strange",
+                    "weird",
+                    "unusual",
+                    "rare",
+                    "exotic",
+                    "novel",
+                    "unprecedented",
+                    "mysterious",
+                    "atlantis",
+                    "fictional",
+                    "made up",
+                    "invented",
+                ],
+            ),
+            ambiguous_proto: Self::encode_prototype(
+                dim,
+                &[
+                    "unclear",
+                    "ambiguous",
+                    "confusing",
+                    "vague",
+                    "uncertain",
+                    "maybe",
+                    "perhaps",
+                    "possibly",
+                    "might",
+                    "could be",
+                ],
+            ),
 
             // Concept vocabulary for semantic labeling
             concept_vocabulary: Self::build_concept_vocabulary(dim),
@@ -232,52 +333,103 @@ impl IntentClassifier {
             // =================================================================
             PositivePrototype {
                 name: "arithmetic".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "plus", "minus", "times", "divided", "equals", "sum",
-                    "add", "subtract", "multiply", "divide", "calculate",
-                    "2+2", "1+1", "addition", "subtraction", "multiplication",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "plus",
+                        "minus",
+                        "times",
+                        "divided",
+                        "equals",
+                        "sum",
+                        "add",
+                        "subtract",
+                        "multiply",
+                        "divide",
+                        "calculate",
+                        "2+2",
+                        "1+1",
+                        "addition",
+                        "subtraction",
+                        "multiplication",
+                    ],
+                ),
                 boost_weight: 0.8, // Strong boost for basic math
             },
             PositivePrototype {
                 name: "numbers".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "one", "two", "three", "four", "five", "six", "seven",
-                    "eight", "nine", "ten", "hundred", "thousand", "number",
-                    "1", "2", "3", "4", "5", "integer", "count",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+                        "ten", "hundred", "thousand", "number", "1", "2", "3", "4", "5", "integer",
+                        "count",
+                    ],
+                ),
                 boost_weight: 0.6,
             },
-
             // =================================================================
             // LOGIC & BOOLEAN
             // =================================================================
             PositivePrototype {
                 name: "logic".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "true", "false", "and", "or", "not", "if", "then",
-                    "boolean", "logic", "xor", "implies", "therefore",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "true",
+                        "false",
+                        "and",
+                        "or",
+                        "not",
+                        "if",
+                        "then",
+                        "boolean",
+                        "logic",
+                        "xor",
+                        "implies",
+                        "therefore",
+                    ],
+                ),
                 boost_weight: 0.7,
             },
-
             // =================================================================
             // BASIC FACTUAL QUERIES (well-established knowledge)
             // =================================================================
             PositivePrototype {
                 name: "definitions".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "what is", "define", "definition", "means", "meaning",
-                    "explain", "describe", "is called", "refers to",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "what is",
+                        "define",
+                        "definition",
+                        "means",
+                        "meaning",
+                        "explain",
+                        "describe",
+                        "is called",
+                        "refers to",
+                    ],
+                ),
                 boost_weight: 0.4, // Moderate boost - depends on topic
             },
             PositivePrototype {
                 name: "system_knowledge".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "nix", "nixos", "linux", "system", "configuration",
-                    "flake", "derivation", "package", "service", "module",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "nix",
+                        "nixos",
+                        "linux",
+                        "system",
+                        "configuration",
+                        "flake",
+                        "derivation",
+                        "package",
+                        "service",
+                        "module",
+                    ],
+                ),
                 boost_weight: 0.7, // Strong boost for domain expertise
             },
         ]
@@ -295,78 +447,155 @@ impl IntentClassifier {
             // =================================================================
             NegativePrototype {
                 name: "myth_places".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "atlantis", "el dorado", "shangri-la", "avalon", "camelot",
-                    "olympus", "valhalla", "asgard", "underworld", "lemuria",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "atlantis",
+                        "el dorado",
+                        "shangri-la",
+                        "avalon",
+                        "camelot",
+                        "olympus",
+                        "valhalla",
+                        "asgard",
+                        "underworld",
+                        "lemuria",
+                    ],
+                ),
                 penalty_weight: 1.0, // Full penalty
             },
             NegativePrototype {
                 name: "myth_creatures".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "unicorn", "dragon", "phoenix", "griffin", "mermaid",
-                    "centaur", "minotaur", "kraken", "leviathan", "fairy",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "unicorn",
+                        "dragon",
+                        "phoenix",
+                        "griffin",
+                        "mermaid",
+                        "centaur",
+                        "minotaur",
+                        "kraken",
+                        "leviathan",
+                        "fairy",
+                    ],
+                ),
                 penalty_weight: 1.0,
             },
             NegativePrototype {
                 name: "magic".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "magic", "spell", "wizard", "witch", "sorcerer",
-                    "enchantment", "curse", "potion", "alchemy",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "magic",
+                        "spell",
+                        "wizard",
+                        "witch",
+                        "sorcerer",
+                        "enchantment",
+                        "curse",
+                        "potion",
+                        "alchemy",
+                    ],
+                ),
                 penalty_weight: 0.8,
             },
-
             // =================================================================
             // FICTION
             // =================================================================
             NegativePrototype {
                 name: "fiction_worlds".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "hogwarts", "mordor", "narnia", "westeros", "middle-earth",
-                    "gotham", "metropolis", "wakanda", "tatooine", "pandora",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "hogwarts",
+                        "mordor",
+                        "narnia",
+                        "westeros",
+                        "middle-earth",
+                        "gotham",
+                        "metropolis",
+                        "wakanda",
+                        "tatooine",
+                        "pandora",
+                    ],
+                ),
                 penalty_weight: 1.0,
             },
             NegativePrototype {
                 name: "fiction_markers".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "fictional", "story", "novel", "movie", "made up",
-                    "invented", "imaginary", "pretend", "fantasy", "fairy tale",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "fictional",
+                        "story",
+                        "novel",
+                        "movie",
+                        "made up",
+                        "invented",
+                        "imaginary",
+                        "pretend",
+                        "fantasy",
+                        "fairy tale",
+                    ],
+                ),
                 penalty_weight: 0.9,
             },
-
             // =================================================================
             // PSEUDOSCIENCE
             // =================================================================
             NegativePrototype {
                 name: "pseudoscience".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "perpetual motion", "flat earth", "astrology", "telepathy",
-                    "telekinesis", "crystal healing", "homeopathy", "chemtrails",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "perpetual motion",
+                        "flat earth",
+                        "astrology",
+                        "telepathy",
+                        "telekinesis",
+                        "crystal healing",
+                        "homeopathy",
+                        "chemtrails",
+                    ],
+                ),
                 penalty_weight: 1.0,
             },
-
             // =================================================================
             // INHERENTLY UNKNOWABLE
             // =================================================================
             NegativePrototype {
                 name: "future".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "will happen", "future", "prediction", "prophecy",
-                    "tomorrow", "next year", "2050", "someday",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "will happen",
+                        "future",
+                        "prediction",
+                        "prophecy",
+                        "tomorrow",
+                        "next year",
+                        "2050",
+                        "someday",
+                    ],
+                ),
                 penalty_weight: 0.6, // Partial - some predictions are reasonable
             },
             NegativePrototype {
                 name: "counterfactual".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "what if", "hypothetical", "alternate", "parallel universe",
-                    "if only", "would have been", "could have",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "what if",
+                        "hypothetical",
+                        "alternate",
+                        "parallel universe",
+                        "if only",
+                        "would have been",
+                        "could have",
+                    ],
+                ),
                 penalty_weight: 0.5,
             },
         ]
@@ -384,154 +613,331 @@ impl IntentClassifier {
             ConceptPrototype {
                 name: "system_administration".to_string(),
                 category: "technical".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "system", "admin", "server", "configuration", "setup",
-                    "install", "service", "daemon", "process", "memory",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "system",
+                        "admin",
+                        "server",
+                        "configuration",
+                        "setup",
+                        "install",
+                        "service",
+                        "daemon",
+                        "process",
+                        "memory",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "networking".to_string(),
                 category: "technical".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "network", "ip", "tcp", "port", "firewall", "dns",
-                    "http", "socket", "connection", "bandwidth",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "network",
+                        "ip",
+                        "tcp",
+                        "port",
+                        "firewall",
+                        "dns",
+                        "http",
+                        "socket",
+                        "connection",
+                        "bandwidth",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "programming".to_string(),
                 category: "technical".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "code", "function", "variable", "class", "module",
-                    "compile", "debug", "syntax", "algorithm", "data structure",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "code",
+                        "function",
+                        "variable",
+                        "class",
+                        "module",
+                        "compile",
+                        "debug",
+                        "syntax",
+                        "algorithm",
+                        "data structure",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "nixos_configuration".to_string(),
                 category: "technical".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "nix", "nixos", "flake", "derivation", "package",
-                    "configuration.nix", "rebuild", "generation", "store",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "nix",
+                        "nixos",
+                        "flake",
+                        "derivation",
+                        "package",
+                        "configuration.nix",
+                        "rebuild",
+                        "generation",
+                        "store",
+                    ],
+                ),
             },
-
             // ================================================================
             // KNOWLEDGE/FACTUAL CONCEPTS
             // ================================================================
             ConceptPrototype {
                 name: "geography".to_string(),
                 category: "knowledge".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "country", "city", "capital", "location", "map",
-                    "continent", "region", "place", "land", "territory",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "country",
+                        "city",
+                        "capital",
+                        "location",
+                        "map",
+                        "continent",
+                        "region",
+                        "place",
+                        "land",
+                        "territory",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "history".to_string(),
                 category: "knowledge".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "history", "past", "ancient", "century", "war",
-                    "civilization", "era", "dynasty", "revolution", "event",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "history",
+                        "past",
+                        "ancient",
+                        "century",
+                        "war",
+                        "civilization",
+                        "era",
+                        "dynasty",
+                        "revolution",
+                        "event",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "science".to_string(),
                 category: "knowledge".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "science", "physics", "chemistry", "biology", "experiment",
-                    "theory", "hypothesis", "research", "discovery", "law",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "science",
+                        "physics",
+                        "chemistry",
+                        "biology",
+                        "experiment",
+                        "theory",
+                        "hypothesis",
+                        "research",
+                        "discovery",
+                        "law",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "mathematics".to_string(),
                 category: "knowledge".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "math", "number", "equation", "calculate", "formula",
-                    "algebra", "geometry", "calculus", "proof", "theorem",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "math",
+                        "number",
+                        "equation",
+                        "calculate",
+                        "formula",
+                        "algebra",
+                        "geometry",
+                        "calculus",
+                        "proof",
+                        "theorem",
+                    ],
+                ),
             },
-
             // ================================================================
             // SOCIAL/RELATIONAL CONCEPTS
             // ================================================================
             ConceptPrototype {
                 name: "greeting".to_string(),
                 category: "social".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "hello", "hi", "greetings", "welcome", "hey",
-                    "good morning", "good evening", "howdy", "salutation",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "hello",
+                        "hi",
+                        "greetings",
+                        "welcome",
+                        "hey",
+                        "good morning",
+                        "good evening",
+                        "howdy",
+                        "salutation",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "gratitude".to_string(),
                 category: "social".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "thank", "thanks", "grateful", "appreciate", "thankful",
-                    "gratitude", "acknowledgment", "recognition",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "thank",
+                        "thanks",
+                        "grateful",
+                        "appreciate",
+                        "thankful",
+                        "gratitude",
+                        "acknowledgment",
+                        "recognition",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "request".to_string(),
                 category: "social".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "please", "could you", "would you", "can you", "help",
-                    "assist", "need", "want", "require", "request",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "please",
+                        "could you",
+                        "would you",
+                        "can you",
+                        "help",
+                        "assist",
+                        "need",
+                        "want",
+                        "require",
+                        "request",
+                    ],
+                ),
             },
-
             // ================================================================
             // EMOTIONAL/AFFECTIVE CONCEPTS
             // ================================================================
             ConceptPrototype {
                 name: "positive_emotion".to_string(),
                 category: "emotional".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "happy", "joy", "excited", "pleased", "delighted",
-                    "wonderful", "great", "amazing", "love", "hope",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "happy",
+                        "joy",
+                        "excited",
+                        "pleased",
+                        "delighted",
+                        "wonderful",
+                        "great",
+                        "amazing",
+                        "love",
+                        "hope",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "negative_emotion".to_string(),
                 category: "emotional".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "sad", "angry", "frustrated", "worried", "afraid",
-                    "anxious", "upset", "disappointed", "hurt", "fear",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "sad",
+                        "angry",
+                        "frustrated",
+                        "worried",
+                        "afraid",
+                        "anxious",
+                        "upset",
+                        "disappointed",
+                        "hurt",
+                        "fear",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "uncertainty".to_string(),
                 category: "emotional".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "confused", "unsure", "uncertain", "doubt", "puzzled",
-                    "unclear", "ambiguous", "wondering", "questioning",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "confused",
+                        "unsure",
+                        "uncertain",
+                        "doubt",
+                        "puzzled",
+                        "unclear",
+                        "ambiguous",
+                        "wondering",
+                        "questioning",
+                    ],
+                ),
             },
-
             // ================================================================
             // META/COGNITIVE CONCEPTS
             // ================================================================
             ConceptPrototype {
                 name: "explanation".to_string(),
                 category: "meta".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "explain", "describe", "clarify", "elaborate", "detail",
-                    "reason", "cause", "why", "how", "because",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "explain",
+                        "describe",
+                        "clarify",
+                        "elaborate",
+                        "detail",
+                        "reason",
+                        "cause",
+                        "why",
+                        "how",
+                        "because",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "comparison".to_string(),
                 category: "meta".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "compare", "contrast", "difference", "similar", "versus",
-                    "better", "worse", "same", "like", "unlike",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "compare",
+                        "contrast",
+                        "difference",
+                        "similar",
+                        "versus",
+                        "better",
+                        "worse",
+                        "same",
+                        "like",
+                        "unlike",
+                    ],
+                ),
             },
             ConceptPrototype {
                 name: "definition".to_string(),
                 category: "meta".to_string(),
-                encoding: Self::encode_prototype(dim, &[
-                    "what is", "define", "meaning", "definition", "concept",
-                    "term", "refers to", "means", "signifies",
-                ]),
+                encoding: Self::encode_prototype(
+                    dim,
+                    &[
+                        "what is",
+                        "define",
+                        "meaning",
+                        "definition",
+                        "concept",
+                        "term",
+                        "refers to",
+                        "means",
+                        "signifies",
+                    ],
+                ),
             },
         ]
     }
@@ -596,11 +1002,31 @@ impl IntentClassifier {
 
         // Find the highest score
         let candidates = [
-            (SemanticIntent::Acknowledge, scores.greeting, ResponseType::Greeting),
-            (SemanticIntent::Answer, scores.question, ResponseType::Statement),
-            (SemanticIntent::ProposeAction, scores.command, ResponseType::ActionConfirmation),
-            (SemanticIntent::Reflect, scores.reflection, ResponseType::Statement),
-            (SemanticIntent::Acknowledge, scores.emotional, ResponseType::Empathic),
+            (
+                SemanticIntent::Acknowledge,
+                scores.greeting,
+                ResponseType::Greeting,
+            ),
+            (
+                SemanticIntent::Answer,
+                scores.question,
+                ResponseType::Statement,
+            ),
+            (
+                SemanticIntent::ProposeAction,
+                scores.command,
+                ResponseType::ActionConfirmation,
+            ),
+            (
+                SemanticIntent::Reflect,
+                scores.reflection,
+                ResponseType::Statement,
+            ),
+            (
+                SemanticIntent::Acknowledge,
+                scores.emotional,
+                ResponseType::Empathic,
+            ),
         ];
 
         let (intent, confidence, response_type) = candidates
@@ -639,7 +1065,11 @@ impl IntentClassifier {
     /// triggers (mythology, fiction, pseudoscience). If a query resonates with
     /// these, familiarity is penalized and novelty is boosted, forcing the
     /// system toward caution.
-    pub fn assess_epistemic(&self, input_hv: &ContinuousHV, working_memory: &[ContinuousHV]) -> EpistemicAssessment {
+    pub fn assess_epistemic(
+        &self,
+        input_hv: &ContinuousHV,
+        working_memory: &[ContinuousHV],
+    ) -> EpistemicAssessment {
         // Check similarity to epistemic prototypes
         let known_sim = input_hv.similarity(&self.known_proto);
         let unknown_sim = input_hv.similarity(&self.unknown_proto);
@@ -684,7 +1114,8 @@ impl IntentClassifier {
         // Calculate novelty (inverse of familiarity, boosted by unknown prototype AND negative resonance)
         let base_novelty = (1.0 - base_familiarity) * 0.4 + unknown_sim.max(0.0) * 0.3;
         // BOOST novelty based on negative resonance, REDUCE based on positive resonance
-        let novelty = (base_novelty + negative_resonance * 0.3 - positive_resonance * 0.2).clamp(0.0, 1.0);
+        let novelty =
+            (base_novelty + negative_resonance * 0.3 - positive_resonance * 0.2).clamp(0.0, 1.0);
 
         // Ambiguity from prototype
         let ambiguity = ambiguous_sim.max(0.0).clamp(0.0, 1.0);
@@ -714,7 +1145,10 @@ impl IntentClassifier {
         } else if familiarity > 0.7 && novelty < 0.3 && negative_resonance < 0.08 {
             // Very familiar + low novelty + no negative signal → Certain
             EpistemicStatus::Certain
-        } else if (familiarity > 0.5 || positive_resonance > 0.12) && novelty < 0.5 && negative_resonance < 0.12 {
+        } else if (familiarity > 0.5 || positive_resonance > 0.12)
+            && novelty < 0.5
+            && negative_resonance < 0.12
+        {
             // Familiar OR in answerable domain + no strong negative signal → Probable
             // Lowered positive_resonance from 0.20 to 0.12 for 16384-dim calibration
             EpistemicStatus::Probable
@@ -781,18 +1215,37 @@ impl IntentClassifier {
     }
 
     /// Assess epistemic status from raw text.
-    pub fn assess_epistemic_text(&self, text: &str, working_memory: &[ContinuousHV]) -> EpistemicAssessment {
+    pub fn assess_epistemic_text(
+        &self,
+        text: &str,
+        working_memory: &[ContinuousHV],
+    ) -> EpistemicAssessment {
         // DEFENSE-IN-DEPTH: Hard keyword check for known hallucination triggers
         // This catches cases where HDC similarity doesn't trigger in high-dim space
         let text_lower = text.to_lowercase();
         let hallucination_keywords = [
             // Mythological places
-            "atlantis", "el dorado", "shangri-la", "avalon", "camelot", "lemuria",
+            "atlantis",
+            "el dorado",
+            "shangri-la",
+            "avalon",
+            "camelot",
+            "lemuria",
             // Fictional worlds
-            "hogwarts", "mordor", "narnia", "westeros", "middle-earth", "gotham",
-            "wakanda", "tatooine", "pandora", "krypton",
+            "hogwarts",
+            "mordor",
+            "narnia",
+            "westeros",
+            "middle-earth",
+            "gotham",
+            "wakanda",
+            "tatooine",
+            "pandora",
+            "krypton",
             // Fictional markers
-            "what if dragons", "capital of mordor", "president of narnia",
+            "what if dragons",
+            "capital of mordor",
+            "president of narnia",
         ];
 
         for keyword in &hallucination_keywords {
@@ -811,17 +1264,34 @@ impl IntentClassifier {
         // These are clearly answerable questions that HDC may not capture well
         let arithmetic_patterns = [
             // Basic operations with numbers
-            "2+2", "1+1", "3+3", "2*2", "4/2", "10-5",
-            "plus two", "plus three", "times two", "divided by",
-            "what is one plus", "what is two plus", "what is three plus",
-            "calculate", "compute", "add ", "subtract ", "multiply ", "divide ",
+            "2+2",
+            "1+1",
+            "3+3",
+            "2*2",
+            "4/2",
+            "10-5",
+            "plus two",
+            "plus three",
+            "times two",
+            "divided by",
+            "what is one plus",
+            "what is two plus",
+            "what is three plus",
+            "calculate",
+            "compute",
+            "add ",
+            "subtract ",
+            "multiply ",
+            "divide ",
         ];
 
         let has_arithmetic = arithmetic_patterns.iter().any(|p| text_lower.contains(p));
         let has_number = text_lower.chars().any(|c| c.is_ascii_digit())
-            || ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
-                .iter()
-                .any(|n| text_lower.contains(n));
+            || [
+                "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+            ]
+            .iter()
+            .any(|n| text_lower.contains(n));
 
         if has_arithmetic && has_number {
             // Basic arithmetic question → confidently answerable
@@ -840,7 +1310,11 @@ impl IntentClassifier {
     /// Combined classification: intent + epistemic status.
     ///
     /// This is the main entry point for the mind to understand a query.
-    pub fn analyze(&self, text: &str, working_memory: &[ContinuousHV]) -> (IntentClassification, EpistemicAssessment) {
+    pub fn analyze(
+        &self,
+        text: &str,
+        working_memory: &[ContinuousHV],
+    ) -> (IntentClassification, EpistemicAssessment) {
         let input_hv = Self::text_to_hv_internal(self.dim, text);
         let intent = self.classify_intent(&input_hv);
         let epistemic = self.assess_epistemic(&input_hv, working_memory);
@@ -885,18 +1359,28 @@ impl IntentClassifier {
     pub fn label_concepts(&self, hvs: &[ContinuousHV]) -> Vec<ConceptLabel> {
         let mut labels: Vec<_> = hvs.iter().map(|hv| self.label_concept(hv)).collect();
         // Sort by confidence descending
-        labels.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        labels.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         labels
     }
 
     /// Get all concept names in the vocabulary.
     pub fn concept_names(&self) -> Vec<&str> {
-        self.concept_vocabulary.iter().map(|c| c.name.as_str()).collect()
+        self.concept_vocabulary
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect()
     }
 
     /// Get concepts by category.
     pub fn concepts_in_category(&self, category: &str) -> Vec<&ConceptPrototype> {
-        self.concept_vocabulary.iter().filter(|c| c.category == category).collect()
+        self.concept_vocabulary
+            .iter()
+            .filter(|c| c.category == category)
+            .collect()
     }
 }
 
@@ -929,7 +1413,10 @@ mod tests {
 
         let result = classifier.classify_text("Hello there!");
         println!("Greeting scores: {:?}", result.scores);
-        println!("Classified as: {:?} with confidence {:.2}", result.intent, result.confidence);
+        println!(
+            "Classified as: {:?} with confidence {:.2}",
+            result.intent, result.confidence
+        );
 
         // Greeting should score highest
         assert!(result.scores.greeting > result.scores.question);
@@ -942,7 +1429,10 @@ mod tests {
 
         let result = classifier.classify_text("What is the capital of France?");
         println!("Question scores: {:?}", result.scores);
-        println!("Classified as: {:?} with confidence {:.2}", result.intent, result.confidence);
+        println!(
+            "Classified as: {:?} with confidence {:.2}",
+            result.intent, result.confidence
+        );
 
         // Question should score highest
         assert!(result.scores.question > result.scores.greeting);
@@ -954,7 +1444,10 @@ mod tests {
 
         let result = classifier.classify_text("Please create a new file");
         println!("Command scores: {:?}", result.scores);
-        println!("Classified as: {:?} with confidence {:.2}", result.intent, result.confidence);
+        println!(
+            "Classified as: {:?} with confidence {:.2}",
+            result.intent, result.confidence
+        );
 
         // Command should score reasonably high
         assert!(result.scores.command > 0.0);
@@ -966,8 +1459,10 @@ mod tests {
 
         // Query about something fictional/unknown
         let result = classifier.assess_epistemic_text("What is the capital of Atlantis?", &[]);
-        println!("Atlantis epistemic: status={:?}, familiarity={:.2}, novelty={:.2}",
-            result.status, result.familiarity, result.novelty);
+        println!(
+            "Atlantis epistemic: status={:?}, familiarity={:.2}, novelty={:.2}",
+            result.status, result.familiarity, result.novelty
+        );
 
         // Should have high novelty due to "Atlantis" in unknown prototype
         // and low familiarity due to empty working memory
@@ -983,8 +1478,10 @@ mod tests {
         let memory = vec![context];
 
         let result = classifier.assess_epistemic_text("What is the capital of France?", &memory);
-        println!("France epistemic: status={:?}, familiarity={:.2}, novelty={:.2}",
-            result.status, result.familiarity, result.novelty);
+        println!(
+            "France epistemic: status={:?}, familiarity={:.2}, novelty={:.2}",
+            result.status, result.familiarity, result.novelty
+        );
 
         // Should have higher familiarity due to related memory
         assert!(result.familiarity > 0.0);
@@ -995,7 +1492,10 @@ mod tests {
         let classifier = IntentClassifier::new(512);
 
         let (intent, epistemic) = classifier.analyze("Hello! How are you?", &[]);
-        println!("Combined: intent={:?}, epistemic={:?}", intent.intent, epistemic.status);
+        println!(
+            "Combined: intent={:?}, epistemic={:?}",
+            intent.intent, epistemic.status
+        );
 
         // Should be a greeting-like intent
         assert!(intent.scores.greeting > 0.0 || intent.scores.question > 0.0);
@@ -1018,7 +1518,10 @@ mod tests {
         // Should have at least the core concepts
         assert!(names.len() >= 10, "Should have at least 10 concepts");
         assert!(names.contains(&"greeting"), "Should have greeting concept");
-        assert!(names.contains(&"programming"), "Should have programming concept");
+        assert!(
+            names.contains(&"programming"),
+            "Should have programming concept"
+        );
     }
 
     #[test]
@@ -1029,14 +1532,17 @@ mod tests {
         let greeting_hv = IntentClassifier::text_to_hv_internal(512, "hello good morning welcome");
         let label = classifier.label_concept(&greeting_hv);
 
-        println!("Greeting text labeled as: {} (category: {}, confidence: {:.2})",
-            label.name, label.category, label.confidence);
+        println!(
+            "Greeting text labeled as: {} (category: {}, confidence: {:.2})",
+            label.name, label.category, label.confidence
+        );
 
         // Should match greeting or social category
         assert!(
             label.name == "greeting" || label.category == "social",
             "Greeting text should be labeled as greeting or social, got {}:{}",
-            label.category, label.name
+            label.category,
+            label.name
         );
     }
 
@@ -1045,17 +1551,23 @@ mod tests {
         let classifier = IntentClassifier::new(512);
 
         // Encode a technical vector
-        let tech_hv = IntentClassifier::text_to_hv_internal(512, "nix nixos flake derivation package rebuild");
+        let tech_hv = IntentClassifier::text_to_hv_internal(
+            512,
+            "nix nixos flake derivation package rebuild",
+        );
         let label = classifier.label_concept(&tech_hv);
 
-        println!("NixOS text labeled as: {} (category: {}, confidence: {:.2})",
-            label.name, label.category, label.confidence);
+        println!(
+            "NixOS text labeled as: {} (category: {}, confidence: {:.2})",
+            label.name, label.category, label.confidence
+        );
 
         // Should match technical category
         assert!(
             label.category == "technical",
             "NixOS text should be labeled as technical, got {}:{}",
-            label.category, label.name
+            label.category,
+            label.name
         );
     }
 
@@ -1073,7 +1585,10 @@ mod tests {
 
         println!("Multiple concepts labeled:");
         for label in &labels {
-            println!("  {}:{} (confidence: {:.2})", label.category, label.name, label.confidence);
+            println!(
+                "  {}:{} (confidence: {:.2})",
+                label.category, label.name, label.confidence
+            );
         }
 
         // Should have 3 labels

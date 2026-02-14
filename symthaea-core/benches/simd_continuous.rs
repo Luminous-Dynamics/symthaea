@@ -11,7 +11,7 @@
 //! Run with:
 //!   CARGO_TARGET_DIR=/tmp/symthaea-target cargo bench --bench simd_continuous --features simd
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 const HDC_DIM: usize = 16_384;
 
@@ -21,12 +21,14 @@ const HDC_DIM: usize = 16_384;
 
 fn random_vec(dim: usize, seed: u64) -> Vec<f32> {
     let mut state = seed;
-    (0..dim).map(|_| {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        (state as f32 / u64::MAX as f32) * 2.0 - 1.0
-    }).collect()
+    (0..dim)
+        .map(|_| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state as f32 / u64::MAX as f32) * 2.0 - 1.0
+        })
+        .collect()
 }
 
 // Scalar baseline implementations for comparison
@@ -64,7 +66,11 @@ fn scalar_bundle(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
 
     let dim = hvs[0].len();
     let weight_sum: f32 = weights.iter().sum();
-    let inv_weight_sum = if weight_sum.abs() > 1e-10 { 1.0 / weight_sum } else { 0.0 };
+    let inv_weight_sum = if weight_sum.abs() > 1e-10 {
+        1.0 / weight_sum
+    } else {
+        0.0
+    };
 
     let mut result = vec![0.0f32; dim];
     for i in 0..dim {
@@ -95,15 +101,13 @@ fn bench_dot_product(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("scalar", dim),
             &(&a, &b),
-            |bench, (a, b)| bench.iter(|| black_box(scalar_dot_product(a, b)))
+            |bench, (a, b)| bench.iter(|| black_box(scalar_dot_product(a, b))),
         );
 
         #[cfg(feature = "simd")]
-        group.bench_with_input(
-            BenchmarkId::new("simd", dim),
-            &(&a, &b),
-            |bench, (a, b)| bench.iter(|| black_box(symthaea_core::hdc::simd_continuous::dot_product_simd(a, b)))
-        );
+        group.bench_with_input(BenchmarkId::new("simd", dim), &(&a, &b), |bench, (a, b)| {
+            bench.iter(|| black_box(symthaea_core::hdc::simd_continuous::dot_product_simd(a, b)))
+        });
     }
 
     group.finish();
@@ -123,15 +127,13 @@ fn bench_bind(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("scalar", dim),
             &(&a, &b),
-            |bench, (a, b)| bench.iter(|| black_box(scalar_bind(a, b)))
+            |bench, (a, b)| bench.iter(|| black_box(scalar_bind(a, b))),
         );
 
         #[cfg(feature = "simd")]
-        group.bench_with_input(
-            BenchmarkId::new("simd", dim),
-            &(&a, &b),
-            |bench, (a, b)| bench.iter(|| black_box(symthaea_core::hdc::simd_continuous::bind_simd(a, b)))
-        );
+        group.bench_with_input(BenchmarkId::new("simd", dim), &(&a, &b), |bench, (a, b)| {
+            bench.iter(|| black_box(symthaea_core::hdc::simd_continuous::bind_simd(a, b)))
+        });
     }
 
     group.finish();
@@ -151,15 +153,13 @@ fn bench_similarity(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("scalar", dim),
             &(&a, &b),
-            |bench, (a, b)| bench.iter(|| black_box(scalar_similarity(a, b)))
+            |bench, (a, b)| bench.iter(|| black_box(scalar_similarity(a, b))),
         );
 
         #[cfg(feature = "simd")]
-        group.bench_with_input(
-            BenchmarkId::new("simd", dim),
-            &(&a, &b),
-            |bench, (a, b)| bench.iter(|| black_box(symthaea_core::hdc::simd_continuous::similarity_simd(a, b)))
-        );
+        group.bench_with_input(BenchmarkId::new("simd", dim), &(&a, &b), |bench, (a, b)| {
+            bench.iter(|| black_box(symthaea_core::hdc::simd_continuous::similarity_simd(a, b)))
+        });
     }
 
     group.finish();
@@ -181,14 +181,20 @@ fn bench_bundle(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("scalar", n_vecs),
             &(&refs, &weights),
-            |bench, (refs, weights)| bench.iter(|| black_box(scalar_bundle(refs, weights)))
+            |bench, (refs, weights)| bench.iter(|| black_box(scalar_bundle(refs, weights))),
         );
 
         #[cfg(feature = "simd")]
         group.bench_with_input(
             BenchmarkId::new("simd", n_vecs),
             &(&refs, &weights),
-            |bench, (refs, weights)| bench.iter(|| black_box(symthaea_core::hdc::simd_continuous::bundle_simd(refs, weights)))
+            |bench, (refs, weights)| {
+                bench.iter(|| {
+                    black_box(symthaea_core::hdc::simd_continuous::bundle_simd(
+                        refs, weights,
+                    ))
+                })
+            },
         );
     }
 
@@ -205,18 +211,14 @@ fn bench_norm(c: &mut Criterion) {
     for dim in [1024, 4096, HDC_DIM, 32768] {
         let a = random_vec(dim, 42);
 
-        group.bench_with_input(
-            BenchmarkId::new("scalar", dim),
-            &a,
-            |bench, a| bench.iter(|| black_box(scalar_norm(a)))
-        );
+        group.bench_with_input(BenchmarkId::new("scalar", dim), &a, |bench, a| {
+            bench.iter(|| black_box(scalar_norm(a)))
+        });
 
         #[cfg(feature = "simd")]
-        group.bench_with_input(
-            BenchmarkId::new("simd", dim),
-            &a,
-            |bench, a| bench.iter(|| black_box(symthaea_core::hdc::simd_continuous::norm_simd(a)))
-        );
+        group.bench_with_input(BenchmarkId::new("simd", dim), &a, |bench, a| {
+            bench.iter(|| black_box(symthaea_core::hdc::simd_continuous::norm_simd(a)))
+        });
     }
 
     group.finish();
@@ -235,20 +237,18 @@ fn bench_continuous_hv_integration(c: &mut Criterion) {
     let a = ContinuousHV::random(HDC_DIM, 42);
     let b = ContinuousHV::random(HDC_DIM, 43);
 
-    group.bench_function("bind", |bench| {
-        bench.iter(|| black_box(a.bind(&b)))
-    });
+    group.bench_function("bind", |bench| bench.iter(|| black_box(a.bind(&b))));
 
     group.bench_function("similarity", |bench| {
         bench.iter(|| black_box(a.similarity(&b)))
     });
 
-    group.bench_function("norm", |bench| {
-        bench.iter(|| black_box(a.norm()))
-    });
+    group.bench_function("norm", |bench| bench.iter(|| black_box(a.norm())));
 
     // Weighted bundle
-    let vecs: Vec<ContinuousHV> = (0..10).map(|i| ContinuousHV::random(HDC_DIM, i + 100)).collect();
+    let vecs: Vec<ContinuousHV> = (0..10)
+        .map(|i| ContinuousHV::random(HDC_DIM, i + 100))
+        .collect();
     let refs: Vec<&ContinuousHV> = vecs.iter().collect();
     let weights: Vec<f32> = (0..10).map(|i| 1.0 + (i as f32) * 0.1).collect();
 
@@ -277,7 +277,11 @@ fn bench_speedup_summary(c: &mut Criterion) {
 
     #[cfg(feature = "simd")]
     group.bench_function("dot_simd", |bench| {
-        bench.iter(|| black_box(symthaea_core::hdc::simd_continuous::dot_product_simd(&a, &b)))
+        bench.iter(|| {
+            black_box(symthaea_core::hdc::simd_continuous::dot_product_simd(
+                &a, &b,
+            ))
+        })
     });
 
     // Similarity

@@ -49,7 +49,7 @@
 //! ```
 
 use crate::cognitive_loop::CognitiveLoopBuilder;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
 /// Configuration for cognitive loop validation experiments
@@ -74,7 +74,7 @@ impl Default for CognitiveLoopValidationConfig {
             warmup_cycles: 10,
             convergence_window: 20,
             attention_emergence_threshold: 0.1,
-            convergence_threshold: 0.001,  // Prediction error delta
+            convergence_threshold: 0.001, // Prediction error delta
         }
     }
 }
@@ -143,8 +143,8 @@ impl ValidationTask {
             ValidationTask::RandomInputs => {
                 // Use deterministic "random" sequence
                 let words = vec![
-                    "apple", "banana", "car", "dog", "elephant",
-                    "fish", "grape", "house", "ice", "jungle",
+                    "apple", "banana", "car", "dog", "elephant", "fish", "grape", "house", "ice",
+                    "jungle",
                 ];
                 (0..num_cycles)
                     .map(|i| words[(i * 7 + 3) % words.len()].to_string())
@@ -152,9 +152,11 @@ impl ValidationTask {
             }
             ValidationTask::SemanticClusters => {
                 // Clusters of related words
-                let clusters = [vec!["install", "download", "setup", "configure"],
+                let clusters = [
+                    vec!["install", "download", "setup", "configure"],
                     vec!["start", "run", "execute", "launch"],
-                    vec!["stop", "kill", "terminate", "halt"]];
+                    vec!["stop", "kill", "terminate", "halt"],
+                ];
                 let mut inputs = Vec::new();
                 for cycle in 0..num_cycles {
                     let cluster = &clusters[cycle / 10 % clusters.len()];
@@ -164,9 +166,11 @@ impl ValidationTask {
             }
             ValidationTask::CausalChains => {
                 // cause -> action -> effect chains
-                let chains = [vec!["need", "install", "have"],
+                let chains = [
+                    vec!["need", "install", "have"],
                     vec!["broken", "fix", "working"],
-                    vec!["slow", "optimize", "fast"]];
+                    vec!["slow", "optimize", "fast"],
+                ];
                 let mut inputs = Vec::new();
                 for cycle in 0..num_cycles {
                     let chain = &chains[(cycle / 3) % chains.len()];
@@ -221,8 +225,8 @@ impl CognitiveLoopValidation {
         // Build the cognitive loop service with higher learning rates for faster convergence
         let mut loop_service = CognitiveLoopBuilder::default()
             .with_ltc_neurons(128)
-            .with_learning_rate(0.01)      // 10x default (was 0.001)
-            .with_attention_lr(0.05)       // Higher attention learning rate
+            .with_learning_rate(0.01) // 10x default (was 0.001)
+            .with_attention_lr(0.05) // Higher attention learning rate
             .with_learning_threshold(0.01)
             .build()?;
 
@@ -243,7 +247,10 @@ impl CognitiveLoopValidation {
                     0.0
                 } else {
                     let mean = attention_values.iter().sum::<f32>() / attention_values.len() as f32;
-                    attention_values.iter().map(|x| (x - mean).powi(2)).sum::<f32>()
+                    attention_values
+                        .iter()
+                        .map(|x| (x - mean).powi(2))
+                        .sum::<f32>()
                         / attention_values.len() as f32
                 };
                 attention_variances.push(attention_variance);
@@ -256,7 +263,8 @@ impl CognitiveLoopValidation {
 
         // Check convergence using rolling window
         let converged = if prediction_errors.len() >= self.config.convergence_window {
-            let window = &prediction_errors[prediction_errors.len() - self.config.convergence_window..];
+            let window =
+                &prediction_errors[prediction_errors.len() - self.config.convergence_window..];
             let window_max = window.iter().copied().fold(f32::NEG_INFINITY, f32::max);
             let window_min = window.iter().copied().fold(f32::INFINITY, f32::min);
             (window_max - window_min) < self.config.convergence_threshold
@@ -267,7 +275,8 @@ impl CognitiveLoopValidation {
         // Find cycles to convergence
         let cycles_to_convergence = if converged {
             // Find first stable window
-            prediction_errors.windows(self.config.convergence_window)
+            prediction_errors
+                .windows(self.config.convergence_window)
                 .enumerate()
                 .find(|(_, window)| {
                     let max = window.iter().copied().fold(f32::NEG_INFINITY, f32::max);
@@ -281,12 +290,12 @@ impl CognitiveLoopValidation {
 
         // Check attention emergence
         let final_attention_variance = attention_variances.last().copied().unwrap_or(0.0);
-        let attention_emerged = final_attention_variance > self.config.attention_emergence_threshold;
+        let attention_emerged =
+            final_attention_variance > self.config.attention_emergence_threshold;
 
         // Calculate learning rate (average error reduction per cycle)
         let learning_rate = if prediction_errors.len() > 1 {
-            (initial_prediction_error - final_prediction_error)
-                / (prediction_errors.len() as f32)
+            (initial_prediction_error - final_prediction_error) / (prediction_errors.len() as f32)
         } else {
             0.0
         };
@@ -333,20 +342,22 @@ impl CognitiveLoopValidation {
 
         // Sequential should show positive learning rate (error decreasing over time)
         // Strict "convergence" is less important than demonstrating learning
-        let sequential_passed = experiments.iter()
+        let sequential_passed = experiments
+            .iter()
             .find(|e| e.experiment_name == "Sequential Pattern")
-            .map(|e| e.learning_rate > 0.001)  // Positive learning with meaningful rate
+            .map(|e| e.learning_rate > 0.001) // Positive learning with meaningful rate
             .unwrap_or(false);
 
-        let random_correctly_unstable = experiments.iter()
+        let random_correctly_unstable = experiments
+            .iter()
             .find(|e| e.experiment_name == "Random Inputs (Baseline)")
-            .map(|e| !e.converged)  // Should NOT converge on random
+            .map(|e| !e.converged) // Should NOT converge on random
             .unwrap_or(false);
 
-        let any_attention_emergence = experiments.iter()
-            .any(|e| e.attention_emerged);
+        let any_attention_emergence = experiments.iter().any(|e| e.attention_emerged);
 
-        let structured_learning = experiments.iter()
+        let structured_learning = experiments
+            .iter()
             .filter(|e| e.experiment_name != "Random Inputs (Baseline)")
             .filter(|e| e.learning_rate > 0.0)
             .count();
@@ -364,7 +375,10 @@ impl CognitiveLoopValidation {
         let reasoning = format!(
             "Sequential learning: {}, Random unstable (correct): {}, \
              Attention emerged: {}, Structured tasks with learning: {}/4 (need 2)",
-            sequential_passed, random_correctly_unstable, any_attention_emergence, structured_learning
+            sequential_passed,
+            random_correctly_unstable,
+            any_attention_emergence,
+            structured_learning
         );
 
         Ok(CognitiveLoopValidationResults {
@@ -386,22 +400,41 @@ pub fn print_cognitive_loop_validation_summary(results: &CognitiveLoopValidation
         println!("┌─────────────────────────────────────────────────────────────┐");
         println!("│ {:<55} │", exp.experiment_name);
         println!("├─────────────────────────────────────────────────────────────┤");
-        println!("│ Cycles: {:>5} | Duration: {:>6}ms                          │",
-                 exp.num_cycles, exp.duration_ms);
-        println!("│ Initial Error: {:.4} → Final Error: {:.4}                  │",
-                 exp.initial_prediction_error, exp.final_prediction_error);
-        println!("│ Learning Rate: {:>+.6} per cycle                           │",
-                 exp.learning_rate);
-        println!("│ Converged: {:>5} | Cycles to converge: {:>4}                │",
-                 if exp.converged { "YES" } else { "NO" },
-                 exp.cycles_to_convergence.map(|c| format!("{}", c)).unwrap_or("N/A".to_string()));
-        println!("│ Attention Emerged: {:>5}                                    │",
-                 if exp.attention_emerged { "YES" } else { "NO" });
+        println!(
+            "│ Cycles: {:>5} | Duration: {:>6}ms                          │",
+            exp.num_cycles, exp.duration_ms
+        );
+        println!(
+            "│ Initial Error: {:.4} → Final Error: {:.4}                  │",
+            exp.initial_prediction_error, exp.final_prediction_error
+        );
+        println!(
+            "│ Learning Rate: {:>+.6} per cycle                           │",
+            exp.learning_rate
+        );
+        println!(
+            "│ Converged: {:>5} | Cycles to converge: {:>4}                │",
+            if exp.converged { "YES" } else { "NO" },
+            exp.cycles_to_convergence
+                .map(|c| format!("{}", c))
+                .unwrap_or("N/A".to_string())
+        );
+        println!(
+            "│ Attention Emerged: {:>5}                                    │",
+            if exp.attention_emerged { "YES" } else { "NO" }
+        );
         println!("└─────────────────────────────────────────────────────────────┘\n");
     }
 
     println!("═══════════════════════════════════════════════════════════════");
-    println!(" OVERALL RESULT: {} ", if results.passed { "PASSED ✓" } else { "FAILED ✗" });
+    println!(
+        " OVERALL RESULT: {} ",
+        if results.passed {
+            "PASSED ✓"
+        } else {
+            "FAILED ✗"
+        }
+    );
     println!(" {}", results.reasoning);
     println!(" Total Time: {}ms", results.total_time_ms);
     println!("═══════════════════════════════════════════════════════════════\n");

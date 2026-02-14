@@ -103,7 +103,7 @@ impl CognitiveSnapshot {
             + self.flow_state as f64 * 0.2
             + self.confidence * 0.2
             + (1.0 - self.uncertainty) * 0.2)
-        .clamp(0.0, 1.0)
+            .clamp(0.0, 1.0)
     }
 }
 
@@ -154,8 +154,8 @@ impl SelfModel {
 
         // Update accuracy (inverse of mean error)
         if !self.prediction_errors.is_empty() {
-            let mean_error: f64 = self.prediction_errors.iter().sum::<f64>()
-                / self.prediction_errors.len() as f64;
+            let mean_error: f64 =
+                self.prediction_errors.iter().sum::<f64>() / self.prediction_errors.len() as f64;
             self.accuracy = (1.0 - mean_error).clamp(0.0, 1.0);
         }
 
@@ -438,9 +438,11 @@ impl SelfImprovementSystem {
         }
 
         // Sort by priority
-        self.recommendations.sort_by(|a, b|
-            b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal)
-        );
+        self.recommendations.sort_by(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
     /// Suggest cognitive mode for low Φ situations
@@ -460,7 +462,8 @@ impl SelfImprovementSystem {
 
     /// Get top recommendation
     pub fn top_recommendation(&self) -> ImprovementRecommendation {
-        self.recommendations.first()
+        self.recommendations
+            .first()
             .cloned()
             .unwrap_or_else(ImprovementRecommendation::none)
     }
@@ -489,7 +492,8 @@ impl SelfImprovementSystem {
         let phi_before = recent[2].phi;
         let effectiveness = phi_after - phi_before;
 
-        self.improvement_effectiveness.push((improvement, effectiveness));
+        self.improvement_effectiveness
+            .push((improvement, effectiveness));
 
         // Keep only recent effectiveness records
         if self.improvement_effectiveness.len() > 50 {
@@ -521,7 +525,9 @@ impl SelfImprovementSystem {
 
     /// Get improvement effectiveness for a type
     pub fn improvement_effectiveness(&self, improvement_type: ImprovementType) -> f64 {
-        let relevant: Vec<_> = self.improvement_effectiveness.iter()
+        let relevant: Vec<_> = self
+            .improvement_effectiveness
+            .iter()
             .filter(|(t, _)| *t == improvement_type)
             .collect();
 
@@ -534,9 +540,11 @@ impl SelfImprovementSystem {
 
     /// Generate comprehensive self-improvement report
     pub fn report(&self) -> String {
-        let current = self.history.back().cloned().unwrap_or_else(||
-            CognitiveSnapshot::now(0.5, CognitiveMode::Balanced, 0.5)
-        );
+        let current = self
+            .history
+            .back()
+            .cloned()
+            .unwrap_or_else(|| CognitiveSnapshot::now(0.5, CognitiveMode::Balanced, 0.5));
 
         let top_rec = self.top_recommendation();
 
@@ -556,7 +564,8 @@ impl SelfImprovementSystem {
              - Priority: {:.2}\n\
              - Reason: {}\n\
              - Expected Gain: {:.3}",
-            current.phi, self.phi_trend(),
+            current.phi,
+            self.phi_trend(),
             current.mode,
             current.flow_state,
             current.quality_score(),
@@ -638,7 +647,8 @@ mod tests {
 
         // Observe improving Φ
         for i in 0..10 {
-            let snapshot = CognitiveSnapshot::now(0.3 + i as f64 * 0.05, CognitiveMode::Balanced, 0.5);
+            let snapshot =
+                CognitiveSnapshot::now(0.3 + i as f64 * 0.05, CognitiveMode::Balanced, 0.5);
             system.observe(snapshot);
         }
 

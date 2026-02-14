@@ -180,7 +180,9 @@ impl ContentExtractor {
         ] {
             if let Ok(selector) = Selector::parse(selector_str) {
                 if let Some(element) = document.select(&selector).next() {
-                    if let Some(content) = element.value().attr("content")
+                    if let Some(content) = element
+                        .value()
+                        .attr("content")
                         .or_else(|| element.value().attr("datetime"))
                     {
                         metadata.date = Some(content.to_string());
@@ -210,13 +212,19 @@ impl ContentExtractor {
         let url_lower = url.to_lowercase();
 
         // Check URL patterns
-        if url_lower.contains("docs.") || url_lower.contains("/doc/") || url_lower.contains("/documentation/") {
+        if url_lower.contains("docs.")
+            || url_lower.contains("/doc/")
+            || url_lower.contains("/documentation/")
+        {
             return ContentType::Documentation;
         }
         if url_lower.contains("arxiv.org") || url_lower.contains("/paper/") {
             return ContentType::Academic;
         }
-        if url_lower.contains("stackoverflow.com") || url_lower.contains("/forum/") || url_lower.contains("/questions/") {
+        if url_lower.contains("stackoverflow.com")
+            || url_lower.contains("/forum/")
+            || url_lower.contains("/questions/")
+        {
             return ContentType::Forum;
         }
         if url_lower.contains("blog.") || url_lower.contains("/blog/") {
@@ -284,7 +292,9 @@ impl ContentExtractor {
     /// Extract a summary from the content
     fn extract_summary(&self, document: &Html, body_text: &str) -> String {
         // Try meta description
-        if let Ok(selector) = Selector::parse("meta[name='description'], meta[property='og:description']") {
+        if let Ok(selector) =
+            Selector::parse("meta[name='description'], meta[property='og:description']")
+        {
             if let Some(element) = document.select(&selector).next() {
                 if let Some(content) = element.value().attr("content") {
                     let summary = content.trim().to_string();
@@ -380,9 +390,24 @@ impl ContentExtractor {
 
         // Prefer sentences with claim indicators
         let claim_indicators = [
-            "is", "are", "was", "were", "has", "have", "can", "will",
-            "because", "therefore", "shows", "demonstrates", "proves",
-            "according to", "research", "study", "found", "discovered",
+            "is",
+            "are",
+            "was",
+            "were",
+            "has",
+            "have",
+            "can",
+            "will",
+            "because",
+            "therefore",
+            "shows",
+            "demonstrates",
+            "proves",
+            "according to",
+            "research",
+            "study",
+            "found",
+            "discovered",
         ];
         for indicator in &claim_indicators {
             if lower.contains(indicator) {
@@ -485,7 +510,9 @@ mod tests {
     fn test_detect_documentation() {
         let html = "<html><body><p>Test</p></body></html>";
         let extractor = ContentExtractor::new();
-        let result = extractor.extract(html, "https://docs.rust-lang.org/book").unwrap();
+        let result = extractor
+            .extract(html, "https://docs.rust-lang.org/book")
+            .unwrap();
 
         assert_eq!(result.metadata.content_type, ContentType::Documentation);
     }

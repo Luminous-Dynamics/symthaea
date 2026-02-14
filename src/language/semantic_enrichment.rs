@@ -155,7 +155,7 @@ impl MorphemePrefix {
             Self::Under => vec![SemanticPrime::Little, SemanticPrime::Below],
             Self::Out => vec![SemanticPrime::Far],
             Self::In => vec![SemanticPrime::Inside],
-            Self::De => vec![SemanticPrime::Not], // reversal
+            Self::De => vec![SemanticPrime::Not],    // reversal
             Self::Auto => vec![SemanticPrime::Same], // self = same as self
             Self::Multi => vec![SemanticPrime::Much],
             Self::Sub => vec![SemanticPrime::PartOf, SemanticPrime::Below],
@@ -219,31 +219,110 @@ impl Default for MorphologicalAnalyzer {
         // These are common words where the apparent prefix is actually part of the root
         for word in &[
             // Words starting with "in-" that aren't "in" + something
-            "install", "inside", "input", "into", "information", "include", "increase",
-            "indeed", "index", "indicate", "industry", "initial", "instead", "interest",
-            "internet", "introduce", "investigate",
+            "install",
+            "inside",
+            "input",
+            "into",
+            "information",
+            "include",
+            "increase",
+            "indeed",
+            "index",
+            "indicate",
+            "industry",
+            "initial",
+            "instead",
+            "interest",
+            "internet",
+            "introduce",
+            "investigate",
             // Words starting with "un-" that aren't negations
-            "under", "understand", "unit", "until", "upon", "use", "usual",
+            "under",
+            "understand",
+            "unit",
+            "until",
+            "upon",
+            "use",
+            "usual",
             // Words starting with "re-" that aren't "again"
-            "real", "reason", "recent", "receive", "record", "reduce", "refer",
-            "region", "relate", "release", "remain", "remember", "remove", "render",
-            "report", "represent", "require", "research", "resolve", "resource",
-            "respond", "result", "return", "reveal", "review",
+            "real",
+            "reason",
+            "recent",
+            "receive",
+            "record",
+            "reduce",
+            "refer",
+            "region",
+            "relate",
+            "release",
+            "remain",
+            "remember",
+            "remove",
+            "render",
+            "report",
+            "represent",
+            "require",
+            "research",
+            "resolve",
+            "resource",
+            "respond",
+            "result",
+            "return",
+            "reveal",
+            "review",
             // Words starting with "de-" that aren't reversals
-            "deal", "decide", "deep", "define", "degree", "deliver", "demand",
-            "describe", "design", "desire", "detail", "determine", "develop", "device",
+            "deal",
+            "decide",
+            "deep",
+            "define",
+            "degree",
+            "deliver",
+            "demand",
+            "describe",
+            "design",
+            "desire",
+            "detail",
+            "determine",
+            "develop",
+            "device",
             // Words starting with "dis-" that aren't negations
-            "discuss", "display", "distance", "distribute",
+            "discuss",
+            "display",
+            "distance",
+            "distribute",
             // Words starting with "pre-" that aren't "before"
-            "present", "president", "press", "pretty", "prevent", "price", "print",
-            "private", "probably", "problem", "process", "produce", "product", "program",
-            "project", "promise", "property", "protect", "provide", "public",
+            "present",
+            "president",
+            "press",
+            "pretty",
+            "prevent",
+            "price",
+            "print",
+            "private",
+            "probably",
+            "problem",
+            "process",
+            "produce",
+            "product",
+            "program",
+            "project",
+            "promise",
+            "property",
+            "protect",
+            "provide",
+            "public",
             // Words starting with "over-" that aren't "excessive"
-            "over", "output",
+            "over",
+            "output",
             // Words starting with "out-" that aren't "external"
-            "other", "otherwise",
+            "other",
+            "otherwise",
             // Other common false-prefix words
-            "auto", "super", "disco", "video", "audio",
+            "auto",
+            "super",
+            "disco",
+            "video",
+            "audio",
         ] {
             protected_roots.insert(word.to_string());
         }
@@ -372,114 +451,504 @@ impl Default for BaseVocabulary {
         let mut roots = HashMap::new();
 
         // === ACTION VERBS ===
-        roots.insert("install".into(), vec![SemanticPrime::Do, SemanticPrime::Move, SemanticPrime::Something]);
-        roots.insert("search".into(), vec![SemanticPrime::Want, SemanticPrime::Know, SemanticPrime::See]);
+        roots.insert(
+            "install".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Move,
+                SemanticPrime::Something,
+            ],
+        );
+        roots.insert(
+            "search".into(),
+            vec![SemanticPrime::Want, SemanticPrime::Know, SemanticPrime::See],
+        );
         roots.insert("find".into(), vec![SemanticPrime::See, SemanticPrime::Know]);
-        roots.insert("config".into(), vec![SemanticPrime::Do, SemanticPrime::Something, SemanticPrime::PartOf]);
-        roots.insert("configur".into(), vec![SemanticPrime::Do, SemanticPrime::Something, SemanticPrime::PartOf]);
-        roots.insert("build".into(), vec![SemanticPrime::Do, SemanticPrime::Something, SemanticPrime::Happen]);
+        roots.insert(
+            "config".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Something,
+                SemanticPrime::PartOf,
+            ],
+        );
+        roots.insert(
+            "configur".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Something,
+                SemanticPrime::PartOf,
+            ],
+        );
+        roots.insert(
+            "build".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Something,
+                SemanticPrime::Happen,
+            ],
+        );
         roots.insert("run".into(), vec![SemanticPrime::Do, SemanticPrime::Happen]);
-        roots.insert("start".into(), vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Now]);
-        roots.insert("stop".into(), vec![SemanticPrime::Do, SemanticPrime::Not, SemanticPrime::Happen]);
-        roots.insert("update".into(), vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Good]);
-        roots.insert("upgrad".into(), vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Good, SemanticPrime::Big]);
-        roots.insert("remov".into(), vec![SemanticPrime::Do, SemanticPrime::Move, SemanticPrime::Not]);
-        roots.insert("delet".into(), vec![SemanticPrime::Do, SemanticPrime::Not, SemanticPrime::ThereIs]);
-        roots.insert("creat".into(), vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::ThereIs]);
-        roots.insert("add".into(), vec![SemanticPrime::Do, SemanticPrime::Move, SemanticPrime::Have]);
+        roots.insert(
+            "start".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Now],
+        );
+        roots.insert(
+            "stop".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Not, SemanticPrime::Happen],
+        );
+        roots.insert(
+            "update".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Happen,
+                SemanticPrime::Good,
+            ],
+        );
+        roots.insert(
+            "upgrad".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Happen,
+                SemanticPrime::Good,
+                SemanticPrime::Big,
+            ],
+        );
+        roots.insert(
+            "remov".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Move, SemanticPrime::Not],
+        );
+        roots.insert(
+            "delet".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Not,
+                SemanticPrime::ThereIs,
+            ],
+        );
+        roots.insert(
+            "creat".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Happen,
+                SemanticPrime::ThereIs,
+            ],
+        );
+        roots.insert(
+            "add".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Move, SemanticPrime::Have],
+        );
         roots.insert("enabl".into(), vec![SemanticPrime::Do, SemanticPrime::Can]);
-        roots.insert("disabl".into(), vec![SemanticPrime::Do, SemanticPrime::Not, SemanticPrime::Can]);
-        roots.insert("check".into(), vec![SemanticPrime::See, SemanticPrime::Know]);
-        roots.insert("test".into(), vec![SemanticPrime::Do, SemanticPrime::See, SemanticPrime::Know]);
-        roots.insert("verif".into(), vec![SemanticPrime::See, SemanticPrime::Know, SemanticPrime::True]);
-        roots.insert("help".into(), vec![SemanticPrime::Do, SemanticPrime::Good, SemanticPrime::Someone]);
+        roots.insert(
+            "disabl".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Not, SemanticPrime::Can],
+        );
+        roots.insert(
+            "check".into(),
+            vec![SemanticPrime::See, SemanticPrime::Know],
+        );
+        roots.insert(
+            "test".into(),
+            vec![SemanticPrime::Do, SemanticPrime::See, SemanticPrime::Know],
+        );
+        roots.insert(
+            "verif".into(),
+            vec![SemanticPrime::See, SemanticPrime::Know, SemanticPrime::True],
+        );
+        roots.insert(
+            "help".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Good,
+                SemanticPrime::Someone,
+            ],
+        );
         roots.insert("show".into(), vec![SemanticPrime::Do, SemanticPrime::See]);
         roots.insert("list".into(), vec![SemanticPrime::See, SemanticPrime::All]);
         roots.insert("get".into(), vec![SemanticPrime::Do, SemanticPrime::Have]);
         roots.insert("set".into(), vec![SemanticPrime::Do, SemanticPrime::Happen]);
-        roots.insert("load".into(), vec![SemanticPrime::Move, SemanticPrime::Inside]);
-        roots.insert("save".into(), vec![SemanticPrime::Do, SemanticPrime::Have, SemanticPrime::LongTime]);
-        roots.insert("open".into(), vec![SemanticPrime::Do, SemanticPrime::Can, SemanticPrime::Inside]);
-        roots.insert("clos".into(), vec![SemanticPrime::Do, SemanticPrime::Not, SemanticPrime::Can, SemanticPrime::Inside]);
-        roots.insert("read".into(), vec![SemanticPrime::See, SemanticPrime::Know, SemanticPrime::Words]);
+        roots.insert(
+            "load".into(),
+            vec![SemanticPrime::Move, SemanticPrime::Inside],
+        );
+        roots.insert(
+            "save".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Have,
+                SemanticPrime::LongTime,
+            ],
+        );
+        roots.insert(
+            "open".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Can, SemanticPrime::Inside],
+        );
+        roots.insert(
+            "clos".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Not,
+                SemanticPrime::Can,
+                SemanticPrime::Inside,
+            ],
+        );
+        roots.insert(
+            "read".into(),
+            vec![
+                SemanticPrime::See,
+                SemanticPrime::Know,
+                SemanticPrime::Words,
+            ],
+        );
         roots.insert("writ".into(), vec![SemanticPrime::Do, SemanticPrime::Words]);
-        roots.insert("edit".into(), vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Other]);
-        roots.insert("chang".into(), vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Other]);
+        roots.insert(
+            "edit".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Happen,
+                SemanticPrime::Other,
+            ],
+        );
+        roots.insert(
+            "chang".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Happen,
+                SemanticPrime::Other,
+            ],
+        );
         roots.insert("mov".into(), vec![SemanticPrime::Move]);
-        roots.insert("copy".into(), vec![SemanticPrime::Do, SemanticPrime::Same, SemanticPrime::Something]);
+        roots.insert(
+            "copy".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Same,
+                SemanticPrime::Something,
+            ],
+        );
         roots.insert("sync".into(), vec![SemanticPrime::Do, SemanticPrime::Same]);
-        roots.insert("connect".into(), vec![SemanticPrime::Do, SemanticPrime::Touch]);
-        roots.insert("send".into(), vec![SemanticPrime::Do, SemanticPrime::Move, SemanticPrime::Far]);
-        roots.insert("receiv".into(), vec![SemanticPrime::Have, SemanticPrime::Move]);
-        roots.insert("download".into(), vec![SemanticPrime::Move, SemanticPrime::Have, SemanticPrime::Below]);
-        roots.insert("upload".into(), vec![SemanticPrime::Move, SemanticPrime::Above]);
-        roots.insert("compil".into(), vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Something]);
-        roots.insert("link".into(), vec![SemanticPrime::Do, SemanticPrime::Touch, SemanticPrime::PartOf]);
-        roots.insert("execut".into(), vec![SemanticPrime::Do, SemanticPrime::Happen]);
-        roots.insert("process".into(), vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Something]);
-        roots.insert("generat".into(), vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::ThereIs]);
-        roots.insert("deploy".into(), vec![SemanticPrime::Move, SemanticPrime::Do, SemanticPrime::Where]);
-        roots.insert("collect".into(), vec![SemanticPrime::Do, SemanticPrime::Have, SemanticPrime::All]);
-        roots.insert("clean".into(), vec![SemanticPrime::Do, SemanticPrime::Good, SemanticPrime::Not, SemanticPrime::Bad]);
-        roots.insert("garbage".into(), vec![SemanticPrime::Bad, SemanticPrime::Something]);
-        roots.insert("switch".into(), vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Other]);
-        roots.insert("rollback".into(), vec![SemanticPrime::Move, SemanticPrime::Before]);
-        roots.insert("boot".into(), vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Now]);
-        roots.insert("rebuild".into(), vec![SemanticPrime::Do, SemanticPrime::Something, SemanticPrime::Before]);
-        roots.insert("flake".into(), vec![SemanticPrime::Something, SemanticPrime::PartOf]); // NixOS specific
+        roots.insert(
+            "connect".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Touch],
+        );
+        roots.insert(
+            "send".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Move, SemanticPrime::Far],
+        );
+        roots.insert(
+            "receiv".into(),
+            vec![SemanticPrime::Have, SemanticPrime::Move],
+        );
+        roots.insert(
+            "download".into(),
+            vec![
+                SemanticPrime::Move,
+                SemanticPrime::Have,
+                SemanticPrime::Below,
+            ],
+        );
+        roots.insert(
+            "upload".into(),
+            vec![SemanticPrime::Move, SemanticPrime::Above],
+        );
+        roots.insert(
+            "compil".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Happen,
+                SemanticPrime::Something,
+            ],
+        );
+        roots.insert(
+            "link".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Touch,
+                SemanticPrime::PartOf,
+            ],
+        );
+        roots.insert(
+            "execut".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Happen],
+        );
+        roots.insert(
+            "process".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Happen,
+                SemanticPrime::Something,
+            ],
+        );
+        roots.insert(
+            "generat".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Happen,
+                SemanticPrime::ThereIs,
+            ],
+        );
+        roots.insert(
+            "deploy".into(),
+            vec![SemanticPrime::Move, SemanticPrime::Do, SemanticPrime::Where],
+        );
+        roots.insert(
+            "collect".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Have, SemanticPrime::All],
+        );
+        roots.insert(
+            "clean".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Good,
+                SemanticPrime::Not,
+                SemanticPrime::Bad,
+            ],
+        );
+        roots.insert(
+            "garbage".into(),
+            vec![SemanticPrime::Bad, SemanticPrime::Something],
+        );
+        roots.insert(
+            "switch".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Happen,
+                SemanticPrime::Other,
+            ],
+        );
+        roots.insert(
+            "rollback".into(),
+            vec![SemanticPrime::Move, SemanticPrime::Before],
+        );
+        roots.insert(
+            "boot".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Now],
+        );
+        roots.insert(
+            "rebuild".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Something,
+                SemanticPrime::Before,
+            ],
+        );
+        roots.insert(
+            "flake".into(),
+            vec![SemanticPrime::Something, SemanticPrime::PartOf],
+        ); // NixOS specific
         roots.insert("nix".into(), vec![SemanticPrime::Something]); // NixOS namespace
 
         // === NOUNS / OBJECTS ===
-        roots.insert("file".into(), vec![SemanticPrime::Something, SemanticPrime::Words]);
-        roots.insert("direct".into(), vec![SemanticPrime::Where, SemanticPrime::PartOf]);
-        roots.insert("fold".into(), vec![SemanticPrime::Where, SemanticPrime::Inside]);
-        roots.insert("packag".into(), vec![SemanticPrime::Something, SemanticPrime::PartOf]);
-        roots.insert("servic".into(), vec![SemanticPrime::Something, SemanticPrime::Do]);
-        roots.insert("system".into(), vec![SemanticPrime::Something, SemanticPrime::All, SemanticPrime::PartOf]);
-        roots.insert("program".into(), vec![SemanticPrime::Something, SemanticPrime::Do]);
-        roots.insert("option".into(), vec![SemanticPrime::Something, SemanticPrime::Can, SemanticPrime::Other]);
+        roots.insert(
+            "file".into(),
+            vec![SemanticPrime::Something, SemanticPrime::Words],
+        );
+        roots.insert(
+            "direct".into(),
+            vec![SemanticPrime::Where, SemanticPrime::PartOf],
+        );
+        roots.insert(
+            "fold".into(),
+            vec![SemanticPrime::Where, SemanticPrime::Inside],
+        );
+        roots.insert(
+            "packag".into(),
+            vec![SemanticPrime::Something, SemanticPrime::PartOf],
+        );
+        roots.insert(
+            "servic".into(),
+            vec![SemanticPrime::Something, SemanticPrime::Do],
+        );
+        roots.insert(
+            "system".into(),
+            vec![
+                SemanticPrime::Something,
+                SemanticPrime::All,
+                SemanticPrime::PartOf,
+            ],
+        );
+        roots.insert(
+            "program".into(),
+            vec![SemanticPrime::Something, SemanticPrime::Do],
+        );
+        roots.insert(
+            "option".into(),
+            vec![
+                SemanticPrime::Something,
+                SemanticPrime::Can,
+                SemanticPrime::Other,
+            ],
+        );
         roots.insert("valu".into(), vec![SemanticPrime::Something]);
-        roots.insert("nam".into(), vec![SemanticPrime::Words, SemanticPrime::This]);
-        roots.insert("path".into(), vec![SemanticPrime::Where, SemanticPrime::PartOf]);
-        roots.insert("user".into(), vec![SemanticPrime::Someone, SemanticPrime::Do]);
-        roots.insert("group".into(), vec![SemanticPrime::People, SemanticPrime::Same]);
-        roots.insert("permiss".into(), vec![SemanticPrime::Can, SemanticPrime::Do]);
-        roots.insert("error".into(), vec![SemanticPrime::Bad, SemanticPrime::Happen]);
-        roots.insert("warn".into(), vec![SemanticPrime::Say, SemanticPrime::Bad, SemanticPrime::Maybe]);
-        roots.insert("log".into(), vec![SemanticPrime::Words, SemanticPrime::Before, SemanticPrime::Happen]);
-        roots.insert("output".into(), vec![SemanticPrime::Something, SemanticPrime::Far]);
-        roots.insert("input".into(), vec![SemanticPrime::Something, SemanticPrime::Inside]);
-        roots.insert("data".into(), vec![SemanticPrime::Something, SemanticPrime::Know]);
-        roots.insert("info".into(), vec![SemanticPrime::Know, SemanticPrime::Something]);
-        roots.insert("inform".into(), vec![SemanticPrime::Know, SemanticPrime::Something]);
-        roots.insert("messag".into(), vec![SemanticPrime::Words, SemanticPrime::Say]);
-        roots.insert("command".into(), vec![SemanticPrime::Words, SemanticPrime::Do, SemanticPrime::Want]);
-        roots.insert("request".into(), vec![SemanticPrime::Want, SemanticPrime::Say]);
-        roots.insert("respons".into(), vec![SemanticPrime::Say, SemanticPrime::After]);
-        roots.insert("result".into(), vec![SemanticPrime::Something, SemanticPrime::After, SemanticPrime::Happen]);
-        roots.insert("status".into(), vec![SemanticPrime::Know, SemanticPrime::Now]);
+        roots.insert(
+            "nam".into(),
+            vec![SemanticPrime::Words, SemanticPrime::This],
+        );
+        roots.insert(
+            "path".into(),
+            vec![SemanticPrime::Where, SemanticPrime::PartOf],
+        );
+        roots.insert(
+            "user".into(),
+            vec![SemanticPrime::Someone, SemanticPrime::Do],
+        );
+        roots.insert(
+            "group".into(),
+            vec![SemanticPrime::People, SemanticPrime::Same],
+        );
+        roots.insert(
+            "permiss".into(),
+            vec![SemanticPrime::Can, SemanticPrime::Do],
+        );
+        roots.insert(
+            "error".into(),
+            vec![SemanticPrime::Bad, SemanticPrime::Happen],
+        );
+        roots.insert(
+            "warn".into(),
+            vec![SemanticPrime::Say, SemanticPrime::Bad, SemanticPrime::Maybe],
+        );
+        roots.insert(
+            "log".into(),
+            vec![
+                SemanticPrime::Words,
+                SemanticPrime::Before,
+                SemanticPrime::Happen,
+            ],
+        );
+        roots.insert(
+            "output".into(),
+            vec![SemanticPrime::Something, SemanticPrime::Far],
+        );
+        roots.insert(
+            "input".into(),
+            vec![SemanticPrime::Something, SemanticPrime::Inside],
+        );
+        roots.insert(
+            "data".into(),
+            vec![SemanticPrime::Something, SemanticPrime::Know],
+        );
+        roots.insert(
+            "info".into(),
+            vec![SemanticPrime::Know, SemanticPrime::Something],
+        );
+        roots.insert(
+            "inform".into(),
+            vec![SemanticPrime::Know, SemanticPrime::Something],
+        );
+        roots.insert(
+            "messag".into(),
+            vec![SemanticPrime::Words, SemanticPrime::Say],
+        );
+        roots.insert(
+            "command".into(),
+            vec![SemanticPrime::Words, SemanticPrime::Do, SemanticPrime::Want],
+        );
+        roots.insert(
+            "request".into(),
+            vec![SemanticPrime::Want, SemanticPrime::Say],
+        );
+        roots.insert(
+            "respons".into(),
+            vec![SemanticPrime::Say, SemanticPrime::After],
+        );
+        roots.insert(
+            "result".into(),
+            vec![
+                SemanticPrime::Something,
+                SemanticPrime::After,
+                SemanticPrime::Happen,
+            ],
+        );
+        roots.insert(
+            "status".into(),
+            vec![SemanticPrime::Know, SemanticPrime::Now],
+        );
         roots.insert("state".into(), vec![SemanticPrime::Be, SemanticPrime::Now]);
-        roots.insert("version".into(), vec![SemanticPrime::This, SemanticPrime::KindOf]);
-        roots.insert("depend".into(), vec![SemanticPrime::Want, SemanticPrime::Have]);
-        roots.insert("modul".into(), vec![SemanticPrime::Something, SemanticPrime::PartOf]);
-        roots.insert("librari".into(), vec![SemanticPrime::Something, SemanticPrime::Have, SemanticPrime::Much]);
-        roots.insert("lib".into(), vec![SemanticPrime::Something, SemanticPrime::Have]);
-        roots.insert("bin".into(), vec![SemanticPrime::Something, SemanticPrime::Do]);
-        roots.insert("src".into(), vec![SemanticPrime::Words, SemanticPrime::Something]);
-        roots.insert("sourc".into(), vec![SemanticPrime::Words, SemanticPrime::Something]);
-        roots.insert("doc".into(), vec![SemanticPrime::Words, SemanticPrime::Know]);
-        roots.insert("document".into(), vec![SemanticPrime::Words, SemanticPrime::Know]);
-        roots.insert("video".into(), vec![SemanticPrime::See, SemanticPrime::Move]);
+        roots.insert(
+            "version".into(),
+            vec![SemanticPrime::This, SemanticPrime::KindOf],
+        );
+        roots.insert(
+            "depend".into(),
+            vec![SemanticPrime::Want, SemanticPrime::Have],
+        );
+        roots.insert(
+            "modul".into(),
+            vec![SemanticPrime::Something, SemanticPrime::PartOf],
+        );
+        roots.insert(
+            "librari".into(),
+            vec![
+                SemanticPrime::Something,
+                SemanticPrime::Have,
+                SemanticPrime::Much,
+            ],
+        );
+        roots.insert(
+            "lib".into(),
+            vec![SemanticPrime::Something, SemanticPrime::Have],
+        );
+        roots.insert(
+            "bin".into(),
+            vec![SemanticPrime::Something, SemanticPrime::Do],
+        );
+        roots.insert(
+            "src".into(),
+            vec![SemanticPrime::Words, SemanticPrime::Something],
+        );
+        roots.insert(
+            "sourc".into(),
+            vec![SemanticPrime::Words, SemanticPrime::Something],
+        );
+        roots.insert(
+            "doc".into(),
+            vec![SemanticPrime::Words, SemanticPrime::Know],
+        );
+        roots.insert(
+            "document".into(),
+            vec![SemanticPrime::Words, SemanticPrime::Know],
+        );
+        roots.insert(
+            "video".into(),
+            vec![SemanticPrime::See, SemanticPrime::Move],
+        );
         roots.insert("audio".into(), vec![SemanticPrime::Hear]);
-        roots.insert("imag".into(), vec![SemanticPrime::See, SemanticPrime::Something]);
+        roots.insert(
+            "imag".into(),
+            vec![SemanticPrime::See, SemanticPrime::Something],
+        );
         roots.insert("text".into(), vec![SemanticPrime::Words]);
-        roots.insert("editor".into(), vec![SemanticPrime::Do, SemanticPrime::Words, SemanticPrime::Happen]);
+        roots.insert(
+            "editor".into(),
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Words,
+                SemanticPrime::Happen,
+            ],
+        );
 
         // === ADJECTIVES / DESCRIPTORS ===
-        roots.insert("new".into(), vec![SemanticPrime::Now, SemanticPrime::Not, SemanticPrime::Before]);
-        roots.insert("old".into(), vec![SemanticPrime::Before, SemanticPrime::LongTime]);
-        roots.insert("fast".into(), vec![SemanticPrime::ShortTime, SemanticPrime::Do]);
-        roots.insert("slow".into(), vec![SemanticPrime::LongTime, SemanticPrime::Do]);
+        roots.insert(
+            "new".into(),
+            vec![
+                SemanticPrime::Now,
+                SemanticPrime::Not,
+                SemanticPrime::Before,
+            ],
+        );
+        roots.insert(
+            "old".into(),
+            vec![SemanticPrime::Before, SemanticPrime::LongTime],
+        );
+        roots.insert(
+            "fast".into(),
+            vec![SemanticPrime::ShortTime, SemanticPrime::Do],
+        );
+        roots.insert(
+            "slow".into(),
+            vec![SemanticPrime::LongTime, SemanticPrime::Do],
+        );
         roots.insert("good".into(), vec![SemanticPrime::Good]);
         roots.insert("bad".into(), vec![SemanticPrime::Bad]);
         roots.insert("big".into(), vec![SemanticPrime::Big]);
@@ -490,23 +959,84 @@ impl Default for BaseVocabulary {
         roots.insert("some".into(), vec![SemanticPrime::Some]);
         roots.insert("many".into(), vec![SemanticPrime::Much]);
         roots.insert("few".into(), vec![SemanticPrime::Little]);
-        roots.insert("first".into(), vec![SemanticPrime::One, SemanticPrime::Before]);
-        roots.insert("last".into(), vec![SemanticPrime::One, SemanticPrime::After]);
-        roots.insert("next".into(), vec![SemanticPrime::After, SemanticPrime::One]);
-        roots.insert("prev".into(), vec![SemanticPrime::Before, SemanticPrime::One]);
-        roots.insert("current".into(), vec![SemanticPrime::Now, SemanticPrime::This]);
-        roots.insert("default".into(), vec![SemanticPrime::Same, SemanticPrime::Not, SemanticPrime::Other]);
-        roots.insert("custom".into(), vec![SemanticPrime::Other, SemanticPrime::Want]);
-        roots.insert("local".into(), vec![SemanticPrime::Near, SemanticPrime::This]);
+        roots.insert(
+            "first".into(),
+            vec![SemanticPrime::One, SemanticPrime::Before],
+        );
+        roots.insert(
+            "last".into(),
+            vec![SemanticPrime::One, SemanticPrime::After],
+        );
+        roots.insert(
+            "next".into(),
+            vec![SemanticPrime::After, SemanticPrime::One],
+        );
+        roots.insert(
+            "prev".into(),
+            vec![SemanticPrime::Before, SemanticPrime::One],
+        );
+        roots.insert(
+            "current".into(),
+            vec![SemanticPrime::Now, SemanticPrime::This],
+        );
+        roots.insert(
+            "default".into(),
+            vec![
+                SemanticPrime::Same,
+                SemanticPrime::Not,
+                SemanticPrime::Other,
+            ],
+        );
+        roots.insert(
+            "custom".into(),
+            vec![SemanticPrime::Other, SemanticPrime::Want],
+        );
+        roots.insert(
+            "local".into(),
+            vec![SemanticPrime::Near, SemanticPrime::This],
+        );
         roots.insert("remot".into(), vec![SemanticPrime::Far]);
-        roots.insert("global".into(), vec![SemanticPrime::All, SemanticPrime::Where]);
-        roots.insert("public".into(), vec![SemanticPrime::All, SemanticPrime::Can, SemanticPrime::See]);
-        roots.insert("privat".into(), vec![SemanticPrime::Not, SemanticPrime::All, SemanticPrime::Can, SemanticPrime::See]);
-        roots.insert("secret".into(), vec![SemanticPrime::Not, SemanticPrime::All, SemanticPrime::Know]);
-        roots.insert("safe".into(), vec![SemanticPrime::Good, SemanticPrime::Not, SemanticPrime::Bad]);
-        roots.insert("danger".into(), vec![SemanticPrime::Bad, SemanticPrime::Maybe, SemanticPrime::Happen]);
-        roots.insert("valid".into(), vec![SemanticPrime::Good, SemanticPrime::True]);
-        roots.insert("invalid".into(), vec![SemanticPrime::Bad, SemanticPrime::Not, SemanticPrime::True]);
+        roots.insert(
+            "global".into(),
+            vec![SemanticPrime::All, SemanticPrime::Where],
+        );
+        roots.insert(
+            "public".into(),
+            vec![SemanticPrime::All, SemanticPrime::Can, SemanticPrime::See],
+        );
+        roots.insert(
+            "privat".into(),
+            vec![
+                SemanticPrime::Not,
+                SemanticPrime::All,
+                SemanticPrime::Can,
+                SemanticPrime::See,
+            ],
+        );
+        roots.insert(
+            "secret".into(),
+            vec![SemanticPrime::Not, SemanticPrime::All, SemanticPrime::Know],
+        );
+        roots.insert(
+            "safe".into(),
+            vec![SemanticPrime::Good, SemanticPrime::Not, SemanticPrime::Bad],
+        );
+        roots.insert(
+            "danger".into(),
+            vec![
+                SemanticPrime::Bad,
+                SemanticPrime::Maybe,
+                SemanticPrime::Happen,
+            ],
+        );
+        roots.insert(
+            "valid".into(),
+            vec![SemanticPrime::Good, SemanticPrime::True],
+        );
+        roots.insert(
+            "invalid".into(),
+            vec![SemanticPrime::Bad, SemanticPrime::Not, SemanticPrime::True],
+        );
 
         // === COMMON WORDS ===
         roots.insert("the".into(), vec![SemanticPrime::This]);
@@ -516,40 +1046,70 @@ impl Default for BaseVocabulary {
         roots.insert("that".into(), vec![SemanticPrime::This]);
         roots.insert("for".into(), vec![SemanticPrime::Because]);
         roots.insert("with".into(), vec![SemanticPrime::Have]);
-        roots.insert("from".into(), vec![SemanticPrime::Where, SemanticPrime::Move]);
+        roots.insert(
+            "from".into(),
+            vec![SemanticPrime::Where, SemanticPrime::Move],
+        );
         roots.insert("to".into(), vec![SemanticPrime::Where]);
         roots.insert("in".into(), vec![SemanticPrime::Inside]);
-        roots.insert("on".into(), vec![SemanticPrime::Above, SemanticPrime::Touch]);
+        roots.insert(
+            "on".into(),
+            vec![SemanticPrime::Above, SemanticPrime::Touch],
+        );
         roots.insert("at".into(), vec![SemanticPrime::Where]);
-        roots.insert("by".into(), vec![SemanticPrime::Near, SemanticPrime::Because]);
+        roots.insert(
+            "by".into(),
+            vec![SemanticPrime::Near, SemanticPrime::Because],
+        );
         roots.insert("of".into(), vec![SemanticPrime::PartOf]);
         roots.insert("and".into(), vec![]); // Connector, no primes
         roots.insert("or".into(), vec![SemanticPrime::Maybe]);
         roots.insert("not".into(), vec![SemanticPrime::Not]);
         roots.insert("if".into(), vec![SemanticPrime::If]);
-        roots.insert("then".into(), vec![SemanticPrime::After, SemanticPrime::Because]);
+        roots.insert(
+            "then".into(),
+            vec![SemanticPrime::After, SemanticPrime::Because],
+        );
         roots.insert("else".into(), vec![SemanticPrime::Other, SemanticPrime::If]);
         roots.insert("when".into(), vec![SemanticPrime::When]);
         roots.insert("where".into(), vec![SemanticPrime::Where]);
         roots.insert("what".into(), vec![SemanticPrime::Something]);
-        roots.insert("which".into(), vec![SemanticPrime::This, SemanticPrime::Something]);
+        roots.insert(
+            "which".into(),
+            vec![SemanticPrime::This, SemanticPrime::Something],
+        );
         roots.insert("who".into(), vec![SemanticPrime::Someone]);
         roots.insert("how".into(), vec![SemanticPrime::KindOf]);
         roots.insert("why".into(), vec![SemanticPrime::Because]);
         roots.insert("thing".into(), vec![SemanticPrime::Something]);
-        roots.insert("stuff".into(), vec![SemanticPrime::Something, SemanticPrime::Some]);
+        roots.insert(
+            "stuff".into(),
+            vec![SemanticPrime::Something, SemanticPrime::Some],
+        );
         roots.insert("do".into(), vec![SemanticPrime::Do]);
         roots.insert("have".into(), vec![SemanticPrime::Have]);
         roots.insert("be".into(), vec![SemanticPrime::Be]);
         roots.insert("want".into(), vec![SemanticPrime::Want]);
-        roots.insert("need".into(), vec![SemanticPrime::Want, SemanticPrime::Want]);
+        roots.insert(
+            "need".into(),
+            vec![SemanticPrime::Want, SemanticPrime::Want],
+        );
         roots.insert("can".into(), vec![SemanticPrime::Can]);
-        roots.insert("could".into(), vec![SemanticPrime::Can, SemanticPrime::Maybe]);
+        roots.insert(
+            "could".into(),
+            vec![SemanticPrime::Can, SemanticPrime::Maybe],
+        );
         roots.insert("would".into(), vec![SemanticPrime::If, SemanticPrime::Do]);
-        roots.insert("should".into(), vec![SemanticPrime::Good, SemanticPrime::Do]);
+        roots.insert(
+            "should".into(),
+            vec![SemanticPrime::Good, SemanticPrime::Do],
+        );
         roots.insert("must".into(), vec![SemanticPrime::Want]);
         roots.insert("maybe".into(), vec![SemanticPrime::Maybe]);
-        roots.insert("pleas".into(), vec![SemanticPrime::Want, SemanticPrime::Good]);
+        roots.insert(
+            "pleas".into(),
+            vec![SemanticPrime::Want, SemanticPrime::Good],
+        );
 
         Self { roots }
     }
@@ -616,7 +1176,11 @@ impl CompositionalInference {
         // Add primes from prefix
         if let Some(prefix) = &analysis.prefix {
             let prefix_primes = prefix.primes();
-            sources.push(format!("prefix '{}' -> {:?}", prefix.as_str(), prefix_primes));
+            sources.push(format!(
+                "prefix '{}' -> {:?}",
+                prefix.as_str(),
+                prefix_primes
+            ));
             primes.extend(prefix_primes);
         }
 
@@ -712,43 +1276,82 @@ impl Default for ContextualDisambiguator {
             // "run" in computing context
             ContextPattern {
                 name: "computing_run".into(),
-                triggers: vec!["program".into(), "command".into(), "script".into(), "code".into(), "process".into()],
+                triggers: vec![
+                    "program".into(),
+                    "command".into(),
+                    "script".into(),
+                    "code".into(),
+                    "process".into(),
+                ],
                 boost_primes: vec![SemanticPrime::Do, SemanticPrime::Happen],
                 suppress_primes: vec![SemanticPrime::Move],
             },
             // "run" in physical context
             ContextPattern {
                 name: "physical_run".into(),
-                triggers: vec!["fast".into(), "walk".into(), "jog".into(), "sprint".into(), "exercise".into()],
+                triggers: vec![
+                    "fast".into(),
+                    "walk".into(),
+                    "jog".into(),
+                    "sprint".into(),
+                    "exercise".into(),
+                ],
                 boost_primes: vec![SemanticPrime::Move],
                 suppress_primes: vec![],
             },
             // File system context
             ContextPattern {
                 name: "filesystem".into(),
-                triggers: vec!["file".into(), "directory".into(), "folder".into(), "path".into()],
+                triggers: vec![
+                    "file".into(),
+                    "directory".into(),
+                    "folder".into(),
+                    "path".into(),
+                ],
                 boost_primes: vec![SemanticPrime::Where, SemanticPrime::PartOf],
                 suppress_primes: vec![],
             },
             // Network context
             ContextPattern {
                 name: "network".into(),
-                triggers: vec!["server".into(), "client".into(), "network".into(), "remote".into(), "connect".into()],
+                triggers: vec![
+                    "server".into(),
+                    "client".into(),
+                    "network".into(),
+                    "remote".into(),
+                    "connect".into(),
+                ],
                 boost_primes: vec![SemanticPrime::Far, SemanticPrime::Touch],
                 suppress_primes: vec![SemanticPrime::Near],
             },
             // Time context
             ContextPattern {
                 name: "temporal".into(),
-                triggers: vec!["schedule".into(), "cron".into(), "timer".into(), "wait".into(), "delay".into()],
+                triggers: vec![
+                    "schedule".into(),
+                    "cron".into(),
+                    "timer".into(),
+                    "wait".into(),
+                    "delay".into(),
+                ],
                 boost_primes: vec![SemanticPrime::When, SemanticPrime::ForSomeTime],
                 suppress_primes: vec![],
             },
             // Package management context
             ContextPattern {
                 name: "package_management".into(),
-                triggers: vec!["package".into(), "install".into(), "nixpkgs".into(), "derivation".into(), "flake".into()],
-                boost_primes: vec![SemanticPrime::Something, SemanticPrime::PartOf, SemanticPrime::Move],
+                triggers: vec![
+                    "package".into(),
+                    "install".into(),
+                    "nixpkgs".into(),
+                    "derivation".into(),
+                    "flake".into(),
+                ],
+                boost_primes: vec![
+                    SemanticPrime::Something,
+                    SemanticPrime::PartOf,
+                    SemanticPrime::Move,
+                ],
                 suppress_primes: vec![],
             },
         ];
@@ -764,7 +1367,11 @@ impl ContextualDisambiguator {
     }
 
     /// Disambiguate primes based on context
-    pub fn disambiguate(&self, context: &ContextWindow, candidate_primes: &[SemanticPrime]) -> DisambiguationResult {
+    pub fn disambiguate(
+        &self,
+        context: &ContextWindow,
+        candidate_primes: &[SemanticPrime],
+    ) -> DisambiguationResult {
         let mut scores: HashMap<SemanticPrime, f64> = HashMap::new();
 
         // Initialize scores
@@ -773,7 +1380,9 @@ impl ContextualDisambiguator {
         }
 
         // Collect all context words
-        let context_words: Vec<&str> = context.before.iter()
+        let context_words: Vec<&str> = context
+            .before
+            .iter()
             .chain(context.after.iter())
             .map(|s| s.as_str())
             .collect();
@@ -782,7 +1391,9 @@ impl ContextualDisambiguator {
 
         // Apply patterns
         for pattern in &self.patterns {
-            let trigger_count: usize = pattern.triggers.iter()
+            let trigger_count: usize = pattern
+                .triggers
+                .iter()
                 .filter(|t| context_words.iter().any(|w| w.contains(t.as_str())))
                 .count();
 
@@ -812,12 +1423,17 @@ impl ContextualDisambiguator {
         ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Keep primes with score >= 0.5
-        let filtered_primes: Vec<SemanticPrime> = ranked.iter()
+        let filtered_primes: Vec<SemanticPrime> = ranked
+            .iter()
             .filter(|(_, score)| *score >= 0.5)
             .map(|(prime, _)| *prime)
             .collect();
 
-        let confidence = if activated_patterns.is_empty() { 0.7 } else { 0.9 };
+        let confidence = if activated_patterns.is_empty() {
+            0.7
+        } else {
+            0.9
+        };
 
         DisambiguationResult {
             original_primes: candidate_primes.to_vec(),
@@ -890,13 +1506,15 @@ impl PrimeCoherenceCalculator {
         let n = decompositions.len();
 
         // Shared primes appear in all decompositions
-        let shared_primes: Vec<_> = prime_counts.iter()
+        let shared_primes: Vec<_> = prime_counts
+            .iter()
             .filter(|(_, count)| **count == n)
             .map(|(prime, _)| *prime)
             .collect();
 
         // Unique primes appear in only one
-        let unique_primes: Vec<_> = prime_counts.iter()
+        let unique_primes: Vec<_> = prime_counts
+            .iter()
             .filter(|(_, count)| **count == 1)
             .map(|(prime, _)| *prime)
             .collect();
@@ -1023,7 +1641,11 @@ impl SelfLearningVocabulary {
     }
 
     /// Record a successful interaction for learning
-    pub fn record_success(&mut self, input: &str, word_primes: HashMap<String, Vec<SemanticPrime>>) {
+    pub fn record_success(
+        &mut self,
+        input: &str,
+        word_primes: HashMap<String, Vec<SemanticPrime>>,
+    ) {
         let interaction = LearnableInteraction {
             input: input.to_string(),
             words: input.split_whitespace().map(|s| s.to_lowercase()).collect(),
@@ -1045,7 +1667,11 @@ impl SelfLearningVocabulary {
     }
 
     /// Record a failed interaction (negative learning)
-    pub fn record_failure(&mut self, input: &str, word_primes: HashMap<String, Vec<SemanticPrime>>) {
+    pub fn record_failure(
+        &mut self,
+        input: &str,
+        word_primes: HashMap<String, Vec<SemanticPrime>>,
+    ) {
         let interaction = LearnableInteraction {
             input: input.to_string(),
             words: input.split_whitespace().map(|s| s.to_lowercase()).collect(),
@@ -1101,7 +1727,11 @@ impl SelfLearningVocabulary {
             base_vocabulary_size: self.inference.vocabulary.len(),
             total_interactions: self.history.len(),
             successful_interactions: successful,
-            success_rate: if self.history.is_empty() { 0.0 } else { successful as f64 / self.history.len() as f64 },
+            success_rate: if self.history.is_empty() {
+                0.0
+            } else {
+                successful as f64 / self.history.len() as f64
+            },
         }
     }
 }
@@ -1183,7 +1813,12 @@ impl FrameInduction {
     }
 
     /// Record an observed pattern
-    pub fn observe(&mut self, verb: &str, arguments: Vec<(String, String)>, primes: Vec<SemanticPrime>) {
+    pub fn observe(
+        &mut self,
+        verb: &str,
+        arguments: Vec<(String, String)>,
+        primes: Vec<SemanticPrime>,
+    ) {
         // Check if we've seen this pattern before
         let verb_lower = verb.to_lowercase();
         if let Some(existing) = self.patterns.iter_mut().find(|p| p.verb == verb_lower) {
@@ -1224,7 +1859,8 @@ impl FrameInduction {
         for (core_primes, patterns) in prime_groups {
             if patterns.len() >= 2 && !core_primes.is_empty() {
                 // Generate frame name from primes
-                let name = core_primes.iter()
+                let name = core_primes
+                    .iter()
                     .take(3)
                     .map(|p| format!("{:?}", p))
                     .collect::<Vec<_>>()
@@ -1243,7 +1879,11 @@ impl FrameInduction {
                 let support = patterns.iter().map(|p| p.frequency).sum();
                 let confidence = (support as f64 / 10.0).min(1.0);
 
-                if let Some(existing) = self.frames.iter_mut().find(|f| f.core_primes == core_primes) {
+                if let Some(existing) = self
+                    .frames
+                    .iter_mut()
+                    .find(|f| f.core_primes == core_primes)
+                {
                     existing.support_count = support;
                     existing.confidence = confidence;
                     for ex in &examples {
@@ -1274,7 +1914,8 @@ impl FrameInduction {
     pub fn find_matching_frames(&self, primes: &[SemanticPrime]) -> Vec<&InducedFrame> {
         let prime_set: HashSet<_> = primes.iter().cloned().collect();
 
-        self.frames.iter()
+        self.frames
+            .iter()
             .filter(|f| {
                 let frame_primes: HashSet<_> = f.core_primes.iter().cloned().collect();
                 let intersection = prime_set.intersection(&frame_primes).count();
@@ -1289,8 +1930,12 @@ impl FrameInduction {
             observed_patterns: self.patterns.len(),
             total_observations: self.patterns.iter().map(|p| p.frequency).sum(),
             induced_frames: self.frames.len(),
-            average_support: if self.frames.is_empty() { 0.0 }
-                else { self.frames.iter().map(|f| f.support_count).sum::<usize>() as f64 / self.frames.len() as f64 },
+            average_support: if self.frames.is_empty() {
+                0.0
+            } else {
+                self.frames.iter().map(|f| f.support_count).sum::<usize>() as f64
+                    / self.frames.len() as f64
+            },
         }
     }
 }
@@ -1397,12 +2042,15 @@ impl GroundedSymbolLearning {
                 GroundingType::CommandFailed => 0.3,
                 _ => 0.6,
             };
-            self.symbols.insert(symbol_lower.clone(), GroundedSymbol {
-                symbol: symbol_lower,
-                primes: vec![], // To be filled by integration
-                groundings: vec![grounding],
-                confidence,
-            });
+            self.symbols.insert(
+                symbol_lower.clone(),
+                GroundedSymbol {
+                    symbol: symbol_lower,
+                    primes: vec![], // To be filled by integration
+                    groundings: vec![grounding],
+                    confidence,
+                },
+            );
         }
     }
 
@@ -1424,14 +2072,21 @@ impl GroundedSymbolLearning {
     /// Get statistics
     pub fn stats(&self) -> GroundingStats {
         let total_groundings: usize = self.symbols.values().map(|s| s.groundings.len()).sum();
-        let well_grounded = self.symbols.values().filter(|s| s.confidence >= 0.7).count();
+        let well_grounded = self
+            .symbols
+            .values()
+            .filter(|s| s.confidence >= 0.7)
+            .count();
 
         GroundingStats {
             total_symbols: self.symbols.len(),
             total_groundings,
             well_grounded_symbols: well_grounded,
-            average_confidence: if self.symbols.is_empty() { 0.0 }
-                else { self.symbols.values().map(|s| s.confidence).sum::<f64>() / self.symbols.len() as f64 },
+            average_confidence: if self.symbols.is_empty() {
+                0.0
+            } else {
+                self.symbols.values().map(|s| s.confidence).sum::<f64>() / self.symbols.len() as f64
+            },
         }
     }
 }
@@ -1490,7 +2145,11 @@ impl SemanticEnrichmentEngine {
     pub fn process(&mut self, input: &str) -> EnrichmentResult {
         let words: Vec<String> = input
             .split_whitespace()
-            .map(|w| w.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .map(|w| {
+                w.to_lowercase()
+                    .trim_matches(|c: char| !c.is_alphanumeric())
+                    .to_string()
+            })
             .filter(|w| !w.is_empty())
             .collect();
 
@@ -1523,15 +2182,19 @@ impl SemanticEnrichmentEngine {
         all_primes.retain(|p| seen.insert(*p));
 
         // Find matching induced frames
-        let matching_frames: Vec<String> = self.frame_induction
+        let matching_frames: Vec<String> = self
+            .frame_induction
             .find_matching_frames(&all_primes)
             .iter()
             .map(|f| f.name.clone())
             .collect();
 
         // Calculate overall confidence
-        let avg_word_confidence = if word_confidences.is_empty() { 0.0 }
-            else { word_confidences.values().sum::<f64>() / word_confidences.len() as f64 };
+        let avg_word_confidence = if word_confidences.is_empty() {
+            0.0
+        } else {
+            word_confidences.values().sum::<f64>() / word_confidences.len() as f64
+        };
         let overall_confidence = avg_word_confidence * coherence_result.coherence;
 
         EnrichmentResult {
@@ -1546,14 +2209,20 @@ impl SemanticEnrichmentEngine {
     }
 
     /// Record feedback for learning
-    pub fn record_feedback(&mut self, input: &str, success: bool, word_primes: HashMap<String, Vec<SemanticPrime>>) {
+    pub fn record_feedback(
+        &mut self,
+        input: &str,
+        success: bool,
+        word_primes: HashMap<String, Vec<SemanticPrime>>,
+    ) {
         if success {
             self.vocabulary.record_success(input, word_primes.clone());
 
             // Also record patterns for frame induction
             let words: Vec<_> = input.split_whitespace().collect();
             if let Some(first_word) = words.first() {
-                let all_primes: Vec<SemanticPrime> = word_primes.values().flatten().cloned().collect();
+                let all_primes: Vec<SemanticPrime> =
+                    word_primes.values().flatten().cloned().collect();
                 self.frame_induction.observe(first_word, vec![], all_primes);
             }
         } else {
@@ -1646,7 +2315,11 @@ mod tests {
             after: vec![],
         };
 
-        let candidate_primes = vec![SemanticPrime::Do, SemanticPrime::Something, SemanticPrime::Move];
+        let candidate_primes = vec![
+            SemanticPrime::Do,
+            SemanticPrime::Something,
+            SemanticPrime::Move,
+        ];
         let result = disambiguator.disambiguate(&context, &candidate_primes);
 
         // Should boost DO and suppress MOVE in computing context
@@ -1660,7 +2333,11 @@ mod tests {
         // High coherence: similar decompositions
         let decompositions = vec![
             vec![SemanticPrime::Do, SemanticPrime::Something],
-            vec![SemanticPrime::Do, SemanticPrime::Something, SemanticPrime::Move],
+            vec![
+                SemanticPrime::Do,
+                SemanticPrime::Something,
+                SemanticPrime::Move,
+            ],
         ];
         let result = calculator.calculate_coherence(&decompositions);
         assert!(result.coherence > 0.5);
@@ -1684,7 +2361,10 @@ mod tests {
 
         // Record success
         let mut word_primes = HashMap::new();
-        word_primes.insert("frobulate".into(), vec![SemanticPrime::Do, SemanticPrime::Something]);
+        word_primes.insert(
+            "frobulate".into(),
+            vec![SemanticPrime::Do, SemanticPrime::Something],
+        );
         vocab.record_success("frobulate the thing", word_primes);
 
         // Should have learned
@@ -1702,6 +2382,10 @@ mod tests {
 
         // Check word-level decomposition
         assert!(result.word_primes.contains_key("install"));
-        assert!(result.word_primes.get("install").unwrap().contains(&SemanticPrime::Do));
+        assert!(result
+            .word_primes
+            .get("install")
+            .unwrap()
+            .contains(&SemanticPrime::Do));
     }
 }

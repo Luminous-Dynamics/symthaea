@@ -30,8 +30,8 @@
 //! - WormWiring.org - Official connectome database
 
 use super::consciousness_topology_generators::{ConsciousnessTopology, TopologyType};
-use super::unified_hv::ContinuousHV;
 use super::spectral_connectivity::ConnectivityCalculator;
+use super::unified_hv::ContinuousHV;
 use std::collections::{HashMap, HashSet};
 
 /// Neuron types in C. elegans
@@ -61,10 +61,10 @@ impl NeuronType {
     /// Get typical count in C. elegans hermaphrodite
     pub fn typical_count(&self) -> usize {
         match self {
-            Self::Sensory => 80,      // ~80 sensory neurons
-            Self::Interneuron => 82,  // ~82 interneurons
-            Self::Motor => 120,       // ~120 motor neurons
-            Self::Pharyngeal => 20,   // ~20 pharyngeal neurons
+            Self::Sensory => 80,     // ~80 sensory neurons
+            Self::Interneuron => 82, // ~82 interneurons
+            Self::Motor => 120,      // ~120 motor neurons
+            Self::Pharyngeal => 20,  // ~20 pharyngeal neurons
         }
     }
 }
@@ -132,16 +132,14 @@ impl CElegansConnectome {
         // === SENSORY NEURONS (indices 0-79) ===
         let sensory_names = [
             // Amphid sensory neurons (chemosensory)
-            "ADAL", "ADAR", "ADEL", "ADER", "ADFL", "ADFR", "ADLL", "ADLR",
-            "AFDL", "AFDR", "AIAL", "AIAR", "AIBL", "AIBR", "AINL", "AINR",
-            "AIYL", "AIYR", "AIZL", "AIZR", "ALA", "ALML", "ALMR", "ALNL",
-            "ALNR", "AQR", "ASEL", "ASER", "ASGL", "ASGR", "ASHL", "ASHR",
-            "ASIL", "ASIR", "ASJL", "ASJR", "ASKL", "ASKR", "AUAL", "AUAR",
-            "AVAL", "AVAR", "AVBL", "AVBR", "AVDL", "AVDR", "AVEL", "AVER",
-            "AVFL", "AVFR", "AVG", "AVHL", "AVHR", "AVJL", "AVJR", "AVKL",
-            "AVKR", "AVL", "AVM", "AWAL", "AWAR", "AWBL", "AWBR", "AWCL",
-            "AWCR", "BAGL", "BAGR", "CEPDL", "CEPDR", "CEPVL", "CEPVR",
-            "FLPL", "FLPR", "IL1DL", "IL1DR", "IL1L", "IL1R", "IL1VL", "IL1VR",
+            "ADAL", "ADAR", "ADEL", "ADER", "ADFL", "ADFR", "ADLL", "ADLR", "AFDL", "AFDR", "AIAL",
+            "AIAR", "AIBL", "AIBR", "AINL", "AINR", "AIYL", "AIYR", "AIZL", "AIZR", "ALA", "ALML",
+            "ALMR", "ALNL", "ALNR", "AQR", "ASEL", "ASER", "ASGL", "ASGR", "ASHL", "ASHR", "ASIL",
+            "ASIR", "ASJL", "ASJR", "ASKL", "ASKR", "AUAL", "AUAR", "AVAL", "AVAR", "AVBL", "AVBR",
+            "AVDL", "AVDR", "AVEL", "AVER", "AVFL", "AVFR", "AVG", "AVHL", "AVHR", "AVJL", "AVJR",
+            "AVKL", "AVKR", "AVL", "AVM", "AWAL", "AWAR", "AWBL", "AWBR", "AWCL", "AWCR", "BAGL",
+            "BAGR", "CEPDL", "CEPDR", "CEPVL", "CEPVR", "FLPL", "FLPR", "IL1DL", "IL1DR", "IL1L",
+            "IL1R", "IL1VL", "IL1VR",
         ];
 
         for (i, name) in sensory_names.iter().enumerate() {
@@ -158,17 +156,15 @@ impl CElegansConnectome {
 
         // === INTERNEURONS (indices 80-161) ===
         let interneuron_names = [
-            "RIAL", "RIAR", "RIBL", "RIBR", "RICL", "RICR", "RID", "RIFL",
-            "RIFR", "RIGL", "RIGR", "RIH", "RIML", "RIMR", "RINL", "RINR",
-            "RIPL", "RIPR", "RIR", "RIS", "RIVL", "RIVR", "RMDDL", "RMDDR",
-            "RMDL", "RMDR", "RMDVL", "RMDVR", "RMED", "RMEL", "RMER", "RMEV",
-            "RMFL", "RMFR", "RMGL", "RMGR", "RMHL", "RMHR", "SAADL", "SAADR",
-            "SAAVL", "SAAVR", "SABD", "SABVL", "SABVR", "SDQL", "SDQR",
-            "SIADL", "SIADR", "SIAVL", "SIAVR", "SIBDL", "SIBDR", "SIBVL",
-            "SIBVR", "SMBDL", "SMBDR", "SMBVL", "SMBVR", "SMDDL", "SMDDR",
-            "SMDVL", "SMDVR", "URADL", "URADR", "URAVL", "URAVR", "URBL",
-            "URBR", "URXL", "URXR", "URYDL", "URYDR", "URYVL", "URYVR",
-            "PVDL", "PVDR", "PVM", "PVNL", "PVNR", "PVPL", "PVPR",
+            "RIAL", "RIAR", "RIBL", "RIBR", "RICL", "RICR", "RID", "RIFL", "RIFR", "RIGL", "RIGR",
+            "RIH", "RIML", "RIMR", "RINL", "RINR", "RIPL", "RIPR", "RIR", "RIS", "RIVL", "RIVR",
+            "RMDDL", "RMDDR", "RMDL", "RMDR", "RMDVL", "RMDVR", "RMED", "RMEL", "RMER", "RMEV",
+            "RMFL", "RMFR", "RMGL", "RMGR", "RMHL", "RMHR", "SAADL", "SAADR", "SAAVL", "SAAVR",
+            "SABD", "SABVL", "SABVR", "SDQL", "SDQR", "SIADL", "SIADR", "SIAVL", "SIAVR", "SIBDL",
+            "SIBDR", "SIBVL", "SIBVR", "SMBDL", "SMBDR", "SMBVL", "SMBVR", "SMDDL", "SMDDR",
+            "SMDVL", "SMDVR", "URADL", "URADR", "URAVL", "URAVR", "URBL", "URBR", "URXL", "URXR",
+            "URYDL", "URYDR", "URYVL", "URYVR", "PVDL", "PVDR", "PVM", "PVNL", "PVNR", "PVPL",
+            "PVPR",
         ];
 
         for (i, name) in interneuron_names.iter().enumerate() {
@@ -186,22 +182,15 @@ impl CElegansConnectome {
 
         // === MOTOR NEURONS (indices 162-278) ===
         let motor_names = [
-            "DA1", "DA2", "DA3", "DA4", "DA5", "DA6", "DA7", "DA8", "DA9",
-            "DB1", "DB2", "DB3", "DB4", "DB5", "DB6", "DB7",
-            "DD1", "DD2", "DD3", "DD4", "DD5", "DD6",
-            "VA1", "VA2", "VA3", "VA4", "VA5", "VA6", "VA7", "VA8", "VA9",
-            "VA10", "VA11", "VA12",
-            "VB1", "VB2", "VB3", "VB4", "VB5", "VB6", "VB7", "VB8", "VB9",
-            "VB10", "VB11",
-            "VC1", "VC2", "VC3", "VC4", "VC5", "VC6",
-            "VD1", "VD2", "VD3", "VD4", "VD5", "VD6", "VD7", "VD8", "VD9",
-            "VD10", "VD11", "VD12", "VD13",
-            "AS1", "AS2", "AS3", "AS4", "AS5", "AS6", "AS7", "AS8", "AS9",
-            "AS10", "AS11",
-            "PDA", "PDB", "PDEL", "PDER", "PHAL", "PHAR", "PHBL", "PHBR",
-            "PHCL", "PHCR", "PLML", "PLMR", "PLNL", "PLNR", "PQR",
-            "PVCL", "PVCR", "PVQL", "PVQR", "PVR", "PVT", "PVWL", "PVWR",
-            "HSNL", "HSNR", "DVA", "DVB", "DVC", "LUAL", "LUAR",
+            "DA1", "DA2", "DA3", "DA4", "DA5", "DA6", "DA7", "DA8", "DA9", "DB1", "DB2", "DB3",
+            "DB4", "DB5", "DB6", "DB7", "DD1", "DD2", "DD3", "DD4", "DD5", "DD6", "VA1", "VA2",
+            "VA3", "VA4", "VA5", "VA6", "VA7", "VA8", "VA9", "VA10", "VA11", "VA12", "VB1", "VB2",
+            "VB3", "VB4", "VB5", "VB6", "VB7", "VB8", "VB9", "VB10", "VB11", "VC1", "VC2", "VC3",
+            "VC4", "VC5", "VC6", "VD1", "VD2", "VD3", "VD4", "VD5", "VD6", "VD7", "VD8", "VD9",
+            "VD10", "VD11", "VD12", "VD13", "AS1", "AS2", "AS3", "AS4", "AS5", "AS6", "AS7", "AS8",
+            "AS9", "AS10", "AS11", "PDA", "PDB", "PDEL", "PDER", "PHAL", "PHAR", "PHBL", "PHBR",
+            "PHCL", "PHCR", "PLML", "PLMR", "PLNL", "PLNR", "PQR", "PVCL", "PVCR", "PVQL", "PVQR",
+            "PVR", "PVT", "PVWL", "PVWR", "HSNL", "HSNR", "DVA", "DVB", "DVC", "LUAL", "LUAR",
             "PVPL2", "PVPR2", "PVR2", // Padding to reach ~117 motor neurons
         ];
 
@@ -467,7 +456,8 @@ impl CElegansConnectome {
 
                     let mut result = ContinuousHV::zero(dim);
                     for (target_idx, weight) in &connections {
-                        let scaled = node_identities[*target_idx].scale((*weight / total_weight) as f32);
+                        let scaled =
+                            node_identities[*target_idx].scale((*weight / total_weight) as f32);
                         result = result.add(&scaled);
                     }
 
@@ -662,13 +652,16 @@ impl CElegansAnalyzer {
 
         // Full connectome Φ
         let full_topology = connectome.to_consciousness_topology(self.dim);
-        let full_phi = self.phi_calc.algebraic_connectivity(&full_topology.node_representations);
+        let full_phi = self
+            .phi_calc
+            .algebraic_connectivity(&full_topology.node_representations);
 
         // Subsystem analysis
         let sensory_net = connectome.extract_subnetwork(&[NeuronType::Sensory]);
         let sensory_topo = sensory_net.to_consciousness_topology(self.dim);
         let sensory_phi = if sensory_topo.n_nodes > 1 {
-            self.phi_calc.algebraic_connectivity(&sensory_topo.node_representations)
+            self.phi_calc
+                .algebraic_connectivity(&sensory_topo.node_representations)
         } else {
             0.0
         };
@@ -676,7 +669,8 @@ impl CElegansAnalyzer {
         let inter_net = connectome.extract_subnetwork(&[NeuronType::Interneuron]);
         let inter_topo = inter_net.to_consciousness_topology(self.dim);
         let interneuron_phi = if inter_topo.n_nodes > 1 {
-            self.phi_calc.algebraic_connectivity(&inter_topo.node_representations)
+            self.phi_calc
+                .algebraic_connectivity(&inter_topo.node_representations)
         } else {
             0.0
         };
@@ -684,16 +678,19 @@ impl CElegansAnalyzer {
         let motor_net = connectome.extract_subnetwork(&[NeuronType::Motor]);
         let motor_topo = motor_net.to_consciousness_topology(self.dim);
         let motor_phi = if motor_topo.n_nodes > 1 {
-            self.phi_calc.algebraic_connectivity(&motor_topo.node_representations)
+            self.phi_calc
+                .algebraic_connectivity(&motor_topo.node_representations)
         } else {
             0.0
         };
 
         // Processing core (sensory + interneuron)
-        let core_net = connectome.extract_subnetwork(&[NeuronType::Sensory, NeuronType::Interneuron]);
+        let core_net =
+            connectome.extract_subnetwork(&[NeuronType::Sensory, NeuronType::Interneuron]);
         let core_topo = core_net.to_consciousness_topology(self.dim);
         let processing_core_phi = if core_topo.n_nodes > 1 {
-            self.phi_calc.algebraic_connectivity(&core_topo.node_representations)
+            self.phi_calc
+                .algebraic_connectivity(&core_topo.node_representations)
         } else {
             0.0
         };
@@ -701,7 +698,9 @@ impl CElegansAnalyzer {
         // Random comparison with same size
         let n = connectome.neuron_count();
         let random_topo = ConsciousnessTopology::random(n, self.dim, 12345);
-        let random_comparison_phi = self.phi_calc.algebraic_connectivity(&random_topo.node_representations);
+        let random_comparison_phi = self
+            .phi_calc
+            .algebraic_connectivity(&random_topo.node_representations);
 
         let phi_ratio = if random_comparison_phi > 0.0 {
             full_phi / random_comparison_phi
@@ -742,7 +741,9 @@ impl CElegansAnalyzer {
         };
 
         let celegans_topo = subset_net.to_consciousness_topology(self.dim);
-        let celegans_phi = self.phi_calc.algebraic_connectivity(&celegans_topo.node_representations);
+        let celegans_phi = self
+            .phi_calc
+            .algebraic_connectivity(&celegans_topo.node_representations);
 
         // Compare to standard topologies
         let ring = ConsciousnessTopology::ring(n, self.dim, seed);
@@ -753,11 +754,21 @@ impl CElegansAnalyzer {
 
         TopologyComparison {
             celegans_phi,
-            ring_phi: self.phi_calc.algebraic_connectivity(&ring.node_representations),
-            star_phi: self.phi_calc.algebraic_connectivity(&star.node_representations),
-            random_phi: self.phi_calc.algebraic_connectivity(&random.node_representations),
-            modular_phi: self.phi_calc.algebraic_connectivity(&modular.node_representations),
-            small_world_phi: self.phi_calc.algebraic_connectivity(&small_world.node_representations),
+            ring_phi: self
+                .phi_calc
+                .algebraic_connectivity(&ring.node_representations),
+            star_phi: self
+                .phi_calc
+                .algebraic_connectivity(&star.node_representations),
+            random_phi: self
+                .phi_calc
+                .algebraic_connectivity(&random.node_representations),
+            modular_phi: self
+                .phi_calc
+                .algebraic_connectivity(&modular.node_representations),
+            small_world_phi: self
+                .phi_calc
+                .algebraic_connectivity(&small_world.node_representations),
             n_nodes: n,
         }
     }
@@ -825,7 +836,10 @@ mod tests {
 
         println!("C. elegans connectome created:");
         println!("  Neurons: {}", connectome.neuron_count());
-        println!("  Chemical synapses: {}", connectome.total_chemical_synapses);
+        println!(
+            "  Chemical synapses: {}",
+            connectome.total_chemical_synapses
+        );
         println!("  Gap junctions: {}", connectome.total_gap_junctions);
     }
 
@@ -860,7 +874,10 @@ mod tests {
         println!("  Avg in-degree: {:.2}", stats.avg_in_degree);
         println!("  Avg out-degree: {:.2}", stats.avg_out_degree);
         println!("  Avg gap degree: {:.2}", stats.avg_gap_degree);
-        println!("  Hub neurons: {:?}", &stats.hub_neurons[..5.min(stats.hub_neurons.len())]);
+        println!(
+            "  Hub neurons: {:?}",
+            &stats.hub_neurons[..5.min(stats.hub_neurons.len())]
+        );
     }
 
     #[test]
@@ -885,7 +902,8 @@ mod tests {
         assert!(!sensory_net.neurons.is_empty());
         assert!(sensory_net.neuron_count() < connectome.neuron_count());
 
-        let processing = connectome.extract_subnetwork(&[NeuronType::Sensory, NeuronType::Interneuron]);
+        let processing =
+            connectome.extract_subnetwork(&[NeuronType::Sensory, NeuronType::Interneuron]);
         assert!(processing.neuron_count() > sensory_net.neuron_count());
 
         println!("Subnetwork extraction:");
@@ -921,7 +939,11 @@ mod tests {
 
         println!("\n=== TOPOLOGY COMPARISON (n={}) ===", comparison.n_nodes);
         for (name, phi) in comparison.ranking() {
-            let marker = if name == "C. elegans" { " <-- BIOLOGICAL" } else { "" };
+            let marker = if name == "C. elegans" {
+                " <-- BIOLOGICAL"
+            } else {
+                ""
+            };
             println!("  {}: Φ = {:.4}{}", name, phi, marker);
         }
         println!("\nC. elegans rank: #{}", comparison.celegans_rank());

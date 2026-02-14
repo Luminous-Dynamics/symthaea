@@ -177,7 +177,11 @@ impl NetworkBackend for LocalChannelBackend {
     async fn unregister_node(&self, node_id: &[u8; 32]) -> NetworkResult<()> {
         if let Some(key) = self.node_id_map.write().remove(node_id) {
             self.senders.write().remove(&key);
-            debug!("Node {} unregistered (key: {})", hex::encode(&node_id[..8]), key);
+            debug!(
+                "Node {} unregistered (key: {})",
+                hex::encode(&node_id[..8]),
+                key
+            );
         }
         Ok(())
     }

@@ -337,9 +337,7 @@ impl SyntheticStatesNSMGrounding {
             state_groundings.insert(state_type, grounding);
         }
 
-        Self {
-            state_groundings,
-        }
+        Self { state_groundings }
     }
 
     /// Get grounding for a specific state type
@@ -506,7 +504,8 @@ impl SyntheticStateGenerator {
     /// **Encoding**: Sequential BIND + periodic cross-ring bindings
     fn generate_moderate_integration(&mut self) -> Vec<BinaryHV> {
         let n = self.num_components;
-        let node_patterns: Vec<BinaryHV> = (0..n).map(|_| BinaryHV::random(self.next_seed())).collect();
+        let node_patterns: Vec<BinaryHV> =
+            (0..n).map(|_| BinaryHV::random(self.next_seed())).collect();
 
         let mut components = Vec::new();
 
@@ -536,7 +535,8 @@ impl SyntheticStateGenerator {
     /// **Encoding**: Sequential BIND operations
     fn generate_moderate_low_integration(&mut self) -> Vec<BinaryHV> {
         let n = self.num_components;
-        let node_patterns: Vec<BinaryHV> = (0..n).map(|_| BinaryHV::random(self.next_seed())).collect();
+        let node_patterns: Vec<BinaryHV> =
+            (0..n).map(|_| BinaryHV::random(self.next_seed())).collect();
 
         let mut components = Vec::new();
 

@@ -6,9 +6,9 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Configuration for emotional core
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,52 +111,84 @@ impl EmotionPrimitiveGrounding {
         let mut emotions = HashMap::new();
 
         // Joy: feeling very good
-        emotions.insert("joy".to_string(), Self::from_primitives(
-            &["NSM_FEEL", "NSM_GOOD", "NSM_VERY"],
-            1.0, 0.7 // positive valence, moderate-high arousal
-        ));
+        emotions.insert(
+            "joy".to_string(),
+            Self::from_primitives(
+                &["NSM_FEEL", "NSM_GOOD", "NSM_VERY"],
+                1.0,
+                0.7, // positive valence, moderate-high arousal
+            ),
+        );
 
         // Sadness: feeling bad, not wanting what happened
-        emotions.insert("sadness".to_string(), Self::from_primitives(
-            &["NSM_FEEL", "NSM_BAD", "NSM_NOT", "NSM_WANT"],
-            -0.8, 0.2 // negative valence, low arousal
-        ));
+        emotions.insert(
+            "sadness".to_string(),
+            Self::from_primitives(
+                &["NSM_FEEL", "NSM_BAD", "NSM_NOT", "NSM_WANT"],
+                -0.8,
+                0.2, // negative valence, low arousal
+            ),
+        );
 
         // Anger: feeling bad, wanting something you can't have
-        emotions.insert("anger".to_string(), Self::from_primitives(
-            &["NSM_FEEL", "NSM_BAD", "NSM_WANT", "NSM_NOT", "NSM_CAN"],
-            -0.6, 0.9 // negative valence, high arousal
-        ));
+        emotions.insert(
+            "anger".to_string(),
+            Self::from_primitives(
+                &["NSM_FEEL", "NSM_BAD", "NSM_WANT", "NSM_NOT", "NSM_CAN"],
+                -0.6,
+                0.9, // negative valence, high arousal
+            ),
+        );
 
         // Fear: feeling bad about what might happen
-        emotions.insert("fear".to_string(), Self::from_primitives(
-            &["NSM_FEEL", "NSM_BAD", "NSM_MAYBE", "NSM_HAPPEN"],
-            -0.7, 0.8 // negative valence, high arousal
-        ));
+        emotions.insert(
+            "fear".to_string(),
+            Self::from_primitives(
+                &["NSM_FEEL", "NSM_BAD", "NSM_MAYBE", "NSM_HAPPEN"],
+                -0.7,
+                0.8, // negative valence, high arousal
+            ),
+        );
 
         // Surprise: not knowing what happened
-        emotions.insert("surprise".to_string(), Self::from_primitives(
-            &["NSM_FEEL", "NSM_NOT", "NSM_KNOW", "NSM_HAPPEN"],
-            0.0, 0.9 // neutral valence, high arousal
-        ));
+        emotions.insert(
+            "surprise".to_string(),
+            Self::from_primitives(
+                &["NSM_FEEL", "NSM_NOT", "NSM_KNOW", "NSM_HAPPEN"],
+                0.0,
+                0.9, // neutral valence, high arousal
+            ),
+        );
 
         // Disgust: feeling bad in the body
-        emotions.insert("disgust".to_string(), Self::from_primitives(
-            &["NSM_FEEL", "NSM_BAD", "NSM_BODY"],
-            -0.8, 0.5 // negative valence, moderate arousal
-        ));
+        emotions.insert(
+            "disgust".to_string(),
+            Self::from_primitives(
+                &["NSM_FEEL", "NSM_BAD", "NSM_BODY"],
+                -0.8,
+                0.5, // negative valence, moderate arousal
+            ),
+        );
 
         // Trust: feeling good about someone being true
-        emotions.insert("trust".to_string(), Self::from_primitives(
-            &["NSM_FEEL", "NSM_GOOD", "NSM_SOMEONE", "NSM_TRUE"],
-            0.7, 0.3 // positive valence, low arousal
-        ));
+        emotions.insert(
+            "trust".to_string(),
+            Self::from_primitives(
+                &["NSM_FEEL", "NSM_GOOD", "NSM_SOMEONE", "NSM_TRUE"],
+                0.7,
+                0.3, // positive valence, low arousal
+            ),
+        );
 
         // Anticipation: wanting what will happen after
-        emotions.insert("anticipation".to_string(), Self::from_primitives(
-            &["NSM_FEEL", "NSM_WANT", "NSM_AFTER", "NSM_HAPPEN"],
-            0.4, 0.6 // mildly positive valence, moderate arousal
-        ));
+        emotions.insert(
+            "anticipation".to_string(),
+            Self::from_primitives(
+                &["NSM_FEEL", "NSM_WANT", "NSM_AFTER", "NSM_HAPPEN"],
+                0.4,
+                0.6, // mildly positive valence, moderate arousal
+            ),
+        );
 
         emotions
     }
@@ -270,7 +302,10 @@ impl EmotionalCore {
 
     /// Calculate emotion similarity using primitive encodings
     pub fn primitive_similarity(&self, emotion1: &str, emotion2: &str) -> f32 {
-        match (self.primitive_groundings.get(emotion1), self.primitive_groundings.get(emotion2)) {
+        match (
+            self.primitive_groundings.get(emotion1),
+            self.primitive_groundings.get(emotion2),
+        ) {
             (Some(g1), Some(g2)) => g1.primitive_encoding.similarity(&g2.primitive_encoding),
             _ => 0.0,
         }
@@ -285,25 +320,52 @@ impl EmotionalCore {
 
         let mut emotion_scores = HashMap::new();
         let emotion_keywords: HashMap<&str, Vec<&str>> = [
-            ("joy", vec!["happy", "joy", "glad", "delighted", "pleased", "excited"]),
-            ("sadness", vec!["sad", "unhappy", "depressed", "melancholy", "grief"]),
-            ("anger", vec!["angry", "furious", "mad", "irritated", "annoyed"]),
-            ("fear", vec!["afraid", "scared", "fearful", "terrified", "anxious"]),
-            ("surprise", vec!["surprised", "amazed", "astonished", "shocked"]),
+            (
+                "joy",
+                vec!["happy", "joy", "glad", "delighted", "pleased", "excited"],
+            ),
+            (
+                "sadness",
+                vec!["sad", "unhappy", "depressed", "melancholy", "grief"],
+            ),
+            (
+                "anger",
+                vec!["angry", "furious", "mad", "irritated", "annoyed"],
+            ),
+            (
+                "fear",
+                vec!["afraid", "scared", "fearful", "terrified", "anxious"],
+            ),
+            (
+                "surprise",
+                vec!["surprised", "amazed", "astonished", "shocked"],
+            ),
             ("disgust", vec!["disgusted", "revolted", "sick", "repulsed"]),
-            ("trust", vec!["trust", "believe", "confident", "faith", "rely"]),
-            ("anticipation", vec!["anticipate", "expect", "await", "hope", "looking forward"]),
-        ].iter().cloned().collect();
+            (
+                "trust",
+                vec!["trust", "believe", "confident", "faith", "rely"],
+            ),
+            (
+                "anticipation",
+                vec!["anticipate", "expect", "await", "hope", "looking forward"],
+            ),
+        ]
+        .iter()
+        .cloned()
+        .collect();
 
         for (emotion, keywords) in &emotion_keywords {
-            let score: f32 = keywords.iter()
+            let score: f32 = keywords
+                .iter()
                 .map(|kw| if text_lower.contains(kw) { 1.0 } else { 0.0 })
-                .sum::<f32>() / keywords.len() as f32;
+                .sum::<f32>()
+                / keywords.len() as f32;
             emotion_scores.insert(emotion.to_string(), score);
         }
 
         // Find primary emotion
-        let (primary_emotion, confidence) = emotion_scores.iter()
+        let (primary_emotion, confidence) = emotion_scores
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(e, s)| (e.clone(), *s))
             .unwrap_or(("neutral".to_string(), 0.0));
@@ -360,13 +422,20 @@ impl EmotionalCore {
     }
 
     /// Generate emotionally-toned response
-    pub fn generate_emotional_response(&mut self, base_text: &str, target_emotion: &str, intensity: f32) -> EmotionalResponse {
+    pub fn generate_emotional_response(
+        &mut self,
+        base_text: &str,
+        target_emotion: &str,
+        intensity: f32,
+    ) -> EmotionalResponse {
         self.stats.responses_generated += 1;
 
         // Get emotion embedding
-        let emotion_emb = self.emotion_embeddings.get(target_emotion)
+        let emotion_emb = self
+            .emotion_embeddings
+            .get(target_emotion)
             .cloned()
-            .unwrap_or_else(|| ContinuousHV::random(self.config.dimension, 0xFA11_BACC));  // Fallback seed
+            .unwrap_or_else(|| ContinuousHV::random(self.config.dimension, 0xFA11_BACC)); // Fallback seed
 
         // Simple emotion modifiers
         let modifiers: HashMap<&str, Vec<&str>> = [
@@ -374,10 +443,17 @@ impl EmotionalCore {
             ("sadness", vec!["sadly", "with sorrow", "regretfully"]),
             ("anger", vec!["angrily", "furiously", "with frustration"]),
             ("fear", vec!["fearfully", "anxiously", "nervously"]),
-            ("surprise", vec!["surprisingly", "amazingly", "unexpectedly"]),
-        ].iter().cloned().collect();
+            (
+                "surprise",
+                vec!["surprisingly", "amazingly", "unexpectedly"],
+            ),
+        ]
+        .iter()
+        .cloned()
+        .collect();
 
-        let modifier = modifiers.get(target_emotion)
+        let modifier = modifiers
+            .get(target_emotion)
             .and_then(|m| m.first())
             .unwrap_or(&"");
 
@@ -475,7 +551,11 @@ impl CoreEmotion {
     pub fn valence(&self) -> f64 {
         match self {
             Self::Neutral => 0.0,
-            Self::Joy | Self::Trust | Self::Anticipation | Self::Curiosity | Self::Determination => 0.7,
+            Self::Joy
+            | Self::Trust
+            | Self::Anticipation
+            | Self::Curiosity
+            | Self::Determination => 0.7,
             Self::Peace | Self::Gratitude | Self::Love => 0.8,
             Self::Surprise => 0.2,
             Self::Sadness | Self::Fear | Self::Confusion => -0.5,
@@ -637,26 +717,52 @@ impl EmpathyModel {
         let lower = text.to_lowercase();
 
         // Check for various emotional signals
-        let (emotion, strength, cue_type) = if lower.contains("frustrated") || lower.contains("annoying") || lower.contains("ugh") {
+        let (emotion, strength, cue_type) = if lower.contains("frustrated")
+            || lower.contains("annoying")
+            || lower.contains("ugh")
+        {
             (CoreEmotion::Frustration, 0.8, EmpathyCueType::StressSignal)
         } else if lower.contains("angry") || lower.contains("furious") {
             (CoreEmotion::Anger, 0.9, EmpathyCueType::StressSignal)
         } else if lower.contains("sad") || lower.contains("disappointed") {
-            (CoreEmotion::Sadness, 0.7, EmpathyCueType::EmotionalExpression)
-        } else if lower.contains("scared") || lower.contains("afraid") || lower.contains("worried") {
+            (
+                CoreEmotion::Sadness,
+                0.7,
+                EmpathyCueType::EmotionalExpression,
+            )
+        } else if lower.contains("scared") || lower.contains("afraid") || lower.contains("worried")
+        {
             (CoreEmotion::Fear, 0.7, EmpathyCueType::StressSignal)
         } else if lower.contains("happy") || lower.contains("great") || lower.contains("awesome") {
             (CoreEmotion::Joy, 0.8, EmpathyCueType::PositiveFeedback)
-        } else if lower.contains("thanks") || lower.contains("thank you") || lower.contains("grateful") {
-            (CoreEmotion::Gratitude, 0.7, EmpathyCueType::PositiveFeedback)
+        } else if lower.contains("thanks")
+            || lower.contains("thank you")
+            || lower.contains("grateful")
+        {
+            (
+                CoreEmotion::Gratitude,
+                0.7,
+                EmpathyCueType::PositiveFeedback,
+            )
         } else if lower.contains("confused") || lower.contains("don't understand") {
             (CoreEmotion::Confusion, 0.6, EmpathyCueType::Uncertainty)
         } else if lower.contains("help") || lower.contains("stuck") || lower.contains("can't") {
             (CoreEmotion::Confusion, 0.5, EmpathyCueType::HelpRequest)
-        } else if lower.contains("curious") || lower.contains("interesting") || lower.contains("wonder") {
-            (CoreEmotion::Curiosity, 0.6, EmpathyCueType::EmotionalExpression)
+        } else if lower.contains("curious")
+            || lower.contains("interesting")
+            || lower.contains("wonder")
+        {
+            (
+                CoreEmotion::Curiosity,
+                0.6,
+                EmpathyCueType::EmotionalExpression,
+            )
         } else {
-            (CoreEmotion::Neutral, 0.3, EmpathyCueType::EmotionalExpression)
+            (
+                CoreEmotion::Neutral,
+                0.3,
+                EmpathyCueType::EmotionalExpression,
+            )
         };
 
         EmpathicCue {
@@ -675,9 +781,9 @@ impl EmpathyModel {
             CoreEmotion::Fear | CoreEmotion::Sadness => CoreEmotion::Love, // Compassion
             CoreEmotion::Anger | CoreEmotion::Frustration => CoreEmotion::Peace, // Calming
             CoreEmotion::Joy | CoreEmotion::Gratitude => CoreEmotion::Joy, // Share joy
-            CoreEmotion::Confusion => CoreEmotion::Trust, // Reassurance
-            CoreEmotion::Curiosity => CoreEmotion::Curiosity, // Engage
-            _ => CoreEmotion::Peace, // Default to calm
+            CoreEmotion::Confusion => CoreEmotion::Trust,                  // Reassurance
+            CoreEmotion::Curiosity => CoreEmotion::Curiosity,              // Engage
+            _ => CoreEmotion::Peace,                                       // Default to calm
         };
         self.mirror_emotion = mirrored;
         mirrored
@@ -685,9 +791,17 @@ impl EmpathyModel {
 
     /// Get recommended empathy type based on cues
     pub fn recommended_empathy_type(&self) -> EmpathyType {
-        if self.cues.iter().any(|c| c.cue_type == EmpathyCueType::StressSignal) {
+        if self
+            .cues
+            .iter()
+            .any(|c| c.cue_type == EmpathyCueType::StressSignal)
+        {
             EmpathyType::Compassionate
-        } else if self.cues.iter().any(|c| c.cue_type == EmpathyCueType::HelpRequest) {
+        } else if self
+            .cues
+            .iter()
+            .any(|c| c.cue_type == EmpathyCueType::HelpRequest)
+        {
             EmpathyType::Supportive
         } else {
             EmpathyType::Cognitive
@@ -910,7 +1024,11 @@ mod tests {
         let mut core = EmotionalCore::default();
         let response = core.generate_emotional_response("I'm sorry", "sadness", 0.9);
 
-        assert!(response.text.contains("sadly") || response.text.contains("sorrow") || response.text.contains("I'm sorry"));
+        assert!(
+            response.text.contains("sadly")
+                || response.text.contains("sorrow")
+                || response.text.contains("I'm sorry")
+        );
         assert_eq!(response.target_emotion, "sadness");
     }
 
@@ -1081,7 +1199,9 @@ mod tests {
         let analysis = core.analyze("I am happy but also sad and a bit angry.");
 
         // Should detect multiple emotions
-        let nonzero_emotions = analysis.emotion_scores.values()
+        let nonzero_emotions = analysis
+            .emotion_scores
+            .values()
             .filter(|&&v| v > 0.0)
             .count();
         assert!(nonzero_emotions >= 1);

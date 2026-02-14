@@ -1,10 +1,10 @@
 //! Temporal Difference Learning for updating the generative model.
 
-use std::collections::VecDeque;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
-use super::types::{HiddenState, Observation};
 use super::generative_model::GenerativeModel;
+use super::types::{HiddenState, Observation};
 
 // =============================================================================
 // TEMPORAL DIFFERENCE LEARNING CONFIGURATION
@@ -92,7 +92,13 @@ pub struct EligibilityTraces {
 
 impl EligibilityTraces {
     /// Create new eligibility traces
-    pub fn new(num_actions: usize, state_dim: usize, obs_dim: usize, lambda: f64, gamma: f64) -> Self {
+    pub fn new(
+        num_actions: usize,
+        state_dim: usize,
+        obs_dim: usize,
+        lambda: f64,
+        gamma: f64,
+    ) -> Self {
         Self {
             transition_traces: vec![vec![vec![0.0; state_dim]; state_dim]; num_actions],
             likelihood_traces: vec![vec![0.0; obs_dim]; state_dim],
@@ -121,7 +127,13 @@ impl EligibilityTraces {
     }
 
     /// Update traces for a transition (accumulating traces)
-    pub fn update(&mut self, action: usize, from_state: &[f64], to_state: &[f64], observation: &[f64]) {
+    pub fn update(
+        &mut self,
+        action: usize,
+        from_state: &[f64],
+        to_state: &[f64],
+        observation: &[f64],
+    ) {
         let action_idx = action.min(self.transition_traces.len().saturating_sub(1));
 
         // Update transition traces (outer product of from_state and to_state)
@@ -193,9 +205,18 @@ pub struct ModelConfidenceTracker {
 
 impl ModelConfidenceTracker {
     /// Create new confidence tracker
-    pub fn new(num_actions: usize, state_dim: usize, obs_dim: usize, decay_rate: f64, min_confidence: f64) -> Self {
+    pub fn new(
+        num_actions: usize,
+        state_dim: usize,
+        obs_dim: usize,
+        decay_rate: f64,
+        min_confidence: f64,
+    ) -> Self {
         Self {
-            transition_confidence: vec![vec![vec![min_confidence; state_dim]; state_dim]; num_actions],
+            transition_confidence: vec![
+                vec![vec![min_confidence; state_dim]; state_dim];
+                num_actions
+            ],
             likelihood_confidence: vec![vec![min_confidence; obs_dim]; state_dim],
             transition_counts: vec![vec![vec![0; state_dim]; state_dim]; num_actions],
             likelihood_counts: vec![vec![0; obs_dim]; state_dim],
@@ -207,8 +228,16 @@ impl ModelConfidenceTracker {
     /// Update confidence based on observed transition
     pub fn update_transition(&mut self, action: usize, from_idx: usize, to_idx: usize) {
         let action_idx = action.min(self.transition_confidence.len().saturating_sub(1));
-        let from_idx = from_idx.min(self.transition_confidence[action_idx].len().saturating_sub(1));
-        let to_idx = to_idx.min(self.transition_confidence[action_idx][from_idx].len().saturating_sub(1));
+        let from_idx = from_idx.min(
+            self.transition_confidence[action_idx]
+                .len()
+                .saturating_sub(1),
+        );
+        let to_idx = to_idx.min(
+            self.transition_confidence[action_idx][from_idx]
+                .len()
+                .saturating_sub(1),
+        );
 
         self.transition_counts[action_idx][from_idx][to_idx] += 1;
         let count = self.transition_counts[action_idx][from_idx][to_idx] as f64;
@@ -221,7 +250,11 @@ impl ModelConfidenceTracker {
     /// Update confidence based on observed observation
     pub fn update_likelihood(&mut self, state_idx: usize, obs_idx: usize) {
         let state_idx = state_idx.min(self.likelihood_confidence.len().saturating_sub(1));
-        let obs_idx = obs_idx.min(self.likelihood_confidence[state_idx].len().saturating_sub(1));
+        let obs_idx = obs_idx.min(
+            self.likelihood_confidence[state_idx]
+                .len()
+                .saturating_sub(1),
+        );
 
         self.likelihood_counts[state_idx][obs_idx] += 1;
         let count = self.likelihood_counts[state_idx][obs_idx] as f64;
@@ -261,7 +294,11 @@ impl ModelConfidenceTracker {
             }
         }
 
-        if count > 0 { sum / count as f64 } else { self.min_confidence }
+        if count > 0 {
+            sum / count as f64
+        } else {
+            self.min_confidence
+        }
     }
 
     /// Get average likelihood confidence
@@ -276,7 +313,11 @@ impl ModelConfidenceTracker {
             }
         }
 
-        if count > 0 { sum / count as f64 } else { self.min_confidence }
+        if count > 0 {
+            sum / count as f64
+        } else {
+            self.min_confidence
+        }
     }
 }
 
@@ -378,29 +419,39 @@ impl TemporalDifferenceLearner {
         let predicted_next = model.predict_next_state(old_state, action);
 
         // State prediction error (how well did we predict the next state?)
-        let _state_prediction_error: f64 = new_state.mean.iter()
+        let _state_prediction_error: f64 = new_state
+            .mean
+            .iter()
             .zip(predicted_next.mean.iter())
             .map(|(actual, predicted)| (actual - predicted).powi(2))
             .sum::<f64>()
             .sqrt();
 
         // Observation prediction error
-        let obs_prediction_error: f64 = observation.values.iter()
+        let obs_prediction_error: f64 = observation
+            .values
+            .iter()
             .zip(predicted_obs.iter())
             .map(|(actual, predicted)| (actual - predicted).powi(2))
             .sum::<f64>()
             .sqrt();
 
         // Nonlinear value function: V(s) = tanh(w · s + b)
-        let pre_old: f64 = self.value_weights.iter()
+        let pre_old: f64 = self
+            .value_weights
+            .iter()
             .zip(old_state.mean.iter())
             .map(|(w, s)| w * s)
-            .sum::<f64>() + self.value_bias;
+            .sum::<f64>()
+            + self.value_bias;
         let v_old = pre_old.tanh();
-        let pre_new: f64 = self.value_weights.iter()
+        let pre_new: f64 = self
+            .value_weights
+            .iter()
             .zip(new_state.mean.iter())
             .map(|(w, s)| w * s)
-            .sum::<f64>() + self.value_bias;
+            .sum::<f64>()
+            + self.value_bias;
         let v_new = pre_new.tanh();
 
         // Intrinsic reward: negative prediction error
@@ -501,7 +552,8 @@ impl TemporalDifferenceLearner {
         // Error-driven gradient: move predictions toward observations
         for i in 0..model.state_dim.min(new_state.mean.len()) {
             for j in 0..model.obs_dim.min(observation.values.len()) {
-                let predicted = model.likelihood_matrix[i].iter()
+                let predicted = model.likelihood_matrix[i]
+                    .iter()
                     .zip(new_state.mean.iter())
                     .map(|(&l, &s)| l * s)
                     .sum::<f64>();
@@ -510,9 +562,7 @@ impl TemporalDifferenceLearner {
 
                 // Scale by eligibility trace if available
                 let trace_scale = if let Some(ref traces) = self.eligibility_traces {
-                    if i < traces.likelihood_traces.len()
-                        && j < traces.likelihood_traces[i].len()
-                    {
+                    if i < traces.likelihood_traces.len() && j < traces.likelihood_traces[i].len() {
                         traces.likelihood_traces[i][j].abs().min(1.0)
                     } else {
                         1.0
@@ -528,10 +578,13 @@ impl TemporalDifferenceLearner {
 
         // Update value function weights: w += lr * δ * dtanh * s, b += lr * δ * dtanh
         // dtanh = 1 - tanh^2(w · s + b)
-        let pre_act: f64 = self.value_weights.iter()
+        let pre_act: f64 = self
+            .value_weights
+            .iter()
             .zip(old_state.mean.iter())
             .map(|(w, s)| w * s)
-            .sum::<f64>() + self.value_bias;
+            .sum::<f64>()
+            + self.value_bias;
         let dtanh = 1.0 - pre_act.tanh().powi(2);
 
         for i in 0..self.value_weights.len().min(old_state.mean.len()) {
@@ -556,23 +609,30 @@ impl TemporalDifferenceLearner {
         self.value_bias = self.value_bias.clamp(-5.0, 5.0);
 
         // Update confidence tracker
-        let from_idx = old_state.mean.iter()
+        let from_idx = old_state
+            .mean
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
             .unwrap_or(0);
-        let to_idx = new_state.mean.iter()
+        let to_idx = new_state
+            .mean
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
             .unwrap_or(0);
-        let obs_idx = observation.values.iter()
+        let obs_idx = observation
+            .values
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
             .unwrap_or(0);
 
-        self.confidence_tracker.update_transition(action, from_idx, to_idx);
+        self.confidence_tracker
+            .update_transition(action, from_idx, to_idx);
         self.confidence_tracker.update_likelihood(to_idx, obs_idx);
     }
 

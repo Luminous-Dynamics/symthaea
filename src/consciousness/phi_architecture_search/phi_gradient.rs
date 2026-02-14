@@ -57,8 +57,13 @@ impl PhiGradient {
             g.recurrence = (g.recurrence + e).clamp(0.0, 1.0);
         });
 
-        let magnitude = (d_density.powi(2) + d_modularity.powi(2) + d_bridge_ratio.powi(2)
-            + d_tau_ratio.powi(2) + d_binding_strength.powi(2) + d_recurrence.powi(2)).sqrt();
+        let magnitude = (d_density.powi(2)
+            + d_modularity.powi(2)
+            + d_bridge_ratio.powi(2)
+            + d_tau_ratio.powi(2)
+            + d_binding_strength.powi(2)
+            + d_recurrence.powi(2))
+        .sqrt();
 
         Self {
             d_density,
@@ -71,7 +76,12 @@ impl PhiGradient {
         }
     }
 
-    fn grad_component<F>(genome: &ArchitectureGenome, _base_phi: f64, epsilon: f32, mutate: F) -> f64
+    fn grad_component<F>(
+        genome: &ArchitectureGenome,
+        _base_phi: f64,
+        epsilon: f32,
+        mutate: F,
+    ) -> f64
     where
         F: Fn(&mut ArchitectureGenome, f32),
     {

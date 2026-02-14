@@ -271,13 +271,23 @@ pub fn print_support_summary() {
             None => "-".to_string(),
         };
 
-        println!("{:16} │ {:6} │ {:6} │ {:^5} │ {:^6} │ {}",
-                 config.model_id.split('/').next_back().unwrap_or(&config.model_id),
-                 config.num_layers,
-                 config.hidden_dim,
-                 if status.loads { "✓" } else { "-" },
-                 if status.effect_observed.is_some() { "✓" } else { "-" },
-                 effect_str);
+        println!(
+            "{:16} │ {:6} │ {:6} │ {:^5} │ {:^6} │ {}",
+            config
+                .model_id
+                .split('/')
+                .next_back()
+                .unwrap_or(&config.model_id),
+            config.num_layers,
+            config.hidden_dim,
+            if status.loads { "✓" } else { "-" },
+            if status.effect_observed.is_some() {
+                "✓"
+            } else {
+                "-"
+            },
+            effect_str
+        );
     }
 
     println!("\n");
@@ -416,7 +426,10 @@ mod tests {
     fn test_model_architecture_equality() {
         assert_eq!(ModelArchitecture::Encoder, ModelArchitecture::Encoder);
         assert_ne!(ModelArchitecture::Encoder, ModelArchitecture::Decoder);
-        assert_ne!(ModelArchitecture::Decoder, ModelArchitecture::EncoderDecoder);
+        assert_ne!(
+            ModelArchitecture::Decoder,
+            ModelArchitecture::EncoderDecoder
+        );
     }
 
     #[test]
@@ -448,10 +461,16 @@ mod tests {
     fn test_pooling_strategies_by_model() {
         // BERT models use CLS pooling
         assert_eq!(ModelPreset::BertBase.config().pooling, PoolingStrategy::Cls);
-        assert_eq!(ModelPreset::BertLarge.config().pooling, PoolingStrategy::Cls);
+        assert_eq!(
+            ModelPreset::BertLarge.config().pooling,
+            PoolingStrategy::Cls
+        );
         // BGE-M3 and RoBERTa use Mean pooling
         assert_eq!(ModelPreset::BgeM3.config().pooling, PoolingStrategy::Mean);
-        assert_eq!(ModelPreset::RobertaBase.config().pooling, PoolingStrategy::Mean);
+        assert_eq!(
+            ModelPreset::RobertaBase.config().pooling,
+            PoolingStrategy::Mean
+        );
     }
 
     // =========================================================================

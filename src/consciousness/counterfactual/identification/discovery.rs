@@ -4,9 +4,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-use super::dag::{
-    CausalDAG, CausalQuery, CausalQueryOutcome,
-};
+use super::dag::{CausalDAG, CausalQuery, CausalQueryOutcome};
 use super::estimation::{EffectEstimator, ObservationalData};
 use super::reasoner::combinations;
 
@@ -84,7 +82,10 @@ impl PCAlgorithm {
     }
 
     /// Phase 1: Learn the skeleton using conditional independence tests.
-    fn learn_skeleton(&self, data: &ObservationalData) -> (Skeleton, HashMap<(usize, usize), Vec<usize>>, usize) {
+    fn learn_skeleton(
+        &self,
+        data: &ObservationalData,
+    ) -> (Skeleton, HashMap<(usize, usize), Vec<usize>>, usize) {
         let n = data.variables.len();
 
         // Start with complete graph
@@ -169,7 +170,13 @@ impl PCAlgorithm {
     }
 
     /// Compute partial correlation of X and Y given Z.
-    fn partial_correlation(&self, data: &ObservationalData, x: usize, y: usize, z: &[usize]) -> f64 {
+    fn partial_correlation(
+        &self,
+        data: &ObservationalData,
+        x: usize,
+        y: usize,
+        z: &[usize],
+    ) -> f64 {
         if z.is_empty() {
             // Simple correlation
             return self.correlation(data, x, y);
@@ -287,7 +294,8 @@ impl PCAlgorithm {
             // R1: A → B - C and A-/-C ⟹ B → C
             for b in 0..cpdag.nodes.len() {
                 let parents: Vec<usize> = cpdag.parents(b).iter().copied().collect();
-                let undirected: Vec<usize> = cpdag.undirected_neighbors(b).iter().copied().collect();
+                let undirected: Vec<usize> =
+                    cpdag.undirected_neighbors(b).iter().copied().collect();
 
                 for &a in &parents {
                     for &c in &undirected {
@@ -460,10 +468,7 @@ impl CPDAG {
     ///
     /// Note: Loses undirected edge information.
     pub fn to_dag(&self) -> CausalDAG {
-        CausalDAG::new(
-            self.nodes.clone(),
-            self.directed.iter().copied().collect(),
-        )
+        CausalDAG::new(self.nodes.clone(), self.directed.iter().copied().collect())
     }
 
     /// Get number of directed edges.
@@ -562,7 +567,12 @@ impl<'a> MediationAnalysis<'a> {
     /// * `mediator` - Index of mediator variable M
     /// * `outcome` - Index of outcome variable Y
     pub fn new(dag: &'a CausalDAG, treatment: usize, mediator: usize, outcome: usize) -> Self {
-        Self { dag, treatment, mediator, outcome }
+        Self {
+            dag,
+            treatment,
+            mediator,
+            outcome,
+        }
     }
 
     /// Check if mediation is identified given the causal structure.
@@ -595,7 +605,8 @@ impl<'a> MediationAnalysis<'a> {
         let y_parents: HashSet<usize> = self.dag.parents(self.outcome).into_iter().collect();
 
         // Potential confounders of M → Y
-        let potential_confounders: Vec<usize> = m_parents.intersection(&y_parents)
+        let potential_confounders: Vec<usize> = m_parents
+            .intersection(&y_parents)
             .filter(|&&n| n != self.treatment && n != self.mediator)
             .copied()
             .collect();
@@ -604,7 +615,10 @@ impl<'a> MediationAnalysis<'a> {
         for &confounder in &potential_confounders {
             if self.dag.has_path(self.treatment, confounder) {
                 return MediationIdentification::ExposureInducedConfounding {
-                    confounder: self.dag.nodes.get(confounder)
+                    confounder: self
+                        .dag
+                        .nodes
+                        .get(confounder)
                         .cloned()
                         .unwrap_or_else(|| format!("Node_{}", confounder)),
                 };
@@ -612,7 +626,9 @@ impl<'a> MediationAnalysis<'a> {
         }
 
         // Find adjustment set for NDE/NIE
-        let baseline_confounders: Vec<usize> = self.dag.parents(self.treatment)
+        let baseline_confounders: Vec<usize> = self
+            .dag
+            .parents(self.treatment)
             .into_iter()
             .filter(|&n| self.dag.has_path(n, self.outcome))
             .collect();
@@ -648,12 +664,8 @@ impl<'a> MediationAnalysis<'a> {
                 let a_path = self.simple_regression(data, self.treatment, self.mediator);
 
                 // Step 3: Effect of M on Y controlling for X (b path) and direct effect (c')
-                let (c_prime, b_path) = self.multiple_regression_2(
-                    data,
-                    self.outcome,
-                    self.treatment,
-                    self.mediator,
-                );
+                let (c_prime, b_path) =
+                    self.multiple_regression_2(data, self.outcome, self.treatment, self.mediator);
 
                 // NIE = a * b (indirect effect)
                 let nie = a_path * b_path;
@@ -725,7 +737,13 @@ impl<'a> MediationAnalysis<'a> {
     }
 
     /// Multiple regression: Y ~ X + M, returns (coef_x, coef_m)
-    fn multiple_regression_2(&self, data: &ObservationalData, y: usize, x1: usize, x2: usize) -> (f64, f64) {
+    fn multiple_regression_2(
+        &self,
+        data: &ObservationalData,
+        y: usize,
+        x1: usize,
+        x2: usize,
+    ) -> (f64, f64) {
         let n = data.n();
         if n < 3 {
             return (0.0, 0.0);
@@ -899,7 +917,12 @@ impl IVEstimator {
     /// 1. Relevance: Z → X path exists
     /// 2. Exclusion: No direct Z → Y path
     /// 3. Independence: No confounding of Z
-    pub fn is_valid_instrument(dag: &CausalDAG, instrument: usize, treatment: usize, outcome: usize) -> IVValidity {
+    pub fn is_valid_instrument(
+        dag: &CausalDAG,
+        instrument: usize,
+        treatment: usize,
+        outcome: usize,
+    ) -> IVValidity {
         // Check relevance: Z must affect X
         if !dag.has_path(instrument, treatment) {
             return IVValidity::Invalid {
@@ -932,7 +955,8 @@ impl IVEstimator {
 
         if reaches_y_not_through_x {
             return IVValidity::Invalid {
-                reason: "Instrument reaches outcome through path not including treatment".to_string(),
+                reason: "Instrument reaches outcome through path not including treatment"
+                    .to_string(),
             };
         }
 
@@ -1142,12 +1166,7 @@ impl TimeSeriesCausalDiscovery {
     /// beyond what past values of Y alone can predict.
     ///
     /// Returns F-statistic and p-value approximation.
-    pub fn granger_test(
-        &self,
-        x: &[f64],
-        y: &[f64],
-        lag: usize,
-    ) -> GrangerResult {
+    pub fn granger_test(&self, x: &[f64], y: &[f64], lag: usize) -> GrangerResult {
         if x.len() != y.len() || x.len() <= lag + 1 {
             return GrangerResult {
                 f_statistic: 0.0,
@@ -1425,11 +1444,7 @@ impl TransportabilityAnalyzer {
     /// * `source_dag` - DAG for the source population
     /// * `target_dag` - DAG for the target population
     /// * `selection_nodes` - Nodes whose mechanisms differ between populations
-    pub fn new(
-        source_dag: CausalDAG,
-        target_dag: CausalDAG,
-        selection_nodes: Vec<usize>,
-    ) -> Self {
+    pub fn new(source_dag: CausalDAG, target_dag: CausalDAG, selection_nodes: Vec<usize>) -> Self {
         Self {
             source_dag,
             target_dag,
@@ -1440,11 +1455,7 @@ impl TransportabilityAnalyzer {
     /// Check if the causal effect P(y|do(x)) is transportable.
     ///
     /// Returns transportability status and any required adjustments.
-    pub fn is_transportable(
-        &self,
-        treatment: usize,
-        outcome: usize,
-    ) -> TransportabilityResult {
+    pub fn is_transportable(&self, treatment: usize, outcome: usize) -> TransportabilityResult {
         // Simple check: effect is directly transportable if no selection
         // node is on any path from treatment to outcome
         let paths_blocked = self.check_selection_blocking(treatment, outcome);

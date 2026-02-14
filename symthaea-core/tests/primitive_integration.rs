@@ -9,8 +9,8 @@
 
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::{
-    PrimitiveSystem, PrimitiveTier, CompositionCache, CompositionAlgebra,
-    PrimitiveGraph, PrimitivePersistence, HistoryEntry,
+    CompositionAlgebra, CompositionCache, HistoryEntry, PrimitiveGraph, PrimitivePersistence,
+    PrimitiveSystem, PrimitiveTier,
 };
 
 // ============================================================================
@@ -37,20 +37,27 @@ mod bootstrapping_integration {
 
         // These categories are known to have matching primitives in the system
         let known_populated = [
-            ReasoningCategory::LogicalDeduction,    // AND, OR, NOT
+            ReasoningCategory::LogicalDeduction,      // AND, OR, NOT
             ReasoningCategory::MathematicalReasoning, // ZERO, ONE, SUCCESSOR, ADDITION
-            ReasoningCategory::CausalInference,     // CAUSE, EFFECT, STATE_CHANGE
-            ReasoningCategory::TemporalReasoning,   // BEFORE, AFTER
+            ReasoningCategory::CausalInference,       // CAUSE, EFFECT, STATE_CHANGE
+            ReasoningCategory::TemporalReasoning,     // BEFORE, AFTER
         ];
 
         for category in &known_populated {
             let prims = bootstrapper.primitives_for_category(*category);
             // Each primitive from bootstrapper should be findable in system
             for (name, hv) in prims {
-                let lookup = system.get(name).unwrap_or_else(|| panic!("Bootstrapper references '{}' but system.get() returned None", name));
+                let lookup = system.get(name).unwrap_or_else(|| {
+                    panic!(
+                        "Bootstrapper references '{}' but system.get() returned None",
+                        name
+                    )
+                });
                 assert_eq!(
-                    lookup.encoding.similarity(hv), 1.0,
-                    "Encoding mismatch for primitive '{}'", name
+                    lookup.encoding.similarity(hv),
+                    1.0,
+                    "Encoding mismatch for primitive '{}'",
+                    name
                 );
             }
         }
@@ -87,17 +94,26 @@ mod bootstrapping_integration {
         // Use the new composition features with bootstrapper-selected primitives
         if names.len() >= 2 {
             let result = system.bind_primitives(names[0], names[1]);
-            assert!(result.is_ok(), "Should be able to bind bootstrapper primitives");
+            assert!(
+                result.is_ok(),
+                "Should be able to bind bootstrapper primitives"
+            );
 
             let bound = result.unwrap();
             let similar = bound.find_similar(system, 3);
-            assert!(!similar.is_empty(), "Composition should have similar primitives");
+            assert!(
+                !similar.is_empty(),
+                "Composition should have similar primitives"
+            );
         }
 
         if names.len() >= 3 {
             let seq_names: Vec<&str> = names.iter().take(3).copied().collect();
             let seq = system.encode_sequence(&seq_names);
-            assert!(seq.is_ok(), "Should encode sequence of bootstrapper primitives");
+            assert!(
+                seq.is_ok(),
+                "Should encode sequence of bootstrapper primitives"
+            );
         }
     }
 }
@@ -138,7 +154,8 @@ mod arithmetic_integration {
         let zero_num = HdcNumber::zero(system);
 
         assert_eq!(
-            zero_prim.encoding.similarity(&zero_num.encoding), 1.0,
+            zero_prim.encoding.similarity(&zero_num.encoding),
+            1.0,
             "ZERO primitive and zero HdcNumber should have identical encoding"
         );
     }
@@ -160,13 +177,18 @@ mod arithmetic_integration {
         let result = engine.multiply(3, 4);
         assert_eq!(result.result.value, 12, "3 * 4 should equal 12");
 
-        let prim_names: Vec<String> = result.proof.iter()
+        let prim_names: Vec<String> = result
+            .proof
+            .iter()
             .flat_map(|step| step.primitives_used.iter().cloned())
             .collect();
 
         assert!(
-            prim_names.iter().any(|n| n == "SUCCESSOR" || n == "ADDITION" || n == "MULTIPLICATION"),
-            "Proof should reference system primitives, got: {:?}", prim_names
+            prim_names
+                .iter()
+                .any(|n| n == "SUCCESSOR" || n == "ADDITION" || n == "MULTIPLICATION"),
+            "Proof should reference system primitives, got: {:?}",
+            prim_names
         );
     }
 
@@ -188,7 +210,8 @@ mod arithmetic_integration {
 
         // They should produce the same encoding
         assert_eq!(
-            three_arith.encoding.similarity(&three_manual), 1.0,
+            three_arith.encoding.similarity(&three_manual),
+            1.0,
             "Arithmetic engine and manual composition should produce identical number encodings"
         );
     }
@@ -223,8 +246,12 @@ mod cross_feature_integration {
         }
 
         // LSH is approximate; with 32 bands we expect good recall
-        assert!(found_self >= 3, "LSH should find self-match for most primitives ({}/{})",
-            found_self, test_names.len());
+        assert!(
+            found_self >= 3,
+            "LSH should find self-match for most primitives ({}/{})",
+            found_self,
+            test_names.len()
+        );
     }
 
     #[test]
@@ -240,12 +267,18 @@ mod cross_feature_integration {
             match (&batch_results[i], &single) {
                 (Ok(batch_r), Ok(single_r)) => {
                     assert_eq!(
-                        batch_r.encoding.similarity(&single_r.encoding), 1.0,
-                        "Batch bind should match single bind for {} ^ {}", a, b
+                        batch_r.encoding.similarity(&single_r.encoding),
+                        1.0,
+                        "Batch bind should match single bind for {} ^ {}",
+                        a,
+                        b
                     );
                 }
                 (Err(_), Err(_)) => {}
-                _ => panic!("Batch and single should agree on success/failure for {} ^ {}", a, b),
+                _ => panic!(
+                    "Batch and single should agree on success/failure for {} ^ {}",
+                    a, b
+                ),
             }
         }
     }
@@ -256,13 +289,18 @@ mod cross_feature_integration {
         let mut algebra = CompositionAlgebra::new();
 
         let result = algebra.define("CAUSATION", "CAUSE ^ EFFECT", system);
-        assert!(result.is_ok(), "Should define CAUSATION: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Should define CAUSATION: {:?}",
+            result.err()
+        );
 
         let direct = system.bind_primitives("CAUSE", "EFFECT").unwrap();
 
         let algebra_enc = algebra.get("CAUSATION").unwrap();
         assert_eq!(
-            algebra_enc.encoding.similarity(&direct.encoding), 1.0,
+            algebra_enc.encoding.similarity(&direct.encoding),
+            1.0,
             "Algebra and direct bind should produce identical encodings"
         );
     }
@@ -279,14 +317,16 @@ mod cross_feature_integration {
         let direct = system.bind_primitives("AND", "OR").unwrap();
 
         assert_eq!(
-            cached_1.encoding.similarity(&direct.encoding), 1.0,
+            cached_1.encoding.similarity(&direct.encoding),
+            1.0,
             "Cached and direct should match"
         );
 
         // Second call (hit)
         let cached_2 = cache.bind_cached(system, "AND", "OR").unwrap();
         assert_eq!(
-            cached_2.encoding.similarity(&cached_1.encoding), 1.0,
+            cached_2.encoding.similarity(&cached_1.encoding),
+            1.0,
             "Cache hit should return same result"
         );
 
@@ -308,7 +348,10 @@ mod cross_feature_integration {
         for i in 0..4 {
             assert!(
                 (matrix[i][i] - 1.0).abs() < 0.001,
-                "Diagonal [{},{}] should be 1.0, got {}", i, i, matrix[i][i]
+                "Diagonal [{},{}] should be 1.0, got {}",
+                i,
+                i,
+                matrix[i][i]
             );
         }
 
@@ -318,7 +361,12 @@ mod cross_feature_integration {
                 assert!(
                     (matrix[i][j] - matrix[j][i]).abs() < 0.001,
                     "Matrix should be symmetric: [{},{}]={} != [{},{}]={}",
-                    i, j, matrix[i][j], j, i, matrix[j][i]
+                    i,
+                    j,
+                    matrix[i][j],
+                    j,
+                    i,
+                    matrix[j][i]
                 );
             }
         }
@@ -334,7 +382,10 @@ mod cross_feature_integration {
         assert!(stats.node_count > 0, "Graph should have nodes");
 
         let dot = graph.to_dot();
-        assert!(dot.contains("digraph"), "DOT output should contain 'digraph'");
+        assert!(
+            dot.contains("digraph"),
+            "DOT output should contain 'digraph'"
+        );
     }
 
     #[test]
@@ -342,21 +393,23 @@ mod cross_feature_integration {
         let system = PrimitiveSystem::global();
 
         let mut algebra = CompositionAlgebra::new();
-        algebra.define("TEST_COMP", "CAUSE ^ EFFECT", system).unwrap();
+        algebra
+            .define("TEST_COMP", "CAUSE ^ EFFECT", system)
+            .unwrap();
 
-        let history = vec![
-            HistoryEntry {
-                operation: "bind CAUSE EFFECT".to_string(),
-                result_match: "CAUSE".to_string(),
-                similarity: 0.52,
-            },
-        ];
+        let history = vec![HistoryEntry {
+            operation: "bind CAUSE EFFECT".to_string(),
+            result_match: "CAUSE".to_string(),
+            similarity: 0.52,
+        }];
 
         let persistence = PrimitivePersistence::new();
         let tmp_path = std::env::temp_dir().join("symthaea_integration_test.json");
         let tmp_str = tmp_path.to_str().unwrap();
 
-        persistence.save_session(tmp_str, &algebra, &history, Some("Integration test")).unwrap();
+        persistence
+            .save_session(tmp_str, &algebra, &history, Some("Integration test"))
+            .unwrap();
         let (loaded_algebra, loaded_history) = persistence.load_session(tmp_str, system).unwrap();
 
         assert_eq!(loaded_algebra.list().len(), 1);
@@ -368,7 +421,8 @@ mod cross_feature_integration {
         let orig_enc = algebra.get("TEST_COMP").unwrap();
         let loaded_enc = loaded_algebra.get("TEST_COMP").unwrap();
         assert_eq!(
-            orig_enc.encoding.similarity(&loaded_enc.encoding), 1.0,
+            orig_enc.encoding.similarity(&loaded_enc.encoding),
+            1.0,
             "Loaded composition encoding should match original"
         );
 
@@ -395,7 +449,8 @@ mod cross_feature_integration {
         let orig_a = original.get("A").unwrap();
         let imp_a = imported.get("A").unwrap();
         assert_eq!(
-            orig_a.encoding.similarity(&imp_a.encoding), 1.0,
+            orig_a.encoding.similarity(&imp_a.encoding),
+            1.0,
             "Imported composition should have same encoding"
         );
     }
@@ -407,8 +462,14 @@ mod cross_feature_integration {
         let bound = system.bind_primitives("CAUSE", "EFFECT").unwrap();
         let (closest_name, similarity) = system.query(&bound.encoding);
 
-        assert!(!closest_name.is_empty(), "Query should return a primitive name");
-        assert!(similarity > 0.0 && similarity <= 1.0, "Similarity should be in (0, 1]");
+        assert!(
+            !closest_name.is_empty(),
+            "Query should return a primitive name"
+        );
+        assert!(
+            similarity > 0.0 && similarity <= 1.0,
+            "Similarity should be in (0, 1]"
+        );
     }
 
     #[test]
@@ -427,8 +488,13 @@ mod cross_feature_integration {
         assert_eq!(pairs.len(), n * (n - 1) / 2);
 
         for (i, j, sim) in &pairs {
-            assert!(*sim >= 0.0 && *sim <= 1.0,
-                "Similarity between {} and {} should be in [0,1], got {}", i, j, sim);
+            assert!(
+                *sim >= 0.0 && *sim <= 1.0,
+                "Similarity between {} and {} should be in [0,1], got {}",
+                i,
+                j,
+                sim
+            );
         }
     }
 }
@@ -467,7 +533,11 @@ mod system_consistency {
 
         for tier in &initialized_tiers {
             let count = system.count_tier(*tier);
-            assert!(count > 0, "Tier {:?} should have at least one primitive, got 0", tier);
+            assert!(
+                count > 0,
+                "Tier {:?} should have at least one primitive, got 0",
+                tier
+            );
         }
     }
 
@@ -476,14 +546,27 @@ mod system_consistency {
         let sys1 = PrimitiveSystem::new();
         let sys2 = PrimitiveSystem::new();
 
-        let test_names = ["ZERO", "ONE", "SUCCESSOR", "AND", "OR", "CAUSE", "EFFECT",
-                          "MASS", "ENERGY", "POINT", "SELF"];
+        let test_names = [
+            "ZERO",
+            "ONE",
+            "SUCCESSOR",
+            "AND",
+            "OR",
+            "CAUSE",
+            "EFFECT",
+            "MASS",
+            "ENERGY",
+            "POINT",
+            "SELF",
+        ];
 
         for name in &test_names {
             if let (Some(p1), Some(p2)) = (sys1.get(name), sys2.get(name)) {
                 assert_eq!(
-                    p1.encoding.similarity(&p2.encoding), 1.0,
-                    "Primitive '{}' should have deterministic encoding", name
+                    p1.encoding.similarity(&p2.encoding),
+                    1.0,
+                    "Primitive '{}' should have deterministic encoding",
+                    name
                 );
             }
         }
@@ -496,10 +579,7 @@ mod system_consistency {
 
         let mut seen = std::collections::HashSet::new();
         for name in &names {
-            assert!(
-                seen.insert(*name),
-                "Duplicate primitive name: '{}'", name
-            );
+            assert!(seen.insert(*name), "Duplicate primitive name: '{}'", name);
         }
     }
 
@@ -531,6 +611,10 @@ mod system_consistency {
     fn system_has_expected_primitive_count() {
         let system = PrimitiveSystem::global();
         // The system summary in prior sessions says ~201 primitives
-        assert!(system.count() >= 100, "System should have at least 100 primitives, got {}", system.count());
+        assert!(
+            system.count() >= 100,
+            "System should have at least 100 primitives, got {}",
+            system.count()
+        );
     }
 }

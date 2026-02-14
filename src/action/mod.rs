@@ -10,18 +10,17 @@
 pub mod nixos_patterns;
 
 pub use nixos_patterns::{
-    NixOSCommand, NixOSExecutor, SafetyLevel,
-    ChannelOperation, FlakeOperation,
-    ExecutionResult as NixOSExecutionResult,
-    ExecutionRecord as NixOSExecutionRecord,
+    ChannelOperation, ExecutionRecord as NixOSExecutionRecord,
+    ExecutionResult as NixOSExecutionResult, FlakeOperation, NixOSCommand, NixOSExecutor,
+    SafetyLevel,
 };
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::path::{Path, PathBuf};
-use thiserror::Error;
 use std::process::Command;
+use thiserror::Error;
 
 /// Complete security policy bundle (TOML-ready).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,7 +39,10 @@ impl PolicyBundle {
             name: "restrictive".into(),
             capabilities: Capabilities {
                 shell: ShellCapabilities {
-                    allowed_programs: ["nix", "ls", "cat", "echo"].iter().map(|s| s.to_string()).collect(),
+                    allowed_programs: ["nix", "ls", "cat", "echo"]
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
                     blocked_programs: BTreeSet::new(),
                     budget_per_hour: 100,
                     allowed_env: BTreeMap::new(),
@@ -174,11 +176,26 @@ impl SandboxRoot {
 /// Safe intermediate representation for actions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActionIR {
-    ReadFile { path: PathBuf, encoding: Option<String> },
-    WriteFile { path: PathBuf, content: Vec<u8>, create_dirs: bool },
-    DeleteFile { path: PathBuf },
-    CreateDirectory { path: PathBuf, recursive: bool },
-    ListDirectory { path: PathBuf, recursive: bool },
+    ReadFile {
+        path: PathBuf,
+        encoding: Option<String>,
+    },
+    WriteFile {
+        path: PathBuf,
+        content: Vec<u8>,
+        create_dirs: bool,
+    },
+    DeleteFile {
+        path: PathBuf,
+    },
+    CreateDirectory {
+        path: PathBuf,
+        recursive: bool,
+    },
+    ListDirectory {
+        path: PathBuf,
+        recursive: bool,
+    },
     RunCommand {
         program: String,
         args: Vec<String>,
@@ -207,7 +224,9 @@ impl ActionIR {
     /// Classify risk tier for budgeting/logging.
     pub fn risk_tier(&self) -> RiskTier {
         match self {
-            ActionIR::ReadFile { .. } | ActionIR::ListDirectory { .. } | ActionIR::NoOp => RiskTier::Low,
+            ActionIR::ReadFile { .. } | ActionIR::ListDirectory { .. } | ActionIR::NoOp => {
+                RiskTier::Low
+            }
             ActionIR::WriteFile { .. }
             | ActionIR::DeleteFile { .. }
             | ActionIR::CreateDirectory { .. } => RiskTier::Medium,
@@ -246,21 +265,24 @@ impl ActionIR {
     /// Get rollback hint for the shell sidecar to display
     pub fn rollback_hint(&self) -> Option<String> {
         match self {
-            ActionIR::RunCommand { program, args, .. } => {
-                get_rollback_hint(program, args)
-            }
+            ActionIR::RunCommand { program, args, .. } => get_rollback_hint(program, args),
             ActionIR::WriteFile { path, .. } => {
                 Some(format!("Restore from backup: {}.bak", path.display()))
             }
-            ActionIR::DeleteFile { path } => {
-                Some(format!("File will be backed up before deletion: {}", path.display()))
-            }
+            ActionIR::DeleteFile { path } => Some(format!(
+                "File will be backed up before deletion: {}",
+                path.display()
+            )),
             _ => None,
         }
     }
 
     /// Validate against policy and sandbox.
-    pub fn validate(&self, policy: &PolicyBundle, sandbox: &SandboxRoot) -> Result<(), PolicyViolation> {
+    pub fn validate(
+        &self,
+        policy: &PolicyBundle,
+        sandbox: &SandboxRoot,
+    ) -> Result<(), PolicyViolation> {
         match self {
             ActionIR::ReadFile { path, .. } | ActionIR::ListDirectory { path, .. } => {
                 let canonical = sandbox.validate(path)?;
@@ -430,8 +452,15 @@ pub enum ActionOutcome {
     Success,
     FileContent(Vec<u8>),
     DirectoryListing(Vec<PathBuf>),
-    SimulatedCommand { program: String, args: Vec<String> },
-    CommandOutput { stdout: Vec<u8>, stderr: Vec<u8>, exit_code: i32 },
+    SimulatedCommand {
+        program: String,
+        args: Vec<String>,
+    },
+    CommandOutput {
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+        exit_code: i32,
+    },
 }
 
 /// Execution error.
@@ -503,19 +532,31 @@ pub struct SimpleExecutor {
 impl SimpleExecutor {
     /// Simulated executor (default, safe).
     pub fn new() -> Self {
-        Self { mode: ExecutionMode::Simulated, log: Vec::new() }
+        Self {
+            mode: ExecutionMode::Simulated,
+            log: Vec::new(),
+        }
     }
 
     /// Enable real command execution for allowed programs.
     pub fn with_real_commands() -> Self {
-        Self { mode: ExecutionMode::Real, log: Vec::new() }
+        Self {
+            mode: ExecutionMode::Real,
+            log: Vec::new(),
+        }
     }
 
     /// Construct executor from env flag: set SYMTHAEA_ALLOW_REAL_EXEC=1 to enable real commands.
     pub fn from_env() -> Self {
         match env::var("SYMTHAEA_ALLOW_REAL_EXEC") {
-            Ok(val) if val == "1" => Self { mode: ExecutionMode::Real, log: Vec::new() },
-            _ => Self { mode: ExecutionMode::Simulated, log: Vec::new() },
+            Ok(val) if val == "1" => Self {
+                mode: ExecutionMode::Real,
+                log: Vec::new(),
+            },
+            _ => Self {
+                mode: ExecutionMode::Simulated,
+                log: Vec::new(),
+            },
         }
     }
 
@@ -558,7 +599,11 @@ impl SimpleExecutor {
                 let data = std::fs::read(&canonical)?;
                 ActionOutcome::FileContent(data)
             }
-            ActionIR::WriteFile { path, content, create_dirs } => {
+            ActionIR::WriteFile {
+                path,
+                content,
+                create_dirs,
+            } => {
                 let canonical = sandbox.validate(path).map_err(ExecutionError::Policy)?;
                 if *create_dirs {
                     if let Some(parent) = canonical.parent() {
@@ -607,28 +652,31 @@ impl SimpleExecutor {
                 }
                 ActionOutcome::DirectoryListing(entries)
             }
-            ActionIR::RunCommand { program, args, env, working_dir } => {
-                match self.mode {
-                    ExecutionMode::Simulated => ActionOutcome::SimulatedCommand {
-                        program: program.clone(),
-                        args: args.clone(),
-                    },
-                    ExecutionMode::Real => {
-                        let mut cmd = Command::new(program);
-                        cmd.args(args);
-                        cmd.envs(env);
-                        if let Some(dir) = working_dir {
-                            cmd.current_dir(dir);
-                        }
-                        let output = cmd.output()?;
-                        ActionOutcome::CommandOutput {
-                            stdout: output.stdout,
-                            stderr: output.stderr,
-                            exit_code: output.status.code().unwrap_or(-1),
-                        }
+            ActionIR::RunCommand {
+                program,
+                args,
+                env,
+                working_dir,
+            } => match self.mode {
+                ExecutionMode::Simulated => ActionOutcome::SimulatedCommand {
+                    program: program.clone(),
+                    args: args.clone(),
+                },
+                ExecutionMode::Real => {
+                    let mut cmd = Command::new(program);
+                    cmd.args(args);
+                    cmd.envs(env);
+                    if let Some(dir) = working_dir {
+                        cmd.current_dir(dir);
+                    }
+                    let output = cmd.output()?;
+                    ActionOutcome::CommandOutput {
+                        stdout: output.stdout,
+                        stderr: output.stderr,
+                        exit_code: output.status.code().unwrap_or(-1),
                     }
                 }
-            }
+            },
             ActionIR::Sequence(actions) => {
                 let mut last = ActionOutcome::Success;
                 for act in actions {
@@ -836,9 +884,10 @@ pub fn get_rollback_hint(program: &str, args: &[String]) -> Option<String> {
 
     // NixOS-specific rollback hints
     if program.contains("nixos-rebuild")
-        && (args_str.contains("switch") || args_str.contains("boot")) {
-            return Some("nixos-rebuild switch --rollback".to_string());
-        }
+        && (args_str.contains("switch") || args_str.contains("boot"))
+    {
+        return Some("nixos-rebuild switch --rollback".to_string());
+    }
 
     if program.contains("nix-env") && (args_str.contains("-i") || args_str.contains("--install")) {
         // Extract package name from args
@@ -861,7 +910,9 @@ pub fn get_rollback_hint(program: &str, args: &[String]) -> Option<String> {
         }
     }
 
-    if program.contains("nix-collect-garbage") || (program.contains("nix") && args_str.contains("gc")) {
+    if program.contains("nix-collect-garbage")
+        || (program.contains("nix") && args_str.contains("gc"))
+    {
         return Some("WARNING: Garbage collection cannot be undone. Old generations will be permanently deleted.".to_string());
     }
 
@@ -879,7 +930,10 @@ mod tests {
         let path = sandbox.root().join("file.txt");
         std::fs::write(&path, b"ok").unwrap();
 
-        let action = ActionIR::ReadFile { path: path.clone(), encoding: None };
+        let action = ActionIR::ReadFile {
+            path: path.clone(),
+            encoding: None,
+        };
         assert!(action.validate(&policy, &sandbox).is_ok());
     }
 
@@ -887,9 +941,15 @@ mod tests {
     fn restrictive_policy_blocks_outside_paths() {
         let policy = PolicyBundle::restrictive();
         let sandbox = SandboxRoot::new("test_block").unwrap();
-        let action = ActionIR::ReadFile { path: PathBuf::from("/etc/passwd"), encoding: None };
+        let action = ActionIR::ReadFile {
+            path: PathBuf::from("/etc/passwd"),
+            encoding: None,
+        };
         let err = action.validate(&policy, &sandbox).unwrap_err();
-        matches!(err, PolicyViolation::SandboxEscape(_) | PolicyViolation::ReadNotAllowed(_));
+        matches!(
+            err,
+            PolicyViolation::SandboxEscape(_) | PolicyViolation::ReadNotAllowed(_)
+        );
     }
 
     #[test]
@@ -934,7 +994,10 @@ mod tests {
         let sandbox = SandboxRoot::new("test_traversal").unwrap();
 
         let escaped = sandbox.root().join("dir/../../etc/passwd");
-        let action = ActionIR::ReadFile { path: escaped, encoding: None };
+        let action = ActionIR::ReadFile {
+            path: escaped,
+            encoding: None,
+        };
         assert!(action.validate(&policy, &sandbox).is_err());
     }
 
@@ -951,11 +1014,16 @@ mod tests {
             content: b"hello".to_vec(),
             create_dirs: true,
         };
-        executor.execute(&write, &policy, &sandbox)
+        executor
+            .execute(&write, &policy, &sandbox)
             .map_err(|e| ActionError::ValidationFailed(e.to_string()))?;
 
-        let read = ActionIR::ReadFile { path: path.clone(), encoding: None };
-        let result = executor.execute(&read, &policy, &sandbox)
+        let read = ActionIR::ReadFile {
+            path: path.clone(),
+            encoding: None,
+        };
+        let result = executor
+            .execute(&read, &policy, &sandbox)
             .map_err(|e| ActionError::ValidationFailed(e.to_string()))?;
         match result.outcome {
             ActionOutcome::FileContent(data) => {
@@ -980,7 +1048,8 @@ mod tests {
             working_dir: None,
         };
 
-        let outcome = executor.execute(&action, &policy, &sandbox)
+        let outcome = executor
+            .execute(&action, &policy, &sandbox)
             .map_err(|e| ActionError::ValidationFailed(e.to_string()))?;
         match outcome.outcome {
             ActionOutcome::SimulatedCommand { program, args } => {

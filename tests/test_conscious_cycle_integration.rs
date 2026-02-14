@@ -15,13 +15,21 @@
 // ==================================================================================
 
 use symthaea::language::{
-    ConsciousnessLanguageCore, ConsciousnessLanguageConfig,
-    ConsciousnessQuadrant, ExecutionStrategy,
+    adapt_response_for_quadrant,
+    verify_response_for_output,
     // Feedback loop types
-    ActionOutcomeFeedback, ExecutionStrategyType, OutcomePatterns,
+    ActionOutcomeFeedback,
+    ConsciousnessLanguageConfig,
+    ConsciousnessLanguageCore,
+    ConsciousnessQuadrant,
+    ExecutionStrategy,
+    ExecutionStrategyType,
+    OutcomePatterns,
+    PhiVerifiedResponse,
+    ResponseDepth,
+    ResponseLength,
     // Φ verification types
-    ResponseVerification, ResponseLength, ResponseDepth, PhiVerifiedResponse,
-    verify_response_for_output, adapt_response_for_quadrant,
+    ResponseVerification,
 };
 
 // ==================================================================================
@@ -38,7 +46,10 @@ fn test_input_to_quadrant_cycle() {
     // Verify we got a valid quadrant determination
     let quadrant = result.quadrant;
     println!("Quadrant for 'install firefox': {:?}", quadrant);
-    println!("Φ: {:.3}, Confidence: {:.3}", result.consciousness_phi, result.epistemic_confidence);
+    println!(
+        "Φ: {:.3}, Confidence: {:.3}",
+        result.consciousness_phi, result.epistemic_confidence
+    );
 
     // The result should have valid consciousness metrics
     assert!(result.consciousness_phi >= 0.0 && result.consciousness_phi <= 1.0);
@@ -94,12 +105,17 @@ fn test_feedback_loop_learning() {
     let patterns = core.outcome_patterns();
 
     // Success count should have increased
-    assert!(final_thresholds.successes > initial_thresholds.successes,
-            "Successes should have increased after positive feedback");
+    assert!(
+        final_thresholds.successes > initial_thresholds.successes,
+        "Successes should have increased after positive feedback"
+    );
 
     // Patterns should have recorded samples
     let total_samples: u32 = patterns.quadrant_samples.iter().sum();
-    assert!(total_samples >= 10, "Should have recorded at least 10 samples");
+    assert!(
+        total_samples >= 10,
+        "Should have recorded at least 10 samples"
+    );
 
     println!("Feedback loop learning test passed!");
     println!("  Initial successes: {}", initial_thresholds.successes);
@@ -129,7 +145,10 @@ fn test_phi_verification_integration() {
     println!("  Quadrant: {:?}", verification.quadrant);
     println!("  Verified: {}", verification.verified);
     println!("  Reason: {}", verification.reason);
-    println!("  Appropriate length: {:?}", verification.appropriate_length);
+    println!(
+        "  Appropriate length: {:?}",
+        verification.appropriate_length
+    );
     println!("  Appropriate depth: {:?}", verification.appropriate_depth);
 
     // Test adaptation
@@ -151,7 +170,12 @@ fn test_quadrant_specific_responses() {
     let confident_response = "I understand you want to install Firefox because it's a \
                               popular browser. This will be done through your NixOS \
                               configuration for reproducibility.";
-    let v = verify_response_for_output(confident_response, ConsciousnessQuadrant::Confident, 0.7, 0.8);
+    let v = verify_response_for_output(
+        confident_response,
+        ConsciousnessQuadrant::Confident,
+        0.7,
+        0.8,
+    );
     assert!(v.verified, "Detailed response should verify for Confident");
     assert_eq!(v.appropriate_depth, ResponseDepth::Deep);
 
@@ -164,7 +188,12 @@ fn test_quadrant_specific_responses() {
 
     // Autopilot: Should accept brief efficient responses
     let autopilot_response = "Installing Firefox via configuration.";
-    let v = verify_response_for_output(autopilot_response, ConsciousnessQuadrant::Autopilot, 0.2, 0.8);
+    let v = verify_response_for_output(
+        autopilot_response,
+        ConsciousnessQuadrant::Autopilot,
+        0.2,
+        0.8,
+    );
     assert!(v.verified, "Brief response should verify for Autopilot");
     assert_eq!(v.appropriate_depth, ResponseDepth::PatternMatched);
 
@@ -192,10 +221,14 @@ fn test_response_adaptation_cycle() {
     // The response should either be expanded OR marked as not verified
     // (adaptation may not always succeed, but it should try)
     let was_flagged = !adapted.verification.verified || adapted.was_modified;
-    assert!(was_flagged,
-            "Brief response should be flagged or modified for Confident quadrant");
-    println!("Confident adaptation: '{}' -> '{}' (modified: {})",
-             brief, adapted.content, adapted.was_modified);
+    assert!(
+        was_flagged,
+        "Brief response should be flagged or modified for Confident quadrant"
+    );
+    println!(
+        "Confident adaptation: '{}' -> '{}' (modified: {})",
+        brief, adapted.content, adapted.was_modified
+    );
 
     // Verbose response should be trimmed for Autopilot quadrant
     let verbose = "I would like to explain in great detail the entire process of \
@@ -206,15 +239,20 @@ fn test_response_adaptation_cycle() {
     let adapted = adapt_response_for_quadrant(verbose, ConsciousnessQuadrant::Autopilot, 0.2, 0.8);
 
     // Should either be trimmed or marked as problematic
-    println!("Autopilot adaptation: {} chars -> {} chars",
-             verbose.len(), adapted.content.len());
+    println!(
+        "Autopilot adaptation: {} chars -> {} chars",
+        verbose.len(),
+        adapted.content.len()
+    );
 
     // Confident response should get uncertainty added for Lost quadrant
     let confident = "I will install the package immediately.";
     let adapted = adapt_response_for_quadrant(confident, ConsciousnessQuadrant::Lost, 0.2, 0.2);
 
-    assert!(adapted.content.contains("?") || adapted.content.contains("not sure"),
-            "Lost quadrant should add uncertainty markers");
+    assert!(
+        adapted.content.contains("?") || adapted.content.contains("not sure"),
+        "Lost quadrant should add uncertainty markers"
+    );
     println!("Lost adaptation: '{}' -> '{}'", confident, adapted.content);
 
     println!("Response adaptation test passed!");
@@ -231,7 +269,10 @@ fn test_full_conscious_cycle() {
     // Step 1: Input processing
     let input = "search for video editing software";
     let result = core.process(input);
-    println!("Step 1 - Processing: quadrant={:?}, Φ={:.3}", result.quadrant, result.consciousness_phi);
+    println!(
+        "Step 1 - Processing: quadrant={:?}, Φ={:.3}",
+        result.quadrant, result.consciousness_phi
+    );
 
     // Step 2: Generate a response based on the understanding
     let raw_response = match result.quadrant {
@@ -244,9 +285,7 @@ fn test_full_conscious_cycle() {
             "I found some video editors. What specific features are you looking for? \
              Are you interested in professional-grade software or something simpler?"
         }
-        ConsciousnessQuadrant::Autopilot => {
-            "Found: kdenlive, shotcut, openshot"
-        }
+        ConsciousnessQuadrant::Autopilot => "Found: kdenlive, shotcut, openshot",
         ConsciousnessQuadrant::Lost => {
             "I'm not sure what kind of video editing you need. Could you tell me more?"
         }
@@ -254,11 +293,17 @@ fn test_full_conscious_cycle() {
 
     // Step 3: Verify the response matches consciousness state
     let verification = core.verify_response(raw_response);
-    println!("Step 3 - Verification: verified={}, reason={}", verification.verified, verification.reason);
+    println!(
+        "Step 3 - Verification: verified={}, reason={}",
+        verification.verified, verification.reason
+    );
 
     // Step 4: Adapt if needed
     let final_response = core.adapt_response(raw_response);
-    println!("Step 4 - Adaptation: modified={}", final_response.was_modified);
+    println!(
+        "Step 4 - Adaptation: modified={}",
+        final_response.was_modified
+    );
 
     // Step 5: Simulate successful execution and provide feedback
     let feedback = ActionOutcomeFeedback {
@@ -282,14 +327,18 @@ fn test_full_conscious_cycle() {
     println!("Step 6 - Learning: recommendation='{}'", recommendation);
 
     // Verify the full cycle completed
-    assert!(patterns.quadrant_samples.iter().sum::<u32>() > 0,
-            "Should have recorded at least one outcome");
+    assert!(
+        patterns.quadrant_samples.iter().sum::<u32>() > 0,
+        "Should have recorded at least one outcome"
+    );
 
     println!("\nFull conscious cycle test passed!");
     println!("  Input: '{}'", input);
-    println!("  Final response ({} chars): '{}'",
-             final_response.content.len(),
-             &final_response.content[..final_response.content.len().min(100)]);
+    println!(
+        "  Final response ({} chars): '{}'",
+        final_response.content.len(),
+        &final_response.content[..final_response.content.len().min(100)]
+    );
 }
 
 // ==================================================================================
@@ -302,8 +351,12 @@ fn test_learning_across_cycles() {
 
     // Run multiple cycles with the same type of task
     let tasks = [
-        "install vim", "install emacs", "install nano",
-        "install neovim", "install helix", "install micro",
+        "install vim",
+        "install emacs",
+        "install nano",
+        "install neovim",
+        "install helix",
+        "install micro",
     ];
 
     for task in &tasks {
@@ -329,9 +382,15 @@ fn test_learning_across_cycles() {
     let thresholds = core.adaptive_thresholds();
 
     println!("Learning across {} cycles:", tasks.len());
-    println!("  Quadrant success rates: {:?}", patterns.quadrant_success_rates);
+    println!(
+        "  Quadrant success rates: {:?}",
+        patterns.quadrant_success_rates
+    );
     println!("  Quadrant samples: {:?}", patterns.quadrant_samples);
-    println!("  Threshold accuracy: {:.1}%", thresholds.accuracy() * 100.0);
+    println!(
+        "  Threshold accuracy: {:.1}%",
+        thresholds.accuracy() * 100.0
+    );
 
     // After 6 successful installs, we should have learned something
     assert!(thresholds.successes >= 6, "Should have recorded successes");
@@ -360,7 +419,7 @@ fn test_failure_learning() {
             phi_at_decision: 0.7,
             confidence_at_decision: 0.8,
             action_succeeded: false, // But it failed!
-            phi_after: 0.65, // Φ decreased
+            phi_after: 0.65,         // Φ decreased
             error_message: Some("Operation failed unexpectedly".to_string()),
             was_dry_run: false,
             user_feedback: Some(false), // User said it was wrong
@@ -375,10 +434,15 @@ fn test_failure_learning() {
     if patterns.quadrant_samples[confident_idx] > 0 {
         println!("Confident quadrant after failures:");
         println!("  Samples: {}", patterns.quadrant_samples[confident_idx]);
-        println!("  Success rate: {:.1}%", patterns.quadrant_success_rates[confident_idx] * 100.0);
+        println!(
+            "  Success rate: {:.1}%",
+            patterns.quadrant_success_rates[confident_idx] * 100.0
+        );
 
-        assert!(patterns.quadrant_success_rates[confident_idx] < 0.5,
-                "Confident success rate should be low after failures");
+        assert!(
+            patterns.quadrant_success_rates[confident_idx] < 0.5,
+            "Confident success rate should be low after failures"
+        );
     }
 
     println!("Failure learning test passed!");

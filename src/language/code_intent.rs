@@ -23,10 +23,7 @@ use crate::mind::structured_thought::EpistemicStatus;
 #[derive(Debug, Clone)]
 pub enum CodeIntent {
     /// Write new code (function, struct, module, etc.)
-    Create {
-        target: CodeTarget,
-        spec: CodeSpec,
-    },
+    Create { target: CodeTarget, spec: CodeSpec },
     /// Modify existing code
     Modify {
         target: CodeTarget,
@@ -147,7 +144,11 @@ pub struct CodeSpec {
 
 impl CodeSpec {
     /// Create a new code spec
-    pub fn new(language: impl Into<String>, name: impl Into<String>, purpose: impl Into<String>) -> Self {
+    pub fn new(
+        language: impl Into<String>,
+        name: impl Into<String>,
+        purpose: impl Into<String>,
+    ) -> Self {
         Self {
             language: language.into(),
             name: name.into(),
@@ -273,30 +274,74 @@ impl CodeIntentClassifier {
     pub fn new(dim: usize) -> Self {
         Self {
             dim,
-            create_prototype: Self::encode_prototype(dim, &[
-                "write", "create", "implement", "add", "new", "generate",
-                "function", "struct", "module", "class",
-            ]),
-            modify_prototype: Self::encode_prototype(dim, &[
-                "change", "modify", "update", "fix", "alter", "adjust",
-                "edit", "transform",
-            ]),
-            explain_prototype: Self::encode_prototype(dim, &[
-                "explain", "what", "how", "why", "describe", "understand",
-                "show", "tell", "mean",
-            ]),
-            find_prototype: Self::encode_prototype(dim, &[
-                "find", "search", "where", "locate", "similar", "like",
-                "match", "pattern",
-            ]),
-            refactor_prototype: Self::encode_prototype(dim, &[
-                "refactor", "extract", "rename", "inline", "split",
-                "reorganize", "clean", "simplify",
-            ]),
-            debug_prototype: Self::encode_prototype(dim, &[
-                "debug", "error", "bug", "fix", "crash", "wrong",
-                "broken", "fail", "issue", "problem",
-            ]),
+            create_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "write",
+                    "create",
+                    "implement",
+                    "add",
+                    "new",
+                    "generate",
+                    "function",
+                    "struct",
+                    "module",
+                    "class",
+                ],
+            ),
+            modify_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "change",
+                    "modify",
+                    "update",
+                    "fix",
+                    "alter",
+                    "adjust",
+                    "edit",
+                    "transform",
+                ],
+            ),
+            explain_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "explain",
+                    "what",
+                    "how",
+                    "why",
+                    "describe",
+                    "understand",
+                    "show",
+                    "tell",
+                    "mean",
+                ],
+            ),
+            find_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "find", "search", "where", "locate", "similar", "like", "match", "pattern",
+                ],
+            ),
+            refactor_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "refactor",
+                    "extract",
+                    "rename",
+                    "inline",
+                    "split",
+                    "reorganize",
+                    "clean",
+                    "simplify",
+                ],
+            ),
+            debug_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "debug", "error", "bug", "fix", "crash", "wrong", "broken", "fail", "issue",
+                    "problem",
+                ],
+            ),
         }
     }
 
@@ -307,7 +352,10 @@ impl CodeIntentClassifier {
         for keyword in keywords {
             let keyword_lower = keyword.to_lowercase();
             for (i, byte) in keyword_lower.bytes().enumerate() {
-                let idx = ((byte as usize).wrapping_mul(31).wrapping_add(i.wrapping_mul(7))) % dim;
+                let idx = ((byte as usize)
+                    .wrapping_mul(31)
+                    .wrapping_add(i.wrapping_mul(7)))
+                    % dim;
                 values[idx] += 1.0;
             }
         }
@@ -329,7 +377,10 @@ impl CodeIntentClassifier {
         let text_lower = text.to_lowercase();
 
         for (i, byte) in text_lower.bytes().enumerate() {
-            let idx = ((byte as usize).wrapping_mul(31).wrapping_add(i.wrapping_mul(7))) % self.dim;
+            let idx = ((byte as usize)
+                .wrapping_mul(31)
+                .wrapping_add(i.wrapping_mul(7)))
+                % self.dim;
             values[idx] += 1.0;
         }
 
@@ -348,15 +399,34 @@ impl CodeIntentClassifier {
         let text_hv = self.encode_text(text);
 
         let scores = [
-            (CodeIntentCategory::Create, text_hv.similarity(&self.create_prototype)),
-            (CodeIntentCategory::Modify, text_hv.similarity(&self.modify_prototype)),
-            (CodeIntentCategory::Explain, text_hv.similarity(&self.explain_prototype)),
-            (CodeIntentCategory::Find, text_hv.similarity(&self.find_prototype)),
-            (CodeIntentCategory::Refactor, text_hv.similarity(&self.refactor_prototype)),
-            (CodeIntentCategory::Debug, text_hv.similarity(&self.debug_prototype)),
+            (
+                CodeIntentCategory::Create,
+                text_hv.similarity(&self.create_prototype),
+            ),
+            (
+                CodeIntentCategory::Modify,
+                text_hv.similarity(&self.modify_prototype),
+            ),
+            (
+                CodeIntentCategory::Explain,
+                text_hv.similarity(&self.explain_prototype),
+            ),
+            (
+                CodeIntentCategory::Find,
+                text_hv.similarity(&self.find_prototype),
+            ),
+            (
+                CodeIntentCategory::Refactor,
+                text_hv.similarity(&self.refactor_prototype),
+            ),
+            (
+                CodeIntentCategory::Debug,
+                text_hv.similarity(&self.debug_prototype),
+            ),
         ];
 
-        scores.iter()
+        scores
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(cat, _)| *cat)
             .unwrap_or(CodeIntentCategory::Create)
@@ -367,12 +437,30 @@ impl CodeIntentClassifier {
         let text_hv = self.encode_text(text);
 
         let mut scores = vec![
-            (CodeIntentCategory::Create, text_hv.similarity(&self.create_prototype)),
-            (CodeIntentCategory::Modify, text_hv.similarity(&self.modify_prototype)),
-            (CodeIntentCategory::Explain, text_hv.similarity(&self.explain_prototype)),
-            (CodeIntentCategory::Find, text_hv.similarity(&self.find_prototype)),
-            (CodeIntentCategory::Refactor, text_hv.similarity(&self.refactor_prototype)),
-            (CodeIntentCategory::Debug, text_hv.similarity(&self.debug_prototype)),
+            (
+                CodeIntentCategory::Create,
+                text_hv.similarity(&self.create_prototype),
+            ),
+            (
+                CodeIntentCategory::Modify,
+                text_hv.similarity(&self.modify_prototype),
+            ),
+            (
+                CodeIntentCategory::Explain,
+                text_hv.similarity(&self.explain_prototype),
+            ),
+            (
+                CodeIntentCategory::Find,
+                text_hv.similarity(&self.find_prototype),
+            ),
+            (
+                CodeIntentCategory::Refactor,
+                text_hv.similarity(&self.refactor_prototype),
+            ),
+            (
+                CodeIntentCategory::Debug,
+                text_hv.similarity(&self.debug_prototype),
+            ),
         ];
 
         scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -440,7 +528,10 @@ mod tests {
         let create_top = create_scores[0].1;
         let debug_top = debug_scores[0].1;
         // Both should have some positive score
-        assert!(create_top > 0.0 && debug_top > 0.0, "Scores should be positive");
+        assert!(
+            create_top > 0.0 && debug_top > 0.0,
+            "Scores should be positive"
+        );
     }
 
     #[test]

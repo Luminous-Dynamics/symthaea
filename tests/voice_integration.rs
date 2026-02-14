@@ -5,10 +5,7 @@
 //! Tests for the voice interface components that don't require
 //! actual audio hardware or TTS/STT features enabled.
 
-use symthaea::voice::{
-    VoiceConfig, VoiceEvent, LTCPacing,
-    ModelPaths, WhisperModel, KokoroModel,
-};
+use symthaea::voice::{KokoroModel, LTCPacing, ModelPaths, VoiceConfig, VoiceEvent, WhisperModel};
 
 // ============================================================================
 // VOICE CONFIG TESTS
@@ -57,12 +54,19 @@ fn test_voice_event_variants() {
         VoiceEvent::Ready,
         VoiceEvent::Listening,
         VoiceEvent::SpeechDetected,
-        VoiceEvent::Transcribed { text: "Hello".to_string(), confidence: 0.95 },
+        VoiceEvent::Transcribed {
+            text: "Hello".to_string(),
+            confidence: 0.95,
+        },
         VoiceEvent::Processing,
-        VoiceEvent::Response { text: "Hi there!".to_string() },
+        VoiceEvent::Response {
+            text: "Hi there!".to_string(),
+        },
         VoiceEvent::Speaking,
         VoiceEvent::Done,
-        VoiceEvent::Error { message: "Test error".to_string() },
+        VoiceEvent::Error {
+            message: "Test error".to_string(),
+        },
         VoiceEvent::Stopped,
     ];
 
@@ -98,13 +102,22 @@ fn test_ltc_pacing_default() {
 fn test_ltc_pacing_from_ltc() {
     // Test with high flow state
     let high_flow = LTCPacing::from_ltc(0.9, 0.5);
-    assert!(high_flow.peak_flow, "High flow (0.9) should trigger peak_flow");
-    assert!(high_flow.speech_rate > 1.0, "High flow should increase speech rate");
+    assert!(
+        high_flow.peak_flow,
+        "High flow (0.9) should trigger peak_flow"
+    );
+    assert!(
+        high_flow.speech_rate > 1.0,
+        "High flow should increase speech rate"
+    );
 
     // Test with low flow state
     let low_flow = LTCPacing::from_ltc(0.2, -0.3);
     assert!(!low_flow.peak_flow, "Low flow should not be peak");
-    assert!(low_flow.speech_rate <= 1.0, "Low flow should not increase rate");
+    assert!(
+        low_flow.speech_rate <= 1.0,
+        "Low flow should not increase rate"
+    );
 }
 
 #[test]
@@ -113,9 +126,12 @@ fn test_ltc_pacing_pause_duration() {
     let rising = LTCPacing::from_ltc(0.5, 0.8);
     let falling = LTCPacing::from_ltc(0.5, -0.8);
 
-    assert!(rising.pause_ms < falling.pause_ms,
+    assert!(
+        rising.pause_ms < falling.pause_ms,
         "Rising Φ ({}) should have shorter pause than falling ({})",
-        rising.pause_ms, falling.pause_ms);
+        rising.pause_ms,
+        falling.pause_ms
+    );
 }
 
 // ============================================================================
@@ -145,7 +161,11 @@ fn test_whisper_model_variants() {
     // Each model should have a distinct filename
     let filenames: Vec<&str> = models.iter().map(|m| m.filename()).collect();
     let unique: std::collections::HashSet<&str> = filenames.iter().cloned().collect();
-    assert_eq!(filenames.len(), unique.len(), "All model filenames should be unique");
+    assert_eq!(
+        filenames.len(),
+        unique.len(),
+        "All model filenames should be unique"
+    );
 }
 
 #[test]
@@ -194,11 +214,11 @@ fn test_model_paths_kokoro_model() {
 fn test_ltc_pacing_speech_rate_bounds() {
     // Test various LTC states don't produce out-of-bounds rates
     let test_cases = [
-        (0.0, 0.0),   // Minimum
-        (1.0, 1.0),   // Maximum
-        (0.5, 0.0),   // Neutral
-        (0.8, 0.9),   // High flow, rising phi
-        (0.1, -0.9),  // Low flow, falling phi
+        (0.0, 0.0),  // Minimum
+        (1.0, 1.0),  // Maximum
+        (0.5, 0.0),  // Neutral
+        (0.8, 0.9),  // High flow, rising phi
+        (0.1, -0.9), // Low flow, falling phi
     ];
 
     for (flow, trend) in test_cases {
@@ -206,7 +226,9 @@ fn test_ltc_pacing_speech_rate_bounds() {
         assert!(
             pacing.speech_rate >= 0.5 && pacing.speech_rate <= 2.0,
             "Speech rate {} out of bounds for flow={}, trend={}",
-            pacing.speech_rate, flow, trend
+            pacing.speech_rate,
+            flow,
+            trend
         );
     }
 }

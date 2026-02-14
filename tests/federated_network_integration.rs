@@ -101,7 +101,11 @@ async fn test_three_node_heartbeat_exchange() {
     // Each node should be able to receive 2 heartbeats
     for coordinator in &coordinators {
         let mut received = 0;
-        while let Ok(_) = coordinator.backend().receive(Duration::from_millis(10)).await {
+        while let Ok(_) = coordinator
+            .backend()
+            .receive(Duration::from_millis(10))
+            .await
+        {
             received += 1;
         }
         assert_eq!(received, 2, "Should receive 2 heartbeats from peers");
@@ -450,7 +454,11 @@ async fn test_process_join_request() {
         .process_message(NodeAddress::Channel("new-peer".to_string()), join_request)
         .await;
 
-    assert!(result.is_ok(), "Process join request should succeed: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Process join request should succeed: {:?}",
+        result
+    );
 
     // Wait for async peer registration with retry logic
     let mut attempts = 0;
@@ -462,7 +470,8 @@ async fn test_process_join_request() {
 
     // Verify the peer was actually registered
     assert_eq!(
-        coordinator.peer_count(), 1,
+        coordinator.peer_count(),
+        1,
         "Peer should be registered after join request (waited {}ms)",
         attempts * 25
     );
@@ -505,7 +514,11 @@ async fn test_network_continues_with_node_failure() {
     let coordinators = create_test_network(4, 5).await;
 
     // Verify initial state: 4 nodes, each sees 3 peers
-    assert_eq!(coordinators[0].peer_count(), 3, "Initial peer count should be 3");
+    assert_eq!(
+        coordinators[0].peer_count(),
+        3,
+        "Initial peer count should be 3"
+    );
 
     // All nodes share gradients initially
     for coordinator in &coordinators {
@@ -517,7 +530,9 @@ async fn test_network_continues_with_node_failure() {
 
     // "Remove" node 2 by dropping it from node 0's perspective
     let node2_id = coordinators[2].local_node_id();
-    coordinators[0].unregister_peer(&node2_id, "simulated failure").await;
+    coordinators[0]
+        .unregister_peer(&node2_id, "simulated failure")
+        .await;
 
     // Wait for async unregister to complete with retry logic
     let mut attempts = 0;
@@ -529,7 +544,8 @@ async fn test_network_continues_with_node_failure() {
 
     // Node 0 should now have 2 peers (3 - 1 removed)
     assert_eq!(
-        coordinators[0].peer_count(), 2,
+        coordinators[0].peer_count(),
+        2,
         "Node 0 should have 2 peers after unregistering node 2 (waited {}ms)",
         attempts * 25
     );
@@ -718,8 +734,7 @@ async fn test_byzantine_tolerance_45_percent() {
     let n_byzantine = 4; // 4/9 = 44.4% ≈ 45%
 
     // trim_fraction = 0.45 means we trim ~45% from each tail
-    let mut aggregator = FederatedAggregator::new(vec![0.0; n_dims])
-        .with_byzantine_tolerance(0.45);
+    let mut aggregator = FederatedAggregator::new(vec![0.0; n_dims]).with_byzantine_tolerance(0.45);
 
     // Run 10 aggregation rounds
     let mut final_weights = vec![0.0f32; n_dims];
@@ -765,8 +780,10 @@ async fn test_byzantine_tolerance_45_percent() {
     let positive_dims = final_weights.iter().filter(|&&w| w > 0.0).count();
     let mean_weight: f32 = final_weights.iter().sum::<f32>() / n_dims as f32;
 
-    println!("  Byzantine 45% test: mean_weight={:.4}, positive_dims={}/{}",
-        mean_weight, positive_dims, n_dims);
+    println!(
+        "  Byzantine 45% test: mean_weight={:.4}, positive_dims={}/{}",
+        mean_weight, positive_dims, n_dims
+    );
 
     // VALIDATED RESULT (Feb 2026): 45% Byzantine tolerance does NOT converge
     // with the current trimmed-mean implementation. At trim_fraction=0.45,

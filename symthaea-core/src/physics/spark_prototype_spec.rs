@@ -60,7 +60,8 @@ impl ModelDesignation {
             FusionReaction::DD => "DD",
             FusionReaction::DT => "DT",
             _ => "XX",
-        }.to_string();
+        }
+        .to_string();
 
         let lifetime_class = format!("{:.0}", conditions.target_lifetime_years);
 
@@ -73,7 +74,10 @@ impl ModelDesignation {
     }
 
     pub fn full_name(&self) -> String {
-        format!("{}-{}-{}-{}", self.series, self.power_class, self.fuel_type, self.lifetime_class)
+        format!(
+            "{}-{}-{}-{}",
+            self.series, self.power_class, self.fuel_type, self.lifetime_class
+        )
     }
 }
 
@@ -223,7 +227,7 @@ impl PrototypeSpecification {
 
         // Calculate costs
         let total_material: f64 = bom.iter().map(|e| e.total_cost_usd).sum();
-        let labor_estimate = total_material * 2.5;  // Assembly labor ~2.5x material
+        let labor_estimate = total_material * 2.5; // Assembly labor ~2.5x material
         let total_estimate = total_material + labor_estimate;
 
         // Generate safety analysis
@@ -234,7 +238,7 @@ impl PrototypeSpecification {
 
         // Performance specs
         let thermal_power = result.conditions.power_kw;
-        let electrical = thermal_power * 0.35;  // ~35% conversion efficiency
+        let electrical = thermal_power * 0.35; // ~35% conversion efficiency
         let efficiency = 35.0;
 
         let summary = format!(
@@ -245,7 +249,11 @@ impl PrototypeSpecification {
             thermal_power,
             result.conditions.reaction,
             result.conditions.target_lifetime_years,
-            if result.feasible { "DESIGN VALIDATED" } else { "DESIGN REQUIRES REVISION" }
+            if result.feasible {
+                "DESIGN VALIDATED"
+            } else {
+                "DESIGN REQUIRES REVISION"
+            }
         );
 
         Self {
@@ -263,7 +271,10 @@ impl PrototypeSpecification {
             thermal_power_kw: thermal_power,
             electrical_output_kw: electrical,
             efficiency_percent: efficiency,
-            operating_temp_range_k: (result.conditions.ambient_temp_k, result.thermal_profile.t_max),
+            operating_temp_range_k: (
+                result.conditions.ambient_temp_k,
+                result.thermal_profile.t_max,
+            ),
             design_lifetime_years: result.conditions.target_lifetime_years,
             predicted_lifetime_years: result.pulse_thermal.lifetime_years.min(100.0),
             regulatory_notes: Self::generate_regulatory_notes(result),
@@ -304,7 +315,9 @@ impl PrototypeSpecification {
             },
             DimensionalSpec {
                 component: "Total outer diameter".to_string(),
-                nominal_mm: (result.geometry_shielding.geometry.outer_radius + result.geometry_shielding.shielding_thickness_m) * 2000.0,
+                nominal_mm: (result.geometry_shielding.geometry.outer_radius
+                    + result.geometry_shielding.shielding_thickness_m)
+                    * 2000.0,
                 tolerance_mm: 10.0,
                 surface_finish_um: 6.3,
                 notes: "External containment".to_string(),
@@ -317,28 +330,29 @@ impl PrototypeSpecification {
 
         // Calculate volumes and masses
         let core_volume = 4.0 / 3.0 * std::f64::consts::PI * geo.core_radius.powi(3);
-        let core_mass = core_volume * 6440.0;  // Galinstan density
+        let core_mass = core_volume * 6440.0; // Galinstan density
 
         let interface_r_inner = geo.core_radius;
         let interface_r_outer = geo.core_radius + geo.interface_thickness;
-        let interface_volume = 4.0 / 3.0 * std::f64::consts::PI
+        let interface_volume = 4.0 / 3.0
+            * std::f64::consts::PI
             * (interface_r_outer.powi(3) - interface_r_inner.powi(3));
-        let interface_mass = interface_volume * 7500.0;  // Zr/Nb density
+        let interface_mass = interface_volume * 7500.0; // Zr/Nb density
 
         let shell_volume = geo.shell_volume();
-        let shell_mass = shell_volume * 7200.0;  // HEA density
+        let shell_mass = shell_volume * 7200.0; // HEA density
 
         let shield_r_inner = geo.outer_radius;
         let shield_r_outer = geo.outer_radius + result.geometry_shielding.shielding_thickness_m;
-        let shield_volume = 4.0 / 3.0 * std::f64::consts::PI
-            * (shield_r_outer.powi(3) - shield_r_inner.powi(3));
-        let shield_mass = shield_volume * 820.0;  // LiH density
+        let shield_volume =
+            4.0 / 3.0 * std::f64::consts::PI * (shield_r_outer.powi(3) - shield_r_inner.powi(3));
+        let shield_mass = shield_volume * 820.0; // LiH density
 
         // Cost estimates (USD/kg)
-        let hea_cost_per_kg = 500.0;    // Custom alloy
-        let laminate_cost_per_kg = 800.0;  // PVD deposited
-        let galinstan_cost_per_kg = 150.0;  // Commercial
-        let lih_cost_per_kg = 50.0;     // Industrial grade
+        let hea_cost_per_kg = 500.0; // Custom alloy
+        let laminate_cost_per_kg = 800.0; // PVD deposited
+        let galinstan_cost_per_kg = 150.0; // Commercial
+        let lih_cost_per_kg = 50.0; // Industrial grade
 
         vec![
             BomEntry {
@@ -495,7 +509,8 @@ impl PrototypeSpecification {
                 step: 1,
                 process: "HEA Shell Fabrication".to_string(),
                 description: "Arc melt constituent elements, cast into ingot, \
-                             HIP consolidate, machine hemispheres".to_string(),
+                             HIP consolidate, machine hemispheres"
+                    .to_string(),
                 equipment: "Vacuum arc furnace, HIP unit, 5-axis CNC".to_string(),
                 critical_params: vec![
                     "Composition within ±0.5 at%".to_string(),
@@ -507,7 +522,8 @@ impl PrototypeSpecification {
                 step: 2,
                 process: "Interface Coating".to_string(),
                 description: "Magnetron sputter deposit Zr/Nb alternating layers, \
-                             100 layer pairs at 5nm each".to_string(),
+                             100 layer pairs at 5nm each"
+                    .to_string(),
                 equipment: "PVD chamber with dual targets".to_string(),
                 critical_params: vec![
                     "Layer thickness 5 ± 0.5 nm".to_string(),
@@ -519,7 +535,8 @@ impl PrototypeSpecification {
                 step: 3,
                 process: "Shell Assembly".to_string(),
                 description: "Electron beam weld hemispheres with fill port, \
-                             leak test, radiograph weld".to_string(),
+                             leak test, radiograph weld"
+                    .to_string(),
                 equipment: "EB welder, He leak detector, X-ray".to_string(),
                 critical_params: vec![
                     "Weld penetration 100%".to_string(),
@@ -531,7 +548,8 @@ impl PrototypeSpecification {
                 step: 4,
                 process: "Core Fill".to_string(),
                 description: "Evacuate shell, backfill with degassed Galinstan, \
-                             seal fill port".to_string(),
+                             seal fill port"
+                    .to_string(),
                 equipment: "Vacuum system, liquid metal handling".to_string(),
                 critical_params: vec![
                     "Fill level 95-98%".to_string(),
@@ -557,7 +575,8 @@ impl PrototypeSpecification {
                 step: 6,
                 process: "Final Integration".to_string(),
                 description: "Install instrumentation, connect control system, \
-                             commission and calibrate".to_string(),
+                             commission and calibrate"
+                    .to_string(),
                 equipment: "Integration fixtures, test equipment".to_string(),
                 critical_params: vec![
                     "All sensors responding".to_string(),
@@ -598,8 +617,12 @@ impl PrototypeSpecification {
         output.push_str(&"═".repeat(70));
         output.push('\n');
         output.push_str("  SPARK ENGINE PROTOTYPE SPECIFICATION\n");
-        output.push_str(&format!("  Model: {}  Rev: {}  Date: {}\n",
-                                 self.model.full_name(), self.revision, self.date));
+        output.push_str(&format!(
+            "  Model: {}  Rev: {}  Date: {}\n",
+            self.model.full_name(),
+            self.revision,
+            self.date
+        ));
         output.push_str(&"═".repeat(70));
         output.push_str("\n\n");
 
@@ -614,24 +637,45 @@ impl PrototypeSpecification {
         output.push_str("PERFORMANCE SPECIFICATIONS\n");
         output.push_str(&"─".repeat(70));
         output.push('\n');
-        output.push_str(&format!("  Thermal Power:     {:.1} kW\n", self.thermal_power_kw));
-        output.push_str(&format!("  Electrical Output: {:.1} kW (est.)\n", self.electrical_output_kw));
-        output.push_str(&format!("  Conversion Eff:    {:.0}%\n", self.efficiency_percent));
-        output.push_str(&format!("  Operating Temp:    {:.0} - {:.0} K\n",
-                                 self.operating_temp_range_k.0, self.operating_temp_range_k.1));
-        output.push_str(&format!("  Design Lifetime:   {:.0} years\n", self.design_lifetime_years));
-        output.push_str(&format!("  Predicted Life:    {:.1} years\n", self.predicted_lifetime_years));
+        output.push_str(&format!(
+            "  Thermal Power:     {:.1} kW\n",
+            self.thermal_power_kw
+        ));
+        output.push_str(&format!(
+            "  Electrical Output: {:.1} kW (est.)\n",
+            self.electrical_output_kw
+        ));
+        output.push_str(&format!(
+            "  Conversion Eff:    {:.0}%\n",
+            self.efficiency_percent
+        ));
+        output.push_str(&format!(
+            "  Operating Temp:    {:.0} - {:.0} K\n",
+            self.operating_temp_range_k.0, self.operating_temp_range_k.1
+        ));
+        output.push_str(&format!(
+            "  Design Lifetime:   {:.0} years\n",
+            self.design_lifetime_years
+        ));
+        output.push_str(&format!(
+            "  Predicted Life:    {:.1} years\n",
+            self.predicted_lifetime_years
+        ));
         output.push('\n');
 
         // Dimensions
         output.push_str("DIMENSIONAL SPECIFICATIONS\n");
         output.push_str(&"─".repeat(70));
         output.push('\n');
-        output.push_str(&format!("{:30} {:>12} {:>10} {:>12}\n",
-                                 "Component", "Nominal", "Tol. ±", "Finish"));
+        output.push_str(&format!(
+            "{:30} {:>12} {:>10} {:>12}\n",
+            "Component", "Nominal", "Tol. ±", "Finish"
+        ));
         for dim in &self.dimensions {
-            output.push_str(&format!("{:30} {:>10.1} mm {:>8.1} mm {:>10.1} µm\n",
-                                     dim.component, dim.nominal_mm, dim.tolerance_mm, dim.surface_finish_um));
+            output.push_str(&format!(
+                "{:30} {:>10.1} mm {:>8.1} mm {:>10.1} µm\n",
+                dim.component, dim.nominal_mm, dim.tolerance_mm, dim.surface_finish_um
+            ));
         }
         output.push('\n');
 
@@ -639,20 +683,35 @@ impl PrototypeSpecification {
         output.push_str("BILL OF MATERIALS\n");
         output.push_str(&"─".repeat(70));
         output.push('\n');
-        output.push_str(&format!("{:4} {:30} {:>10} {:>12}\n",
-                                 "Item", "Description", "Mass (kg)", "Cost (USD)"));
+        output.push_str(&format!(
+            "{:4} {:30} {:>10} {:>12}\n",
+            "Item", "Description", "Mass (kg)", "Cost (USD)"
+        ));
         for entry in &self.bom {
-            output.push_str(&format!("{:4} {:30} {:>10.2} {:>12.0}\n",
-                                     entry.item, entry.name, entry.mass_kg, entry.total_cost_usd));
+            output.push_str(&format!(
+                "{:4} {:30} {:>10.2} {:>12.0}\n",
+                entry.item, entry.name, entry.mass_kg, entry.total_cost_usd
+            ));
         }
-        output.push_str(&format!("{:34} {:>10} {:>12}\n", "", "─".repeat(10), "─".repeat(12)));
+        output.push_str(&format!(
+            "{:34} {:>10} {:>12}\n",
+            "",
+            "─".repeat(10),
+            "─".repeat(12)
+        ));
         let total_mass: f64 = self.bom.iter().map(|e| e.mass_kg).sum();
-        output.push_str(&format!("{:34} {:>10.1} {:>12.0}\n",
-                                 "TOTAL", total_mass, self.total_material_cost_usd));
-        output.push_str(&format!("{:34} {:>10} {:>12.0}\n",
-                                 "Est. Labor", "", self.estimated_labor_cost_usd));
-        output.push_str(&format!("{:34} {:>10} {:>12.0}\n",
-                                 "EST. TOTAL", "", self.estimated_total_cost_usd));
+        output.push_str(&format!(
+            "{:34} {:>10.1} {:>12.0}\n",
+            "TOTAL", total_mass, self.total_material_cost_usd
+        ));
+        output.push_str(&format!(
+            "{:34} {:>10} {:>12.0}\n",
+            "Est. Labor", "", self.estimated_labor_cost_usd
+        ));
+        output.push_str(&format!(
+            "{:34} {:>10} {:>12.0}\n",
+            "EST. TOTAL", "", self.estimated_total_cost_usd
+        ));
         output.push('\n');
 
         // Safety
@@ -660,10 +719,12 @@ impl PrototypeSpecification {
         output.push_str(&"─".repeat(70));
         output.push('\n');
         for entry in &self.safety {
-            output.push_str(&format!("[{}] {}: {}\n",
-                                     entry.residual_risk.as_str(),
-                                     entry.category,
-                                     entry.hazard));
+            output.push_str(&format!(
+                "[{}] {}: {}\n",
+                entry.residual_risk.as_str(),
+                entry.category,
+                entry.hazard
+            ));
             output.push_str(&format!("    Mitigation: {}\n", entry.mitigation));
         }
         output.push('\n');

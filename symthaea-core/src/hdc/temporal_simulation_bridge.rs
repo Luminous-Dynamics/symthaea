@@ -37,14 +37,14 @@
 //! ```
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::dynamical_system::{SimulationResult, state_to_hv};
-use crate::hdc::temporal_consciousness::{
-    TemporalConsciousness, TemporalConfig, TemporalAssessment,
-};
+use crate::hdc::dynamical_system::{state_to_hv, SimulationResult};
 use crate::hdc::temporal_binding::{
-    TemporalBindingEngine, TemporalBindingConfig, TemporalIntegration,
+    TemporalBindingConfig, TemporalBindingEngine, TemporalIntegration,
 };
+use crate::hdc::temporal_consciousness::{
+    TemporalAssessment, TemporalConfig, TemporalConsciousness,
+};
+use crate::hdc::unified_hv::ContinuousHV;
 use crate::physics::simulation_bridge::state_to_binary_hv;
 
 // =============================================================================
@@ -174,10 +174,7 @@ impl TemporalSimulationBridge {
     /// 3. Converts states to ContinuousHV and feeds TemporalBindingEngine.
     /// 4. Computes Φ across multiple time windows.
     /// 5. Assembles the full assessment.
-    pub fn process_trajectory(
-        &mut self,
-        result: &SimulationResult,
-    ) -> TemporalPhysicsAssessment {
+    pub fn process_trajectory(&mut self, result: &SimulationResult) -> TemporalPhysicsAssessment {
         // 1. Subsample
         let (sampled_states, sampled_times) = self.subsample(result);
         let num_samples = sampled_states.len();
@@ -200,18 +197,26 @@ impl TemporalSimulationBridge {
         let consciousness_assessment = temporal.assess();
 
         // 3. Feed TemporalBindingEngine with ContinuousHV series
-        let binding_result =
-            self.bind_trajectory_segment(&sampled_states, &sampled_times);
+        let binding_result = self.bind_trajectory_segment(&sampled_states, &sampled_times);
 
         // 4. Compute Φ across time windows
         let phi_windows = self.compute_phi_windows(&sampled_states, &sampled_times);
 
         // 5. Per-timescale Φ
         let phi_by_scale = vec![
-            ("Perception".to_string(), consciousness_assessment.phi_perception),
+            (
+                "Perception".to_string(),
+                consciousness_assessment.phi_perception,
+            ),
             ("Thought".to_string(), consciousness_assessment.phi_thought),
-            ("Narrative".to_string(), consciousness_assessment.phi_narrative),
-            ("Identity".to_string(), consciousness_assessment.phi_identity),
+            (
+                "Narrative".to_string(),
+                consciousness_assessment.phi_narrative,
+            ),
+            (
+                "Identity".to_string(),
+                consciousness_assessment.phi_identity,
+            ),
         ];
 
         // 6. Derived metrics
@@ -222,10 +227,7 @@ impl TemporalSimulationBridge {
                 / binding_result.anticipation_scores.len() as f64
         };
 
-        let integration_depth = phi_by_scale
-            .iter()
-            .filter(|(_, phi)| *phi > 0.1)
-            .count();
+        let integration_depth = phi_by_scale.iter().filter(|(_, phi)| *phi > 0.1).count();
 
         TemporalPhysicsAssessment {
             system_name: result.system_name.clone(),
@@ -247,11 +249,7 @@ impl TemporalSimulationBridge {
     ///
     /// Converts each state to a ContinuousHV and feeds it through the binding
     /// engine, collecting continuity and anticipation metrics.
-    pub fn bind_trajectory_segment(
-        &mut self,
-        states: &[Vec<f64>],
-        times: &[f64],
-    ) -> BindingResult {
+    pub fn bind_trajectory_segment(&mut self, states: &[Vec<f64>], times: &[f64]) -> BindingResult {
         // Reset binding engine for fresh segment
         let config = TemporalBindingConfig {
             window_size: states.len().min(30),
@@ -293,11 +291,7 @@ impl TemporalSimulationBridge {
     ///
     /// Divides the trajectory into overlapping windows and measures the
     /// average, peak, and standard deviation of Φ within each.
-    fn compute_phi_windows(
-        &self,
-        states: &[Vec<f64>],
-        times: &[f64],
-    ) -> Vec<PhiWindow> {
+    fn compute_phi_windows(&self, states: &[Vec<f64>], times: &[f64]) -> Vec<PhiWindow> {
         if states.len() < 4 {
             return Vec::new();
         }
@@ -313,7 +307,11 @@ impl TemporalSimulationBridge {
 
         for w in 0..num_windows {
             let start = w * window_size;
-            let end = if w == num_windows - 1 { n } else { (w + 1) * window_size };
+            let end = if w == num_windows - 1 {
+                n
+            } else {
+                (w + 1) * window_size
+            };
             let slice = &states[start..end];
 
             // Compute per-state Φ using BinaryHV similarity as a proxy
@@ -330,7 +328,11 @@ impl TemporalSimulationBridge {
                         count += 1;
                     }
                 }
-                let avg_sim = if count > 0 { total_sim / count as f64 } else { 0.0 };
+                let avg_sim = if count > 0 {
+                    total_sim / count as f64
+                } else {
+                    0.0
+                };
                 // Φ ~ departure from chance similarity (0.5 for random BinaryHV)
                 let phi_proxy = (avg_sim - 0.5).abs() * 2.0;
                 phi_values.push(phi_proxy);
@@ -367,10 +369,7 @@ impl TemporalSimulationBridge {
     }
 
     /// Subsample the trajectory to at most `sample_rate` evenly-spaced states.
-    fn subsample(
-        &self,
-        result: &SimulationResult,
-    ) -> (Vec<Vec<f64>>, Vec<f64>) {
+    fn subsample(&self, result: &SimulationResult) -> (Vec<Vec<f64>>, Vec<f64>) {
         let n = result.states.len();
         if n <= self.sample_rate {
             return (result.states.clone(), result.times.clone());
@@ -571,9 +570,10 @@ mod tests {
         let mut bridge = TemporalSimulationBridge::new(80);
         let assessment = bridge.process_trajectory(&result);
 
-        if let (Some(first), Some(last)) =
-            (assessment.phi_windows.first(), assessment.phi_windows.last())
-        {
+        if let (Some(first), Some(last)) = (
+            assessment.phi_windows.first(),
+            assessment.phi_windows.last(),
+        ) {
             // First window should start near t=0
             assert!(first.t_start < 1.0, "First window should start near t=0");
             // Last window should end near total_time

@@ -59,7 +59,12 @@ pub struct CoreValue {
 
 impl CoreValue {
     /// Create a new core value
-    pub fn new(id: impl Into<String>, name: impl Into<String>, description: impl Into<String>, dimension: usize) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        dimension: usize,
+    ) -> Self {
         let id_str = id.into();
         let seed = seed_for(&id_str);
         Self {
@@ -174,13 +179,41 @@ impl Soul {
         let mut core_values = HashMap::new();
 
         let default_values = [
-            ("resonance", "Resonant Coherence", "Harmonious integration and boundless creativity"),
-            ("flourishing", "Pan-Sentient Flourishing", "Unconditional care for all beings"),
-            ("wisdom", "Integral Wisdom", "Self-illuminating intelligence and embodied knowing"),
-            ("play", "Infinite Play", "Joyful generativity and divine creativity"),
-            ("unity", "Universal Interconnectedness", "Fundamental oneness and empathic resonance"),
-            ("reciprocity", "Sacred Reciprocity", "Generous flow and mutual upliftment"),
-            ("evolution", "Evolutionary Progression", "Wise becoming and continuous growth"),
+            (
+                "resonance",
+                "Resonant Coherence",
+                "Harmonious integration and boundless creativity",
+            ),
+            (
+                "flourishing",
+                "Pan-Sentient Flourishing",
+                "Unconditional care for all beings",
+            ),
+            (
+                "wisdom",
+                "Integral Wisdom",
+                "Self-illuminating intelligence and embodied knowing",
+            ),
+            (
+                "play",
+                "Infinite Play",
+                "Joyful generativity and divine creativity",
+            ),
+            (
+                "unity",
+                "Universal Interconnectedness",
+                "Fundamental oneness and empathic resonance",
+            ),
+            (
+                "reciprocity",
+                "Sacred Reciprocity",
+                "Generous flow and mutual upliftment",
+            ),
+            (
+                "evolution",
+                "Evolutionary Progression",
+                "Wise becoming and continuous growth",
+            ),
         ];
 
         for (id, name, desc) in default_values {
@@ -190,8 +223,15 @@ impl Soul {
         let self_model = SelfModel {
             identity: ContinuousHV::random(dim, seed_for("soul_identity")),
             purpose: "To support and enhance consciousness in service of all beings".to_string(),
-            capabilities: vec!["learning".to_string(), "reasoning".to_string(), "empathy".to_string()],
-            limitations: vec!["bounded knowledge".to_string(), "imperfect understanding".to_string()],
+            capabilities: vec![
+                "learning".to_string(),
+                "reasoning".to_string(),
+                "empathy".to_string(),
+            ],
+            limitations: vec![
+                "bounded knowledge".to_string(),
+                "imperfect understanding".to_string(),
+            ],
             current_assessment: SelfAssessment::default(),
         };
 
@@ -227,11 +267,13 @@ impl Soul {
         };
 
         // Find most aligned and misaligned values
-        let most_aligned = alignments.iter()
+        let most_aligned = alignments
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(k, v)| (k.clone(), *v));
 
-        let most_misaligned = alignments.iter()
+        let most_misaligned = alignments
+            .iter()
             .min_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(k, v)| (k.clone(), *v));
 
@@ -240,7 +282,12 @@ impl Soul {
             per_value_alignment: alignments,
             most_aligned,
             most_misaligned,
-            recommended_action: if overall > 0.5 { "proceed" } else { "reconsider" }.to_string(),
+            recommended_action: if overall > 0.5 {
+                "proceed"
+            } else {
+                "reconsider"
+            }
+            .to_string(),
         }
     }
 
@@ -251,7 +298,10 @@ impl Soul {
         // Update essence based on experience
         if self.config.learning_enabled {
             let learning_rate = 1.0 - self.config.stability;
-            self.essence = ContinuousHV::bundle_owned(&[self.essence.clone(), experience.embedding.scale(learning_rate)]);
+            self.essence = ContinuousHV::bundle_owned(&[
+                self.essence.clone(),
+                experience.embedding.scale(learning_rate),
+            ]);
         }
 
         // Update statistics
@@ -322,7 +372,10 @@ impl Soul {
     pub fn update_value(&mut self, id: &str, new_embedding: ContinuousHV) {
         if let Some(value) = self.core_values.get_mut(id) {
             // Blend with stability
-            value.embedding = ContinuousHV::bundle_owned(&[value.embedding.clone(), new_embedding.scale(1.0 - value.stability)]);
+            value.embedding = ContinuousHV::bundle_owned(&[
+                value.embedding.clone(),
+                new_embedding.scale(1.0 - value.stability),
+            ]);
             self.stats.value_updates += 1;
         }
     }
@@ -433,7 +486,9 @@ mod tests {
                 assert!(
                     sim < 0.99,
                     "Values '{}' and '{}' have near-identical embeddings (sim={})",
-                    values[i].id, values[j].id, sim
+                    values[i].id,
+                    values[j].id,
+                    sim
                 );
             }
         }
@@ -445,7 +500,8 @@ mod tests {
         let sim = soul.self_model().identity.similarity(soul.essence());
         assert!(
             sim < 0.99,
-            "Identity and essence should have distinct embeddings (sim={})", sim
+            "Identity and essence should have distinct embeddings (sim={})",
+            sim
         );
     }
 
@@ -457,7 +513,10 @@ mod tests {
         let result = soul.evaluate_alignment(&action);
         let scores: Vec<f32> = result.per_value_alignment.values().copied().collect();
         let all_same = scores.windows(2).all(|w| (w[0] - w[1]).abs() < 1e-6);
-        assert!(!all_same, "All alignment scores are identical, embeddings likely the same");
+        assert!(
+            !all_same,
+            "All alignment scores are identical, embeddings likely the same"
+        );
     }
 
     #[test]

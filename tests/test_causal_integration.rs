@@ -9,9 +9,8 @@
 //! - Grid search threshold tuning
 
 use symthaea::intelligence::{
-    CausalDiscoveryEngine, CausalDirection,
-    CausalConsciousness, CausalAttention, CausalLTCBridge,
-    NixOSCausalAnalyzer, ThresholdTuner, RandomThresholdSearch,
+    CausalAttention, CausalConsciousness, CausalDirection, CausalDiscoveryEngine, CausalLTCBridge,
+    NixOSCausalAnalyzer, RandomThresholdSearch, ThresholdTuner,
 };
 
 // ============================================================================
@@ -23,9 +22,7 @@ fn test_causal_discovery_with_hdc_signals() {
     // Simulate HDC signals with causal structure
     // Signal A causes signal B through a nonlinear transformation
     let signal_a: Vec<f64> = (0..200).map(|i| (i as f64 * 0.1).sin()).collect();
-    let signal_b: Vec<f64> = signal_a.iter()
-        .map(|&a| (a * 2.0).tanh() + 0.05)
-        .collect();
+    let signal_b: Vec<f64> = signal_a.iter().map(|&a| (a * 2.0).tanh() + 0.05).collect();
 
     let mut engine = CausalDiscoveryEngine::with_ensemble_size(42, 5);
 
@@ -56,7 +53,11 @@ fn test_causal_attention_multiple_layers() {
 
     println!("Causal attention matrix (5 HDC layers):");
     for (i, row) in weights.iter().enumerate() {
-        println!("  Layer {} -> {:?}", i, row.iter().map(|v| format!("{:.2}", v)).collect::<Vec<_>>());
+        println!(
+            "  Layer {} -> {:?}",
+            i,
+            row.iter().map(|v| format!("{:.2}", v)).collect::<Vec<_>>()
+        );
     }
 
     // Check attention matrix is valid
@@ -65,7 +66,11 @@ fn test_causal_attention_multiple_layers() {
         assert_eq!(row.len(), 5);
         // Softmax should sum to ~1
         let sum: f64 = row.iter().sum();
-        assert!((sum - 1.0).abs() < 0.01, "Attention should sum to 1, got {}", sum);
+        assert!(
+            (sum - 1.0).abs() < 0.01,
+            "Attention should sum to 1, got {}",
+            sum
+        );
     }
 
     // Check that we can identify causes
@@ -141,7 +146,10 @@ fn test_nixos_causal_analyzer_full_workflow() {
     let edges = analyzer.discover_structure();
     println!("Discovered causal edges: {}", edges.len());
     for edge in &edges {
-        println!("  {} -> {} (confidence: {:.2})", edge.from, edge.to, edge.confidence);
+        println!(
+            "  {} -> {} (confidence: {:.2})",
+            edge.from, edge.to, edge.confidence
+        );
     }
 
     // Analyze root causes of display manager issues
@@ -149,7 +157,10 @@ fn test_nixos_causal_analyzer_full_workflow() {
     println!("\nRoot cause analysis for display manager:");
     println!("  Symptom: {}", analysis.symptom);
     for cause in &analysis.root_causes {
-        println!("  Root cause: {} (confidence: {:.2})", cause.variable, cause.confidence);
+        println!(
+            "  Root cause: {} (confidence: {:.2})",
+            cause.variable, cause.confidence
+        );
         println!("    Explanation: {}", cause.explanation);
     }
 
@@ -157,8 +168,10 @@ fn test_nixos_causal_analyzer_full_workflow() {
     let effects = analyzer.predict_side_effects("hardware.nvidia.enable");
     println!("\nSide effects of changing NVIDIA:");
     for effect in &effects {
-        println!("  {} will {} (confidence: {:.2})",
-            effect.affected_variable, effect.direction, effect.confidence);
+        println!(
+            "  {} will {} (confidence: {:.2})",
+            effect.affected_variable, effect.direction, effect.confidence
+        );
     }
 
     // Get fix recommendations
@@ -230,9 +243,16 @@ fn test_threshold_tuner_with_hdc_data() {
     println!("  Best noise threshold: {:.2}", result.noise_threshold);
     println!("  Best nonlin threshold: {:.2}", result.nonlin_threshold);
     println!("  Best corr threshold: {:.2}", result.corr_threshold);
-    println!("  Best kurtosis threshold: {:.2}", result.kurtosis_threshold);
-    println!("  Accuracy: {:.1}% ({}/{})",
-        result.accuracy * 100.0, result.n_correct, result.n_total);
+    println!(
+        "  Best kurtosis threshold: {:.2}",
+        result.kurtosis_threshold
+    );
+    println!(
+        "  Accuracy: {:.1}% ({}/{})",
+        result.accuracy * 100.0,
+        result.n_correct,
+        result.n_total
+    );
 
     assert!(result.n_total == 30);
 }
@@ -270,9 +290,7 @@ fn test_full_causal_consciousness_workflow() {
 
     // Simulate consciousness signals with causal structure
     let sensory: Vec<f64> = (0..150).map(|i| (i as f64 * 0.1).sin()).collect();
-    let cognitive: Vec<f64> = sensory.iter()
-        .map(|&s| (s * 1.5).tanh())
-        .collect();
+    let cognitive: Vec<f64> = sensory.iter().map(|&s| (s * 1.5).tanh()).collect();
 
     // Full analysis
     let result = cc.analyze(&sensory, &cognitive);
@@ -283,7 +301,10 @@ fn test_full_causal_consciousness_workflow() {
     println!("  HSIC dependence: {:.4}", result.hsic_dependence);
     println!("  Is independent: {}", result.is_independent);
     println!("  P-value: {:.4}", result.p_value);
-    println!("  Residual independence: {:.4}", result.residual_independence);
+    println!(
+        "  Residual independence: {:.4}",
+        result.residual_independence
+    );
 
     // Provide feedback to improve
     cc.learn(&sensory, &cognitive, CausalDirection::Forward);
@@ -293,8 +314,14 @@ fn test_full_causal_consciousness_workflow() {
     println!("\nSystem stats after learning:");
     println!("  N predictions: {}", stats.n_predictions);
     println!("  Accuracy: {:.1}%", stats.accuracy * 100.0);
-    println!("  Learned noise threshold: {:.2}", stats.learned_noise_threshold);
-    println!("  Learned corr threshold: {:.2}", stats.learned_corr_threshold);
+    println!(
+        "  Learned noise threshold: {:.2}",
+        stats.learned_noise_threshold
+    );
+    println!(
+        "  Learned corr threshold: {:.2}",
+        stats.learned_corr_threshold
+    );
 
     // Validate confidence bounds
     assert!(result.confidence >= 0.0 && result.confidence <= 1.0);
@@ -320,5 +347,8 @@ fn test_causal_discovery_parallel_mode() {
     println!("  Confidence: {:.2}%", confidence * 100.0);
 
     // Should complete quickly
-    assert!(elapsed.as_millis() < 5000, "Parallel prediction should be fast");
+    assert!(
+        elapsed.as_millis() < 5000,
+        "Parallel prediction should be fast"
+    );
 }

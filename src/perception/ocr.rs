@@ -198,7 +198,8 @@ impl TesseractEngine {
         let out_base = temp_dir.join(format!("symthaea_ocr_{}_out", std::process::id()));
 
         // Save image as PNG
-        image.save(&img_path)
+        image
+            .save(&img_path)
             .context("Failed to save temporary image for OCR")?;
 
         // Run tesseract with TSV output for confidence scores
@@ -225,8 +226,7 @@ impl TesseractEngine {
 
         // Read TSV output
         let tsv_path = out_base.with_extension("tsv");
-        let tsv_content = std::fs::read_to_string(&tsv_path)
-            .unwrap_or_default();
+        let tsv_content = std::fs::read_to_string(&tsv_path).unwrap_or_default();
         let _ = std::fs::remove_file(&tsv_path);
 
         // Parse TSV for text and confidence
@@ -235,7 +235,8 @@ impl TesseractEngine {
         let mut word_count: usize = 0;
         let mut words: Vec<OcrWord> = Vec::new();
 
-        for line in tsv_content.lines().skip(1) { // Skip header
+        for line in tsv_content.lines().skip(1) {
+            // Skip header
             let cols: Vec<&str> = line.split('\t').collect();
             if cols.len() >= 12 {
                 let word_text = cols[11].trim();
@@ -313,7 +314,8 @@ impl OcrSystem {
     /// Initialize the OCR system
     pub fn initialize(&mut self) -> Result<()> {
         // Initialize Rust OCR
-        self.rust_ocr.initialize()
+        self.rust_ocr
+            .initialize()
             .context("Failed to initialize Rust OCR engine")?;
 
         // Check if Tesseract is available (optional)
@@ -335,9 +337,11 @@ impl OcrSystem {
         // Calculate contrast (std deviation of pixel values)
         let pixels: Vec<u8> = gray.pixels().map(|p| p[0]).collect();
         let mean: f32 = pixels.iter().map(|&p| p as f32).sum::<f32>() / pixels.len() as f32;
-        let variance: f32 = pixels.iter()
+        let variance: f32 = pixels
+            .iter()
             .map(|&p| (p as f32 - mean).powi(2))
-            .sum::<f32>() / pixels.len() as f32;
+            .sum::<f32>()
+            / pixels.len() as f32;
         let std_dev = variance.sqrt();
 
         // Good contrast: std dev > 30 (on 0-255 scale)
@@ -542,7 +546,10 @@ mod tests {
         }
 
         let quality = ocr.assess_quality(&DynamicImage::ImageRgb8(high_contrast));
-        assert!(quality.contrast_ok, "High contrast image should have good contrast");
+        assert!(
+            quality.contrast_ok,
+            "High contrast image should have good contrast"
+        );
     }
 
     #[test]

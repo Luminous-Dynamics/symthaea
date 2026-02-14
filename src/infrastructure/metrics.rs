@@ -74,7 +74,7 @@ pub struct MetricsCollector {
 
     /// Request counters
     requests_total: AtomicU64,
-    #[allow(dead_code)]  // Reserved for per-type metrics dashboard
+    #[allow(dead_code)] // Reserved for per-type metrics dashboard
     requests_by_type: HashMap<String, AtomicU64>,
 
     /// Execution metrics
@@ -124,12 +124,11 @@ impl AtomicF64 {
         loop {
             let current = self.0.load(Ordering::Relaxed);
             let new = f64::from_bits(current) + val;
-            if self.0.compare_exchange_weak(
-                current,
-                new.to_bits(),
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ).is_ok() {
+            if self
+                .0
+                .compare_exchange_weak(current, new.to_bits(), Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
                 break;
             }
         }
@@ -352,7 +351,10 @@ impl MetricsCollector {
             "symthaea_executions_vetoed_total",
             "Commands vetoed by safety system",
             MetricType::Counter,
-            &[(vec![], self.executions_vetoed.load(Ordering::Relaxed) as f64)],
+            &[(
+                vec![],
+                self.executions_vetoed.load(Ordering::Relaxed) as f64,
+            )],
         );
 
         self.write_metric(
@@ -390,7 +392,10 @@ impl MetricsCollector {
             "symthaea_safety_scans_total",
             "Total safety scans performed",
             MetricType::Counter,
-            &[(vec![], self.safety_scans_total.load(Ordering::Relaxed) as f64)],
+            &[(
+                vec![],
+                self.safety_scans_total.load(Ordering::Relaxed) as f64,
+            )],
         );
 
         self.write_metric(
@@ -437,7 +442,10 @@ impl MetricsCollector {
             "symthaea_active_connections",
             "Number of active client connections",
             MetricType::Gauge,
-            &[(vec![], self.active_connections.load(Ordering::Relaxed) as f64)],
+            &[(
+                vec![],
+                self.active_connections.load(Ordering::Relaxed) as f64,
+            )],
         );
 
         output

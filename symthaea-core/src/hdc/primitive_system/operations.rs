@@ -9,8 +9,8 @@
 //! - Typed primitive operations (bind, bundle, analogy, permute, encode_sequence)
 //! - Default trait implementation
 
+use super::{LshIndex, Primitive, PrimitiveError, PrimitiveResult, PrimitiveSystem, PrimitiveTier};
 use crate::hdc::binary_hv::BinaryHV;
-use super::{PrimitiveSystem, PrimitiveTier, Primitive, PrimitiveResult, PrimitiveError, LshIndex};
 
 impl PrimitiveSystem {
     /// Get a primitive by name
@@ -20,8 +20,14 @@ impl PrimitiveSystem {
 
     /// Get all primitives in a tier
     pub fn get_tier(&self, tier: PrimitiveTier) -> Vec<&Primitive> {
-        self.by_tier.get(&tier)
-            .map(|names| names.iter().filter_map(|n| self.primitives.get(n)).collect())
+        self.by_tier
+            .get(&tier)
+            .map(|names| {
+                names
+                    .iter()
+                    .filter_map(|n| self.primitives.get(n))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -42,20 +48,20 @@ impl PrimitiveSystem {
     /// Returns pairs whose similarity deviates from 0.5 (random baseline) by
     /// more than `threshold`. With 16,384-bit vectors, expected deviation from
     /// 0.5 is ~0.008 (1 sigma) for random pairs, so threshold=0.03 is approx 4 sigma.
-    pub fn validate_tier_orthogonality(&self, tier: PrimitiveTier, threshold: f32) -> Vec<(String, String, f32)> {
+    pub fn validate_tier_orthogonality(
+        &self,
+        tier: PrimitiveTier,
+        threshold: f32,
+    ) -> Vec<(String, String, f32)> {
         let mut violations = Vec::new();
         let primitives = self.get_tier(tier);
 
         for i in 0..primitives.len() {
-            for j in (i+1)..primitives.len() {
+            for j in (i + 1)..primitives.len() {
                 let sim = primitives[i].encoding.similarity(&primitives[j].encoding);
                 let deviation = (sim - 0.5).abs();
                 if deviation > threshold {
-                    violations.push((
-                        primitives[i].name.clone(),
-                        primitives[j].name.clone(),
-                        sim
-                    ));
+                    violations.push((primitives[i].name.clone(), primitives[j].name.clone(), sim));
                 }
             }
         }
@@ -93,11 +99,16 @@ impl PrimitiveSystem {
             if !prim.is_base {
                 if let Some(ref derivation) = prim.derivation {
                     // Parse parent names from derivation expression (split on ^ or whitespace ops)
-                    let parent_names: Vec<&str> = derivation.split(['^', ' '])
+                    let parent_names: Vec<&str> = derivation
+                        .split(['^', ' '])
                         .map(|s| s.trim())
-                        .filter(|s| !s.is_empty() && s.chars().next().is_some_and(|c| c.is_uppercase()))
+                        .filter(|s| {
+                            !s.is_empty() && s.chars().next().is_some_and(|c| c.is_uppercase())
+                        })
                         .collect();
-                    let all_found = parent_names.iter().all(|p| self.primitives.contains_key(*p));
+                    let all_found = parent_names
+                        .iter()
+                        .all(|p| self.primitives.contains_key(*p));
                     if !all_found {
                         diagnostics.push((name.clone(), false, Some(derivation.clone())));
                     }
@@ -114,15 +125,21 @@ impl PrimitiveSystem {
         let mut results = Vec::new();
 
         for i in 0..domain_names.len() {
-            for j in (i+1)..domain_names.len() {
-                let prims_i: Vec<&Primitive> = self.primitives.values()
+            for j in (i + 1)..domain_names.len() {
+                let prims_i: Vec<&Primitive> = self
+                    .primitives
+                    .values()
                     .filter(|p| p.domain == domain_names[i])
                     .collect();
-                let prims_j: Vec<&Primitive> = self.primitives.values()
+                let prims_j: Vec<&Primitive> = self
+                    .primitives
+                    .values()
                     .filter(|p| p.domain == domain_names[j])
                     .collect();
 
-                if prims_i.is_empty() || prims_j.is_empty() { continue; }
+                if prims_i.is_empty() || prims_j.is_empty() {
+                    continue;
+                }
 
                 let mut total_sim = 0.0f32;
                 let mut count = 0u32;
@@ -141,8 +158,16 @@ impl PrimitiveSystem {
 
     /// Run all validation checks and return a summary.
     #[allow(clippy::type_complexity)]
-    pub fn validate_all(&self) -> (Vec<(String, bool, Option<String>)>, Vec<(String, String, f32)>) {
-        (self.validate_derivation_chain(), self.validate_domain_orthogonality())
+    pub fn validate_all(
+        &self,
+    ) -> (
+        Vec<(String, bool, Option<String>)>,
+        Vec<(String, String, f32)>,
+    ) {
+        (
+            self.validate_derivation_chain(),
+            self.validate_domain_orthogonality(),
+        )
     }
 
     // === COMPOSITIONAL OPERATOR EXECUTION (Tier 7) ===
@@ -243,7 +268,10 @@ impl PrimitiveSystem {
             report.push_str(&format!("- **Purpose**: {}\n\n", domain.purpose));
         }
 
-        report.push_str(&format!("\n## Binding Rules: {}\n\n", self.binding_rules.len()));
+        report.push_str(&format!(
+            "\n## Binding Rules: {}\n\n",
+            self.binding_rules.len()
+        ));
 
         report
     }
@@ -266,7 +294,8 @@ impl PrimitiveSystem {
             None => return Vec::new(),
         };
 
-        let mut similarities: Vec<(String, f32)> = self.primitives
+        let mut similarities: Vec<(String, f32)> = self
+            .primitives
             .iter()
             .filter(|(n, _)| *n != name)
             .map(|(n, p)| {
@@ -283,8 +312,13 @@ impl PrimitiveSystem {
     /// Find primitives most similar to a given encoding.
     ///
     /// Useful for finding matches to composed/derived encodings.
-    pub fn find_similar_to_encoding(&self, encoding: &BinaryHV, top_k: usize) -> Vec<(String, f32)> {
-        let mut similarities: Vec<(String, f32)> = self.primitives
+    pub fn find_similar_to_encoding(
+        &self,
+        encoding: &BinaryHV,
+        top_k: usize,
+    ) -> Vec<(String, f32)> {
+        let mut similarities: Vec<(String, f32)> = self
+            .primitives
             .iter()
             .map(|(n, p)| {
                 let sim = encoding.similarity(&p.encoding);
@@ -447,10 +481,7 @@ impl PrimitiveSystem {
     }
 
     /// Batch bundle multiple primitive groups.
-    pub fn batch_bundle(
-        &self,
-        groups: &[&[&str]],
-    ) -> Vec<Result<PrimitiveResult, PrimitiveError>> {
+    pub fn batch_bundle(&self, groups: &[&[&str]]) -> Vec<Result<PrimitiveResult, PrimitiveError>> {
         groups
             .iter()
             .map(|names| self.bundle_primitives(names))
@@ -519,9 +550,13 @@ impl PrimitiveSystem {
     /// two concepts. In HDC, bind(A, B) creates a vector orthogonal to both
     /// A and B but can be "unbound" by either to recover the other.
     pub fn bind_primitives(&self, a: &str, b: &str) -> Result<PrimitiveResult, PrimitiveError> {
-        let prim_a = self.primitives.get(a)
+        let prim_a = self
+            .primitives
+            .get(a)
             .ok_or_else(|| PrimitiveError::NotFound(a.to_string()))?;
-        let prim_b = self.primitives.get(b)
+        let prim_b = self
+            .primitives
+            .get(b)
             .ok_or_else(|| PrimitiveError::NotFound(b.to_string()))?;
 
         let encoding = prim_a.encoding.bind(&prim_b.encoding);
@@ -542,7 +577,9 @@ impl PrimitiveSystem {
 
         let mut encodings = Vec::with_capacity(names.len());
         for name in names {
-            let prim = self.primitives.get(*name)
+            let prim = self
+                .primitives
+                .get(*name)
                 .ok_or_else(|| PrimitiveError::NotFound(name.to_string()))?;
             encodings.push(prim.encoding);
         }
@@ -560,7 +597,10 @@ impl PrimitiveSystem {
     ///
     /// Higher weights make that primitive more dominant in the result.
     /// Uses probabilistic bit selection based on weights.
-    pub fn bundle_weighted(&self, weighted: &[(&str, f32)]) -> Result<PrimitiveResult, PrimitiveError> {
+    pub fn bundle_weighted(
+        &self,
+        weighted: &[(&str, f32)],
+    ) -> Result<PrimitiveResult, PrimitiveError> {
         if weighted.is_empty() {
             return Err(PrimitiveError::EmptyInput);
         }
@@ -575,7 +615,9 @@ impl PrimitiveSystem {
         let mut weights = Vec::with_capacity(weighted.len());
 
         for (name, weight) in weighted {
-            let prim = self.primitives.get(*name)
+            let prim = self
+                .primitives
+                .get(*name)
                 .ok_or_else(|| PrimitiveError::NotFound(name.to_string()))?;
             encodings.push(prim.encoding);
             weights.push(*weight / total_weight);
@@ -606,8 +648,14 @@ impl PrimitiveSystem {
 
         Ok(PrimitiveResult {
             encoding,
-            operation: format!("bundle_weighted({})",
-                weighted.iter().map(|(n, w)| format!("{}:{:.2}", n, w)).collect::<Vec<_>>().join(", ")),
+            operation: format!(
+                "bundle_weighted({})",
+                weighted
+                    .iter()
+                    .map(|(n, w)| format!("{}:{:.2}", n, w))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
             source_primitives: names,
         })
     }
@@ -616,11 +664,17 @@ impl PrimitiveSystem {
     ///
     /// Uses the HDC analogy formula: result = bind(unbind(A, B), C)
     pub fn analogy(&self, a: &str, b: &str, c: &str) -> Result<PrimitiveResult, PrimitiveError> {
-        let prim_a = self.primitives.get(a)
+        let prim_a = self
+            .primitives
+            .get(a)
             .ok_or_else(|| PrimitiveError::NotFound(a.to_string()))?;
-        let prim_b = self.primitives.get(b)
+        let prim_b = self
+            .primitives
+            .get(b)
             .ok_or_else(|| PrimitiveError::NotFound(b.to_string()))?;
-        let prim_c = self.primitives.get(c)
+        let prim_c = self
+            .primitives
+            .get(c)
             .ok_or_else(|| PrimitiveError::NotFound(c.to_string()))?;
 
         // Analogy: A:B :: C:? => ? = bind(bind(A, B), C)
@@ -638,8 +692,14 @@ impl PrimitiveSystem {
     /// Permute a named primitive (cyclic rotation in BinaryHV space).
     ///
     /// Useful for encoding sequences or temporal relationships.
-    pub fn permute_primitive(&self, name: &str, steps: usize) -> Result<PrimitiveResult, PrimitiveError> {
-        let prim = self.primitives.get(name)
+    pub fn permute_primitive(
+        &self,
+        name: &str,
+        steps: usize,
+    ) -> Result<PrimitiveResult, PrimitiveError> {
+        let prim = self
+            .primitives
+            .get(name)
             .ok_or_else(|| PrimitiveError::NotFound(name.to_string()))?;
 
         let encoding = prim.encoding.permute(steps);
@@ -660,13 +720,17 @@ impl PrimitiveSystem {
             return Err(PrimitiveError::EmptyInput);
         }
 
-        let first = self.primitives.get(names[0])
+        let first = self
+            .primitives
+            .get(names[0])
             .ok_or_else(|| PrimitiveError::NotFound(names[0].to_string()))?;
 
         let mut encoding = first.encoding;
 
         for (i, name) in names.iter().enumerate().skip(1) {
-            let prim = self.primitives.get(*name)
+            let prim = self
+                .primitives
+                .get(*name)
                 .ok_or_else(|| PrimitiveError::NotFound(name.to_string()))?;
             let permuted = prim.encoding.permute(i);
             encoding = encoding.bind(&permuted);
@@ -682,7 +746,10 @@ impl PrimitiveSystem {
     /// Query what primitive best matches a given encoding.
     pub fn query(&self, encoding: &BinaryHV) -> (String, f32) {
         let matches = self.find_similar_to_encoding(encoding, 1);
-        matches.into_iter().next().unwrap_or_else(|| ("UNKNOWN".to_string(), 0.0))
+        matches
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| ("UNKNOWN".to_string(), 0.0))
     }
 }
 

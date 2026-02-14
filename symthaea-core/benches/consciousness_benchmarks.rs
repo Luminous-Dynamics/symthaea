@@ -104,7 +104,11 @@ fn bench_find_similar(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
             b.iter(|| {
-                let results = consciousness_perf::find_similar(black_box(&query), black_box(&candidates), 0.6);
+                let results = consciousness_perf::find_similar(
+                    black_box(&query),
+                    black_box(&candidates),
+                    0.6,
+                );
                 black_box(results);
             });
         });
@@ -118,8 +122,8 @@ fn bench_find_similar(c: &mut Criterion) {
 
 fn bench_subsystem_dispatch_overhead(c: &mut Criterion) {
     use symthaea_core::hdc::consciousness_metacognitive::MetacognitiveSubsystem;
-    use symthaea_core::hdc::consciousness_self_awareness::SelfAwarenessSubsystem;
     use symthaea_core::hdc::consciousness_phi_optimization::PhiOptimizationSubsystem;
+    use symthaea_core::hdc::consciousness_self_awareness::SelfAwarenessSubsystem;
 
     let mut group = c.benchmark_group("subsystem_dispatch");
     group.sample_size(10);

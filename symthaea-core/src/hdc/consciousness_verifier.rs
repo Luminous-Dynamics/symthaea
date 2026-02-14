@@ -23,12 +23,12 @@
 //! println!("Verdict: {:?}, Φ = {:.4}", report.verdict, report.consensus_phi);
 //! ```
 
-use std::time::Instant;
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 
-use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::consciousness_integration::ConsciousnessState;
-use crate::phi_engine::{PhiEngine, PhiMethod, ApproximationTier};
+use crate::hdc::unified_hv::ContinuousHV;
+use crate::phi_engine::{ApproximationTier, PhiEngine, PhiMethod};
 
 /// Consciousness verifier that cross-validates multiple Φ methods.
 #[derive(Debug, Clone)]
@@ -165,7 +165,11 @@ impl ConsciousnessVerifier {
 
         // Derive axiom scores from state properties
         let iit_axiom_scores = IITAxiomScores {
-            information: if consciousness_level > 0.1 { consciousness_level } else { 0.0 },
+            information: if consciousness_level > 0.1 {
+                consciousness_level
+            } else {
+                0.0
+            },
             integration: if phi > 0.0 { (phi / 0.5).min(1.0) } else { 0.0 },
             exclusion: state.topological_unity.min(1.0),
             composition: state.semantic_depth.min(1.0),
@@ -213,7 +217,10 @@ impl ConsciousnessVerifier {
     fn run_phi_methods(&self, hvs: &[ContinuousHV]) -> Vec<PhiMeasurement> {
         let methods: Vec<(&str, PhiMethod)> = vec![
             ("SpectralConnectivity", PhiMethod::SpectralConnectivity),
-            ("Tiered(Approximate)", PhiMethod::Tiered(ApproximationTier::RandomBaseline)),
+            (
+                "Tiered(Approximate)",
+                PhiMethod::Tiered(ApproximationTier::RandomBaseline),
+            ),
             ("Resonator", PhiMethod::Resonator),
         ];
 
@@ -269,10 +276,7 @@ impl ConsciousnessVerifier {
             return 0.0;
         }
 
-        let sum_sq: f64 = measurements
-            .iter()
-            .map(|m| (m.phi - mean).powi(2))
-            .sum();
+        let sum_sq: f64 = measurements.iter().map(|m| (m.phi - mean).powi(2)).sum();
 
         sum_sq / measurements.len() as f64
     }
@@ -366,8 +370,8 @@ impl ConsciousnessVerifier {
         // Composition = spread of similarities (not all the same).
         // If all pairs have similar similarity, there is no hierarchical structure.
         let mean: f64 = sims.iter().sum::<f64>() / sims.len() as f64;
-        let variance: f64 = sims.iter().map(|s| (s - mean).powi(2)).sum::<f64>()
-            / sims.len() as f64;
+        let variance: f64 =
+            sims.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / sims.len() as f64;
         let std_dev = variance.sqrt();
 
         // Some variance in similarities indicates hierarchical structure.
@@ -491,9 +495,9 @@ impl Default for ConsciousnessVerifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::unified_hv::ContinuousHV;
     use crate::hdc::consciousness_integration::ConsciousnessState;
     use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
+    use crate::hdc::unified_hv::ContinuousHV;
 
     // ── Helpers ────────────────────────────────────────────────────────
 
@@ -624,7 +628,11 @@ mod tests {
         // Identical HVs → low information
         let identical = identical_hvs(4, 256);
         let low_info = v.score_information(&identical);
-        assert!(low_info < 0.2, "Identical HVs should have low information score: {}", low_info);
+        assert!(
+            low_info < 0.2,
+            "Identical HVs should have low information score: {}",
+            low_info
+        );
 
         // Diverse HVs → high information
         let diverse = diverse_hvs(4, 256);
@@ -645,15 +653,27 @@ mod tests {
 
         // Phi = 0.25 → integration = 0.5
         let mid = v.score_integration(0.25);
-        assert!((mid - 0.5).abs() < 1e-9, "Expected 0.5 for phi=0.25, got {}", mid);
+        assert!(
+            (mid - 0.5).abs() < 1e-9,
+            "Expected 0.5 for phi=0.25, got {}",
+            mid
+        );
 
         // Phi = 0.5 → integration = 1.0
         let high = v.score_integration(0.5);
-        assert!((high - 1.0).abs() < 1e-9, "Expected 1.0 for phi=0.5, got {}", high);
+        assert!(
+            (high - 1.0).abs() < 1e-9,
+            "Expected 1.0 for phi=0.5, got {}",
+            high
+        );
 
         // Phi > 0.5 → clamped to 1.0
         let clamped = v.score_integration(0.8);
-        assert!((clamped - 1.0).abs() < 1e-9, "Expected 1.0 for phi=0.8, got {}", clamped);
+        assert!(
+            (clamped - 1.0).abs() < 1e-9,
+            "Expected 1.0 for phi=0.8, got {}",
+            clamped
+        );
     }
 
     #[test]
@@ -746,9 +766,21 @@ mod tests {
         let v = ConsciousnessVerifier::new();
 
         let measurements = vec![
-            PhiMeasurement { method: "SpectralConnectivity".to_string(), phi: 0.5, computation_time_ms: 10 },
-            PhiMeasurement { method: "Resonator".to_string(), phi: 0.4, computation_time_ms: 20 },
-            PhiMeasurement { method: "Tiered(Approximate)".to_string(), phi: 0.3, computation_time_ms: 5 },
+            PhiMeasurement {
+                method: "SpectralConnectivity".to_string(),
+                phi: 0.5,
+                computation_time_ms: 10,
+            },
+            PhiMeasurement {
+                method: "Resonator".to_string(),
+                phi: 0.4,
+                computation_time_ms: 20,
+            },
+            PhiMeasurement {
+                method: "Tiered(Approximate)".to_string(),
+                phi: 0.3,
+                computation_time_ms: 5,
+            },
         ];
 
         // Weights: SC=3, Res=2, Tiered=1 → (0.5*3 + 0.4*2 + 0.3*1) / 6 = 2.6/6 ≈ 0.4333
@@ -768,16 +800,36 @@ mod tests {
 
         // All same → 0 variance
         let same = vec![
-            PhiMeasurement { method: "A".to_string(), phi: 0.3, computation_time_ms: 0 },
-            PhiMeasurement { method: "B".to_string(), phi: 0.3, computation_time_ms: 0 },
-            PhiMeasurement { method: "C".to_string(), phi: 0.3, computation_time_ms: 0 },
+            PhiMeasurement {
+                method: "A".to_string(),
+                phi: 0.3,
+                computation_time_ms: 0,
+            },
+            PhiMeasurement {
+                method: "B".to_string(),
+                phi: 0.3,
+                computation_time_ms: 0,
+            },
+            PhiMeasurement {
+                method: "C".to_string(),
+                phi: 0.3,
+                computation_time_ms: 0,
+            },
         ];
         assert!((v.compute_variance(&same, 0.3)).abs() < 1e-10);
 
         // Different values → nonzero variance
         let diff = vec![
-            PhiMeasurement { method: "A".to_string(), phi: 0.1, computation_time_ms: 0 },
-            PhiMeasurement { method: "B".to_string(), phi: 0.5, computation_time_ms: 0 },
+            PhiMeasurement {
+                method: "A".to_string(),
+                phi: 0.1,
+                computation_time_ms: 0,
+            },
+            PhiMeasurement {
+                method: "B".to_string(),
+                phi: 0.5,
+                computation_time_ms: 0,
+            },
         ];
         let var = v.compute_variance(&diff, 0.3);
         assert!(var > 0.0, "Expected nonzero variance, got {}", var);

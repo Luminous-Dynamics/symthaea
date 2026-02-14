@@ -8,17 +8,17 @@
 //! Returns `Identified`, `Unidentified`, or `AssumptionRequired` — never overclaims.
 
 pub mod dag;
-pub mod reasoner;
+pub mod discovery;
 pub mod estimation;
 pub mod id_algorithm;
-pub mod discovery;
+pub mod reasoner;
 
 #[cfg(test)]
 mod tests;
 
 // Re-export everything for backward compatibility
 pub use dag::*;
-pub use reasoner::*;
+pub use discovery::*;
 pub use estimation::*;
 pub use id_algorithm::*;
-pub use discovery::*;
+pub use reasoner::*;

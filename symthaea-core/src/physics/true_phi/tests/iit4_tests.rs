@@ -9,12 +9,20 @@ fn test_iit4_intrinsic_difference() {
     // Same vector should have zero intrinsic difference
     let a = ContinuousHV::random(HDC_DIMENSION, 1);
     let id_same = calc.intrinsic_difference(&a, &a);
-    assert!(id_same < 0.01, "Same vector should have near-zero id: {:.6}", id_same);
+    assert!(
+        id_same < 0.01,
+        "Same vector should have near-zero id: {:.6}",
+        id_same
+    );
 
     // Different vectors should have positive id
     let b = ContinuousHV::random(HDC_DIMENSION, 2);
     let id_diff = calc.intrinsic_difference(&a, &b);
-    assert!(id_diff >= 0.0, "Different vectors should have non-negative id: {:.6}", id_diff);
+    assert!(
+        id_diff >= 0.0,
+        "Different vectors should have non-negative id: {:.6}",
+        id_diff
+    );
 }
 
 #[test]
@@ -51,7 +59,10 @@ fn test_iit4_analyze() {
     println!("  Intrinsic Difference: {:.6}", result.intrinsic_difference);
     println!("  Small \u{03c6} (avg): {:.6}", result.small_phi);
     println!("  Big \u{03a6}: {:.6}", result.big_phi);
-    println!("  Intrinsic Information: {:.6}", result.intrinsic_information);
+    println!(
+        "  Intrinsic Information: {:.6}",
+        result.intrinsic_information
+    );
     println!("  Concept Count: {}", result.concept_count);
 }
 
@@ -70,7 +81,7 @@ fn test_iit4_correlated_higher_phi() {
         .map(|i| {
             ContinuousHV::weighted_bundle(
                 &[&base, &ContinuousHV::random(HDC_DIMENSION, 100 + i)],
-                &[0.8, 0.2]
+                &[0.8, 0.2],
             )
         })
         .collect();
@@ -79,6 +90,8 @@ fn test_iit4_correlated_higher_phi() {
     let cor_result = calc.analyze(&correlated);
 
     // Correlated should generally have higher Φ
-    println!("IIT 4.0 - Independent \u{03a6}: {:.6}, Correlated \u{03a6}: {:.6}",
-        ind_result.big_phi, cor_result.big_phi);
+    println!(
+        "IIT 4.0 - Independent \u{03a6}: {:.6}, Correlated \u{03a6}: {:.6}",
+        ind_result.big_phi, cor_result.big_phi
+    );
 }

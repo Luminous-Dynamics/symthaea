@@ -34,7 +34,7 @@ use anyhow::Result;
 use symthaea::perception::bge_m3::{BgeM3, BGE_M3_DIM};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -83,9 +83,11 @@ fn run_training() -> Result<()> {
         .iter()
         .map(|concept| encoder.encode(concept))
         .collect::<Result<Vec<_>>>()?;
-    println!("  Extracted {} embeddings in {:.2}s\n",
-             embeddings.len(),
-             extract_start.elapsed().as_secs_f64());
+    println!(
+        "  Extracted {} embeddings in {:.2}s\n",
+        embeddings.len(),
+        extract_start.elapsed().as_secs_f64()
+    );
 
     // Generate target HDC vectors
     println!("Generating target HDC vectors...");
@@ -113,9 +115,12 @@ fn run_training() -> Result<()> {
     println!("Initializing weights...");
     let mut weights = initialize_weights(BGE_M3_DIM, HDC_DIMENSION);
     let mut velocity = vec![0.0f32; BGE_M3_DIM * HDC_DIMENSION];
-    println!("  Weight matrix: {}x{} ({:.2}MB)\n",
-             HDC_DIMENSION, BGE_M3_DIM,
-             (weights.len() * 4) as f64 / 1_000_000.0);
+    println!(
+        "  Weight matrix: {}x{} ({:.2}MB)\n",
+        HDC_DIMENSION,
+        BGE_M3_DIM,
+        (weights.len() * 4) as f64 / 1_000_000.0
+    );
 
     // Training loop
     println!("================================================================");
@@ -144,7 +149,11 @@ fn run_training() -> Result<()> {
             let elapsed = train_start.elapsed().as_secs_f64();
             println!(
                 "Epoch {:4}/{}: train_loss={:.6}, val_loss={:.6}, elapsed={:.1}s",
-                epoch + 1, config.epochs, train_loss, val_loss, elapsed
+                epoch + 1,
+                config.epochs,
+                train_loss,
+                val_loss,
+                elapsed
             );
         }
 
@@ -154,7 +163,10 @@ fn run_training() -> Result<()> {
         }
     }
 
-    println!("\nTraining completed in {:.1}s", train_start.elapsed().as_secs_f64());
+    println!(
+        "\nTraining completed in {:.1}s",
+        train_start.elapsed().as_secs_f64()
+    );
     println!("Best validation loss: {:.6}\n", best_val_loss);
 
     // Save weights
@@ -171,8 +183,16 @@ fn run_training() -> Result<()> {
     let final_val_loss = compute_loss(&weights, val_embeddings, val_targets);
 
     println!("Final losses:");
-    println!("  Training: {:.6} (cosine similarity: {:.4})", final_train_loss, 1.0 - final_train_loss);
-    println!("  Validation: {:.6} (cosine similarity: {:.4})", final_val_loss, 1.0 - final_val_loss);
+    println!(
+        "  Training: {:.6} (cosine similarity: {:.4})",
+        final_train_loss,
+        1.0 - final_train_loss
+    );
+    println!(
+        "  Validation: {:.6} (cosine similarity: {:.4})",
+        final_val_loss,
+        1.0 - final_val_loss
+    );
 
     // Test a few examples
     println!("\nSample projections:");
@@ -250,7 +270,8 @@ fn get_training_concepts() -> Vec<&'static str> {
 
 #[cfg(feature = "neural-bridge")]
 fn hash_concept(text: &str) -> u64 {
-    text.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
+    text.bytes()
+        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
 }
 
 #[cfg(feature = "neural-bridge")]
@@ -310,7 +331,11 @@ fn train_epoch(
             continue;
         }
 
-        let dot: f32 = projected.iter().zip(target.iter()).map(|(a, b)| a * b).sum();
+        let dot: f32 = projected
+            .iter()
+            .zip(target.iter())
+            .map(|(a, b)| a * b)
+            .sum();
 
         // Gradient: d(cos)/d(proj) = (target/|target| - proj*cos/(|proj|^2)) / |proj|
         let cos_sim = dot / (proj_norm * tgt_norm);

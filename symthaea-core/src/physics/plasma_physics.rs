@@ -23,10 +23,10 @@
 //! - Stellarator confinement
 //! - Inertial confinement
 
+use super::constants::{EPSILON_0, E_CHARGE, K_BOLTZMANN, M_ELECTRON};
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::{E_CHARGE, M_ELECTRON, EPSILON_0, K_BOLTZMANN};
 use serde::{Deserialize, Serialize};
 
 /// Plasma confinement scheme
@@ -80,11 +80,11 @@ impl Instability {
 /// Plasma wave type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PlasmaWave {
-    Langmuir,      // Electron plasma wave
-    IonAcoustic,   // Ion sound wave
-    Alfven,        // MHD wave along B
-    Magnetosonic,  // MHD compression wave
-    Whistler,      // Electron cyclotron wave
+    Langmuir,     // Electron plasma wave
+    IonAcoustic,  // Ion sound wave
+    Alfven,       // MHD wave along B
+    Magnetosonic, // MHD compression wave
+    Whistler,     // Electron cyclotron wave
 }
 
 impl PlasmaWave {
@@ -160,7 +160,7 @@ pub struct PlasmaEncoder {
     pub frozen_in: ContinuousHV,
     pub magnetic_pressure: ContinuousHV,
     pub magnetic_tension: ContinuousHV,
-    pub beta: ContinuousHV,  // Plasma beta = p_thermal / p_magnetic
+    pub beta: ContinuousHV, // Plasma beta = p_thermal / p_magnetic
 
     // Confinement
     pub confinement: ContinuousHV,
@@ -224,7 +224,7 @@ impl PlasmaEncoder {
 
     /// Calculate Debye length: λ_D = √(ε₀ k_B T / n e²)
     pub fn debye_length_m(&self, temp_ev: f64, density_m3: f64) -> f64 {
-        let temp_k = temp_ev * 11604.0;  // eV to Kelvin
+        let temp_k = temp_ev * 11604.0; // eV to Kelvin
         (EPSILON_0 * K_BOLTZMANN * temp_k / (density_m3 * E_CHARGE * E_CHARGE)).sqrt()
     }
 
@@ -252,11 +252,19 @@ impl PlasmaEncoder {
     }
 
     /// Create a plasma
-    pub fn create_plasma(&self, name: &str, density_m3: f64, temp_ev: f64, b_field_t: f64, _genesis: &GenesisSeed) -> Plasma {
+    pub fn create_plasma(
+        &self,
+        name: &str,
+        density_m3: f64,
+        temp_ev: f64,
+        b_field_t: f64,
+        _genesis: &GenesisSeed,
+    ) -> Plasma {
         let debye = self.debye_length_m(temp_ev, density_m3);
         let omega_p = self.plasma_frequency_rad_s(density_m3);
 
-        let vector = self.plasma
+        let vector = self
+            .plasma
             .bind(&self.ionized)
             .bind(&self.quasi_neutral)
             .scale((density_m3.log10() - 15.0) as f32);
@@ -293,11 +301,20 @@ impl PlasmaEncoder {
     }
 
     /// Create a fusion reactor
-    pub fn create_reactor(&self, name: &str, scheme: ConfinementScheme, temp_kev: f64, density_m3: f64, tau_s: f64, genesis: &GenesisSeed) -> FusionReactor {
+    pub fn create_reactor(
+        &self,
+        name: &str,
+        scheme: ConfinementScheme,
+        temp_kev: f64,
+        density_m3: f64,
+        tau_s: f64,
+        genesis: &GenesisSeed,
+    ) -> FusionReactor {
         let triple = self.triple_product(density_m3, temp_kev, tau_s);
         let scheme_vec = genesis.hv(scheme.domain(), PHYSICS_DIM);
 
-        let vector = self.fusion
+        let vector = self
+            .fusion
             .bind(&self.confinement)
             .bind(&scheme_vec)
             .scale(triple.log10() as f32);
@@ -330,7 +347,7 @@ impl PlasmaEncoder {
 
     /// Alfvén wave in plasma
     pub fn alfven_wave(&self, plasma: &Plasma, _genesis: &GenesisSeed) -> ContinuousHV {
-        let mass_density = plasma.density_m3 * 1.67e-27;  // Assume protons
+        let mass_density = plasma.density_m3 * 1.67e-27; // Assume protons
         let v_a = self.alfven_velocity(plasma.magnetic_field_t, mass_density);
 
         self.alfven_wave

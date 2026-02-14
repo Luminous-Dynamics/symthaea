@@ -22,16 +22,15 @@ use super::types::MultiTheoryMetrics;
 /// - `reliability`: R ∈ [0, 1], consensus among calibrated theories.
 /// - `gamma`: Sensitivity exponent ∈ [1.0, 4.0].
 pub fn effective_phi(phi: f64, reliability: f64, gamma: f64) -> f64 {
-    debug_assert!(
-        (1.0..=4.0).contains(&gamma),
-        "γ out of bounds: {}",
-        gamma
-    );
+    debug_assert!((1.0..=4.0).contains(&gamma), "γ out of bounds: {}", gamma);
     phi * reliability.powf(gamma)
 }
 
 /// Convenience: compute Φ_eff from metrics and a calibrator.
-pub fn compute_phi_eff(metrics: &MultiTheoryMetrics, calibrator: &TheoryCalibrator) -> PhiEffResult {
+pub fn compute_phi_eff(
+    metrics: &MultiTheoryMetrics,
+    calibrator: &TheoryCalibrator,
+) -> PhiEffResult {
     let reliability = calibrator.reliability(metrics);
     let gamma = calibrator.gamma();
     let phi_eff = effective_phi(metrics.phi, reliability, gamma);

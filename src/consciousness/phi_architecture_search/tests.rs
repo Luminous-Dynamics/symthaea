@@ -21,16 +21,16 @@ fn test_genome_mutation() {
     let mut genome = ArchitectureGenome::default();
     let original_density = genome.connection_density;
 
-    genome.mutate(1.0, 12345);  // High mutation rate
+    genome.mutate(1.0, 12345); // High mutation rate
 
     // At least some parameter should have changed
     // (with mutation rate 1.0, all parameters mutate)
     // Use epsilon-based comparison for floating-point values
     const EPSILON: f32 = 1e-9;
     assert!(
-        (genome.connection_density - original_density).abs() > EPSILON ||
-        genome.num_nodes != 16 ||
-        (genome.modularity - 0.5).abs() > EPSILON
+        (genome.connection_density - original_density).abs() > EPSILON
+            || genome.num_nodes != 16
+            || (genome.modularity - 0.5).abs() > EPSILON
     );
 }
 
@@ -42,17 +42,14 @@ fn test_genome_crossover() {
     let child = parent1.crossover(&parent2, 300);
 
     // Child should have values from one of the parents
-    assert!(
-        child.num_nodes == parent1.num_nodes ||
-        child.num_nodes == parent2.num_nodes
-    );
+    assert!(child.num_nodes == parent1.num_nodes || child.num_nodes == parent2.num_nodes);
 }
 
 #[test]
 fn test_decode_architecture() {
     let genome = ArchitectureGenome {
         num_nodes: 8,
-        hdc_dim: 256,  // Small for fast tests
+        hdc_dim: 256, // Small for fast tests
         ..Default::default()
     };
 
@@ -226,8 +223,8 @@ fn test_architecture_stats() {
     let stats = arch.stats();
 
     assert_eq!(stats.num_nodes, 10);
-    assert_eq!(stats.num_edges, 10);  // Ring has n edges
-    assert!((stats.avg_degree - 2.0).abs() < 0.1);  // Ring: each node has degree 2
+    assert_eq!(stats.num_edges, 10); // Ring has n edges
+    assert!((stats.avg_degree - 2.0).abs() < 0.1); // Ring: each node has degree 2
 }
 
 #[test]

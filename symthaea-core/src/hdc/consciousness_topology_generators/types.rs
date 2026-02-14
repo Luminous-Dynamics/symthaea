@@ -35,31 +35,31 @@ pub enum TopologyType {
     DenseNetwork,
     Modular,
     Lattice,
-    Sphere,          // 2-manifold: S²
-    Torus,           // 2-manifold: T²
-    KleinBottle,     // Non-orientable 2-manifold
+    Sphere,      // 2-manifold: S²
+    Torus,       // 2-manifold: T²
+    KleinBottle, // Non-orientable 2-manifold
     SmallWorld,
     MobiusStrip,
     Hyperbolic,
     ScaleFree,
-    Fractal,         // Tier 3: Generic fractal (deprecated - use specific types)
-    SierpinskiGasket,  // Tier 3: Fractal triangle (d≈1.585)
-    FractalTree,     // Tier 3: Self-similar hierarchical branching
-    KochSnowflake,   // Tier 3: Fractal curve (d≈1.262)
-    MengerSponge,    // Tier 3: 3D fractal (d≈2.727)
-    CantorSet,       // Tier 3: Disconnected fractal (d≈0.631)
-    Hypercube,       // Tier 3: 3D/4D/5D dimensional scaling
-    Quantum,         // Tier 3: Superposition of topologies
+    Fractal,          // Tier 3: Generic fractal (deprecated - use specific types)
+    SierpinskiGasket, // Tier 3: Fractal triangle (d≈1.585)
+    FractalTree,      // Tier 3: Self-similar hierarchical branching
+    KochSnowflake,    // Tier 3: Fractal curve (d≈1.262)
+    MengerSponge,     // Tier 3: 3D fractal (d≈2.727)
+    CantorSet,        // Tier 3: Disconnected fractal (d≈0.631)
+    Hypercube,        // Tier 3: 3D/4D/5D dimensional scaling
+    Quantum,          // Tier 3: Superposition of topologies
     // Tier 4: Extended topologies (Revolutionary #102)
-    CorticalColumn,  // 6-layer hierarchical (like mammalian cortex)
-    Feedforward,     // Layered neural network structure
-    Recurrent,       // Feedback loops (like RNNs)
-    Bipartite,       // Two-layer structure (like retina → V1)
-    CorePeriphery,   // Dense core, sparse periphery
-    BowTie,          // IN → CORE → OUT structure
-    Attention,       // Query-Key-Value structure
-    Residual,        // Skip connections (like ResNets)
-    PetersenGraph,   // Famous 10-node highly symmetric graph
+    CorticalColumn,    // 6-layer hierarchical (like mammalian cortex)
+    Feedforward,       // Layered neural network structure
+    Recurrent,         // Feedback loops (like RNNs)
+    Bipartite,         // Two-layer structure (like retina → V1)
+    CorePeriphery,     // Dense core, sparse periphery
+    BowTie,            // IN → CORE → OUT structure
+    Attention,         // Query-Key-Value structure
+    Residual,          // Skip connections (like ResNets)
+    PetersenGraph,     // Famous 10-node highly symmetric graph
     CompleteBipartite, // K_{n,n} - All-to-all between groups
 }
 
@@ -70,5 +70,5 @@ pub struct SimilarityStats {
     pub std_dev: f32,
     pub min: f32,
     pub max: f32,
-    pub heterogeneity: f32,  // Normalized measure of diversity
+    pub heterogeneity: f32, // Normalized measure of diversity
 }

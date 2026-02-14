@@ -4,8 +4,8 @@
 use std::collections::HashSet;
 
 use super::dag::{
-    CausalDAG, CausalEstimand, CausalQuery, CausalQueryOutcome,
-    IdentificationMethod, UnidentifiedReason,
+    CausalDAG, CausalEstimand, CausalQuery, CausalQueryOutcome, IdentificationMethod,
+    UnidentifiedReason,
 };
 
 /// Counterfactual reasoner implementing backdoor and frontdoor criteria.
@@ -17,9 +17,7 @@ pub struct CounterfactualReasoner {
 
 impl CounterfactualReasoner {
     pub fn new() -> Self {
-        Self {
-            max_dag_size: 20,
-        }
+        Self { max_dag_size: 20 }
     }
 
     /// Query a causal effect using the best available method.
@@ -57,11 +55,20 @@ impl CounterfactualReasoner {
                         "P({}|do({})) = Σ_{{{:?}}} P({}|{},{{{:?}}}) P({{{:?}}})",
                         dag.nodes[query.outcome],
                         dag.nodes[query.treatment],
-                        adjustment_set.iter().map(|&i| &dag.nodes[i]).collect::<Vec<_>>(),
+                        adjustment_set
+                            .iter()
+                            .map(|&i| &dag.nodes[i])
+                            .collect::<Vec<_>>(),
                         dag.nodes[query.outcome],
                         dag.nodes[query.treatment],
-                        adjustment_set.iter().map(|&i| &dag.nodes[i]).collect::<Vec<_>>(),
-                        adjustment_set.iter().map(|&i| &dag.nodes[i]).collect::<Vec<_>>(),
+                        adjustment_set
+                            .iter()
+                            .map(|&i| &dag.nodes[i])
+                            .collect::<Vec<_>>(),
+                        adjustment_set
+                            .iter()
+                            .map(|&i| &dag.nodes[i])
+                            .collect::<Vec<_>>(),
                     ),
                 },
                 method: IdentificationMethod::BackdoorAdjustment,
@@ -79,7 +86,10 @@ impl CounterfactualReasoner {
                         "Frontdoor: P({}|do({})) via mediators {{{:?}}}",
                         dag.nodes[query.outcome],
                         dag.nodes[query.treatment],
-                        mediator_set.iter().map(|&i| &dag.nodes[i]).collect::<Vec<_>>(),
+                        mediator_set
+                            .iter()
+                            .map(|&i| &dag.nodes[i])
+                            .collect::<Vec<_>>(),
                     ),
                 },
                 method: IdentificationMethod::FrontdoorCriterion,
@@ -90,7 +100,13 @@ impl CounterfactualReasoner {
         // Try Rule 2 for potential intervention candidates
         // (nodes that could be converted from do(z) to observation of z)
         for intervention in self.find_intervention_candidates(dag, query) {
-            if let Some(result) = self.try_rule2(dag, query.treatment, query.outcome, intervention, &query.conditioning) {
+            if let Some(result) = self.try_rule2(
+                dag,
+                query.treatment,
+                query.outcome,
+                intervention,
+                &query.conditioning,
+            ) {
                 return result;
             }
         }
@@ -98,7 +114,13 @@ impl CounterfactualReasoner {
         // Try Rule 3 for potential intervention candidates
         // (interventions that can be dropped entirely)
         for intervention in self.find_intervention_candidates(dag, query) {
-            if let Some(result) = self.try_rule3(dag, query.treatment, query.outcome, intervention, &query.conditioning) {
+            if let Some(result) = self.try_rule3(
+                dag,
+                query.treatment,
+                query.outcome,
+                intervention,
+                &query.conditioning,
+            ) {
                 return result;
             }
         }
@@ -172,9 +194,9 @@ impl CounterfactualReasoner {
     pub(crate) fn try_rule2(
         &self,
         dag: &CausalDAG,
-        treatment: usize,      // X
-        outcome: usize,        // Y
-        intervention: usize,   // Z (to convert from do(z) to z)
+        treatment: usize,       // X
+        outcome: usize,         // Y
+        intervention: usize,    // Z (to convert from do(z) to z)
         conditioning: &[usize], // W
     ) -> Option<CausalQueryOutcome> {
         // Construct G̅_X,Z_ (remove incoming to X, outgoing from Z)
@@ -202,7 +224,11 @@ impl CounterfactualReasoner {
                 } else {
                     format!(
                         ",{{{}}}",
-                        conditioning.iter().map(|&i| dag.nodes[i].as_str()).collect::<Vec<_>>().join(",")
+                        conditioning
+                            .iter()
+                            .map(|&i| dag.nodes[i].as_str())
+                            .collect::<Vec<_>>()
+                            .join(",")
                     )
                 }
             );
@@ -235,9 +261,9 @@ impl CounterfactualReasoner {
     pub(crate) fn try_rule3(
         &self,
         dag: &CausalDAG,
-        treatment: usize,      // X
-        outcome: usize,        // Y
-        intervention: usize,   // Z (to remove do(z))
+        treatment: usize,       // X
+        outcome: usize,         // Y
+        intervention: usize,    // Z (to remove do(z))
         conditioning: &[usize], // W
     ) -> Option<CausalQueryOutcome> {
         // Construct G̅_X,Z(W)
@@ -262,7 +288,11 @@ impl CounterfactualReasoner {
                 } else {
                     format!(
                         "|{{{}}}",
-                        conditioning.iter().map(|&i| dag.nodes[i].as_str()).collect::<Vec<_>>().join(",")
+                        conditioning
+                            .iter()
+                            .map(|&i| dag.nodes[i].as_str())
+                            .collect::<Vec<_>>()
+                            .join(",")
                     )
                 }
             );

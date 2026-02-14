@@ -39,16 +39,16 @@
 //! - `iroh::EndpointId` - 32-byte public key identifying an endpoint
 //! - `iroh::EndpointAddr` - Address containing EndpointId + relay info + direct addrs
 
-mod ticket;
 mod streaming;
+mod ticket;
 
+pub use streaming::{StreamConfig, TensorStream};
 pub use ticket::TicketManager;
-pub use streaming::{TensorStream, StreamConfig};
 
-use crate::swarm::{SwarmConfig, SwarmError, SwarmResult, ConsciousnessVector};
+use crate::swarm::{ConsciousnessVector, SwarmConfig, SwarmError, SwarmResult};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 // ============================================================================
 // IROH NODE - Main Entry Point
@@ -236,8 +236,7 @@ impl IrohNode {
     pub fn create_ticket(&self) -> SwarmResult<String> {
         use crate::swarm::ConnectionTicket;
 
-        let endpoint = self.endpoint.as_ref()
-            .ok_or(SwarmError::NotInitialized)?;
+        let endpoint = self.endpoint.as_ref().ok_or(SwarmError::NotInitialized)?;
 
         // Get our address info for others to connect
         // In Iroh 0.95, addr() is synchronous and returns EndpointAddr
@@ -251,7 +250,10 @@ impl IrohNode {
         let connection_ticket = ConnectionTicket::new(&ticket_str, &self.node_id);
         self.ticket_manager.store_outgoing(connection_ticket);
 
-        tracing::debug!("Created and stored outgoing ticket for node {}", &self.node_id[..16.min(self.node_id.len())]);
+        tracing::debug!(
+            "Created and stored outgoing ticket for node {}",
+            &self.node_id[..16.min(self.node_id.len())]
+        );
 
         Ok(ticket_str)
     }
@@ -274,15 +276,14 @@ impl IrohNode {
     pub async fn connect(&self, ticket: &str) -> SwarmResult<IrohChannel> {
         use crate::swarm::ConnectionTicket;
 
-        let endpoint = self.endpoint.as_ref()
-            .ok_or(SwarmError::NotInitialized)?;
+        let endpoint = self.endpoint.as_ref().ok_or(SwarmError::NotInitialized)?;
 
         // Cleanup expired tickets before processing
         self.ticket_manager.cleanup_expired();
 
         // Deserialize the ticket as EndpointAddr (JSON format)
-        let endpoint_addr: iroh::EndpointAddr = serde_json::from_str(ticket)
-            .map_err(|e| SwarmError::InvalidTicket {
+        let endpoint_addr: iroh::EndpointAddr =
+            serde_json::from_str(ticket).map_err(|e| SwarmError::InvalidTicket {
                 reason: format!("Failed to deserialize ticket: {}", e),
             })?;
 
@@ -317,12 +318,17 @@ impl IrohNode {
         let channel = IrohChannel::new(peer_id.clone(), connection);
 
         // Store connection
-        self.connections.write().insert(peer_id.clone(), channel.clone());
+        self.connections
+            .write()
+            .insert(peer_id.clone(), channel.clone());
 
         // Mark ticket as used
         self.ticket_manager.mark_used(&peer_id);
 
-        tracing::info!("Connected to peer: {} (ticket validated and stored)", peer_id);
+        tracing::info!(
+            "Connected to peer: {} (ticket validated and stored)",
+            peer_id
+        );
 
         Ok(channel)
     }
@@ -408,8 +414,9 @@ impl IrohChannel {
     /// Opens a bi-directional stream and sends the serialized vector
     #[cfg(feature = "swarm")]
     pub async fn send_consciousness(&self, state: &ConsciousnessVector) -> SwarmResult<()> {
-        let connection = self.connection.as_ref()
-            .ok_or(SwarmError::ChannelClosed { peer_id: self.peer_id.clone() })?;
+        let connection = self.connection.as_ref().ok_or(SwarmError::ChannelClosed {
+            peer_id: self.peer_id.clone(),
+        })?;
 
         let (mut send, _recv) = connection
             .open_bi()
@@ -419,20 +426,20 @@ impl IrohChannel {
                 reason: e.to_string(),
             })?;
 
-        let bytes = bincode::serialize(state)
-            .map_err(|e| SwarmError::SerializationError(e.to_string()))?;
+        let bytes =
+            bincode::serialize(state).map_err(|e| SwarmError::SerializationError(e.to_string()))?;
 
-        send.write_all(&bytes).await
+        send.write_all(&bytes)
+            .await
             .map_err(|e| SwarmError::SendFailed {
                 peer_id: self.peer_id.clone(),
                 reason: e.to_string(),
             })?;
 
-        send.finish()
-            .map_err(|e| SwarmError::SendFailed {
-                peer_id: self.peer_id.clone(),
-                reason: e.to_string(),
-            })?;
+        send.finish().map_err(|e| SwarmError::SendFailed {
+            peer_id: self.peer_id.clone(),
+            reason: e.to_string(),
+        })?;
 
         Ok(())
     }
@@ -448,26 +455,28 @@ impl IrohChannel {
     /// Receive a consciousness vector from the channel (real with feature)
     #[cfg(feature = "swarm")]
     pub async fn recv_consciousness(&self) -> SwarmResult<ConsciousnessVector> {
-        let connection = self.connection.as_ref()
-            .ok_or(SwarmError::ChannelClosed { peer_id: self.peer_id.clone() })?;
+        let connection = self.connection.as_ref().ok_or(SwarmError::ChannelClosed {
+            peer_id: self.peer_id.clone(),
+        })?;
 
-        let (_send, mut recv) = connection
-            .accept_bi()
+        let (_send, mut recv) =
+            connection
+                .accept_bi()
+                .await
+                .map_err(|e| SwarmError::ReceiveFailed {
+                    peer_id: self.peer_id.clone(),
+                    reason: e.to_string(),
+                })?;
+
+        let bytes = recv
+            .read_to_end(1024 * 1024) // 1MB max
             .await
             .map_err(|e| SwarmError::ReceiveFailed {
                 peer_id: self.peer_id.clone(),
                 reason: e.to_string(),
             })?;
 
-        let bytes = recv.read_to_end(1024 * 1024) // 1MB max
-            .await
-            .map_err(|e| SwarmError::ReceiveFailed {
-                peer_id: self.peer_id.clone(),
-                reason: e.to_string(),
-            })?;
-
-        bincode::deserialize(&bytes)
-            .map_err(|e| SwarmError::SerializationError(e.to_string()))
+        bincode::deserialize(&bytes).map_err(|e| SwarmError::SerializationError(e.to_string()))
     }
 
     /// Close the channel

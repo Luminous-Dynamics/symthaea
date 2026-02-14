@@ -87,23 +87,35 @@ impl EmotionalState {
         match (self.valence >= 0.0, self.arousal >= 0.0) {
             (true, true) => {
                 // High valence, high arousal
-                if self.arousal > 0.5 { EmotionCategory::Excited }
-                else { EmotionCategory::Happy }
+                if self.arousal > 0.5 {
+                    EmotionCategory::Excited
+                } else {
+                    EmotionCategory::Happy
+                }
             }
             (true, false) => {
                 // High valence, low arousal
-                if self.arousal < -0.5 { EmotionCategory::Relaxed }
-                else { EmotionCategory::Content }
+                if self.arousal < -0.5 {
+                    EmotionCategory::Relaxed
+                } else {
+                    EmotionCategory::Content
+                }
             }
             (false, true) => {
                 // Low valence, high arousal
-                if self.arousal > 0.5 { EmotionCategory::Angry }
-                else { EmotionCategory::Afraid }
+                if self.arousal > 0.5 {
+                    EmotionCategory::Angry
+                } else {
+                    EmotionCategory::Afraid
+                }
             }
             (false, false) => {
                 // Low valence, low arousal
-                if self.arousal < -0.5 { EmotionCategory::Bored }
-                else { EmotionCategory::Sad }
+                if self.arousal < -0.5 {
+                    EmotionCategory::Bored
+                } else {
+                    EmotionCategory::Sad
+                }
             }
         }
     }
@@ -158,11 +170,12 @@ impl EmotionCategory {
 
     /// Is this a positive valence emotion?
     pub fn is_positive(&self) -> bool {
-        matches!(self,
-            EmotionCategory::Excited |
-            EmotionCategory::Happy |
-            EmotionCategory::Content |
-            EmotionCategory::Relaxed
+        matches!(
+            self,
+            EmotionCategory::Excited
+                | EmotionCategory::Happy
+                | EmotionCategory::Content
+                | EmotionCategory::Relaxed
         )
     }
 
@@ -195,25 +208,25 @@ pub enum EmotionChannel {
     Fz,  // Midline frontal
 
     // Central channels
-    C3,  // Left central
-    C4,  // Right central
-    Cz,  // Midline central
+    C3, // Left central
+    C4, // Right central
+    Cz, // Midline central
 
     // Parietal channels
-    P3,  // Left parietal
-    P4,  // Right parietal
-    Pz,  // Midline parietal
+    P3, // Left parietal
+    P4, // Right parietal
+    Pz, // Midline parietal
 
     // Temporal channels
-    T3,  // Left temporal (T7 in 10-20)
-    T4,  // Right temporal (T8 in 10-20)
-    T5,  // Left posterior temporal (P7)
-    T6,  // Right posterior temporal (P8)
+    T3, // Left temporal (T7 in 10-20)
+    T4, // Right temporal (T8 in 10-20)
+    T5, // Left posterior temporal (P7)
+    T6, // Right posterior temporal (P8)
 
     // Occipital channels
-    O1,  // Left occipital
-    O2,  // Right occipital
-    Oz,  // Midline occipital
+    O1, // Left occipital
+    O2, // Right occipital
+    Oz, // Midline occipital
 }
 
 impl EmotionChannel {
@@ -273,28 +286,45 @@ impl EmotionChannel {
 
     /// Is this a left hemisphere channel?
     pub fn is_left(&self) -> bool {
-        matches!(self,
-            EmotionChannel::F3 | EmotionChannel::F7 | EmotionChannel::Fp1 |
-            EmotionChannel::C3 | EmotionChannel::P3 | EmotionChannel::T3 |
-            EmotionChannel::T5 | EmotionChannel::O1
+        matches!(
+            self,
+            EmotionChannel::F3
+                | EmotionChannel::F7
+                | EmotionChannel::Fp1
+                | EmotionChannel::C3
+                | EmotionChannel::P3
+                | EmotionChannel::T3
+                | EmotionChannel::T5
+                | EmotionChannel::O1
         )
     }
 
     /// Is this a right hemisphere channel?
     pub fn is_right(&self) -> bool {
-        matches!(self,
-            EmotionChannel::F4 | EmotionChannel::F8 | EmotionChannel::Fp2 |
-            EmotionChannel::C4 | EmotionChannel::P4 | EmotionChannel::T4 |
-            EmotionChannel::T6 | EmotionChannel::O2
+        matches!(
+            self,
+            EmotionChannel::F4
+                | EmotionChannel::F8
+                | EmotionChannel::Fp2
+                | EmotionChannel::C4
+                | EmotionChannel::P4
+                | EmotionChannel::T4
+                | EmotionChannel::T6
+                | EmotionChannel::O2
         )
     }
 
     /// Is this a frontal channel?
     pub fn is_frontal(&self) -> bool {
-        matches!(self,
-            EmotionChannel::F3 | EmotionChannel::F4 | EmotionChannel::F7 |
-            EmotionChannel::F8 | EmotionChannel::Fp1 | EmotionChannel::Fp2 |
-            EmotionChannel::Fz
+        matches!(
+            self,
+            EmotionChannel::F3
+                | EmotionChannel::F4
+                | EmotionChannel::F7
+                | EmotionChannel::F8
+                | EmotionChannel::Fp1
+                | EmotionChannel::Fp2
+                | EmotionChannel::Fz
         )
     }
 }
@@ -308,15 +338,30 @@ pub struct FrequencyBand {
 
 impl FrequencyBand {
     /// Delta band (0.5-4 Hz) - deep sleep, unconscious
-    pub const DELTA: FrequencyBand = FrequencyBand { low: 0.5, high: 4.0 };
+    pub const DELTA: FrequencyBand = FrequencyBand {
+        low: 0.5,
+        high: 4.0,
+    };
     /// Theta band (4-8 Hz) - drowsiness, memory
-    pub const THETA: FrequencyBand = FrequencyBand { low: 4.0, high: 8.0 };
+    pub const THETA: FrequencyBand = FrequencyBand {
+        low: 4.0,
+        high: 8.0,
+    };
     /// Alpha band (8-13 Hz) - relaxed, eyes closed
-    pub const ALPHA: FrequencyBand = FrequencyBand { low: 8.0, high: 13.0 };
+    pub const ALPHA: FrequencyBand = FrequencyBand {
+        low: 8.0,
+        high: 13.0,
+    };
     /// Beta band (13-30 Hz) - active thinking, focus
-    pub const BETA: FrequencyBand = FrequencyBand { low: 13.0, high: 30.0 };
+    pub const BETA: FrequencyBand = FrequencyBand {
+        low: 13.0,
+        high: 30.0,
+    };
     /// Gamma band (30-100 Hz) - cognitive processing, binding
-    pub const GAMMA: FrequencyBand = FrequencyBand { low: 30.0, high: 100.0 };
+    pub const GAMMA: FrequencyBand = FrequencyBand {
+        low: 30.0,
+        high: 100.0,
+    };
 }
 
 /// Multi-channel EEG data for emotion detection
@@ -395,7 +440,9 @@ fn compute_band_power(data: &[f64], sample_rate: f64, low_freq: f64, high_freq: 
     }
 
     // Apply Hann window
-    let windowed: Vec<f64> = data.iter().enumerate()
+    let windowed: Vec<f64> = data
+        .iter()
+        .enumerate()
         .map(|(i, &x)| {
             let window = 0.5 * (1.0 - (2.0 * PI * i as f64 / (n - 1) as f64).cos());
             x * window
@@ -529,11 +576,7 @@ impl ArousalDetector {
     /// Higher ratio = higher arousal
     pub fn compute(&mut self, eeg: &EmotionEEG) -> Option<f64> {
         // Use frontal and parietal channels for arousal
-        let channels = [
-            EmotionChannel::Fz,
-            EmotionChannel::Cz,
-            EmotionChannel::Pz,
-        ];
+        let channels = [EmotionChannel::Fz, EmotionChannel::Cz, EmotionChannel::Pz];
 
         let mut total_alpha = 0.0;
         let mut total_beta = 0.0;
@@ -612,7 +655,9 @@ impl EmotionSentinel {
     /// Process EEG window and detect emotional state
     pub fn detect(&mut self, eeg: &EmotionEEG) -> EmotionalState {
         // Compute valence from frontal asymmetry
-        let valence = self.frontal_asymmetry.compute_extended(eeg)
+        let valence = self
+            .frontal_asymmetry
+            .compute_extended(eeg)
             .map(|fai| {
                 // FAI typically ranges from -0.5 to 0.5
                 // Map to [-1, 1] for valence
@@ -621,11 +666,11 @@ impl EmotionSentinel {
             .unwrap_or(0.0);
 
         // Compute arousal from Beta/Alpha ratio
-        let arousal = self.arousal_detector.compute(eeg)
-            .unwrap_or(0.0);
+        let arousal = self.arousal_detector.compute(eeg).unwrap_or(0.0);
 
         // Compute dominance from frontal theta (approach behavior)
-        let dominance = eeg.band_power(EmotionChannel::Fz, FrequencyBand::THETA)
+        let dominance = eeg
+            .band_power(EmotionChannel::Fz, FrequencyBand::THETA)
             .map(|theta| {
                 // Higher frontal theta = higher approach/dominance
                 (theta * 10.0 - 0.5).clamp(-1.0, 1.0)
@@ -633,7 +678,9 @@ impl EmotionSentinel {
             .unwrap_or(0.0);
 
         // Confidence based on signal quality and consistency
-        let engagement = self.arousal_detector.compute_gamma_engagement(eeg)
+        let engagement = self
+            .arousal_detector
+            .compute_gamma_engagement(eeg)
             .unwrap_or(0.5);
         let confidence = engagement.clamp(0.3, 1.0);
 
@@ -667,7 +714,8 @@ impl EmotionSentinel {
 
     /// Get the current detected emotion category
     pub fn current_emotion(&self) -> EmotionCategory {
-        self.history.last()
+        self.history
+            .last()
             .map(|s| s.classify())
             .unwrap_or(EmotionCategory::Neutral)
     }
@@ -720,9 +768,13 @@ impl EmotionSimulator {
 
         // Generate each channel with appropriate characteristics
         let channels = [
-            EmotionChannel::F3, EmotionChannel::F4,
-            EmotionChannel::F7, EmotionChannel::F8,
-            EmotionChannel::Fz, EmotionChannel::Cz, EmotionChannel::Pz,
+            EmotionChannel::F3,
+            EmotionChannel::F4,
+            EmotionChannel::F7,
+            EmotionChannel::F8,
+            EmotionChannel::Fz,
+            EmotionChannel::Cz,
+            EmotionChannel::Pz,
         ];
 
         for channel in channels {
@@ -734,7 +786,13 @@ impl EmotionSimulator {
     }
 
     /// Generate single channel data
-    fn generate_channel(&mut self, channel: EmotionChannel, valence: f64, arousal: f64, n_samples: usize) -> Vec<f64> {
+    fn generate_channel(
+        &mut self,
+        channel: EmotionChannel,
+        valence: f64,
+        arousal: f64,
+        n_samples: usize,
+    ) -> Vec<f64> {
         let mut data = vec![0.0; n_samples];
 
         // Base frequencies and their modulation by emotion
@@ -775,7 +833,10 @@ impl EmotionSimulator {
             let t = i as f64 / self.sample_rate;
 
             // Simple PRNG for noise
-            self.rng_seed = self.rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            self.rng_seed = self
+                .rng_seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1);
             let noise = (self.rng_seed as f64 / u64::MAX as f64) * 2.0 - 1.0;
 
             // Alpha component (10 Hz)
@@ -798,8 +859,12 @@ impl EmotionSimulator {
     }
 
     /// Generate a session with multiple emotion blocks
-    pub fn generate_session(&mut self, blocks: &[(EmotionCategory, f64)]) -> Vec<(EmotionEEG, EmotionCategory)> {
-        blocks.iter()
+    pub fn generate_session(
+        &mut self,
+        blocks: &[(EmotionCategory, f64)],
+    ) -> Vec<(EmotionEEG, EmotionCategory)> {
+        blocks
+            .iter()
             .map(|(emotion, duration)| {
                 let eeg = self.generate(*emotion, *duration);
                 (eeg, *emotion)

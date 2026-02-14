@@ -85,12 +85,12 @@
 //! └─────────────────────────────────────────────────────────────────────────┘
 //! ```
 
-use crate::hdc::binary_hv::BinaryHV;
-use crate::consciousness::temporal_primitives::{
-    AllenRelation, TemporalReasoner, TemporalConfig as TemporalPrimitivesConfig
-};
 use crate::consciousness::narrative_self::NarrativeSelfModel;
 use crate::consciousness::predictive_self::PredictiveSelfModel;
+use crate::consciousness::temporal_primitives::{
+    AllenRelation, TemporalConfig as TemporalPrimitivesConfig, TemporalReasoner,
+};
+use crate::hdc::binary_hv::BinaryHV;
 use std::collections::VecDeque;
 use std::time::Instant;
 
@@ -369,7 +369,7 @@ impl ConsciousnessContinuity {
         let mut count = 0;
 
         for i in 1..self.recent_states.len() {
-            let sim = self.recent_states[i].similarity(&self.recent_states[i-1]) as f64;
+            let sim = self.recent_states[i].similarity(&self.recent_states[i - 1]) as f64;
             total_similarity += sim;
             count += 1;
         }
@@ -452,12 +452,7 @@ impl TemporalIdentityCoherence {
     }
 
     /// Update with explicit representations
-    pub fn update_explicit(
-        &mut self,
-        past: &BinaryHV,
-        present: &BinaryHV,
-        future: &BinaryHV,
-    ) {
+    pub fn update_explicit(&mut self, past: &BinaryHV, present: &BinaryHV, future: &BinaryHV) {
         self.past_self = Some(*past);
         self.present_self = Some(*present);
         self.future_self = Some(*future);
@@ -484,7 +479,8 @@ impl TemporalIdentityCoherence {
             + self.config.future_weight * self.past_future_alignment;
 
         // Normalize
-        let total_weight = self.config.past_weight + self.config.present_weight + self.config.future_weight;
+        let total_weight =
+            self.config.past_weight + self.config.present_weight + self.config.future_weight;
         if total_weight > 0.0 {
             self.coherence /= total_weight;
         }
@@ -492,9 +488,9 @@ impl TemporalIdentityCoherence {
 
     /// Check if identity is temporally coherent
     pub fn is_coherent(&self) -> bool {
-        self.coherence > 0.6 &&
-        self.past_present_alignment > 0.5 &&
-        self.present_future_alignment > 0.5
+        self.coherence > 0.6
+            && self.past_present_alignment > 0.5
+            && self.present_future_alignment > 0.5
     }
 }
 
@@ -540,7 +536,8 @@ impl HusserlianAnalysis {
     pub fn update_primal(&mut self, state: BinaryHV, phi: f64) {
         // Move current primal to retention
         if let Some((old_state, old_phi)) = self.primal_impression.take() {
-            self.retention.push_back((Instant::now(), old_state, old_phi));
+            self.retention
+                .push_back((Instant::now(), old_state, old_phi));
             if self.retention.len() > 10 {
                 self.retention.pop_front();
             }
@@ -573,21 +570,25 @@ impl HusserlianAnalysis {
         // Check retention coherence
         if self.retention.len() >= 2 {
             for i in 1..self.retention.len() {
-                let sim = self.retention[i].1.similarity(&self.retention[i-1].1) as f64;
+                let sim = self.retention[i].1.similarity(&self.retention[i - 1].1) as f64;
                 total_sim += sim;
                 count += 1;
             }
         }
 
         // Check retention-primal coherence
-        if let (Some(last_ret), Some((primal, _))) = (self.retention.back(), &self.primal_impression) {
+        if let (Some(last_ret), Some((primal, _))) =
+            (self.retention.back(), &self.primal_impression)
+        {
             let sim = primal.similarity(&last_ret.1) as f64;
             total_sim += sim;
             count += 1;
         }
 
         // Check primal-protention coherence
-        if let (Some((primal, _)), Some(first_prot)) = (&self.primal_impression, self.protention.front()) {
+        if let (Some((primal, _)), Some(first_prot)) =
+            (&self.primal_impression, self.protention.front())
+        {
             let sim = primal.similarity(&first_prot.0) as f64;
             total_sim += sim;
             count += 1;
@@ -809,7 +810,11 @@ impl TemporalConsciousnessAnalyzer {
     /// Compute overall temporal coherence
     pub fn overall_temporal_coherence(&self) -> f64 {
         // Weighted combination of all temporal metrics
-        let phi_health = if self.phi_trajectory.is_healthy() { 1.0 } else { 0.5 };
+        let phi_health = if self.phi_trajectory.is_healthy() {
+            1.0
+        } else {
+            0.5
+        };
         let continuity = self.continuity.score;
         let identity = self.identity_coherence.coherence;
         let husserlian = self.husserlian.coherence();
@@ -821,11 +826,11 @@ impl TemporalConsciousnessAnalyzer {
 
     /// Check if temporal consciousness is healthy
     pub fn is_temporally_healthy(&self) -> bool {
-        self.phi_trajectory.is_healthy() &&
-        self.continuity.is_continuous() &&
-        self.identity_coherence.is_coherent() &&
-        self.husserlian.coherence() > 0.6 &&
-        self.binding.is_unified()
+        self.phi_trajectory.is_healthy()
+            && self.continuity.is_continuous()
+            && self.identity_coherence.is_coherent()
+            && self.husserlian.coherence() > 0.6
+            && self.binding.is_unified()
     }
 
     /// Get detailed temporal report
@@ -886,11 +891,15 @@ impl TemporalConsciousnessAnalyzer {
         }
 
         if !self.binding.is_unified() {
-            recs.push("Weak temporal binding - strengthen cross-component synchronization".to_string());
+            recs.push(
+                "Weak temporal binding - strengthen cross-component synchronization".to_string(),
+            );
         }
 
         if recs.is_empty() {
-            recs.push("Temporal consciousness is healthy - maintain current integration".to_string());
+            recs.push(
+                "Temporal consciousness is healthy - maintain current integration".to_string(),
+            );
         }
 
         recs
@@ -936,7 +945,9 @@ pub struct TemporalConsciousnessReport {
 
 impl std::fmt::Display for TemporalConsciousnessReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, r#"
+        write!(
+            f,
+            r#"
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║     TEMPORAL CONSCIOUSNESS REPORT (#75) - Consciousness Through Time     ║
 ╠══════════════════════════════════════════════════════════════════════════╣
@@ -973,11 +984,19 @@ impl std::fmt::Display for TemporalConsciousnessReport {
 ╚══════════════════════════════════════════════════════════════════════════╝
 "#,
             self.overall_coherence * 100.0,
-            if self.is_healthy { "✓ HEALTHY" } else { "⚠ ATTENTION" },
+            if self.is_healthy {
+                "✓ HEALTHY"
+            } else {
+                "⚠ ATTENTION"
+            },
             self.phi_velocity,
             self.phi_acceleration,
             self.phi_stability,
-            match self.phi_trend { 1 => "↑ Rising", -1 => "↓ Declining", _ => "→ Stable" },
+            match self.phi_trend {
+                1 => "↑ Rising",
+                -1 => "↓ Declining",
+                _ => "→ Stable",
+            },
             self.continuity_score * 100.0,
             self.discontinuities,
             self.identity_coherence * 100.0,
@@ -990,7 +1009,8 @@ impl std::fmt::Display for TemporalConsciousnessReport {
             self.temporal_horizon,
             self.binding_strength * 100.0,
             self.gamma_sync * 100.0,
-            self.recommendations.iter()
+            self.recommendations
+                .iter()
                 .map(|r| format!("║   • {}\n", r))
                 .collect::<String>()
         )
@@ -1030,7 +1050,10 @@ mod tests {
         continuity.observe(&state1, 0.5, 0.5);
         continuity.observe(&state2, 0.5, 0.5);
 
-        assert!(continuity.score > 0.9, "Similar states should have high continuity");
+        assert!(
+            continuity.score > 0.9,
+            "Similar states should have high continuity"
+        );
     }
 
     #[test]
@@ -1058,7 +1081,10 @@ mod tests {
         let self_vec = BinaryHV::random(42);
         coherence.update_explicit(&self_vec, &self_vec, &self_vec);
 
-        assert!(coherence.coherence > 0.95, "Identical selves should be coherent");
+        assert!(
+            coherence.coherence > 0.95,
+            "Identical selves should be coherent"
+        );
         assert!(coherence.is_coherent());
     }
 
@@ -1129,7 +1155,11 @@ mod tests {
         let base_state = BinaryHV::random(42);
         for i in 0..20 {
             // Slight variations
-            let state = if i % 2 == 0 { base_state } else { BinaryHV::random(i as u64) };
+            let state = if i % 2 == 0 {
+                base_state
+            } else {
+                BinaryHV::random(i as u64)
+            };
             analyzer.observe(&state, 0.5, None, None);
         }
 

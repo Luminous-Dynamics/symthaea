@@ -11,8 +11,8 @@
 
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::hdc::code_memory::CodebaseMemory;
-use symthaea_core::hdc::ContinuousHV;
 use std::collections::HashMap;
+use symthaea_core::hdc::ContinuousHV;
 
 // ============================================================================
 // Structured Intent (Output of Path A - LLM)
@@ -139,10 +139,7 @@ pub enum IntentResult {
         divergence: DivergenceAnalysis,
     },
     /// Cannot understand at all
-    Incomprehensible {
-        raw_input: String,
-        reason: String,
-    },
+    Incomprehensible { raw_input: String, reason: String },
 }
 
 // ============================================================================
@@ -268,11 +265,7 @@ impl TriuneIntentIntegrator {
     // ========================================================================
 
     /// Resolve intent using the triune consensus mechanism
-    pub fn resolve_intent(
-        &mut self,
-        input: &str,
-        codebase: &CodebaseMemory,
-    ) -> IntentResult {
+    pub fn resolve_intent(&mut self, input: &str, codebase: &CodebaseMemory) -> IntentResult {
         // ====================================================================
         // PATH A: Symbolic Parsing (LLM - The Neocortex)
         // ====================================================================
@@ -326,7 +319,8 @@ impl TriuneIntentIntegrator {
 
         // Compute algebraic delta: what change does this imply?
         // delta = trajectory ⊖ current_state (unbind operation)
-        let current_state_hv = codebase.codebase_hv()
+        let current_state_hv = codebase
+            .codebase_hv()
             .cloned()
             .unwrap_or_else(|| ContinuousHV::zero(self.config.hdc_dim));
         // unbind = bind with inverse
@@ -351,10 +345,15 @@ impl TriuneIntentIntegrator {
         }
     }
 
-    fn find_similar_intents(&self, input_hv: &ContinuousHV, codebase: &CodebaseMemory) -> Vec<(String, f32)> {
+    fn find_similar_intents(
+        &self,
+        input_hv: &ContinuousHV,
+        codebase: &CodebaseMemory,
+    ) -> Vec<(String, f32)> {
         // Query codebase memory for similar patterns
         let matches = codebase.query(input_hv, 5);
-        matches.iter()
+        matches
+            .iter()
             .map(|m| (m.name.clone(), m.similarity))
             .collect()
     }
@@ -476,7 +475,8 @@ impl TriuneIntentIntegrator {
         intuitive: &IntuitiveIntent,
     ) -> String {
         if sources.is_empty() {
-            return "I'm not sure I understand. Could you clarify what you'd like me to do?".to_string();
+            return "I'm not sure I understand. Could you clarify what you'd like me to do?"
+                .to_string();
         }
 
         // Use the most significant divergence source
@@ -484,7 +484,9 @@ impl TriuneIntentIntegrator {
 
         if primary.aspect.starts_with("action:") {
             // Action mismatch
-            let suggested_action = intuitive.similar_intents.first()
+            let suggested_action = intuitive
+                .similar_intents
+                .first()
                 .map(|(name, _)| name.as_str())
                 .unwrap_or("something else");
 
@@ -550,28 +552,45 @@ impl LLMIntentParser {
         // Detect actions (heuristic - replace with LLM in production)
         let mut actions = Vec::new();
 
-        if input_lower.contains("create") || input_lower.contains("write") ||
-           input_lower.contains("implement") || input_lower.contains("add") {
+        if input_lower.contains("create")
+            || input_lower.contains("write")
+            || input_lower.contains("implement")
+            || input_lower.contains("add")
+        {
             actions.push((IntentAction::Create, 0.8));
         }
-        if input_lower.contains("modify") || input_lower.contains("change") ||
-           input_lower.contains("update") || input_lower.contains("edit") {
+        if input_lower.contains("modify")
+            || input_lower.contains("change")
+            || input_lower.contains("update")
+            || input_lower.contains("edit")
+        {
             actions.push((IntentAction::Modify, 0.7));
         }
-        if input_lower.contains("explain") || input_lower.contains("what") ||
-           input_lower.contains("how") || input_lower.contains("why") {
+        if input_lower.contains("explain")
+            || input_lower.contains("what")
+            || input_lower.contains("how")
+            || input_lower.contains("why")
+        {
             actions.push((IntentAction::Explain, 0.8));
         }
-        if input_lower.contains("find") || input_lower.contains("search") ||
-           input_lower.contains("where") || input_lower.contains("similar") {
+        if input_lower.contains("find")
+            || input_lower.contains("search")
+            || input_lower.contains("where")
+            || input_lower.contains("similar")
+        {
             actions.push((IntentAction::Find, 0.7));
         }
-        if input_lower.contains("refactor") || input_lower.contains("clean") ||
-           input_lower.contains("reorganize") {
+        if input_lower.contains("refactor")
+            || input_lower.contains("clean")
+            || input_lower.contains("reorganize")
+        {
             actions.push((IntentAction::Refactor, 0.8));
         }
-        if input_lower.contains("debug") || input_lower.contains("fix") ||
-           input_lower.contains("error") || input_lower.contains("bug") {
+        if input_lower.contains("debug")
+            || input_lower.contains("fix")
+            || input_lower.contains("error")
+            || input_lower.contains("bug")
+        {
             actions.push((IntentAction::Debug, 0.8));
         }
         if input_lower.contains("test") {
@@ -612,7 +631,8 @@ impl LLMIntentParser {
         };
 
         // Extract patterns (simple word extraction - LLM would do better)
-        let patterns: Vec<String> = input.split_whitespace()
+        let patterns: Vec<String> = input
+            .split_whitespace()
             .filter(|w| w.len() > 3 && !Self::is_common_word(w))
             .map(|s| s.to_lowercase())
             .collect();
@@ -634,10 +654,27 @@ impl LLMIntentParser {
     }
 
     fn is_common_word(word: &str) -> bool {
-        matches!(word.to_lowercase().as_str(),
-            "the" | "and" | "for" | "that" | "with" | "this" | "from" |
-            "have" | "will" | "would" | "could" | "should" | "please" |
-            "want" | "need" | "like" | "make" | "using" | "into"
+        matches!(
+            word.to_lowercase().as_str(),
+            "the"
+                | "and"
+                | "for"
+                | "that"
+                | "with"
+                | "this"
+                | "from"
+                | "have"
+                | "will"
+                | "would"
+                | "could"
+                | "should"
+                | "please"
+                | "want"
+                | "need"
+                | "like"
+                | "make"
+                | "using"
+                | "into"
         )
     }
 }
@@ -705,13 +742,18 @@ impl CfCTemporalState {
         // Blend with previous trajectory (accumulate history)
         let blend_factor = 0.7;
         for i in 0..dim {
-            self.trajectory.values[i] =
-                blend_factor * self.trajectory.values[i] +
-                (1.0 - blend_factor) * trajectory_values[i];
+            self.trajectory.values[i] = blend_factor * self.trajectory.values[i]
+                + (1.0 - blend_factor) * trajectory_values[i];
         }
 
         // Normalize
-        let norm: f32 = self.trajectory.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm: f32 = self
+            .trajectory
+            .values
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
         if norm > 1e-6 {
             for v in &mut self.trajectory.values {
                 *v /= norm;
@@ -768,7 +810,10 @@ mod tests {
         let parser = LLMIntentParser::new();
         let intent = parser.parse_to_struct("Create a Rust function that sorts a vector");
 
-        assert!(intent.actions.iter().any(|(a, _)| *a == IntentAction::Create));
+        assert!(intent
+            .actions
+            .iter()
+            .any(|(a, _)| *a == IntentAction::Create));
         assert_eq!(intent.target.kind, TargetKind::Function);
         assert_eq!(intent.language, Some("rust".to_string()));
     }
@@ -778,7 +823,10 @@ mod tests {
         let parser = LLMIntentParser::new();
         let intent = parser.parse_to_struct("Fix the bug in the login function");
 
-        assert!(intent.actions.iter().any(|(a, _)| *a == IntentAction::Debug));
+        assert!(intent
+            .actions
+            .iter()
+            .any(|(a, _)| *a == IntentAction::Debug));
     }
 
     #[test]
@@ -802,17 +850,23 @@ mod tests {
         let mut integrator = TriuneIntentIntegrator::new(512);
         let memory = test_memory();
 
-        let result = integrator.resolve_intent(
-            "Write a function to sort numbers",
-            &memory
-        );
+        let result = integrator.resolve_intent("Write a function to sort numbers", &memory);
 
         match result {
-            IntentResult::Actionable { intent, confidence, .. } => {
-                assert!(intent.actions.iter().any(|(a, _)| *a == IntentAction::Create));
+            IntentResult::Actionable {
+                intent, confidence, ..
+            } => {
+                assert!(intent
+                    .actions
+                    .iter()
+                    .any(|(a, _)| *a == IntentAction::Create));
                 assert!(confidence > 0.0);
             }
-            IntentResult::NeedsClarification { partial_intent, divergence, .. } => {
+            IntentResult::NeedsClarification {
+                partial_intent,
+                divergence,
+                ..
+            } => {
                 // Also acceptable - just means high uncertainty
                 assert!(divergence.free_energy > 0.0);
                 assert!(!partial_intent.actions.is_empty());
@@ -838,7 +892,10 @@ mod tests {
 
         // Trajectory should evolve but maintain coherence
         let similarity = traj1.similarity(&traj2);
-        assert!(similarity > 0.2, "Trajectory should maintain some coherence");
+        assert!(
+            similarity > 0.2,
+            "Trajectory should maintain some coherence"
+        );
         assert!(similarity < 0.95, "Trajectory should evolve");
     }
 
@@ -897,6 +954,9 @@ mod tests {
 
         // Different intents should have different encodings
         let similarity = hv1.similarity(&hv2);
-        assert!(similarity < 0.8, "Different intents should have different encodings");
+        assert!(
+            similarity < 0.8,
+            "Different intents should have different encodings"
+        );
     }
 }

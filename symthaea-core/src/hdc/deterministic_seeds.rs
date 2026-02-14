@@ -133,16 +133,12 @@ impl SeedDomain {
 /// Composite concepts become products of primes.
 pub static PRIMES: LazyLock<[u64; 100]> = LazyLock::new(|| {
     [
-        2, 3, 5, 7, 11, 13, 17, 19, 23, 29,
-        31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
-        73, 79, 83, 89, 97, 101, 103, 107, 109, 113,
-        127, 131, 137, 139, 149, 151, 157, 163, 167, 173,
-        179, 181, 191, 193, 197, 199, 211, 223, 227, 229,
-        233, 239, 241, 251, 257, 263, 269, 271, 277, 281,
-        283, 293, 307, 311, 313, 317, 331, 337, 347, 349,
-        353, 359, 367, 373, 379, 383, 389, 397, 401, 409,
-        419, 421, 431, 433, 439, 443, 449, 457, 461, 463,
-        467, 479, 487, 491, 499, 503, 509, 521, 523, 541,
+        2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89,
+        97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181,
+        191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281,
+        283, 293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397,
+        401, 409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499, 503,
+        509, 521, 523, 541,
     ]
 });
 
@@ -252,9 +248,7 @@ impl GodelNumber {
 
     /// Create a Gödel number from multiple concepts.
     pub fn from_concepts(concepts: &[NixPrimeConcept]) -> Self {
-        let product = concepts.iter()
-            .map(|c| c.prime())
-            .product();
+        let product = concepts.iter().map(|c| c.prime()).product();
         Self(product)
     }
 
@@ -289,7 +283,11 @@ impl GodelNumber {
 
 /// Greatest Common Divisor (Euclidean algorithm).
 fn gcd(a: u64, b: u64) -> u64 {
-    if b == 0 { a } else { gcd(b, a % b) }
+    if b == 0 {
+        a
+    } else {
+        gcd(b, a % b)
+    }
 }
 
 // ============================================================================
@@ -415,14 +413,10 @@ mod tests {
 
     #[test]
     fn test_godel_shared_concepts() {
-        let install_package = GodelNumber::from_concepts(&[
-            NixPrimeConcept::Install,
-            NixPrimeConcept::Package,
-        ]);
-        let search_package = GodelNumber::from_concepts(&[
-            NixPrimeConcept::Search,
-            NixPrimeConcept::Package,
-        ]);
+        let install_package =
+            GodelNumber::from_concepts(&[NixPrimeConcept::Install, NixPrimeConcept::Package]);
+        let search_package =
+            GodelNumber::from_concepts(&[NixPrimeConcept::Search, NixPrimeConcept::Package]);
 
         let shared = install_package.shared(&search_package);
 
@@ -451,24 +445,20 @@ mod tests {
 
     #[test]
     fn test_godel_seed_generation() {
-        let install_pkg = GodelNumber::from_concepts(&[
-            NixPrimeConcept::Install,
-            NixPrimeConcept::Package,
-        ]);
-        let search_pkg = GodelNumber::from_concepts(&[
-            NixPrimeConcept::Search,
-            NixPrimeConcept::Package,
-        ]);
+        let install_pkg =
+            GodelNumber::from_concepts(&[NixPrimeConcept::Install, NixPrimeConcept::Package]);
+        let search_pkg =
+            GodelNumber::from_concepts(&[NixPrimeConcept::Search, NixPrimeConcept::Package]);
 
         // Different Gödel numbers produce different seeds
         assert_ne!(install_pkg.seed(), search_pkg.seed());
 
         // Same Gödel number produces same seed
         let install_pkg2 = GodelNumber::from_concepts(&[
-            NixPrimeConcept::Package,  // Order doesn't matter!
+            NixPrimeConcept::Package, // Order doesn't matter!
             NixPrimeConcept::Install,
         ]);
-        assert_eq!(install_pkg.0, install_pkg2.0);  // Same product
+        assert_eq!(install_pkg.0, install_pkg2.0); // Same product
         assert_eq!(install_pkg.seed(), install_pkg2.seed());
     }
 
@@ -477,7 +467,7 @@ mod tests {
         // Verify first few primes are correct
         assert_eq!(NixPrimeConcept::Install.prime(), 2);
         assert_eq!(NixPrimeConcept::Search.prime(), 3);
-        assert_eq!(NixPrimeConcept::Package.prime(), 31);  // 10th prime
+        assert_eq!(NixPrimeConcept::Package.prime(), 31); // 10th prime
     }
 
     #[test]

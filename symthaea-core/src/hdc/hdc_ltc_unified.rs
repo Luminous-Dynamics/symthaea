@@ -96,15 +96,15 @@ pub struct UnifiedConfig {
 impl Default for UnifiedConfig {
     fn default() -> Self {
         Self {
-            tau_base: 0.1,           // 100ms base time constant
+            tau_base: 0.1,            // 100ms base time constant
             backbone_tau: 0.5,        // Moderate state dependency
             dimension: HDC_DIMENSION, // 16,384
             activation: UnifiedActivation::Tanh,
             learning_rate: 0.01,
             momentum: 0.9,
             weight_decay: 0.0001,
-            gating_steepness: 1.0,    // Standard sigmoid
-            interp_bias: 0.0,         // Neutral interpolation
+            gating_steepness: 1.0, // Standard sigmoid
+            interp_bias: 0.0,      // Neutral interpolation
         }
     }
 }
@@ -129,18 +129,16 @@ impl UnifiedActivation {
     #[inline]
     pub fn apply(&self, hv: &ContinuousHV) -> ContinuousHV {
         let values: Vec<f32> = match self {
-            UnifiedActivation::Tanh => {
-                hv.values.iter().map(|x| x.tanh()).collect()
-            }
+            UnifiedActivation::Tanh => hv.values.iter().map(|x| x.tanh()).collect(),
             UnifiedActivation::Sigmoid => {
                 hv.values.iter().map(|x| 1.0 / (1.0 + (-x).exp())).collect()
             }
-            UnifiedActivation::SiLU => {
-                hv.values.iter().map(|x| x * (1.0 / (1.0 + (-x).exp()))).collect()
-            }
-            UnifiedActivation::Identity => {
-                hv.values.clone()
-            }
+            UnifiedActivation::SiLU => hv
+                .values
+                .iter()
+                .map(|x| x * (1.0 / (1.0 + (-x).exp())))
+                .collect(),
+            UnifiedActivation::Identity => hv.values.clone(),
             UnifiedActivation::BoundedTanh { scale } => {
                 hv.values.iter().map(|x| (x * scale).tanh()).collect()
             }
@@ -262,7 +260,11 @@ impl HdcLtcUnifiedNeuron {
     /// Create a neuron with all internal HVs deterministically derived from a genesis seed.
     ///
     /// Domain labels are derived as `"{label}::weight_hv"`, `"{label}::input_mask"`, etc.
-    pub fn from_genesis(config: UnifiedConfig, genesis: &crate::genesis::GenesisSeed, label: &str) -> Self {
+    pub fn from_genesis(
+        config: UnifiedConfig,
+        genesis: &crate::genesis::GenesisSeed,
+        label: &str,
+    ) -> Self {
         let dim = config.dimension;
         Self {
             state: ContinuousHV::zero(dim),
@@ -638,13 +640,11 @@ impl HdcLtcUnifiedNeuron {
 
         // Update with momentum
         let m = self.config.momentum;
-        self.weight_momentum = self.weight_momentum.scale(m)
-            .add(&correlation.scale(lr));
+        self.weight_momentum = self.weight_momentum.scale(m).add(&correlation.scale(lr));
 
         // Apply weight decay and momentum
         let decay = self.config.weight_decay;
-        self.weight_hv = self.weight_hv.scale(1.0 - decay)
-            .add(&self.weight_momentum);
+        self.weight_hv = self.weight_hv.scale(1.0 - decay).add(&self.weight_momentum);
 
         // Normalize to prevent explosion
         if self.weight_hv.norm() > 2.0 {
@@ -653,7 +653,12 @@ impl HdcLtcUnifiedNeuron {
     }
 
     /// Contrastive learning update (for prediction tasks)
-    pub fn contrastive_update(&mut self, positive: &ContinuousHV, negative: &ContinuousHV, lr: f32) {
+    pub fn contrastive_update(
+        &mut self,
+        positive: &ContinuousHV,
+        negative: &ContinuousHV,
+        lr: f32,
+    ) {
         // Pull toward positive examples
         let pos_delta = positive.subtract(&self.state);
         let pos_gradient = self.weight_hv.bind(&pos_delta);
@@ -689,10 +694,10 @@ impl HdcLtcUnifiedNeuron {
     /// Uses exponential windows with tau_plus=20ms (LTP) and tau_minus=20ms (LTD)
     pub fn stdp_update(&mut self, pre: &ContinuousHV, post: &ContinuousHV, dt: f32, lr: f32) {
         // STDP time constants (in same units as dt)
-        const TAU_PLUS: f32 = 0.02;   // 20ms for LTP
-        const TAU_MINUS: f32 = 0.02;  // 20ms for LTD
-        const A_PLUS: f32 = 1.0;      // LTP amplitude
-        const A_MINUS: f32 = 0.5;     // LTD amplitude (asymmetric)
+        const TAU_PLUS: f32 = 0.02; // 20ms for LTP
+        const TAU_MINUS: f32 = 0.02; // 20ms for LTD
+        const A_PLUS: f32 = 1.0; // LTP amplitude
+        const A_MINUS: f32 = 0.5; // LTD amplitude (asymmetric)
 
         // Compute STDP weight change
         let delta_w = if dt > 0.0 {
@@ -708,13 +713,14 @@ impl HdcLtcUnifiedNeuron {
 
         // Apply STDP-modulated update with momentum
         let m = self.config.momentum;
-        self.weight_momentum = self.weight_momentum.scale(m)
+        self.weight_momentum = self
+            .weight_momentum
+            .scale(m)
             .add(&correlation.scale(lr * delta_w));
 
         // Apply weight decay and momentum
         let decay = self.config.weight_decay;
-        self.weight_hv = self.weight_hv.scale(1.0 - decay)
-            .add(&self.weight_momentum);
+        self.weight_hv = self.weight_hv.scale(1.0 - decay).add(&self.weight_momentum);
 
         // Normalize
         if self.weight_hv.norm() > 2.0 {
@@ -742,7 +748,9 @@ impl HdcLtcUnifiedNeuron {
         const EPSILON: f32 = 1e-8;
 
         // Update biased first moment estimate (momentum)
-        self.weight_momentum = self.weight_momentum.scale(beta1)
+        self.weight_momentum = self
+            .weight_momentum
+            .scale(beta1)
             .add(&gradient.scale(1.0 - beta1));
 
         // For simplicity, we use the momentum directly without full Adam
@@ -757,7 +765,9 @@ impl HdcLtcUnifiedNeuron {
 
         // Apply weight decay
         let decay = self.config.weight_decay;
-        self.weight_hv = self.weight_hv.scale(1.0 - decay)
+        self.weight_hv = self
+            .weight_hv
+            .scale(1.0 - decay)
             .add(&corrected.scale(base_lr));
 
         // Normalize
@@ -798,7 +808,9 @@ impl HdcLtcUnifiedNeuron {
 
         // Combined update with momentum
         let m = self.config.momentum;
-        let update = correlation.scale(lr * homeostatic_factor).subtract(&l2_penalty);
+        let update = correlation
+            .scale(lr * homeostatic_factor)
+            .subtract(&l2_penalty);
 
         self.weight_momentum = self.weight_momentum.scale(m).add(&update);
 
@@ -848,10 +860,14 @@ impl HdcLtcUnifiedNeuron {
 
             // Update with momentum
             let m = self.config.momentum;
-            self.weight_momentum = self.weight_momentum.scale(m)
+            self.weight_momentum = self
+                .weight_momentum
+                .scale(m)
                 .add(&weight_gradient.scale(lr));
 
-            self.weight_hv = self.weight_hv.scale(1.0 - self.config.weight_decay)
+            self.weight_hv = self
+                .weight_hv
+                .scale(1.0 - self.config.weight_decay)
                 .add(&self.weight_momentum);
 
             // Normalize
@@ -911,7 +927,9 @@ impl HdcLtcUnifiedNeuron {
         // Through activation: dL/dz = dL/dx_∞ ⊙ f'(z)
         // We need element-wise: dx_inf[i] * activation.derivative(z[i])
         let activation = self.config.activation;
-        let dz_values: Vec<f32> = dx_inf.values.iter()
+        let dz_values: Vec<f32> = dx_inf
+            .values
+            .iter()
             .zip(z.values.iter())
             .map(|(&di, &zi)| di * activation.derivative(zi))
             .collect();
@@ -933,11 +951,14 @@ impl HdcLtcUnifiedNeuron {
         // dL/dτ = Σ_i dh_i × (x_∞_i - x_i) × dσ/dτ
         //       = Σ_i dh_i × (x_inf_i - state_i) × (-dt/τ²) × exp(-dt/τ)
         let diff = x_inf.subtract(&self.state);
-        let dtau_scalar: f32 = dh.values.iter()
+        let dtau_scalar: f32 = dh
+            .values
+            .iter()
             .zip(diff.values.iter())
             .map(|(&dhi, &di)| dhi * di)
             .sum::<f32>()
-            * (-dt / (tau * tau)) * decay;
+            * (-dt / (tau * tau))
+            * decay;
 
         HdcLtcGradients {
             dw,
@@ -952,21 +973,21 @@ impl HdcLtcUnifiedNeuron {
         let decay = self.config.weight_decay;
 
         // Weight HV update with momentum
-        self.weight_momentum = self.weight_momentum.scale(m)
-            .add(&grads.dw.scale(-lr));
-        self.weight_hv = self.weight_hv.scale(1.0 - decay)
-            .add(&self.weight_momentum);
+        self.weight_momentum = self.weight_momentum.scale(m).add(&grads.dw.scale(-lr));
+        self.weight_hv = self.weight_hv.scale(1.0 - decay).add(&self.weight_momentum);
 
         // Input mask update with momentum
-        self.input_momentum = self.input_momentum.scale(m)
-            .add(&grads.du.scale(-lr));
-        self.input_mask = self.input_mask.scale(1.0 - decay)
-            .add(&self.input_momentum);
+        self.input_momentum = self.input_momentum.scale(m).add(&grads.du.scale(-lr));
+        self.input_mask = self.input_mask.scale(1.0 - decay).add(&self.input_momentum);
 
         // Tau modulator update (project scalar gradient onto tau_modulator direction)
         if grads.dtau_scalar.abs() > 1e-10 {
-            self.tau_modulator = self.tau_modulator
-                .add(&self.tau_modulator.normalize().scale(-lr * grads.dtau_scalar));
+            self.tau_modulator = self.tau_modulator.add(
+                &self
+                    .tau_modulator
+                    .normalize()
+                    .scale(-lr * grads.dtau_scalar),
+            );
         }
 
         // Norm clip to 2.0
@@ -1103,7 +1124,10 @@ impl HdcLtcUnifiedNetwork {
     /// Domain labels follow the pattern:
     /// - Neurons: `"layer_{l}::neuron_{n}"`
     /// - Layer bindings: `"layer_binding_{l}"`
-    pub fn from_genesis(config: UnifiedNetworkConfig, genesis: &crate::genesis::GenesisSeed) -> Self {
+    pub fn from_genesis(
+        config: UnifiedNetworkConfig,
+        genesis: &crate::genesis::GenesisSeed,
+    ) -> Self {
         let mut layers = Vec::new();
 
         for (l, &layer_size) in config.layer_sizes.iter().enumerate() {
@@ -1121,7 +1145,9 @@ impl HdcLtcUnifiedNetwork {
             .map(|l| genesis.hv(&format!("layer_binding_{}", l), dim))
             .collect();
 
-        let layer_outputs = config.layer_sizes.iter()
+        let layer_outputs = config
+            .layer_sizes
+            .iter()
             .map(|_| ContinuousHV::zero(dim))
             .collect();
 
@@ -1153,7 +1179,9 @@ impl HdcLtcUnifiedNetwork {
             .map(|i| ContinuousHV::random(dim, seed + 10000 + i as u64))
             .collect();
 
-        let layer_outputs = config.layer_sizes.iter()
+        let layer_outputs = config
+            .layer_sizes
+            .iter()
             .map(|_| ContinuousHV::zero(dim))
             .collect();
 
@@ -1258,9 +1286,10 @@ impl HdcLtcUnifiedNetwork {
 
     /// Get network output (bundled final layer states)
     pub fn output(&self) -> ContinuousHV {
-        self.layer_outputs.last().cloned().unwrap_or_else(|| {
-            ContinuousHV::zero(self.config.neuron_config.dimension)
-        })
+        self.layer_outputs
+            .last()
+            .cloned()
+            .unwrap_or_else(|| ContinuousHV::zero(self.config.neuron_config.dimension))
     }
 
     /// Reset all neurons
@@ -1292,12 +1321,15 @@ impl HdcLtcUnifiedNetwork {
 
     /// Get network statistics
     pub fn stats(&self) -> UnifiedNetworkStats {
-        let all_stats: Vec<UnifiedNeuronStats> = self.layers.iter()
+        let all_stats: Vec<UnifiedNeuronStats> = self
+            .layers
+            .iter()
             .flat_map(|layer| layer.iter().map(|n| n.stats()))
             .collect();
 
         let avg_norm = all_stats.iter().map(|s| s.state_norm).sum::<f32>() / all_stats.len() as f32;
-        let avg_weight_norm = all_stats.iter().map(|s| s.weight_norm).sum::<f32>() / all_stats.len() as f32;
+        let avg_weight_norm =
+            all_stats.iter().map(|s| s.weight_norm).sum::<f32>() / all_stats.len() as f32;
 
         UnifiedNetworkStats {
             n_neurons: all_stats.len(),
@@ -1356,7 +1388,10 @@ mod tests {
         }
 
         let final_norm = neuron.state().norm();
-        assert!(final_norm > initial_norm, "State should evolve away from zero");
+        assert!(
+            final_norm > initial_norm,
+            "State should evolve away from zero"
+        );
         assert!(final_norm < 10.0, "State should remain bounded");
         assert_eq!(neuron.update_count(), 100);
     }
@@ -1390,7 +1425,11 @@ mod tests {
 
         // Both should reach similar equilibrium (not identical due to gating differences)
         let similarity = neuron_euler.state().similarity(neuron_cf.state());
-        assert!(similarity > 0.5, "Euler and closed-form should produce similar results: {}", similarity);
+        assert!(
+            similarity > 0.5,
+            "Euler and closed-form should produce similar results: {}",
+            similarity
+        );
     }
 
     #[test]
@@ -1408,7 +1447,10 @@ mod tests {
         // Both should produce valid states (the point is computational cost is the same)
         assert!(neuron_small.state().norm() > 0.0);
         assert!(neuron_large.state().norm() > 0.0);
-        assert!(neuron_large.state().norm() < 10.0, "Large jump should still be bounded");
+        assert!(
+            neuron_large.state().norm() < 10.0,
+            "Large jump should still be bounded"
+        );
     }
 
     #[test]
@@ -1423,8 +1465,14 @@ mod tests {
         let sim_to_weight = transformed.similarity(&neuron.weight_hv);
         let sim_to_input = transformed.similarity(&input);
 
-        assert!(sim_to_weight.abs() < 0.3, "Binding should be dissimilar to weight");
-        assert!(sim_to_input.abs() < 0.3, "Binding should be dissimilar to input");
+        assert!(
+            sim_to_weight.abs() < 0.3,
+            "Binding should be dissimilar to weight"
+        );
+        assert!(
+            sim_to_input.abs() < 0.3,
+            "Binding should be dissimilar to input"
+        );
     }
 
     #[test]
@@ -1445,7 +1493,8 @@ mod tests {
         assert!(
             (tau_final - tau_initial).abs() > 0.001,
             "Tau should be state-dependent: initial={}, final={}",
-            tau_initial, tau_final
+            tau_initial,
+            tau_final
         );
     }
 
@@ -1566,9 +1615,18 @@ mod tests {
         // Large dt should give larger sigma (more interpolation)
         let sigma_large = neuron.compute_gating(&input, 10.0);
 
-        assert!(sigma_small >= 0.0 && sigma_small <= 1.0, "Sigma should be in [0,1]");
-        assert!(sigma_large >= 0.0 && sigma_large <= 1.0, "Sigma should be in [0,1]");
-        assert!(sigma_large >= sigma_small, "Larger dt should give larger sigma");
+        assert!(
+            sigma_small >= 0.0 && sigma_small <= 1.0,
+            "Sigma should be in [0,1]"
+        );
+        assert!(
+            sigma_large >= 0.0 && sigma_large <= 1.0,
+            "Sigma should be in [0,1]"
+        );
+        assert!(
+            sigma_large >= sigma_small,
+            "Larger dt should give larger sigma"
+        );
     }
 
     #[test]
@@ -1589,7 +1647,10 @@ mod tests {
         neuron.contrastive_update(&positive, &negative, 0.1);
 
         // Weights should have changed (we didn't update state, but weights affect future dynamics)
-        assert!(neuron.weight_hv.norm() <= 2.1, "Weights should remain bounded");
+        assert!(
+            neuron.weight_hv.norm() <= 2.1,
+            "Weights should remain bounded"
+        );
     }
 
     #[test]
@@ -1628,22 +1689,33 @@ mod tests {
 
         // All neurons must be bit-identical
         for l in 0..net1.n_layers() {
-            for (n, (a, b)) in net1.layer(l).unwrap().iter()
+            for (n, (a, b)) in net1
+                .layer(l)
+                .unwrap()
+                .iter()
                 .zip(net2.layer(l).unwrap().iter())
                 .enumerate()
             {
                 assert_eq!(
                     a.weight_hv_ref().values,
                     b.weight_hv_ref().values,
-                    "layer {} neuron {} weight_hv mismatch", l, n
+                    "layer {} neuron {} weight_hv mismatch",
+                    l,
+                    n
                 );
             }
         }
 
         // Layer bindings must be identical
         assert_eq!(
-            net1.layer_bindings.iter().map(|hv| &hv.values).collect::<Vec<_>>(),
-            net2.layer_bindings.iter().map(|hv| &hv.values).collect::<Vec<_>>(),
+            net1.layer_bindings
+                .iter()
+                .map(|hv| &hv.values)
+                .collect::<Vec<_>>(),
+            net2.layer_bindings
+                .iter()
+                .map(|hv| &hv.values)
+                .collect::<Vec<_>>(),
             "layer_bindings mismatch"
         );
 
@@ -1651,7 +1723,11 @@ mod tests {
         let n00 = net1.layer(0).unwrap()[0].weight_hv_ref();
         let n11 = net1.layer(1).unwrap()[1].weight_hv_ref();
         let sim = n00.similarity(n11);
-        assert!(sim.abs() < 0.05, "Different neurons should be near-orthogonal, got {}", sim);
+        assert!(
+            sim.abs() < 0.05,
+            "Different neurons should be near-orthogonal, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -1669,6 +1745,9 @@ mod tests {
         net.evolve_closed_form(1.0, &input);
 
         let output = net.output();
-        assert!(output.norm() > 0.0, "Network should produce output after evolution");
+        assert!(
+            output.norm() > 0.0,
+            "Network should produce output after evolution"
+        );
     }
 }

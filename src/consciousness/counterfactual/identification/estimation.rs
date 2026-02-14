@@ -7,8 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::dag::{
-    CausalDAG, CausalEstimand, CausalQuery, CausalQueryOutcome,
-    IdentificationMethod,
+    CausalDAG, CausalEstimand, CausalQuery, CausalQueryOutcome, IdentificationMethod,
 };
 use super::reasoner::CounterfactualReasoner;
 
@@ -38,7 +37,11 @@ impl ObservationalData {
 
     /// Add an observation (row of values).
     pub fn add_observation(&mut self, values: Vec<f64>) {
-        assert_eq!(values.len(), self.variables.len(), "Value count must match variable count");
+        assert_eq!(
+            values.len(),
+            self.variables.len(),
+            "Value count must match variable count"
+        );
         self.observations.push(values);
     }
 
@@ -62,7 +65,9 @@ impl ObservationalData {
             return 0.0;
         }
         let mean = self.mean(var_idx);
-        let sum_sq: f64 = self.observations.iter()
+        let sum_sq: f64 = self
+            .observations
+            .iter()
             .map(|row| (row[var_idx] - mean).powi(2))
             .sum();
         sum_sq / (self.observations.len() - 1) as f64
@@ -75,7 +80,9 @@ impl ObservationalData {
         }
         let mean1 = self.mean(var1);
         let mean2 = self.mean(var2);
-        let sum: f64 = self.observations.iter()
+        let sum: f64 = self
+            .observations
+            .iter()
             .map(|row| (row[var1] - mean1) * (row[var2] - mean2))
             .sum();
         sum / (self.observations.len() - 1) as f64
@@ -83,7 +90,9 @@ impl ObservationalData {
 
     /// Filter observations by a condition on one variable.
     pub fn filter(&self, var_idx: usize, predicate: impl Fn(f64) -> bool) -> ObservationalData {
-        let filtered: Vec<Vec<f64>> = self.observations.iter()
+        let filtered: Vec<Vec<f64>> = self
+            .observations
+            .iter()
             .filter(|row| predicate(row[var_idx]))
             .cloned()
             .collect();
@@ -103,11 +112,17 @@ impl ObservationalData {
             groups.entry(bin).or_default().push(row.clone());
         }
 
-        groups.into_iter()
-            .map(|(bin, obs)| (bin, ObservationalData {
-                variables: self.variables.clone(),
-                observations: obs,
-            }))
+        groups
+            .into_iter()
+            .map(|(bin, obs)| {
+                (
+                    bin,
+                    ObservationalData {
+                        variables: self.variables.clone(),
+                        observations: obs,
+                    },
+                )
+            })
             .collect()
     }
 }
@@ -139,7 +154,11 @@ impl EffectEstimator {
         let outcome = self.reasoner.query(dag, query);
 
         match &outcome {
-            CausalQueryOutcome::Identified { estimand, method, confidence } => {
+            CausalQueryOutcome::Identified {
+                estimand,
+                method,
+                confidence,
+            } => {
                 // Compute actual effect based on method
                 let effect = match method {
                     IdentificationMethod::BackdoorAdjustment => {
@@ -207,14 +226,13 @@ impl EffectEstimator {
         let mean_y = y_residuals.iter().sum::<f64>() / n;
         let mean_x = x_residuals.iter().sum::<f64>() / n;
 
-        let cov: f64 = y_residuals.iter()
+        let cov: f64 = y_residuals
+            .iter()
             .zip(x_residuals.iter())
             .map(|(yi, xi)| (yi - mean_y) * (xi - mean_x))
             .sum();
 
-        let var_x: f64 = x_residuals.iter()
-            .map(|xi| (xi - mean_x).powi(2))
-            .sum();
+        let var_x: f64 = x_residuals.iter().map(|xi| (xi - mean_x).powi(2)).sum();
 
         if var_x.abs() < 1e-10 {
             return 0.0;
@@ -284,14 +302,13 @@ impl EffectEstimator {
         let mean_y = y_residuals.iter().sum::<f64>() / n;
         let mean_x = x_residuals.iter().sum::<f64>() / n;
 
-        let cov: f64 = y_residuals.iter()
+        let cov: f64 = y_residuals
+            .iter()
             .zip(x_residuals.iter())
             .map(|(yi, xi)| (yi - mean_y) * (xi - mean_x))
             .sum();
 
-        let var_x: f64 = x_residuals.iter()
-            .map(|xi| (xi - mean_x).powi(2))
-            .sum();
+        let var_x: f64 = x_residuals.iter().map(|xi| (xi - mean_x).powi(2)).sum();
 
         if var_x.abs() < 1e-10 {
             return 0.0;
@@ -329,10 +346,12 @@ impl EffectEstimator {
             }
 
             // Coefficient for this control
-            let cov_tc: f64 = residuals.iter()
+            let cov_tc: f64 = residuals
+                .iter()
                 .zip(data.observations.iter())
                 .map(|(r, row)| (*r - target_mean) * (row[control] - control_mean))
-                .sum::<f64>() / (n - 1) as f64;
+                .sum::<f64>()
+                / (n - 1) as f64;
 
             let beta = cov_tc / control_var;
 
@@ -556,9 +575,9 @@ impl EffectEstimator {
         let outcome = self.reasoner.query(dag, query);
 
         let (adjustment_set, method) = match &outcome {
-            CausalQueryOutcome::Identified { estimand, method, .. } => {
-                (estimand.adjustment_set.clone(), *method)
-            }
+            CausalQueryOutcome::Identified {
+                estimand, method, ..
+            } => (estimand.adjustment_set.clone(), *method),
             _ => {
                 return RobustEstimate {
                     effect: 0.0,
@@ -609,7 +628,8 @@ impl RobustEstimate {
     ///
     /// Large disagreement between methods suggests model problems.
     pub fn estimates_agree(&self, tolerance: f64) -> bool {
-        let max_diff = (self.regression_estimate - self.ipw_estimate).abs()
+        let max_diff = (self.regression_estimate - self.ipw_estimate)
+            .abs()
             .max((self.regression_estimate - self.dr_estimate).abs())
             .max((self.ipw_estimate - self.dr_estimate).abs());
         max_diff < tolerance
@@ -621,7 +641,8 @@ impl RobustEstimate {
             return 0.0;
         }
 
-        let spread = (self.regression_estimate - self.ipw_estimate).abs()
+        let spread = (self.regression_estimate - self.ipw_estimate)
+            .abs()
             .max((self.regression_estimate - self.dr_estimate).abs());
 
         // Higher agreement = higher confidence

@@ -40,16 +40,16 @@
 //!    - Epistemic certainty about one's own states
 //!
 //! ## Revolutionary Properties
-//! 
+//!
 //! 1. **Differentiable**: Can be optimized with gradient descent
 //! 2. **Temporally Continuous**: Models persistence of consciousness
 //! 3. **Causally Grounded**: Measures if consciousness causes behavior
 //! 4. **Multi-Theory Unified**: First equation combining ALL major theories
 //! 5. **Empirically Testable**: Weights can be learned from data
 
+use crate::consciousness::pac::PacTracker;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use crate::consciousness::pac::PacTracker;
 
 /// Temperature for soft-minimum (default: sharp but smooth)
 pub const DEFAULT_TAU: f64 = 0.1;
@@ -192,12 +192,14 @@ impl ConsciousnessStateV2 {
 
     /// Set an extended component value
     pub fn set_extended(&mut self, name: &str, value: f64) {
-        self.extended_values.insert(name.to_string(), value.clamp(0.0, 1.0));
+        self.extended_values
+            .insert(name.to_string(), value.clamp(0.0, 1.0));
     }
 
     /// Set phase coherence for a component
     pub fn set_coherence(&mut self, name: &str, coherence: f64) {
-        self.phase_coherence.insert(name.to_string(), coherence.clamp(0.0, 1.0));
+        self.phase_coherence
+            .insert(name.to_string(), coherence.clamp(0.0, 1.0));
     }
 
     /// Get phase coherence (default to 1.0 if not set)
@@ -241,7 +243,8 @@ impl PhaseCoherenceTracker {
 
     /// Update phase for a component
     pub fn update_phase(&mut self, component: &str, phase: f64) {
-        let history = self.phase_history
+        let history = self
+            .phase_history
             .entry(component.to_string())
             .or_insert_with(|| VecDeque::with_capacity(self.window_size));
 
@@ -404,7 +407,7 @@ impl ConsciousnessEquationV2 {
     /// Create with custom config
     pub fn with_config(config: EquationConfig) -> Self {
         let phase_tracker = PhaseCoherenceTracker::new(config.coherence_window);
-        
+
         // Initialize PAC tracking Workspace (low freq) -> Binding (high freq)
         let pac_tracker = PacTracker::new("Workspace", "Binding", config.coherence_window);
 
@@ -462,15 +465,24 @@ impl ConsciousnessEquationV2 {
         // 2. PAC Integration: Observe Workspace (Driver) -> Binding (Responder)
         // Workspace value acts as low-freq phase proxy (scaled 0-2pi)
         // Binding value acts as high-freq amplitude
-        self.pac_tracker.observe(workspace * std::f64::consts::TAU, binding);
-        
+        self.pac_tracker
+            .observe(workspace * std::f64::consts::TAU, binding);
+
         let pac_modulation = self.pac_tracker.compute_modulation_index();
-        
+
         // Boost Binding if PAC is high (Top-down control successful)
         // B' = B * (1 + PAC) normalized
         let effective_binding = (binding * (1.0 + pac_modulation)).clamp(0.0, 1.0);
 
-        let core_values = [phi, effective_binding, workspace, attention, recursion, efficacy, knowledge];
+        let core_values = [
+            phi,
+            effective_binding,
+            workspace,
+            attention,
+            recursion,
+            efficacy,
+            knowledge,
+        ];
 
         // 3. Soft minimum (differentiable)
         let core_min = self.soft_min(&core_values);
@@ -505,7 +517,8 @@ impl ConsciousnessEquationV2 {
         self.update_temporal_memory(consciousness);
 
         // 11. Update phase tracking (use core_min as global phase proxy)
-        self.phase_tracker.update_global(core_min * std::f64::consts::TAU);
+        self.phase_tracker
+            .update_global(core_min * std::f64::consts::TAU);
 
         // 12. Generate explanation
         let explanation = self.generate_explanation(
@@ -556,7 +569,8 @@ impl ConsciousnessEquationV2 {
         // For numerical stability, subtract max before exp
         let max_val = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
-        let sum_exp: f64 = values.iter()
+        let sum_exp: f64 = values
+            .iter()
             .map(|&x| (-(x - max_val) / self.config.tau).exp())
             .sum();
 
@@ -573,7 +587,8 @@ impl ConsciousnessEquationV2 {
 
     /// Find the limiting factor (lowest core component)
     fn find_limiting_factor(&self, values: &[(CoreComponent, f64)]) -> CoreComponent {
-        values.iter()
+        values
+            .iter()
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .map(|(c, _)| *c)
             .unwrap_or(CoreComponent::Integration)
@@ -765,8 +780,12 @@ mod tests {
         let true_min = values.iter().cloned().fold(f64::INFINITY, f64::min);
 
         // With τ = 0.1, soft_min should be close to true min
-        assert!((soft - true_min).abs() < 0.05, 
-            "soft_min={}, true_min={}", soft, true_min);
+        assert!(
+            (soft - true_min).abs() < 0.05,
+            "soft_min={}, true_min={}",
+            soft,
+            true_min
+        );
     }
 
     #[test]
@@ -809,7 +828,11 @@ mod tests {
         println!("  Explanation: {}", result.explanation);
 
         // Should have high consciousness
-        assert!(result.consciousness > 0.5, "Expected high consciousness, got {}", result.consciousness);
+        assert!(
+            result.consciousness > 0.5,
+            "Expected high consciousness, got {}",
+            result.consciousness
+        );
     }
 
     #[test]
@@ -834,7 +857,11 @@ mod tests {
         println!("  Limiting factor: {:?}", result.limiting_factor);
 
         // Should have lower consciousness
-        assert!(result.consciousness < 0.5, "Expected low consciousness, got {}", result.consciousness);
+        assert!(
+            result.consciousness < 0.5,
+            "Expected low consciousness, got {}",
+            result.consciousness
+        );
 
         // Binding should be the limiting factor
         assert_eq!(result.limiting_factor, CoreComponent::Binding);
@@ -893,7 +920,10 @@ mod tests {
 
         let coherence = tracker.compute_coherence("test");
         println!("Perfect synchrony coherence: {}", coherence);
-        assert!(coherence > 0.9, "Synchronized phases should have high coherence");
+        assert!(
+            coherence > 0.9,
+            "Synchronized phases should have high coherence"
+        );
 
         // Add desynchronized phases
         let mut tracker2 = PhaseCoherenceTracker::new(10);
@@ -911,22 +941,22 @@ mod tests {
     fn test_pac_modulation() {
         let mut eq = ConsciousnessEquationV2::new();
         let mut state = ConsciousnessStateV2::new();
-        
+
         // Initial binding is low
         state.set_core(CoreComponent::Binding, 0.3);
         state.set_core(CoreComponent::Workspace, 0.8);
-        
+
         // Feed synchronized data (phase 0 -> high amp, phase pi -> low amp)
         for i in 0..50 {
             let phase = (i as f64) * 0.2;
             let amp = 0.5 + 0.4 * phase.cos(); // Amplitude follows phase
-            
+
             state.set_core(CoreComponent::Workspace, phase / std::f64::consts::TAU);
             state.set_core(CoreComponent::Binding, amp);
-            
+
             eq.compute(&state);
         }
-        
+
         let result = eq.compute(&state);
         println!("PAC Modulation: {:.4}", result.pac_modulation);
         assert!(result.pac_modulation > 0.01, "Should detect coupling");
@@ -937,7 +967,13 @@ mod tests {
         let mut eq = ConsciousnessEquationV2::new();
 
         // Test various levels
-        let levels = [(0.9, "very high"), (0.7, "high"), (0.5, "moderate"), (0.3, "low"), (0.1, "minimal")];
+        let levels = [
+            (0.9, "very high"),
+            (0.7, "high"),
+            (0.5, "moderate"),
+            (0.3, "low"),
+            (0.1, "minimal"),
+        ];
 
         for (target, _expected_level) in levels {
             let mut state = ConsciousnessStateV2::new();
@@ -947,10 +983,16 @@ mod tests {
 
             let result = eq.compute(&state);
             // Explanation should be non-empty and consciousness level should be in valid range
-            assert!(!result.explanation.is_empty(),
-                "Explanation should not be empty for C={:.1}", target);
-            assert!(result.consciousness >= 0.0 && result.consciousness <= 1.0,
-                "Consciousness level should be in [0, 1] for target={:.1}", target);
+            assert!(
+                !result.explanation.is_empty(),
+                "Explanation should not be empty for C={:.1}",
+                target
+            );
+            assert!(
+                result.consciousness >= 0.0 && result.consciousness <= 1.0,
+                "Consciousness level should be in [0, 1] for target={:.1}",
+                target
+            );
         }
     }
 }

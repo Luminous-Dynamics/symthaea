@@ -413,8 +413,7 @@ pub enum AutopoieticPhase {
 /// Life state of the autopoietic system
 ///
 /// Describes the overall vitality and operational state of the system.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum LifeState {
     /// System is thriving and expanding capabilities
     Flourishing,
@@ -428,7 +427,6 @@ pub enum LifeState {
     /// System has lost autopoietic organization
     Dead,
 }
-
 
 /// A perturbation from the environment
 #[derive(Debug, Clone)]
@@ -592,7 +590,8 @@ impl AutopoieticConsciousness {
             self.stats.boundary_violations += 1;
 
             // Strengthen boundary
-            self.boundary = ContinuousHV::bundle_owned(&[self.boundary.clone(), perturbation.content.clone()]);
+            self.boundary =
+                ContinuousHV::bundle_owned(&[self.boundary.clone(), perturbation.content.clone()]);
             self.state.boundary_strength = (self.state.boundary_strength + 0.1).min(1.0);
 
             return false;
@@ -608,7 +607,8 @@ impl AutopoieticConsciousness {
         for component in self.components.values_mut() {
             if component.component_type == ComponentType::Processing {
                 let perturbation_effect = perturbation.content.clone().scale(adaptation_strength);
-                component.state = ContinuousHV::bundle_owned(&[component.state.clone(), perturbation_effect]);
+                component.state =
+                    ContinuousHV::bundle_owned(&[component.state.clone(), perturbation_effect]);
             }
         }
 

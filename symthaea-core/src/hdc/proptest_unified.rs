@@ -4,8 +4,8 @@
 //! commutativity, orthogonality, symmetry, permutation invertibility, normalization
 //! idempotence, and bundle retrieval properties.
 
-use proptest::prelude::*;
 use super::unified_hv::ContinuousHV;
+use proptest::prelude::*;
 
 const TEST_DIM: usize = 512;
 

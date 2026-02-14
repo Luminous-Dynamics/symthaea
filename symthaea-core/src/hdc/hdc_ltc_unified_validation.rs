@@ -41,8 +41,8 @@
 //! - Long-term evolution (t=100)
 //! - Edge cases (zero input, saturated state)
 
+use crate::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig};
 use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig, UnifiedActivation};
 
 /// Test configuration for validation runs
 #[derive(Debug, Clone)]
@@ -96,7 +96,9 @@ impl ValidationResult {
 /// Compute L2 error between two hypervectors
 pub fn l2_error(a: &ContinuousHV, b: &ContinuousHV) -> f64 {
     assert_eq!(a.dim(), b.dim());
-    let sum_sq: f64 = a.values.iter()
+    let sum_sq: f64 = a
+        .values
+        .iter()
         .zip(b.values.iter())
         .map(|(x, y)| (*x as f64 - *y as f64).powi(2))
         .sum();
@@ -106,7 +108,8 @@ pub fn l2_error(a: &ContinuousHV, b: &ContinuousHV) -> f64 {
 /// Compute maximum component-wise error
 pub fn max_component_error(a: &ContinuousHV, b: &ContinuousHV) -> f64 {
     assert_eq!(a.dim(), b.dim());
-    a.values.iter()
+    a.values
+        .iter()
         .zip(b.values.iter())
         .map(|(x, y)| (*x as f64 - *y as f64).abs())
         .fold(0.0f64, f64::max)
@@ -116,7 +119,7 @@ pub fn max_component_error(a: &ContinuousHV, b: &ContinuousHV) -> f64 {
 fn create_test_neuron(tau: f32, dim: usize, seed: u64) -> HdcLtcUnifiedNeuron {
     let config = UnifiedConfig {
         tau_base: tau,
-        backbone_tau: 0.0,  // Disable state-dependent tau for validation
+        backbone_tau: 0.0, // Disable state-dependent tau for validation
         dimension: dim,
         activation: UnifiedActivation::Tanh,
         learning_rate: 0.01,
@@ -147,7 +150,11 @@ pub fn validate_closed_form_vs_rk4(config: &ValidationConfig) -> ValidationResul
     let l2 = l2_error(neuron_rk4.state(), neuron_cf.state());
     let max_err = max_component_error(neuron_rk4.state(), neuron_cf.state());
     let rk4_norm = neuron_rk4.state().norm() as f64;
-    let relative = if rk4_norm > 1e-10 { l2 / rk4_norm * 100.0 } else { 0.0 };
+    let relative = if rk4_norm > 1e-10 {
+        l2 / rk4_norm * 100.0
+    } else {
+        0.0
+    };
     let sim = neuron_rk4.state().similarity(neuron_cf.state());
 
     ValidationResult {
@@ -182,7 +189,11 @@ pub fn validate_exact_closed_form_vs_rk4(config: &ValidationConfig) -> Validatio
     let l2 = l2_error(neuron_rk4.state(), neuron_exact.state());
     let max_err = max_component_error(neuron_rk4.state(), neuron_exact.state());
     let rk4_norm = neuron_rk4.state().norm() as f64;
-    let relative = if rk4_norm > 1e-10 { l2 / rk4_norm * 100.0 } else { 0.0 };
+    let relative = if rk4_norm > 1e-10 {
+        l2 / rk4_norm * 100.0
+    } else {
+        0.0
+    };
     let sim = neuron_rk4.state().similarity(neuron_exact.state());
 
     ValidationResult {
@@ -210,7 +221,11 @@ pub fn compare_cfc_vs_exact(config: &ValidationConfig) -> ValidationResult {
     let l2 = l2_error(neuron_cfc.state(), neuron_exact.state());
     let max_err = max_component_error(neuron_cfc.state(), neuron_exact.state());
     let exact_norm = neuron_exact.state().norm() as f64;
-    let relative = if exact_norm > 1e-10 { l2 / exact_norm * 100.0 } else { 0.0 };
+    let relative = if exact_norm > 1e-10 {
+        l2 / exact_norm * 100.0
+    } else {
+        0.0
+    };
     let sim = neuron_cfc.state().similarity(neuron_exact.state());
 
     ValidationResult {
@@ -244,7 +259,11 @@ pub fn validate_iterative_closed_form_vs_rk4(config: &ValidationConfig) -> Valid
     let l2 = l2_error(neuron_rk4.state(), neuron_iter.state());
     let max_err = max_component_error(neuron_rk4.state(), neuron_iter.state());
     let rk4_norm = neuron_rk4.state().norm() as f64;
-    let relative = if rk4_norm > 1e-10 { l2 / rk4_norm * 100.0 } else { 0.0 };
+    let relative = if rk4_norm > 1e-10 {
+        l2 / rk4_norm * 100.0
+    } else {
+        0.0
+    };
     let sim = neuron_rk4.state().similarity(neuron_iter.state());
 
     ValidationResult {
@@ -276,7 +295,11 @@ pub fn validate_closed_form_vs_euler(config: &ValidationConfig) -> ValidationRes
     let l2 = l2_error(neuron_euler.state(), neuron_cf.state());
     let max_err = max_component_error(neuron_euler.state(), neuron_cf.state());
     let euler_norm = neuron_euler.state().norm() as f64;
-    let relative = if euler_norm > 1e-10 { l2 / euler_norm * 100.0 } else { 0.0 };
+    let relative = if euler_norm > 1e-10 {
+        l2 / euler_norm * 100.0
+    } else {
+        0.0
+    };
     let sim = neuron_euler.state().similarity(neuron_cf.state());
 
     ValidationResult {
@@ -315,7 +338,11 @@ pub fn measure_error_growth(config: &ValidationConfig) -> ValidationResult {
 
         let l2 = l2_error(neuron_rk4.state(), neuron_cf.state());
         let rk4_norm = neuron_rk4.state().norm() as f64;
-        let relative = if rk4_norm > 1e-10 { l2 / rk4_norm * 100.0 } else { 0.0 };
+        let relative = if rk4_norm > 1e-10 {
+            l2 / rk4_norm * 100.0
+        } else {
+            0.0
+        };
         errors.push((t, relative));
     }
 
@@ -369,7 +396,11 @@ pub fn validate_zero_input(tau: f32, dim: usize) -> ValidationResult {
     let l2 = l2_error(neuron_rk4.state(), neuron_cf.state());
     let max_err = max_component_error(neuron_rk4.state(), neuron_cf.state());
     let rk4_norm = neuron_rk4.state().norm() as f64;
-    let relative = if rk4_norm > 1e-10 { l2 / rk4_norm * 100.0 } else { 0.0 };
+    let relative = if rk4_norm > 1e-10 {
+        l2 / rk4_norm * 100.0
+    } else {
+        0.0
+    };
     let sim = neuron_rk4.state().similarity(neuron_cf.state());
 
     ValidationResult {
@@ -404,7 +435,11 @@ pub fn validate_saturated_state(tau: f32, dim: usize) -> ValidationResult {
     let l2 = l2_error(neuron_rk4.state(), neuron_cf.state());
     let max_err = max_component_error(neuron_rk4.state(), neuron_cf.state());
     let rk4_norm = neuron_rk4.state().norm() as f64;
-    let relative = if rk4_norm > 1e-10 { l2 / rk4_norm * 100.0 } else { 0.0 };
+    let relative = if rk4_norm > 1e-10 {
+        l2 / rk4_norm * 100.0
+    } else {
+        0.0
+    };
     let sim = neuron_rk4.state().similarity(neuron_cf.state());
 
     ValidationResult {
@@ -419,7 +454,7 @@ pub fn validate_saturated_state(tau: f32, dim: usize) -> ValidationResult {
 
 /// Run all validation scenarios
 pub fn run_all_validations() -> Vec<ValidationResult> {
-    let dim = 1024;  // Smaller dimension for faster tests
+    let dim = 1024; // Smaller dimension for faster tests
 
     let scenarios = vec![
         ValidationConfig {
@@ -504,14 +539,31 @@ pub fn print_validation_report(results: &[ValidationResult]) {
         };
 
         println!("║ {:60} [{:4}] ║", result.scenario, status);
-        println!("║   L2 Error:     {:12.6}                                         ║", result.l2_error);
-        println!("║   Max Error:    {:12.6}                                         ║", result.max_error);
-        println!("║   Relative:     {:10.3}%                                          ║", result.relative_error_percent);
-        println!("║   Similarity:   {:12.4}                                         ║", result.similarity);
+        println!(
+            "║   L2 Error:     {:12.6}                                         ║",
+            result.l2_error
+        );
+        println!(
+            "║   Max Error:    {:12.6}                                         ║",
+            result.max_error
+        );
+        println!(
+            "║   Relative:     {:10.3}%                                          ║",
+            result.relative_error_percent
+        );
+        println!(
+            "║   Similarity:   {:12.4}                                         ║",
+            result.similarity
+        );
         if let Some(growth) = result.error_growth {
-            println!("║   Error Growth: {:12.6}/s                                      ║", growth);
+            println!(
+                "║   Error Growth: {:12.6}/s                                      ║",
+                growth
+            );
         }
-        println!("╠══════════════════════════════════════════════════════════════════════════════╣");
+        println!(
+            "╠══════════════════════════════════════════════════════════════════════════════╣"
+        );
     }
 
     println!("╚══════════════════════════════════════════════════════════════════════════════╝\n");
@@ -526,10 +578,9 @@ mod tests {
     use super::*;
 
     /// Test that validates accuracy thresholds
-    const ACCURACY_THRESHOLD_PERCENT: f64 = 1.0;  // 1% relative error threshold
+    const ACCURACY_THRESHOLD_PERCENT: f64 = 1.0; // 1% relative error threshold
 
     #[test]
-
 
     fn test_fast_tau_accuracy() {
         let config = ValidationConfig {
@@ -553,7 +604,6 @@ mod tests {
 
     #[test]
 
-
     fn test_medium_tau_accuracy() {
         let config = ValidationConfig {
             tau_base: 1.0,
@@ -573,7 +623,6 @@ mod tests {
     }
 
     #[test]
-
 
     fn test_slow_tau_accuracy() {
         let config = ValidationConfig {
@@ -595,7 +644,6 @@ mod tests {
 
     #[test]
 
-
     fn test_small_input_accuracy() {
         let config = ValidationConfig {
             tau_base: 1.0,
@@ -616,7 +664,6 @@ mod tests {
 
     #[test]
 
-
     fn test_large_input_accuracy() {
         let config = ValidationConfig {
             tau_base: 1.0,
@@ -636,7 +683,6 @@ mod tests {
     }
 
     #[test]
-
 
     fn test_long_term_accuracy() {
         let config = ValidationConfig {
@@ -659,7 +705,6 @@ mod tests {
 
     #[test]
 
-
     fn test_zero_input_edge_case() {
         let result = validate_zero_input(1.0, 512);
         println!("{}", result.report());
@@ -674,7 +719,6 @@ mod tests {
 
     #[test]
 
-
     fn test_saturated_state_edge_case() {
         let result = validate_saturated_state(1.0, 512);
         println!("{}", result.report());
@@ -688,7 +732,6 @@ mod tests {
     }
 
     #[test]
-
 
     fn test_error_growth_bounded() {
         let config = ValidationConfig {
@@ -723,19 +766,24 @@ mod tests {
         }
 
         // Count failures (>5% relative error)
-        let failures: Vec<_> = results.iter()
+        let failures: Vec<_> = results
+            .iter()
             .filter(|r| r.relative_error_percent > 5.0 && r.similarity < 0.5)
             .collect();
 
         if !failures.is_empty() {
             println!("\nFailed scenarios:");
             for f in &failures {
-                println!("  - {}: {:.2}% error, sim={:.4}", f.scenario, f.relative_error_percent, f.similarity);
+                println!(
+                    "  - {}: {:.2}% error, sim={:.4}",
+                    f.scenario, f.relative_error_percent, f.similarity
+                );
             }
         }
 
         // The test passes if similarity is reasonable (CfC-style gating is approximate)
-        let avg_similarity: f32 = results.iter().map(|r| r.similarity).sum::<f32>() / results.len() as f32;
+        let avg_similarity: f32 =
+            results.iter().map(|r| r.similarity).sum::<f32>() / results.len() as f32;
         println!("\nAverage similarity: {:.4}", avg_similarity);
 
         assert!(
@@ -760,7 +808,12 @@ mod tests {
 
         // This should give us: 0.5 + 0.5 * exp(-1) = 0.5 + 0.5 * 0.368 = 0.684
         let computed = 0.684_f32;
-        assert!((expected - computed).abs() < 0.01, "Expected {}, got {}", expected, computed);
+        assert!(
+            (expected - computed).abs() < 0.01,
+            "Expected {}, got {}",
+            expected,
+            computed
+        );
     }
 
     /// Test that the current gating formula is consistent with documentation
@@ -841,7 +894,7 @@ mod tests {
 
     fn test_equilibrium_convergence() {
         let dim = 256;
-        let tau = 0.1;  // Fast dynamics
+        let tau = 0.1; // Fast dynamics
         let input = ContinuousHV::random(dim, 123);
 
         let mut neuron = create_test_neuron(tau, dim, 42);
@@ -1033,7 +1086,10 @@ mod tests {
 
         // CfC and EXACT will differ due to learned gating
         // Just verify they're still in the same ballpark
-        println!("CfC vs EXACT difference: L2={:.6}, Rel={}%", result.l2_error, result.relative_error_percent);
+        println!(
+            "CfC vs EXACT difference: L2={:.6}, Rel={}%",
+            result.l2_error, result.relative_error_percent
+        );
     }
 
     /// Comprehensive validation of ITERATIVE closed-form across all scenarios
@@ -1084,7 +1140,11 @@ mod tests {
         let mut all_pass = true;
         for config in &scenarios {
             let result = validate_iterative_closed_form_vs_rk4(config);
-            let status = if result.relative_error_percent < 1.0 { "PASS" } else { "FAIL" };
+            let status = if result.relative_error_percent < 1.0 {
+                "PASS"
+            } else {
+                "FAIL"
+            };
             println!("[{}] {}", status, result.report());
 
             if result.relative_error_percent >= 1.0 {
@@ -1092,7 +1152,10 @@ mod tests {
             }
         }
 
-        assert!(all_pass, "All ITERATIVE closed-form scenarios should have <1% error");
+        assert!(
+            all_pass,
+            "All ITERATIVE closed-form scenarios should have <1% error"
+        );
     }
 
     /// Test that exact closed-form preserves the analytical relationship
@@ -1119,7 +1182,10 @@ mod tests {
         // The state should have moved toward equilibrium by factor (1 - exp(-1)) = 0.632
         let expected_factor = 1.0 - (-dt / tau).exp();
         println!("Expected interpolation factor: {:.6}", expected_factor);
-        println!("State norm after exact evolution: {:.6}", neuron.state().norm());
+        println!(
+            "State norm after exact evolution: {:.6}",
+            neuron.state().norm()
+        );
 
         // The state shouldn't be zero anymore
         assert!(
@@ -1170,7 +1236,8 @@ mod tests {
         assert!(
             iter_sim > exact_sim - 0.01,
             "Iterative should be at least as good as single-step: iter={}, exact={}",
-            iter_sim, exact_sim
+            iter_sim,
+            exact_sim
         );
 
         // Iterative should have very high similarity

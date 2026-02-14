@@ -326,8 +326,14 @@ impl TestSuiteResolver {
             .ok()
             .and_then(|re| re.captures(&combined))
         {
-            let passed: usize = caps.get(1).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
-            let failed: usize = caps.get(2).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
+            let passed: usize = caps
+                .get(1)
+                .and_then(|m| m.as_str().parse().ok())
+                .unwrap_or(0);
+            let failed: usize = caps
+                .get(2)
+                .and_then(|m| m.as_str().parse().ok())
+                .unwrap_or(0);
             return (passed, failed);
         }
 
@@ -336,7 +342,10 @@ impl TestSuiteResolver {
             .ok()
             .and_then(|re| re.captures(&combined))
         {
-            let passed: usize = caps.get(1).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
+            let passed: usize = caps
+                .get(1)
+                .and_then(|m| m.as_str().parse().ok())
+                .unwrap_or(0);
 
             let failed: usize = Regex::new(r"(\d+) failed")
                 .ok()
@@ -422,27 +431,28 @@ impl ResourceStateResolver {
                     )
                 }
             }
-            ResourceExpectation::Contains(expected_content) => match std::fs::read_to_string(path)
-            {
-                Ok(content) => {
-                    if content.contains(expected_content) {
-                        ResolutionResult::success(format!(
-                            "Resource contains expected content: {}",
-                            self.path
-                        ))
-                    } else {
-                        ResolutionResult::failure(
-                            OutcomeCategory::SafeFailure,
-                            format!(
-                                "Resource does not contain expected content: {}",
+            ResourceExpectation::Contains(expected_content) => {
+                match std::fs::read_to_string(path) {
+                    Ok(content) => {
+                        if content.contains(expected_content) {
+                            ResolutionResult::success(format!(
+                                "Resource contains expected content: {}",
                                 self.path
-                            ),
-                        )
-                        .with_output(content)
+                            ))
+                        } else {
+                            ResolutionResult::failure(
+                                OutcomeCategory::SafeFailure,
+                                format!(
+                                    "Resource does not contain expected content: {}",
+                                    self.path
+                                ),
+                            )
+                            .with_output(content)
+                        }
                     }
+                    Err(e) => ResolutionResult::unclear(format!("Failed to read resource: {}", e)),
                 }
-                Err(e) => ResolutionResult::unclear(format!("Failed to read resource: {}", e)),
-            },
+            }
             ResourceExpectation::MatchesPattern(pattern) => match std::fs::read_to_string(path) {
                 Ok(content) => match Regex::new(pattern) {
                     Ok(re) => {
@@ -686,13 +696,17 @@ impl ResolutionExecutor {
                 resolver.execute()
             }
 
-            ResolutionAuthority::Composite { authorities, quorum } => {
+            ResolutionAuthority::Composite {
+                authorities,
+                quorum,
+            } => {
                 // Resolve each authority using a helper to avoid cloning the entire prediction
                 let successes = authorities
                     .iter()
                     .filter(|auth| {
                         self.resolve_single_authority(prediction, auth, timeout)
-                            .outcome == OutcomeCategory::Success
+                            .outcome
+                            == OutcomeCategory::Success
                     })
                     .count();
 
@@ -727,7 +741,10 @@ impl ResolutionExecutor {
     ) -> ResolutionResult {
         // Directly match on the authority instead of cloning the prediction
         match authority {
-            ResolutionAuthority::TestSuite { test_pattern, pass_threshold } => {
+            ResolutionAuthority::TestSuite {
+                test_pattern,
+                pass_threshold,
+            } => {
                 let resolver = TestSuiteResolver::cargo_test(Some(test_pattern.clone()))
                     .with_pass_threshold(*pass_threshold);
                 resolver.execute(timeout)
@@ -747,30 +764,46 @@ impl ResolutionExecutor {
                     .with_args(parts[1..].iter().map(|s| (*s).to_string()).collect());
                 resolver.execute(timeout)
             }
-            ResolutionAuthority::DiffVerifier { expected_path, tolerance: _ } => {
-                ResourceStateResolver::exists(expected_path.to_string_lossy()).execute()
-            }
-            ResolutionAuthority::ExternalAPI { endpoint, .. } => {
-                ResolutionResult::unclear(format!("External API resolution not implemented: {}", endpoint))
-            }
+            ResolutionAuthority::DiffVerifier {
+                expected_path,
+                tolerance: _,
+            } => ResourceStateResolver::exists(expected_path.to_string_lossy()).execute(),
+            ResolutionAuthority::ExternalAPI { endpoint, .. } => ResolutionResult::unclear(
+                format!("External API resolution not implemented: {}", endpoint),
+            ),
             ResolutionAuthority::HumanConfirmation { prompt, .. } => {
                 HumanConfirmationResolver::new(prompt.as_str()).execute(timeout)
             }
-            ResolutionAuthority::ResourceState { path, expected_state } => {
+            ResolutionAuthority::ResourceState {
+                path,
+                expected_state,
+            } => {
                 ResourceStateResolver::new(path.to_string_lossy(), expected_state.clone()).execute()
             }
-            ResolutionAuthority::Composite { authorities, quorum } => {
+            ResolutionAuthority::Composite {
+                authorities,
+                quorum,
+            } => {
                 // Recursive case - count successes
                 let successes = authorities
                     .iter()
                     .filter(|auth| {
-                        self.resolve_single_authority(prediction, auth, timeout).outcome == OutcomeCategory::Success
+                        self.resolve_single_authority(prediction, auth, timeout)
+                            .outcome
+                            == OutcomeCategory::Success
                     })
                     .count();
                 if successes >= *quorum {
-                    ResolutionResult::success(format!("Composite: {}/{} agreed", successes, authorities.len()))
+                    ResolutionResult::success(format!(
+                        "Composite: {}/{} agreed",
+                        successes,
+                        authorities.len()
+                    ))
                 } else {
-                    ResolutionResult::failure(OutcomeCategory::SafeFailure, format!("Composite failed: {}/{}", successes, authorities.len()))
+                    ResolutionResult::failure(
+                        OutcomeCategory::SafeFailure,
+                        format!("Composite failed: {}/{}", successes, authorities.len()),
+                    )
                 }
             }
         }
@@ -839,9 +872,10 @@ mod tests {
 
     #[test]
     fn test_human_confirmation_with_callback() {
-        let resolver = HumanConfirmationResolver::new("Is this correct?").with_callback(Box::new(
-            |_prompt| Some((OutcomeCategory::Success, "User confirmed".to_string())),
-        ));
+        let resolver =
+            HumanConfirmationResolver::new("Is this correct?").with_callback(Box::new(|_prompt| {
+                Some((OutcomeCategory::Success, "User confirmed".to_string()))
+            }));
         let result = resolver.execute(Duration::from_secs(1));
         assert_eq!(result.outcome, OutcomeCategory::Success);
     }

@@ -1,13 +1,12 @@
 //! Free energy computation, precision estimation, and expected free energy for action selection.
 
-use std::collections::VecDeque;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
-use super::types::{
-    FreeEnergyComponents, HiddenState, Observation, PrecisionSnapshot,
-    ExpectedFreeEnergyResult,
-};
 use super::generative_model::GenerativeModel;
+use super::types::{
+    ExpectedFreeEnergyResult, FreeEnergyComponents, HiddenState, Observation, PrecisionSnapshot,
+};
 
 // =============================================================================
 // FREE ENERGY CALCULATOR
@@ -77,7 +76,12 @@ impl FreeEnergyCalculator {
     }
 
     /// Compute accuracy term: E_q[ln p(o|s)] ≈ -0.5 * π * ε^2
-    fn compute_accuracy(&self, prediction: &[f64], observation: &Observation, precision: f64) -> f64 {
+    fn compute_accuracy(
+        &self,
+        prediction: &[f64],
+        observation: &Observation,
+        precision: f64,
+    ) -> f64 {
         let mut sum_sq_error = 0.0;
         for (pred, obs) in prediction.iter().zip(observation.values.iter()) {
             sum_sq_error += (pred - obs).powi(2);
@@ -86,7 +90,12 @@ impl FreeEnergyCalculator {
     }
 
     /// Compute complexity term: D_KL[q(s) || p(s)]
-    fn compute_complexity(&self, state: &HiddenState, prior_mean: &[f64], prior_precision: &[f64]) -> f64 {
+    fn compute_complexity(
+        &self,
+        state: &HiddenState,
+        prior_mean: &[f64],
+        prior_precision: &[f64],
+    ) -> f64 {
         let mut kl = 0.0;
         for i in 0..state.mean.len().min(prior_mean.len()) {
             let var_q = 1.0 / state.precision[i].max(0.001);
@@ -100,7 +109,11 @@ impl FreeEnergyCalculator {
     }
 
     /// Compute magnitude of prediction error
-    fn compute_prediction_error_magnitude(&self, prediction: &[f64], observation: &Observation) -> f64 {
+    fn compute_prediction_error_magnitude(
+        &self,
+        prediction: &[f64],
+        observation: &Observation,
+    ) -> f64 {
         let mut sum_sq = 0.0;
         for (pred, obs) in prediction.iter().zip(observation.values.iter()) {
             sum_sq += (pred - obs).powi(2);
@@ -115,7 +128,14 @@ impl FreeEnergyCalculator {
         }
 
         let recent: Vec<f64> = self.history.iter().rev().take(10).cloned().collect();
-        let older: Vec<f64> = self.history.iter().rev().skip(10).take(10).cloned().collect();
+        let older: Vec<f64> = self
+            .history
+            .iter()
+            .rev()
+            .skip(10)
+            .take(10)
+            .cloned()
+            .collect();
 
         if recent.is_empty() || older.is_empty() {
             return 0.0;
@@ -173,14 +193,18 @@ impl PrecisionEstimator {
         // Update sensory precision (how much to trust observations)
         if prediction_error.abs() > 0.5 {
             // High error: increase sensory precision (trust observations more)
-            self.sensory_precision = (self.sensory_precision * (1.0 + self.learning_rate * error_factor)).min(5.0);
+            self.sensory_precision =
+                (self.sensory_precision * (1.0 + self.learning_rate * error_factor)).min(5.0);
             // Decrease prior precision (trust predictions less)
-            self.prior_precision = (self.prior_precision * (1.0 - self.learning_rate * 0.5)).max(0.1);
+            self.prior_precision =
+                (self.prior_precision * (1.0 - self.learning_rate * 0.5)).max(0.1);
         } else {
             // Low error: can rely more on predictions
-            self.prior_precision = (self.prior_precision * (1.0 + self.learning_rate * error_factor)).min(5.0);
+            self.prior_precision =
+                (self.prior_precision * (1.0 + self.learning_rate * error_factor)).min(5.0);
             // Slight decrease in sensory precision (predictions are good)
-            self.sensory_precision = (self.sensory_precision * (1.0 - self.learning_rate * 0.1)).max(0.5);
+            self.sensory_precision =
+                (self.sensory_precision * (1.0 - self.learning_rate * 0.1)).max(0.5);
         }
 
         // State precision based on running average
@@ -191,7 +215,12 @@ impl PrecisionEstimator {
     }
 
     /// Update precision based on action outcome
-    pub fn update_from_action(&mut self, expected_outcome: f64, actual_outcome: f64, timestamp: u64) {
+    pub fn update_from_action(
+        &mut self,
+        expected_outcome: f64,
+        actual_outcome: f64,
+        timestamp: u64,
+    ) {
         let action_error = (expected_outcome - actual_outcome).abs();
         let error_factor = (1.0 + action_error).recip();
 
@@ -234,7 +263,8 @@ impl PrecisionEstimator {
 
         let precisions: Vec<f64> = self.history.iter().map(|s| s.state).collect();
         let mean = precisions.iter().sum::<f64>() / precisions.len() as f64;
-        let variance = precisions.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / precisions.len() as f64;
+        let variance =
+            precisions.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / precisions.len() as f64;
 
         // High variance = low stability
         1.0 - (variance.sqrt() / 2.0).min(1.0)
@@ -293,7 +323,12 @@ impl ExpectedFreeEnergyComputer {
     ///
     /// G(π) = Pragmatic + Epistemic
     ///      = E_q[D_KL[q(o|s) || p̃(o)]] + E_q[H[p(o|s)]]
-    pub fn compute(&mut self, action: usize, state: &HiddenState, model: &GenerativeModel) -> ExpectedFreeEnergyResult {
+    pub fn compute(
+        &mut self,
+        action: usize,
+        state: &HiddenState,
+        model: &GenerativeModel,
+    ) -> ExpectedFreeEnergyResult {
         // Predict next state under this action
         let predicted_state = model.predict_next_state(state, action);
 
@@ -318,8 +353,7 @@ impl ExpectedFreeEnergyComputer {
         }
 
         // Total expected free energy (lower is better)
-        let total = self.pragmatic_weight * pragmatic
-            + self.epistemic_weight * epistemic
+        let total = self.pragmatic_weight * pragmatic + self.epistemic_weight * epistemic
             - self.novelty_weight * novelty; // Novelty encourages exploration
 
         ExpectedFreeEnergyResult {
@@ -343,7 +377,11 @@ impl ExpectedFreeEnergyComputer {
     }
 
     /// Compute epistemic value (uncertainty about outcomes)
-    fn compute_epistemic_value(&self, predicted_state: &HiddenState, current_state: &HiddenState) -> f64 {
+    fn compute_epistemic_value(
+        &self,
+        predicted_state: &HiddenState,
+        current_state: &HiddenState,
+    ) -> f64 {
         // Epistemic value = reduction in uncertainty
         let current_entropy = current_state.entropy();
         let predicted_entropy = predicted_state.entropy();

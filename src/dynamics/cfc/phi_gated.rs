@@ -67,7 +67,10 @@ pub fn compute_phi_attention_weights(phi_values: &[f64], config: &PhiGatedConfig
 
     // Apply softmax with temperature
     let temp = config.temperature.max(1e-10);
-    let max_val = transformed.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let max_val = transformed
+        .iter()
+        .cloned()
+        .fold(f32::NEG_INFINITY, f32::max);
 
     let exp_values: Vec<f32> = transformed
         .iter()

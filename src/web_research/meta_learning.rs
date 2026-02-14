@@ -5,8 +5,8 @@
 //! It tracks verification outcomes, learns source trustworthiness per
 //! domain, and develops domain-specific expertise.
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use super::types::{ResearchSource, VerificationOutcome};
 
@@ -74,7 +74,9 @@ impl SourceCredibility {
 
     /// Get credibility for a specific topic domain
     pub fn credibility_for_domain(&self, topic_domain: &str) -> f32 {
-        self.domain_credibility.get(topic_domain).copied()
+        self.domain_credibility
+            .get(topic_domain)
+            .copied()
             .unwrap_or(self.credibility)
     }
 }
@@ -133,8 +135,8 @@ impl MetaPhi {
         let strategy_factor = (strategy_count as f64 / 5.0).min(1.0);
         let improvement_factor = (accuracy_improvement as f64 + 0.5).clamp(0.0, 1.0);
 
-        let value = (improvement_factor * 0.5 + domain_factor * 0.3 + strategy_factor * 0.2)
-            .min(1.0);
+        let value =
+            (improvement_factor * 0.5 + domain_factor * 0.3 + strategy_factor * 0.2).min(1.0);
 
         Self {
             value,
@@ -157,8 +159,8 @@ impl MetaPhi {
         let strategy_factor = (strategy_count as f64 / 5.0).min(1.0);
         let improvement_factor = (self.accuracy_improvement as f64 + 0.5).clamp(0.0, 1.0);
 
-        let new_value = (improvement_factor * 0.5 + domain_factor * 0.3 + strategy_factor * 0.2)
-            .min(1.0);
+        let new_value =
+            (improvement_factor * 0.5 + domain_factor * 0.3 + strategy_factor * 0.2).min(1.0);
 
         // Calculate improvement rate (smoothed)
         self.improvement_rate = self.improvement_rate * 0.9 + (new_value - self.value) * 0.1;
@@ -242,7 +244,8 @@ impl EpistemicLearner {
     fn update_source_credibility(&mut self, outcome: &VerificationOutcome) {
         let domain = &outcome.source_domain;
 
-        let credibility = self.source_credibility
+        let credibility = self
+            .source_credibility
             .entry(domain.clone())
             .or_insert_with(|| SourceCredibility::new(domain.clone(), outcome.source_type));
 
@@ -259,12 +262,15 @@ impl EpistemicLearner {
 
         // Update domain-specific credibility
         let topic_domain = &outcome.domain;
-        let current = credibility.domain_credibility
+        let current = credibility
+            .domain_credibility
             .get(topic_domain)
             .copied()
             .unwrap_or(0.5);
         let new_value = current + self.config.learning_rate * (target - current);
-        credibility.domain_credibility.insert(topic_domain.clone(), new_value.clamp(0.1, 0.99));
+        credibility
+            .domain_credibility
+            .insert(topic_domain.clone(), new_value.clamp(0.1, 0.99));
     }
 
     /// Update domain expertise based on outcome
@@ -290,7 +296,8 @@ impl EpistemicLearner {
         let domain_count = self.domain_expertise.len();
         let strategy_count = self.strategies.len();
 
-        self.meta_phi.update(current_accuracy, domain_count, strategy_count);
+        self.meta_phi
+            .update(current_accuracy, domain_count, strategy_count);
     }
 
     /// Calculate overall accuracy across all outcomes
@@ -310,7 +317,8 @@ impl EpistemicLearner {
 
     /// Get recommended sources for a topic domain
     pub fn recommend_sources(&self, topic_domain: &str) -> Vec<(String, f32)> {
-        let mut recommendations: Vec<_> = self.source_credibility
+        let mut recommendations: Vec<_> = self
+            .source_credibility
             .values()
             .map(|s| {
                 let credibility = s.credibility_for_domain(topic_domain);
@@ -357,7 +365,11 @@ impl EpistemicLearner {
         self.strategies
             .iter()
             .filter(|s| s.domain == topic_domain)
-            .max_by(|a, b| a.success_rate.partial_cmp(&b.success_rate).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.success_rate
+                    .partial_cmp(&b.success_rate)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
     }
 
     /// Add a verification strategy
@@ -438,18 +450,19 @@ mod tests {
         // Record some outcomes: 7 correct, 3 wrong
         for i in 0..10 {
             let correct = i % 3 != 0; // i=0,3,6,9 are wrong, rest are correct (6/10)
-            learner.record_outcome(make_outcome(
-                "programming",
-                "rust-lang.org",
-                correct,
-            )).unwrap();
+            learner
+                .record_outcome(make_outcome("programming", "rust-lang.org", correct))
+                .unwrap();
         }
 
         let stats = learner.stats();
         assert_eq!(stats.total_outcomes, 10);
         // 6 out of 10 are correct (i=1,2,4,5,7,8)
-        assert!(stats.accuracy >= 0.5 && stats.accuracy <= 0.7,
-                "Expected accuracy between 0.5 and 0.7, got {}", stats.accuracy);
+        assert!(
+            stats.accuracy >= 0.5 && stats.accuracy <= 0.7,
+            "Expected accuracy between 0.5 and 0.7, got {}",
+            stats.accuracy
+        );
         assert_eq!(stats.source_count, 1);
     }
 
@@ -459,15 +472,21 @@ mod tests {
 
         // Source that is mostly correct
         for _ in 0..20 {
-            learner.record_outcome(make_outcome("programming", "docs.rust-lang.org", true)).unwrap();
+            learner
+                .record_outcome(make_outcome("programming", "docs.rust-lang.org", true))
+                .unwrap();
         }
 
         // Source that is often wrong
         for _ in 0..20 {
-            learner.record_outcome(make_outcome("programming", "random-blog.com", false)).unwrap();
+            learner
+                .record_outcome(make_outcome("programming", "random-blog.com", false))
+                .unwrap();
         }
 
-        let good_source = learner.get_source_credibility("docs.rust-lang.org").unwrap();
+        let good_source = learner
+            .get_source_credibility("docs.rust-lang.org")
+            .unwrap();
         let bad_source = learner.get_source_credibility("random-blog.com").unwrap();
 
         assert!(good_source.credibility > bad_source.credibility);
@@ -481,7 +500,9 @@ mod tests {
 
         // Build expertise in programming
         for _ in 0..30 {
-            learner.record_outcome(make_outcome("programming", "rust-lang.org", true)).unwrap();
+            learner
+                .record_outcome(make_outcome("programming", "rust-lang.org", true))
+                .unwrap();
         }
 
         let expertise = learner.get_domain_expertise("programming");
@@ -506,11 +527,17 @@ mod tests {
 
         // Build history with different sources
         for _ in 0..10 {
-            learner.record_outcome(make_outcome("programming", "rust-lang.org", true)).unwrap();
+            learner
+                .record_outcome(make_outcome("programming", "rust-lang.org", true))
+                .unwrap();
         }
         for _ in 0..10 {
-            learner.record_outcome(make_outcome("programming", "stackoverflow.com", true)).unwrap();
-            learner.record_outcome(make_outcome("programming", "stackoverflow.com", false)).unwrap();
+            learner
+                .record_outcome(make_outcome("programming", "stackoverflow.com", true))
+                .unwrap();
+            learner
+                .record_outcome(make_outcome("programming", "stackoverflow.com", false))
+                .unwrap();
         }
 
         let recommendations = learner.recommend_sources("programming");

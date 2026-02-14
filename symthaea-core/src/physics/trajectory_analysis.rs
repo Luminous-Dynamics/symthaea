@@ -39,16 +39,12 @@
 //! "trajectory consciousness" metrics. The metrics measure engineering
 //! properties (coherence, stability, trend), not consciousness.
 
-use crate::genesis::GenesisSeed;
-use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::temporal_binding::{
-    TemporalBindingConfig, TemporalBindingEngine, StreamHealth,
-};
-use super::design_integration::{
-    DesignIntegrationEngine, EncodedPhysicsState, IntegrationMetrics,
-};
-use super::coupled_physics::{CoupledSimulationResult, OperatingConditions, CoupledPhysicsEngine};
+use super::coupled_physics::{CoupledPhysicsEngine, CoupledSimulationResult, OperatingConditions};
+use super::design_integration::{DesignIntegrationEngine, EncodedPhysicsState, IntegrationMetrics};
 use super::standard_model::PHYSICS_DIM;
+use crate::genesis::GenesisSeed;
+use crate::hdc::temporal_binding::{StreamHealth, TemporalBindingConfig, TemporalBindingEngine};
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -209,7 +205,8 @@ impl TrajectoryAnalysisEngine {
 
         // Update trajectory vector (slow accumulation)
         let lr = 0.1;
-        self.trajectory_vector = self.trajectory_vector
+        self.trajectory_vector = self
+            .trajectory_vector
             .scale((1.0 - lr) as f32)
             .add(&moment.bound_experience.scale(lr as f32));
 
@@ -265,7 +262,9 @@ impl TrajectoryAnalysisEngine {
 
         // Compute variance
         let variance = if self.history.len() > 1 {
-            let sum_sq: f32 = self.history.iter()
+            let sum_sq: f32 = self
+                .history
+                .iter()
                 .map(|s| (s.metrics.overall_integration - mean_integration).powi(2))
                 .sum();
             sum_sq / self.history.len() as f32
@@ -274,10 +273,9 @@ impl TrajectoryAnalysisEngine {
         };
 
         // Trajectory quality: combines temporal coherence with mean integration
-        let trajectory_quality =
-            0.5 * temporal_integration.coherence as f32 +
-            0.3 * mean_integration +
-            0.2 * (1.0 - variance.sqrt().min(1.0));
+        let trajectory_quality = 0.5 * temporal_integration.coherence as f32
+            + 0.3 * mean_integration
+            + 0.2 * (1.0 - variance.sqrt().min(1.0));
 
         TrajectoryMetrics {
             trajectory_quality,
@@ -287,8 +285,16 @@ impl TrajectoryAnalysisEngine {
             narrative_length: self.history.len(),
             mean_integration,
             integration_variance: variance,
-            peak_integration: if self.integration_max.is_finite() { self.integration_max } else { 0.0 },
-            valley_integration: if self.integration_min.is_finite() { self.integration_min } else { 0.0 },
+            peak_integration: if self.integration_max.is_finite() {
+                self.integration_max
+            } else {
+                0.0
+            },
+            valley_integration: if self.integration_min.is_finite() {
+                self.integration_min
+            } else {
+                0.0
+            },
         }
     }
 
@@ -339,7 +345,6 @@ impl TrajectoryAnalysisEngine {
             sum_xx += x * x;
         }
 
-        
         (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x)
     }
 }
@@ -372,7 +377,9 @@ pub fn compare_trajectories(
     let metrics_a = engine_a.trajectory_metrics();
     let metrics_b = engine_b.trajectory_metrics();
 
-    let vector_similarity = engine_a.trajectory_vector.similarity(&engine_b.trajectory_vector);
+    let vector_similarity = engine_a
+        .trajectory_vector
+        .similarity(&engine_b.trajectory_vector);
     let quality_delta = metrics_a.trajectory_quality - metrics_b.trajectory_quality;
 
     let healthier = if metrics_a.trajectory_quality > metrics_b.trajectory_quality {
@@ -438,11 +445,10 @@ mod tests {
             let result = physics.simulate(&conditions);
             let state = trajectory.process(&result);
 
-            println!("  {:>5.0} kW: I={:.4}, binding={:.4}, continuity={:.4}",
-                     power,
-                     state.metrics.overall_integration,
-                     state.temporal_binding,
-                     state.continuity);
+            println!(
+                "  {:>5.0} kW: I={:.4}, binding={:.4}, continuity={:.4}",
+                power, state.metrics.overall_integration, state.temporal_binding, state.continuity
+            );
         }
 
         let metrics = trajectory.trajectory_metrics();
@@ -481,14 +487,22 @@ mod tests {
         println!("\n========================================");
         println!("TRAJECTORY COMPARISON");
         println!("========================================");
-        println!("Steady (A) quality: {:.4}", comparison.metrics_a.trajectory_quality);
-        println!("Ramping (B) quality: {:.4}", comparison.metrics_b.trajectory_quality);
+        println!(
+            "Steady (A) quality: {:.4}",
+            comparison.metrics_a.trajectory_quality
+        );
+        println!(
+            "Ramping (B) quality: {:.4}",
+            comparison.metrics_b.trajectory_quality
+        );
         println!("Vector similarity: {:.4}", comparison.vector_similarity);
         println!("Healthier trajectory: {}", comparison.healthier);
         println!("========================================\n");
 
         assert!(
-            (comparison.metrics_a.trajectory_quality - comparison.metrics_b.trajectory_quality).abs() > 0.001,
+            (comparison.metrics_a.trajectory_quality - comparison.metrics_b.trajectory_quality)
+                .abs()
+                > 0.001,
             "Trajectories should have different quality values"
         );
     }
@@ -550,6 +564,9 @@ mod tests {
         let final_health = trajectory.stream_health();
         println!("\nFinal: {}", final_health);
 
-        assert!(final_health.is_flowing, "Stream should be flowing after 20 states");
+        assert!(
+            final_health.is_flowing,
+            "Stream should be flowing after 20 states"
+        );
     }
 }

@@ -37,8 +37,8 @@
 // ==================================================================================
 
 use super::binary_hv::BinaryHV;
-use super::integrated_information::IntegratedInformation;
 use super::consciousness_gradients::{GradientComputer, GradientConfig};
+use super::integrated_information::IntegratedInformation;
 use serde::{Deserialize, Serialize};
 
 /// Phase space point: (state, velocity)
@@ -84,8 +84,8 @@ impl FlowField {
     pub fn new(num_components: usize, config: GradientConfig) -> Self {
         Self {
             gradient_computer: GradientComputer::new(num_components, config),
-            damping: 0.1,    // Light damping
-            forcing: 1.0,    // Drive toward high consciousness
+            damping: 0.1, // Light damping
+            forcing: 1.0, // Drive toward high consciousness
         }
     }
 
@@ -100,20 +100,25 @@ impl FlowField {
         let gradient = self.gradient_computer.compute_gradient(&point.state);
 
         // Acceleration = forcing * ∇Φ - damping * velocity
-        let acceleration: Vec<BinaryHV> = point.state.iter().enumerate().map(|(i, component)| {
-            // Force from gradient (toward high Φ)
-            let force = gradient.direction;
+        let acceleration: Vec<BinaryHV> = point
+            .state
+            .iter()
+            .enumerate()
+            .map(|(i, component)| {
+                // Force from gradient (toward high Φ)
+                let force = gradient.direction;
 
-            // Damping (opposes motion)
-            let damped = point.velocity[i].bind(&force);
+                // Damping (opposes motion)
+                let damped = point.velocity[i].bind(&force);
 
-            // Combine: a = F - γv
-            if self.forcing > 0.5 {
-                damped.add_noise(self.damping as f32, i as u64)
-            } else {
-                damped
-            }
-        }).collect();
+                // Combine: a = F - γv
+                if self.forcing > 0.5 {
+                    damped.add_noise(self.damping as f32, i as u64)
+                } else {
+                    damped
+                }
+            })
+            .collect();
 
         (state_velocity, acceleration)
     }
@@ -126,7 +131,10 @@ impl FlowField {
         let (velocity, acceleration) = self.compute_flow(point);
 
         // Update velocity: v' = v + a*dt
-        let new_velocity: Vec<BinaryHV> = point.velocity.iter().zip(&acceleration)
+        let new_velocity: Vec<BinaryHV> = point
+            .velocity
+            .iter()
+            .zip(&acceleration)
             .map(|(v, a)| {
                 let scaled = a.permute((dt * 10.0) as usize);
                 v.bind(&scaled)
@@ -134,7 +142,10 @@ impl FlowField {
             .collect();
 
         // Update position: s' = s + v*dt
-        let new_state: Vec<BinaryHV> = point.state.iter().zip(&velocity)
+        let new_state: Vec<BinaryHV> = point
+            .state
+            .iter()
+            .zip(&velocity)
             .map(|(s, v)| {
                 let scaled = v.permute((dt * 10.0) as usize);
                 s.bind(&scaled)
@@ -203,13 +214,17 @@ impl ConsciousnessTrajectory {
         }
 
         // Compare recent variance to older variance
-        let recent: Vec<f64> = self.points.iter()
+        let recent: Vec<f64> = self
+            .points
+            .iter()
             .rev()
             .take(window_size)
             .map(|p| p.phi)
             .collect();
 
-        let older: Vec<f64> = self.points.iter()
+        let older: Vec<f64> = self
+            .points
+            .iter()
             .rev()
             .skip(window_size)
             .take(window_size)
@@ -321,10 +336,10 @@ pub struct DynamicsConfig {
 impl Default for DynamicsConfig {
     fn default() -> Self {
         Self {
-            dt: 0.01,                       // Small time step
-            max_time: 10.0,                 // Simulate for 10 time units
-            convergence_threshold: 1e-3,    // Tight convergence
-            convergence_window: 20,         // Check last 20 steps
+            dt: 0.01,                    // Small time step
+            max_time: 10.0,              // Simulate for 10 time units
+            convergence_threshold: 1e-3, // Tight convergence
+            convergence_window: 20,      // Check last 20 steps
             gradient_config: GradientConfig::default(),
         }
     }
@@ -347,7 +362,12 @@ impl ConsciousnessDynamics {
     /// Simulate consciousness evolution from initial state
     ///
     /// Returns complete trajectory showing how consciousness evolves.
-    pub fn simulate(&mut self, initial_state: &[BinaryHV], num_steps: usize, dt: f64) -> ConsciousnessTrajectory {
+    pub fn simulate(
+        &mut self,
+        initial_state: &[BinaryHV],
+        num_steps: usize,
+        dt: f64,
+    ) -> ConsciousnessTrajectory {
         let mut trajectory = ConsciousnessTrajectory::new();
 
         // Create initial phase point (zero velocity)
@@ -371,12 +391,14 @@ impl ConsciousnessDynamics {
             trajectory.add_point(point.clone());
 
             // Check convergence
-            if step % self.config.convergence_window == 0 && step > self.config.convergence_window * 2
-                && trajectory.is_converging(self.config.convergence_window) {
-                    trajectory.stable = true;
-                    trajectory.attractor = Some(point.state.clone());
-                    break;
-                }
+            if step % self.config.convergence_window == 0
+                && step > self.config.convergence_window * 2
+                && trajectory.is_converging(self.config.convergence_window)
+            {
+                trajectory.stable = true;
+                trajectory.attractor = Some(point.state.clone());
+                break;
+            }
         }
 
         trajectory
@@ -422,9 +444,11 @@ impl ConsciousnessDynamics {
 
     /// Compute similarity between attractors
     fn attractor_similarity(&self, a: &[BinaryHV], b: &[BinaryHV]) -> f32 {
-        a.iter().zip(b.iter())
+        a.iter()
+            .zip(b.iter())
             .map(|(ai, bi)| ai.similarity(bi))
-            .sum::<f32>() / a.len() as f32
+            .sum::<f32>()
+            / a.len() as f32
     }
 
     /// Analyze trajectory stability using Lyapunov analysis
@@ -435,7 +459,9 @@ impl ConsciousnessDynamics {
 
         // Simple Lyapunov exponent estimation
         // λ = lim (1/n) Σ log|dΦ/dt|
-        let log_sum: f64 = trajectory.points.iter()
+        let log_sum: f64 = trajectory
+            .points
+            .iter()
             .map(|p| (p.phi_dot.abs() + 1e-10).ln())
             .sum();
 
@@ -485,9 +511,11 @@ impl ConsciousnessDynamics {
         let (_velocity, acceleration) = self.flow_field.compute_flow(&point);
 
         // Check if acceleration is near zero
-        let acc_magnitude: f32 = acceleration.iter()
+        let acc_magnitude: f32 = acceleration
+            .iter()
             .map(|a| a.popcount() as f32)
-            .sum::<f32>() / acceleration.len() as f32;
+            .sum::<f32>()
+            / acceleration.len() as f32;
 
         acc_magnitude / 2048.0 < threshold as f32
     }
@@ -497,7 +525,9 @@ impl ConsciousnessDynamics {
         let num_steps = (t / self.config.dt) as usize;
         let trajectory = self.simulate(current_state, num_steps, self.config.dt);
 
-        trajectory.points.last()
+        trajectory
+            .points
+            .last()
             .map(|p| p.state.clone())
             .unwrap_or_else(|| current_state.to_vec())
     }
@@ -542,9 +572,9 @@ impl ConsciousnessController {
     pub fn new(target_phi: f64) -> Self {
         Self {
             target_phi,
-            kp: 1.0,     // Proportional gain
-            ki: 0.1,     // Integral gain
-            kd: 0.5,     // Derivative gain
+            kp: 1.0, // Proportional gain
+            ki: 0.1, // Integral gain
+            kd: 0.5, // Derivative gain
             integral_error: 0.0,
             prev_error: 0.0,
         }
@@ -680,7 +710,7 @@ mod tests {
     #[test]
     fn test_find_attractors() {
         let config = DynamicsConfig {
-            dt: 0.05,  // Larger step for faster test
+            dt: 0.05, // Larger step for faster test
             ..Default::default()
         };
         let mut dynamics = ConsciousnessDynamics::new(4, config);
@@ -689,8 +719,11 @@ mod tests {
 
         // Each attractor should have the right number of processes (4)
         for attractor in &attractors {
-            assert_eq!(attractor.len(), 4,
-                       "Each attractor state should have 4 process vectors");
+            assert_eq!(
+                attractor.len(),
+                4,
+                "Each attractor state should have 4 process vectors"
+            );
         }
     }
 

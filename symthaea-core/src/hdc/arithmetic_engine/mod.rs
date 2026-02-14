@@ -16,26 +16,26 @@
 //! | [`symbolic`] | Symbolic algebra: expressions, polynomials, simplification, equation solving |
 //! | [`multi_path`] | `MultiPathVerifier` — multiple independent proof strategies with Phi ranking |
 
-mod verification;
 mod core_number;
-mod engine;
-mod theorems;
-mod hybrid;
 mod discovery;
+mod engine;
+mod hybrid;
+mod multi_path;
 mod reasoning_bridge;
 mod symbolic;
-mod multi_path;
+mod theorems;
+mod verification;
 
 #[cfg(test)]
 mod tests;
 
 // Re-export everything for backward compatibility
-pub use verification::*;
 pub use core_number::*;
-pub use engine::*;
-pub use theorems::*;
-pub use hybrid::*;
 pub use discovery::*;
+pub use engine::*;
+pub use hybrid::*;
+pub use multi_path::*;
 pub use reasoning_bridge::*;
 pub use symbolic::*;
-pub use multi_path::*;
+pub use theorems::*;
+pub use verification::*;

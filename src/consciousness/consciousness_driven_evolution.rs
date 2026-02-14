@@ -44,10 +44,10 @@
 //! **more aware of itself and its environment**.
 
 use crate::consciousness::{
-    hierarchical_ltc::{HierarchicalLTC, HierarchicalConfig},
+    hierarchical_ltc::{HierarchicalConfig, HierarchicalLTC},
     recursive_improvement::{
-        recursive_optimizer::{RecursiveOptimizer, OptimizerConfig},
         gradient_optimizer::{ConsciousnessGradientOptimizer, GradientOptimizerConfig},
+        recursive_optimizer::{OptimizerConfig, RecursiveOptimizer},
     },
 };
 use crate::hdc::binary_hv::BinaryHV;
@@ -172,7 +172,8 @@ impl ConsciousnessOracle {
             phi / coherence
         } else {
             0.0
-        }.clamp(0.0, 1.0);
+        }
+        .clamp(0.0, 1.0);
 
         let now = Instant::now();
         let sample = PhiSample {
@@ -226,16 +227,16 @@ impl ConsciousnessOracle {
         }
 
         // Compute variance of recent Φ measurements
-        let recent: Vec<f64> = self.phi_history.iter()
+        let recent: Vec<f64> = self
+            .phi_history
+            .iter()
             .rev()
             .take(10)
             .map(|s| s.phi)
             .collect();
 
         let mean = recent.iter().sum::<f64>() / recent.len() as f64;
-        let variance = recent.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / recent.len() as f64;
+        let variance = recent.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / recent.len() as f64;
 
         // Sensitivity proportional to variance
         (variance.sqrt() * 10.0).clamp(0.01, 1.0)
@@ -252,12 +253,12 @@ impl ConsciousnessOracle {
             self.stats.max_phi = sample.phi;
             self.stats.min_phi = sample.phi;
         } else {
-            self.stats.current_phi_ema =
-                self.config.smoothing_alpha * sample.phi +
-                (1.0 - self.config.smoothing_alpha) * self.stats.current_phi_ema;
+            self.stats.current_phi_ema = self.config.smoothing_alpha * sample.phi
+                + (1.0 - self.config.smoothing_alpha) * self.stats.current_phi_ema;
 
             self.stats.avg_phi = (self.stats.avg_phi * (self.stats.total_measurements - 1) as f64
-                + sample.phi) / self.stats.total_measurements as f64;
+                + sample.phi)
+                / self.stats.total_measurements as f64;
 
             self.stats.max_phi = self.stats.max_phi.max(sample.phi);
             self.stats.min_phi = self.stats.min_phi.min(sample.phi);
@@ -265,15 +266,15 @@ impl ConsciousnessOracle {
 
         // Compute trend
         if self.phi_history.len() >= 10 {
-            let old_avg: f64 = self.phi_history.iter()
-                .take(5)
-                .map(|s| s.phi)
-                .sum::<f64>() / 5.0;
-            let new_avg: f64 = self.phi_history.iter()
+            let old_avg: f64 = self.phi_history.iter().take(5).map(|s| s.phi).sum::<f64>() / 5.0;
+            let new_avg: f64 = self
+                .phi_history
+                .iter()
                 .rev()
                 .take(5)
                 .map(|s| s.phi)
-                .sum::<f64>() / 5.0;
+                .sum::<f64>()
+                / 5.0;
             self.stats.phi_trend = new_avg - old_avg;
         }
     }
@@ -396,11 +397,17 @@ impl Default for ArchitecturalGenome {
 
         // LTC parameters
         genes.insert("ltc_time_constant".to_string(), Gene::new(0.5, 0.1, 2.0));
-        genes.insert("ltc_coupling_strength".to_string(), Gene::new(0.3, 0.01, 1.0));
+        genes.insert(
+            "ltc_coupling_strength".to_string(),
+            Gene::new(0.3, 0.01, 1.0),
+        );
         genes.insert("ltc_circuit_count".to_string(), Gene::new(8.0, 4.0, 16.0));
 
         // Integration parameters
-        genes.insert("integration_threshold".to_string(), Gene::new(0.5, 0.1, 0.9));
+        genes.insert(
+            "integration_threshold".to_string(),
+            Gene::new(0.5, 0.1, 0.9),
+        );
         genes.insert("coherence_weight".to_string(), Gene::new(0.5, 0.1, 1.0));
 
         // Evolution parameters
@@ -507,7 +514,7 @@ impl ConsciousnessDrivenEvolver {
             oracle: ConsciousnessOracle::new(OracleConfig::default()),
             optimizer: RecursiveOptimizer::new(OptimizerConfig::default()),
             gradient_optimizer: ConsciousnessGradientOptimizer::new(
-                GradientOptimizerConfig::default()
+                GradientOptimizerConfig::default(),
             ),
             genome: ArchitecturalGenome::default(),
             history: Vec::new(),
@@ -660,7 +667,8 @@ impl ConsciousnessDrivenEvolver {
         let mut mutations = 0;
 
         // Get genes to mutate based on bottlenecks
-        let genes_to_mutate: Vec<String> = bottlenecks.iter()
+        let genes_to_mutate: Vec<String> = bottlenecks
+            .iter()
             .flat_map(|b| b.suggested_genes.iter().map(|s| s.to_string()))
             .collect();
 
@@ -712,7 +720,8 @@ impl ConsciousnessDrivenEvolver {
                     if let Some(gene) = self.genome.genes.get_mut(*gene_name) {
                         // Positive delta = gene helped, negative = gene hurt
                         let sensitivity_update = if phi_delta > 0.0 { 0.1 } else { -0.05 };
-                        gene.phi_sensitivity = (gene.phi_sensitivity + sensitivity_update).clamp(0.0, 1.0);
+                        gene.phi_sensitivity =
+                            (gene.phi_sensitivity + sensitivity_update).clamp(0.0, 1.0);
                     }
                 }
             }
@@ -721,7 +730,10 @@ impl ConsciousnessDrivenEvolver {
 
     /// Update list of most sensitive genes
     fn update_sensitive_genes(&mut self) {
-        let mut gene_sensitivities: Vec<(String, f64)> = self.genome.genes.iter()
+        let mut gene_sensitivities: Vec<(String, f64)> = self
+            .genome
+            .genes
+            .iter()
             .map(|(name, gene)| (name.clone(), gene.phi_sensitivity))
             .collect();
 
@@ -742,7 +754,9 @@ impl ConsciousnessDrivenEvolver {
 
             // Check for stagnation
             if self.history.len() > 20 {
-                let recent_improvement: f64 = self.history.iter()
+                let recent_improvement: f64 = self
+                    .history
+                    .iter()
                     .rev()
                     .take(20)
                     .map(|s| s.phi_delta)

@@ -18,11 +18,11 @@
 //! - Cognitive Loop: Bidirectional HDC↔LTC (cognitive_loop.cycle)
 
 use crate::cognitive_loop::{CognitiveLoopBuilder, CognitiveLoopService};
-use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 use crate::learnable_ltc::{LearnableLTC, LearnableLTCConfig};
-use serde::{Serialize, Deserialize};
-use std::time::Instant;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
+use std::time::Instant;
+use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
 /// Configuration for cognitive primitive learning
 #[derive(Debug, Clone)]
@@ -68,14 +68,16 @@ impl CognitivePrimitiveTask {
     /// Get the pattern parts and valid completions
     pub fn get_pattern(&self) -> (&'static str, &'static str, Vec<&'static str>) {
         match self {
-            CognitivePrimitiveTask::CausalChain =>
-                ("cause", "effect", vec!["action", "process", "change"]),
-            CognitivePrimitiveTask::LogicalInference =>
-                ("true", "consequence", vec!["implies", "therefore", "thus"]),
-            CognitivePrimitiveTask::ActionSequence =>
-                ("want", "have", vec!["do", "make", "get"]),
-            CognitivePrimitiveTask::TemporalOrder =>
-                ("before", "after", vec!["now", "during", "when"]),
+            CognitivePrimitiveTask::CausalChain => {
+                ("cause", "effect", vec!["action", "process", "change"])
+            }
+            CognitivePrimitiveTask::LogicalInference => {
+                ("true", "consequence", vec!["implies", "therefore", "thus"])
+            }
+            CognitivePrimitiveTask::ActionSequence => ("want", "have", vec!["do", "make", "get"]),
+            CognitivePrimitiveTask::TemporalOrder => {
+                ("before", "after", vec!["now", "during", "when"])
+            }
         }
     }
 
@@ -94,12 +96,14 @@ impl CognitivePrimitiveTask {
         let (start, end, completions) = self.get_pattern();
         let mut rng = rand::thread_rng();
 
-        (0..count).map(|_| {
-            let completion = completions[rng.gen_range(0..completions.len())];
-            // Create a string that the encoder can process
-            // Format: "start completion end" - the full reasoning chain
-            format!("{} {} {}", start, completion, end)
-        }).collect()
+        (0..count)
+            .map(|_| {
+                let completion = completions[rng.gen_range(0..completions.len())];
+                // Create a string that the encoder can process
+                // Format: "start completion end" - the full reasoning chain
+                format!("{} {} {}", start, completion, end)
+            })
+            .collect()
     }
 }
 
@@ -142,7 +146,10 @@ impl CognitivePrimitiveLearning {
     }
 
     /// Run task with cognitive loop (bidirectional HDC↔LTC)
-    pub fn run_cognitive(&self, task: CognitivePrimitiveTask) -> anyhow::Result<CognitivePrimitiveLearningResults> {
+    pub fn run_cognitive(
+        &self,
+        task: CognitivePrimitiveTask,
+    ) -> anyhow::Result<CognitivePrimitiveLearningResults> {
         let start_time = Instant::now();
 
         // Build cognitive loop service with tuned parameters
@@ -150,7 +157,7 @@ impl CognitivePrimitiveLearning {
         let mut loop_service = CognitiveLoopBuilder::default()
             .with_ltc_neurons(256)
             .with_learning_rate(self.config.learning_rate * 3.0) // 3x learning rate
-            .with_attention_lr(self.config.attention_lr * 2.0)   // 2x attention lr
+            .with_attention_lr(self.config.attention_lr * 2.0) // 2x attention lr
             .with_learning_threshold(0.005) // Lower threshold = learn more often
             .build()?;
 
@@ -215,8 +222,14 @@ impl CognitivePrimitiveLearning {
         let reasoning = format!(
             "Error: {:.1}% reduction | Accuracy: {:.1}% → {:.1}% (Δ{:+.1}%) | Attention: {}",
             error_reduction,
-            initial_accuracy, final_accuracy, accuracy_improvement,
-            if attention_emerged { "emerged" } else { "uniform" }
+            initial_accuracy,
+            final_accuracy,
+            accuracy_improvement,
+            if attention_emerged {
+                "emerged"
+            } else {
+                "uniform"
+            }
         );
 
         Ok(CognitivePrimitiveLearningResults {
@@ -237,7 +250,10 @@ impl CognitivePrimitiveLearning {
     }
 
     /// Run task with original one-way pipeline (for comparison)
-    pub fn run_original(&self, task: CognitivePrimitiveTask) -> anyhow::Result<CognitivePrimitiveLearningResults> {
+    pub fn run_original(
+        &self,
+        task: CognitivePrimitiveTask,
+    ) -> anyhow::Result<CognitivePrimitiveLearningResults> {
         let start_time = Instant::now();
 
         // Create direct LTC (one-way pipeline)
@@ -258,7 +274,8 @@ impl CognitivePrimitiveLearning {
 
         // Measure initial error
         let initial_error = self.measure_ltc_error(&mut ltc, &test_inputs, primitive_system);
-        let initial_accuracy = self.measure_ltc_accuracy(&mut ltc, task, &test_inputs, primitive_system);
+        let initial_accuracy =
+            self.measure_ltc_accuracy(&mut ltc, task, &test_inputs, primitive_system);
 
         let mut episodes = Vec::new();
 
@@ -281,12 +298,13 @@ impl CognitivePrimitiveLearning {
             let avg_loss = total_loss / train_inputs.len() as f32;
 
             // Measure accuracy
-            let accuracy = self.measure_ltc_accuracy(&mut ltc, task, &test_inputs, primitive_system);
+            let accuracy =
+                self.measure_ltc_accuracy(&mut ltc, task, &test_inputs, primitive_system);
 
             episodes.push(CognitiveEpisodeResult {
                 episode,
                 avg_prediction_error: avg_loss,
-                attention_variance: 0.0,  // No attention in one-way pipeline
+                attention_variance: 0.0, // No attention in one-way pipeline
                 pattern_accuracy: accuracy,
                 duration_ms: episode_start.elapsed().as_millis() as u64,
             });
@@ -294,7 +312,8 @@ impl CognitivePrimitiveLearning {
 
         // Final measurements
         let final_error = self.measure_ltc_error(&mut ltc, &test_inputs, primitive_system);
-        let final_accuracy = self.measure_ltc_accuracy(&mut ltc, task, &test_inputs, primitive_system);
+        let final_accuracy =
+            self.measure_ltc_accuracy(&mut ltc, task, &test_inputs, primitive_system);
 
         let error_reduction = if initial_error > 0.0 {
             ((initial_error - final_error) / initial_error * 100.0).max(-100.0)
@@ -331,7 +350,13 @@ impl CognitivePrimitiveLearning {
     }
 
     /// Run both methods and compare
-    pub fn run_comparison(&self, task: CognitivePrimitiveTask) -> anyhow::Result<(CognitivePrimitiveLearningResults, CognitivePrimitiveLearningResults)> {
+    pub fn run_comparison(
+        &self,
+        task: CognitivePrimitiveTask,
+    ) -> anyhow::Result<(
+        CognitivePrimitiveLearningResults,
+        CognitivePrimitiveLearningResults,
+    )> {
         let cognitive_result = self.run_cognitive(task)?;
         let original_result = self.run_original(task)?;
         Ok((cognitive_result, original_result))
@@ -348,7 +373,12 @@ impl CognitivePrimitiveLearning {
         total_error / inputs.len() as f32
     }
 
-    fn measure_accuracy(&self, service: &mut CognitiveLoopService, task: CognitivePrimitiveTask, inputs: &[String]) -> f32 {
+    fn measure_accuracy(
+        &self,
+        service: &mut CognitiveLoopService,
+        task: CognitivePrimitiveTask,
+        inputs: &[String],
+    ) -> f32 {
         let (_, _, valid_completions) = task.get_pattern();
         let mut correct = 0;
 
@@ -356,7 +386,11 @@ impl CognitivePrimitiveLearning {
             let result = service.cycle(input);
             // Check if any valid completion primitive was detected
             for completion in &valid_completions {
-                if result.detected_primitives.iter().any(|p| p.to_lowercase().contains(completion)) {
+                if result
+                    .detected_primitives
+                    .iter()
+                    .any(|p| p.to_lowercase().contains(completion))
+                {
                     correct += 1;
                     break;
                 }
@@ -366,14 +400,22 @@ impl CognitivePrimitiveLearning {
         (correct as f32 / inputs.len() as f32) * 100.0
     }
 
-    fn measure_ltc_error(&self, ltc: &mut LearnableLTC, inputs: &[String], primitive_system: &PrimitiveSystem) -> f32 {
+    fn measure_ltc_error(
+        &self,
+        ltc: &mut LearnableLTC,
+        inputs: &[String],
+        primitive_system: &PrimitiveSystem,
+    ) -> f32 {
         let mut total_error = 0.0;
         for input in inputs {
             let (encoded, target) = self.encode_for_ltc(input, primitive_system);
             if let Ok((output, _)) = ltc.forward(&encoded) {
-                let error: f32 = output.iter().zip(target.iter())
+                let error: f32 = output
+                    .iter()
+                    .zip(target.iter())
                     .map(|(o, t)| (o - t).powi(2))
-                    .sum::<f32>() / target.len() as f32;
+                    .sum::<f32>()
+                    / target.len() as f32;
                 total_error += error;
             }
             ltc.reset_state();
@@ -381,7 +423,13 @@ impl CognitivePrimitiveLearning {
         total_error / inputs.len() as f32
     }
 
-    fn measure_ltc_accuracy(&self, ltc: &mut LearnableLTC, task: CognitivePrimitiveTask, inputs: &[String], primitive_system: &PrimitiveSystem) -> f32 {
+    fn measure_ltc_accuracy(
+        &self,
+        ltc: &mut LearnableLTC,
+        task: CognitivePrimitiveTask,
+        inputs: &[String],
+        primitive_system: &PrimitiveSystem,
+    ) -> f32 {
         let (_, _, valid_completions) = task.get_pattern();
         let mut correct = 0;
 
@@ -390,7 +438,8 @@ impl CognitivePrimitiveLearning {
             if let Ok((output, _)) = ltc.forward(&encoded) {
                 // Simple heuristic: check if output has high values in expected positions
                 // This is a weak proxy for accuracy in the one-way pipeline
-                let max_idx = output.iter()
+                let max_idx = output
+                    .iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                     .map(|(i, _)| i)
@@ -398,7 +447,7 @@ impl CognitivePrimitiveLearning {
 
                 // Map output index to completion (very rough heuristic)
                 if max_idx < valid_completions.len() {
-                    correct += 1;  // Give benefit of doubt
+                    correct += 1; // Give benefit of doubt
                 }
             }
             ltc.reset_state();
@@ -407,7 +456,11 @@ impl CognitivePrimitiveLearning {
         (correct as f32 / inputs.len() as f32) * 100.0
     }
 
-    fn encode_for_ltc(&self, input: &str, primitive_system: &PrimitiveSystem) -> (Vec<f32>, Vec<f32>) {
+    fn encode_for_ltc(
+        &self,
+        input: &str,
+        primitive_system: &PrimitiveSystem,
+    ) -> (Vec<f32>, Vec<f32>) {
         // Simple encoding: hash-based compression to 128D input, 64D target
         let mut encoded = vec![0.0f32; 128];
         let mut target = vec![0.0f32; 64];
@@ -466,24 +519,52 @@ pub fn print_comparison_results(
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│ COGNITIVE LOOP (Bidirectional HDC↔LTC)                      │");
     println!("├─────────────────────────────────────────────────────────────┤");
-    println!("│ Error Reduction: {:>6.1}%                                    │", cognitive.error_reduction_percent);
-    println!("│ Accuracy: {:>5.1}% → {:>5.1}% (Δ{:+5.1}%)                      │",
-             cognitive.initial_accuracy, cognitive.final_accuracy, cognitive.accuracy_improvement);
-    println!("│ Attention Emerged: {:>3}                                      │",
-             if cognitive.attention_emerged { "YES" } else { "NO" });
-    println!("│ Result: {}                                                  │",
-             if cognitive.passed { "PASSED ✓" } else { "FAILED ✗" });
+    println!(
+        "│ Error Reduction: {:>6.1}%                                    │",
+        cognitive.error_reduction_percent
+    );
+    println!(
+        "│ Accuracy: {:>5.1}% → {:>5.1}% (Δ{:+5.1}%)                      │",
+        cognitive.initial_accuracy, cognitive.final_accuracy, cognitive.accuracy_improvement
+    );
+    println!(
+        "│ Attention Emerged: {:>3}                                      │",
+        if cognitive.attention_emerged {
+            "YES"
+        } else {
+            "NO"
+        }
+    );
+    println!(
+        "│ Result: {}                                                  │",
+        if cognitive.passed {
+            "PASSED ✓"
+        } else {
+            "FAILED ✗"
+        }
+    );
     println!("└─────────────────────────────────────────────────────────────┘\n");
 
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│ ORIGINAL (One-Way LTC Pipeline)                             │");
     println!("├─────────────────────────────────────────────────────────────┤");
-    println!("│ Error Reduction: {:>6.1}%                                    │", original.error_reduction_percent);
-    println!("│ Accuracy: {:>5.1}% → {:>5.1}% (Δ{:+5.1}%)                      │",
-             original.initial_accuracy, original.final_accuracy, original.accuracy_improvement);
+    println!(
+        "│ Error Reduction: {:>6.1}%                                    │",
+        original.error_reduction_percent
+    );
+    println!(
+        "│ Accuracy: {:>5.1}% → {:>5.1}% (Δ{:+5.1}%)                      │",
+        original.initial_accuracy, original.final_accuracy, original.accuracy_improvement
+    );
     println!("│ Attention Emerged: N/A (no attention in one-way)            │");
-    println!("│ Result: {}                                                  │",
-             if original.passed { "PASSED ✓" } else { "FAILED ✗" });
+    println!(
+        "│ Result: {}                                                  │",
+        if original.passed {
+            "PASSED ✓"
+        } else {
+            "FAILED ✗"
+        }
+    );
     println!("└─────────────────────────────────────────────────────────────┘\n");
 
     // Winner determination
@@ -492,9 +573,15 @@ pub fn print_comparison_results(
 
     println!("═══════════════════════════════════════════════════════════════");
     if cognitive_score > original_score + 5.0 {
-        println!(" WINNER: COGNITIVE LOOP ({:+.1} combined improvement)         ", cognitive_score - original_score);
+        println!(
+            " WINNER: COGNITIVE LOOP ({:+.1} combined improvement)         ",
+            cognitive_score - original_score
+        );
     } else if original_score > cognitive_score + 5.0 {
-        println!(" WINNER: ORIGINAL ({:+.1} combined improvement)                ", original_score - cognitive_score);
+        println!(
+            " WINNER: ORIGINAL ({:+.1} combined improvement)                ",
+            original_score - cognitive_score
+        );
     } else {
         println!(" RESULT: COMPARABLE (difference < 5%)                          ");
     }

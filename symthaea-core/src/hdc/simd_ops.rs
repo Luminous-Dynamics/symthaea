@@ -276,8 +276,14 @@ unsafe fn intersection_avx512(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 
     let b_ptr = b.as_ptr() as *const __m512i;
     let r_ptr = result.as_mut_ptr() as *mut __m512i;
     for i in (0..32).step_by(2) {
-        let r0 = _mm512_and_si512(_mm512_loadu_si512(a_ptr.add(i)), _mm512_loadu_si512(b_ptr.add(i)));
-        let r1 = _mm512_and_si512(_mm512_loadu_si512(a_ptr.add(i + 1)), _mm512_loadu_si512(b_ptr.add(i + 1)));
+        let r0 = _mm512_and_si512(
+            _mm512_loadu_si512(a_ptr.add(i)),
+            _mm512_loadu_si512(b_ptr.add(i)),
+        );
+        let r1 = _mm512_and_si512(
+            _mm512_loadu_si512(a_ptr.add(i + 1)),
+            _mm512_loadu_si512(b_ptr.add(i + 1)),
+        );
         _mm512_storeu_si512(r_ptr.add(i), r0);
         _mm512_storeu_si512(r_ptr.add(i + 1), r1);
     }
@@ -291,10 +297,34 @@ unsafe fn intersection_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 20
     let b_ptr = b.as_ptr() as *const __m256i;
     let r_ptr = result.as_mut_ptr() as *mut __m256i;
     for i in (0..64).step_by(4) {
-        _mm256_storeu_si256(r_ptr.add(i), _mm256_and_si256(_mm256_loadu_si256(a_ptr.add(i)), _mm256_loadu_si256(b_ptr.add(i))));
-        _mm256_storeu_si256(r_ptr.add(i + 1), _mm256_and_si256(_mm256_loadu_si256(a_ptr.add(i + 1)), _mm256_loadu_si256(b_ptr.add(i + 1))));
-        _mm256_storeu_si256(r_ptr.add(i + 2), _mm256_and_si256(_mm256_loadu_si256(a_ptr.add(i + 2)), _mm256_loadu_si256(b_ptr.add(i + 2))));
-        _mm256_storeu_si256(r_ptr.add(i + 3), _mm256_and_si256(_mm256_loadu_si256(a_ptr.add(i + 3)), _mm256_loadu_si256(b_ptr.add(i + 3))));
+        _mm256_storeu_si256(
+            r_ptr.add(i),
+            _mm256_and_si256(
+                _mm256_loadu_si256(a_ptr.add(i)),
+                _mm256_loadu_si256(b_ptr.add(i)),
+            ),
+        );
+        _mm256_storeu_si256(
+            r_ptr.add(i + 1),
+            _mm256_and_si256(
+                _mm256_loadu_si256(a_ptr.add(i + 1)),
+                _mm256_loadu_si256(b_ptr.add(i + 1)),
+            ),
+        );
+        _mm256_storeu_si256(
+            r_ptr.add(i + 2),
+            _mm256_and_si256(
+                _mm256_loadu_si256(a_ptr.add(i + 2)),
+                _mm256_loadu_si256(b_ptr.add(i + 2)),
+            ),
+        );
+        _mm256_storeu_si256(
+            r_ptr.add(i + 3),
+            _mm256_and_si256(
+                _mm256_loadu_si256(a_ptr.add(i + 3)),
+                _mm256_loadu_si256(b_ptr.add(i + 3)),
+            ),
+        );
     }
 }
 
@@ -306,10 +336,31 @@ unsafe fn intersection_sse41(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2
     let b_ptr = b.as_ptr() as *const __m128i;
     let r_ptr = result.as_mut_ptr() as *mut __m128i;
     for i in (0..128).step_by(4) {
-        _mm_storeu_si128(r_ptr.add(i), _mm_and_si128(_mm_loadu_si128(a_ptr.add(i)), _mm_loadu_si128(b_ptr.add(i))));
-        _mm_storeu_si128(r_ptr.add(i + 1), _mm_and_si128(_mm_loadu_si128(a_ptr.add(i + 1)), _mm_loadu_si128(b_ptr.add(i + 1))));
-        _mm_storeu_si128(r_ptr.add(i + 2), _mm_and_si128(_mm_loadu_si128(a_ptr.add(i + 2)), _mm_loadu_si128(b_ptr.add(i + 2))));
-        _mm_storeu_si128(r_ptr.add(i + 3), _mm_and_si128(_mm_loadu_si128(a_ptr.add(i + 3)), _mm_loadu_si128(b_ptr.add(i + 3))));
+        _mm_storeu_si128(
+            r_ptr.add(i),
+            _mm_and_si128(_mm_loadu_si128(a_ptr.add(i)), _mm_loadu_si128(b_ptr.add(i))),
+        );
+        _mm_storeu_si128(
+            r_ptr.add(i + 1),
+            _mm_and_si128(
+                _mm_loadu_si128(a_ptr.add(i + 1)),
+                _mm_loadu_si128(b_ptr.add(i + 1)),
+            ),
+        );
+        _mm_storeu_si128(
+            r_ptr.add(i + 2),
+            _mm_and_si128(
+                _mm_loadu_si128(a_ptr.add(i + 2)),
+                _mm_loadu_si128(b_ptr.add(i + 2)),
+            ),
+        );
+        _mm_storeu_si128(
+            r_ptr.add(i + 3),
+            _mm_and_si128(
+                _mm_loadu_si128(a_ptr.add(i + 3)),
+                _mm_loadu_si128(b_ptr.add(i + 3)),
+            ),
+        );
     }
 }
 
@@ -321,10 +372,22 @@ fn intersection_scalar_unrolled(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8
     let r_ptr = result.as_mut_ptr() as *mut u64;
     unsafe {
         for i in (0..256).step_by(4) {
-            write_unaligned(r_ptr.add(i), read_unaligned(a_ptr.add(i)) & read_unaligned(b_ptr.add(i)));
-            write_unaligned(r_ptr.add(i + 1), read_unaligned(a_ptr.add(i + 1)) & read_unaligned(b_ptr.add(i + 1)));
-            write_unaligned(r_ptr.add(i + 2), read_unaligned(a_ptr.add(i + 2)) & read_unaligned(b_ptr.add(i + 2)));
-            write_unaligned(r_ptr.add(i + 3), read_unaligned(a_ptr.add(i + 3)) & read_unaligned(b_ptr.add(i + 3)));
+            write_unaligned(
+                r_ptr.add(i),
+                read_unaligned(a_ptr.add(i)) & read_unaligned(b_ptr.add(i)),
+            );
+            write_unaligned(
+                r_ptr.add(i + 1),
+                read_unaligned(a_ptr.add(i + 1)) & read_unaligned(b_ptr.add(i + 1)),
+            );
+            write_unaligned(
+                r_ptr.add(i + 2),
+                read_unaligned(a_ptr.add(i + 2)) & read_unaligned(b_ptr.add(i + 2)),
+            );
+            write_unaligned(
+                r_ptr.add(i + 3),
+                read_unaligned(a_ptr.add(i + 3)) & read_unaligned(b_ptr.add(i + 3)),
+            );
         }
     }
 }
@@ -354,8 +417,14 @@ unsafe fn union_avx512(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) 
     let b_ptr = b.as_ptr() as *const __m512i;
     let r_ptr = result.as_mut_ptr() as *mut __m512i;
     for i in (0..32).step_by(2) {
-        let r0 = _mm512_or_si512(_mm512_loadu_si512(a_ptr.add(i)), _mm512_loadu_si512(b_ptr.add(i)));
-        let r1 = _mm512_or_si512(_mm512_loadu_si512(a_ptr.add(i + 1)), _mm512_loadu_si512(b_ptr.add(i + 1)));
+        let r0 = _mm512_or_si512(
+            _mm512_loadu_si512(a_ptr.add(i)),
+            _mm512_loadu_si512(b_ptr.add(i)),
+        );
+        let r1 = _mm512_or_si512(
+            _mm512_loadu_si512(a_ptr.add(i + 1)),
+            _mm512_loadu_si512(b_ptr.add(i + 1)),
+        );
         _mm512_storeu_si512(r_ptr.add(i), r0);
         _mm512_storeu_si512(r_ptr.add(i + 1), r1);
     }
@@ -369,10 +438,34 @@ unsafe fn union_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
     let b_ptr = b.as_ptr() as *const __m256i;
     let r_ptr = result.as_mut_ptr() as *mut __m256i;
     for i in (0..64).step_by(4) {
-        _mm256_storeu_si256(r_ptr.add(i), _mm256_or_si256(_mm256_loadu_si256(a_ptr.add(i)), _mm256_loadu_si256(b_ptr.add(i))));
-        _mm256_storeu_si256(r_ptr.add(i + 1), _mm256_or_si256(_mm256_loadu_si256(a_ptr.add(i + 1)), _mm256_loadu_si256(b_ptr.add(i + 1))));
-        _mm256_storeu_si256(r_ptr.add(i + 2), _mm256_or_si256(_mm256_loadu_si256(a_ptr.add(i + 2)), _mm256_loadu_si256(b_ptr.add(i + 2))));
-        _mm256_storeu_si256(r_ptr.add(i + 3), _mm256_or_si256(_mm256_loadu_si256(a_ptr.add(i + 3)), _mm256_loadu_si256(b_ptr.add(i + 3))));
+        _mm256_storeu_si256(
+            r_ptr.add(i),
+            _mm256_or_si256(
+                _mm256_loadu_si256(a_ptr.add(i)),
+                _mm256_loadu_si256(b_ptr.add(i)),
+            ),
+        );
+        _mm256_storeu_si256(
+            r_ptr.add(i + 1),
+            _mm256_or_si256(
+                _mm256_loadu_si256(a_ptr.add(i + 1)),
+                _mm256_loadu_si256(b_ptr.add(i + 1)),
+            ),
+        );
+        _mm256_storeu_si256(
+            r_ptr.add(i + 2),
+            _mm256_or_si256(
+                _mm256_loadu_si256(a_ptr.add(i + 2)),
+                _mm256_loadu_si256(b_ptr.add(i + 2)),
+            ),
+        );
+        _mm256_storeu_si256(
+            r_ptr.add(i + 3),
+            _mm256_or_si256(
+                _mm256_loadu_si256(a_ptr.add(i + 3)),
+                _mm256_loadu_si256(b_ptr.add(i + 3)),
+            ),
+        );
     }
 }
 
@@ -384,10 +477,31 @@ unsafe fn union_sse41(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
     let b_ptr = b.as_ptr() as *const __m128i;
     let r_ptr = result.as_mut_ptr() as *mut __m128i;
     for i in (0..128).step_by(4) {
-        _mm_storeu_si128(r_ptr.add(i), _mm_or_si128(_mm_loadu_si128(a_ptr.add(i)), _mm_loadu_si128(b_ptr.add(i))));
-        _mm_storeu_si128(r_ptr.add(i + 1), _mm_or_si128(_mm_loadu_si128(a_ptr.add(i + 1)), _mm_loadu_si128(b_ptr.add(i + 1))));
-        _mm_storeu_si128(r_ptr.add(i + 2), _mm_or_si128(_mm_loadu_si128(a_ptr.add(i + 2)), _mm_loadu_si128(b_ptr.add(i + 2))));
-        _mm_storeu_si128(r_ptr.add(i + 3), _mm_or_si128(_mm_loadu_si128(a_ptr.add(i + 3)), _mm_loadu_si128(b_ptr.add(i + 3))));
+        _mm_storeu_si128(
+            r_ptr.add(i),
+            _mm_or_si128(_mm_loadu_si128(a_ptr.add(i)), _mm_loadu_si128(b_ptr.add(i))),
+        );
+        _mm_storeu_si128(
+            r_ptr.add(i + 1),
+            _mm_or_si128(
+                _mm_loadu_si128(a_ptr.add(i + 1)),
+                _mm_loadu_si128(b_ptr.add(i + 1)),
+            ),
+        );
+        _mm_storeu_si128(
+            r_ptr.add(i + 2),
+            _mm_or_si128(
+                _mm_loadu_si128(a_ptr.add(i + 2)),
+                _mm_loadu_si128(b_ptr.add(i + 2)),
+            ),
+        );
+        _mm_storeu_si128(
+            r_ptr.add(i + 3),
+            _mm_or_si128(
+                _mm_loadu_si128(a_ptr.add(i + 3)),
+                _mm_loadu_si128(b_ptr.add(i + 3)),
+            ),
+        );
     }
 }
 
@@ -399,10 +513,22 @@ fn union_scalar_unrolled(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]
     let r_ptr = result.as_mut_ptr() as *mut u64;
     unsafe {
         for i in (0..256).step_by(4) {
-            write_unaligned(r_ptr.add(i), read_unaligned(a_ptr.add(i)) | read_unaligned(b_ptr.add(i)));
-            write_unaligned(r_ptr.add(i + 1), read_unaligned(a_ptr.add(i + 1)) | read_unaligned(b_ptr.add(i + 1)));
-            write_unaligned(r_ptr.add(i + 2), read_unaligned(a_ptr.add(i + 2)) | read_unaligned(b_ptr.add(i + 2)));
-            write_unaligned(r_ptr.add(i + 3), read_unaligned(a_ptr.add(i + 3)) | read_unaligned(b_ptr.add(i + 3)));
+            write_unaligned(
+                r_ptr.add(i),
+                read_unaligned(a_ptr.add(i)) | read_unaligned(b_ptr.add(i)),
+            );
+            write_unaligned(
+                r_ptr.add(i + 1),
+                read_unaligned(a_ptr.add(i + 1)) | read_unaligned(b_ptr.add(i + 1)),
+            );
+            write_unaligned(
+                r_ptr.add(i + 2),
+                read_unaligned(a_ptr.add(i + 2)) | read_unaligned(b_ptr.add(i + 2)),
+            );
+            write_unaligned(
+                r_ptr.add(i + 3),
+                read_unaligned(a_ptr.add(i + 3)) | read_unaligned(b_ptr.add(i + 3)),
+            );
         }
     }
 }
@@ -858,21 +984,27 @@ pub fn bundle_simd_slice(vectors: &[[u8; 2048]]) -> [u8; 2048] {
 #[cfg(not(target_arch = "x86_64"))]
 pub fn bind_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
-    for i in 0..2048 { result[i] = a[i] ^ b[i]; }
+    for i in 0..2048 {
+        result[i] = a[i] ^ b[i];
+    }
     result
 }
 
 #[cfg(not(target_arch = "x86_64"))]
 pub fn intersection_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
-    for i in 0..2048 { result[i] = a[i] & b[i]; }
+    for i in 0..2048 {
+        result[i] = a[i] & b[i];
+    }
     result
 }
 
 #[cfg(not(target_arch = "x86_64"))]
 pub fn union_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
-    for i in 0..2048 { result[i] = a[i] | b[i]; }
+    for i in 0..2048 {
+        result[i] = a[i] | b[i];
+    }
     result
 }
 
@@ -965,7 +1097,10 @@ mod tests {
         // Scalar version (original)
         let scalar_result = a.bind(&b);
 
-        assert_eq!(simd_result, scalar_result.0, "SIMD bind must match scalar bind");
+        assert_eq!(
+            simd_result, scalar_result.0,
+            "SIMD bind must match scalar bind"
+        );
     }
 
     #[test]
@@ -982,8 +1117,12 @@ mod tests {
 
         // Allow small rounding difference
         let diff = (simd_matching as i32 - scalar_matching as i32).abs();
-        assert!(diff <= 1, "SIMD matching bits must match scalar: {} vs {}",
-                simd_matching, scalar_matching);
+        assert!(
+            diff <= 1,
+            "SIMD matching bits must match scalar: {} vs {}",
+            simd_matching,
+            scalar_matching
+        );
     }
 
     #[test]
@@ -996,7 +1135,10 @@ mod tests {
         // Scalar version
         let scalar_result = a.invert();
 
-        assert_eq!(simd_result, scalar_result.0, "SIMD invert must match scalar invert");
+        assert_eq!(
+            simd_result, scalar_result.0,
+            "SIMD invert must match scalar invert"
+        );
     }
 
     #[test]
@@ -1010,7 +1152,10 @@ mod tests {
         // Scalar version
         let scalar_dist = a.hamming_distance(&b);
 
-        assert_eq!(simd_dist, scalar_dist, "SIMD hamming distance must match scalar");
+        assert_eq!(
+            simd_dist, scalar_dist,
+            "SIMD hamming distance must match scalar"
+        );
     }
 
     #[test]
@@ -1043,8 +1188,8 @@ mod tests {
     #[test]
     #[ignore = "benchmark test - run with cargo test --release -- --ignored"]
     fn bench_simd_vs_scalar() {
-        use std::time::Instant;
         use std::hint::black_box;
+        use std::time::Instant;
 
         let a = BinaryHV::random(1);
         let b = BinaryHV::random(2);
@@ -1079,20 +1224,30 @@ mod tests {
         let scalar_sim_ns = start.elapsed().as_nanos() / iterations;
 
         println!("\n📊 SIMD vs Scalar Performance:");
-        println!("  Bind:       SIMD {}ns vs Scalar {}ns ({:.1}x speedup)",
-                 simd_bind_ns, scalar_bind_ns,
-                 scalar_bind_ns as f64 / simd_bind_ns.max(1) as f64);
-        println!("  Similarity: SIMD {}ns vs Scalar {}ns ({:.1}x speedup)",
-                 simd_sim_ns, scalar_sim_ns,
-                 scalar_sim_ns as f64 / simd_sim_ns.max(1) as f64);
+        println!(
+            "  Bind:       SIMD {}ns vs Scalar {}ns ({:.1}x speedup)",
+            simd_bind_ns,
+            scalar_bind_ns,
+            scalar_bind_ns as f64 / simd_bind_ns.max(1) as f64
+        );
+        println!(
+            "  Similarity: SIMD {}ns vs Scalar {}ns ({:.1}x speedup)",
+            simd_sim_ns,
+            scalar_sim_ns,
+            scalar_sim_ns as f64 / simd_sim_ns.max(1) as f64
+        );
 
         // Assert meaningful speedup in release mode
         #[cfg(not(debug_assertions))]
         {
-            assert!(simd_bind_ns < scalar_bind_ns,
-                    "SIMD bind should be faster than scalar");
-            assert!(simd_sim_ns < scalar_sim_ns,
-                    "SIMD similarity should be faster than scalar");
+            assert!(
+                simd_bind_ns < scalar_bind_ns,
+                "SIMD bind should be faster than scalar"
+            );
+            assert!(
+                simd_sim_ns < scalar_sim_ns,
+                "SIMD similarity should be faster than scalar"
+            );
         }
     }
 
@@ -1108,7 +1263,10 @@ mod tests {
         let scalar_result = BinaryHV::bundle(&vectors);
 
         // Results should match exactly
-        assert_eq!(simd_result, scalar_result.0, "SIMD bundle must match scalar bundle");
+        assert_eq!(
+            simd_result, scalar_result.0,
+            "SIMD bundle must match scalar bundle"
+        );
     }
 
     #[test]
@@ -1117,7 +1275,10 @@ mod tests {
         let refs: Vec<&[u8; 2048]> = vec![&v.0];
 
         let result = bundle_simd(&refs);
-        assert_eq!(result, v.0, "Bundle of single vector should return that vector");
+        assert_eq!(
+            result, v.0,
+            "Bundle of single vector should return that vector"
+        );
     }
 
     #[test]
@@ -1153,16 +1314,25 @@ mod tests {
         let bundled = BinaryHV(bundle_simd(&refs));
 
         // Bundled vector should be similar to all inputs
-        assert!(bundled.similarity(&a) > 0.5, "Bundle should be similar to input A");
-        assert!(bundled.similarity(&b) > 0.5, "Bundle should be similar to input B");
-        assert!(bundled.similarity(&c) > 0.5, "Bundle should be similar to input C");
+        assert!(
+            bundled.similarity(&a) > 0.5,
+            "Bundle should be similar to input A"
+        );
+        assert!(
+            bundled.similarity(&b) > 0.5,
+            "Bundle should be similar to input B"
+        );
+        assert!(
+            bundled.similarity(&c) > 0.5,
+            "Bundle should be similar to input C"
+        );
     }
 
     #[test]
     #[ignore = "benchmark test - run with cargo test --release -- --ignored"]
     fn bench_bundle_simd_vs_scalar() {
-        use std::time::Instant;
         use std::hint::black_box;
+        use std::time::Instant;
 
         let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
         let refs: Vec<&[u8; 2048]> = vectors.iter().map(|v| &v.0).collect();
@@ -1185,7 +1355,10 @@ mod tests {
         println!("\n📊 Bundle SIMD vs Scalar Performance (100 vectors):");
         println!("  SIMD:   {}ns", simd_ns);
         println!("  Scalar: {}ns", scalar_ns);
-        println!("  Speedup: {:.1}x", scalar_ns as f64 / simd_ns.max(1) as f64);
+        println!(
+            "  Speedup: {:.1}x",
+            scalar_ns as f64 / simd_ns.max(1) as f64
+        );
     }
 
     #[test]
@@ -1194,8 +1367,13 @@ mod tests {
         let b = BinaryHV::random(43);
         let simd_result = intersection_simd(&a.0, &b.0);
         let mut scalar = [0u8; 2048];
-        for i in 0..2048 { scalar[i] = a.0[i] & b.0[i]; }
-        assert_eq!(simd_result, scalar, "SIMD intersection must match scalar AND");
+        for i in 0..2048 {
+            scalar[i] = a.0[i] & b.0[i];
+        }
+        assert_eq!(
+            simd_result, scalar,
+            "SIMD intersection must match scalar AND"
+        );
     }
 
     #[test]
@@ -1204,7 +1382,9 @@ mod tests {
         let b = BinaryHV::random(43);
         let simd_result = union_simd(&a.0, &b.0);
         let mut scalar = [0u8; 2048];
-        for i in 0..2048 { scalar[i] = a.0[i] | b.0[i]; }
+        for i in 0..2048 {
+            scalar[i] = a.0[i] | b.0[i];
+        }
         assert_eq!(simd_result, scalar, "SIMD union must match scalar OR");
     }
 

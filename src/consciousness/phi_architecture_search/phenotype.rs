@@ -52,14 +52,11 @@ impl DecodedArchitecture {
             .collect();
 
         // Assign modules
-        let module_assignment: Vec<usize> = (0..n)
-            .map(|i| i % genome.num_modules.max(1))
-            .collect();
+        let module_assignment: Vec<usize> = (0..n).map(|i| i % genome.num_modules.max(1)).collect();
 
         // Assign hierarchy levels
-        let level_assignment: Vec<usize> = (0..n)
-            .map(|i| i % genome.hierarchy_depth.max(1))
-            .collect();
+        let level_assignment: Vec<usize> =
+            (0..n).map(|i| i % genome.hierarchy_depth.max(1)).collect();
 
         // Compute tau values based on level
         let tau_values: Vec<f32> = level_assignment
@@ -72,37 +69,30 @@ impl DecodedArchitecture {
             TopologyGene::Random => {
                 Self::build_random_topology(n, genome.connection_density, &mut state, next_f32)
             }
-            TopologyGene::Ring => {
-                Self::build_ring_topology(n)
-            }
-            TopologyGene::Star => {
-                Self::build_star_topology(n)
-            }
+            TopologyGene::Ring => Self::build_ring_topology(n),
+            TopologyGene::Star => Self::build_star_topology(n),
             TopologyGene::HierarchicalTree => {
                 Self::build_hierarchical_tree(n, genome.hierarchy_depth)
             }
-            TopologyGene::Modular => {
-                Self::build_modular_topology(
-                    n,
-                    genome.num_modules,
-                    genome.connection_density,
-                    genome.bridge_ratio,
-                    &mut state,
-                    next_f32,
-                )
-            }
-            TopologyGene::ScaleFree => {
-                Self::build_scale_free_topology(n, &mut state, next_f32)
-            }
+            TopologyGene::Modular => Self::build_modular_topology(
+                n,
+                genome.num_modules,
+                genome.connection_density,
+                genome.bridge_ratio,
+                &mut state,
+                next_f32,
+            ),
+            TopologyGene::ScaleFree => Self::build_scale_free_topology(n, &mut state, next_f32),
             TopologyGene::SmallWorld => {
                 Self::build_small_world_topology(n, genome.connection_density, &mut state, next_f32)
             }
-            TopologyGene::Lattice => {
-                Self::build_lattice_topology(n)
-            }
-            TopologyGene::CorePeriphery => {
-                Self::build_core_periphery_topology(n, genome.connection_density, &mut state, next_f32)
-            }
+            TopologyGene::Lattice => Self::build_lattice_topology(n),
+            TopologyGene::CorePeriphery => Self::build_core_periphery_topology(
+                n,
+                genome.connection_density,
+                &mut state,
+                next_f32,
+            ),
             TopologyGene::Attention => {
                 Self::build_attention_topology(n, genome.connection_density, &mut state, next_f32)
             }
@@ -167,7 +157,7 @@ impl DecodedArchitecture {
             let right = 2 * i + 2;
             if left < n {
                 adj[i].push((left, 1.0));
-                adj[left].push((i, 0.8));  // Asymmetric for hierarchy
+                adj[left].push((i, 0.8)); // Asymmetric for hierarchy
             }
             if right < n {
                 adj[i].push((right, 1.0));
@@ -193,9 +183,9 @@ impl DecodedArchitecture {
             for j in (i + 1)..n {
                 let module_j = j / module_size.max(1);
                 let threshold = if module_i == module_j {
-                    density  // Intra-module: use full density
+                    density // Intra-module: use full density
                 } else {
-                    density * bridge_ratio  // Inter-module: reduced density
+                    density * bridge_ratio // Inter-module: reduced density
                 };
 
                 if next_f32(state) < threshold {
@@ -316,15 +306,19 @@ impl DecodedArchitecture {
                 let one_core = i < core_size || j < core_size;
 
                 let threshold = if both_core {
-                    density * 2.0  // Dense core
+                    density * 2.0 // Dense core
                 } else if one_core {
-                    density * 0.5  // Core-periphery connections
+                    density * 0.5 // Core-periphery connections
                 } else {
-                    density * 0.1  // Sparse periphery
+                    density * 0.1 // Sparse periphery
                 };
 
                 if next_f32(state) < threshold.min(0.95) {
-                    let weight = if both_core { 1.0 } else { 0.5 + next_f32(state) * 0.3 };
+                    let weight = if both_core {
+                        1.0
+                    } else {
+                        0.5 + next_f32(state) * 0.3
+                    };
                     adj[i].push((j, weight));
                     adj[j].push((i, weight));
                 }
@@ -371,7 +365,8 @@ impl DecodedArchitecture {
 
     /// Convert to node representations for Phi calculation
     pub fn to_node_representations(&self) -> Vec<ContinuousHV> {
-        self.nodes.iter()
+        self.nodes
+            .iter()
             .enumerate()
             .map(|(i, node)| {
                 let neighbors = &self.adjacency[i];
@@ -379,7 +374,8 @@ impl DecodedArchitecture {
                     node.clone()
                 } else {
                     // Bind node with weighted bundle of neighbors
-                    let neighbor_hvs: Vec<ContinuousHV> = neighbors.iter()
+                    let neighbor_hvs: Vec<ContinuousHV> = neighbors
+                        .iter()
                         .map(|(j, w)| self.nodes[*j].scale(*w))
                         .collect();
 
@@ -424,7 +420,7 @@ impl DecodedArchitecture {
 
         ArchitectureStats {
             num_nodes: n,
-            num_edges: total_edges / 2,  // Undirected
+            num_edges: total_edges / 2, // Undirected
             density,
             avg_degree,
             max_degree,

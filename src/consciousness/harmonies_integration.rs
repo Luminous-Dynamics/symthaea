@@ -3,10 +3,10 @@
 //! Integrates the Seven Harmonies value system into consciousness operations.
 //! This provides ethical and value-aligned decision making.
 
+use super::seven_harmonies::{AlignmentResult, Harmony, SevenHarmonies};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
-use super::seven_harmonies::{SevenHarmonies, Harmony, AlignmentResult};
 
 /// Configuration for harmonies integration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,7 +58,11 @@ pub struct ValuedAction {
 
 impl ValuedAction {
     /// Create a new valued action
-    pub fn new(id: impl Into<String>, description: impl Into<String>, embedding: ContinuousHV) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        description: impl Into<String>,
+        embedding: ContinuousHV,
+    ) -> Self {
         Self {
             id: id.into(),
             description: description.into(),
@@ -163,7 +167,12 @@ impl HarmoniesIntegrator {
         // Calculate alignment with each harmony
         for (harmony, embedding) in &self.harmony_embeddings {
             let similarity = action.embedding.similarity(embedding);
-            let weight = self.config.harmony_weights.get(harmony).copied().unwrap_or(1.0);
+            let weight = self
+                .config
+                .harmony_weights
+                .get(harmony)
+                .copied()
+                .unwrap_or(1.0);
 
             harmony_scores.insert(*harmony, similarity);
             weighted_sum += similarity * weight;
@@ -187,8 +196,7 @@ impl HarmoniesIntegrator {
 
         // Update average alignment
         let n = self.stats.total_evaluations as f32;
-        self.stats.avg_alignment =
-            (self.stats.avg_alignment * (n - 1.0) + overall_alignment) / n;
+        self.stats.avg_alignment = (self.stats.avg_alignment * (n - 1.0) + overall_alignment) / n;
 
         // Generate reasoning
         let reasoning = self.generate_reasoning(&harmony_scores, overall_alignment, approved);
@@ -217,7 +225,7 @@ impl HarmoniesIntegrator {
         &self,
         scores: &HashMap<Harmony, f32>,
         overall: f32,
-        approved: bool
+        approved: bool,
     ) -> String {
         let mut reasoning = String::new();
 
@@ -264,20 +272,23 @@ impl HarmoniesIntegrator {
         for (harmony, &score) in scores {
             if score < 0.5 {
                 let suggestion = match harmony {
-                    Harmony::ResonantCoherence =>
-                        "Consider how this action contributes to harmonious integration.",
-                    Harmony::PanSentientFlourishing =>
-                        "Consider the impact on all sentient beings affected.",
-                    Harmony::IntegralWisdom =>
-                        "Reflect on whether this embodies integral wisdom.",
-                    Harmony::InfinitePlay =>
-                        "Consider the playful, creative aspects of this action.",
-                    Harmony::UniversalInterconnectedness =>
-                        "Consider the connections and relationships involved.",
-                    Harmony::SacredReciprocity =>
-                        "Ensure mutual benefit and generative exchange.",
-                    Harmony::EvolutionaryProgression =>
-                        "Consider how this contributes to evolutionary growth.",
+                    Harmony::ResonantCoherence => {
+                        "Consider how this action contributes to harmonious integration."
+                    }
+                    Harmony::PanSentientFlourishing => {
+                        "Consider the impact on all sentient beings affected."
+                    }
+                    Harmony::IntegralWisdom => "Reflect on whether this embodies integral wisdom.",
+                    Harmony::InfinitePlay => {
+                        "Consider the playful, creative aspects of this action."
+                    }
+                    Harmony::UniversalInterconnectedness => {
+                        "Consider the connections and relationships involved."
+                    }
+                    Harmony::SacredReciprocity => "Ensure mutual benefit and generative exchange.",
+                    Harmony::EvolutionaryProgression => {
+                        "Consider how this contributes to evolutionary growth."
+                    }
                 };
                 suggestions.push(suggestion.to_string());
             }
@@ -291,7 +302,12 @@ impl HarmoniesIntegrator {
         let learning_rate = self.config.learning_rate * feedback.signum();
 
         for (harmony, embedding) in self.harmony_embeddings.iter_mut() {
-            let weight = self.config.harmony_weights.get(harmony).copied().unwrap_or(1.0);
+            let weight = self
+                .config
+                .harmony_weights
+                .get(harmony)
+                .copied()
+                .unwrap_or(1.0);
             let adjustment = action.embedding.clone().scale(learning_rate * weight);
             *embedding = ContinuousHV::bundle_owned(&[embedding.clone(), adjustment]);
         }
@@ -340,7 +356,7 @@ mod tests {
         let action = ValuedAction::new(
             "help_user",
             "Assist user with their request",
-            ContinuousHV::random(512, 42)
+            ContinuousHV::random(512, 42),
         );
 
         let evaluation = integrator.evaluate(&action);

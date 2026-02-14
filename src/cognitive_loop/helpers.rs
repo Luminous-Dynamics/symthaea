@@ -3,17 +3,14 @@
 //! Contains experience creation, statistics updates, error trend computation,
 //! prediction confidence tracking, reset, and neural bridge processing.
 
-use std::time::{Duration, Instant};
-use ndarray::Array1;
-use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 use crate::consciousness::fep_active_inference::ActiveInferenceAgent;
+use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 #[cfg(feature = "neural-bridge")]
 use anyhow::Result;
+use ndarray::Array1;
+use std::time::{Duration, Instant};
 
-use super::{
-    CognitiveLoopService, Experience, LoopStats, AdaptiveBehavior,
-    ActionHint,
-};
+use super::{ActionHint, AdaptiveBehavior, CognitiveLoopService, Experience, LoopStats};
 // CycleResult is used by process_text_input (neural-bridge feature)
 #[cfg(feature = "neural-bridge")]
 use super::CycleResult;
@@ -32,10 +29,10 @@ impl CognitiveLoopService {
     pub fn process_text_input(&mut self, embedding: &[f32]) -> Result<CycleResult> {
         use symthaea_core::hdc::ContinuousHV;
 
-        let bridge = self.neural_bridge.as_ref()
-            .ok_or_else(|| anyhow::anyhow!(
-                "Neural bridge not loaded (no probe weights found)"
-            ))?;
+        let bridge = self
+            .neural_bridge
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Neural bridge not loaded (no probe weights found)"))?;
 
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
@@ -47,10 +44,9 @@ impl CognitiveLoopService {
         let hdv = ContinuousHV::from_vec(hdc_continuous);
 
         // 3. Compress HDC -> CfC input dimension via random projection
-        let compressed_state = self.encoder.compress_for_ltc(
-            &hdv,
-            self.config.cfc_config.input_dim,
-        );
+        let compressed_state = self
+            .encoder
+            .compress_for_ltc(&hdv, self.config.cfc_config.input_dim);
 
         // 4. Convert to ndarray and step the temporal network
         let input_array = Array1::from_vec(compressed_state.clone());
@@ -61,7 +57,9 @@ impl CognitiveLoopService {
         let prediction = self.get_multi_scale_prediction(&input_array);
 
         // 6. Read CfC output state
-        let output = self.temporal_network.read_state()
+        let output = self
+            .temporal_network
+            .read_state()
             .map(|arr| arr.to_vec())
             .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.num_neurons]);
 
@@ -74,7 +72,8 @@ impl CognitiveLoopService {
             if n == 0 {
                 0.0
             } else {
-                compressed_state[..n].iter()
+                compressed_state[..n]
+                    .iter()
                     .zip(prev[..n].iter())
                     .map(|(a, b)| (a - b).powi(2))
                     .sum::<f32>()
@@ -104,8 +103,8 @@ impl CognitiveLoopService {
         if self.error_history.len() > 100 {
             self.error_history.pop_front();
         }
-        self.stats.avg_prediction_error = self.error_history.iter().sum::<f32>()
-            / self.error_history.len().max(1) as f32;
+        self.stats.avg_prediction_error =
+            self.error_history.iter().sum::<f32>() / self.error_history.len().max(1) as f32;
 
         Ok(CycleResult {
             output: output.clone(),
@@ -135,17 +134,17 @@ impl CognitiveLoopService {
         use ConsciousnessPattern::*;
 
         // Base decay/growth parameters
-        const DECAY_RATE_UNCERTAIN: f32 = 0.05;    // Fast decay when uncertain
-        const DECAY_RATE_TRANSITION: f32 = 0.03;   // Moderate decay during transitions
-        const GROWTH_RATE_ACCURATE: f32 = 0.02;    // Slow growth for stability
-        const ERROR_THRESHOLD: f32 = 0.3;          // Below this = accurate prediction
+        const DECAY_RATE_UNCERTAIN: f32 = 0.05; // Fast decay when uncertain
+        const DECAY_RATE_TRANSITION: f32 = 0.03; // Moderate decay during transitions
+        const GROWTH_RATE_ACCURATE: f32 = 0.02; // Slow growth for stability
+        const ERROR_THRESHOLD: f32 = 0.3; // Below this = accurate prediction
 
         // Decay rate depends on consciousness state
         let decay_rate = match pattern {
             Uncertain => DECAY_RATE_UNCERTAIN,
             Transitioning => DECAY_RATE_TRANSITION,
             Resting => DECAY_RATE_TRANSITION * 0.5, // Slight decay in resting
-            _ => 0.0, // No decay in stable states
+            _ => 0.0,                               // No decay in stable states
         };
 
         // Growth when predictions are accurate in stable states
@@ -220,13 +219,11 @@ impl CognitiveLoopService {
         self.stats.diverged_primitives = encoder_stats.diverged_primitives;
 
         // Buffer utilization
-        self.stats.buffer_utilization =
-            self.buffer.len() as f32 / self.config.buffer_size as f32;
+        self.stats.buffer_utilization = self.buffer.len() as f32 / self.config.buffer_size as f32;
 
         // Timing stats
         let cycle_us = cycle_time.as_micros() as f32;
-        self.stats.avg_cycle_time_us =
-            self.stats.avg_cycle_time_us * 0.99 + cycle_us * 0.01;
+        self.stats.avg_cycle_time_us = self.stats.avg_cycle_time_us * 0.99 + cycle_us * 0.01;
 
         // Cycles per second
         let elapsed = self.start_time.elapsed().as_secs_f32();
@@ -258,9 +255,9 @@ impl CognitiveLoopService {
         self.stats.adaptive_confidence = self.adaptive_behavior.confidence;
         self.stats.action_hint = format!("{:?}", self.adaptive_behavior.action_hint);
         self.stats.learning_paused = self.adaptive_behavior.pause_learning;
-        self.stats.adaptive_learning_rate = self.adaptive_behavior.effective_learning_rate(
-            self.combined_learning_rate()
-        );
+        self.stats.adaptive_learning_rate = self
+            .adaptive_behavior
+            .effective_learning_rate(self.combined_learning_rate());
         self.stats.adaptive_speech_rate = self.adaptive_behavior.speech_rate_multiplier;
 
         // Prediction confidence stats
@@ -319,12 +316,14 @@ impl CognitiveLoopService {
         self.stats.unified_emotional_valence = unified_state.valence as f32;
         self.stats.unified_emotional_arousal = unified_state.arousal as f32;
         self.stats.unified_emotional_dominance = unified_state.dominance as f32;
-        self.stats.unified_emotion = unified_state.discrete_emotion
+        self.stats.unified_emotion = unified_state
+            .discrete_emotion
             .map(|e| format!("{:?}", e))
             .unwrap_or_else(|| "Neutral".to_string());
 
         // Emotional pattern from the bridge
-        self.stats.emotional_pattern = format!("{:?}", self.unification_engine.emotional.detect_pattern());
+        self.stats.emotional_pattern =
+            format!("{:?}", self.unification_engine.emotional.detect_pattern());
 
         // Thalamic routing statistics
         let (reflex_rate, cortical_rate, deep_rate) = self.thalamic_router.routing_stats();
@@ -334,18 +333,18 @@ impl CognitiveLoopService {
 
         // Active Inference Bridge statistics
         let ai_stats = self.active_inference_bridge.statistics();
-        self.stats.active_inference_modulation_index = ai_stats.modulation_index
-            .map(|mi| mi as f32)
-            .unwrap_or(0.0);
+        self.stats.active_inference_modulation_index =
+            ai_stats.modulation_index.map(|mi| mi as f32).unwrap_or(0.0);
         self.stats.active_inference_coupling_quality = format!("{:?}", ai_stats.coupling_quality);
-        self.stats.active_inference_avg_error = ai_stats.average_prediction_error
+        self.stats.active_inference_avg_error = ai_stats
+            .average_prediction_error
             .map(|e| e as f32)
             .unwrap_or(0.5);
 
         // Enhanced FEP Bridge statistics
         self.stats.fep_learning_signal = self.fep_learning_signal;
         // attention_shift is updated during cycle processing
-        self.stats.fep_action_outcome_coupling = 0.5;  // Will be updated during cycle
+        self.stats.fep_action_outcome_coupling = 0.5; // Will be updated during cycle
 
         // Closed Learning Loop statistics
         self.stats.current_strategy = format!("{:?}", self.closed_learning_loop.current_strategy);
@@ -365,8 +364,7 @@ impl CognitiveLoopService {
 
     pub(super) fn update_loss_stats(&mut self, loss: f32) {
         let alpha = 0.1;
-        self.stats.avg_training_loss =
-            self.stats.avg_training_loss * (1.0 - alpha) + loss * alpha;
+        self.stats.avg_training_loss = self.stats.avg_training_loss * (1.0 - alpha) + loss * alpha;
     }
 
     pub(super) fn compute_error_trend(&self) -> f32 {

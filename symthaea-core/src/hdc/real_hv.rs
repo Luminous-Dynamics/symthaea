@@ -20,7 +20,11 @@ mod tests {
         let b = RealHV::random(2048, 43);
 
         let sim = a.similarity(&b);
-        assert!(sim.abs() < 0.2, "Random real-valued vectors should be nearly orthogonal, got {:.4}", sim);
+        assert!(
+            sim.abs() < 0.2,
+            "Random real-valued vectors should be nearly orthogonal, got {:.4}",
+            sim
+        );
     }
 
     #[test]
@@ -38,10 +42,16 @@ mod tests {
         let sim_0_1 = a.similarity(&a_with_0_1);
         let sim_1_0 = a.similarity(&a_with_1_0);
 
-        assert!(sim_0_1 > 0.7,
-                "Small noise should preserve high similarity, got {:.4}", sim_0_1);
-        assert!(sim_1_0.abs() < 0.3,
-                "Large noise should create low similarity, got {:.4}", sim_1_0);
+        assert!(
+            sim_0_1 > 0.7,
+            "Small noise should preserve high similarity, got {:.4}",
+            sim_0_1
+        );
+        assert!(
+            sim_1_0.abs() < 0.3,
+            "Large noise should create low similarity, got {:.4}",
+            sim_1_0
+        );
     }
 
     #[test]
@@ -52,9 +62,18 @@ mod tests {
 
         let bundled = RealHV::bundle(&[&a, &b, &c]);
 
-        assert!(bundled.similarity(&a) > 0.4, "Bundle should be similar to component A");
-        assert!(bundled.similarity(&b) > 0.4, "Bundle should be similar to component B");
-        assert!(bundled.similarity(&c) > 0.4, "Bundle should be similar to component C");
+        assert!(
+            bundled.similarity(&a) > 0.4,
+            "Bundle should be similar to component A"
+        );
+        assert!(
+            bundled.similarity(&b) > 0.4,
+            "Bundle should be similar to component B"
+        );
+        assert!(
+            bundled.similarity(&c) > 0.4,
+            "Bundle should be similar to component C"
+        );
     }
 
     #[test]
@@ -69,9 +88,15 @@ mod tests {
         let real_sim = real_a.similarity(&real_b);
         let bin_sim = bin_a.similarity(&bin_b);
 
-        assert!(real_sim.abs() < 0.15,
-            "RealHV random vectors should be near-orthogonal, got {:.4}", real_sim);
-        assert!((bin_sim - 0.5).abs() < 0.05,
-            "BinaryHV random vectors should be ~0.5, got {:.4}", bin_sim);
+        assert!(
+            real_sim.abs() < 0.15,
+            "RealHV random vectors should be near-orthogonal, got {:.4}",
+            real_sim
+        );
+        assert!(
+            (bin_sim - 0.5).abs() < 0.05,
+            "BinaryHV random vectors should be ~0.5, got {:.4}",
+            bin_sim
+        );
     }
 }

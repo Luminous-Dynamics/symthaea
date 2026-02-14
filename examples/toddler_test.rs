@@ -29,12 +29,11 @@
 //! cargo run --release --example toddler_test
 //! ```
 
+use std::collections::HashMap;
 use symthaea::consciousness::recursive_improvement::{
-    PrimitiveSemanticBridge, PrimitiveSemanticBridgeConfig,
-    ActionContext,
+    ActionContext, PrimitiveSemanticBridge, PrimitiveSemanticBridgeConfig,
 };
 use symthaea::hdc::primitive_system::PrimitiveTier;
-use std::collections::HashMap;
 
 /// A semantic domain for testing discrimination
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -67,14 +66,8 @@ impl SemanticDomain {
                 PrimitiveTier::NSM,
                 PrimitiveTier::MetaCognitive,
             ],
-            SemanticDomain::Temporal => vec![
-                PrimitiveTier::Temporal,
-                PrimitiveTier::Strategic,
-            ],
-            SemanticDomain::Spatial => vec![
-                PrimitiveTier::Geometric,
-                PrimitiveTier::Physical,
-            ],
+            SemanticDomain::Temporal => vec![PrimitiveTier::Temporal, PrimitiveTier::Strategic],
+            SemanticDomain::Spatial => vec![PrimitiveTier::Geometric, PrimitiveTier::Physical],
         }
     }
 }
@@ -109,10 +102,16 @@ impl DomainProfile {
     /// Compute similarity to another profile (0.0 to 1.0)
     fn similarity(&self, other: &DomainProfile) -> f32 {
         // Compare top primitives overlap
-        let self_prims: std::collections::HashSet<_> =
-            self.top_primitives.iter().map(|(n, _)| n.as_str()).collect();
-        let other_prims: std::collections::HashSet<_> =
-            other.top_primitives.iter().map(|(n, _)| n.as_str()).collect();
+        let self_prims: std::collections::HashSet<_> = self
+            .top_primitives
+            .iter()
+            .map(|(n, _)| n.as_str())
+            .collect();
+        let other_prims: std::collections::HashSet<_> = other
+            .top_primitives
+            .iter()
+            .map(|(n, _)| n.as_str())
+            .collect();
 
         let intersection = self_prims.intersection(&other_prims).count();
         let union = self_prims.union(&other_prims).count();
@@ -146,51 +145,200 @@ fn main() {
 
     let test_items = vec![
         // TECHNICAL domain - code, algorithms, systems
-        TestItem { text: "The compiler optimizes the abstract syntax tree", domain: SemanticDomain::Technical, context: ActionContext::Response },
-        TestItem { text: "Hash tables provide O(1) average lookup time", domain: SemanticDomain::Technical, context: ActionContext::Response },
-        TestItem { text: "The garbage collector reclaims unused memory", domain: SemanticDomain::Technical, context: ActionContext::Response },
-        TestItem { text: "Recursion requires a base case to terminate", domain: SemanticDomain::Technical, context: ActionContext::Response },
-        TestItem { text: "The API endpoint returns JSON responses", domain: SemanticDomain::Technical, context: ActionContext::Response },
-        TestItem { text: "Binary search has logarithmic complexity", domain: SemanticDomain::Technical, context: ActionContext::Response },
-        TestItem { text: "The mutex prevents race conditions", domain: SemanticDomain::Technical, context: ActionContext::Response },
-        TestItem { text: "Type inference deduces variable types automatically", domain: SemanticDomain::Technical, context: ActionContext::Response },
-
+        TestItem {
+            text: "The compiler optimizes the abstract syntax tree",
+            domain: SemanticDomain::Technical,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Hash tables provide O(1) average lookup time",
+            domain: SemanticDomain::Technical,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "The garbage collector reclaims unused memory",
+            domain: SemanticDomain::Technical,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Recursion requires a base case to terminate",
+            domain: SemanticDomain::Technical,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "The API endpoint returns JSON responses",
+            domain: SemanticDomain::Technical,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Binary search has logarithmic complexity",
+            domain: SemanticDomain::Technical,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "The mutex prevents race conditions",
+            domain: SemanticDomain::Technical,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Type inference deduces variable types automatically",
+            domain: SemanticDomain::Technical,
+            context: ActionContext::Response,
+        },
         // EMOTIONAL domain - feelings, relationships, self
-        TestItem { text: "I feel frustrated when things don't work", domain: SemanticDomain::Emotional, context: ActionContext::Thought },
-        TestItem { text: "Love is a deep connection between people", domain: SemanticDomain::Emotional, context: ActionContext::Response },
-        TestItem { text: "Anxiety makes my thoughts race uncontrollably", domain: SemanticDomain::Emotional, context: ActionContext::Thought },
-        TestItem { text: "Trust is built through consistent actions", domain: SemanticDomain::Emotional, context: ActionContext::Response },
-        TestItem { text: "I wonder if I'm making the right choice", domain: SemanticDomain::Emotional, context: ActionContext::Thought },
-        TestItem { text: "Empathy means understanding another's feelings", domain: SemanticDomain::Emotional, context: ActionContext::Response },
-        TestItem { text: "Grief takes time to process and heal", domain: SemanticDomain::Emotional, context: ActionContext::Response },
-        TestItem { text: "Self-doubt creeps in when I'm uncertain", domain: SemanticDomain::Emotional, context: ActionContext::Thought },
-
+        TestItem {
+            text: "I feel frustrated when things don't work",
+            domain: SemanticDomain::Emotional,
+            context: ActionContext::Thought,
+        },
+        TestItem {
+            text: "Love is a deep connection between people",
+            domain: SemanticDomain::Emotional,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Anxiety makes my thoughts race uncontrollably",
+            domain: SemanticDomain::Emotional,
+            context: ActionContext::Thought,
+        },
+        TestItem {
+            text: "Trust is built through consistent actions",
+            domain: SemanticDomain::Emotional,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "I wonder if I'm making the right choice",
+            domain: SemanticDomain::Emotional,
+            context: ActionContext::Thought,
+        },
+        TestItem {
+            text: "Empathy means understanding another's feelings",
+            domain: SemanticDomain::Emotional,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Grief takes time to process and heal",
+            domain: SemanticDomain::Emotional,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Self-doubt creeps in when I'm uncertain",
+            domain: SemanticDomain::Emotional,
+            context: ActionContext::Thought,
+        },
         // TEMPORAL domain - time, planning, sequences
-        TestItem { text: "First we plan, then we execute, finally we review", domain: SemanticDomain::Temporal, context: ActionContext::Response },
-        TestItem { text: "The deadline is approaching quickly", domain: SemanticDomain::Temporal, context: ActionContext::Thought },
-        TestItem { text: "Schedule the meeting for next Tuesday", domain: SemanticDomain::Temporal, context: ActionContext::Query },
-        TestItem { text: "History repeats itself in cycles", domain: SemanticDomain::Temporal, context: ActionContext::Response },
-        TestItem { text: "Before starting, ensure prerequisites are met", domain: SemanticDomain::Temporal, context: ActionContext::Response },
-        TestItem { text: "The future depends on decisions made today", domain: SemanticDomain::Temporal, context: ActionContext::Response },
-        TestItem { text: "Memories fade over time but emotions persist", domain: SemanticDomain::Temporal, context: ActionContext::Response },
-        TestItem { text: "Sequential execution versus parallel processing", domain: SemanticDomain::Temporal, context: ActionContext::Response },
-
+        TestItem {
+            text: "First we plan, then we execute, finally we review",
+            domain: SemanticDomain::Temporal,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "The deadline is approaching quickly",
+            domain: SemanticDomain::Temporal,
+            context: ActionContext::Thought,
+        },
+        TestItem {
+            text: "Schedule the meeting for next Tuesday",
+            domain: SemanticDomain::Temporal,
+            context: ActionContext::Query,
+        },
+        TestItem {
+            text: "History repeats itself in cycles",
+            domain: SemanticDomain::Temporal,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Before starting, ensure prerequisites are met",
+            domain: SemanticDomain::Temporal,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "The future depends on decisions made today",
+            domain: SemanticDomain::Temporal,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Memories fade over time but emotions persist",
+            domain: SemanticDomain::Temporal,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Sequential execution versus parallel processing",
+            domain: SemanticDomain::Temporal,
+            context: ActionContext::Response,
+        },
         // SPATIAL domain - structure, layout, geometry
-        TestItem { text: "The folder hierarchy organizes files by category", domain: SemanticDomain::Spatial, context: ActionContext::Response },
-        TestItem { text: "Components are arranged in a grid layout", domain: SemanticDomain::Spatial, context: ActionContext::Response },
-        TestItem { text: "The boundary separates internal from external", domain: SemanticDomain::Spatial, context: ActionContext::Response },
-        TestItem { text: "Nested structures contain inner elements", domain: SemanticDomain::Spatial, context: ActionContext::Response },
-        TestItem { text: "The center of the circle is equidistant from edges", domain: SemanticDomain::Spatial, context: ActionContext::Response },
-        TestItem { text: "Layers stack on top of each other", domain: SemanticDomain::Spatial, context: ActionContext::Response },
-        TestItem { text: "The path connects point A to point B", domain: SemanticDomain::Spatial, context: ActionContext::Response },
-        TestItem { text: "Symmetry reflects across the central axis", domain: SemanticDomain::Spatial, context: ActionContext::Response },
+        TestItem {
+            text: "The folder hierarchy organizes files by category",
+            domain: SemanticDomain::Spatial,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Components are arranged in a grid layout",
+            domain: SemanticDomain::Spatial,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "The boundary separates internal from external",
+            domain: SemanticDomain::Spatial,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Nested structures contain inner elements",
+            domain: SemanticDomain::Spatial,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "The center of the circle is equidistant from edges",
+            domain: SemanticDomain::Spatial,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Layers stack on top of each other",
+            domain: SemanticDomain::Spatial,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "The path connects point A to point B",
+            domain: SemanticDomain::Spatial,
+            context: ActionContext::Response,
+        },
+        TestItem {
+            text: "Symmetry reflects across the central axis",
+            domain: SemanticDomain::Spatial,
+            context: ActionContext::Response,
+        },
     ];
 
     println!("  Test corpus: {} items across 4 domains", test_items.len());
-    println!("  - TECHNICAL: {} items", test_items.iter().filter(|i| i.domain == SemanticDomain::Technical).count());
-    println!("  - EMOTIONAL: {} items", test_items.iter().filter(|i| i.domain == SemanticDomain::Emotional).count());
-    println!("  - TEMPORAL:  {} items", test_items.iter().filter(|i| i.domain == SemanticDomain::Temporal).count());
-    println!("  - SPATIAL:   {} items", test_items.iter().filter(|i| i.domain == SemanticDomain::Spatial).count());
+    println!(
+        "  - TECHNICAL: {} items",
+        test_items
+            .iter()
+            .filter(|i| i.domain == SemanticDomain::Technical)
+            .count()
+    );
+    println!(
+        "  - EMOTIONAL: {} items",
+        test_items
+            .iter()
+            .filter(|i| i.domain == SemanticDomain::Emotional)
+            .count()
+    );
+    println!(
+        "  - TEMPORAL:  {} items",
+        test_items
+            .iter()
+            .filter(|i| i.domain == SemanticDomain::Temporal)
+            .count()
+    );
+    println!(
+        "  - SPATIAL:   {} items",
+        test_items
+            .iter()
+            .filter(|i| i.domain == SemanticDomain::Spatial)
+            .count()
+    );
     println!();
 
     // =========================================================================
@@ -209,7 +357,8 @@ fn main() {
 
     // Collect primitive activations per domain
     let mut domain_primitives: HashMap<SemanticDomain, Vec<Vec<(String, f32)>>> = HashMap::new();
-    let mut domain_tiers: HashMap<SemanticDomain, Vec<HashMap<PrimitiveTier, usize>>> = HashMap::new();
+    let mut domain_tiers: HashMap<SemanticDomain, Vec<HashMap<PrimitiveTier, usize>>> =
+        HashMap::new();
 
     for item in &test_items {
         let result = bridge.process(item.text, item.context);
@@ -234,8 +383,12 @@ fn main() {
     // Build domain profiles
     let mut profiles: HashMap<SemanticDomain, DomainProfile> = HashMap::new();
 
-    for domain in [SemanticDomain::Technical, SemanticDomain::Emotional,
-                   SemanticDomain::Temporal, SemanticDomain::Spatial] {
+    for domain in [
+        SemanticDomain::Technical,
+        SemanticDomain::Emotional,
+        SemanticDomain::Temporal,
+        SemanticDomain::Spatial,
+    ] {
         let mut profile = DomainProfile::new();
 
         if let Some(all_primitives) = domain_primitives.get(&domain) {
@@ -252,7 +405,8 @@ fn main() {
             }
 
             // Sort by frequency * average strength
-            let mut sorted: Vec<_> = prim_totals.iter()
+            let mut sorted: Vec<_> = prim_totals
+                .iter()
                 .map(|(name, (total, count))| {
                     let avg = total / *count as f32;
                     let freq = *count as f32 / all_primitives.len() as f32;
@@ -261,7 +415,8 @@ fn main() {
                 .collect();
             sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-            profile.top_primitives = sorted.iter()
+            profile.top_primitives = sorted
+                .iter()
                 .take(10)
                 .map(|(n, _, avg)| (n.clone(), *avg))
                 .collect();
@@ -279,7 +434,9 @@ fn main() {
             let total: usize = tier_totals.values().sum();
             if total > 0 {
                 for (tier, count) in tier_totals {
-                    profile.tier_distribution.insert(tier, count as f32 / total as f32);
+                    profile
+                        .tier_distribution
+                        .insert(tier, count as f32 / total as f32);
                 }
             }
         }
@@ -288,8 +445,12 @@ fn main() {
     }
 
     // Print domain profiles
-    for domain in [SemanticDomain::Technical, SemanticDomain::Emotional,
-                   SemanticDomain::Temporal, SemanticDomain::Spatial] {
+    for domain in [
+        SemanticDomain::Technical,
+        SemanticDomain::Emotional,
+        SemanticDomain::Temporal,
+        SemanticDomain::Spatial,
+    ] {
         let profile = profiles.get(&domain).unwrap();
         println!();
         println!("  ═══ {} ═══", domain.name());
@@ -318,8 +479,12 @@ fn main() {
     println!("────────────────────────────────────────────────────────────────────");
 
     // Compute pairwise similarities between domain profiles
-    let domains = [SemanticDomain::Technical, SemanticDomain::Emotional,
-                   SemanticDomain::Temporal, SemanticDomain::Spatial];
+    let domains = [
+        SemanticDomain::Technical,
+        SemanticDomain::Emotional,
+        SemanticDomain::Temporal,
+        SemanticDomain::Spatial,
+    ];
 
     println!();
     println!("  Cross-Domain Similarity Matrix (lower = better discrimination):");
@@ -351,12 +516,14 @@ fn main() {
     }
 
     // Calculate discrimination metrics
-    let self_similarities: Vec<f32> = similarities.iter()
+    let self_similarities: Vec<f32> = similarities
+        .iter()
         .filter(|(d1, d2, _)| d1 == d2)
         .map(|(_, _, s)| *s)
         .collect();
 
-    let cross_similarities: Vec<f32> = similarities.iter()
+    let cross_similarities: Vec<f32> = similarities
+        .iter()
         .filter(|(d1, d2, _)| d1 != d2)
         .map(|(_, _, s)| *s)
         .collect();
@@ -384,7 +551,9 @@ fn main() {
         let result = bridge.process(item.text, item.context);
 
         // Create a mini-profile for this item
-        let item_prims: std::collections::HashSet<_> = result.primitive_birth.iter()
+        let item_prims: std::collections::HashSet<_> = result
+            .primitive_birth
+            .iter()
             .map(|(n, _)| n.as_str())
             .collect();
 
@@ -394,13 +563,19 @@ fn main() {
 
         for domain in &domains {
             let profile = profiles.get(domain).unwrap();
-            let profile_prims: std::collections::HashSet<_> = profile.top_primitives.iter()
+            let profile_prims: std::collections::HashSet<_> = profile
+                .top_primitives
+                .iter()
                 .map(|(n, _)| n.as_str())
                 .collect();
 
             let intersection = item_prims.intersection(&profile_prims).count();
             let union = item_prims.union(&profile_prims).count();
-            let score = if union > 0 { intersection as f32 / union as f32 } else { 0.0 };
+            let score = if union > 0 {
+                intersection as f32 / union as f32
+            } else {
+                0.0
+            };
 
             if score > best_score {
                 best_score = score;
@@ -442,7 +617,10 @@ fn main() {
     }
 
     println!();
-    println!("  Classification accuracy: {:.1}% ({}/{})", accuracy, correct, total);
+    println!(
+        "  Classification accuracy: {:.1}% ({}/{})",
+        accuracy, correct, total
+    );
     println!();
 
     // =========================================================================
@@ -509,9 +687,18 @@ fn main() {
     println!("  ────────────────────────────────┼─────────────────────────────");
     println!("  Items tested                    | {}", total);
     println!("  Classification accuracy         | {:.1}%", accuracy);
-    println!("  Avg cross-domain similarity     | {:.1}%", avg_cross * 100.0);
-    println!("  Max cross-domain similarity     | {:.1}%", max_cross * 100.0);
-    println!("  Min cross-domain similarity     | {:.1}%", min_cross * 100.0);
+    println!(
+        "  Avg cross-domain similarity     | {:.1}%",
+        avg_cross * 100.0
+    );
+    println!(
+        "  Max cross-domain similarity     | {:.1}%",
+        max_cross * 100.0
+    );
+    println!(
+        "  Min cross-domain similarity     | {:.1}%",
+        min_cross * 100.0
+    );
     println!();
 
     // Determine pass/fail
@@ -542,8 +729,14 @@ fn main() {
         println!("║  Some discrimination ability detected, but weak.                  ║");
         println!("║                                                                    ║");
         println!("║  Current state:                                                   ║");
-        println!("║  - Classification: {:.1}% (random would be 25%)              ║", accuracy);
-        println!("║  - Cross-domain similarity: {:.1}% (lower is better)         ║", avg_cross * 100.0);
+        println!(
+            "║  - Classification: {:.1}% (random would be 25%)              ║",
+            accuracy
+        );
+        println!(
+            "║  - Cross-domain similarity: {:.1}% (lower is better)         ║",
+            avg_cross * 100.0
+        );
         println!("║                                                                    ║");
         println!("║  This is expected with simulated embeddings.                      ║");
         println!("║  Real embeddings would strengthen discrimination.                 ║");

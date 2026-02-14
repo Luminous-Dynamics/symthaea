@@ -62,7 +62,10 @@ impl AdaptiveThresholds {
         let mut base = HashMap::new();
         base.insert(TaskComplexity::Reflex, config.min_reflex_coherence);
         base.insert(TaskComplexity::Cognitive, config.min_cognitive_coherence);
-        base.insert(TaskComplexity::DeepThought, config.min_deep_thought_coherence);
+        base.insert(
+            TaskComplexity::DeepThought,
+            config.min_deep_thought_coherence,
+        );
         base.insert(TaskComplexity::Empathy, config.min_empathy_coherence);
         base.insert(TaskComplexity::Learning, config.min_learning_coherence);
         base.insert(TaskComplexity::Creation, config.min_creation_coherence);
@@ -123,7 +126,9 @@ impl AdaptiveThresholds {
 
     /// Get statistics for a task type
     pub fn stats(&self, task: TaskComplexity) -> (usize, usize, f32) {
-        let records: Vec<_> = self.history.iter()
+        let records: Vec<_> = self
+            .history
+            .iter()
             .filter(|r| r.task_type == task)
             .collect();
 

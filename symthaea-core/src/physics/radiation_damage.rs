@@ -23,10 +23,10 @@
 //! 3. **Sluggish Diffusion**: HEAs trap defects in local minima
 //! 4. **Dynamic Recrystallization**: Lattice rebuilds under stress
 
+use super::phonon_dynamics::{CrystalStructure, LatticeMaterial};
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::phonon_dynamics::{CrystalStructure, LatticeMaterial};
 use serde::{Deserialize, Serialize};
 
 /// Radiation damage characteristics
@@ -157,22 +157,16 @@ impl RadiationDamageSystem {
 
             // Vacancy-Interstitial recombination
             ("V-I Recombination", 1e12, 0.1, 0.9),
-
             // Grain boundary sinks (nano-crystalline)
             ("GB Defect Sinks", 1e10, 0.3, 0.7),
-
             // HEA sluggish diffusion (traps defects)
             ("Sluggish Diffusion", 1e8, 0.5, 0.85),
-
             // Dynamic recrystallization
             ("Dynamic Recrystallization", 1e6, 0.8, 0.4),
-
             // Thermal annealing (requires high T)
             ("Thermal Annealing", 1e14, 1.5, 0.1),
-
             // Interstitial clustering (can be positive)
             ("Interstitial Clustering", 1e9, 0.2, 0.5),
-
             // Liquid metal self-healing (no lattice to break)
             ("Liquid Phase", 1e15, 0.0, 1.0),
         ];
@@ -352,7 +346,11 @@ impl RadiationDamageSystem {
             )
         } else if is_hea {
             ContinuousHV::weighted_bundle(
-                &[&self.self_healing, &self.high_entropy, &self.sluggish_diffusion],
+                &[
+                    &self.self_healing,
+                    &self.high_entropy,
+                    &self.sluggish_diffusion,
+                ],
                 &[1.0, 1.5, 1.0],
             )
         } else {
@@ -377,9 +375,9 @@ impl RadiationDamageSystem {
     pub fn quick_healing_estimate(&self, structure: CrystalStructure, z: u8) -> f32 {
         // Base score from structure
         let structure_score: f32 = match structure {
-            CrystalStructure::BCC => 0.7,    // Good radiation resistance
-            CrystalStructure::FCC => 0.5,    // Moderate
-            CrystalStructure::HCP => 0.4,    // Poor
+            CrystalStructure::BCC => 0.7,     // Good radiation resistance
+            CrystalStructure::FCC => 0.5,     // Moderate
+            CrystalStructure::HCP => 0.4,     // Poor
             CrystalStructure::Diamond => 0.3, // Very poor
             CrystalStructure::Fluorite => 0.6,
             CrystalStructure::Rocksalt => 0.5,
@@ -387,19 +385,19 @@ impl RadiationDamageSystem {
 
         // Adjust for element
         let element_score: f32 = match z {
-            22 => 0.7, // Titanium - good
-            23 => 0.8, // Vanadium - excellent
+            22 => 0.7,  // Titanium - good
+            23 => 0.8,  // Vanadium - excellent
             24 => 0.75, // Chromium - good
-            26 => 0.7, // Iron - good (especially ferritic)
+            26 => 0.7,  // Iron - good (especially ferritic)
             27 => 0.65, // Cobalt
-            28 => 0.5, // Nickel - moderate
+            28 => 0.5,  // Nickel - moderate
             40 => 0.75, // Zirconium - good
-            41 => 0.8, // Niobium - excellent
-            42 => 0.7, // Molybdenum - good
-            46 => 0.3, // Palladium - poor
+            41 => 0.8,  // Niobium - excellent
+            42 => 0.7,  // Molybdenum - good
+            46 => 0.3,  // Palladium - poor
             68 => 0.35, // Erbium - poor
             73 => 0.85, // Tantalum - excellent
-            74 => 0.8, // Tungsten - excellent
+            74 => 0.8,  // Tungsten - excellent
             _ => 0.5,
         };
 
@@ -434,7 +432,7 @@ impl FusionReaction {
     /// Total energy release in MeV
     pub fn total_energy_mev(&self) -> f64 {
         match self {
-            FusionReaction::DD => 3.27,      // avg of both branches
+            FusionReaction::DD => 3.27, // avg of both branches
             FusionReaction::DT => 17.6,
             FusionReaction::DdProton => 4.03,
             FusionReaction::DHe3 => 18.3,
@@ -445,9 +443,9 @@ impl FusionReaction {
     pub fn optimal_temp_kev(&self) -> f64 {
         match self {
             FusionReaction::DD => 15.0,
-            FusionReaction::DT => 60.0,      // Peak cross-section temperature
+            FusionReaction::DT => 60.0, // Peak cross-section temperature
             FusionReaction::DdProton => 15.0,
-            FusionReaction::DHe3 => 58.0,    // Highest - hardest to achieve
+            FusionReaction::DHe3 => 58.0, // Highest - hardest to achieve
         }
     }
 
@@ -470,9 +468,9 @@ impl FusionReaction {
         // Mean free path in fusion plasma/liquid metal core
         // Galinstan has high density (~6400 kg/m³) providing significant moderation
         let mfp = match self {
-            FusionReaction::DD => 0.15,   // 2.45 MeV neutrons, shorter MFP
-            FusionReaction::DT => 0.25,   // 14.1 MeV neutrons, longer MFP
-            _ => 1.0,                      // No neutrons
+            FusionReaction::DD => 0.15, // 2.45 MeV neutrons, shorter MFP
+            FusionReaction::DT => 0.25, // 14.1 MeV neutrons, longer MFP
+            _ => 1.0,                   // No neutrons
         };
 
         // Escape probability: exp(-R/λ) for spherical geometry
@@ -489,8 +487,8 @@ impl FusionReaction {
     /// Total fuel mass in g/mol (sum of reactant atomic masses)
     #[allow(dead_code)]
     pub fn fuel_mass_g_mol(&self) -> f64 {
-        let d = 2.01410;  // Deuterium
-        let t = 3.01605;  // Tritium
+        let d = 2.01410; // Deuterium
+        let t = 3.01605; // Tritium
         let he3 = 3.01603; // Helium-3
         match self {
             FusionReaction::DD => 2.0 * d,
@@ -504,7 +502,7 @@ impl FusionReaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::physics::{StandardModel, Hadrons, PeriodicTable, PhononDynamics};
+    use crate::physics::{Hadrons, PeriodicTable, PhononDynamics, StandardModel};
 
     fn setup() -> (GenesisSeed, RadiationDamageSystem, PhononDynamics) {
         let genesis = GenesisSeed::from_phrase("wolverine test");
@@ -523,16 +521,27 @@ mod tests {
         // D-T fusion neutron on Titanium
         let damage = radiation.calculate_damage(14.1, 1e14, 22);
 
-        assert!(damage.pka_energy_kev > 100.0, "PKA energy should be > 100 keV");
-        assert!(damage.displacements_per_cascade > 100.0, "Should create >100 displacements");
-        assert!(damage.time_to_failure_s > 0.0, "Time to failure should be positive");
+        assert!(
+            damage.pka_energy_kev > 100.0,
+            "PKA energy should be > 100 keV"
+        );
+        assert!(
+            damage.displacements_per_cascade > 100.0,
+            "Should create >100 displacements"
+        );
+        assert!(
+            damage.time_to_failure_s > 0.0,
+            "Time to failure should be positive"
+        );
     }
 
     #[test]
     fn test_palladium_embrittlement() {
         let (_, radiation, phonons) = setup();
 
-        let pd = phonons.materials.iter()
+        let pd = phonons
+            .materials
+            .iter()
             .find(|m| m.name == "Palladium")
             .expect("Palladium should exist");
 
@@ -551,7 +560,9 @@ mod tests {
     fn test_hea_improvement() {
         let (_, radiation, phonons) = setup();
 
-        let ti = phonons.materials.iter()
+        let ti = phonons
+            .materials
+            .iter()
             .find(|m| m.name == "Titanium")
             .expect("Titanium should exist");
 
@@ -577,7 +588,9 @@ mod tests {
     fn test_liquid_metal_healing() {
         let (_, radiation, phonons) = setup();
 
-        let pd = phonons.materials.iter()
+        let pd = phonons
+            .materials
+            .iter()
             .find(|m| m.name == "Palladium")
             .expect("Palladium should exist");
 
@@ -585,7 +598,10 @@ mod tests {
         let healing = radiation.analyze_healing(pd, &damage, false, true, 100.0);
 
         // Liquid metal should have perfect healing
-        assert_eq!(healing.healing_score, 1.0, "Liquid metal should have perfect healing");
+        assert_eq!(
+            healing.healing_score, 1.0,
+            "Liquid metal should have perfect healing"
+        );
         assert_eq!(healing.primary_mechanism, "Liquid Phase");
     }
 

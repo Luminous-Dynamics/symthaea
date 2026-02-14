@@ -26,11 +26,11 @@ use anyhow::Result;
 use ndarray::Array1;
 use serde::{Deserialize, Serialize};
 
+use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::hdc_ltc_unified::{
-    HdcLtcUnifiedNetwork, UnifiedNetworkConfig, UnifiedConfig, UnifiedActivation,
+    HdcLtcUnifiedNetwork, UnifiedActivation, UnifiedConfig, UnifiedNetworkConfig,
 };
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
-use symthaea_core::genesis::GenesisSeed;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -125,9 +125,9 @@ pub enum BridgeActivation {
 impl Default for HdcLtcBridgeConfig {
     fn default() -> Self {
         Self {
-            input_dim: 256,  // Match CfC default
+            input_dim: 256, // Match CfC default
             output_dim: 256,
-            layer_sizes: vec![4, 8, 4],  // 3-layer network
+            layer_sizes: vec![4, 8, 4], // 3-layer network
             tau_base: 0.1,
             backbone_tau: 0.5,
             learning_rate: 0.01,
@@ -145,9 +145,9 @@ impl HdcLtcBridgeConfig {
     /// Create config optimized for fast response
     pub fn fast() -> Self {
         Self {
-            tau_base: 0.05,  // Faster time constant
-            layer_sizes: vec![2, 4, 2],  // Smaller network
-            hdc_dim: 2048,   // Reduced dimension for speed
+            tau_base: 0.05,             // Faster time constant
+            layer_sizes: vec![2, 4, 2], // Smaller network
+            hdc_dim: 2048,              // Reduced dimension for speed
             ..Default::default()
         }
     }
@@ -155,7 +155,7 @@ impl HdcLtcBridgeConfig {
     /// Create config optimized for accuracy
     pub fn accurate() -> Self {
         Self {
-            layer_sizes: vec![8, 16, 8],  // Larger network
+            layer_sizes: vec![8, 16, 8], // Larger network
             skip_connections: true,
             ..Default::default()
         }
@@ -230,17 +230,11 @@ impl HdcLtcBridge {
         let network = HdcLtcUnifiedNetwork::new(network_config, config.seed);
 
         // Initialize random projection matrices
-        let input_projection = Self::init_projection(
-            config.input_dim,
-            hdc_dim,
-            config.seed + 100000,
-        );
+        let input_projection =
+            Self::init_projection(config.input_dim, hdc_dim, config.seed + 100000);
 
-        let output_projection = Self::init_projection(
-            hdc_dim,
-            config.output_dim,
-            config.seed + 200000,
-        );
+        let output_projection =
+            Self::init_projection(hdc_dim, config.output_dim, config.seed + 200000);
 
         Self {
             network,
@@ -256,7 +250,10 @@ impl HdcLtcBridge {
     }
 
     /// Create a bridge with deterministic genesis seeding
-    pub fn from_genesis(config: HdcLtcBridgeConfig, genesis: &symthaea_core::genesis::GenesisSeed) -> Self {
+    pub fn from_genesis(
+        config: HdcLtcBridgeConfig,
+        genesis: &symthaea_core::genesis::GenesisSeed,
+    ) -> Self {
         let hdc_dim = config.hdc_dim;
 
         let neuron_config = UnifiedConfig {
@@ -283,10 +280,16 @@ impl HdcLtcBridge {
         let network = HdcLtcUnifiedNetwork::from_genesis(network_config, genesis);
 
         let input_projection = Self::init_projection_from_genesis(
-            genesis, "bridge::input_projection", config.input_dim, hdc_dim,
+            genesis,
+            "bridge::input_projection",
+            config.input_dim,
+            hdc_dim,
         );
         let output_projection = Self::init_projection_from_genesis(
-            genesis, "bridge::output_projection", hdc_dim, config.output_dim,
+            genesis,
+            "bridge::output_projection",
+            hdc_dim,
+            config.output_dim,
         );
 
         Self {
@@ -351,7 +354,9 @@ impl HdcLtcBridge {
         // Each row is contiguous in memory → cache-friendly
         for i in 0..input_dim {
             let x = input[i];
-            if x.abs() < 1e-10 { continue; } // Skip near-zero inputs
+            if x.abs() < 1e-10 {
+                continue;
+            } // Skip near-zero inputs
             let row = &self.input_projection[i * hdc_dim..(i + 1) * hdc_dim];
             for (v, &w) in values.iter_mut().zip(row.iter()) {
                 *v += x * w;
@@ -380,7 +385,9 @@ impl HdcLtcBridge {
         // Row-accumulation: iterate rows (HDC elements), accumulate into output
         for j in 0..hdc_dim {
             let x = hv.values[j];
-            if x.abs() < 1e-10 { continue; } // Skip near-zero elements
+            if x.abs() < 1e-10 {
+                continue;
+            } // Skip near-zero elements
             let row = &self.output_projection[j * output_dim..(j + 1) * output_dim];
             for (o, &w) in output.iter_mut().zip(row.iter()) {
                 *o += x * w;
@@ -439,7 +446,9 @@ impl HdcLtcBridge {
         let new_dim = if current_error > adaptive.upscale_error_threshold {
             (current_dim + adaptive.scale_step).min(adaptive.max_dim)
         } else if current_error < adaptive.downscale_error_threshold {
-            current_dim.saturating_sub(adaptive.scale_step).max(adaptive.min_dim)
+            current_dim
+                .saturating_sub(adaptive.scale_step)
+                .max(adaptive.min_dim)
         } else {
             return; // No change needed
         };
@@ -502,7 +511,8 @@ impl HdcLtcBridge {
         if let Some(ref genesis) = self.genesis {
             self.network = HdcLtcUnifiedNetwork::from_genesis(network_config, genesis);
         } else {
-            self.network = HdcLtcUnifiedNetwork::new(network_config, self.config.seed + self.total_steps);
+            self.network =
+                HdcLtcUnifiedNetwork::new(network_config, self.config.seed + self.total_steps);
         }
         self.cycles_since_resize = 0;
     }
@@ -572,10 +582,12 @@ impl HdcLtcBridge {
         let output = self.project_from_hdc(&hdc_output);
 
         // Compute MSE loss in output space
-        let loss: f32 = output.iter()
+        let loss: f32 = output
+            .iter()
             .zip(target.iter())
             .map(|(o, t)| (o - t).powi(2))
-            .sum::<f32>() / target.len() as f32;
+            .sum::<f32>()
+            / target.len() as f32;
 
         // Apply BPTT gradients to all layers
         let n_layers = self.network.n_layers();
@@ -611,7 +623,8 @@ impl HdcLtcBridge {
         let output_dim = self.config.output_dim;
 
         // Compute output error
-        let errors: Vec<f32> = output.iter()
+        let errors: Vec<f32> = output
+            .iter()
             .zip(target.iter())
             .map(|(o, t)| o - t)
             .collect();
@@ -662,7 +675,8 @@ impl HdcLtcBridge {
         for layer_idx in 0..self.network.n_layers() {
             if let Some(layer) = self.network.layer(layer_idx) {
                 // Create a single tau array for this layer based on neuron configs
-                let layer_taus: Vec<f32> = layer.iter()
+                let layer_taus: Vec<f32> = layer
+                    .iter()
                     .map(|n| n.config().tau_base * (1.0 + n.config().backbone_tau))
                     .collect();
                 taus.push(Array1::from_vec(layer_taus));
@@ -674,7 +688,10 @@ impl HdcLtcBridge {
 
     /// Get flattened tau values
     pub fn flattened_tau(&self) -> Vec<f32> {
-        self.all_tau().into_iter().flat_map(|t| t.to_vec()).collect()
+        self.all_tau()
+            .into_iter()
+            .flat_map(|t| t.to_vec())
+            .collect()
     }
 
     /// Get configuration
@@ -722,7 +739,9 @@ impl HdcLtcBridge {
         // Use 1e-6 threshold instead of 1e-10 to be less aggressive about skipping
         for i in 0..input_dim {
             let x = input[i];
-            if x.abs() < 1e-6 { continue; } // Skip near-zero inputs
+            if x.abs() < 1e-6 {
+                continue;
+            } // Skip near-zero inputs
             let row_start = i * hdc_dim;
             let row_end = (i + 1) * hdc_dim;
 
@@ -926,7 +945,11 @@ mod tests {
             bridge.maybe_resize(0.9);
         }
 
-        assert!(bridge.current_hdc_dim() > 2048, "dim should have increased, got {}", bridge.current_hdc_dim());
+        assert!(
+            bridge.current_hdc_dim() > 2048,
+            "dim should have increased, got {}",
+            bridge.current_hdc_dim()
+        );
     }
 
     #[test]
@@ -947,7 +970,11 @@ mod tests {
             bridge.maybe_resize(0.1);
         }
 
-        assert!(bridge.current_hdc_dim() < 8192, "dim should have decreased, got {}", bridge.current_hdc_dim());
+        assert!(
+            bridge.current_hdc_dim() < 8192,
+            "dim should have decreased, got {}",
+            bridge.current_hdc_dim()
+        );
     }
 
     #[test]
@@ -966,12 +993,19 @@ mod tests {
         for _ in 0..10 {
             bridge.maybe_resize(0.9);
         }
-        assert_eq!(bridge.current_hdc_dim(), 4096, "should not resize within cooldown");
+        assert_eq!(
+            bridge.current_hdc_dim(),
+            4096,
+            "should not resize within cooldown"
+        );
 
         // Call 15 more (total 25, exceeds cooldown) - should resize
         for _ in 0..15 {
             bridge.maybe_resize(0.9);
         }
-        assert!(bridge.current_hdc_dim() > 4096, "should resize after cooldown");
+        assert!(
+            bridge.current_hdc_dim() > 4096,
+            "should resize after cooldown"
+        );
     }
 }

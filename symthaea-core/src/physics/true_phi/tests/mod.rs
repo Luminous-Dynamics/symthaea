@@ -15,14 +15,14 @@ pub(crate) fn create_test_vectors(count: usize) -> Vec<ContinuousHV> {
         .collect()
 }
 
-mod core_tests;
-mod optimized_tests;
-mod temporal_tests;
-mod pyphi_tests;
-mod invariant_tests;
-mod iit4_tests;
-mod quantum_tests;
-mod parallel_tests;
 mod cache_tests;
-mod simd_tests;
 mod conceptual_tests;
+mod core_tests;
+mod iit4_tests;
+mod invariant_tests;
+mod optimized_tests;
+mod parallel_tests;
+mod pyphi_tests;
+mod quantum_tests;
+mod simd_tests;
+mod temporal_tests;

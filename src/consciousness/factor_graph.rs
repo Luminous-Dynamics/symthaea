@@ -357,7 +357,11 @@ impl FactorGraph {
         let mut result = vec![0.0; target_card];
 
         // Collect cardinalities and incoming messages for the factor's variables.
-        let cards: Vec<usize> = f.variables.iter().map(|&v| self.variables[v].cardinality).collect();
+        let cards: Vec<usize> = f
+            .variables
+            .iter()
+            .map(|&v| self.variables[v].cardinality)
+            .collect();
         let incoming: Vec<Vec<f64>> = f
             .variables
             .iter()
@@ -366,10 +370,9 @@ impl FactorGraph {
                     vec![1.0; self.variables[v].cardinality]
                 } else {
                     let key = self.var_to_factor_key(v, factor);
-                    self.messages
-                        .get(&key)
-                        .cloned()
-                        .unwrap_or_else(|| vec![1.0 / cards[0] as f64; self.variables[v].cardinality])
+                    self.messages.get(&key).cloned().unwrap_or_else(|| {
+                        vec![1.0 / cards[0] as f64; self.variables[v].cardinality]
+                    })
                 }
             })
             .collect();
@@ -411,7 +414,11 @@ impl FactorGraph {
         let target_card = self.variables[target_var].cardinality;
         let mut result = vec![0.0_f64; target_card];
 
-        let cards: Vec<usize> = f.variables.iter().map(|&v| self.variables[v].cardinality).collect();
+        let cards: Vec<usize> = f
+            .variables
+            .iter()
+            .map(|&v| self.variables[v].cardinality)
+            .collect();
         let incoming: Vec<Vec<f64>> = f
             .variables
             .iter()
@@ -523,8 +530,8 @@ impl FactorGraph {
                         let damped = if let Some(old) = old_msg {
                             let mut d = vec![0.0; new_msg.len()];
                             for i in 0..d.len() {
-                                d[i] = config.damping * new_msg[i]
-                                    + (1.0 - config.damping) * old[i];
+                                d[i] =
+                                    config.damping * new_msg[i] + (1.0 - config.damping) * old[i];
                             }
                             let delta: f64 = d
                                 .iter()
@@ -674,7 +681,11 @@ impl FactorGraph {
 
         // Factor-belief energy terms.
         for f in &self.factors {
-            let cards: Vec<usize> = f.variables.iter().map(|&v| self.variables[v].cardinality).collect();
+            let cards: Vec<usize> = f
+                .variables
+                .iter()
+                .map(|&v| self.variables[v].cardinality)
+                .collect();
             let total: usize = cards.iter().product();
 
             for flat_idx in 0..total {
@@ -859,11 +870,7 @@ mod tests {
         let result = fg.run_map(&config);
 
         // The highest entry in the factor table is (A=1, B=1) = 0.4.
-        assert_eq!(
-            result.assignment,
-            vec![1, 1],
-            "MAP should be (A=1, B=1)"
-        );
+        assert_eq!(result.assignment, vec![1, 1], "MAP should be (A=1, B=1)");
         assert!(result.converged);
     }
 

@@ -177,7 +177,8 @@ fn bundle(vectors: &[&[i8]]) -> Vec<i8> {
 
     // Threshold to binary
     let threshold = vectors.len() as i32 / 2;
-    result.iter()
+    result
+        .iter()
         .map(|&sum| if sum > threshold { 1 } else { -1 })
         .collect()
 }
@@ -191,14 +192,16 @@ fn simple_encode(text: &str) -> Vec<i8> {
         let char_val = c as usize;
         for j in 0..dim {
             let idx = (char_val + i * 7 + j) % dim;
-            hv[idx] = hv[idx].saturating_add(if (char_val + j).is_multiple_of(2) { 1 } else { -1 });
+            hv[idx] = hv[idx].saturating_add(if (char_val + j).is_multiple_of(2) {
+                1
+            } else {
+                -1
+            });
         }
     }
 
     // Threshold
-    hv.iter()
-        .map(|&v| if v > 0 { 1 } else { -1 })
-        .collect()
+    hv.iter().map(|&v| if v > 0 { 1 } else { -1 }).collect()
 }
 
 // Additional property tests for infrastructure

@@ -27,7 +27,7 @@
 //! monitor and improve cognition in real-time!
 
 use crate::consciousness::primitive_reasoning::{
-    ReasoningChain, PrimitiveExecution, TransformationType,
+    PrimitiveExecution, ReasoningChain, TransformationType,
 };
 use crate::hdc::primitive_system::Primitive;
 use anyhow::Result;
@@ -42,7 +42,7 @@ pub enum MonitoringResult {
     /// Anomaly detected - reasoning may be degrading
     Anomaly {
         diagnosis: Diagnosis,
-        severity: f64,  // 0.0 = minor, 1.0 = severe
+        severity: f64, // 0.0 = minor, 1.0 = severe
     },
 
     /// Critical failure - reasoning has degraded significantly
@@ -153,7 +153,10 @@ impl MetacognitiveMonitor {
         self.phi_history.push(execution.phi_contribution);
 
         // Detect anomalies
-        if let Some(anomaly) = self.anomaly_detector.detect(&self.phi_history, self.phi_threshold) {
+        if let Some(anomaly) = self
+            .anomaly_detector
+            .detect(&self.phi_history, self.phi_threshold)
+        {
             self.anomalies_detected += 1;
 
             // Diagnose the problem
@@ -162,13 +165,14 @@ impl MetacognitiveMonitor {
             // Check severity
             if diagnosis.severity > 0.7 {
                 // Critical - propose correction
-                let correction = self.self_correction.propose_correction(
-                    execution,
-                    chain,
-                    &diagnosis,
-                );
+                let correction = self
+                    .self_correction
+                    .propose_correction(execution, chain, &diagnosis);
 
-                return MonitoringResult::Critical { diagnosis, correction };
+                return MonitoringResult::Critical {
+                    diagnosis,
+                    correction,
+                };
             } else {
                 // Mild anomaly - just warn
                 return MonitoringResult::Anomaly {
@@ -208,10 +212,12 @@ impl MetacognitiveMonitor {
                 )
             }
             ProblemType::PhiOscillation => {
-                "Φ oscillating - reasoning unstable. May need different primitive sequence.".to_string()
+                "Φ oscillating - reasoning unstable. May need different primitive sequence."
+                    .to_string()
             }
             ProblemType::SuboptimalPrimitive => {
-                "Current primitive selection appears suboptimal based on Φ contribution.".to_string()
+                "Current primitive selection appears suboptimal based on Φ contribution."
+                    .to_string()
             }
             ProblemType::IneffectiveChain => {
                 format!(
@@ -297,7 +303,12 @@ impl AnomalyDetector {
             return None;
         }
 
-        let recent: Vec<f64> = phi_history.iter().rev().take(self.window_size).copied().collect();
+        let recent: Vec<f64> = phi_history
+            .iter()
+            .rev()
+            .take(self.window_size)
+            .copied()
+            .collect();
 
         // Check for Φ drop
         if recent[0] < threshold * 0.5 {
@@ -338,7 +349,7 @@ impl AnomalyDetector {
             .map(|&v| (v - mean).abs())
             .fold(0.0f64, |a, b| a.max(b));
 
-        max_deviation < mean * 0.05  // Less than 5% variation
+        max_deviation < mean * 0.05 // Less than 5% variation
     }
 
     /// Check if Φ is oscillating
@@ -358,7 +369,7 @@ impl AnomalyDetector {
             }
         }
 
-        sign_changes >= 2  // At least 2 direction changes
+        sign_changes >= 2 // At least 2 direction changes
     }
 }
 
@@ -389,16 +400,12 @@ impl SelfCorrectionEngine {
         diagnosis: &Diagnosis,
     ) -> SelfCorrection {
         // Strategy: Try a different transformation type with the same primitive
-        let alternative_transformation = self.suggest_alternative_transformation(
-            &execution.transformation,
-            diagnosis.problem_type,
-        );
+        let alternative_transformation = self
+            .suggest_alternative_transformation(&execution.transformation, diagnosis.problem_type);
 
         // Estimate expected improvement
-        let expected_phi_improvement = self.estimate_improvement(
-            execution.phi_contribution,
-            &alternative_transformation,
-        );
+        let expected_phi_improvement =
+            self.estimate_improvement(execution.phi_contribution, &alternative_transformation);
 
         // Compute confidence
         let confidence = self.compute_confidence(diagnosis, expected_phi_improvement);
@@ -501,23 +508,28 @@ impl MetacognitiveReasoner {
         let monitoring_result = self.monitor.monitor_step(execution, chain);
 
         match monitoring_result {
-            MonitoringResult::Healthy => {
-                Ok(MetacognitiveStep {
-                    execution: execution.clone(),
-                    monitoring_result: MonitoringResult::Healthy,
-                    correction_applied: None,
-                })
-            }
+            MonitoringResult::Healthy => Ok(MetacognitiveStep {
+                execution: execution.clone(),
+                monitoring_result: MonitoringResult::Healthy,
+                correction_applied: None,
+            }),
 
-            MonitoringResult::Anomaly { diagnosis, severity } => {
-                Ok(MetacognitiveStep {
-                    execution: execution.clone(),
-                    monitoring_result: MonitoringResult::Anomaly { diagnosis, severity },
-                    correction_applied: None,
-                })
-            }
+            MonitoringResult::Anomaly {
+                diagnosis,
+                severity,
+            } => Ok(MetacognitiveStep {
+                execution: execution.clone(),
+                monitoring_result: MonitoringResult::Anomaly {
+                    diagnosis,
+                    severity,
+                },
+                correction_applied: None,
+            }),
 
-            MonitoringResult::Critical { diagnosis, correction } => {
+            MonitoringResult::Critical {
+                diagnosis,
+                correction,
+            } => {
                 // Record the correction
                 let record = CorrectionRecord {
                     step: chain.executions.len(),
@@ -529,7 +541,10 @@ impl MetacognitiveReasoner {
 
                 Ok(MetacognitiveStep {
                     execution: execution.clone(),
-                    monitoring_result: MonitoringResult::Critical { diagnosis, correction: correction.clone() },
+                    monitoring_result: MonitoringResult::Critical {
+                        diagnosis,
+                        correction: correction.clone(),
+                    },
                     correction_applied: Some(correction),
                 })
             }
@@ -588,7 +603,10 @@ pub struct MonitoringStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::{BinaryHV, primitive_system::{Primitive, PrimitiveTier}};
+    use crate::hdc::{
+        primitive_system::{Primitive, PrimitiveTier},
+        BinaryHV,
+    };
 
     #[test]
     fn test_monitor_healthy() {
@@ -609,7 +627,7 @@ mod tests {
             input: BinaryHV::random(1),
             output: BinaryHV::random(2),
             transformation: TransformationType::Bind,
-            phi_contribution: 0.002,  // Above threshold
+            phi_contribution: 0.002, // Above threshold
             timestamp: 0.0,
         };
 
@@ -642,7 +660,7 @@ mod tests {
             input: BinaryHV::random(1),
             output: BinaryHV::random(2),
             transformation: TransformationType::Bind,
-            phi_contribution: 0.001,  // Below threshold
+            phi_contribution: 0.001, // Below threshold
             timestamp: 0.0,
         };
 
@@ -651,10 +669,13 @@ mod tests {
         let result = monitor.monitor_step(&execution, &chain);
         // Phi drop should be detected (went from 0.01 to 0.001)
         match &result {
-            MonitoringResult::Anomaly { diagnosis, .. } |
-            MonitoringResult::Critical { diagnosis, .. } => {
-                assert_eq!(diagnosis.problem_type, ProblemType::PhiDrop,
-                    "Expected PhiDrop detection");
+            MonitoringResult::Anomaly { diagnosis, .. }
+            | MonitoringResult::Critical { diagnosis, .. } => {
+                assert_eq!(
+                    diagnosis.problem_type,
+                    ProblemType::PhiDrop,
+                    "Expected PhiDrop detection"
+                );
             }
             MonitoringResult::Healthy => {
                 // Healthy is acceptable if threshold wasn't crossed

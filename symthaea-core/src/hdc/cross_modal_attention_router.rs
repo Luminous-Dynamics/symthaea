@@ -33,7 +33,7 @@
 //! 5. **Binding Integration**: Routes through CrossModalBinder for fusion
 
 use super::binary_hv::BinaryHV;
-use super::cross_modal_binding::{CrossModalBinder, Modality, CrossModalConfig};
+use super::cross_modal_binding::{CrossModalBinder, CrossModalConfig, Modality};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -190,7 +190,9 @@ pub struct RoutingResult {
 impl RoutingResult {
     /// Get a summary of which modalities contributed
     pub fn summary(&self) -> String {
-        let weights: Vec<String> = self.attention_weights.iter()
+        let weights: Vec<String> = self
+            .attention_weights
+            .iter()
             .filter(|(_, w)| **w > 0.1)
             .map(|(m, w)| format!("{:?}: {:.2}", m, w))
             .collect();
@@ -301,7 +303,8 @@ impl CrossModalAttentionRouter {
         self.update_attention_state(&attention_weights);
 
         // Step 5: Determine which modalities to bind
-        let (modalities_to_bind, cross_modal) = self.select_modalities_to_bind(&attention_weights, phi);
+        let (modalities_to_bind, cross_modal) =
+            self.select_modalities_to_bind(&attention_weights, phi);
 
         // Step 6: Perform binding using CrossModalBinder
         let unified_hv = self.perform_binding(inputs, &attention_weights, &modalities_to_bind);
@@ -357,7 +360,8 @@ impl CrossModalAttentionRouter {
                 if let Some(state) = self.attention_state.get(&input.modality) {
                     if state.dwell_time > 3 {
                         // Reduce attention to recently attended modalities
-                        let ior_penalty = self.config.ior_strength * (state.dwell_time as f64 / 10.0).min(1.0);
+                        let ior_penalty =
+                            self.config.ior_strength * (state.dwell_time as f64 / 10.0).min(1.0);
                         score *= 1.0 - ior_penalty;
                     }
                 }
@@ -373,7 +377,11 @@ impl CrossModalAttentionRouter {
     }
 
     /// Apply Φ-gating: consciousness level determines integration capacity
-    fn apply_phi_gating(&self, raw_scores: &HashMap<Modality, f64>, phi: f64) -> HashMap<Modality, f64> {
+    fn apply_phi_gating(
+        &self,
+        raw_scores: &HashMap<Modality, f64>,
+        phi: f64,
+    ) -> HashMap<Modality, f64> {
         let mut gated = HashMap::new();
 
         // Low Φ: only dominant modality gets attention
@@ -390,7 +398,11 @@ impl CrossModalAttentionRouter {
 
         for (modality, score) in raw_scores {
             // Suppress non-dominant modalities when Φ is low
-            let relative_score = if max_score > 0.0 { score / max_score } else { 0.0 };
+            let relative_score = if max_score > 0.0 {
+                score / max_score
+            } else {
+                0.0
+            };
             let suppression = if relative_score < 0.5 {
                 1.0 - (1.0 - integration_capacity) * (1.0 - relative_score * 2.0)
             } else {
@@ -409,7 +421,8 @@ impl CrossModalAttentionRouter {
 
         // Compute softmax
         let max_score = scores.values().cloned().fold(f64::NEG_INFINITY, f64::max);
-        let exp_sum: f64 = scores.values()
+        let exp_sum: f64 = scores
+            .values()
             .map(|s| ((s - max_score) / self.config.temperature).exp())
             .sum();
 
@@ -477,7 +490,8 @@ impl CrossModalAttentionRouter {
 
         // High Φ: bind modalities above threshold
         let threshold = 0.1;
-        let selected: Vec<Modality> = sorted.iter()
+        let selected: Vec<Modality> = sorted
+            .iter()
             .filter(|(_, w)| **w > threshold)
             .take(self.config.max_simultaneous_modalities)
             .map(|(m, _)| **m)
@@ -510,7 +524,8 @@ impl CrossModalAttentionRouter {
 
         // Multiple modalities: use weighted bundling
         // Convert BinaryHV to weighted inputs for binding
-        let selected_inputs: Vec<_> = inputs.iter()
+        let selected_inputs: Vec<_> = inputs
+            .iter()
             .filter(|i| modalities_to_bind.contains(&i.modality))
             .collect();
 
@@ -519,7 +534,8 @@ impl CrossModalAttentionRouter {
         }
 
         // Weighted bundle
-        let weighted_hvs: Vec<(BinaryHV, f64)> = selected_inputs.iter()
+        let weighted_hvs: Vec<(BinaryHV, f64)> = selected_inputs
+            .iter()
             .map(|i| {
                 let weight = *weights.get(&i.modality).unwrap_or(&0.0);
                 (i.hv, weight)
@@ -598,7 +614,8 @@ impl CrossModalAttentionRouter {
 
     /// Find the dominant modality
     fn find_dominant_modality(&self, weights: &HashMap<Modality, f64>) -> Option<Modality> {
-        weights.iter()
+        weights
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(m, _)| *m)
     }
@@ -622,14 +639,16 @@ impl CrossModalAttentionRouter {
 
     /// Get attention history for a modality
     pub fn modality_history(&self, modality: Modality) -> Vec<f64> {
-        self.history.iter()
+        self.history
+            .iter()
             .filter_map(|r| r.attention_weights.get(&modality).copied())
             .collect()
     }
 
     /// Get dominant modality over time
     pub fn dominant_modality_sequence(&self) -> Vec<Modality> {
-        self.history.iter()
+        self.history
+            .iter()
             .filter_map(|r| r.dominant_modality)
             .collect()
     }
@@ -738,7 +757,11 @@ mod tests {
         let result = router.route(&inputs, 0.6);
 
         let sum: f64 = result.attention_weights.values().sum();
-        assert!((sum - 1.0).abs() < 0.01, "Weights should sum to 1.0, got {}", sum);
+        assert!(
+            (sum - 1.0).abs() < 0.01,
+            "Weights should sum to 1.0, got {}",
+            sum
+        );
     }
 
     #[test]
@@ -757,12 +780,21 @@ mod tests {
         let result = router.route(&inputs, 0.6);
 
         // Visual should have higher attention due to context similarity
-        let visual_weight = result.attention_weights.get(&Modality::Visual).unwrap_or(&0.0);
-        let auditory_weight = result.attention_weights.get(&Modality::Auditory).unwrap_or(&0.0);
+        let visual_weight = result
+            .attention_weights
+            .get(&Modality::Visual)
+            .unwrap_or(&0.0);
+        let auditory_weight = result
+            .attention_weights
+            .get(&Modality::Auditory)
+            .unwrap_or(&0.0);
 
-        assert!(visual_weight > auditory_weight,
+        assert!(
+            visual_weight > auditory_weight,
             "Visual ({}) should have higher attention than auditory ({}) due to context",
-            visual_weight, auditory_weight);
+            visual_weight,
+            auditory_weight
+        );
     }
 
     #[test]

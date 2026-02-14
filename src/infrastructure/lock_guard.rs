@@ -188,7 +188,7 @@ macro_rules! lock {
     ($mutex:expr) => {
         $crate::infrastructure::lock_guard::ResilientMutex::lock_resilient(
             &$mutex,
-            concat!(file!(), ":", line!())
+            concat!(file!(), ":", line!()),
         )
     };
     ($mutex:expr, $context:expr) => {
@@ -202,7 +202,7 @@ macro_rules! read_lock {
     ($rwlock:expr) => {
         $crate::infrastructure::lock_guard::ResilientRwLock::read_resilient(
             &$rwlock,
-            concat!(file!(), ":", line!())
+            concat!(file!(), ":", line!()),
         )
     };
     ($rwlock:expr, $context:expr) => {
@@ -216,7 +216,7 @@ macro_rules! write_lock {
     ($rwlock:expr) => {
         $crate::infrastructure::lock_guard::ResilientRwLock::write_resilient(
             &$rwlock,
-            concat!(file!(), ":", line!())
+            concat!(file!(), ":", line!()),
         )
     };
     ($rwlock:expr, $context:expr) => {

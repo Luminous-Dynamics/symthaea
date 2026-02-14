@@ -101,7 +101,11 @@ impl Frame {
         match self.format {
             FrameFormat::Rgb24 | FrameFormat::Rgba32 => {
                 if offset + 2 < self.data.len() {
-                    Some((self.data[offset], self.data[offset + 1], self.data[offset + 2]))
+                    Some((
+                        self.data[offset],
+                        self.data[offset + 1],
+                        self.data[offset + 2],
+                    ))
                 } else {
                     None
                 }

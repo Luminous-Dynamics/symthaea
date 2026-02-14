@@ -3,11 +3,11 @@
 //! Provides hooks for observing REPL events and consciousness state.
 //! Integrates with the main observability module for causal tracing.
 
-use std::time::{Instant, SystemTime};
 use std::collections::HashMap;
+use std::time::{Instant, SystemTime};
 
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn, Level};
 
 use crate::cognitive_loop::ConsciousnessSnapshot;
@@ -147,7 +147,12 @@ impl ConsciousnessTracer {
     }
 
     /// Record a trace
-    fn record(&mut self, event_type: TraceEventType, consciousness: &ConsciousnessSnapshot, context: HashMap<String, String>) {
+    fn record(
+        &mut self,
+        event_type: TraceEventType,
+        consciousness: &ConsciousnessSnapshot,
+        context: HashMap<String, String>,
+    ) {
         let timestamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
@@ -229,8 +234,10 @@ impl ObservabilityHook for ConsciousnessTracer {
         // In real use, we'd have access to the actual consciousness state
         let mut context = HashMap::new();
         context.insert("input_length".to_string(), input.len().to_string());
-        context.insert("input_preview".to_string(),
-            input.chars().take(50).collect::<String>());
+        context.insert(
+            "input_preview".to_string(),
+            input.chars().take(50).collect::<String>(),
+        );
 
         // Can't record without consciousness state - log instead
         info!(
@@ -487,7 +494,8 @@ impl ObservabilityHook for MetricsAggregator {
 
         // Update histories
         self.phi_history.push(consciousness.unified_phi);
-        self.coherence_history.push(consciousness.temporal_coherence);
+        self.coherence_history
+            .push(consciousness.temporal_coherence);
 
         if self.phi_history.len() > self.max_history {
             self.phi_history.remove(0);
@@ -498,7 +506,10 @@ impl ObservabilityHook for MetricsAggregator {
 
         // Update histograms
         Self::update_histogram(&mut self.phi_histogram, consciousness.unified_phi);
-        Self::update_histogram(&mut self.coherence_histogram, consciousness.temporal_coherence);
+        Self::update_histogram(
+            &mut self.coherence_histogram,
+            consciousness.temporal_coherence,
+        );
 
         // Update stats
         if consciousness.unified_phi > self.stats.peak_phi {
@@ -523,8 +534,7 @@ impl ObservabilityHook for MetricsAggregator {
 
         // Update avg phi (rolling)
         let alpha = 0.05;
-        self.stats.avg_phi = self.stats.avg_phi * (1.0 - alpha)
-            + consciousness.unified_phi * alpha;
+        self.stats.avg_phi = self.stats.avg_phi * (1.0 - alpha) + consciousness.unified_phi * alpha;
     }
 
     fn on_flow_change(&mut self, _in_flow: bool, _intensity: f32) {

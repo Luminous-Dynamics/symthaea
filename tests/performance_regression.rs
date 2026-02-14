@@ -53,7 +53,10 @@ fn regression_hv16_bind() {
     let elapsed = start.elapsed();
     let us_per_op = elapsed.as_micros() as f64 / ITERATIONS as f64;
 
-    println!("  BinaryHV.bind(): {:.1} µs/op (release: ~0.05µs, debug: ~500µs)", us_per_op);
+    println!(
+        "  BinaryHV.bind(): {:.1} µs/op (release: ~0.05µs, debug: ~500µs)",
+        us_per_op
+    );
 
     // 10ms threshold - only fails for catastrophic regression
     assert!(
@@ -84,7 +87,10 @@ fn regression_hv16_similarity() {
     let elapsed = start.elapsed();
     let us_per_op = elapsed.as_micros() as f64 / ITERATIONS as f64;
 
-    println!("  BinaryHV.similarity(): {:.1} µs/op (release: ~0.1µs, debug: ~500µs)", us_per_op);
+    println!(
+        "  BinaryHV.similarity(): {:.1} µs/op (release: ~0.1µs, debug: ~500µs)",
+        us_per_op
+    );
 
     // 10ms threshold - only fails for catastrophic regression
     assert!(
@@ -200,7 +206,7 @@ fn regression_hv16_bundle() {
 /// LSH index creation: threshold 5 seconds (catastrophic regression check)
 #[test]
 fn regression_lsh_index_creation() {
-    use symthaea::hdc::lsh_simhash::{SimHashIndex, SimHashConfig};
+    use symthaea::hdc::lsh_simhash::{SimHashConfig, SimHashIndex};
 
     println!("\n=== LSH Index Creation Performance Regression ===\n");
 
@@ -235,7 +241,7 @@ fn regression_lsh_index_creation() {
 /// LSH query: threshold 1 second (catastrophic regression check)
 #[test]
 fn regression_lsh_query_performance() {
-    use symthaea::hdc::lsh_simhash::{SimHashIndex, SimHashConfig};
+    use symthaea::hdc::lsh_simhash::{SimHashConfig, SimHashIndex};
 
     println!("\n=== LSH Query Performance Regression ===\n");
 

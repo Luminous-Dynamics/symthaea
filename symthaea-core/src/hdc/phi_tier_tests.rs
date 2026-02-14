@@ -14,7 +14,7 @@
  */
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
+use crate::hdc::tiered_phi::{ApproximationTier, TieredPhi};
 
 /// Helper: Create deterministic BinaryHV from string (using hash as seed)
 fn hv_from_str(s: &str) -> BinaryHV {
@@ -66,7 +66,7 @@ mod phi_tier_unit_tests {
         // Φ = 1.0 after normalization (all information is cross-partition)
         let base_concept = "neural_network_architecture";
         let comp_a = hv_from_str(base_concept);
-        let comp_b = hv_from_str(base_concept);  // Identical
+        let comp_b = hv_from_str(base_concept); // Identical
         let components = vec![comp_a, comp_b];
 
         let mut calc = TieredPhi::new(ApproximationTier::SampledPartition);
@@ -78,8 +78,11 @@ mod phi_tier_unit_tests {
         // system_info = 1.0 × ln(2), partition_info = 0 (no within-partition pairs)
         // Φ = 1.0 × ln(2) / ln(2) = 1.0 (maximum integration)
         // Expected: 0.9-1.0 (very high, as all correlation is cross-partition)
-        assert!(phi > 0.9 && phi <= 1.0,
-                "Two identical components should have near-maximal Φ (~1.0), got {:.4}", phi);
+        assert!(
+            phi > 0.9 && phi <= 1.0,
+            "Two identical components should have near-maximal Φ (~1.0), got {:.4}",
+            phi
+        );
     }
 
     // ========================================================================
@@ -105,13 +108,19 @@ mod phi_tier_unit_tests {
         println!("  High integration:   Φ = {:.4}", phi_high);
 
         // CRITICAL: Φ must increase with integration level
-        assert!(phi_medium > phi_low,
-                "Medium integration Φ={:.4} should exceed low Φ={:.4}",
-                phi_medium, phi_low);
+        assert!(
+            phi_medium > phi_low,
+            "Medium integration Φ={:.4} should exceed low Φ={:.4}",
+            phi_medium,
+            phi_low
+        );
 
-        assert!(phi_high > phi_medium,
-                "High integration Φ={:.4} should exceed medium Φ={:.4}",
-                phi_high, phi_medium);
+        assert!(
+            phi_high > phi_medium,
+            "High integration Φ={:.4} should exceed medium Φ={:.4}",
+            phi_high,
+            phi_medium
+        );
     }
 
     // ========================================================================
@@ -143,8 +152,10 @@ mod phi_tier_unit_tests {
         assert!(phi_16 > 0.0, "n=16 should have positive Φ");
 
         // All should be in valid range
-        assert!(phi_2 <= 1.0 && phi_4 <= 1.0 && phi_8 <= 1.0 && phi_16 <= 1.0,
-                "All Φ values should be ≤ 1.0");
+        assert!(
+            phi_2 <= 1.0 && phi_4 <= 1.0 && phi_8 <= 1.0 && phi_16 <= 1.0,
+            "All Φ values should be ≤ 1.0"
+        );
     }
 
     // ========================================================================
@@ -168,7 +179,8 @@ mod phi_tier_unit_tests {
         // Test Heuristic tier for validity and basic ordering
         {
             let mut calc = TieredPhi::new(ApproximationTier::SampledPartition);
-            let phi_values: Vec<_> = states.iter()
+            let phi_values: Vec<_> = states
+                .iter()
                 .map(|(name, state)| {
                     let phi = calc.compute(state);
                     println!("Heuristic tier - {}: Φ = {:.4}", name, phi);
@@ -178,17 +190,25 @@ mod phi_tier_unit_tests {
 
             // All values should be valid
             for (i, (name, _)) in states.iter().enumerate() {
-                assert!(phi_values[i] >= 0.0 && phi_values[i] <= 1.0,
-                        "Heuristic tier {} should produce valid Φ in [0,1], got {:.4}", name, phi_values[i]);
+                assert!(
+                    phi_values[i] >= 0.0 && phi_values[i] <= 1.0,
+                    "Heuristic tier {} should produce valid Φ in [0,1], got {:.4}",
+                    name,
+                    phi_values[i]
+                );
             }
 
             // Low integration should be lower than at least one of medium/high
-            assert!(phi_values[0] < phi_values[1] || phi_values[0] < phi_values[2],
-                    "Heuristic tier: low should be less than at least one integrated state");
+            assert!(
+                phi_values[0] < phi_values[1] || phi_values[0] < phi_values[2],
+                "Heuristic tier: low should be less than at least one integrated state"
+            );
 
             // Medium and high should both be significantly higher than low
-            assert!(phi_values[1] > phi_values[0] * 2.0,
-                    "Heuristic tier: medium should be notably higher than low");
+            assert!(
+                phi_values[1] > phi_values[0] * 2.0,
+                "Heuristic tier: medium should be notably higher than low"
+            );
         }
 
         // Test Spectral tier for validity
@@ -197,8 +217,12 @@ mod phi_tier_unit_tests {
             for (name, state) in &states {
                 let phi = calc.compute(state);
                 println!("Spectral tier - {}: Φ = {:.4}", name, phi);
-                assert!(phi >= 0.0 && phi <= 1.0,
-                        "Spectral tier {} should produce valid Φ in [0,1], got {:.4}", name, phi);
+                assert!(
+                    phi >= 0.0 && phi <= 1.0,
+                    "Spectral tier {} should produce valid Φ in [0,1], got {:.4}",
+                    name,
+                    phi
+                );
             }
         }
     }
@@ -240,8 +264,11 @@ mod phi_tier_unit_tests {
 
         for state in states {
             let phi = calc.compute(&state);
-            assert!(phi >= 0.0 && phi <= 1.0,
-                    "Φ = {:.4} outside valid range [0, 1]", phi);
+            assert!(
+                phi >= 0.0 && phi <= 1.0,
+                "Φ = {:.4} outside valid range [0, 1]",
+                phi
+            );
         }
     }
 
@@ -269,8 +296,11 @@ mod phi_tier_unit_tests {
         let relative_error = ((phi_heuristic - phi_exact).abs() / phi_exact.max(0.01)) * 100.0;
         println!("  Relative error: {:.1}%", relative_error);
 
-        assert!(relative_error < 30.0,
-                "HEURISTIC deviates too much from EXACT: {:.1}% error", relative_error);
+        assert!(
+            relative_error < 30.0,
+            "HEURISTIC deviates too much from EXACT: {:.1}% error",
+            relative_error
+        );
     }
 
     // ========================================================================
@@ -323,7 +353,9 @@ mod phi_tier_unit_tests {
     /// the likely partition boundaries, not just local neighborhood density.
     fn create_high_integration_state(n: usize) -> Vec<BinaryHV> {
         if n < 2 {
-            return (0..n).map(|i| hv_from_str(&format!("solo_{}", i))).collect();
+            return (0..n)
+                .map(|i| hv_from_str(&format!("solo_{}", i)))
+                .collect();
         }
 
         // Create pair bases - each pair (i, i+n/2) shares a unique base

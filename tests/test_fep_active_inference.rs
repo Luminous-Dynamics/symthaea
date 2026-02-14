@@ -28,10 +28,9 @@ fn test_free_energy_principle_math() {
     let posterior_var: f64 = 0.5;
 
     // KL divergence for Gaussians
-    let kl: f64 = 0.5 * (posterior_var / prior_var
-        + (prior_mean - posterior_mean).powi(2) / prior_var
-        - 1.0
-        + (prior_var / posterior_var).ln());
+    let kl: f64 = 0.5
+        * (posterior_var / prior_var + (prior_mean - posterior_mean).powi(2) / prior_var - 1.0
+            + (prior_var / posterior_var).ln());
 
     assert!(kl >= 0.0, "KL divergence must be non-negative");
     assert!(kl.is_finite(), "KL divergence must be finite");
@@ -61,10 +60,7 @@ fn test_precision_weighting() {
         "Higher precision should amplify error signal"
     );
 
-    println!(
-        "High precision weighted error: {:.4}",
-        weighted_error_high
-    );
+    println!("High precision weighted error: {:.4}", weighted_error_high);
     println!("Low precision weighted error: {:.4}", weighted_error_low);
 }
 
@@ -175,10 +171,12 @@ fn test_generative_model() {
 
     // Simple linear generative model: o = W * s
     let state = vec![0.7, 0.6, 0.8, 0.5];
-    let weights = [vec![0.8, 0.1, 0.05, 0.05],
+    let weights = [
+        vec![0.8, 0.1, 0.05, 0.05],
         vec![0.1, 0.8, 0.05, 0.05],
         vec![0.05, 0.1, 0.8, 0.05],
-        vec![0.05, 0.05, 0.1, 0.8]];
+        vec![0.05, 0.05, 0.1, 0.8],
+    ];
 
     // Predict observation
     let mut predicted: Vec<f64> = vec![0.0; 4];
@@ -228,9 +226,7 @@ fn test_loop_convergence() {
 
         let complexity: f64 = belief
             .iter()
-            .map(|b| {
-                0.5 * (1.0 + (b - prior_mean).powi(2) * prior_precision - 1.0)
-            })
+            .map(|b| 0.5 * (1.0 + (b - prior_mean).powi(2) * prior_precision - 1.0))
             .sum();
 
         let free_energy = complexity - accuracy;
@@ -249,10 +245,7 @@ fn test_loop_convergence() {
 
     println!("Initial free energy: {:.4}", first_fe);
     println!("Final free energy: {:.4}", last_fe);
-    println!(
-        "Reduction: {:.4}",
-        first_fe - last_fe
-    );
+    println!("Reduction: {:.4}", first_fe - last_fe);
 
     assert!(
         last_fe <= first_fe + 0.5, // Allow some tolerance

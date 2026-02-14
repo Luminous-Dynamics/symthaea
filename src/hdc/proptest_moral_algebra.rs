@@ -17,10 +17,8 @@ moral algebra construction is more expensive than raw HDC operations.
 
 #![cfg(test)]
 
+use super::moral_algebra::{ConsentState, Magnitude, MoralAlgebra, MoralIntent};
 use proptest::prelude::*;
-use super::moral_algebra::{
-    MoralAlgebra, MoralIntent, Magnitude, ConsentState,
-};
 
 const TEST_DIM: usize = 512;
 

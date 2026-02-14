@@ -8,19 +8,35 @@
 #![cfg(feature = "web_research_module")]
 
 use symthaea::web_research::{
-    // Types
-    EpistemicStatus, ResearchSource, ResearchStatus, VerifiedClaim,
-    WebResearchQuery, WebResearchResult, WebResearchConfig,
-    IntegrationResult, VerificationOutcome,
-    // Knowledge Graph
-    KnowledgeGraph, NodeType, EdgeType, KnowledgeSource,
     // Implementations
-    ContentExtractor, ExtractedContent,
-    EpistemicVerifier, VerificationContext, SourceEvidence,
-    KnowledgeIntegrator, IntegratorConfig,
-    EpistemicLearner, LearnerConfig, MetaPhi,
+    ContentExtractor,
+    EdgeType,
     // High-level
-    EpistemicConsciousness, EpistemicStats,
+    EpistemicConsciousness,
+    EpistemicLearner,
+    EpistemicStats,
+    // Types
+    EpistemicStatus,
+    EpistemicVerifier,
+    ExtractedContent,
+    IntegrationResult,
+    IntegratorConfig,
+    // Knowledge Graph
+    KnowledgeGraph,
+    KnowledgeIntegrator,
+    KnowledgeSource,
+    LearnerConfig,
+    MetaPhi,
+    NodeType,
+    ResearchSource,
+    ResearchStatus,
+    SourceEvidence,
+    VerificationContext,
+    VerificationOutcome,
+    VerifiedClaim,
+    WebResearchConfig,
+    WebResearchQuery,
+    WebResearchResult,
 };
 
 // ============================================================================
@@ -40,12 +56,18 @@ fn test_knowledge_graph_creation() {
 
     // Add edges
     graph.add_edge_with_meta(
-        node1, EdgeType::RelatedTo, node2, 0.9,
-        KnowledgeSource::External("https://rust-lang.org".into())
+        node1,
+        EdgeType::RelatedTo,
+        node2,
+        0.9,
+        KnowledgeSource::External("https://rust-lang.org".into()),
     );
     graph.add_edge_with_meta(
-        node2, EdgeType::Supports, node3, 0.8,
-        KnowledgeSource::Internal
+        node2,
+        EdgeType::Supports,
+        node3,
+        0.8,
+        KnowledgeSource::Internal,
     );
 
     assert_eq!(graph.stats().edges, 2);
@@ -59,21 +81,26 @@ fn test_knowledge_graph_phi() {
     assert_eq!(graph.calculate_phi(), 0.0);
 
     // Build a connected graph
-    let nodes: Vec<_> = (0..5).map(|i| {
-        graph.add_node_with_config(
-            format!("Claim {}", i),
-            NodeType::Claim,
-            0.8,
-            KnowledgeSource::External("test".into())
-        )
-    }).collect();
+    let nodes: Vec<_> = (0..5)
+        .map(|i| {
+            graph.add_node_with_config(
+                format!("Claim {}", i),
+                NodeType::Claim,
+                0.8,
+                KnowledgeSource::External("test".into()),
+            )
+        })
+        .collect();
 
     // Connect all nodes
     for i in 0..nodes.len() {
         for j in (i + 1)..nodes.len() {
             graph.add_edge_with_meta(
-                nodes[i], EdgeType::RelatedTo, nodes[j], 0.7,
-                KnowledgeSource::Inferred
+                nodes[i],
+                EdgeType::RelatedTo,
+                nodes[j],
+                0.7,
+                KnowledgeSource::Inferred,
             );
         }
     }
@@ -102,10 +129,14 @@ fn test_epistemic_status_properties() {
     assert!(EpistemicStatus::InsufficientEvidence.is_uncertain());
 
     // Confidence scores should be ordered
-    assert!(EpistemicStatus::HighConfidence.confidence_score() >
-            EpistemicStatus::ModerateConfidence.confidence_score());
-    assert!(EpistemicStatus::ModerateConfidence.confidence_score() >
-            EpistemicStatus::LowConfidence.confidence_score());
+    assert!(
+        EpistemicStatus::HighConfidence.confidence_score()
+            > EpistemicStatus::ModerateConfidence.confidence_score()
+    );
+    assert!(
+        EpistemicStatus::ModerateConfidence.confidence_score()
+            > EpistemicStatus::LowConfidence.confidence_score()
+    );
 }
 
 #[test]
@@ -197,7 +228,9 @@ fn test_content_extractor() {
     </html>
     "#;
 
-    let result = extractor.extract(html, "https://www.rust-lang.org").unwrap();
+    let result = extractor
+        .extract(html, "https://www.rust-lang.org")
+        .unwrap();
 
     assert_eq!(result.title, "Rust Programming Language");
     assert!(result.body_text.contains("memory-efficient"));
@@ -224,16 +257,14 @@ async fn test_knowledge_integrator() {
         confidence: 0.95,
         epistemic_status: EpistemicStatus::HighConfidence,
         status: ResearchStatus::Success,
-        claims: vec![
-            VerifiedClaim {
-                text: "Rust provides memory safety without garbage collection".into(),
-                status: EpistemicStatus::HighConfidence,
-                confidence: 0.95,
-                supporting_sources: vec!["https://rust-lang.org".into()],
-                contradicting_sources: vec![],
-                hedge: EpistemicStatus::HighConfidence.hedge_phrase().into(),
-            },
-        ],
+        claims: vec![VerifiedClaim {
+            text: "Rust provides memory safety without garbage collection".into(),
+            status: EpistemicStatus::HighConfidence,
+            confidence: 0.95,
+            supporting_sources: vec!["https://rust-lang.org".into()],
+            contradicting_sources: vec![],
+            hedge: EpistemicStatus::HighConfidence.hedge_phrase().into(),
+        }],
     };
 
     let phi_before = integrator.current_phi();
@@ -277,30 +308,38 @@ fn test_source_credibility_learning() {
 
     // Reliable source - always correct
     for _ in 0..20 {
-        learner.record_outcome(VerificationOutcome {
-            claim: "Test".into(),
-            source_domain: "docs.rust-lang.org".into(),
-            source_type: ResearchSource::Documentation,
-            was_correct: true,
-            predicted_confidence: 0.9,
-            domain: "programming".into(),
-        }).unwrap();
+        learner
+            .record_outcome(VerificationOutcome {
+                claim: "Test".into(),
+                source_domain: "docs.rust-lang.org".into(),
+                source_type: ResearchSource::Documentation,
+                was_correct: true,
+                predicted_confidence: 0.9,
+                domain: "programming".into(),
+            })
+            .unwrap();
     }
 
     // Unreliable source - often wrong
     for _ in 0..20 {
-        learner.record_outcome(VerificationOutcome {
-            claim: "Test".into(),
-            source_domain: "unreliable-blog.com".into(),
-            source_type: ResearchSource::Web,
-            was_correct: false,
-            predicted_confidence: 0.5,
-            domain: "programming".into(),
-        }).unwrap();
+        learner
+            .record_outcome(VerificationOutcome {
+                claim: "Test".into(),
+                source_domain: "unreliable-blog.com".into(),
+                source_type: ResearchSource::Web,
+                was_correct: false,
+                predicted_confidence: 0.5,
+                domain: "programming".into(),
+            })
+            .unwrap();
     }
 
-    let good_cred = learner.get_source_credibility("docs.rust-lang.org").unwrap();
-    let bad_cred = learner.get_source_credibility("unreliable-blog.com").unwrap();
+    let good_cred = learner
+        .get_source_credibility("docs.rust-lang.org")
+        .unwrap();
+    let bad_cred = learner
+        .get_source_credibility("unreliable-blog.com")
+        .unwrap();
 
     assert!(good_cred.credibility > bad_cred.credibility);
     assert!(good_cred.accuracy() > 0.9);
@@ -310,10 +349,10 @@ fn test_source_credibility_learning() {
 #[test]
 fn test_meta_phi_calculation() {
     let meta_phi = MetaPhi::calculate(
-        0.5,  // initial accuracy
-        0.8,  // current accuracy (improved)
-        5,    // domains
-        3,    // strategies
+        0.5, // initial accuracy
+        0.8, // current accuracy (improved)
+        5,   // domains
+        3,   // strategies
     );
 
     assert!(meta_phi.value > 0.0);
@@ -369,17 +408,15 @@ fn test_full_epistemic_pipeline() {
     // 2. Verify a claim manually (would be from research)
     let verifier = researcher.verifier();
 
-    let sources = vec![
-        SourceEvidence {
-            url: "https://nixos.org".into(),
-            domain: "nixos.org".into(),
-            source_type: ResearchSource::Documentation,
-            relevant_text: "NixOS is a Linux distribution".into(),
-            supports: Some(true),
-            similarity: 0.9,
-            credibility: 0.9,
-        },
-    ];
+    let sources = vec![SourceEvidence {
+        url: "https://nixos.org".into(),
+        domain: "nixos.org".into(),
+        source_type: ResearchSource::Documentation,
+        relevant_text: "NixOS is a Linux distribution".into(),
+        supports: Some(true),
+        similarity: 0.9,
+        credibility: 0.9,
+    }];
 
     let context = VerificationContext {
         sources,
@@ -391,14 +428,16 @@ fn test_full_epistemic_pipeline() {
     assert!(verification.confidence > 0.3);
 
     // 3. Record outcome for learning
-    learner.record_outcome(VerificationOutcome {
-        claim: verification.claim.clone(),
-        source_domain: "nixos.org".into(),
-        source_type: ResearchSource::Documentation,
-        was_correct: true,
-        predicted_confidence: verification.confidence,
-        domain: "systems".into(),
-    }).unwrap();
+    learner
+        .record_outcome(VerificationOutcome {
+            claim: verification.claim.clone(),
+            source_domain: "nixos.org".into(),
+            source_type: ResearchSource::Documentation,
+            was_correct: true,
+            predicted_confidence: verification.confidence,
+            domain: "systems".into(),
+        })
+        .unwrap();
 
     // 4. Verify learning occurred
     let stats = learner.stats();

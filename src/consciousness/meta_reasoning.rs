@@ -27,12 +27,10 @@
 //! simple execution and achieve true self-reflective reasoning!
 
 use crate::consciousness::context_aware_evolution::{
-    ContextAwareOptimizer, ContextAwareResult, ReasoningContext, ObjectiveWeights,
+    ContextAwareOptimizer, ContextAwareResult, ObjectiveWeights, ReasoningContext,
 };
 use crate::consciousness::metacognitive_monitoring::MetacognitiveMonitor;
-use crate::consciousness::primitive_evolution::{
-    CandidatePrimitive, EvolutionConfig,
-};
+use crate::consciousness::primitive_evolution::{CandidatePrimitive, EvolutionConfig};
 use crate::consciousness::primitive_reasoning::ReasoningChain;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -222,7 +220,10 @@ impl Default for MetaReasoningConfig {
 
 impl MetaCognitiveReasoner {
     /// Create new meta-cognitive reasoner
-    pub fn new(evolution_config: EvolutionConfig, meta_config: MetaReasoningConfig) -> Result<Self> {
+    pub fn new(
+        evolution_config: EvolutionConfig,
+        meta_config: MetaReasoningConfig,
+    ) -> Result<Self> {
         let optimizer = ContextAwareOptimizer::new(evolution_config)?;
         let monitor = MetacognitiveMonitor::new(0.001);
 
@@ -286,20 +287,18 @@ impl MetaCognitiveReasoner {
         }
 
         // Step 3: Optimize primitives for detected context
-        let optimization_result = self.optimizer.optimize_for_context(
-            context_reflection.detected_context,
-            primitives,
-        )?;
+        let optimization_result = self
+            .optimizer
+            .optimize_for_context(context_reflection.detected_context, primitives)?;
 
         // Step 4: Reflect on optimization strategy
         let strategy_reflection = self.reflect_on_strategy(&optimization_result)?;
 
         // Step 5: Check if we should adjust strategy
         if strategy_reflection.adjust_strategy && self.config.enable_strategy_adaptation {
-            let adjusted_result = self.strategy_adapter.adjust_strategy(
-                &optimization_result,
-                &strategy_reflection,
-            )?;
+            let adjusted_result = self
+                .strategy_adapter
+                .adjust_strategy(&optimization_result, &strategy_reflection)?;
 
             let meta_decision = MetaDecision {
                 decision_type: MetaDecisionType::StrategySwitch,
@@ -495,7 +494,10 @@ impl MetaCognitiveReasoner {
     }
 
     /// Suggest alternative weight configurations
-    fn suggest_alternative_weights(&self, result: &ContextAwareResult) -> Vec<(ObjectiveWeights, f64)> {
+    fn suggest_alternative_weights(
+        &self,
+        result: &ContextAwareResult,
+    ) -> Vec<(ObjectiveWeights, f64)> {
         let mut alternatives = Vec::new();
 
         // Try emphasizing each objective
@@ -504,21 +506,30 @@ impl MetaCognitiveReasoner {
             harmonic_weight: 0.2,
             epistemic_weight: 0.2,
         };
-        alternatives.push((phi_emphasis, result.tradeoff_point.weighted_fitness(&phi_emphasis)));
+        alternatives.push((
+            phi_emphasis,
+            result.tradeoff_point.weighted_fitness(&phi_emphasis),
+        ));
 
         let harmonic_emphasis = ObjectiveWeights {
             phi_weight: 0.2,
             harmonic_weight: 0.6,
             epistemic_weight: 0.2,
         };
-        alternatives.push((harmonic_emphasis, result.tradeoff_point.weighted_fitness(&harmonic_emphasis)));
+        alternatives.push((
+            harmonic_emphasis,
+            result.tradeoff_point.weighted_fitness(&harmonic_emphasis),
+        ));
 
         let epistemic_emphasis = ObjectiveWeights {
             phi_weight: 0.2,
             harmonic_weight: 0.2,
             epistemic_weight: 0.6,
         };
-        alternatives.push((epistemic_emphasis, result.tradeoff_point.weighted_fitness(&epistemic_emphasis)));
+        alternatives.push((
+            epistemic_emphasis,
+            result.tradeoff_point.weighted_fitness(&epistemic_emphasis),
+        ));
 
         // Sort by expected fitness
         alternatives.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
@@ -547,7 +558,9 @@ impl MetaCognitiveReasoner {
         };
 
         // Weight recent decision success
-        let recent_successes = self.state.decision_history
+        let recent_successes = self
+            .state
+            .decision_history
             .iter()
             .rev()
             .take(10)
@@ -614,9 +627,14 @@ impl MetaLearningEngine {
 
         // Pattern 1: Context detection accuracy
         if context_reflection.confidence < 0.6 {
-            let pattern_key = format!("low_context_confidence_{:?}", context_reflection.detected_context);
+            let pattern_key = format!(
+                "low_context_confidence_{:?}",
+                context_reflection.detected_context
+            );
 
-            let insight = self.patterns.entry(pattern_key.clone())
+            let insight = self
+                .patterns
+                .entry(pattern_key.clone())
                 .or_insert(MetaLearningInsight {
                     pattern: format!(
                         "Low confidence in detecting {} context",
@@ -641,7 +659,9 @@ impl MetaLearningEngine {
             let dominant = result.weights.dominant_objective();
             let pattern_key = format!("effective_weight_{}", dominant);
 
-            let insight = self.patterns.entry(pattern_key.clone())
+            let insight = self
+                .patterns
+                .entry(pattern_key.clone())
                 .or_insert(MetaLearningInsight {
                     pattern: format!("Emphasizing {} yields good results", dominant),
                     reliability: 0.5,
@@ -727,14 +747,20 @@ mod tests {
         let safety_context = ReasoningContext::CriticalSafety;
         let confidence = reasoner.estimate_context_confidence(safety_query, &safety_context);
 
-        assert!(confidence > 0.7, "Safety query should have high confidence for safety context");
+        assert!(
+            confidence > 0.7,
+            "Safety query should have high confidence for safety context"
+        );
 
         // Creative context with keywords
         let creative_query = "Let's brainstorm creative and imaginative solutions!";
         let creative_context = ReasoningContext::CreativeExploration;
         let confidence = reasoner.estimate_context_confidence(creative_query, &creative_context);
 
-        assert!(confidence > 0.7, "Creative query should have high confidence for creative context");
+        assert!(
+            confidence > 0.7,
+            "Creative query should have high confidence for creative context"
+        );
     }
 
     #[test]
@@ -747,12 +773,17 @@ mod tests {
         let alternatives = reasoner.find_alternative_contexts(query);
 
         assert!(!alternatives.is_empty(), "Should find alternative contexts");
-        assert!(alternatives.len() <= 3, "Should return at most 3 alternatives");
+        assert!(
+            alternatives.len() <= 3,
+            "Should return at most 3 alternatives"
+        );
 
         // Alternatives should be sorted by confidence
         for i in 0..alternatives.len() - 1 {
-            assert!(alternatives[i].1 >= alternatives[i + 1].1,
-                "Alternatives should be sorted by confidence descending");
+            assert!(
+                alternatives[i].1 >= alternatives[i + 1].1,
+                "Alternatives should be sorted by confidence descending"
+            );
         }
     }
 

@@ -23,9 +23,9 @@
 //! - Phonon engineering
 //! - Acoustic metamaterials
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 use serde::{Deserialize, Serialize};
 
 /// Speed of sound in air at 20°C
@@ -39,8 +39,8 @@ pub const P_REF: f64 = 2e-5; // Pa (threshold of hearing)
 pub enum WaveType {
     Longitudinal,
     Transverse,
-    Surface,       // Rayleigh waves
-    Plate,         // Lamb waves
+    Surface, // Rayleigh waves
+    Plate,   // Lamb waves
 }
 
 /// Medium type
@@ -90,8 +90,8 @@ pub struct Resonator {
 #[derive(Debug, Clone)]
 pub struct MetamaterialCell {
     pub name: String,
-    pub effective_density: f64,    // Can be negative!
-    pub effective_modulus: f64,    // Can be negative!
+    pub effective_density: f64, // Can be negative!
+    pub effective_modulus: f64, // Can be negative!
     pub bandgap_hz: Option<(f64, f64)>,
     pub vector: ContinuousHV,
 }
@@ -206,7 +206,12 @@ impl AcousticsEncoder {
     }
 
     /// Calculate sound speed in a solid (longitudinal): c_L = √((K + 4G/3)/ρ)
-    pub fn sound_speed_solid_long(&self, bulk_modulus: f64, shear_modulus: f64, density: f64) -> f64 {
+    pub fn sound_speed_solid_long(
+        &self,
+        bulk_modulus: f64,
+        shear_modulus: f64,
+        density: f64,
+    ) -> f64 {
         ((bulk_modulus + 4.0 * shear_modulus / 3.0) / density).sqrt()
     }
 
@@ -238,7 +243,8 @@ impl AcousticsEncoder {
             WaveType::Plate => self.surface_wave.bind(&self.transverse),
         };
 
-        let vector = self.wave
+        let vector = self
+            .wave
             .bind(&type_vec)
             .bind(&self.frequency.scale(freq_hz as f32))
             .bind(&self.amplitude.scale(amp_pa as f32));
@@ -289,7 +295,8 @@ impl AcousticsEncoder {
         ContinuousHV::weighted_bundle(
             &[&self.reflection, &self.transmission],
             &[r.abs() as f32, t.abs() as f32],
-        ).bind(&self.impedance)
+        )
+        .bind(&self.impedance)
     }
 
     // ============================================================
@@ -297,12 +304,17 @@ impl AcousticsEncoder {
     // ============================================================
 
     /// Create a resonator (open pipe, closed pipe, string, etc.)
-    pub fn create_resonator(&self, name: &str, fundamental: f64, n_harmonics: usize, q: f64) -> Resonator {
-        let harmonics: Vec<f64> = (1..=n_harmonics)
-            .map(|n| fundamental * n as f64)
-            .collect();
+    pub fn create_resonator(
+        &self,
+        name: &str,
+        fundamental: f64,
+        n_harmonics: usize,
+        q: f64,
+    ) -> Resonator {
+        let harmonics: Vec<f64> = (1..=n_harmonics).map(|n| fundamental * n as f64).collect();
 
-        let vector = self.resonance
+        let vector = self
+            .resonance
             .bind(&self.frequency.scale(fundamental as f32))
             .bind(&self.standing_wave);
 
@@ -343,9 +355,7 @@ impl AcousticsEncoder {
     /// Doppler encoding
     pub fn doppler_effect(&self) -> ContinuousHV {
         let velocity = self.genesis.hv("mechanics::velocity", PHYSICS_DIM);
-        self.doppler
-            .bind(&self.frequency)
-            .bind(&velocity)
+        self.doppler.bind(&self.frequency).bind(&velocity)
     }
 
     // ============================================================
@@ -381,7 +391,9 @@ impl AcousticsEncoder {
     pub fn phonon_thermal_conductivity(&self) -> ContinuousHV {
         let heat_capacity = self.genesis.hv("thermo::heat_capacity", PHYSICS_DIM);
         let mean_free_path = self.genesis.hv("transport::mean_free_path", PHYSICS_DIM);
-        let conductivity = self.genesis.hv("transport::thermal_conductivity", PHYSICS_DIM);
+        let conductivity = self
+            .genesis
+            .hv("transport::thermal_conductivity", PHYSICS_DIM);
 
         self.phonon
             .bind(&conductivity)
@@ -401,7 +413,8 @@ impl AcousticsEncoder {
         eff_modulus: f64,
         bandgap: Option<(f64, f64)>,
     ) -> MetamaterialCell {
-        let mut vector = self.metamaterial
+        let mut vector = self
+            .metamaterial
             .bind(&self.density.scale(eff_density as f32))
             .bind(&self.bulk_modulus.scale(eff_modulus as f32));
 
@@ -459,9 +472,7 @@ impl AcousticsEncoder {
 
     /// Addition of incoherent sound sources
     pub fn add_incoherent_sources(&self, levels_db: &[f64]) -> f64 {
-        let total_intensity: f64 = levels_db.iter()
-            .map(|db| 10.0_f64.powf(db / 10.0))
-            .sum();
+        let total_intensity: f64 = levels_db.iter().map(|db| 10.0_f64.powf(db / 10.0)).sum();
         10.0 * total_intensity.log10()
     }
 }
@@ -505,8 +516,8 @@ mod tests {
         let encoder = setup();
 
         let wave = encoder.create_wave(
-            440.0,  // A4
-            0.1,    // 0.1 Pa
+            440.0, // A4
+            0.1,   // 0.1 Pa
             WaveType::Longitudinal,
             MediumType::Gas,
             343.0,
@@ -572,12 +583,8 @@ mod tests {
         let encoder = setup();
 
         // Negative effective mass
-        let meta = encoder.create_metamaterial(
-            "Negative density",
-            -1.0,
-            100e9,
-            Some((1000.0, 2000.0)),
-        );
+        let meta =
+            encoder.create_metamaterial("Negative density", -1.0, 100e9, Some((1000.0, 2000.0)));
 
         assert!(meta.effective_density < 0.0);
         assert!(meta.bandgap_hz.is_some());

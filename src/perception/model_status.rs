@@ -116,8 +116,7 @@ impl ModelRegistry {
         name: &str,
         loader: impl FnOnce() -> Result<PathBuf, ModelLoadError>,
     ) -> Result<PathBuf, ModelLoadError> {
-        self.statuses
-            .insert(name.to_string(), ModelStatus::Loading);
+        self.statuses.insert(name.to_string(), ModelStatus::Loading);
         match loader() {
             Ok(path) => {
                 self.statuses
@@ -267,8 +266,7 @@ mod tests {
     #[test]
     fn test_error_is_std_error() {
         // Verify ModelLoadError implements std::error::Error
-        let err: Box<dyn std::error::Error> =
-            Box::new(ModelLoadError::Other("test".to_string()));
+        let err: Box<dyn std::error::Error> = Box::new(ModelLoadError::Other("test".to_string()));
         assert!(format!("{}", err).contains("test"));
     }
 
@@ -343,9 +341,8 @@ mod tests {
         // Simulate multiple failures -- none should panic
         for i in 0..10 {
             let name = format!("model-{}", i);
-            let result = registry.try_load(&name, || {
-                Err(ModelLoadError::Other(format!("error {}", i)))
-            });
+            let result =
+                registry.try_load(&name, || Err(ModelLoadError::Other(format!("error {}", i))));
             assert!(result.is_err());
         }
 
@@ -426,18 +423,14 @@ mod tests {
         let mut registry = ModelRegistry::new();
 
         // Load several models with mixed results
-        let _ = registry.try_load("qwen3-embedding", || {
-            Ok(PathBuf::from("/models/qwen3"))
-        });
+        let _ = registry.try_load("qwen3-embedding", || Ok(PathBuf::from("/models/qwen3")));
         let _ = registry.try_load("siglip", || {
             Err(ModelLoadError::FeatureDisabled("vision".to_string()))
         });
         let _ = registry.try_load("moondream", || {
             Err(ModelLoadError::FileNotFound("not downloaded".to_string()))
         });
-        let _ = registry.try_load("bge", || {
-            Ok(PathBuf::from("/models/bge"))
-        });
+        let _ = registry.try_load("bge", || Ok(PathBuf::from("/models/bge")));
 
         assert_eq!(registry.total_count(), 4);
         assert_eq!(registry.available_count(), 2);
@@ -447,9 +440,7 @@ mod tests {
     fn test_summary_formatting() {
         let mut registry = ModelRegistry::new();
 
-        let _ = registry.try_load("qwen3-embedding", || {
-            Ok(PathBuf::from("/models/qwen3"))
-        });
+        let _ = registry.try_load("qwen3-embedding", || Ok(PathBuf::from("/models/qwen3")));
         let _ = registry.try_load("siglip", || {
             Err(ModelLoadError::FeatureDisabled("vision".to_string()))
         });

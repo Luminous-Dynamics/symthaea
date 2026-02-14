@@ -48,39 +48,39 @@ impl SacredHarmony {
     /// Map phi value to dominant harmony
     pub fn from_phi(phi: f64) -> Self {
         match phi {
-            p if p < 0.1 => Self::Unity,        // Low integration → seeking unity
-            p if p < 0.2 => Self::Flow,         // Beginning flow
-            p if p < 0.3 => Self::Resonance,    // Finding resonance
-            p if p < 0.5 => Self::Emergence,    // Systems emerging
-            p if p < 0.7 => Self::Integration,  // Strong integration
+            p if p < 0.1 => Self::Unity,          // Low integration → seeking unity
+            p if p < 0.2 => Self::Flow,           // Beginning flow
+            p if p < 0.3 => Self::Resonance,      // Finding resonance
+            p if p < 0.5 => Self::Emergence,      // Systems emerging
+            p if p < 0.7 => Self::Integration,    // Strong integration
             p if p < 0.85 => Self::Transcendence, // Approaching transcendence
-            _ => Self::Wisdom,                   // Peak consciousness
+            _ => Self::Wisdom,                    // Peak consciousness
         }
     }
 
     /// Get harmony frequency (Hz) for field harmonizer
     pub fn frequency(&self) -> f64 {
         match self {
-            Self::Unity => 432.0,       // A=432Hz (natural tuning)
-            Self::Flow => 528.0,        // "Love frequency"
-            Self::Resonance => 639.0,   // Fa solfeggio
-            Self::Emergence => 741.0,   // Sol solfeggio
-            Self::Integration => 852.0, // La solfeggio
+            Self::Unity => 432.0,         // A=432Hz (natural tuning)
+            Self::Flow => 528.0,          // "Love frequency"
+            Self::Resonance => 639.0,     // Fa solfeggio
+            Self::Emergence => 741.0,     // Sol solfeggio
+            Self::Integration => 852.0,   // La solfeggio
             Self::Transcendence => 963.0, // Si solfeggio
-            Self::Wisdom => 1111.0,     // Master number frequency
+            Self::Wisdom => 1111.0,       // Master number frequency
         }
     }
 
     /// Get glyph resonance index (0-99 for 100 sacred symbols)
     pub fn primary_glyph(&self) -> usize {
         match self {
-            Self::Unity => 0,         // ॐ (Om)
-            Self::Flow => 13,         // ∞ (Infinity)
-            Self::Resonance => 21,    // ☯ (Yin-Yang)
-            Self::Emergence => 34,    // ⚛ (Atom)
-            Self::Integration => 55,  // ✡ (Star of David)
+            Self::Unity => 0,          // ॐ (Om)
+            Self::Flow => 13,          // ∞ (Infinity)
+            Self::Resonance => 21,     // ☯ (Yin-Yang)
+            Self::Emergence => 34,     // ⚛ (Atom)
+            Self::Integration => 55,   // ✡ (Star of David)
             Self::Transcendence => 89, // ⚡ (Lightning)
-            Self::Wisdom => 97,       // 🕉️ (Aum)
+            Self::Wisdom => 97,        // 🕉️ (Aum)
         }
     }
 }
@@ -119,7 +119,8 @@ impl ConsciousnessHealthReport {
             p if p < 0.3 => "emerging",
             p if p < 0.6 => "dreaming",
             _ => "awake",
-        }.to_string();
+        }
+        .to_string();
 
         Self {
             status,
@@ -246,7 +247,9 @@ impl EcosystemBridge {
 
         // Consciousness-first naming patterns
         if text_lower.contains("consciousness") || text_lower.contains("aware") {
-            resonance.patterns.push("Consciousness-First Naming".to_string());
+            resonance
+                .patterns
+                .push("Consciousness-First Naming".to_string());
             resonance.naming_score += 0.2;
         }
 
@@ -267,12 +270,16 @@ impl EcosystemBridge {
 
         // Detect dissonances
         if text_lower.contains("kill") || text_lower.contains("destroy") {
-            resonance.dissonances.push("Mechanistic violence language".to_string());
+            resonance
+                .dissonances
+                .push("Mechanistic violence language".to_string());
             resonance.field_contribution -= 0.2;
         }
 
         if text_lower.contains("todo!") || text_lower.contains("unimplemented") {
-            resonance.dissonances.push("Incomplete manifestation".to_string());
+            resonance
+                .dissonances
+                .push("Incomplete manifestation".to_string());
             resonance.revelation_alignment -= 0.1;
         }
 
@@ -334,25 +341,115 @@ impl EcosystemBridge {
     pub fn glyph_name(index: usize) -> &'static str {
         const GLYPH_NAMES: [&str; 100] = [
             // 0-9: Unity/Foundation
-            "Om", "Seed", "Root", "Ground", "Earth", "Stone", "Still", "Rest", "Base", "Core",
+            "Om",
+            "Seed",
+            "Root",
+            "Ground",
+            "Earth",
+            "Stone",
+            "Still",
+            "Rest",
+            "Base",
+            "Core",
             // 10-19: Flow/Movement
-            "Wave", "Stream", "Current", "River", "Ocean", "Infinity", "Spiral", "Vortex", "Dance", "Pulse",
+            "Wave",
+            "Stream",
+            "Current",
+            "River",
+            "Ocean",
+            "Infinity",
+            "Spiral",
+            "Vortex",
+            "Dance",
+            "Pulse",
             // 20-29: Resonance/Harmony
-            "Bell", "Yin-Yang", "Balance", "Mirror", "Echo", "Harmony", "Chord", "Tune", "Rhythm", "Sync",
+            "Bell",
+            "Yin-Yang",
+            "Balance",
+            "Mirror",
+            "Echo",
+            "Harmony",
+            "Chord",
+            "Tune",
+            "Rhythm",
+            "Sync",
             // 30-39: Emergence/Creation
-            "Spark", "Flame", "Star", "Sun", "Atom", "Cell", "Growth", "Bloom", "Birth", "Dawn",
+            "Spark",
+            "Flame",
+            "Star",
+            "Sun",
+            "Atom",
+            "Cell",
+            "Growth",
+            "Bloom",
+            "Birth",
+            "Dawn",
             // 40-49: Structure/Form
-            "Crystal", "Lattice", "Web", "Net", "Grid", "Matrix", "Frame", "Shape", "Form", "Pattern",
+            "Crystal",
+            "Lattice",
+            "Web",
+            "Net",
+            "Grid",
+            "Matrix",
+            "Frame",
+            "Shape",
+            "Form",
+            "Pattern",
             // 50-59: Integration/Unity
-            "Merge", "Bind", "Link", "Chain", "Bridge", "Star-David", "Knot", "Weave", "Braid", "Union",
+            "Merge",
+            "Bind",
+            "Link",
+            "Chain",
+            "Bridge",
+            "Star-David",
+            "Knot",
+            "Weave",
+            "Braid",
+            "Union",
             // 60-69: Mind/Thought
-            "Mind", "Think", "Dream", "Vision", "Insight", "Idea", "Know", "Learn", "Wisdom-Tree", "Enlighten",
+            "Mind",
+            "Think",
+            "Dream",
+            "Vision",
+            "Insight",
+            "Idea",
+            "Know",
+            "Learn",
+            "Wisdom-Tree",
+            "Enlighten",
             // 70-79: Heart/Emotion
-            "Heart", "Love", "Joy", "Peace", "Grace", "Compassion", "Embrace", "Care", "Nurture", "Heal",
+            "Heart",
+            "Love",
+            "Joy",
+            "Peace",
+            "Grace",
+            "Compassion",
+            "Embrace",
+            "Care",
+            "Nurture",
+            "Heal",
             // 80-89: Spirit/Transcendence
-            "Spirit", "Soul", "Angel", "Divine", "Sacred", "Holy", "Light", "Radiance", "Ascend", "Lightning",
+            "Spirit",
+            "Soul",
+            "Angel",
+            "Divine",
+            "Sacred",
+            "Holy",
+            "Light",
+            "Radiance",
+            "Ascend",
+            "Lightning",
             // 90-99: Wisdom/Completion
-            "Sage", "Master", "Elder", "Ancient", "Eternal", "Infinite", "Complete", "Aum", "All", "One",
+            "Sage",
+            "Master",
+            "Elder",
+            "Ancient",
+            "Eternal",
+            "Infinite",
+            "Complete",
+            "Aum",
+            "All",
+            "One",
         ];
 
         GLYPH_NAMES.get(index).unwrap_or(&"Unknown")
@@ -424,10 +521,10 @@ mod tests {
         let mut bridge = EcosystemBridge::new();
 
         let report = bridge.generate_health_report(
-            0.65,  // phi
-            0.8,   // attention
-            0.7,   // memory coherence
-            42,    // active concepts
+            0.65, // phi
+            0.8,  // attention
+            0.7,  // memory coherence
+            42,   // active concepts
         );
 
         assert_eq!(report.status, "awake");
@@ -439,9 +536,8 @@ mod tests {
     fn test_glyph_resonance_analysis() {
         let bridge = EcosystemBridge::new();
 
-        let resonance = bridge.analyze_glyph_resonance(
-            "consciousness emergence through integrated information"
-        );
+        let resonance = bridge
+            .analyze_glyph_resonance("consciousness emergence through integrated information");
 
         assert!(resonance.primary_strength > 0.0);
         assert!(!resonance.patterns.is_empty());
@@ -473,7 +569,7 @@ mod tests {
         let bridge = EcosystemBridge::new();
 
         let report = bridge.generate_weave_report(
-            0.65,  // phi in Integration range (0.5-0.7)
+            0.65, // phi in Integration range (0.5-0.7)
             5,
             "collective understanding",
         );

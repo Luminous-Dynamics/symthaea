@@ -49,7 +49,7 @@
 //! - **4E**: How grounded is understanding in actual system state?
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 use symthaea_core::hdc::universal_semantics::SemanticPrime;
 
 // ============================================================================
@@ -113,8 +113,14 @@ impl SubsystemId {
     /// All subsystems
     pub fn all() -> Vec<SubsystemId> {
         vec![
-            Self::Language, Self::Intent, Self::Semantics, Self::Memory,
-            Self::Action, Self::Error, Self::Prediction, Self::Embodiment,
+            Self::Language,
+            Self::Intent,
+            Self::Semantics,
+            Self::Memory,
+            Self::Action,
+            Self::Error,
+            Self::Prediction,
+            Self::Embodiment,
         ]
     }
 }
@@ -184,7 +190,13 @@ impl GlobalWorkspace {
     }
 
     /// Submit a message for potential broadcast (competition)
-    pub fn submit(&mut self, source: SubsystemId, content: String, primes: Vec<SemanticPrime>, salience: f64) -> Option<u64> {
+    pub fn submit(
+        &mut self,
+        source: SubsystemId,
+        content: String,
+        primes: Vec<SemanticPrime>,
+        salience: f64,
+    ) -> Option<u64> {
         // Competition: only high-salience messages enter
         if salience < self.competition_threshold {
             return None;
@@ -205,9 +217,15 @@ impl GlobalWorkspace {
         // If at capacity, evict lowest salience
         if self.contents.len() >= self.capacity {
             // Find minimum salience
-            let min_idx = self.contents.iter()
+            let min_idx = self
+                .contents
+                .iter()
                 .enumerate()
-                .min_by(|(_, a), (_, b)| a.salience.partial_cmp(&b.salience).unwrap_or(std::cmp::Ordering::Equal))
+                .min_by(|(_, a), (_, b)| {
+                    a.salience
+                        .partial_cmp(&b.salience)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|(i, _)| i);
 
             if let Some(idx) = min_idx {
@@ -291,7 +309,8 @@ impl GlobalWorkspace {
             return 0.0;
         }
         let utilization = self.contents.len() as f64 / self.capacity as f64;
-        let avg_salience = self.contents.iter().map(|m| m.salience).sum::<f64>() / self.contents.len() as f64;
+        let avg_salience =
+            self.contents.iter().map(|m| m.salience).sum::<f64>() / self.contents.len() as f64;
         utilization * avg_salience
     }
 }
@@ -386,7 +405,13 @@ impl AttentionSchema {
     }
 
     /// Set primary attention focus
-    pub fn focus_on(&mut self, target: &str, reason: &str, confidence: f64, category: AttentionCategory) {
+    pub fn focus_on(
+        &mut self,
+        target: &str,
+        reason: &str,
+        confidence: f64,
+        category: AttentionCategory,
+    ) {
         // Move current focus to history
         if let Some(current) = self.primary_focus.take() {
             if self.history.len() >= self.max_history {
@@ -407,7 +432,13 @@ impl AttentionSchema {
     }
 
     /// Add secondary (peripheral) focus
-    pub fn add_secondary(&mut self, target: &str, reason: &str, confidence: f64, category: AttentionCategory) {
+    pub fn add_secondary(
+        &mut self,
+        target: &str,
+        reason: &str,
+        confidence: f64,
+        category: AttentionCategory,
+    ) {
         // Limit secondary foci
         if self.secondary_foci.len() >= 3 {
             self.secondary_foci.remove(0);
@@ -438,8 +469,7 @@ impl AttentionSchema {
         for secondary in &self.secondary_foci {
             parts.push(format!(
                 "I also noticed \"{}\" ({})",
-                secondary.target,
-                secondary.reason
+                secondary.target, secondary.reason
             ));
         }
 
@@ -455,7 +485,9 @@ impl AttentionSchema {
         if self.shift_count == 0 {
             return 1.0;
         }
-        let history_time = self.history.iter()
+        let history_time = self
+            .history
+            .iter()
             .filter_map(|f| f.started.elapsed().ok())
             .map(|d| d.as_secs_f64())
             .sum::<f64>();
@@ -471,9 +503,17 @@ impl AttentionSchema {
 
     /// Calculate AST metric (attention coherence)
     pub fn ast_metric(&self) -> f64 {
-        let focus_confidence = self.primary_focus.as_ref().map(|f| f.confidence).unwrap_or(0.0);
+        let focus_confidence = self
+            .primary_focus
+            .as_ref()
+            .map(|f| f.confidence)
+            .unwrap_or(0.0);
         let stability = self.stability();
-        let has_focus = if self.primary_focus.is_some() { 0.5 } else { 0.0 };
+        let has_focus = if self.primary_focus.is_some() {
+            0.5
+        } else {
+            0.0
+        };
 
         (focus_confidence * 0.4 + stability * 0.3 + has_focus * 0.3).clamp(0.0, 1.0)
     }
@@ -568,7 +608,13 @@ impl PredictiveProcessor {
     }
 
     /// Generate a prediction
-    pub fn predict(&mut self, expected: &str, confidence: f64, source: PredictionSource, expected_primes: Vec<SemanticPrime>) {
+    pub fn predict(
+        &mut self,
+        expected: &str,
+        confidence: f64,
+        source: PredictionSource,
+        expected_primes: Vec<SemanticPrime>,
+    ) {
         self.active_predictions.push(Prediction {
             expected: expected.to_string(),
             confidence,
@@ -599,7 +645,10 @@ impl PredictiveProcessor {
             // String similarity (simple)
             let string_match = if prediction.expected.to_lowercase() == actual.to_lowercase() {
                 1.0
-            } else if actual.to_lowercase().contains(&prediction.expected.to_lowercase()) {
+            } else if actual
+                .to_lowercase()
+                .contains(&prediction.expected.to_lowercase())
+            {
                 0.7
             } else {
                 0.0
@@ -745,7 +794,12 @@ impl RecurrentProcessor {
     }
 
     /// Record a processing pass
-    pub fn record_pass(&mut self, understanding: &str, confidence: f64, changes: Vec<String>) -> bool {
+    pub fn record_pass(
+        &mut self,
+        understanding: &str,
+        confidence: f64,
+        changes: Vec<String>,
+    ) -> bool {
         let pass_num = self.passes.len() + 1;
 
         let improved = if let Some(prev) = self.passes.last() {
@@ -756,7 +810,11 @@ impl RecurrentProcessor {
 
         self.passes.push(ProcessingPass {
             pass: pass_num,
-            input: self.passes.first().map(|p| p.input.clone()).unwrap_or_default(),
+            input: self
+                .passes
+                .first()
+                .map(|p| p.input.clone())
+                .unwrap_or_default(),
             understanding: understanding.to_string(),
             confidence,
             changes,
@@ -802,9 +860,8 @@ impl RecurrentProcessor {
     pub fn rpt_metric(&self) -> f64 {
         // Combine current depth with improvement trajectory
         let depth = self.depth_score();
-        let improvement = self.passes.iter()
-            .filter(|p| p.improved)
-            .count() as f64 / self.passes.len().max(1) as f64;
+        let improvement = self.passes.iter().filter(|p| p.improved).count() as f64
+            / self.passes.len().max(1) as f64;
 
         (depth * 0.5 + improvement * 0.5).clamp(0.0, 1.0)
     }
@@ -933,15 +990,26 @@ impl EmbodiedState {
 
     /// Record a package observation
     pub fn observe_package(&mut self, name: &str, installed: bool, confidence: f64) {
-        self.known_packages.insert(name.to_string(), PackageState {
-            name: name.to_string(),
-            installed,
-            last_observed: SystemTime::now(),
-            confidence,
-        });
+        self.known_packages.insert(
+            name.to_string(),
+            PackageState {
+                name: name.to_string(),
+                installed,
+                last_observed: SystemTime::now(),
+                confidence,
+            },
+        );
 
         self.add_observation(
-            &format!("Package '{}' is {}", name, if installed { "installed" } else { "not installed" }),
+            &format!(
+                "Package '{}' is {}",
+                name,
+                if installed {
+                    "installed"
+                } else {
+                    "not installed"
+                }
+            ),
             ObservationCategory::Package,
             true,
         );
@@ -949,25 +1017,36 @@ impl EmbodiedState {
 
     /// Record a service observation
     pub fn observe_service(&mut self, name: &str, enabled: bool, running: bool, confidence: f64) {
-        self.known_services.insert(name.to_string(), ServiceState {
-            name: name.to_string(),
-            enabled,
-            running,
-            last_observed: SystemTime::now(),
-            confidence,
-        });
+        self.known_services.insert(
+            name.to_string(),
+            ServiceState {
+                name: name.to_string(),
+                enabled,
+                running,
+                last_observed: SystemTime::now(),
+                confidence,
+            },
+        );
 
         self.add_observation(
-            &format!("Service '{}' is {} and {}", name,
+            &format!(
+                "Service '{}' is {} and {}",
+                name,
                 if enabled { "enabled" } else { "disabled" },
-                if running { "running" } else { "stopped" }),
+                if running { "running" } else { "stopped" }
+            ),
             ObservationCategory::Service,
             true,
         );
     }
 
     /// Add a general observation
-    pub fn add_observation(&mut self, observation: &str, category: ObservationCategory, success: bool) {
+    pub fn add_observation(
+        &mut self,
+        observation: &str,
+        category: ObservationCategory,
+        success: bool,
+    ) {
         if self.observations.len() >= 100 {
             self.observations.pop_front();
         }
@@ -982,8 +1061,8 @@ impl EmbodiedState {
     /// Check if a symbol is grounded (has real-world correspondence)
     pub fn is_grounded(&self, symbol: &str) -> bool {
         let symbol_lower = symbol.to_lowercase();
-        self.known_packages.contains_key(&symbol_lower) ||
-        self.known_services.contains_key(&symbol_lower)
+        self.known_packages.contains_key(&symbol_lower)
+            || self.known_services.contains_key(&symbol_lower)
     }
 
     /// Get grounding confidence for a symbol
@@ -992,13 +1071,19 @@ impl EmbodiedState {
 
         if let Some(pkg) = self.known_packages.get(&symbol_lower) {
             // Decay confidence over time
-            let age = pkg.last_observed.elapsed().unwrap_or(Duration::from_secs(3600));
+            let age = pkg
+                .last_observed
+                .elapsed()
+                .unwrap_or(Duration::from_secs(3600));
             let decay = (-age.as_secs_f64() / 3600.0).exp(); // 1-hour half-life
             return pkg.confidence * decay;
         }
 
         if let Some(svc) = self.known_services.get(&symbol_lower) {
-            let age = svc.last_observed.elapsed().unwrap_or(Duration::from_secs(3600));
+            let age = svc
+                .last_observed
+                .elapsed()
+                .unwrap_or(Duration::from_secs(3600));
             let decay = (-age.as_secs_f64() / 3600.0).exp();
             return svc.confidence * decay;
         }
@@ -1025,8 +1110,15 @@ impl EmbodiedState {
         let observation_score = if self.observations.is_empty() {
             0.0
         } else {
-            let recent = self.observations.iter()
-                .filter(|o| o.timestamp.elapsed().map(|d| d.as_secs() < 300).unwrap_or(false))
+            let recent = self
+                .observations
+                .iter()
+                .filter(|o| {
+                    o.timestamp
+                        .elapsed()
+                        .map(|d| d.as_secs() < 300)
+                        .unwrap_or(false)
+                })
                 .count();
             (recent as f64 / self.observations.len() as f64).min(1.0)
         };
@@ -1037,7 +1129,11 @@ impl EmbodiedState {
         let proprio_score = [
             self.proprioception.can_query_packages,
             self.proprioception.can_read_files,
-        ].iter().filter(|&&b| b).count() as f64 / 2.0;
+        ]
+        .iter()
+        .filter(|&&b| b)
+        .count() as f64
+            / 2.0;
 
         (observation_score * 0.3 + grounding_score * 0.4 + proprio_score * 0.3).clamp(0.0, 1.0)
     }
@@ -1077,8 +1173,10 @@ impl MultiTheoryMetrics {
             self.ast * 0.15 +         // AST: Attention model
             self.pp * 0.20 +          // PP: Prediction
             self.rpt * 0.15 +         // RPT: Recurrence
-            self.embodiment * 0.15    // 4E: Grounding
-        ).clamp(0.0, 1.0);
+            self.embodiment * 0.15
+            // 4E: Grounding
+        )
+        .clamp(0.0, 1.0);
     }
 
     /// Get dominant theory (highest contribution)
@@ -1092,7 +1190,8 @@ impl MultiTheoryMetrics {
             (self.embodiment, "4E (Embodiment)"),
         ];
 
-        theories.iter()
+        theories
+            .iter()
             .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(_, name)| *name)
             .unwrap_or("Unknown")
@@ -1144,7 +1243,12 @@ impl MultiTheoryConsciousness {
     }
 
     /// Process input through all consciousness theories
-    pub fn process(&mut self, input: &str, primes: &[SemanticPrime], phi: f64) -> MultiTheoryResult {
+    pub fn process(
+        &mut self,
+        input: &str,
+        primes: &[SemanticPrime],
+        phi: f64,
+    ) -> MultiTheoryResult {
         // 1. Start recurrent processing
         self.recurrence.start(input);
 
@@ -1159,7 +1263,8 @@ impl MultiTheoryConsciousness {
         // 3. Generate predictions based on priors
         let priors = self.predictor.get_priors("input_start");
         for (expected, confidence) in priors.iter().take(3) {
-            self.predictor.predict(expected, *confidence, PredictionSource::Experience, vec![]);
+            self.predictor
+                .predict(expected, *confidence, PredictionSource::Experience, vec![]);
         }
 
         // 4. Submit to global workspace
@@ -1187,7 +1292,8 @@ impl MultiTheoryConsciousness {
 
         // 7. Check embodiment
         let words: Vec<&str> = input.split_whitespace().collect();
-        let grounded_count = words.iter()
+        let grounded_count = words
+            .iter()
             .filter(|w| self.embodiment.is_grounded(w))
             .count();
         let grounding_ratio = grounded_count as f64 / words.len().max(1) as f64;
@@ -1212,7 +1318,11 @@ impl MultiTheoryConsciousness {
         self.metrics.calculate_unified();
 
         // 10. Learn from this interaction
-        self.predictor.learn_prior("input_start", &words.first().unwrap_or(&"").to_string(), 0.5);
+        self.predictor.learn_prior(
+            "input_start",
+            &words.first().unwrap_or(&"").to_string(),
+            0.5,
+        );
 
         MultiTheoryResult {
             input: input.to_string(),
@@ -1236,7 +1346,11 @@ impl MultiTheoryConsciousness {
 
         // Update embodiment based on interaction
         self.embodiment.add_observation(
-            &format!("Interaction {} - {}", context, if success { "succeeded" } else { "failed" }),
+            &format!(
+                "Interaction {} - {}",
+                context,
+                if success { "succeeded" } else { "failed" }
+            ),
             ObservationCategory::Command,
             success,
         );
@@ -1250,7 +1364,8 @@ impl MultiTheoryConsciousness {
                 x if x > 0.7 => "Highly integrated processing",
                 x if x > 0.4 => "Moderate integration",
                 _ => "Fragmented processing",
-            }.to_string(),
+            }
+            .to_string(),
 
             // Broadcast (GWT)
             workspace_state: format!(
@@ -1362,10 +1477,20 @@ mod tests {
     fn test_attention_schema() {
         let mut attention = AttentionSchema::new();
 
-        attention.focus_on("install command", "Detected action verb", 0.9, AttentionCategory::Intent);
+        attention.focus_on(
+            "install command",
+            "Detected action verb",
+            0.9,
+            AttentionCategory::Intent,
+        );
         assert!(attention.primary_focus.is_some());
 
-        attention.add_secondary("firefox", "Package name detected", 0.7, AttentionCategory::Entity);
+        attention.add_secondary(
+            "firefox",
+            "Package name detected",
+            0.7,
+            AttentionCategory::Entity,
+        );
         assert_eq!(attention.secondary_foci.len(), 1);
 
         let description = attention.describe();
@@ -1376,7 +1501,12 @@ mod tests {
     fn test_predictive_processor() {
         let mut predictor = PredictiveProcessor::new();
 
-        predictor.predict("install", 0.8, PredictionSource::Context, vec![SemanticPrime::Do]);
+        predictor.predict(
+            "install",
+            0.8,
+            PredictionSource::Context,
+            vec![SemanticPrime::Do],
+        );
 
         let errors = predictor.check("install firefox", &[SemanticPrime::Do, SemanticPrime::Move]);
         assert!(!errors.is_empty());
@@ -1414,7 +1544,11 @@ mod tests {
     fn test_multi_theory_consciousness() {
         let mut consciousness = MultiTheoryConsciousness::new();
 
-        let result = consciousness.process("install firefox", &[SemanticPrime::Do, SemanticPrime::Move], 0.5);
+        let result = consciousness.process(
+            "install firefox",
+            &[SemanticPrime::Do, SemanticPrime::Move],
+            0.5,
+        );
 
         assert!(result.metrics.unified > 0.0);
         assert!(!result.attention_description.is_empty());

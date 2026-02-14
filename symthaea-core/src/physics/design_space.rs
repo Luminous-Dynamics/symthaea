@@ -20,9 +20,9 @@
 //!     0    10   20   30   40   50
 //! ```
 
-use crate::genesis::GenesisSeed;
 use super::coupled_physics::{CoupledPhysicsEngine, OperatingConditions};
 use super::radiation_damage::FusionReaction;
+use crate::genesis::GenesisSeed;
 
 /// Result of a parametric sweep point
 #[derive(Debug, Clone)]
@@ -175,7 +175,7 @@ impl DesignSpaceMapper {
                 power_kw: power,
                 param_value: mass_kg,
                 feasible: result.feasible,
-                metric_value: mass_kg / power,  // kg per kW
+                metric_value: mass_kg / power, // kg per kW
                 notes: format!("{:.1} kg/kW", mass_kg / power),
             });
 
@@ -222,7 +222,8 @@ impl DesignSpaceMapper {
             let result = self.engine.simulate(&conditions);
 
             // Estimate cost
-            let spec = super::spark_prototype_spec::PrototypeSpecification::from_simulation(&result);
+            let spec =
+                super::spark_prototype_spec::PrototypeSpecification::from_simulation(&result);
             let cost_per_kw = spec.estimated_total_cost_usd / power;
 
             points.push(DesignPoint {
@@ -250,15 +251,13 @@ impl DesignSpaceMapper {
     }
 
     /// Find minimum feasible power for given reaction
-    pub fn find_minimum_feasible_power(
-        &self,
-        reaction: FusionReaction,
-    ) -> Option<f64> {
+    pub fn find_minimum_feasible_power(&self, reaction: FusionReaction) -> Option<f64> {
         // Binary search for minimum feasible power
         let mut low = 0.1;
         let mut high = 100.0;
 
-        for _ in 0..20 {  // 20 iterations for precision
+        for _ in 0..20 {
+            // 20 iterations for precision
             let mid = (low + high) / 2.0;
 
             let conditions = OperatingConditions {
@@ -301,10 +300,26 @@ impl DesignSpaceMapper {
         let mut output = String::new();
 
         // Find data range
-        let x_min = sweep.points.iter().map(|p| p.power_kw).fold(f64::INFINITY, f64::min);
-        let x_max = sweep.points.iter().map(|p| p.power_kw).fold(f64::NEG_INFINITY, f64::max);
-        let y_min = sweep.points.iter().map(|p| p.param_value).fold(f64::INFINITY, f64::min);
-        let y_max = sweep.points.iter().map(|p| p.param_value).fold(f64::NEG_INFINITY, f64::max);
+        let x_min = sweep
+            .points
+            .iter()
+            .map(|p| p.power_kw)
+            .fold(f64::INFINITY, f64::min);
+        let x_max = sweep
+            .points
+            .iter()
+            .map(|p| p.power_kw)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let y_min = sweep
+            .points
+            .iter()
+            .map(|p| p.param_value)
+            .fold(f64::INFINITY, f64::min);
+        let y_max = sweep
+            .points
+            .iter()
+            .map(|p| p.param_value)
+            .fold(f64::NEG_INFINITY, f64::max);
 
         // Add margin
         let y_range = y_max - y_min;
@@ -312,7 +327,10 @@ impl DesignSpaceMapper {
         let y_min = (y_min - y_range * 0.1).max(0.0);
 
         // Title
-        output.push_str(&format!("\n{:?} ({:?})\n", sweep.sweep_type, sweep.reaction));
+        output.push_str(&format!(
+            "\n{:?} ({:?})\n",
+            sweep.sweep_type, sweep.reaction
+        ));
         output.push_str(&"─".repeat(width + 10));
         output.push('\n');
 
@@ -335,12 +353,11 @@ impl DesignSpaceMapper {
                 let x_val = x_min + (x_max - x_min) * (col as f64 / (width - 1) as f64);
 
                 // Find nearest point
-                let nearest = sweep.points.iter()
-                    .min_by(|a, b| {
-                        let da = (a.power_kw - x_val).abs();
-                        let db = (b.power_kw - x_val).abs();
-                        da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
-                    });
+                let nearest = sweep.points.iter().min_by(|a, b| {
+                    let da = (a.power_kw - x_val).abs();
+                    let db = (b.power_kw - x_val).abs();
+                    da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+                });
 
                 if let Some(point) = nearest {
                     let px = (point.power_kw - x_min) / (x_max - x_min) * (width - 1) as f64;
@@ -369,9 +386,21 @@ impl DesignSpaceMapper {
 
         // X-axis labels
         output.push_str(&format!("{:>7}  ", ""));
-        output.push_str(&format!("{:<width$}", format!("{:.0}", x_min), width = width / 3));
-        output.push_str(&format!("{:^width$}", format!("{:.0}", (x_min + x_max) / 2.0), width = width / 3));
-        output.push_str(&format!("{:>width$}", format!("{:.0}", x_max), width = width / 3));
+        output.push_str(&format!(
+            "{:<width$}",
+            format!("{:.0}", x_min),
+            width = width / 3
+        ));
+        output.push_str(&format!(
+            "{:^width$}",
+            format!("{:.0}", (x_min + x_max) / 2.0),
+            width = width / 3
+        ));
+        output.push_str(&format!(
+            "{:>width$}",
+            format!("{:.0}", x_max),
+            width = width / 3
+        ));
         output.push('\n');
 
         // Axis labels
@@ -382,7 +411,11 @@ impl DesignSpaceMapper {
 
         // Summary stats
         let feasible_count = sweep.points.iter().filter(|p| p.feasible).count();
-        output.push_str(&format!("\nFeasible: {}/{} points\n", feasible_count, sweep.points.len()));
+        output.push_str(&format!(
+            "\nFeasible: {}/{} points\n",
+            feasible_count,
+            sweep.points.len()
+        ));
 
         output
     }
@@ -415,40 +448,45 @@ impl DesignEnvelope {
         mass_sweep: &ParametricSweep,
         cost_sweep: &ParametricSweep,
     ) -> Self {
-        let feasible_shielding: Vec<_> = shielding_sweep.points.iter()
+        let feasible_shielding: Vec<_> = shielding_sweep
+            .points
+            .iter()
             .filter(|p| p.feasible)
             .collect();
 
-        let feasible_mass: Vec<_> = mass_sweep.points.iter()
-            .filter(|p| p.feasible)
-            .collect();
+        let feasible_mass: Vec<_> = mass_sweep.points.iter().filter(|p| p.feasible).collect();
 
-        let feasible_cost: Vec<_> = cost_sweep.points.iter()
-            .filter(|p| p.feasible)
-            .collect();
+        let feasible_cost: Vec<_> = cost_sweep.points.iter().filter(|p| p.feasible).collect();
 
-        let min_power = feasible_shielding.iter()
+        let min_power = feasible_shielding
+            .iter()
             .map(|p| p.power_kw)
             .fold(f64::INFINITY, f64::min);
 
-        let shielding_min = feasible_shielding.iter()
+        let shielding_min = feasible_shielding
+            .iter()
             .map(|p| p.param_value)
             .fold(f64::INFINITY, f64::min);
-        let shielding_max = feasible_shielding.iter()
+        let shielding_max = feasible_shielding
+            .iter()
             .map(|p| p.param_value)
             .fold(f64::NEG_INFINITY, f64::max);
 
-        let mass_min = feasible_mass.iter()
+        let mass_min = feasible_mass
+            .iter()
             .map(|p| p.param_value)
             .fold(f64::INFINITY, f64::min);
-        let mass_max = feasible_mass.iter()
+        let mass_max = feasible_mass
+            .iter()
             .map(|p| p.param_value)
             .fold(f64::NEG_INFINITY, f64::max);
 
-        let cost_min = feasible_cost.iter()
+        let cost_min = feasible_cost
+            .iter()
             .map(|p| p.param_value)
             .fold(f64::INFINITY, f64::min);
-        let cost_max = feasible_cost.iter()
+        let cost_max = feasible_cost
+            .iter()
             .map(|p| p.param_value)
             .fold(f64::NEG_INFINITY, f64::max);
 
@@ -459,8 +497,14 @@ impl DesignEnvelope {
 
         Self {
             reaction,
-            min_power_kw: if min_power.is_finite() { Some(min_power) } else { None },
-            max_power_kw: shielding_sweep.points.iter()
+            min_power_kw: if min_power.is_finite() {
+                Some(min_power)
+            } else {
+                None
+            },
+            max_power_kw: shielding_sweep
+                .points
+                .iter()
                 .map(|p| p.power_kw)
                 .fold(f64::NEG_INFINITY, f64::max),
             shielding_range_cm: (shielding_min, shielding_max),
@@ -514,7 +558,8 @@ impl MultiObjectiveDesign {
         let dominated_dose = self.dose_rate <= other.dose_rate;
         let dominated_lifetime = self.lifetime_years >= other.lifetime_years;
 
-        let all_dominated = dominated_mass && dominated_cost && dominated_dose && dominated_lifetime;
+        let all_dominated =
+            dominated_mass && dominated_cost && dominated_dose && dominated_lifetime;
 
         let strictly_better = self.mass_kg < other.mass_kg
             || self.cost_per_kw < other.cost_per_kw
@@ -531,7 +576,8 @@ impl MultiObjectiveDesign {
             (self.cost_per_kw - min_max.cost_min) / (min_max.cost_max - min_max.cost_min + 1e-10),
             (self.dose_rate - min_max.dose_min) / (min_max.dose_max - min_max.dose_min + 1e-10),
             // Invert lifetime since we maximize it
-            1.0 - (self.lifetime_years - min_max.lifetime_min) / (min_max.lifetime_max - min_max.lifetime_min + 1e-10),
+            1.0 - (self.lifetime_years - min_max.lifetime_min)
+                / (min_max.lifetime_max - min_max.lifetime_min + 1e-10),
         ]
     }
 }
@@ -552,14 +598,38 @@ pub struct ObjectiveRanges {
 impl ObjectiveRanges {
     fn from_designs(designs: &[MultiObjectiveDesign]) -> Self {
         Self {
-            mass_min: designs.iter().map(|d| d.mass_kg).fold(f64::INFINITY, f64::min),
-            mass_max: designs.iter().map(|d| d.mass_kg).fold(f64::NEG_INFINITY, f64::max),
-            cost_min: designs.iter().map(|d| d.cost_per_kw).fold(f64::INFINITY, f64::min),
-            cost_max: designs.iter().map(|d| d.cost_per_kw).fold(f64::NEG_INFINITY, f64::max),
-            dose_min: designs.iter().map(|d| d.dose_rate).fold(f64::INFINITY, f64::min),
-            dose_max: designs.iter().map(|d| d.dose_rate).fold(f64::NEG_INFINITY, f64::max),
-            lifetime_min: designs.iter().map(|d| d.lifetime_years).fold(f64::INFINITY, f64::min),
-            lifetime_max: designs.iter().map(|d| d.lifetime_years).fold(f64::NEG_INFINITY, f64::max),
+            mass_min: designs
+                .iter()
+                .map(|d| d.mass_kg)
+                .fold(f64::INFINITY, f64::min),
+            mass_max: designs
+                .iter()
+                .map(|d| d.mass_kg)
+                .fold(f64::NEG_INFINITY, f64::max),
+            cost_min: designs
+                .iter()
+                .map(|d| d.cost_per_kw)
+                .fold(f64::INFINITY, f64::min),
+            cost_max: designs
+                .iter()
+                .map(|d| d.cost_per_kw)
+                .fold(f64::NEG_INFINITY, f64::max),
+            dose_min: designs
+                .iter()
+                .map(|d| d.dose_rate)
+                .fold(f64::INFINITY, f64::min),
+            dose_max: designs
+                .iter()
+                .map(|d| d.dose_rate)
+                .fold(f64::NEG_INFINITY, f64::max),
+            lifetime_min: designs
+                .iter()
+                .map(|d| d.lifetime_years)
+                .fold(f64::INFINITY, f64::min),
+            lifetime_max: designs
+                .iter()
+                .map(|d| d.lifetime_years)
+                .fold(f64::NEG_INFINITY, f64::max),
         }
     }
 }
@@ -621,7 +691,9 @@ impl ParetoOptimizer {
         let cost_per_kw = total_cost / power_kw;
 
         // Get lifetime
-        let lifetime = result.pulse_thermal.lifetime_years
+        let lifetime = result
+            .pulse_thermal
+            .lifetime_years
             .min(result.pulse_thermal.fatigue_lifetime_years)
             .min(100.0);
 
@@ -662,7 +734,8 @@ impl ParetoOptimizer {
         self.compute_crowding_distance(&mut designs);
 
         // Extract frontier
-        let frontier: Vec<MultiObjectiveDesign> = designs.iter()
+        let frontier: Vec<MultiObjectiveDesign> = designs
+            .iter()
             .filter(|d| d.pareto_rank == 0 && d.feasible)
             .cloned()
             .collect();
@@ -671,17 +744,37 @@ impl ParetoOptimizer {
         let feasible: Vec<_> = designs.iter().filter(|d| d.feasible).collect();
 
         let best_by_objective = BestByObjective {
-            min_mass: feasible.iter()
-                .min_by(|a, b| a.mass_kg.partial_cmp(&b.mass_kg).unwrap_or(std::cmp::Ordering::Equal))
+            min_mass: feasible
+                .iter()
+                .min_by(|a, b| {
+                    a.mass_kg
+                        .partial_cmp(&b.mass_kg)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|d| (*d).clone()),
-            min_cost: feasible.iter()
-                .min_by(|a, b| a.cost_per_kw.partial_cmp(&b.cost_per_kw).unwrap_or(std::cmp::Ordering::Equal))
+            min_cost: feasible
+                .iter()
+                .min_by(|a, b| {
+                    a.cost_per_kw
+                        .partial_cmp(&b.cost_per_kw)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|d| (*d).clone()),
-            min_dose: feasible.iter()
-                .min_by(|a, b| a.dose_rate.partial_cmp(&b.dose_rate).unwrap_or(std::cmp::Ordering::Equal))
+            min_dose: feasible
+                .iter()
+                .min_by(|a, b| {
+                    a.dose_rate
+                        .partial_cmp(&b.dose_rate)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|d| (*d).clone()),
-            max_lifetime: feasible.iter()
-                .max_by(|a, b| a.lifetime_years.partial_cmp(&b.lifetime_years).unwrap_or(std::cmp::Ordering::Equal))
+            max_lifetime: feasible
+                .iter()
+                .max_by(|a, b| {
+                    a.lifetime_years
+                        .partial_cmp(&b.lifetime_years)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|d| (*d).clone()),
         };
 
@@ -717,9 +810,7 @@ impl ParetoOptimizer {
         }
 
         // Assign ranks iteratively
-        let mut current_front: Vec<usize> = (0..n)
-            .filter(|&i| domination_count[i] == 0)
-            .collect();
+        let mut current_front: Vec<usize> = (0..n).filter(|&i| domination_count[i] == 0).collect();
 
         let mut rank = 0;
         while !current_front.is_empty() {
@@ -754,7 +845,8 @@ impl ParetoOptimizer {
         let max_rank = designs.iter().map(|d| d.pareto_rank).max().unwrap_or(0);
 
         for rank in 0..=max_rank {
-            let mut indices: Vec<usize> = designs.iter()
+            let mut indices: Vec<usize> = designs
+                .iter()
                 .enumerate()
                 .filter(|(_, d)| d.pareto_rank == rank)
                 .map(|(i, _)| i)
@@ -802,10 +894,18 @@ impl ParetoOptimizer {
         output.push_str("                    PARETO FRONTIER ANALYSIS\n");
         output.push_str("════════════════════════════════════════════════════════════════\n\n");
 
-        output.push_str(&format!("Total designs evaluated: {}\n", pareto.all_designs.len()));
-        output.push_str(&format!("Feasible designs: {}\n",
-                                  pareto.all_designs.iter().filter(|d| d.feasible).count()));
-        output.push_str(&format!("Pareto-optimal designs: {}\n\n", pareto.frontier.len()));
+        output.push_str(&format!(
+            "Total designs evaluated: {}\n",
+            pareto.all_designs.len()
+        ));
+        output.push_str(&format!(
+            "Feasible designs: {}\n",
+            pareto.all_designs.iter().filter(|d| d.feasible).count()
+        ));
+        output.push_str(&format!(
+            "Pareto-optimal designs: {}\n\n",
+            pareto.frontier.len()
+        ));
 
         output.push_str("┌────────────────────────────────────────────────────────────────┐\n");
         output.push_str("│  PARETO FRONTIER (Non-Dominated Feasible Designs)             │\n");
@@ -822,7 +922,11 @@ impl ParetoOptimizer {
                 design.cost_per_kw,
                 design.dose_rate,
                 design.lifetime_years.min(100.0),
-                if design.crowding_distance.is_infinite() { f64::NAN } else { design.crowding_distance }
+                if design.crowding_distance.is_infinite() {
+                    f64::NAN
+                } else {
+                    design.crowding_distance
+                }
             ));
         }
         output.push_str("└────────┴────────┴──────────┴────────────┴──────────┴──────────┘\n");
@@ -832,20 +936,29 @@ impl ParetoOptimizer {
         output.push_str("├────────────────────────────────────────────────────────────────┤\n");
 
         if let Some(ref d) = pareto.best_by_objective.min_mass {
-            output.push_str(&format!("│  Min Mass:     {:>6.0} kg at {:>5.1} kW                         │\n",
-                                      d.mass_kg, d.power_kw));
+            output.push_str(&format!(
+                "│  Min Mass:     {:>6.0} kg at {:>5.1} kW                         │\n",
+                d.mass_kg, d.power_kw
+            ));
         }
         if let Some(ref d) = pareto.best_by_objective.min_cost {
-            output.push_str(&format!("│  Min Cost:     ${:>5.0}/kW at {:>5.1} kW                        │\n",
-                                      d.cost_per_kw, d.power_kw));
+            output.push_str(&format!(
+                "│  Min Cost:     ${:>5.0}/kW at {:>5.1} kW                        │\n",
+                d.cost_per_kw, d.power_kw
+            ));
         }
         if let Some(ref d) = pareto.best_by_objective.min_dose {
-            output.push_str(&format!("│  Min Dose:     {:>.4} mSv/hr at {:>5.1} kW                     │\n",
-                                      d.dose_rate, d.power_kw));
+            output.push_str(&format!(
+                "│  Min Dose:     {:>.4} mSv/hr at {:>5.1} kW                     │\n",
+                d.dose_rate, d.power_kw
+            ));
         }
         if let Some(ref d) = pareto.best_by_objective.max_lifetime {
-            output.push_str(&format!("│  Max Lifetime: {:>5.0} years at {:>5.1} kW                      │\n",
-                                      d.lifetime_years.min(100.0), d.power_kw));
+            output.push_str(&format!(
+                "│  Max Lifetime: {:>5.0} years at {:>5.1} kW                      │\n",
+                d.lifetime_years.min(100.0),
+                d.power_kw
+            ));
         }
         output.push_str("└────────────────────────────────────────────────────────────────┘\n");
 
@@ -870,8 +983,10 @@ mod tests {
         assert_eq!(sweep.points.len(), 5);
         println!("Sweep results:");
         for point in &sweep.points {
-            println!("  {:.1} kW: {:.1} cm shielding, feasible={}",
-                     point.power_kw, point.param_value, point.feasible);
+            println!(
+                "  {:.1} kW: {:.1} cm shielding, feasible={}",
+                point.power_kw, point.param_value, point.feasible
+            );
         }
     }
 
@@ -901,11 +1016,7 @@ mod tests {
         let genesis = GenesisSeed::from_phrase("pareto test");
         let optimizer = ParetoOptimizer::from_genesis(&genesis);
 
-        let pareto = optimizer.compute_pareto_frontier(
-            FusionReaction::DD,
-            (1.0, 20.0),
-            10,
-        );
+        let pareto = optimizer.compute_pareto_frontier(FusionReaction::DD, (1.0, 20.0), 10);
 
         println!("Pareto frontier has {} designs", pareto.frontier.len());
         println!("{}", optimizer.format_report(&pareto));
@@ -917,8 +1028,12 @@ mod tests {
         for i in 0..pareto.frontier.len() {
             for j in 0..pareto.frontier.len() {
                 if i != j {
-                    assert!(!pareto.frontier[i].dominates(&pareto.frontier[j]),
-                            "Frontier design {} dominates {}", i, j);
+                    assert!(
+                        !pareto.frontier[i].dominates(&pareto.frontier[j]),
+                        "Frontier design {} dominates {}",
+                        i,
+                        j
+                    );
                 }
             }
         }
@@ -939,16 +1054,19 @@ mod tests {
 
         let b = MultiObjectiveDesign {
             power_kw: 5.0,
-            mass_kg: 1500.0,  // Worse
-            cost_per_kw: 15000.0,  // Worse
-            dose_rate: 0.002,  // Worse
-            lifetime_years: 40.0,  // Worse
+            mass_kg: 1500.0,      // Worse
+            cost_per_kw: 15000.0, // Worse
+            dose_rate: 0.002,     // Worse
+            lifetime_years: 40.0, // Worse
             feasible: true,
             pareto_rank: 0,
             crowding_distance: 0.0,
         };
 
-        assert!(a.dominates(&b), "A should dominate B (better on all objectives)");
+        assert!(
+            a.dominates(&b),
+            "A should dominate B (better on all objectives)"
+        );
         assert!(!b.dominates(&a), "B should not dominate A");
     }
 }

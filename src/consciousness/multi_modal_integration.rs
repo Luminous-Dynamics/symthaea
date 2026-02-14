@@ -37,15 +37,15 @@
 //! println!("Unified Φ: {:.3}", result.integrated_phi);
 //! ```
 
-use symthaea_core::hdc::binary_hv::BinaryHV;
 use crate::consciousness::cross_modal_binding::{
-    Modality, ModalityChannel, ConvergenceZone, EpisodicBuffer, ConvergenceLevel,
+    ConvergenceLevel, ConvergenceZone, EpisodicBuffer, Modality, ModalityChannel,
 };
-use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
-use std::sync::mpsc::{Sender, Receiver, channel};
+use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
 // =============================================================================
 // CONFIGURATION
@@ -308,7 +308,8 @@ impl MultiModalIntegrator {
         for input in inputs {
             if let Some(channel) = self.channels.get_mut(&input.modality) {
                 channel.update(input.features);
-                channel.attention = (channel.attention + input.confidence * self.config.attention_learning_rate)
+                channel.attention = (channel.attention
+                    + input.confidence * self.config.attention_learning_rate)
                     .min(1.0);
             }
             self.stats.total_inputs += 1;
@@ -317,7 +318,8 @@ impl MultiModalIntegrator {
         self.emit_event(IntegrationEventType::ModalInput, None);
 
         // Collect current channel representations
-        let channel_inputs: HashMap<Modality, BinaryHV> = self.channels
+        let channel_inputs: HashMap<Modality, BinaryHV> = self
+            .channels
             .iter()
             .map(|(m, c)| (*m, c.attended()))
             .collect();
@@ -330,15 +332,19 @@ impl MultiModalIntegrator {
         self.emit_event(IntegrationEventType::BindingUpdated, None);
 
         // Compute unified representation from amodal zones
-        let amodal_zones: Vec<_> = self.convergence_zones
+        let amodal_zones: Vec<_> = self
+            .convergence_zones
             .iter()
-            .filter(|z| matches!(z.level, ConvergenceLevel::Amodal | ConvergenceLevel::Tertiary))
+            .filter(|z| {
+                matches!(
+                    z.level,
+                    ConvergenceLevel::Amodal | ConvergenceLevel::Tertiary
+                )
+            })
             .collect();
 
         if !amodal_zones.is_empty() {
-            let zone_vectors: Vec<BinaryHV> = amodal_zones.iter()
-                .map(|z| z.integrated)
-                .collect();
+            let zone_vectors: Vec<BinaryHV> = amodal_zones.iter().map(|z| z.integrated).collect();
             self.unified = BinaryHV::bundle(&zone_vectors);
         }
 
@@ -380,12 +386,17 @@ impl MultiModalIntegrator {
         }
 
         // Build active zone info
-        let active_zones: Vec<_> = self.convergence_zones
+        let active_zones: Vec<_> = self
+            .convergence_zones
             .iter()
             .filter(|z| z.activation > 0.1)
             .map(|z| ConvergenceZoneInfo {
                 level: format!("{:?}", z.level),
-                sources: z.source_modalities.iter().map(|m| format!("{:?}", m)).collect(),
+                sources: z
+                    .source_modalities
+                    .iter()
+                    .map(|m| format!("{:?}", m))
+                    .collect(),
                 binding_strength: z.binding_strength,
                 activation: z.activation,
             })
@@ -437,7 +448,8 @@ impl MultiModalIntegrator {
     /// Compute binding coherence
     fn compute_binding_coherence(&self) -> f64 {
         // Coherence: average temporal coherence across active channels
-        let active_channels: Vec<_> = self.channels
+        let active_channels: Vec<_> = self
+            .channels
             .values()
             .filter(|c| c.attention > 0.1)
             .collect();
@@ -446,9 +458,7 @@ impl MultiModalIntegrator {
             return 0.0;
         }
 
-        let total: f64 = active_channels.iter()
-            .map(|c| c.temporal_coherence())
-            .sum();
+        let total: f64 = active_channels.iter().map(|c| c.temporal_coherence()).sum();
 
         total / active_channels.len() as f64
     }
@@ -522,20 +532,17 @@ impl MultiModalIntegrator {
 
 /// Create a visual input
 pub fn visual_input(features: BinaryHV, confidence: f64) -> ModalInput {
-    ModalInput::new(Modality::Visual, features, confidence)
-        .with_source("visual_perception")
+    ModalInput::new(Modality::Visual, features, confidence).with_source("visual_perception")
 }
 
 /// Create an auditory input
 pub fn auditory_input(features: BinaryHV, confidence: f64) -> ModalInput {
-    ModalInput::new(Modality::Auditory, features, confidence)
-        .with_source("auditory_perception")
+    ModalInput::new(Modality::Auditory, features, confidence).with_source("auditory_perception")
 }
 
 /// Create a linguistic input
 pub fn linguistic_input(features: BinaryHV, confidence: f64) -> ModalInput {
-    ModalInput::new(Modality::Linguistic, features, confidence)
-        .with_source("language_processing")
+    ModalInput::new(Modality::Linguistic, features, confidence).with_source("language_processing")
 }
 
 // =============================================================================
@@ -549,8 +556,7 @@ mod tests {
     #[test]
     fn test_modal_input_creation() {
         let features = BinaryHV::random(42);
-        let input = ModalInput::new(Modality::Visual, features, 0.9)
-            .with_source("test");
+        let input = ModalInput::new(Modality::Visual, features, 0.9).with_source("test");
 
         assert_eq!(input.modality, Modality::Visual);
         assert_eq!(input.confidence, 0.9);
@@ -590,15 +596,15 @@ mod tests {
         let features = BinaryHV::random(42);
         let mut last_coherence = 0.0;
         for _ in 0..5 {
-            let inputs = vec![
-                visual_input(features, 0.9),
-            ];
+            let inputs = vec![visual_input(features, 0.9)];
             let result = integrator.integrate(&inputs);
             last_coherence = result.binding_coherence;
         }
         // Coherence should be in valid range after repeated input
-        assert!((0.0..=1.0).contains(&last_coherence),
-            "Binding coherence must be in [0,1]: {last_coherence}");
+        assert!(
+            (0.0..=1.0).contains(&last_coherence),
+            "Binding coherence must be in [0,1]: {last_coherence}"
+        );
     }
 
     #[test]
@@ -609,9 +615,11 @@ mod tests {
         let matches = integrator.route_to_primitives(&system);
         // Routing should produce a valid (possibly empty) vec
         let prim_count = system.all_primitives().count();
-        assert!(matches.len() <= prim_count,
+        assert!(
+            matches.len() <= prim_count,
             "Route matches ({}) cannot exceed primitives count ({prim_count})",
-            matches.len());
+            matches.len()
+        );
     }
 
     #[test]

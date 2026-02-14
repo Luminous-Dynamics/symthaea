@@ -59,7 +59,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use super::calibration::{CalibrationConfig, DomainStats};
 use super::constraint_gate::ConstraintGateConfig;
 use super::magi_integration::{
-    CalibrationQuality, CausalAttribution, CapabilityDomain, MagiLoopState, WorldGroundedConfig,
+    CalibrationQuality, CapabilityDomain, CausalAttribution, MagiLoopState, WorldGroundedConfig,
 };
 use super::world_prediction::PredictionDomain;
 
@@ -111,7 +111,10 @@ impl PersistenceConfig {
             Ok(self.state_path.clone())
         } else {
             let home = dirs::home_dir().ok_or_else(|| {
-                io::Error::new(io::ErrorKind::NotFound, "Could not determine home directory")
+                io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "Could not determine home directory",
+                )
             })?;
             Ok(home.join(&self.state_path))
         }
@@ -476,8 +479,8 @@ impl PersistenceManager {
         let path = self.config.full_path()?;
         let file = fs::File::open(&path)?;
         let reader = BufReader::new(file);
-        let snapshot: MagiStateSnapshot =
-            serde_json::from_reader(reader).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let snapshot: MagiStateSnapshot = serde_json::from_reader(reader)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         Ok(snapshot)
     }
 
@@ -543,9 +546,9 @@ impl PersistenceManager {
 
     /// Remove old backup files beyond max_backups
     fn cleanup_old_backups(&self, path: &Path) -> io::Result<()> {
-        let parent = path.parent().ok_or_else(|| {
-            io::Error::new(io::ErrorKind::NotFound, "No parent directory")
-        })?;
+        let parent = path
+            .parent()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No parent directory"))?;
 
         let base_name = path
             .file_stem()
@@ -618,8 +621,8 @@ impl PersistenceManager {
             lifetime_brier: cal_summary.global_brier,
             ece: cal_summary.global_ece,
             total_predictions: cal_summary.total_predictions,
-            correct_predictions: (cal_summary.global_accuracy * cal_summary.total_predictions as f64)
-                as usize,
+            correct_predictions: (cal_summary.global_accuracy
+                * cal_summary.total_predictions as f64) as usize,
             brier_sum: cal_summary.global_brier * cal_summary.total_predictions as f64,
             confidence_adjustment: 1.0, // Global doesn't have single adjustment
             is_well_calibrated: cal_summary.is_well_calibrated,
@@ -702,9 +705,7 @@ pub enum StartupMode {
     },
 
     /// Found state but failed to load - starting fresh
-    RecoveryStart {
-        error: String,
-    },
+    RecoveryStart { error: String },
 
     /// Persistence disabled
     Disabled,
@@ -814,7 +815,9 @@ impl MagiPersistentModel {
 
         let model = match &startup_mode {
             StartupMode::WarmStart { .. } => {
-                super::magi_integration::WorldGroundedSelfModel::from_snapshot(persistence.current())
+                super::magi_integration::WorldGroundedSelfModel::from_snapshot(
+                    persistence.current(),
+                )
             }
             _ => super::magi_integration::WorldGroundedSelfModel::with_defaults(),
         };
@@ -837,8 +840,9 @@ impl MagiPersistentModel {
         let model = match &startup_mode {
             StartupMode::WarmStart { .. } => {
                 // Merge snapshot with custom config where appropriate
-                let mut restored =
-                    super::magi_integration::WorldGroundedSelfModel::from_snapshot(persistence.current());
+                let mut restored = super::magi_integration::WorldGroundedSelfModel::from_snapshot(
+                    persistence.current(),
+                );
                 // The snapshot takes precedence for learned state,
                 // but we could merge other config here if needed
                 restored
@@ -1066,13 +1070,11 @@ mod tests {
                 brier_sum: 9.0,
                 confidence_adjustment: 0.85,
                 is_overconfident: true,
-                recent_outcomes: vec![
-                    PersistedPredictionOutcome {
-                        confidence: 0.9,
-                        was_correct: true,
-                        brier_component: 0.01,
-                    },
-                ],
+                recent_outcomes: vec![PersistedPredictionOutcome {
+                    confidence: 0.9,
+                    was_correct: true,
+                    brier_component: 0.01,
+                }],
             },
         );
 
@@ -1154,13 +1156,25 @@ mod tests {
 
             // Record that we've done work (directly via persistence snapshot)
             magi.persistence_mut().current_mut().lifetime_iterations = 10;
-            magi.persistence_mut().current_mut().global_stats.total_predictions = 25;
-            magi.persistence_mut().current_mut().global_stats.lifetime_brier = 0.22;
+            magi.persistence_mut()
+                .current_mut()
+                .global_stats
+                .total_predictions = 25;
+            magi.persistence_mut()
+                .current_mut()
+                .global_stats
+                .lifetime_brier = 0.22;
             magi.persistence_mut().current_mut().global_stats.ece = 0.08;
 
             // Also set loop state so warm start detection works
-            magi.persistence_mut().current_mut().loop_state.loop_iterations = 10;
-            magi.persistence_mut().current_mut().loop_state.predictions_made = 25;
+            magi.persistence_mut()
+                .current_mut()
+                .loop_state
+                .loop_iterations = 10;
+            magi.persistence_mut()
+                .current_mut()
+                .loop_state
+                .predictions_made = 25;
 
             // Force save directly (skip update_from_model since we set values manually)
             magi.persistence_mut().force_save().unwrap();
@@ -1172,7 +1186,12 @@ mod tests {
 
             // Verify warm start
             assert!(magi.has_prior_knowledge());
-            if let StartupMode::WarmStart { session, lifetime_iterations, .. } = magi.startup_mode() {
+            if let StartupMode::WarmStart {
+                session,
+                lifetime_iterations,
+                ..
+            } = magi.startup_mode()
+            {
                 assert_eq!(*session, 2);
                 assert_eq!(*lifetime_iterations, 10);
             } else {
@@ -1227,8 +1246,10 @@ mod tests {
             );
 
             // Add causal attribution
-            magi.persistence_mut().current_mut().attribution_history.push(
-                PersistedCausalAttribution {
+            magi.persistence_mut()
+                .current_mut()
+                .attribution_history
+                .push(PersistedCausalAttribution {
                     prediction_id: "test-prediction-001".to_string(),
                     failure_mode: "External system timeout".to_string(),
                     missing_information: vec!["network latency".to_string()],
@@ -1236,13 +1257,21 @@ mod tests {
                     recurrence_prediction: Some("May recur under high load".to_string()),
                     confidence: 0.85,
                     created_at_unix: 1700000000,
-                }
-            );
+                });
 
             // Set loop state
-            magi.persistence_mut().current_mut().loop_state.loop_iterations = 50;
-            magi.persistence_mut().current_mut().loop_state.predictions_made = 200;
-            magi.persistence_mut().current_mut().loop_state.predictions_resolved = 195;
+            magi.persistence_mut()
+                .current_mut()
+                .loop_state
+                .loop_iterations = 50;
+            magi.persistence_mut()
+                .current_mut()
+                .loop_state
+                .predictions_made = 200;
+            magi.persistence_mut()
+                .current_mut()
+                .loop_state
+                .predictions_resolved = 195;
 
             // Force save directly (skip update_from_model since we set values manually)
             magi.persistence_mut().force_save().unwrap();
@@ -1256,7 +1285,10 @@ mod tests {
             let snapshot = magi.persistence().current();
 
             // Check domain calibration
-            let sys_cal = snapshot.calibration.get(&PredictionDomain::SystemState).unwrap();
+            let sys_cal = snapshot
+                .calibration
+                .get(&PredictionDomain::SystemState)
+                .unwrap();
             assert_eq!(sys_cal.prediction_count, 100);
             assert_eq!(sys_cal.correct_count, 88);
             assert!((sys_cal.confidence_adjustment - 0.92).abs() < 0.001);
@@ -1265,7 +1297,10 @@ mod tests {
 
             // Check causal attribution
             assert_eq!(snapshot.attribution_history.len(), 1);
-            assert_eq!(snapshot.attribution_history[0].prediction_id, "test-prediction-001");
+            assert_eq!(
+                snapshot.attribution_history[0].prediction_id,
+                "test-prediction-001"
+            );
             assert!((snapshot.attribution_history[0].confidence - 0.85).abs() < 0.001);
 
             // Check loop state
@@ -1330,7 +1365,10 @@ mod tests {
             let current_iterations = magi.persistence().current().lifetime_iterations;
             magi.persistence_mut().current_mut().lifetime_iterations = current_iterations + 10;
             // Also update loop_state for warm start detection
-            magi.persistence_mut().current_mut().loop_state.loop_iterations = current_iterations + 10;
+            magi.persistence_mut()
+                .current_mut()
+                .loop_state
+                .loop_iterations = current_iterations + 10;
             // Force save directly (skip update_from_model since we set values manually)
             magi.persistence_mut().force_save().unwrap();
         }

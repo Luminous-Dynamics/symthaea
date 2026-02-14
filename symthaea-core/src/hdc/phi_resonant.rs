@@ -411,7 +411,11 @@ impl ResonantPhiCalculator {
     ///
     /// Each resonator i updates as:
     /// new_i = damping × old_i + (1-damping) × Σⱼ similarity(i,j) × old_j
-    fn resonance_step(&self, current_state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> Vec<ContinuousHV> {
+    fn resonance_step(
+        &self,
+        current_state: &[ContinuousHV],
+        similarity_matrix: &[Vec<f64>],
+    ) -> Vec<ContinuousHV> {
         let n = current_state.len();
         let use_parallel = self.config.parallel && n >= self.config.parallel_threshold;
 
@@ -423,7 +427,11 @@ impl ResonantPhiCalculator {
     }
 
     /// Sequential resonance step
-    fn resonance_step_sequential(&self, current_state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> Vec<ContinuousHV> {
+    fn resonance_step_sequential(
+        &self,
+        current_state: &[ContinuousHV],
+        similarity_matrix: &[Vec<f64>],
+    ) -> Vec<ContinuousHV> {
         let damping = self.config.damping;
         let normalize = self.config.normalize;
 
@@ -431,7 +439,14 @@ impl ResonantPhiCalculator {
             .iter()
             .enumerate()
             .map(|(i, current_hv)| {
-                self.update_single_resonator(i, current_hv, current_state, similarity_matrix, damping, normalize)
+                self.update_single_resonator(
+                    i,
+                    current_hv,
+                    current_state,
+                    similarity_matrix,
+                    damping,
+                    normalize,
+                )
             })
             .collect()
     }
@@ -439,14 +454,25 @@ impl ResonantPhiCalculator {
     /// Parallel resonance step using rayon
     ///
     /// Each node update is independent and can be computed in parallel
-    fn resonance_step_parallel(&self, current_state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> Vec<ContinuousHV> {
+    fn resonance_step_parallel(
+        &self,
+        current_state: &[ContinuousHV],
+        similarity_matrix: &[Vec<f64>],
+    ) -> Vec<ContinuousHV> {
         let damping = self.config.damping;
         let normalize = self.config.normalize;
 
         (0..current_state.len())
             .into_par_iter()
             .map(|i| {
-                self.update_single_resonator(i, &current_state[i], current_state, similarity_matrix, damping, normalize)
+                self.update_single_resonator(
+                    i,
+                    &current_state[i],
+                    current_state,
+                    similarity_matrix,
+                    damping,
+                    normalize,
+                )
             })
             .collect()
     }
@@ -490,7 +516,12 @@ impl ResonantPhiCalculator {
 
         // SIMD-optimized damped blend: result = damping * current + (1-damping) * coupled
         let mut result = vec![0.0f32; dim];
-        simd_damped_blend(&mut result, &current_hv.values, &coupled_sum, damping as f32);
+        simd_damped_blend(
+            &mut result,
+            &current_hv.values,
+            &coupled_sum,
+            damping as f32,
+        );
 
         // Optional normalization (SIMD-optimized)
         if normalize {
@@ -516,7 +547,11 @@ impl ResonantPhiCalculator {
     }
 
     /// Sequential energy computation
-    fn compute_energy_sequential(&self, state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> f64 {
+    fn compute_energy_sequential(
+        &self,
+        state: &[ContinuousHV],
+        similarity_matrix: &[Vec<f64>],
+    ) -> f64 {
         let n = state.len();
         let mut energy = 0.0;
 
@@ -534,7 +569,11 @@ impl ResonantPhiCalculator {
     /// Parallel energy computation using rayon
     ///
     /// Parallelizes over rows, each row computes its contribution to energy
-    fn compute_energy_parallel(&self, state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> f64 {
+    fn compute_energy_parallel(
+        &self,
+        state: &[ContinuousHV],
+        similarity_matrix: &[Vec<f64>],
+    ) -> f64 {
         let n = state.len();
 
         // Compute partial sums in parallel (one per row)
@@ -616,7 +655,7 @@ impl ResonantPhiCalculator {
         let v1: Vec<f64> = degrees.iter().map(|&d| (d / total_degree).sqrt()).collect();
 
         // Power iteration with deflation for second eigenvector
-        let mut v = vec![1.0 / (n as f64).sqrt(); n];  // Random start
+        let mut v = vec![1.0 / (n as f64).sqrt(); n]; // Random start
 
         // Orthogonalize against v1
         let dot_v1: f64 = v.iter().zip(&v1).map(|(a, b)| a * b).sum();
@@ -737,8 +776,10 @@ mod tests {
         assert!(result.phi > 0.0, "Φ should be positive");
         assert!(result.phi <= 1.0, "Φ should be ≤ 1.0");
 
-        println!("Resonant Φ: {:.4} (converged in {} iterations, {:.2}ms)",
-                 result.phi, result.iterations, result.convergence_time_ms);
+        println!(
+            "Resonant Φ: {:.4} (converged in {} iterations, {:.2}ms)",
+            result.phi, result.iterations, result.convergence_time_ms
+        );
     }
 
     #[test]
@@ -753,10 +794,14 @@ mod tests {
         let random = ConsciousnessTopology::random(8, HDC_DIMENSION, 42);
         let phi_random = calc.compute(&random.node_representations);
 
-        println!("Star Φ: {:.4} ({} iter, {:.1}ms)",
-                 phi_star.phi, phi_star.iterations, phi_star.convergence_time_ms);
-        println!("Random Φ: {:.4} ({} iter, {:.1}ms)",
-                 phi_random.phi, phi_random.iterations, phi_random.convergence_time_ms);
+        println!(
+            "Star Φ: {:.4} ({} iter, {:.1}ms)",
+            phi_star.phi, phi_star.iterations, phi_star.convergence_time_ms
+        );
+        println!(
+            "Random Φ: {:.4} ({} iter, {:.1}ms)",
+            phi_random.phi, phi_random.iterations, phi_random.convergence_time_ms
+        );
 
         // Star should have higher Φ (or at least competitive)
         // Note: Resonant Φ may have different absolute scale, but ordering should match
@@ -780,6 +825,9 @@ mod tests {
 
         // Should be reasonably fast (debug mode is ~10x slower than release)
         // Release mode: <1s target, Debug mode: <10s acceptable
-        assert!(elapsed.as_secs_f64() < 10.0, "Should complete in <10 seconds (debug mode)");
+        assert!(
+            elapsed.as_secs_f64() < 10.0,
+            "Should complete in <10 seconds (debug mode)"
+        );
     }
 }

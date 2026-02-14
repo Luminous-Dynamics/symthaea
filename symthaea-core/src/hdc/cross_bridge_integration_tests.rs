@@ -22,11 +22,11 @@
 //! and the math → HDC → consciousness pipeline produce meaningful,
 //! non-degenerate results when chained together.
 
-use crate::physics::simulation_bridge::{PhysicsSimulator, SimulationAnalysis, state_to_binary_hv};
-use crate::hdc::math_bridge::{UnifiedMathEngine, MathValue};
-use crate::hdc::consciousness_integration::{ConsciousnessPipeline, IntegrationConfig};
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::dynamical_system::{LorenzSystem, NBodyGravity, HarmonicOscillator};
+use crate::hdc::consciousness_integration::{ConsciousnessPipeline, IntegrationConfig};
+use crate::hdc::dynamical_system::{HarmonicOscillator, LorenzSystem, NBodyGravity};
+use crate::hdc::math_bridge::{MathValue, UnifiedMathEngine};
+use crate::physics::simulation_bridge::{state_to_binary_hv, PhysicsSimulator, SimulationAnalysis};
 
 // =============================================================================
 // PHYSICS → HDC → CONSCIOUSNESS PIPELINE
@@ -41,10 +41,15 @@ fn test_harmonic_to_consciousness() {
     let result = sim.simulate(5.0, 0.01);
 
     assert!(result.steps > 100, "Should have many integration steps");
-    assert!(result.states.len() > 100, "Should have many recorded states");
+    assert!(
+        result.states.len() > 100,
+        "Should have many recorded states"
+    );
 
     // 2. Encode trajectory states as BinaryHV
-    let binary_hvs: Vec<BinaryHV> = result.states.iter()
+    let binary_hvs: Vec<BinaryHV> = result
+        .states
+        .iter()
         .take(10) // Take 10 representative states
         .map(|state| state_to_binary_hv(state))
         .collect();
@@ -60,12 +65,21 @@ fn test_harmonic_to_consciousness() {
     let state = pipeline.process(binary_hvs, &priorities);
 
     // 4. Verify meaningful consciousness metrics
-    assert!(state.phi > 0.0, "Φ should be positive for multi-component input");
-    assert!(state.consciousness_level > 0.0, "Should have non-zero consciousness");
+    assert!(
+        state.phi > 0.0,
+        "Φ should be positive for multi-component input"
+    );
+    assert!(
+        state.consciousness_level > 0.0,
+        "Should have non-zero consciousness"
+    );
 
     // 5. Assess integration
     let assessment = pipeline.assess();
-    assert!(assessment.consciousness_score > 0.0, "Assessment score should be positive");
+    assert!(
+        assessment.consciousness_score > 0.0,
+        "Assessment score should be positive"
+    );
 }
 
 /// Lorenz attractor (chaotic): verify that chaotic physics produces richer
@@ -77,12 +91,17 @@ fn test_lorenz_chaos_consciousness() {
     let result = sim.simulate(2.0, 0.005);
 
     // 2. Encode as BinaryHV
-    let binary_hvs: Vec<BinaryHV> = result.states.iter()
+    let binary_hvs: Vec<BinaryHV> = result
+        .states
+        .iter()
         .step_by(result.states.len() / 10) // Sample 10 evenly-spaced states
         .map(|state| state_to_binary_hv(state))
         .collect();
 
-    assert!(binary_hvs.len() >= 5, "Should have at least 5 sample states");
+    assert!(
+        binary_hvs.len() >= 5,
+        "Should have at least 5 sample states"
+    );
 
     // 3. Feed to consciousness
     let config = IntegrationConfig::default();
@@ -93,17 +112,32 @@ fn test_lorenz_chaos_consciousness() {
     let state = pipeline.process(binary_hvs, &priorities);
 
     assert!(state.phi > 0.0, "Chaotic system should produce positive Φ");
-    assert!(state.consciousness_level > 0.0, "Chaotic system should be conscious");
+    assert!(
+        state.consciousness_level > 0.0,
+        "Chaotic system should be conscious"
+    );
 
     // 4. Verify analysis recognizes chaos
     let lorenz_sys = LorenzSystem::standard();
-    let analysis = SimulationAnalysis::from_result(&result)
-        .with_lyapunov_estimate(&lorenz_sys, &[1.0, 1.0, 1.0], 2.0, 0.005, 1e-8);
-    assert!(analysis.lyapunov_estimate.is_some(), "Should estimate Lyapunov exponent");
+    let analysis = SimulationAnalysis::from_result(&result).with_lyapunov_estimate(
+        &lorenz_sys,
+        &[1.0, 1.0, 1.0],
+        2.0,
+        0.005,
+        1e-8,
+    );
+    assert!(
+        analysis.lyapunov_estimate.is_some(),
+        "Should estimate Lyapunov exponent"
+    );
     // Lorenz is chaotic → Lyapunov should be computed (sign depends on
     // estimation method and short simulation window; just verify it's finite)
     if let Some(lyap) = analysis.lyapunov_estimate {
-        assert!(lyap.is_finite(), "Lyapunov estimate should be finite, got {}", lyap);
+        assert!(
+            lyap.is_finite(),
+            "Lyapunov estimate should be finite, got {}",
+            lyap
+        );
     }
 }
 
@@ -117,7 +151,9 @@ fn test_gravity_orbit_consciousness() {
 
     // 2. Encode trajectory as HDC vectors
     let sample_count = 8.min(result.states.len());
-    let binary_hvs: Vec<BinaryHV> = result.states.iter()
+    let binary_hvs: Vec<BinaryHV> = result
+        .states
+        .iter()
         .step_by((result.states.len() / sample_count).max(1))
         .take(sample_count)
         .map(|state| state_to_binary_hv(state))
@@ -131,12 +167,14 @@ fn test_gravity_orbit_consciousness() {
     let priorities: Vec<f64> = vec![0.85; binary_hvs.len()];
     let state = pipeline.process(binary_hvs, &priorities);
 
-    assert!(state.phi > 0.0, "Orbital dynamics should produce positive Φ");
+    assert!(
+        state.phi > 0.0,
+        "Orbital dynamics should produce positive Φ"
+    );
 
     // 4. Check energy conservation
     let nbody = NBodyGravity::two_body(1.0, 1.0, 1.0, 2);
-    let analysis = SimulationAnalysis::from_result(&result)
-        .with_nbody_energy(&nbody, &result);
+    let analysis = SimulationAnalysis::from_result(&result).with_nbody_energy(&nbody, &result);
     if let Some(drift) = analysis.energy_drift {
         assert!(
             drift.abs() < 0.5, // RK4 should conserve energy reasonably
@@ -150,14 +188,16 @@ fn test_gravity_orbit_consciousness() {
 #[test]
 fn test_charged_particle_consciousness() {
     let sim = PhysicsSimulator::charged_particle(
-        1.0,                    // q/m
-        [0.0, 0.0, 0.0],      // no electric field
-        [0.0, 0.0, 1.0],      // B field in z
+        1.0,                            // q/m
+        [0.0, 0.0, 0.0],                // no electric field
+        [0.0, 0.0, 1.0],                // B field in z
         [1.0, 0.0, 0.0, 0.0, 1.0, 0.0], // circular motion
     );
     let result = sim.simulate(6.28, 0.01); // One full cyclotron period
 
-    let binary_hvs: Vec<BinaryHV> = result.states.iter()
+    let binary_hvs: Vec<BinaryHV> = result
+        .states
+        .iter()
         .step_by((result.states.len() / 6).max(1))
         .take(6)
         .map(|state| state_to_binary_hv(state))
@@ -170,7 +210,10 @@ fn test_charged_particle_consciousness() {
     let priorities: Vec<f64> = vec![0.75; binary_hvs.len()];
     let state = pipeline.process(binary_hvs, &priorities);
 
-    assert!(state.phi > 0.0, "Cyclotron motion should produce positive Φ");
+    assert!(
+        state.phi > 0.0,
+        "Cyclotron motion should produce positive Φ"
+    );
 }
 
 /// Heat diffusion: dissipative system → consciousness. Verify that
@@ -181,12 +224,16 @@ fn test_heat_diffusion_consciousness() {
     let result = sim.simulate(1.0, 0.001);
 
     // Early states (far from equilibrium) vs late states (near equilibrium)
-    let early_hvs: Vec<BinaryHV> = result.states.iter()
+    let early_hvs: Vec<BinaryHV> = result
+        .states
+        .iter()
         .take(5)
         .map(|state| state_to_binary_hv(state))
         .collect();
 
-    let late_hvs: Vec<BinaryHV> = result.states.iter()
+    let late_hvs: Vec<BinaryHV> = result
+        .states
+        .iter()
         .rev()
         .take(5)
         .map(|state| state_to_binary_hv(state))
@@ -240,7 +287,12 @@ fn test_physics_multi_cycle_consciousness() {
     assert_eq!(phi_values.len(), 4, "Should have 4 cycles");
     // All cycles should produce valid Φ
     for (i, &phi) in phi_values.iter().enumerate() {
-        assert!(phi >= 0.0, "Cycle {} Φ should be non-negative, got {}", i, phi);
+        assert!(
+            phi >= 0.0,
+            "Cycle {} Φ should be non-negative, got {}",
+            i,
+            phi
+        );
     }
 }
 
@@ -262,9 +314,7 @@ fn test_math_operations_to_consciousness() {
     ];
 
     // Collect BinaryHV encodings from math results
-    let binary_hvs: Vec<BinaryHV> = results.iter()
-        .map(|r| r.encoding)
-        .collect();
+    let binary_hvs: Vec<BinaryHV> = results.iter().map(|r| r.encoding).collect();
 
     assert_eq!(binary_hvs.len(), 4);
 
@@ -277,7 +327,10 @@ fn test_math_operations_to_consciousness() {
     let state = pipeline.process(binary_hvs, &priorities);
 
     assert!(state.phi > 0.0, "Math encodings should produce positive Φ");
-    assert!(state.consciousness_level > 0.0, "Should be conscious of math results");
+    assert!(
+        state.consciousness_level > 0.0,
+        "Should be conscious of math results"
+    );
 }
 
 /// Complex number operations → consciousness. Domain promotion should produce
@@ -299,7 +352,10 @@ fn test_complex_math_consciousness() {
 
     // All should have promoted to ℂ
     assert_eq!(sqrt_neg.value.domain(), "\u{2102}"); // ℂ
-    assert!(!sqrt_neg.domain_promotions.is_empty(), "sqrt(-1) should record promotion");
+    assert!(
+        !sqrt_neg.domain_promotions.is_empty(),
+        "sqrt(-1) should record promotion"
+    );
 
     // Feed encodings to consciousness
     let binary_hvs = vec![sqrt_neg.encoding, complex_mul.encoding, promotion.encoding];
@@ -350,7 +406,8 @@ fn test_full_tower_chain_to_consciousness() {
     assert!(
         complex.phi >= natural.phi,
         "Complex domain Φ ({}) should be >= Natural Φ ({})",
-        complex.phi, natural.phi
+        complex.phi,
+        natural.phi
     );
 
     // Feed full tower to consciousness
@@ -361,11 +418,20 @@ fn test_full_tower_chain_to_consciousness() {
     let priorities = vec![0.6, 0.7, 0.8, 0.9, 0.95]; // Increasing priority with domain
     let state = pipeline.process(binary_hvs, &priorities);
 
-    assert!(state.phi > 0.0, "Full tower chain should produce positive Φ");
-    assert!(state.consciousness_level > 0.0, "Full tower should be conscious");
+    assert!(
+        state.phi > 0.0,
+        "Full tower chain should produce positive Φ"
+    );
+    assert!(
+        state.consciousness_level > 0.0,
+        "Full tower should be conscious"
+    );
 
     let assessment = pipeline.assess();
-    assert!(assessment.consciousness_score > 0.0, "Assessment should be positive");
+    assert!(
+        assessment.consciousness_score > 0.0,
+        "Assessment should be positive"
+    );
 }
 
 // =============================================================================
@@ -380,7 +446,9 @@ fn test_mixed_physics_math_consciousness() {
     let sim = PhysicsSimulator::harmonic(1.0, 1.0, 0.0);
     let result = sim.simulate(3.0, 0.01);
 
-    let physics_hvs: Vec<BinaryHV> = result.states.iter()
+    let physics_hvs: Vec<BinaryHV> = result
+        .states
+        .iter()
         .take(3)
         .map(|state| state_to_binary_hv(state))
         .collect();
@@ -388,9 +456,13 @@ fn test_mixed_physics_math_consciousness() {
     // Math: arithmetic results
     let engine = UnifiedMathEngine::new();
     let math_hvs: Vec<BinaryHV> = vec![
-        engine.add(&MathValue::Real(3.14), &MathValue::Real(2.72)).encoding,
+        engine
+            .add(&MathValue::Real(3.14), &MathValue::Real(2.72))
+            .encoding,
         engine.sqrt(&MathValue::Integer(-1)).encoding,
-        engine.multiply(&MathValue::Natural(7), &MathValue::Natural(6)).encoding,
+        engine
+            .multiply(&MathValue::Natural(7), &MathValue::Natural(6))
+            .encoding,
     ];
 
     // Combine physics + math into single consciousness input
@@ -405,8 +477,14 @@ fn test_mixed_physics_math_consciousness() {
     let priorities = vec![0.8, 0.7, 0.9, 0.85, 0.95, 0.75];
     let state = pipeline.process(all_hvs, &priorities);
 
-    assert!(state.phi > 0.0, "Mixed physics+math should produce positive Φ");
-    assert!(state.consciousness_level > 0.0, "Mixed input should be conscious");
+    assert!(
+        state.phi > 0.0,
+        "Mixed physics+math should produce positive Φ"
+    );
+    assert!(
+        state.consciousness_level > 0.0,
+        "Mixed input should be conscious"
+    );
 }
 
 /// Simulate → Analyze → Compute → Consciousness: full pipeline where
@@ -419,16 +497,13 @@ fn test_analysis_to_math_to_consciousness() {
 
     // 2. Analyze trajectory
     let osc = HarmonicOscillator::simple(2.0);
-    let analysis = SimulationAnalysis::from_result(&result)
-        .with_harmonic_energy(&osc, &result);
+    let analysis = SimulationAnalysis::from_result(&result).with_harmonic_energy(&osc, &result);
 
     // 3. Use analysis values as math inputs
     let engine = UnifiedMathEngine::new();
 
-    let total_time_result = engine.add(
-        &MathValue::Real(analysis.total_time),
-        &MathValue::Real(0.0),
-    );
+    let total_time_result =
+        engine.add(&MathValue::Real(analysis.total_time), &MathValue::Real(0.0));
 
     let steps_result = engine.multiply(
         &MathValue::Natural(analysis.num_steps as u64),
@@ -453,7 +528,10 @@ fn test_analysis_to_math_to_consciousness() {
     let priorities = vec![0.7, 0.6, 0.9]; // Energy drift gets highest priority
     let state = pipeline.process(binary_hvs, &priorities);
 
-    assert!(state.phi >= 0.0, "Analysis→math→consciousness should produce valid Φ");
+    assert!(
+        state.phi >= 0.0,
+        "Analysis→math→consciousness should produce valid Φ"
+    );
 }
 
 // =============================================================================
@@ -512,9 +590,13 @@ fn test_combined_phi_exceeds_individual() {
 
     let engine = UnifiedMathEngine::new();
     let math_hvs: Vec<BinaryHV> = vec![
-        engine.add(&MathValue::Real(1.0), &MathValue::Real(2.0)).encoding,
+        engine
+            .add(&MathValue::Real(1.0), &MathValue::Real(2.0))
+            .encoding,
         engine.sqrt(&MathValue::Integer(-1)).encoding,
-        engine.multiply(&MathValue::Natural(7), &MathValue::Natural(8)).encoding,
+        engine
+            .multiply(&MathValue::Natural(7), &MathValue::Natural(8))
+            .encoding,
     ];
 
     // Physics only

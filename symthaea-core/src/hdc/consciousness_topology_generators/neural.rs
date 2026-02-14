@@ -3,8 +3,8 @@
 //! CorticalColumn, Feedforward, Recurrent, Bipartite, CorePeriphery,
 //! BowTie, Attention, Residual, PetersenGraph, CompleteBipartite.
 
-use super::types::{ConsciousnessTopology, TopologyType};
 use super::super::unified_hv::ContinuousHV;
+use super::types::{ConsciousnessTopology, TopologyType};
 
 impl ConsciousnessTopology {
     // ==========================================================================
@@ -24,9 +24,8 @@ impl ConsciousnessTopology {
         let n_layers = 6;
         let n_nodes = neurons_per_layer * n_layers;
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut edges = Vec::new();
 
@@ -111,9 +110,8 @@ impl ConsciousnessTopology {
     pub fn feedforward(layers: &[usize], dim: usize, _seed: u64) -> Self {
         let n_nodes: usize = layers.iter().sum();
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut edges = Vec::new();
         let mut offset = 0;
@@ -171,9 +169,8 @@ impl ConsciousnessTopology {
     pub fn recurrent(layers: &[usize], dim: usize, _seed: u64) -> Self {
         let n_nodes: usize = layers.iter().sum();
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut edges = Vec::new();
         let mut offset = 0;
@@ -241,12 +238,17 @@ impl ConsciousnessTopology {
     ///
     /// Models sensory processing (inputs → outputs with no lateral connections).
     /// Like retina → V1 or encoder → decoder.
-    pub fn bipartite(n_left: usize, n_right: usize, connection_prob: f64, dim: usize, seed: u64) -> Self {
+    pub fn bipartite(
+        n_left: usize,
+        n_right: usize,
+        connection_prob: f64,
+        dim: usize,
+        seed: u64,
+    ) -> Self {
         let n_nodes = n_left + n_right;
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut edges = Vec::new();
 
@@ -297,9 +299,8 @@ impl ConsciousnessTopology {
     pub fn core_periphery(core_size: usize, periphery_size: usize, dim: usize, _seed: u64) -> Self {
         let n_nodes = core_size + periphery_size;
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut edges = Vec::new();
 
@@ -364,9 +365,8 @@ impl ConsciousnessTopology {
     pub fn bow_tie(n_in: usize, n_core: usize, n_out: usize, dim: usize, _seed: u64) -> Self {
         let n_nodes = n_in + n_core + n_out;
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut edges = Vec::new();
 
@@ -425,12 +425,17 @@ impl ConsciousnessTopology {
     ///
     /// Models transformer attention: queries attend to keys, which gate values.
     /// Three-layer structure with all-to-all attention weights.
-    pub fn attention(n_queries: usize, n_keys: usize, n_values: usize, dim: usize, _seed: u64) -> Self {
+    pub fn attention(
+        n_queries: usize,
+        n_keys: usize,
+        n_values: usize,
+        dim: usize,
+        _seed: u64,
+    ) -> Self {
         let n_nodes = n_queries + n_keys + n_values;
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut edges = Vec::new();
 
@@ -493,9 +498,8 @@ impl ConsciousnessTopology {
     pub fn residual(layers: &[usize], dim: usize, _seed: u64) -> Self {
         let n_nodes: usize = layers.iter().sum();
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut edges = Vec::new();
         let mut offsets: Vec<usize> = vec![0];
@@ -574,9 +578,8 @@ impl ConsciousnessTopology {
     pub fn petersen_graph(dim: usize, _seed: u64) -> Self {
         let n_nodes = 10;
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         // Petersen graph edges (fixed structure)
         // Outer pentagon: 0-1-2-3-4-0
@@ -584,11 +587,23 @@ impl ConsciousnessTopology {
         // Spokes: 0-5, 1-6, 2-7, 3-8, 4-9
         let edges = vec![
             // Outer pentagon
-            (0, 1), (1, 2), (2, 3), (3, 4), (4, 0),
+            (0, 1),
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (4, 0),
             // Inner pentagram
-            (5, 7), (7, 9), (9, 6), (6, 8), (8, 5),
+            (5, 7),
+            (7, 9),
+            (9, 6),
+            (6, 8),
+            (8, 5),
             // Spokes
-            (0, 5), (1, 6), (2, 7), (3, 8), (4, 9),
+            (0, 5),
+            (1, 6),
+            (2, 7),
+            (3, 8),
+            (4, 9),
         ];
 
         let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
@@ -624,9 +639,8 @@ impl ConsciousnessTopology {
     pub fn complete_bipartite(n: usize, m: usize, dim: usize, _seed: u64) -> Self {
         let n_nodes = n + m;
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut edges = Vec::new();
 

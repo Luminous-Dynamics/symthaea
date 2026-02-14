@@ -43,10 +43,11 @@ impl AdaptiveQuantizer {
     /// Create a uniform quantizer with `n_levels` equally-spaced bins in [0, 1].
     pub fn uniform(n_levels: usize) -> Self {
         assert!(n_levels >= 2, "need at least 2 levels");
-        let boundaries: Vec<f32> = (1..n_levels)
-            .map(|i| i as f32 / n_levels as f32)
-            .collect();
-        Self { boundaries, n_levels }
+        let boundaries: Vec<f32> = (1..n_levels).map(|i| i as f32 / n_levels as f32).collect();
+        Self {
+            boundaries,
+            n_levels,
+        }
     }
 
     /// Learn quantization boundaries from data so each bin has roughly equal
@@ -69,7 +70,10 @@ impl AdaptiveQuantizer {
             })
             .collect();
 
-        Self { boundaries, n_levels }
+        Self {
+            boundaries,
+            n_levels,
+        }
     }
 
     /// Quantize a value to a level index in [0, n_levels).
@@ -100,7 +104,11 @@ impl AdaptiveQuantizer {
         let level = self.quantize(value);
 
         // Compute bin center and width for interpolation
-        let lo = if level == 0 { 0.0 } else { self.boundaries[level - 1] };
+        let lo = if level == 0 {
+            0.0
+        } else {
+            self.boundaries[level - 1]
+        };
         let hi = if level >= self.n_levels - 1 {
             1.0
         } else {
@@ -175,7 +183,11 @@ impl LearnableLevelEncoder {
     pub fn new(config: LearnableLevelConfig) -> Self {
         let levels = Self::init_interpolated_levels(config.dim, config.n_levels, 42, 43);
         let quantizer = AdaptiveQuantizer::uniform(config.n_levels);
-        Self { levels, quantizer, config }
+        Self {
+            levels,
+            quantizer,
+            config,
+        }
     }
 
     /// Create with adaptive quantization learned from training data.
@@ -185,7 +197,11 @@ impl LearnableLevelEncoder {
     ) -> Self {
         let levels = Self::init_interpolated_levels(config.dim, config.n_levels, 42, 43);
         let quantizer = AdaptiveQuantizer::from_data(training_values, config.n_levels);
-        Self { levels, quantizer, config }
+        Self {
+            levels,
+            quantizer,
+            config,
+        }
     }
 
     /// Initialize level HVs via smooth interpolation between two random endpoints.
@@ -250,12 +266,7 @@ impl LearnableLevelEncoder {
     /// - `value`: the input value that was misclassified
     /// - `correct_proto`: the prototype HV of the correct class
     /// - `wrong_proto`: the prototype HV of the predicted (wrong) class
-    pub fn refine(
-        &mut self,
-        value: f32,
-        correct_proto: &ContinuousHV,
-        wrong_proto: &ContinuousHV,
-    ) {
+    pub fn refine(&mut self, value: f32, correct_proto: &ContinuousHV, wrong_proto: &ContinuousHV) {
         let idx = self.quantizer.quantize(value);
         let lr = self.config.learning_rate;
 
@@ -353,7 +364,11 @@ impl WeightedFeatureEncoder {
 
     /// Encode a feature vector into a single hypervector.
     pub fn encode(&self, features: &[f32]) -> ContinuousHV {
-        assert_eq!(features.len(), self.n_features, "feature dimension mismatch");
+        assert_eq!(
+            features.len(),
+            self.n_features,
+            "feature dimension mismatch"
+        );
 
         let dim = self.level_encoder.dim();
         let mut accumulator = vec![0.0f32; dim];
@@ -474,7 +489,12 @@ pub struct SpatialContextEncoder {
 impl SpatialContextEncoder {
     /// Create a new spatial encoder for a `width x height` grid.
     pub fn new(width: usize, height: usize, radius: usize, decay: f32) -> Self {
-        Self { width, height, radius, decay }
+        Self {
+            width,
+            height,
+            radius,
+            decay,
+        }
     }
 
     /// Create a spatial encoder for MNIST (28x28, radius=1, decay=0.5).
@@ -509,11 +529,7 @@ impl SpatialContextEncoder {
                         }
                         let nx = x as i32 + dx;
                         let ny = y as i32 + dy;
-                        if nx >= 0
-                            && nx < self.width as i32
-                            && ny >= 0
-                            && ny < self.height as i32
-                        {
+                        if nx >= 0 && nx < self.width as i32 && ny >= 0 && ny < self.height as i32 {
                             let nidx = ny as usize * self.width + nx as usize;
                             let dist = ((dx * dx + dy * dy) as f32).sqrt();
                             let w = self.decay.powf(dist);
@@ -673,11 +689,7 @@ impl LearnedHdcClassifier {
     /// Run multiple retraining iterations until convergence or max iterations.
     ///
     /// Returns final accuracy.
-    pub fn retrain(
-        &mut self,
-        samples: &[(Vec<f32>, usize)],
-        max_iterations: usize,
-    ) -> f32 {
+    pub fn retrain(&mut self, samples: &[(Vec<f32>, usize)], max_iterations: usize) -> f32 {
         let mut best_acc = 0.0f32;
 
         for _iter in 0..max_iterations {
@@ -749,7 +761,7 @@ mod tests {
     fn test_soft_quantize_interpolation() {
         let q = AdaptiveQuantizer::uniform(4);
         let (lo, hi, alpha) = q.soft_quantize(0.26); // Just above boundary 0.25
-        // Should be near the boundary between bins 0 and 1
+                                                     // Should be near the boundary between bins 0 and 1
         assert!(lo <= 1 && hi <= 1);
         assert!((0.0..=1.0).contains(&alpha));
     }

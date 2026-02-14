@@ -88,8 +88,7 @@ pub struct AttentionState {
 }
 
 /// Attention modes (how attention is deployed)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum AttentionMode {
     /// Focused (narrow, deep attention on single target)
     Focused,
@@ -113,7 +112,6 @@ pub enum AttentionMode {
     /// Inhibited (actively suppressing attention to a target)
     Inhibited,
 }
-
 
 /// Attention channel (where attention can be deployed)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -336,8 +334,8 @@ impl Default for AttentionCapabilities {
             can_divide: true,
             can_inhibit: true,
             can_enhance: true,
-            switching_cost_ms: 150.0,  // ~150ms attention shift
-            capacity_items: 4,         // Miller's 4±1 for attention
+            switching_cost_ms: 150.0, // ~150ms attention shift
+            capacity_items: 4,        // Miller's 4±1 for attention
         }
     }
 }
@@ -716,8 +714,8 @@ impl AttentionSchema {
         self.attention_prediction.clear();
 
         // Predict next state based on current dynamics
-        let predicted_intensity = (self.current_state.intensity - self.config.decay_rate)
-            .max(self.config.min_intensity);
+        let predicted_intensity =
+            (self.current_state.intensity - self.config.decay_rate).max(self.config.min_intensity);
 
         let predicted_mode = if predicted_intensity < 0.3 {
             AttentionMode::Diffuse
@@ -754,14 +752,15 @@ impl AttentionSchema {
         let sc = &self.self_model.subjective_character;
 
         // Combine presence, controllability, and intensity
-        let base_signal = sc.presence * 0.3 + sc.controllability * 0.3 + self.current_state.intensity * 0.4;
+        let base_signal =
+            sc.presence * 0.3 + sc.controllability * 0.3 + self.current_state.intensity * 0.4;
 
         // Boost for focused mode
         let mode_modifier = match self.current_state.mode {
             AttentionMode::Focused => 1.2,
             AttentionMode::Vigilant => 1.1,
             AttentionMode::Diffuse => 0.7,
-            AttentionMode::Reflexive => 0.5,  // Reflexive = less control
+            AttentionMode::Reflexive => 0.5, // Reflexive = less control
             _ => 1.0,
         };
 
@@ -805,12 +804,17 @@ impl AttentionSchema {
 
     /// Describe how attention is being deployed
     fn describe_mode(&self) -> String {
-        let channels: Vec<String> = self.current_state.active_channels
+        let channels: Vec<String> = self
+            .current_state
+            .active_channels
             .iter()
             .map(|c| format!("{:?}", c))
             .collect();
 
-        format!("Mode: {:?}, Channels: {:?}", self.current_state.mode, channels)
+        format!(
+            "Mode: {:?}, Channels: {:?}",
+            self.current_state.mode, channels
+        )
     }
 
     /// Describe reason for attention allocation
@@ -830,9 +834,12 @@ impl AttentionSchema {
 
         // Channels not active
         let all_channels = [
-            AttentionChannel::Visual, AttentionChannel::Auditory,
-            AttentionChannel::Motor, AttentionChannel::Memory,
-            AttentionChannel::Social, AttentionChannel::Interoceptive,
+            AttentionChannel::Visual,
+            AttentionChannel::Auditory,
+            AttentionChannel::Motor,
+            AttentionChannel::Memory,
+            AttentionChannel::Social,
+            AttentionChannel::Interoceptive,
         ];
 
         for channel in all_channels.iter() {
@@ -851,9 +858,11 @@ impl AttentionSchema {
 
     /// Describe predicted future states
     fn describe_predictions(&self) -> Vec<String> {
-        self.attention_prediction.iter().take(3).map(|s| {
-            format!("Intensity: {:.2}, Mode: {:?}", s.intensity, s.mode)
-        }).collect()
+        self.attention_prediction
+            .iter()
+            .take(3)
+            .map(|s| format!("Intensity: {:.2}, Mode: {:?}", s.intensity, s.mode))
+            .collect()
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -895,8 +904,11 @@ impl AttentionSchema {
     pub fn divide_attention(&mut self, targets: Vec<BinaryHV>) -> Result<Vec<f32>> {
         let n = targets.len();
         if n > self.self_model.capabilities.capacity_items {
-            anyhow::bail!("Exceeds attention capacity ({} > {})",
-                n, self.self_model.capabilities.capacity_items);
+            anyhow::bail!(
+                "Exceeds attention capacity ({} > {})",
+                n,
+                self.self_model.capabilities.capacity_items
+            );
         }
 
         // Divide resources

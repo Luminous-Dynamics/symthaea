@@ -21,19 +21,17 @@
 //! 3. **CompositionGrammar** - Learns which compositions tend to increase Φ
 //! 4. **EmergentDiscovery** - Discovers novel compositions that maximize Φ
 
+use crate::consciousness::compositionality_primitives::{
+    ComposedPrimitive, CompositionMetadata, CompositionType, CompositionalityConfig,
+    CompositionalityEngine,
+};
+use crate::consciousness::consciousness_driven_evolution::{ConsciousnessOracle, OracleConfig};
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
-use crate::consciousness::compositionality_primitives::{
-    CompositionalityEngine, CompositionalityConfig, ComposedPrimitive,
-    CompositionType, CompositionMetadata,
-};
-use crate::consciousness::consciousness_driven_evolution::{
-    ConsciousnessOracle, OracleConfig,
-};
 use anyhow::Result;
-use std::collections::{HashMap, VecDeque, BinaryHeap};
-use std::sync::Arc;
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap, VecDeque};
+use std::sync::Arc;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CORE DATA STRUCTURES
@@ -75,7 +73,9 @@ impl Ord for CompositionCandidate {
         // Higher Φ is better, weighted by confidence
         let self_score = self.phi_score * self.confidence;
         let other_score = other.phi_score * other.confidence;
-        self_score.partial_cmp(&other_score).unwrap_or(Ordering::Equal)
+        self_score
+            .partial_cmp(&other_score)
+            .unwrap_or(Ordering::Equal)
     }
 }
 
@@ -155,15 +155,9 @@ pub struct PhiGuidedSearch {
 
 impl PhiGuidedSearch {
     /// Create a new Φ-guided search system
-    pub fn new(
-        base_system: Arc<PrimitiveSystem>,
-        config: DiscoveryConfig,
-    ) -> Self {
+    pub fn new(base_system: Arc<PrimitiveSystem>, config: DiscoveryConfig) -> Self {
         let oracle = ConsciousnessOracle::new(OracleConfig::default());
-        let engine = CompositionalityEngine::new(
-            base_system,
-            CompositionalityConfig::default(),
-        );
+        let engine = CompositionalityEngine::new(base_system, CompositionalityConfig::default());
 
         Self {
             oracle,
@@ -204,7 +198,8 @@ impl PhiGuidedSearch {
         // Update beam
         for candidate in &good_candidates {
             self.beam.push(candidate.clone());
-            self.discovered.insert(candidate.composition.id.clone(), candidate.clone());
+            self.discovered
+                .insert(candidate.composition.id.clone(), candidate.clone());
 
             // Track best
             if candidate.phi_score > self.stats.best_phi {
@@ -235,7 +230,9 @@ impl PhiGuidedSearch {
         let base_ids = self.get_base_primitive_ids();
 
         // Get existing good compositions
-        let good_compositions: Vec<_> = self.beam.iter()
+        let good_compositions: Vec<_> = self
+            .beam
+            .iter()
             .take(10)
             .map(|c| c.composition.id.clone())
             .collect();
@@ -253,11 +250,9 @@ impl PhiGuidedSearch {
 
                     if a_idx != b_idx {
                         let comp_type = self.random_composition_type();
-                        if let Ok(composed) = self.create_composition(
-                            &base_ids[a_idx],
-                            &base_ids[b_idx],
-                            comp_type,
-                        ) {
+                        if let Ok(composed) =
+                            self.create_composition(&base_ids[a_idx], &base_ids[b_idx], comp_type)
+                        {
                             candidates.push(composed);
                             generated += 1;
                         }
@@ -270,7 +265,8 @@ impl PhiGuidedSearch {
 
                 let comp_type = if self.config.learn_grammar {
                     // Use grammar to suggest likely-good composition type
-                    self.grammar.suggest_composition_type(&good_compositions[comp_idx])
+                    self.grammar
+                        .suggest_composition_type(&good_compositions[comp_idx])
                 } else {
                     self.random_composition_type()
                 };
@@ -294,7 +290,10 @@ impl PhiGuidedSearch {
     }
 
     /// Evaluate a candidate composition using real Φ measurement
-    fn evaluate_candidate(&mut self, composition: ComposedPrimitive) -> Result<CompositionCandidate> {
+    fn evaluate_candidate(
+        &mut self,
+        composition: ComposedPrimitive,
+    ) -> Result<CompositionCandidate> {
         // Create input from composition encoding
         let input = &composition.encoding;
 
@@ -319,15 +318,13 @@ impl PhiGuidedSearch {
         comp_type: CompositionType,
     ) -> Result<ComposedPrimitive> {
         match comp_type {
-            CompositionType::Sequential => {
-                self.engine.compose_sequential(a_id, b_id)
-            }
-            CompositionType::Parallel => {
-                self.engine.compose_parallel(a_id, b_id)
-            }
-            CompositionType::Fallback { confidence_threshold } => {
-                self.engine.compose_fallback(a_id, b_id, confidence_threshold as f32 / 1000.0)
-            }
+            CompositionType::Sequential => self.engine.compose_sequential(a_id, b_id),
+            CompositionType::Parallel => self.engine.compose_parallel(a_id, b_id),
+            CompositionType::Fallback {
+                confidence_threshold,
+            } => self
+                .engine
+                .compose_fallback(a_id, b_id, confidence_threshold as f32 / 1000.0),
             _ => {
                 // Default to sequential for other types
                 self.engine.compose_sequential(a_id, b_id)
@@ -367,7 +364,9 @@ impl PhiGuidedSearch {
         let types = [
             CompositionType::Sequential,
             CompositionType::Parallel,
-            CompositionType::Fallback { confidence_threshold: 500 },
+            CompositionType::Fallback {
+                confidence_threshold: 500,
+            },
         ];
         let idx = self.random_index(types.len());
         types[idx].clone()
@@ -376,7 +375,11 @@ impl PhiGuidedSearch {
     /// Get current best compositions
     pub fn best_compositions(&self, n: usize) -> Vec<&CompositionCandidate> {
         let mut sorted: Vec<_> = self.discovered.values().collect();
-        sorted.sort_by(|a, b| b.phi_score.partial_cmp(&a.phi_score).unwrap_or(Ordering::Equal));
+        sorted.sort_by(|a, b| {
+            b.phi_score
+                .partial_cmp(&a.phi_score)
+                .unwrap_or(Ordering::Equal)
+        });
         sorted.into_iter().take(n).collect()
     }
 
@@ -425,7 +428,10 @@ impl CompositionGrammar {
         *self.successful_patterns.entry(key).or_insert(0) += 1;
 
         // Update type preferences
-        let prefs = self.type_preferences.entry(prefix).or_insert_with(HashMap::new);
+        let prefs = self
+            .type_preferences
+            .entry(prefix)
+            .or_insert_with(HashMap::new);
         let count = *prefs.get(&comp_type).unwrap_or(&0.0);
         prefs.insert(comp_type, count + 1.0);
     }
@@ -436,7 +442,8 @@ impl CompositionGrammar {
 
         if let Some(prefs) = self.type_preferences.get(&prefix) {
             // Find the most successful type for this prefix
-            let best = prefs.iter()
+            let best = prefs
+                .iter()
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal));
 
             if let Some((type_str, _)) = best {
@@ -471,10 +478,18 @@ impl CompositionGrammar {
         match s {
             "seq" => CompositionType::Sequential,
             "par" => CompositionType::Parallel,
-            "cond" => CompositionType::Conditional { pattern: String::new(), threshold: 500 },
-            "fix" => CompositionType::FixedPoint { max_iterations: 100, convergence_threshold: 990 },
+            "cond" => CompositionType::Conditional {
+                pattern: String::new(),
+                threshold: 500,
+            },
+            "fix" => CompositionType::FixedPoint {
+                max_iterations: 100,
+                convergence_threshold: 990,
+            },
             "ho" => CompositionType::HigherOrder,
-            "fall" => CompositionType::Fallback { confidence_threshold: 500 },
+            "fall" => CompositionType::Fallback {
+                confidence_threshold: 500,
+            },
             _ => CompositionType::Sequential,
         }
     }
@@ -484,7 +499,8 @@ impl CompositionGrammar {
         let mut rules = Vec::new();
 
         for ((prefix, comp_type), count) in &self.successful_patterns {
-            if *count >= 3 { // Only show rules with sufficient evidence
+            if *count >= 3 {
+                // Only show rules with sufficient evidence
                 rules.push(format!(
                     "{} + {} = success (observed {} times)",
                     prefix, comp_type, count
@@ -517,10 +533,7 @@ pub struct EmergentDiscovery {
 
 impl EmergentDiscovery {
     /// Create a new emergent discovery system
-    pub fn new(
-        base_system: Arc<PrimitiveSystem>,
-        config: DiscoveryConfig,
-    ) -> Self {
+    pub fn new(base_system: Arc<PrimitiveSystem>, config: DiscoveryConfig) -> Self {
         Self {
             search: PhiGuidedSearch::new(base_system, config),
             phi_history: VecDeque::new(),
@@ -776,7 +789,11 @@ impl PhiGradientOptimizer {
     }
 
     /// Evaluate Φ for a composition with given parameters
-    fn evaluate_phi(&mut self, composition: &ComposedPrimitive, params: &CompositionParameters) -> f64 {
+    fn evaluate_phi(
+        &mut self,
+        composition: &ComposedPrimitive,
+        params: &CompositionParameters,
+    ) -> f64 {
         // Use the composition encoding modulated by parameters
         let mut samples = Vec::new();
 
@@ -856,13 +873,18 @@ impl PhiOptimizedDiscovery {
     }
 
     /// Discover and optimize compositions
-    pub fn discover_and_optimize(&mut self, cycles: usize) -> Result<Vec<(CompositionCandidate, f64)>> {
+    pub fn discover_and_optimize(
+        &mut self,
+        cycles: usize,
+    ) -> Result<Vec<(CompositionCandidate, f64)>> {
         // First, discover compositions
         let candidates = self.discovery.discover_cycles(cycles)?;
 
         // Then optimize the top candidates
         let mut results = Vec::new();
-        let top_candidates: Vec<_> = self.discovery.best_discoveries(10)
+        let top_candidates: Vec<_> = self
+            .discovery
+            .best_discoveries(10)
             .into_iter()
             .cloned()
             .collect();
@@ -871,7 +893,10 @@ impl PhiOptimizedDiscovery {
             self.optimizer.clear_history();
 
             let initial_params = CompositionParameters::default();
-            match self.optimizer.optimize(&candidate.composition, initial_params) {
+            match self
+                .optimizer
+                .optimize(&candidate.composition, initial_params)
+            {
                 Ok((optimized_params, optimized_phi)) => {
                     self.optimized.insert(
                         candidate.composition.id.clone(),
@@ -914,8 +939,8 @@ impl PhiOptimizedDiscovery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::BinaryHV;
     use crate::consciousness::compositionality_primitives::CompositionMetadata;
+    use crate::hdc::BinaryHV;
 
     fn create_test_system() -> Arc<PrimitiveSystem> {
         Arc::new(PrimitiveSystem::new())

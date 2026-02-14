@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
+use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
 
 /// Prime factorization of a number with HDC encoding
 #[derive(Debug, Clone)]
@@ -24,10 +24,22 @@ impl NumberTheoryEngine {
     pub fn new() -> Self {
         let prims = PrimitiveSystem::global();
         Self {
-            multiplication: prims.get("MULTIPLICATION").expect("MULTIPLICATION primitive must exist").encoding,
-            addition: prims.get("ADDITION").expect("ADDITION primitive must exist").encoding,
-            zero: prims.get("ZERO").expect("ZERO primitive must exist").encoding,
-            successor: prims.get("SUCCESSOR").expect("SUCCESSOR primitive must exist").encoding,
+            multiplication: prims
+                .get("MULTIPLICATION")
+                .expect("MULTIPLICATION primitive must exist")
+                .encoding,
+            addition: prims
+                .get("ADDITION")
+                .expect("ADDITION primitive must exist")
+                .encoding,
+            zero: prims
+                .get("ZERO")
+                .expect("ZERO primitive must exist")
+                .encoding,
+            successor: prims
+                .get("SUCCESSOR")
+                .expect("SUCCESSOR primitive must exist")
+                .encoding,
         }
     }
 

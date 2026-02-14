@@ -24,16 +24,16 @@ of the amplitude distribution from a uniform distribution.
 4. Calculate deviation from uniform distribution.
 */
 
-use std::f64::consts::PI;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use std::f64::consts::PI;
 
 /// Tracks signals for Phase-Amplitude Coupling computation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PacTracker {
     /// Name of the low-frequency driver (e.g., "Workspace")
     pub low_freq_name: String,
-    
+
     /// Name of the high-frequency responder (e.g., "Binding")
     pub high_freq_name: String,
 
@@ -74,7 +74,7 @@ impl PacTracker {
 
         // Normalize phase to [0, 2π]
         let normalized_phase = low_freq_phase.rem_euclid(2.0 * PI);
-        
+
         self.phase_history.push_back(normalized_phase);
         self.amplitude_history.push_back(high_freq_amp);
     }
@@ -97,7 +97,7 @@ impl PacTracker {
         for (phase, amp) in self.phase_history.iter().zip(self.amplitude_history.iter()) {
             let bin_idx = (phase / bin_width).floor() as usize;
             let idx = bin_idx.clamp(0, self.num_bins - 1);
-            
+
             bins[idx] += amp;
             counts[idx] += 1;
         }
@@ -116,8 +116,10 @@ impl PacTracker {
         }
 
         // 3. Convert to probability distribution (P)
-        if total_amp < 1e-9 { return 0.0; } 
-        
+        if total_amp < 1e-9 {
+            return 0.0;
+        }
+
         let p: Vec<f64> = mean_amplitudes.iter().map(|&a| a / total_amp).collect();
 
         // 4. Compute Shannon Entropy (H)
@@ -132,7 +134,7 @@ impl PacTracker {
         // MI = (H_max - H) / H_max
         // H_max = ln(N) (Uniform distribution)
         let h_max = (self.num_bins as f64).ln();
-        
+
         ((h_max - h) / h_max).clamp(0.0, 1.0)
     }
 }

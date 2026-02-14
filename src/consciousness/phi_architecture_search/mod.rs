@@ -47,18 +47,17 @@
 //! println!("Best architecture: {:?}", result.best_architecture);
 //! ```
 
+mod engine;
 mod genome;
 mod phenotype;
 mod phi_gradient;
-mod engine;
 
 #[cfg(test)]
 mod tests;
 
-pub use genome::{ArchitectureGenome, TopologyGene, BundlingGene};
-pub use phenotype::{DecodedArchitecture, ArchitectureStats};
-pub use phi_gradient::{PhiGradient, GradientVelocity};
 pub use engine::{
-    PhiArchitectureSearch, SearchConfig, SearchStrategy, SearchResult,
-    Individual, SearchStats,
+    Individual, PhiArchitectureSearch, SearchConfig, SearchResult, SearchStats, SearchStrategy,
 };
+pub use genome::{ArchitectureGenome, BundlingGene, TopologyGene};
+pub use phenotype::{ArchitectureStats, DecodedArchitecture};
+pub use phi_gradient::{GradientVelocity, PhiGradient};

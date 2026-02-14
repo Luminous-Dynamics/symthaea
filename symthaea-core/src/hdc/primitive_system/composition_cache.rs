@@ -1,5 +1,5 @@
+use super::{PrimitiveError, PrimitiveResult, PrimitiveSystem};
 use std::collections::HashMap;
-use super::{PrimitiveSystem, PrimitiveResult, PrimitiveError};
 
 /// Cache for memoizing primitive composition operations.
 ///
@@ -170,7 +170,8 @@ impl CompositionCache {
         if self.cache.contains_key(key) {
             self.hits += 1;
             self.access_counter += 1;
-            self.access_order.insert(key.to_string(), self.access_counter);
+            self.access_order
+                .insert(key.to_string(), self.access_counter);
             self.cache.get(key)
         } else {
             self.misses += 1;

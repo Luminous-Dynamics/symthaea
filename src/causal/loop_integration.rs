@@ -33,12 +33,10 @@
 //! let attention_weights = enhancer.causal_attention_weights(feature_idx);
 //! ```
 
+use crate::intelligence::{CausalAttention, CausalDirection, CausalDiscoveryEngine};
 use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::HDC_DIMENSION;
-use crate::intelligence::{
-    CausalDiscoveryEngine, CausalDirection, CausalAttention,
-};
 
 /// Configuration for the causal loop enhancer
 #[derive(Debug, Clone)]
@@ -130,19 +128,25 @@ impl CausalGraph {
 
     /// Get the strongest cause of a variable
     pub fn strongest_cause(&self, var: usize) -> Option<(usize, f64)> {
-        self.parents.get(&var)
+        self.parents
+            .get(&var)
             .and_then(|parents| parents.first().cloned())
     }
 
     /// Get the strongest effect of a variable
     pub fn strongest_effect(&self, var: usize) -> Option<(usize, f64)> {
-        self.children.get(&var)
+        self.children
+            .get(&var)
             .and_then(|children| children.first().cloned())
     }
 
     /// Convert to human-readable format
     pub fn summarize(&self) -> String {
-        let mut summary = format!("CausalGraph: {} vars, {} edges\n", self.n_vars, self.edges.len());
+        let mut summary = format!(
+            "CausalGraph: {} vars, {} edges\n",
+            self.n_vars,
+            self.edges.len()
+        );
         for edge in &self.edges {
             let dir_str = match edge.direction {
                 CausalDirection::Forward => "->",
@@ -237,9 +241,8 @@ impl CausalLoopEnhancer {
 
     /// Create with custom configuration
     pub fn with_config(config: CausalEnhancerConfig) -> Self {
-        let subsample_indices = Self::generate_subsample_indices(
-            HDC_DIMENSION, config.subsample_dims, config.seed
-        );
+        let subsample_indices =
+            Self::generate_subsample_indices(HDC_DIMENSION, config.subsample_dims, config.seed);
 
         Self {
             discovery_engine: CausalDiscoveryEngine::with_ensemble_size(config.seed, 5),
@@ -256,7 +259,7 @@ impl CausalLoopEnhancer {
 
     /// Generate deterministic subsample indices
     fn generate_subsample_indices(total_dim: usize, subsample_dim: usize, seed: u64) -> Vec<usize> {
-        use rand::{SeedableRng, seq::SliceRandom};
+        use rand::{seq::SliceRandom, SeedableRng};
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
         let mut indices: Vec<usize> = (0..total_dim).collect();
         indices.shuffle(&mut rng);
@@ -267,7 +270,8 @@ impl CausalLoopEnhancer {
 
     /// Subsample an HV to the configured number of dimensions
     fn subsample_hv(&self, hv: &ContinuousHV) -> Vec<f64> {
-        self.subsample_indices.iter()
+        self.subsample_indices
+            .iter()
             .map(|&i| hv.values.get(i).copied().unwrap_or(0.0) as f64)
             .collect()
     }
@@ -300,7 +304,8 @@ impl CausalLoopEnhancer {
 
         // Subsample from input/output
         let subsample_from = |src: &[f32], indices: &[usize]| -> Vec<f64> {
-            indices.iter()
+            indices
+                .iter()
                 .map(|&i| src.get(i).copied().unwrap_or(0.0) as f64)
                 .collect()
         };
@@ -320,7 +325,9 @@ impl CausalLoopEnhancer {
     /// Check if it's time to run causal discovery
     pub fn should_discover(&self) -> bool {
         self.history.len() >= self.config.min_pairs_for_discovery
-            && self.current_cycle.is_multiple_of(self.config.discovery_interval)
+            && self
+                .current_cycle
+                .is_multiple_of(self.config.discovery_interval)
     }
 
     /// Detect causal structure from accumulated history
@@ -329,9 +336,13 @@ impl CausalLoopEnhancer {
     /// 1. Extracts variables (each subsampled dimension as a time series)
     /// 2. Runs bivariate causal discovery between input and output dimensions
     /// 3. Builds a causal graph
-    pub fn detect_causal_structure(&mut self, history: &[(ContinuousHV, ContinuousHV)]) -> CausalGraph {
+    pub fn detect_causal_structure(
+        &mut self,
+        history: &[(ContinuousHV, ContinuousHV)],
+    ) -> CausalGraph {
         // Convert to internal format
-        let pairs: Vec<CyclePair> = history.iter()
+        let pairs: Vec<CyclePair> = history
+            .iter()
             .enumerate()
             .map(|(i, (input, output))| CyclePair {
                 input: self.subsample_hv(input),
@@ -391,16 +402,17 @@ impl CausalLoopEnhancer {
                     continue;
                 }
 
-                let (direction, confidence) = self.discovery_engine.predict_with_confidence(
-                    &input_series[i],
-                    &output_series[j],
-                );
+                let (direction, confidence) = self
+                    .discovery_engine
+                    .predict_with_confidence(&input_series[i], &output_series[j]);
 
                 // Only record significant causal relationships
                 if confidence > 0.3 {
                     // Compute strength using correlation as proxy
-                    let strength = self.compute_correlation(&input_series[i], &output_series[j])
-                        .abs().min(1.0);
+                    let strength = self
+                        .compute_correlation(&input_series[i], &output_series[j])
+                        .abs()
+                        .min(1.0);
 
                     if strength > 0.1 {
                         let edge = CausalGraphEdge {
@@ -424,13 +436,25 @@ impl CausalLoopEnhancer {
                         match direction {
                             CausalDirection::Forward => {
                                 // i causes j
-                                parents.entry(j).or_default().push((i, strength * confidence));
-                                children.entry(i).or_default().push((j, strength * confidence));
+                                parents
+                                    .entry(j)
+                                    .or_default()
+                                    .push((i, strength * confidence));
+                                children
+                                    .entry(i)
+                                    .or_default()
+                                    .push((j, strength * confidence));
                             }
                             CausalDirection::Backward => {
                                 // j causes i (reverse)
-                                parents.entry(i).or_default().push((j, strength * confidence));
-                                children.entry(j).or_default().push((i, strength * confidence));
+                                parents
+                                    .entry(i)
+                                    .or_default()
+                                    .push((j, strength * confidence));
+                                children
+                                    .entry(j)
+                                    .or_default()
+                                    .push((i, strength * confidence));
                             }
                         }
 
@@ -445,13 +469,14 @@ impl CausalLoopEnhancer {
             parents_list.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         }
         for children_list in children.values_mut() {
-            children_list.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            children_list
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         }
 
         self.stats.total_edges_discovered += edges.len();
         if !edges.is_empty() {
-            self.stats.avg_confidence = edges.iter().map(|e| e.confidence).sum::<f64>()
-                / edges.len() as f64;
+            self.stats.avg_confidence =
+                edges.iter().map(|e| e.confidence).sum::<f64>() / edges.len() as f64;
         }
 
         CausalGraph {
@@ -480,9 +505,12 @@ impl CausalLoopEnhancer {
             return 0.0;
         }
 
-        let cov: f64 = x.iter().zip(y.iter())
+        let cov: f64 = x
+            .iter()
+            .zip(y.iter())
             .map(|(&xi, &yi)| (xi - mean_x) * (yi - mean_y))
-            .sum::<f64>() / (n - 1) as f64;
+            .sum::<f64>()
+            / (n - 1) as f64;
 
         cov / (var_x.sqrt() * var_y.sqrt())
     }
@@ -502,7 +530,8 @@ impl CausalLoopEnhancer {
             for &(parent_idx, strength) in parents {
                 if parent_idx < n {
                     // Boost proportional to causal strength and config
-                    weights[parent_idx] *= self.config.causal_attention_boost * (1.0 + strength as f32);
+                    weights[parent_idx] *=
+                        self.config.causal_attention_boost * (1.0 + strength as f32);
                 }
             }
         }
@@ -523,9 +552,9 @@ impl CausalLoopEnhancer {
     /// Based on discovered causal structure, suggests which dimension
     /// to intervene on to explore causal effects.
     pub fn suggest_intervention(&mut self) -> Option<(usize, f64)> {
-        use rand::{SeedableRng, Rng};
+        use rand::{Rng, SeedableRng};
         let mut rng = rand::rngs::StdRng::seed_from_u64(
-            self.config.seed.wrapping_add(self.current_cycle as u64)
+            self.config.seed.wrapping_add(self.current_cycle as u64),
         );
 
         // Only intervene with configured probability
@@ -566,8 +595,8 @@ impl CausalLoopEnhancer {
         if let Some(parents) = self.current_graph.parents.get(&target_dim) {
             for &(parent_idx, strength) in parents {
                 if parent_idx < n {
-                    causal_weights[parent_idx] *= self.config.causal_attention_boost
-                        * (1.0 + strength as f32);
+                    causal_weights[parent_idx] *=
+                        self.config.causal_attention_boost * (1.0 + strength as f32);
                 }
             }
         }
@@ -637,7 +666,10 @@ impl CausalLoopEnhancer {
                 to = edge.to,
                 confidence = format!("{:.2}", edge.confidence),
                 strength = format!("{:.2}", edge.strength),
-                "dim{} {} dim{}", edge.from, dir_str, edge.to
+                "dim{} {} dim{}",
+                edge.from,
+                dir_str,
+                edge.to
             );
         }
     }
@@ -646,19 +678,18 @@ impl CausalLoopEnhancer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::{SeedableRng, Rng};
+    use rand::{Rng, SeedableRng};
 
     /// Generate synthetic causal data: X causes Y (utility for future tests)
     #[allow(dead_code)]
     fn generate_causal_data(n_samples: usize, seed: u64) -> (Vec<f64>, Vec<f64>) {
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
 
-        let x: Vec<f64> = (0..n_samples)
-            .map(|_| rng.gen_range(-1.0..1.0))
-            .collect();
+        let x: Vec<f64> = (0..n_samples).map(|_| rng.gen_range(-1.0..1.0)).collect();
 
         // Y = 0.8 * X + noise
-        let y: Vec<f64> = x.iter()
+        let y: Vec<f64> = x
+            .iter()
             .map(|&xi| 0.8 * xi + rng.gen_range(-0.2..0.2))
             .collect();
 
@@ -697,8 +728,10 @@ mod tests {
         let graph = enhancer.run_discovery();
 
         // Verify some structure was discovered
-        assert!(!graph.edges.is_empty(),
-            "Should discover at least one edge with synthetic causal data");
+        assert!(
+            !graph.edges.is_empty(),
+            "Should discover at least one edge with synthetic causal data"
+        );
 
         println!("Discovered graph:\n{}", graph.summarize());
         println!("Stats: {:?}", enhancer.stats());
@@ -711,15 +744,13 @@ mod tests {
         // Manually set up a causal graph for testing
         enhancer.current_graph = CausalGraph {
             n_vars: 64,
-            edges: vec![
-                CausalGraphEdge {
-                    from: 0,
-                    to: 1,
-                    direction: CausalDirection::Forward,
-                    confidence: 0.8,
-                    strength: 0.7,
-                }
-            ],
+            edges: vec![CausalGraphEdge {
+                from: 0,
+                to: 1,
+                direction: CausalDirection::Forward,
+                confidence: 0.8,
+                strength: 0.7,
+            }],
             parents: {
                 let mut p = HashMap::new();
                 p.insert(1, vec![(0, 0.56)]); // 0 is parent of 1
@@ -737,9 +768,12 @@ mod tests {
         let weights = enhancer.causal_attention_weights(1);
 
         // The parent (dim 0) should have higher weight
-        assert!(weights[0] > 1.0 / 64.0,
+        assert!(
+            weights[0] > 1.0 / 64.0,
             "Parent dimension should have boosted weight: {} > {}",
-            weights[0], 1.0 / 64.0);
+            weights[0],
+            1.0 / 64.0
+        );
     }
 
     #[test]
@@ -751,15 +785,13 @@ mod tests {
         // Set up causal structure
         enhancer_with_causal.current_graph = CausalGraph {
             n_vars: 64,
-            edges: vec![
-                CausalGraphEdge {
-                    from: 5,
-                    to: 10,
-                    direction: CausalDirection::Forward,
-                    confidence: 0.9,
-                    strength: 0.8,
-                }
-            ],
+            edges: vec![CausalGraphEdge {
+                from: 5,
+                to: 10,
+                direction: CausalDirection::Forward,
+                confidence: 0.9,
+                strength: 0.8,
+            }],
             parents: {
                 let mut p = HashMap::new();
                 p.insert(10, vec![(5, 0.72)]);
@@ -778,9 +810,12 @@ mod tests {
         let weights_without = enhancer_without_causal.causal_attention_weights(10);
 
         // With causal knowledge, the parent (dim 5) should be weighted higher
-        assert!(weights_with[5] > weights_without[5],
+        assert!(
+            weights_with[5] > weights_without[5],
             "Causal parent should get more attention: {} > {}",
-            weights_with[5], weights_without[5]);
+            weights_with[5],
+            weights_without[5]
+        );
 
         // The attention should be normalized (sum to 1)
         let sum_with: f32 = weights_with.iter().sum();
@@ -825,7 +860,10 @@ mod tests {
         enhancer.config.exploration_probability = 1.0;
 
         let suggestion = enhancer.suggest_intervention();
-        assert!(suggestion.is_some(), "Should suggest intervention when structure exists");
+        assert!(
+            suggestion.is_some(),
+            "Should suggest intervention when structure exists"
+        );
 
         if let Some((var, value)) = suggestion {
             assert_eq!(var, 0, "Should suggest intervening on most influential var");

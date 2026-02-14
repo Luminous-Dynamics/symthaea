@@ -28,13 +28,13 @@
 //!
 //! This is biologically inspired by predictive coding in the cortex.
 
-use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 use crate::hdc::text_encoder::{TextEncoder, TextEncoderConfig};
+use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::HDC_DIMENSION;
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use serde::{Serialize, Deserialize};
 
 /// Configuration for the predictive encoder
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,7 +151,8 @@ impl PredictiveHdcEncoder {
         let text_encoder = TextEncoder::new(TextEncoderConfig {
             dimension: config.dimension,
             ..Default::default()
-        }).expect("Failed to create text encoder for predictive encoder");
+        })
+        .expect("Failed to create text encoder for predictive encoder");
 
         // Initialize attention weights for all primitives
         let mut attention_weights = HashMap::new();
@@ -192,11 +193,15 @@ impl PredictiveHdcEncoder {
         self.stats.total_cycles += 1;
 
         // 1. Get base encoding via text encoder (uses primitives internally)
-        let base_encoding = match self.text_encoder.encode_with_primitives(input, self.primitive_system) {
+        let base_encoding = match self
+            .text_encoder
+            .encode_with_primitives(input, self.primitive_system)
+        {
             Ok(enc) => enc,
             Err(_) => {
                 // Fallback to sentence encoding if primitive encoding fails
-                self.text_encoder.encode_sentence(input)
+                self.text_encoder
+                    .encode_sentence(input)
                     .unwrap_or_else(|_| vec![0i8; self.config.dimension])
             }
         };
@@ -260,9 +265,7 @@ impl PredictiveHdcEncoder {
 
     /// Convert bipolar encoding to ContinuousHV
     fn bipolar_to_real(&self, bipolar: &[i8]) -> ContinuousHV {
-        let values: Vec<f32> = bipolar.iter()
-            .map(|&b| b as f32)
-            .collect();
+        let values: Vec<f32> = bipolar.iter().map(|&b| b as f32).collect();
 
         // Pad or truncate to match dimension
         let mut result = vec![0.0f32; self.config.dimension];
@@ -332,13 +335,18 @@ impl PredictiveHdcEncoder {
     }
 
     /// Apply attention weights to HDV
-    fn apply_attention(&self, base_hdv: &ContinuousHV, detected_primitives: &[String]) -> ContinuousHV {
+    fn apply_attention(
+        &self,
+        base_hdv: &ContinuousHV,
+        detected_primitives: &[String],
+    ) -> ContinuousHV {
         if detected_primitives.is_empty() {
             return base_hdv.clone();
         }
 
         // Compute composite attention weight from detected primitives
-        let total_attention: f32 = detected_primitives.iter()
+        let total_attention: f32 = detected_primitives
+            .iter()
             .filter_map(|name| self.attention_weights.get(name))
             .sum();
 
@@ -364,12 +372,14 @@ impl PredictiveHdcEncoder {
                 let compressed_current = self.compress_for_ltc(current_hdv, predicted.len());
 
                 // Compute normalized L2 distance in compressed space
-                let diff: f32 = compressed_current.iter()
+                let diff: f32 = compressed_current
+                    .iter()
                     .zip(predicted.iter())
                     .map(|(a, b)| (a - b).powi(2))
                     .sum();
 
-                let norm_current: f32 = compressed_current.iter().map(|x| x * x).sum::<f32>().sqrt();
+                let norm_current: f32 =
+                    compressed_current.iter().map(|x| x * x).sum::<f32>().sqrt();
                 let norm_pred: f32 = predicted.iter().map(|x| x * x).sum::<f32>().sqrt();
 
                 if norm_current > 0.0 && norm_pred > 0.0 {
@@ -425,10 +435,8 @@ impl PredictiveHdcEncoder {
             if let Some(weight) = self.attention_weights.get_mut(name) {
                 // Increase attention proportional to error
                 let delta = self.config.attention_lr * error;
-                *weight = (*weight + delta).clamp(
-                    self.config.min_attention,
-                    self.config.max_attention
-                );
+                *weight =
+                    (*weight + delta).clamp(self.config.min_attention, self.config.max_attention);
             }
         }
 
@@ -438,10 +446,8 @@ impl PredictiveHdcEncoder {
             if !detected_primitives.contains(name) {
                 if let Some(weight) = self.attention_weights.get_mut(name) {
                     let delta = self.config.attention_lr * error * 0.1; // Smaller decrease
-                    *weight = (*weight - delta).clamp(
-                        self.config.min_attention,
-                        self.config.max_attention
-                    );
+                    *weight = (*weight - delta)
+                        .clamp(self.config.min_attention, self.config.max_attention);
                 }
             }
         }
@@ -463,13 +469,13 @@ impl PredictiveHdcEncoder {
         // Compute attention variance (emergence metric)
         let weights: Vec<f32> = self.attention_weights.values().cloned().collect();
         let mean: f32 = weights.iter().sum::<f32>() / weights.len() as f32;
-        let variance: f32 = weights.iter()
-            .map(|w| (w - mean).powi(2))
-            .sum::<f32>() / weights.len() as f32;
+        let variance: f32 =
+            weights.iter().map(|w| (w - mean).powi(2)).sum::<f32>() / weights.len() as f32;
         self.stats.attention_variance = variance;
 
         // Count diverged primitives
-        self.stats.diverged_primitives = weights.iter()
+        self.stats.diverged_primitives = weights
+            .iter()
             .filter(|&&w| (w - self.config.initial_attention).abs() > 0.1)
             .count();
 
@@ -484,7 +490,8 @@ impl PredictiveHdcEncoder {
     pub fn compress_for_ltc(&self, hdv: &ContinuousHV, output_dim: usize) -> Vec<f32> {
         // Downsample by taking evenly spaced values
         let step = hdv.values.len() / output_dim;
-        hdv.values.iter()
+        hdv.values
+            .iter()
             .step_by(step)
             .take(output_dim)
             .cloned()
@@ -537,7 +544,7 @@ mod tests {
     fn test_attention_weights_diverge() {
         let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig {
             error_threshold: 0.0, // Always update
-            attention_lr: 0.5, // High learning rate for test
+            attention_lr: 0.5,    // High learning rate for test
             ..Default::default()
         });
 
@@ -547,8 +554,10 @@ mod tests {
         }
 
         // Attention should have diverged from uniform
-        assert!(encoder.stats.attention_variance > 0.0,
-            "Attention should diverge from uniform");
+        assert!(
+            encoder.stats.attention_variance > 0.0,
+            "Attention should diverge from uniform"
+        );
     }
 
     #[test]
@@ -557,9 +566,10 @@ mod tests {
         let detected = encoder.detect_primitives("The cause leads to an effect");
 
         // Should detect causal primitives
-        assert!(detected.contains(&"CAUSE".to_string()) ||
-                detected.contains(&"EFFECT".to_string()),
-            "Should detect causal primitives");
+        assert!(
+            detected.contains(&"CAUSE".to_string()) || detected.contains(&"EFFECT".to_string()),
+            "Should detect causal primitives"
+        );
     }
 
     #[test]

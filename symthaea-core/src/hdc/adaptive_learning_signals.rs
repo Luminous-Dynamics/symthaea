@@ -243,16 +243,13 @@ impl AdaptiveLearningController {
         let coherence_gate = self.compute_coherence_gate(coherence);
 
         // Combine into learning rate modifier
-        let learning_rate_mod = self.config.base_learning_rate
-            * phi_modulation
-            * arousal_gate;
+        let learning_rate_mod = self.config.base_learning_rate * phi_modulation * arousal_gate;
 
         // Plasticity gate is open when coherence is high and arousal is optimal
         let plasticity_gate = coherence_gate * arousal_gate;
 
         // Consolidation is ready when system is calm and integrated
-        let consolidation_ready =
-            coherence > self.config.coherence_threshold * 1.2
+        let consolidation_ready = coherence > self.config.coherence_threshold * 1.2
             && arousal < self.config.optimal_arousal
             && self.current_surprise < 0.2;
 
@@ -292,9 +289,11 @@ impl AdaptiveLearningController {
         };
 
         let phi_variance = if self.phi_history.len() > 1 {
-            self.phi_history.iter()
+            self.phi_history
+                .iter()
                 .map(|&p| (p - phi_avg).powi(2))
-                .sum::<f32>() / (self.phi_history.len() - 1) as f32
+                .sum::<f32>()
+                / (self.phi_history.len() - 1) as f32
         } else {
             0.0
         };
@@ -515,11 +514,7 @@ impl NeuromodulatorLearningMap {
     /// let hormones = endocrine_system.state();
     /// let neuro_map = NeuromodulatorLearningMap::from_hormone_state(hormones);
     /// ```
-    pub fn from_hormone_state(
-        dopamine: f32,
-        acetylcholine: f32,
-        cortisol: f32,
-    ) -> Self {
+    pub fn from_hormone_state(dopamine: f32, acetylcholine: f32, cortisol: f32) -> Self {
         // Infer norepinephrine from cortisol (stress → alertness)
         let norepinephrine = (cortisol * 0.8 + 0.2).clamp(0.0, 1.0);
 
@@ -586,10 +581,7 @@ impl ConsciousnessGatedLearning {
         // Check consciousness gate
         if phi < self.min_phi {
             self.learning_enabled = false;
-            self.block_reason = Some(format!(
-                "Φ too low: {:.3} < {:.3}",
-                phi, self.min_phi
-            ));
+            self.block_reason = Some(format!("Φ too low: {:.3} < {:.3}", phi, self.min_phi));
             return None;
         }
 
@@ -609,13 +601,9 @@ impl ConsciousnessGatedLearning {
         let arousal = neuromod.arousal();
         let valence = neuromod.emotional_valence();
 
-        let signal = self.controller.update(
-            phi,
-            coherence,
-            prediction_error,
-            arousal,
-            valence,
-        );
+        let signal = self
+            .controller
+            .update(phi, coherence, prediction_error, arousal, valence);
 
         Some(signal)
     }

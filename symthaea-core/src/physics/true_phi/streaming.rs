@@ -5,9 +5,7 @@
 
 use crate::hdc::unified_hv::ContinuousHV;
 
-use super::{
-    ApproximateMIPFinder, ContinuousEntropyEstimator, PhiAlert, PhiAlertType,
-};
+use super::{ApproximateMIPFinder, ContinuousEntropyEstimator, PhiAlert, PhiAlertType};
 
 /// Streaming Φ calculator for incremental updates
 ///
@@ -34,9 +32,7 @@ impl StreamingPhiCalculator {
         let n = components.len();
 
         // Compute initial entropies
-        let entropies: Vec<f64> = components.iter()
-            .map(|c| estimator.entropy(c))
-            .collect();
+        let entropies: Vec<f64> = components.iter().map(|c| estimator.entropy(c)).collect();
 
         // Compute initial MI matrix
         let mut mi_matrix = vec![vec![0.0; n]; n];
@@ -64,7 +60,12 @@ impl StreamingPhiCalculator {
     /// Update when a single component changes
     ///
     /// Complexity: O(n) instead of O(n²)
-    pub fn update_component(&mut self, index: usize, new_component: &ContinuousHV, all_components: &[ContinuousHV]) {
+    pub fn update_component(
+        &mut self,
+        index: usize,
+        new_component: &ContinuousHV,
+        all_components: &[ContinuousHV],
+    ) {
         if index >= self.n {
             return;
         }
@@ -83,7 +84,9 @@ impl StreamingPhiCalculator {
                 self.system_ei -= old_mi;
 
                 // Compute new MI
-                let new_mi = self.estimator.mutual_information_fast(new_component, &all_components[j]);
+                let new_mi = self
+                    .estimator
+                    .mutual_information_fast(new_component, &all_components[j]);
                 self.mi_matrix[index][j] = new_mi;
                 self.mi_matrix[j][index] = new_mi;
 
@@ -94,7 +97,12 @@ impl StreamingPhiCalculator {
     }
 
     /// Update when multiple components change
-    pub fn update_components(&mut self, indices: &[usize], new_components: &[&ContinuousHV], all_components: &[ContinuousHV]) {
+    pub fn update_components(
+        &mut self,
+        indices: &[usize],
+        new_components: &[&ContinuousHV],
+        all_components: &[ContinuousHV],
+    ) {
         for (idx, &i) in indices.iter().enumerate() {
             if i < self.n && idx < new_components.len() {
                 self.update_component(i, new_components[idx], all_components);
@@ -184,10 +192,16 @@ impl PhiMonitor {
     }
 
     /// Update and check for alerts
-    pub fn update(&mut self, index: usize, new_component: &ContinuousHV, all_components: &[ContinuousHV]) -> Option<PhiAlert> {
+    pub fn update(
+        &mut self,
+        index: usize,
+        new_component: &ContinuousHV,
+        all_components: &[ContinuousHV],
+    ) -> Option<PhiAlert> {
         let previous_phi = *self.history.last().unwrap_or(&0.0);
 
-        self.calculator.update_component(index, new_component, all_components);
+        self.calculator
+            .update_component(index, new_component, all_components);
         let current_phi = self.calculator.compute_phi_fast(all_components);
 
         // Maintain history

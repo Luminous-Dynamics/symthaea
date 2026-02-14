@@ -4,7 +4,7 @@
 //! low prediction error, and high temporal coherence. Flow state boosts learning
 //! efficiency and signals peak cognitive performance.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
 use crate::dynamics::temporal_signatures::ConsciousnessPattern;
@@ -41,7 +41,6 @@ pub struct FlowState {
     // ═══════════════════════════════════════════════════════════════════════════
     // TEMPORAL ENCODING - Time Context for Flow States
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Timestamp when flow state started (if in flow)
     /// Note: Not serialized as Instant is monotonic/non-portable
     #[serde(skip)]
@@ -99,8 +98,8 @@ impl FlowState {
             pattern,
             ConsciousnessPattern::Focused | ConsciousnessPattern::Contemplative
         ) && prediction_error < Self::FLOW_ERROR_THRESHOLD
-          && coherence > Self::FLOW_COHERENCE_THRESHOLD
-          && prediction_confidence > Self::FLOW_CONFIDENCE_THRESHOLD;
+            && coherence > Self::FLOW_COHERENCE_THRESHOLD
+            && prediction_confidence > Self::FLOW_CONFIDENCE_THRESHOLD;
 
         // Update running averages (EMA)
         let alpha = 0.2;
@@ -161,8 +160,8 @@ impl FlowState {
             pattern,
             ConsciousnessPattern::Focused | ConsciousnessPattern::Contemplative
         ) && prediction_error < error_threshold
-          && coherence > coherence_threshold
-          && prediction_confidence > Self::FLOW_CONFIDENCE_THRESHOLD;
+            && coherence > coherence_threshold
+            && prediction_confidence > Self::FLOW_CONFIDENCE_THRESHOLD;
 
         // Update running averages (EMA)
         let alpha = 0.2;
@@ -210,8 +209,8 @@ impl FlowState {
 
                         // Update average duration (safe division with max(1))
                         if self.flow_periods > 0 {
-                            self.avg_flow_duration_secs = self.total_flow_time_secs
-                                / self.flow_periods.max(1) as f32;
+                            self.avg_flow_duration_secs =
+                                self.total_flow_time_secs / self.flow_periods.max(1) as f32;
                         }
                     }
 
@@ -242,7 +241,8 @@ impl FlowState {
 
     /// Get current flow duration in seconds (if in flow)
     pub fn current_flow_duration_secs(&self) -> Option<f32> {
-        self.flow_started_at.map(|started| started.elapsed().as_secs_f32())
+        self.flow_started_at
+            .map(|started| started.elapsed().as_secs_f32())
     }
 
     /// Get total time spent in flow (including current session)
@@ -297,8 +297,7 @@ pub struct FlowTemporalSummary {
 /// 1. Q-learning from past interactions
 /// 2. Previous reward (stick with success, avoid failure)
 /// 3. Φ-gating (high Φ → Exploratory, low Φ → Supportive)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ResponseStrategy {
     /// Elaborate explanations with detail
     Detailed,
@@ -312,7 +311,6 @@ pub enum ResponseStrategy {
     /// Offer new perspectives
     Exploratory,
 }
-
 
 impl ResponseStrategy {
     /// Get the opposite strategy (for switching after negative feedback)

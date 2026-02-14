@@ -9,10 +9,10 @@
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::consciousness_integration::ConsciousnessPipeline;
-use crate::hdc::consciousness_subsystem::ConsciousnessSubsystem;
 use crate::hdc::consciousness_metacognitive::MetacognitiveSubsystem;
-use crate::hdc::consciousness_self_awareness::SelfAwarenessSubsystem;
 use crate::hdc::consciousness_phi_optimization::PhiOptimizationSubsystem;
+use crate::hdc::consciousness_self_awareness::SelfAwarenessSubsystem;
+use crate::hdc::consciousness_subsystem::ConsciousnessSubsystem;
 
 /// Fast variant of test_phi_optimization_multiple_steps
 /// Original: 60s with graph topology. This uses standalone subsystem.
@@ -104,8 +104,10 @@ fn test_fast_self_awareness_prediction_learning() {
         sub.process_cycle(&mut state, &inputs).unwrap();
     }
 
-    assert!(state.self_model_confidence > prev_confidence,
-        "Confidence should increase with stable input");
+    assert!(
+        state.self_model_confidence > prev_confidence,
+        "Confidence should increase with stable input"
+    );
 }
 
 /// Fast variant of test_self_awareness_during_processing

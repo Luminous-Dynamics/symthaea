@@ -14,9 +14,11 @@
 //! The `TermType::Function` variant encodes named functions (sin, cos, exp, ln, etc.)
 //! with full chain rule support for compositions like d/dx sin(x²) = cos(x²) · 2x.
 
-use crate::hdc::arithmetic_engine::{HybridArithmeticEngine, Polynomial, SymbolicExpr, SymbolicOp, TermType};
+use crate::hdc::arithmetic_engine::{
+    HybridArithmeticEngine, Polynomial, SymbolicExpr, SymbolicOp, TermType,
+};
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
+use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
 
 /// Result of a calculus operation with HDC encoding
 pub struct CalculusResult {
@@ -37,10 +39,15 @@ pub struct SymbolicDifferentiator;
 
 impl SymbolicDifferentiator {
     /// Differentiate an expression with respect to a variable
-    pub fn differentiate(expr: &SymbolicExpr, variable: &str, primitives: &PrimitiveSystem) -> CalculusResult {
+    pub fn differentiate(
+        expr: &SymbolicExpr,
+        variable: &str,
+        primitives: &PrimitiveSystem,
+    ) -> CalculusResult {
         let diff_expr = Self::diff_recursive(&expr.term_type, variable, primitives);
 
-        let diff_prim = primitives.get("DIFFERENTIATION")
+        let diff_prim = primitives
+            .get("DIFFERENTIATION")
             .expect("DIFFERENTIATION primitive not found");
         let var_encoding = BinaryHV::random(seed_from_name(variable));
         let encoding = diff_prim.encoding.bind(&expr.encoding).bind(&var_encoding);
@@ -57,13 +64,19 @@ impl SymbolicDifferentiator {
     }
 
     /// Apply differentiation n times
-    pub fn differentiate_n(expr: &SymbolicExpr, variable: &str, n: usize, primitives: &PrimitiveSystem) -> CalculusResult {
+    pub fn differentiate_n(
+        expr: &SymbolicExpr,
+        variable: &str,
+        n: usize,
+        primitives: &PrimitiveSystem,
+    ) -> CalculusResult {
         let mut current_term = expr.term_type.clone();
         for _ in 0..n {
             current_term = Self::diff_recursive(&current_term, variable, primitives);
         }
 
-        let diff_prim = primitives.get("DIFFERENTIATION")
+        let diff_prim = primitives
+            .get("DIFFERENTIATION")
             .expect("DIFFERENTIATION primitive not found");
         let var_encoding = BinaryHV::random(seed_from_name(variable));
         let mut encoding = expr.encoding;
@@ -250,18 +263,16 @@ impl SymbolicDifferentiator {
                 }
             }
 
-            TermType::UnaryOp { op, operand } => {
-                match op {
-                    SymbolicOp::Neg => {
-                        let d = Self::diff_recursive(operand, variable, primitives);
-                        TermType::UnaryOp {
-                            op: SymbolicOp::Neg,
-                            operand: Box::new(d),
-                        }
+            TermType::UnaryOp { op, operand } => match op {
+                SymbolicOp::Neg => {
+                    let d = Self::diff_recursive(operand, variable, primitives);
+                    TermType::UnaryOp {
+                        op: SymbolicOp::Neg,
+                        operand: Box::new(d),
                     }
-                    _ => TermType::Constant(0),
                 }
-            }
+                _ => TermType::Constant(0),
+            },
 
             TermType::Function { name, arg } => {
                 // Chain rule: d/dx f(g(x)) = f'(g(x)) * g'(x)
@@ -534,11 +545,7 @@ impl SymbolicIntegrator {
     }
 
     /// Compute definite integral returning exact rational result (numerator, denominator).
-    pub fn definite_integral_exact(
-        poly: &Polynomial,
-        lower: i64,
-        upper: i64,
-    ) -> (i64, i64) {
+    pub fn definite_integral_exact(poly: &Polynomial, lower: i64, upper: i64) -> (i64, i64) {
         let coeffs = poly.coefficients();
         let rational_poly = RationalPolynomial::from_integer_coeffs(coeffs, "x");
         rational_poly.definite_integral(lower, upper)
@@ -618,12 +625,21 @@ impl RationalPolynomial {
     /// Create from rational coefficient pairs
     pub fn new(coeffs: Vec<(i64, i64)>, variable: &str) -> Self {
         // Normalize each coefficient
-        let normalized: Vec<(i64, i64)> = coeffs.iter().map(|&(n, d)| {
-            if n == 0 { return (0, 1); }
-            let g = gcd_i64(n.abs(), d.abs());
-            let (n2, d2) = (n / g, d / g);
-            if d2 < 0 { (-n2, -d2) } else { (n2, d2) }
-        }).collect();
+        let normalized: Vec<(i64, i64)> = coeffs
+            .iter()
+            .map(|&(n, d)| {
+                if n == 0 {
+                    return (0, 1);
+                }
+                let g = gcd_i64(n.abs(), d.abs());
+                let (n2, d2) = (n / g, d / g);
+                if d2 < 0 {
+                    (-n2, -d2)
+                } else {
+                    (n2, d2)
+                }
+            })
+            .collect();
         Self {
             coefficients: normalized,
             variable: variable.to_string(),
@@ -641,14 +657,18 @@ impl RationalPolynomial {
         let mut den = 1i64;
 
         for (power, &(cn, cd)) in self.coefficients.iter().enumerate() {
-            if cn == 0 { continue; }
+            if cn == 0 {
+                continue;
+            }
             // term = (cn/cd) * x^power
             let x_pow = x.pow(power as u32);
             let term_num = cn.wrapping_mul(x_pow);
             let term_den = cd;
 
             // Add: num/den + term_num/term_den = (num*term_den + term_num*den) / (den*term_den)
-            num = num.wrapping_mul(term_den).wrapping_add(term_num.wrapping_mul(den));
+            num = num
+                .wrapping_mul(term_den)
+                .wrapping_add(term_num.wrapping_mul(den));
             den = den.wrapping_mul(term_den);
 
             // Reduce to prevent overflow
@@ -686,7 +706,11 @@ impl RationalPolynomial {
             } else {
                 let g = gcd_i64(new_num.abs(), new_den.abs());
                 let (n, d) = (new_num / g, new_den / g);
-                if d < 0 { new_coeffs.push((-n, -d)); } else { new_coeffs.push((n, d)); }
+                if d < 0 {
+                    new_coeffs.push((-n, -d));
+                } else {
+                    new_coeffs.push((n, d));
+                }
             }
         }
 
@@ -740,7 +764,11 @@ impl RationalPolynomial {
         let den = upper_den * lower_den;
 
         let g = gcd_i64(num.abs(), den.abs());
-        if g > 1 { (num / g, den / g) } else { (num, den) }
+        if g > 1 {
+            (num / g, den / g)
+        } else {
+            (num, den)
+        }
     }
 
     /// Verify fundamental theorem: d/dx ∫f(x) dx == f(x)
@@ -752,7 +780,9 @@ impl RationalPolynomial {
             return false;
         }
 
-        self.coefficients.iter().zip(derivative_of_integral.coefficients.iter())
+        self.coefficients
+            .iter()
+            .zip(derivative_of_integral.coefficients.iter())
             .all(|(&(an, ad), &(bn, bd))| {
                 // Compare: an/ad == bn/bd => an*bd == bn*ad
                 an * bd == bn * ad
@@ -834,7 +864,10 @@ mod tests {
         let prims = PrimitiveSystem::global();
         // d/dx sin(x) = cos(x)
         let x_var = TermType::Variable("x".to_string());
-        let sin_x = TermType::Function { name: "sin".to_string(), arg: Box::new(x_var) };
+        let sin_x = TermType::Function {
+            name: "sin".to_string(),
+            arg: Box::new(x_var),
+        };
         let result = SymbolicDifferentiator::diff_recursive(&sin_x, "x", prims);
         // Should be cos(x)
         match &result {
@@ -851,19 +884,23 @@ mod tests {
         let prims = PrimitiveSystem::global();
         // d/dx cos(x) = -sin(x)
         let x_var = TermType::Variable("x".to_string());
-        let cos_x = TermType::Function { name: "cos".to_string(), arg: Box::new(x_var) };
+        let cos_x = TermType::Function {
+            name: "cos".to_string(),
+            arg: Box::new(x_var),
+        };
         let result = SymbolicDifferentiator::diff_recursive(&cos_x, "x", prims);
         // Should be -sin(x) = UnaryOp(Neg, Function(sin, x))
         match &result {
-            TermType::UnaryOp { op: SymbolicOp::Neg, operand } => {
-                match operand.as_ref() {
-                    TermType::Function { name, arg } => {
-                        assert_eq!(name, "sin");
-                        assert_eq!(**arg, TermType::Variable("x".to_string()));
-                    }
-                    _ => panic!("Expected Function(sin, x) inside Neg"),
+            TermType::UnaryOp {
+                op: SymbolicOp::Neg,
+                operand,
+            } => match operand.as_ref() {
+                TermType::Function { name, arg } => {
+                    assert_eq!(name, "sin");
+                    assert_eq!(**arg, TermType::Variable("x".to_string()));
                 }
-            }
+                _ => panic!("Expected Function(sin, x) inside Neg"),
+            },
             _ => panic!("Expected UnaryOp(Neg, Function(sin, x)), got {:?}", result),
         }
     }
@@ -873,7 +910,10 @@ mod tests {
         let prims = PrimitiveSystem::global();
         // d/dx exp(x) = exp(x)
         let x_var = TermType::Variable("x".to_string());
-        let exp_x = TermType::Function { name: "exp".to_string(), arg: Box::new(x_var.clone()) };
+        let exp_x = TermType::Function {
+            name: "exp".to_string(),
+            arg: Box::new(x_var.clone()),
+        };
         let result = SymbolicDifferentiator::diff_recursive(&exp_x, "x", prims);
         // Should be exp(x)
         match &result {
@@ -890,11 +930,18 @@ mod tests {
         let prims = PrimitiveSystem::global();
         // d/dx ln(x) = 1/x
         let x_var = TermType::Variable("x".to_string());
-        let ln_x = TermType::Function { name: "ln".to_string(), arg: Box::new(x_var) };
+        let ln_x = TermType::Function {
+            name: "ln".to_string(),
+            arg: Box::new(x_var),
+        };
         let result = SymbolicDifferentiator::diff_recursive(&ln_x, "x", prims);
         // Should be 1/x = BinaryOp(Div, 1, x)
         match &result {
-            TermType::BinaryOp { op: SymbolicOp::Div, left, right } => {
+            TermType::BinaryOp {
+                op: SymbolicOp::Div,
+                left,
+                right,
+            } => {
                 assert_eq!(**left, TermType::Constant(1));
                 assert_eq!(**right, TermType::Variable("x".to_string()));
             }
@@ -914,12 +961,19 @@ mod tests {
             left: Box::new(x_var),
             right: Box::new(TermType::Constant(2)),
         };
-        let sin_x2 = TermType::Function { name: "sin".to_string(), arg: Box::new(x_squared) };
+        let sin_x2 = TermType::Function {
+            name: "sin".to_string(),
+            arg: Box::new(x_squared),
+        };
         let result = SymbolicDifferentiator::diff_recursive(&sin_x2, "x", prims);
         // Should be cos(x²) * (2 * x^1 * 1) = cos(x²) * 2x
         // The structure is: Mul(cos(x²), Mul(Mul(2, Pow(x, 1)), 1))
         match &result {
-            TermType::BinaryOp { op: SymbolicOp::Mul, left, right: _ } => {
+            TermType::BinaryOp {
+                op: SymbolicOp::Mul,
+                left,
+                right: _,
+            } => {
                 // Left should be cos(x²)
                 match left.as_ref() {
                     TermType::Function { name, .. } => assert_eq!(name, "cos"),
@@ -939,11 +993,18 @@ mod tests {
             left: Box::new(TermType::Constant(3)),
             right: Box::new(TermType::Variable("x".to_string())),
         };
-        let exp_3x = TermType::Function { name: "exp".to_string(), arg: Box::new(three_x) };
+        let exp_3x = TermType::Function {
+            name: "exp".to_string(),
+            arg: Box::new(three_x),
+        };
         let result = SymbolicDifferentiator::diff_recursive(&exp_3x, "x", prims);
         // Should be exp(3x) * d/dx(3x) = exp(3x) * (0*x + 3*1) = exp(3x) * 3
         match &result {
-            TermType::BinaryOp { op: SymbolicOp::Mul, left, .. } => {
+            TermType::BinaryOp {
+                op: SymbolicOp::Mul,
+                left,
+                ..
+            } => {
                 // Left should be exp(3x)
                 match left.as_ref() {
                     TermType::Function { name, .. } => assert_eq!(name, "exp"),
@@ -996,7 +1057,10 @@ mod tests {
         assert_ne!(result, TermType::Constant(0), "d/dx(x^x) should not be 0");
         // Should be a Mul expression
         match &result {
-            TermType::BinaryOp { op: SymbolicOp::Mul, .. } => {
+            TermType::BinaryOp {
+                op: SymbolicOp::Mul,
+                ..
+            } => {
                 // Good - it's a product (x^x * something)
             }
             _ => panic!("Expected Mul for d/dx(x^x), got {:?}", result),
@@ -1030,7 +1094,8 @@ mod tests {
         let mut engine = HybridArithmeticEngine::new();
         // integral from 0 to 1 of 2x dx = x^2 |_0^1 = 1
         let poly = Polynomial::new(vec![0, 2], "x", prims);
-        let result = SymbolicIntegrator::definite_integral(&poly, 0, 1, prims, &mut engine).unwrap();
+        let result =
+            SymbolicIntegrator::definite_integral(&poly, 0, 1, prims, &mut engine).unwrap();
         assert_eq!(result, 1);
     }
 
@@ -1057,15 +1122,18 @@ mod tests {
     fn test_rational_polynomial_ftc() {
         // Fundamental theorem should hold for any integer-coefficient polynomial
         for coeffs in &[
-            vec![1],                    // f(x) = 1
-            vec![0, 1],                 // f(x) = x
-            vec![0, 0, 1],             // f(x) = x²
-            vec![1, 2, 3],             // f(x) = 1 + 2x + 3x²
-            vec![5, -3, 0, 7],         // f(x) = 5 - 3x + 7x³
+            vec![1],           // f(x) = 1
+            vec![0, 1],        // f(x) = x
+            vec![0, 0, 1],     // f(x) = x²
+            vec![1, 2, 3],     // f(x) = 1 + 2x + 3x²
+            vec![5, -3, 0, 7], // f(x) = 5 - 3x + 7x³
         ] {
             let poly = RationalPolynomial::from_integer_coeffs(coeffs, "x");
-            assert!(poly.verify_fundamental_theorem(),
-                "FTC should hold for {:?}", coeffs);
+            assert!(
+                poly.verify_fundamental_theorem(),
+                "FTC should hold for {:?}",
+                coeffs
+            );
         }
     }
 
