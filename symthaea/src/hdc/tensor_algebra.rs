@@ -742,7 +742,7 @@ impl Multivector {
     /// Extract the grade-k part of a multivector.
     ///
     /// Returns a new multivector with only the grade-k components nonzero.
-    /// This is the projection <M>_k.
+    /// This is the projection `<M>_k`.
     pub fn grade(&self, k: usize) -> Multivector {
         let mut result = Multivector::zero(&self.algebra);
         if k > self.algebra.dimension {

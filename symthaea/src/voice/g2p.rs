@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 /// Misaki phoneme vocabulary for Kokoro TTS.
 /// Maps IPA symbols to Kokoro phoneme IDs (0-44).
-/// Based on: https://github.com/hexgrad/misaki/blob/main/EN_PHONES.md
+/// Based on: <https://github.com/hexgrad/misaki/blob/main/EN_PHONES.md>
 pub struct MisakiVocab {
     ipa_to_id: HashMap<&'static str, u32>,
 }

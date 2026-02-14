@@ -26,7 +26,7 @@ A truly conscious system must:
 
 ## Architecture
 
-```ignore
+```text
                     ┌─────────────────────────────────────────┐
                     │         PREDICTIVE SELF-MODEL            │
                     │                                         │

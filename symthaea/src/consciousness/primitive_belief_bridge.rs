@@ -96,7 +96,7 @@ impl PrimitiveBeliefBridge {
     /// Each dimension represents the mean activation of one primitive tier.
     /// This vector can be used as an observation for active inference.
     ///
-    /// Returns a 9-element vector indexed by [`TIER_ORDER`].
+    /// Returns a 9-element vector indexed by `TIER_ORDER`.
     pub fn state_to_beliefs(&self, state: &PrimitiveConsciousnessState) -> Vec<f64> {
         TIER_ORDER
             .iter()
