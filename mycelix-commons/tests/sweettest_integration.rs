@@ -36,9 +36,13 @@ pub struct RegisterPropertyInput {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum PropertyType {
-    Residential,
-    Commercial,
-    Agricultural,
+    Land,
+    Building,
+    Unit,
+    Equipment,
+    Intellectual,
+    Digital,
+    Other(String),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -51,24 +55,26 @@ pub struct CoOwner {
 pub struct GeoLocation {
     pub latitude: f64,
     pub longitude: f64,
+    pub boundaries: Option<Vec<(f64, f64)>>,
+    pub area_sqm: Option<f64>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Address {
     pub street: String,
     pub city: String,
-    pub state: String,
+    pub region: String,
     pub country: String,
-    pub postal_code: String,
+    pub postal_code: Option<String>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PropertyMetadata {
-    pub area_sqm: Option<f64>,
-    pub year_built: Option<u32>,
-    pub zoning: Option<String>,
-    pub assessed_value: Option<u64>,
+    pub appraised_value: Option<f64>,
     pub currency: Option<String>,
+    pub legal_description: Option<String>,
+    pub parcel_number: Option<String>,
+    pub attachments: Vec<String>,
 }
 
 // --- commons-bridge ---
@@ -138,7 +144,7 @@ async fn test_property_register_and_get() {
     let agent = alice.agent_pubkey().clone();
 
     let input = RegisterPropertyInput {
-        property_type: PropertyType::Residential,
+        property_type: PropertyType::Building,
         title: "Test Property".to_string(),
         description: "A test property".to_string(),
         owner_did: format!("did:key:{}", agent),
@@ -146,20 +152,22 @@ async fn test_property_register_and_get() {
         geolocation: Some(GeoLocation {
             latitude: 32.9483,
             longitude: -96.7299,
+            boundaries: None,
+            area_sqm: Some(150.0),
         }),
         address: Some(Address {
             street: "123 Main St".to_string(),
             city: "Richardson".to_string(),
-            state: "TX".to_string(),
+            region: "TX".to_string(),
             country: "US".to_string(),
-            postal_code: "75080".to_string(),
+            postal_code: Some("75080".to_string()),
         }),
         metadata: PropertyMetadata {
-            area_sqm: Some(150.0),
-            year_built: Some(2020),
-            zoning: Some("R-1".to_string()),
-            assessed_value: Some(250000),
+            appraised_value: Some(250_000.0),
             currency: Some("USD".to_string()),
+            legal_description: None,
+            parcel_number: None,
+            attachments: vec![],
         },
     };
 
@@ -301,7 +309,7 @@ async fn test_cross_domain_housing_queries_property() {
 
     // 1. Register a property
     let prop_input = RegisterPropertyInput {
-        property_type: PropertyType::Residential,
+        property_type: PropertyType::Building,
         title: "CLT Community Housing".to_string(),
         description: "Community land trust property".to_string(),
         owner_did: format!("did:key:{}", agent),
@@ -309,11 +317,11 @@ async fn test_cross_domain_housing_queries_property() {
         geolocation: None,
         address: None,
         metadata: PropertyMetadata {
-            area_sqm: Some(500.0),
-            year_built: Some(2024),
-            zoning: None,
-            assessed_value: None,
+            appraised_value: Some(500_000.0),
             currency: None,
+            legal_description: None,
+            parcel_number: None,
+            attachments: vec![],
         },
     };
 

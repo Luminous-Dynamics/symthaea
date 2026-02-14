@@ -262,4 +262,148 @@ mod tests {
         assert_eq!(decoded.source_attribution, None);
         assert!(decoded.tags.is_empty());
     }
+
+    // ========================================================================
+    // Anchor serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn anchor_serde_roundtrip() {
+        let anchor = food_knowledge_integrity::Anchor("all_seeds".to_string());
+        let json = serde_json::to_string(&anchor).unwrap();
+        let decoded: food_knowledge_integrity::Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, anchor);
+    }
+
+    #[test]
+    fn anchor_empty_string_serde() {
+        let anchor = food_knowledge_integrity::Anchor("".to_string());
+        let json = serde_json::to_string(&anchor).unwrap();
+        let decoded: food_knowledge_integrity::Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, anchor);
+    }
+
+    #[test]
+    fn anchor_unicode_serde() {
+        let anchor = food_knowledge_integrity::Anchor("species:\u{7389}\u{7c73}".to_string());
+        let json = serde_json::to_string(&anchor).unwrap();
+        let decoded: food_knowledge_integrity::Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, anchor);
+    }
+
+    // ========================================================================
+    // Struct clone and equality tests
+    // ========================================================================
+
+    #[test]
+    fn seed_variety_clone_is_equal() {
+        let seed = SeedVariety {
+            name: "Brandywine".to_string(),
+            species: "Solanum lycopersicum".to_string(),
+            origin: Some("Amish community, Chester County PA".to_string()),
+            days_to_maturity: 90,
+            companion_plants: vec!["Basil".to_string()],
+            avoid_plants: vec!["Brassicas".to_string()],
+            seed_saving_notes: Some("Heirloom, open-pollinated".to_string()),
+        };
+        let cloned = seed.clone();
+        assert_eq!(seed, cloned);
+    }
+
+    #[test]
+    fn traditional_practice_clone_is_equal() {
+        let practice = TraditionalPractice {
+            name: "Milpa".to_string(),
+            description: "Mesoamerican crop-growing system".to_string(),
+            region: Some("Central America".to_string()),
+            season: Some("Spring".to_string()),
+            category: PracticeCategory::Planting,
+        };
+        let cloned = practice.clone();
+        assert_eq!(practice, cloned);
+    }
+
+    #[test]
+    fn recipe_clone_is_equal() {
+        let recipe = Recipe {
+            name: "Pozole".to_string(),
+            ingredients: vec!["Hominy".to_string(), "Pork".to_string(), "Chili".to_string()],
+            instructions: "Simmer all ingredients for hours".to_string(),
+            servings: 8,
+            prep_time_min: 240,
+            tags: vec!["Mexican".to_string(), "soup".to_string()],
+            source_attribution: Some("Grandmother's recipe".to_string()),
+        };
+        let cloned = recipe.clone();
+        assert_eq!(recipe, cloned);
+    }
+
+    // ========================================================================
+    // Edge case: large data and boundary values
+    // ========================================================================
+
+    #[test]
+    fn seed_variety_max_maturity_days() {
+        let seed = SeedVariety {
+            name: "Century Plant".to_string(),
+            species: "Agave americana".to_string(),
+            origin: None,
+            days_to_maturity: u32::MAX,
+            companion_plants: vec![],
+            avoid_plants: vec![],
+            seed_saving_notes: None,
+        };
+        let json = serde_json::to_string(&seed).unwrap();
+        let decoded: SeedVariety = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.days_to_maturity, u32::MAX);
+    }
+
+    #[test]
+    fn recipe_many_ingredients_serde() {
+        let recipe = Recipe {
+            name: "Complex Stew".to_string(),
+            ingredients: (0..100).map(|i| format!("ingredient-{}", i)).collect(),
+            instructions: "Combine all ingredients".to_string(),
+            servings: 20,
+            prep_time_min: 300,
+            tags: (0..50).map(|i| format!("tag-{}", i)).collect(),
+            source_attribution: Some("Community potluck".to_string()),
+        };
+        let json = serde_json::to_string(&recipe).unwrap();
+        let decoded: Recipe = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.ingredients.len(), 100);
+        assert_eq!(decoded.tags.len(), 50);
+    }
+
+    #[test]
+    fn traditional_practice_none_fields_serde() {
+        let practice = TraditionalPractice {
+            name: "Companion Planting".to_string(),
+            description: "Growing compatible plants near each other".to_string(),
+            region: None,
+            season: None,
+            category: PracticeCategory::Pest,
+        };
+        let json = serde_json::to_string(&practice).unwrap();
+        let decoded: TraditionalPractice = serde_json::from_str(&json).unwrap();
+        assert!(decoded.region.is_none());
+        assert!(decoded.season.is_none());
+    }
+
+    #[test]
+    fn seed_variety_unicode_fields_serde() {
+        let seed = SeedVariety {
+            name: "\u{5c3e}\u{5f35}\u{5927}\u{6839}".to_string(),
+            species: "Raphanus sativus var. longipinnatus".to_string(),
+            origin: Some("\u{65e5}\u{672c}".to_string()),
+            days_to_maturity: 60,
+            companion_plants: vec!["\u{4eba}\u{53c2}".to_string()],
+            avoid_plants: vec![],
+            seed_saving_notes: Some("\u{79cb}\u{306b}\u{7a2e}\u{3092}\u{53d6}\u{308b}".to_string()),
+        };
+        let json = serde_json::to_string(&seed).unwrap();
+        let decoded: SeedVariety = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, seed.name);
+        assert_eq!(decoded.origin, seed.origin);
+    }
 }

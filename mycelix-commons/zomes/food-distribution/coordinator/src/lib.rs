@@ -272,4 +272,168 @@ mod tests {
             assert_eq!(decoded, mt);
         }
     }
+
+    // ========================================================================
+    // ListingStatus enum serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn listing_status_all_variants_serde_roundtrip() {
+        let variants = vec![
+            ListingStatus::Available,
+            ListingStatus::Reserved,
+            ListingStatus::Sold,
+            ListingStatus::Expired,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: ListingStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // Market struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn market_serde_roundtrip() {
+        let market = Market {
+            id: "mkt-7".to_string(),
+            name: "Richardson Farmers Market".to_string(),
+            location_lat: 32.95,
+            location_lon: -96.73,
+            market_type: MarketType::Farmers,
+            steward: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            schedule: "Saturdays 8am-1pm".to_string(),
+        };
+        let json = serde_json::to_string(&market).unwrap();
+        let decoded: Market = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "mkt-7");
+        assert_eq!(decoded.name, "Richardson Farmers Market");
+        assert_eq!(decoded.location_lat, 32.95);
+        assert_eq!(decoded.location_lon, -96.73);
+        assert_eq!(decoded.market_type, MarketType::Farmers);
+        assert_eq!(decoded.schedule, "Saturdays 8am-1pm");
+    }
+
+    #[test]
+    fn market_serde_all_types() {
+        for mt in [MarketType::Farmers, MarketType::CSA, MarketType::FoodBank, MarketType::CoOp] {
+            let market = Market {
+                id: "mkt-types".to_string(),
+                name: "Test Market".to_string(),
+                location_lat: 0.0,
+                location_lon: 0.0,
+                market_type: mt.clone(),
+                steward: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                schedule: "Daily".to_string(),
+            };
+            let json = serde_json::to_string(&market).unwrap();
+            let decoded: Market = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.market_type, mt);
+        }
+    }
+
+    // ========================================================================
+    // Listing struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn listing_serde_roundtrip_available() {
+        let listing = Listing {
+            market_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            producer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            product_name: "Heirloom Tomatoes".to_string(),
+            quantity_kg: 15.0,
+            price_per_kg: 5.50,
+            available_from: 1700000000,
+            status: ListingStatus::Available,
+        };
+        let json = serde_json::to_string(&listing).unwrap();
+        let decoded: Listing = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.product_name, "Heirloom Tomatoes");
+        assert_eq!(decoded.quantity_kg, 15.0);
+        assert_eq!(decoded.price_per_kg, 5.50);
+        assert_eq!(decoded.available_from, 1700000000);
+        assert_eq!(decoded.status, ListingStatus::Available);
+    }
+
+    #[test]
+    fn listing_serde_all_statuses() {
+        for status in [
+            ListingStatus::Available,
+            ListingStatus::Reserved,
+            ListingStatus::Sold,
+            ListingStatus::Expired,
+        ] {
+            let listing = Listing {
+                market_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+                producer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                product_name: "Basil".to_string(),
+                quantity_kg: 2.0,
+                price_per_kg: 8.00,
+                available_from: 1700000000,
+                status: status.clone(),
+            };
+            let json = serde_json::to_string(&listing).unwrap();
+            let decoded: Listing = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.status, status);
+        }
+    }
+
+    #[test]
+    fn listing_serde_zero_price_donation() {
+        let listing = Listing {
+            market_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            producer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            product_name: "Donated Zucchini".to_string(),
+            quantity_kg: 50.0,
+            price_per_kg: 0.0,
+            available_from: 1700000000,
+            status: ListingStatus::Available,
+        };
+        let json = serde_json::to_string(&listing).unwrap();
+        let decoded: Listing = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.price_per_kg, 0.0);
+        assert_eq!(decoded.product_name, "Donated Zucchini");
+    }
+
+    // ========================================================================
+    // Order struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn order_serde_roundtrip_pending() {
+        let order = Order {
+            listing_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            buyer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            quantity_kg: 5.0,
+            status: OrderStatus::Pending,
+        };
+        let json = serde_json::to_string(&order).unwrap();
+        let decoded: Order = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity_kg, 5.0);
+        assert_eq!(decoded.status, OrderStatus::Pending);
+    }
+
+    #[test]
+    fn order_serde_all_statuses() {
+        for status in [
+            OrderStatus::Pending,
+            OrderStatus::Confirmed,
+            OrderStatus::Fulfilled,
+            OrderStatus::Cancelled,
+        ] {
+            let order = Order {
+                listing_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+                buyer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                quantity_kg: 3.0,
+                status: status.clone(),
+            };
+            let json = serde_json::to_string(&order).unwrap();
+            let decoded: Order = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.status, status);
+        }
+    }
 }

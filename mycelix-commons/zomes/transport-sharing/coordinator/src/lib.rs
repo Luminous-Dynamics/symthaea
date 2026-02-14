@@ -245,4 +245,237 @@ mod tests {
             assert_eq!(decoded, status);
         }
     }
+
+    // ========================================================================
+    // RideOffer struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn ride_offer_serde_roundtrip_with_route() {
+        let offer = RideOffer {
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            route_hash: Some(ActionHash::from_raw_36(vec![0xcd; 36])),
+            driver: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            departure_time: 1700000000,
+            seats_available: 3,
+            price_per_seat: 5.0,
+            status: OfferStatus::Open,
+        };
+        let json = serde_json::to_string(&offer).unwrap();
+        let decoded: RideOffer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.departure_time, 1700000000);
+        assert_eq!(decoded.seats_available, 3);
+        assert_eq!(decoded.price_per_seat, 5.0);
+        assert_eq!(decoded.status, OfferStatus::Open);
+        assert!(decoded.route_hash.is_some());
+    }
+
+    #[test]
+    fn ride_offer_serde_roundtrip_without_route() {
+        let offer = RideOffer {
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            route_hash: None,
+            driver: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            departure_time: 1700000000,
+            seats_available: 1,
+            price_per_seat: 0.0,
+            status: OfferStatus::Full,
+        };
+        let json = serde_json::to_string(&offer).unwrap();
+        let decoded: RideOffer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.route_hash, None);
+        assert_eq!(decoded.seats_available, 1);
+        assert_eq!(decoded.price_per_seat, 0.0);
+        assert_eq!(decoded.status, OfferStatus::Full);
+    }
+
+    #[test]
+    fn ride_offer_serde_all_statuses() {
+        for status in [
+            OfferStatus::Open,
+            OfferStatus::Full,
+            OfferStatus::InProgress,
+            OfferStatus::Completed,
+            OfferStatus::Cancelled,
+        ] {
+            let offer = RideOffer {
+                vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+                route_hash: None,
+                driver: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                departure_time: 1700000000,
+                seats_available: 2,
+                price_per_seat: 3.0,
+                status: status.clone(),
+            };
+            let json = serde_json::to_string(&offer).unwrap();
+            let decoded: RideOffer = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.status, status);
+        }
+    }
+
+    // ========================================================================
+    // RideRequest struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn ride_request_serde_roundtrip() {
+        let request = RideRequest {
+            requester: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            origin_lat: 32.95,
+            origin_lon: -96.73,
+            destination_lat: 32.78,
+            destination_lon: -96.80,
+            requested_time: 1700000000,
+            passengers: 2,
+            status: RequestStatus::Open,
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let decoded: RideRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.origin_lat, 32.95);
+        assert_eq!(decoded.origin_lon, -96.73);
+        assert_eq!(decoded.destination_lat, 32.78);
+        assert_eq!(decoded.destination_lon, -96.80);
+        assert_eq!(decoded.requested_time, 1700000000);
+        assert_eq!(decoded.passengers, 2);
+        assert_eq!(decoded.status, RequestStatus::Open);
+    }
+
+    #[test]
+    fn ride_request_serde_all_statuses() {
+        for status in [
+            RequestStatus::Open,
+            RequestStatus::Matched,
+            RequestStatus::Cancelled,
+        ] {
+            let request = RideRequest {
+                requester: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                origin_lat: 0.0,
+                origin_lon: 0.0,
+                destination_lat: 1.0,
+                destination_lon: 1.0,
+                requested_time: 1700000000,
+                passengers: 1,
+                status: status.clone(),
+            };
+            let json = serde_json::to_string(&request).unwrap();
+            let decoded: RideRequest = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.status, status);
+        }
+    }
+
+    #[test]
+    fn ride_request_serde_single_passenger() {
+        let request = RideRequest {
+            requester: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            origin_lat: -33.87,
+            origin_lon: 151.21,
+            destination_lat: -33.85,
+            destination_lon: 151.20,
+            requested_time: 1705000000,
+            passengers: 1,
+            status: RequestStatus::Matched,
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let decoded: RideRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.passengers, 1);
+        assert_eq!(decoded.origin_lat, -33.87);
+    }
+
+    // ========================================================================
+    // RideMatch struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn ride_match_serde_roundtrip_pending() {
+        let ride_match = RideMatch {
+            offer_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            request_hash: ActionHash::from_raw_36(vec![0xcd; 36]),
+            confirmed_at: None,
+            status: MatchStatus::Pending,
+        };
+        let json = serde_json::to_string(&ride_match).unwrap();
+        let decoded: RideMatch = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.confirmed_at, None);
+        assert_eq!(decoded.status, MatchStatus::Pending);
+    }
+
+    #[test]
+    fn ride_match_serde_roundtrip_confirmed() {
+        let ride_match = RideMatch {
+            offer_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            request_hash: ActionHash::from_raw_36(vec![0xcd; 36]),
+            confirmed_at: Some(1700050000),
+            status: MatchStatus::Confirmed,
+        };
+        let json = serde_json::to_string(&ride_match).unwrap();
+        let decoded: RideMatch = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.confirmed_at, Some(1700050000));
+        assert_eq!(decoded.status, MatchStatus::Confirmed);
+    }
+
+    #[test]
+    fn ride_match_serde_all_statuses() {
+        for status in [
+            MatchStatus::Pending,
+            MatchStatus::Confirmed,
+            MatchStatus::InProgress,
+            MatchStatus::Completed,
+            MatchStatus::Cancelled,
+        ] {
+            let ride_match = RideMatch {
+                offer_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+                request_hash: ActionHash::from_raw_36(vec![0xcd; 36]),
+                confirmed_at: None,
+                status: status.clone(),
+            };
+            let json = serde_json::to_string(&ride_match).unwrap();
+            let decoded: RideMatch = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.status, status);
+        }
+    }
+
+    // ========================================================================
+    // CargoOffer struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn cargo_offer_serde_roundtrip() {
+        let cargo = CargoOffer {
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            origin_lat: 32.95,
+            origin_lon: -96.73,
+            destination_lat: 33.45,
+            destination_lon: -96.50,
+            capacity_kg: 500.0,
+            price_per_kg: 0.75,
+            departure_time: 1700000000,
+        };
+        let json = serde_json::to_string(&cargo).unwrap();
+        let decoded: CargoOffer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.origin_lat, 32.95);
+        assert_eq!(decoded.origin_lon, -96.73);
+        assert_eq!(decoded.destination_lat, 33.45);
+        assert_eq!(decoded.destination_lon, -96.50);
+        assert_eq!(decoded.capacity_kg, 500.0);
+        assert_eq!(decoded.price_per_kg, 0.75);
+        assert_eq!(decoded.departure_time, 1700000000);
+    }
+
+    #[test]
+    fn cargo_offer_serde_free_delivery() {
+        let cargo = CargoOffer {
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            origin_lat: 0.0,
+            origin_lon: 0.0,
+            destination_lat: 1.0,
+            destination_lon: 1.0,
+            capacity_kg: 100.0,
+            price_per_kg: 0.0,
+            departure_time: 1705000000,
+        };
+        let json = serde_json::to_string(&cargo).unwrap();
+        let decoded: CargoOffer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.price_per_kg, 0.0);
+        assert_eq!(decoded.capacity_kg, 100.0);
+    }
 }

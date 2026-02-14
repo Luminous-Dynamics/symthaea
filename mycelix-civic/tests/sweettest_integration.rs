@@ -78,18 +78,31 @@ pub struct PublishInput {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum ContentType {
     Article,
-    Report,
     Opinion,
     Investigation,
-    FactCheck,
+    Review,
+    Analysis,
+    Interview,
+    Report,
     Editorial,
-    RawData,
+    Other(String),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum License {
-    CreativeCommons(String),
-    PublicDomain,
+pub struct License {
+    pub license_type: LicenseType,
+    pub attribution_required: bool,
+    pub commercial_use: bool,
+    pub derivative_works: bool,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum LicenseType {
+    CC0,
+    CCBY,
+    CCBYSA,
+    CCBYNC,
+    CCBYNCSA,
     AllRightsReserved,
     Custom(String),
 }
@@ -108,27 +121,46 @@ pub struct SubmitFactCheckInput {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum EpistemicPosition {
-    Established,
-    Emerging,
-    Contested,
-    Speculative,
+pub struct EpistemicPosition {
+    pub empirical: f64,
+    pub normative: f64,
+    pub mythic: f64,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum FactCheckVerdict {
     True,
+    MostlyTrue,
+    HalfTrue,
+    MostlyFalse,
     False,
+    Unverifiable,
+    OutOfContext,
+    Satire,
+    Opinion,
     PartiallyTrue,
     Misleading,
-    Unverifiable,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct EvidenceItem {
-    pub source_url: String,
+    pub source_type: SourceType,
+    pub source_url: Option<String>,
+    pub source_did: Option<String>,
     pub description: String,
-    pub evidence_type: String,
+    pub supports_claim: bool,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum SourceType {
+    PrimarySource,
+    SecondarySource,
+    ExpertOpinion,
+    OfficialDocument,
+    ScientificStudy,
+    EyewitnessAccount,
+    DataAnalysis,
+    Other(String),
 }
 
 // --- emergency-incidents ---
@@ -277,7 +309,12 @@ async fn test_media_publish_and_factcheck() {
         co_authors: vec![],
         language: "en".to_string(),
         tags: vec!["water".to_string(), "rights".to_string()],
-        license: License::CreativeCommons("CC-BY-4.0".to_string()),
+        license: License {
+            license_type: LicenseType::CCBY,
+            attribution_required: true,
+            commercial_use: true,
+            derivative_works: true,
+        },
         encrypted: false,
     };
 
@@ -290,12 +327,18 @@ async fn test_media_publish_and_factcheck() {
         publication_id: pub_record.action_address().to_string(),
         claim_text: "Water rights are universally protected".to_string(),
         claim_location: "paragraph 3".to_string(),
-        epistemic_position: EpistemicPosition::Contested,
+        epistemic_position: EpistemicPosition {
+            empirical: 0.4,
+            normative: 0.6,
+            mythic: 0.0,
+        },
         verdict: FactCheckVerdict::PartiallyTrue,
         evidence: vec![EvidenceItem {
-            source_url: "https://example.com/water-law".to_string(),
+            source_type: SourceType::OfficialDocument,
+            source_url: Some("https://example.com/water-law".to_string()),
+            source_did: None,
             description: "UN Water Rights resolution".to_string(),
-            evidence_type: "legal_document".to_string(),
+            supports_claim: true,
         }],
         checker_did: author_did.clone(),
     };
@@ -355,7 +398,12 @@ async fn test_cross_domain_media_references_emergency() {
         co_authors: vec![],
         language: "en".to_string(),
         tags: vec!["emergency".to_string(), "flood".to_string()],
-        license: License::PublicDomain,
+        license: License {
+            license_type: LicenseType::CC0,
+            attribution_required: false,
+            commercial_use: true,
+            derivative_works: true,
+        },
         encrypted: false,
     };
 
@@ -480,6 +528,11 @@ pub enum CaseType {
     ContractDispute,
     ConductViolation,
     PropertyDispute,
+    FinancialDispute,
+    GovernanceDispute,
+    IdentityDispute,
+    IPDispute,
+    Other { category: String },
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -494,6 +547,9 @@ pub enum PartyRole {
     Complainant,
     Respondent,
     Witness,
+    Expert,
+    Intervenor,
+    Affected,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -502,14 +558,22 @@ pub enum CasePhase {
     Negotiation,
     Mediation,
     Arbitration,
+    Appeal,
+    Enforcement,
     Closed,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum CaseStatus {
     Active,
+    OnHold,
+    AwaitingResponse,
+    InDeliberation,
+    DecisionRendered,
+    Enforcing,
     Resolved,
     Dismissed,
+    Withdrawn,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -553,8 +617,15 @@ pub struct DeclareDisasterInput {
 pub enum DisasterType {
     Hurricane,
     Earthquake,
-    Flood,
     Wildfire,
+    Flood,
+    Tornado,
+    Pandemic,
+    Industrial,
+    MassCasualty,
+    CyberAttack,
+    Infrastructure,
+    Other(String),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -597,6 +668,8 @@ pub enum ZoneStatus {
     Unassessed,
     Active,
     Cleared,
+    Hazardous,
+    Evacuated,
 }
 
 // --- Mirror types for emergency-shelters ---
@@ -616,21 +689,27 @@ pub struct RegisterShelterInput {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum ShelterType {
-    PublicBuilding,
-    School,
-    CommunityCenter,
-    ReligiousFacility,
-    TemporaryStructure,
+    Emergency,
+    Community,
+    Medical,
+    PetFriendly,
+    Accessible,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Amenity {
-    FoodPrep,
-    MedicalStation,
+    Power,
+    Water,
+    Medical,
+    Food,
     Showers,
+    Wifi,
+    Charging,
+    Cots,
+    Blankets,
     PetArea,
-    Electricity,
-    WiFi,
+    ChildCare,
+    MentalHealth,
 }
 
 // --- Mirror types for emergency-resources ---
@@ -647,30 +726,34 @@ pub struct RegisterResourceInput {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum EmergencyResourceType {
-    Water,
+    Medical,
+    Personnel,
+    Equipment,
+    Shelter,
+    Transport,
+    Communication,
     Food,
-    MedicalSupplies,
-    Blankets,
-    Generators,
-    FuelSupplies,
+    Water,
+    Power,
+    Fuel,
 }
 
 // --- Mirror types for media-curation ---
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCollectionInput {
-    pub curator_did: String,
     pub name: String,
     pub description: String,
-    pub publication_ids: Vec<String>,
+    pub curator_did: String,
     pub visibility: Visibility,
+    pub publication_ids: Vec<String>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Visibility {
     Public,
     Private,
-    CommunityOnly,
+    Unlisted,
 }
 
 // --- Mirror types for bridge audit trail ---
@@ -865,11 +948,11 @@ async fn test_emergency_register_shelter() {
         location_lon: -95.3698,
         address: "123 Main St, Houston, TX".to_string(),
         capacity: 200,
-        shelter_type: ShelterType::CommunityCenter,
+        shelter_type: ShelterType::Community,
         amenities: vec![
-            Amenity::FoodPrep,
-            Amenity::MedicalStation,
-            Amenity::WiFi,
+            Amenity::Food,
+            Amenity::Medical,
+            Amenity::Wifi,
         ],
         contact: "shelter-ops@example.com".to_string(),
     };
@@ -967,8 +1050,8 @@ async fn test_emergency_full_workflow() {
         location_lon: -122.42,
         address: "456 Shelter Way, San Francisco".to_string(),
         capacity: 500,
-        shelter_type: ShelterType::PublicBuilding,
-        amenities: vec![Amenity::FoodPrep, Amenity::MedicalStation, Amenity::Electricity],
+        shelter_type: ShelterType::Emergency,
+        amenities: vec![Amenity::Food, Amenity::Medical, Amenity::Power],
         contact: "ops@bayarea-emergency.org".to_string(),
     };
 
@@ -983,7 +1066,7 @@ async fn test_emergency_full_workflow() {
     // 3. Register emergency supplies
     let supplies = RegisterResourceInput {
         id: "resource-wf-001".to_string(),
-        resource_type: EmergencyResourceType::MedicalSupplies,
+        resource_type: EmergencyResourceType::Medical,
         name: "First aid kits".to_string(),
         quantity: 200,
         unit: "kits".to_string(),
@@ -1093,7 +1176,12 @@ async fn test_justice_case_with_media_evidence() {
         co_authors: vec![],
         language: "en".to_string(),
         tags: vec!["governance".to_string(), "dispute".to_string()],
-        license: License::AllRightsReserved,
+        license: License {
+            license_type: LicenseType::AllRightsReserved,
+            attribution_required: false,
+            commercial_use: false,
+            derivative_works: false,
+        },
         encrypted: false,
     };
 
@@ -1106,12 +1194,18 @@ async fn test_justice_case_with_media_evidence() {
         publication_id: pub_record.action_address().to_string(),
         claim_text: "The governance decision was unanimous".to_string(),
         claim_location: "paragraph 2".to_string(),
-        epistemic_position: EpistemicPosition::Established,
+        epistemic_position: EpistemicPosition {
+            empirical: 0.9,
+            normative: 0.1,
+            mythic: 0.0,
+        },
         verdict: FactCheckVerdict::False,
         evidence: vec![EvidenceItem {
-            source_url: "https://governance.example.com/minutes".to_string(),
+            source_type: SourceType::OfficialDocument,
+            source_url: Some("https://governance.example.com/minutes".to_string()),
+            source_did: None,
             description: "Official meeting minutes show 7-3 vote".to_string(),
-            evidence_type: "official_record".to_string(),
+            supports_claim: false,
         }],
         checker_did: format!("did:key:{}", agent),
     };

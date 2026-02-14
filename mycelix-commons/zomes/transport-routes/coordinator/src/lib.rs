@@ -184,4 +184,249 @@ mod tests {
             assert_eq!(decoded, vt);
         }
     }
+
+    // ========================================================================
+    // TransportMode enum serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn transport_mode_all_variants_serde_roundtrip() {
+        let variants = vec![
+            TransportMode::Driving,
+            TransportMode::Cycling,
+            TransportMode::Walking,
+            TransportMode::Transit,
+            TransportMode::Mixed,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: TransportMode = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // StopType enum serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn stop_type_all_variants_serde_roundtrip() {
+        let variants = vec![
+            StopType::Pickup,
+            StopType::Dropoff,
+            StopType::Transfer,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: StopType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // Waypoint struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn waypoint_serde_roundtrip_with_label() {
+        let wp = Waypoint {
+            lat: 32.95,
+            lon: -96.73,
+            label: Some("Downtown Station".to_string()),
+        };
+        let json = serde_json::to_string(&wp).unwrap();
+        let decoded: Waypoint = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.lat, 32.95);
+        assert_eq!(decoded.lon, -96.73);
+        assert_eq!(decoded.label, Some("Downtown Station".to_string()));
+    }
+
+    #[test]
+    fn waypoint_serde_roundtrip_without_label() {
+        let wp = Waypoint {
+            lat: -33.87,
+            lon: 151.21,
+            label: None,
+        };
+        let json = serde_json::to_string(&wp).unwrap();
+        let decoded: Waypoint = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.lat, -33.87);
+        assert_eq!(decoded.lon, 151.21);
+        assert_eq!(decoded.label, None);
+    }
+
+    // ========================================================================
+    // Route struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn route_serde_roundtrip() {
+        let route = Route {
+            id: "rt-42".to_string(),
+            name: "Downtown Loop".to_string(),
+            waypoints: vec![
+                Waypoint { lat: 32.95, lon: -96.73, label: Some("Start".to_string()) },
+                Waypoint { lat: 32.96, lon: -96.74, label: None },
+                Waypoint { lat: 32.97, lon: -96.75, label: Some("End".to_string()) },
+            ],
+            distance_km: 5.2,
+            estimated_minutes: 20,
+            mode: TransportMode::Driving,
+        };
+        let json = serde_json::to_string(&route).unwrap();
+        let decoded: Route = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "rt-42");
+        assert_eq!(decoded.name, "Downtown Loop");
+        assert_eq!(decoded.waypoints.len(), 3);
+        assert_eq!(decoded.waypoints[0].label, Some("Start".to_string()));
+        assert_eq!(decoded.waypoints[1].label, None);
+        assert_eq!(decoded.distance_km, 5.2);
+        assert_eq!(decoded.estimated_minutes, 20);
+        assert_eq!(decoded.mode, TransportMode::Driving);
+    }
+
+    #[test]
+    fn route_serde_all_modes() {
+        for mode in [
+            TransportMode::Driving,
+            TransportMode::Cycling,
+            TransportMode::Walking,
+            TransportMode::Transit,
+            TransportMode::Mixed,
+        ] {
+            let route = Route {
+                id: "rt-mode".to_string(),
+                name: "Mode Test".to_string(),
+                waypoints: vec![
+                    Waypoint { lat: 0.0, lon: 0.0, label: None },
+                    Waypoint { lat: 1.0, lon: 1.0, label: None },
+                ],
+                distance_km: 1.0,
+                estimated_minutes: 10,
+                mode: mode.clone(),
+            };
+            let json = serde_json::to_string(&route).unwrap();
+            let decoded: Route = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.mode, mode);
+        }
+    }
+
+    #[test]
+    fn route_serde_minimal_waypoints() {
+        let route = Route {
+            id: "rt-min".to_string(),
+            name: "Short Route".to_string(),
+            waypoints: vec![
+                Waypoint { lat: 32.95, lon: -96.73, label: None },
+                Waypoint { lat: 32.96, lon: -96.74, label: None },
+            ],
+            distance_km: 0.5,
+            estimated_minutes: 3,
+            mode: TransportMode::Walking,
+        };
+        let json = serde_json::to_string(&route).unwrap();
+        let decoded: Route = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.waypoints.len(), 2);
+        assert_eq!(decoded.distance_km, 0.5);
+    }
+
+    // ========================================================================
+    // Stop struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn stop_serde_roundtrip_with_scheduled_time() {
+        let stop = Stop {
+            route_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            name: "Main St Station".to_string(),
+            location_lat: 32.95,
+            location_lon: -96.73,
+            scheduled_time: Some(1700000000),
+            stop_type: StopType::Pickup,
+        };
+        let json = serde_json::to_string(&stop).unwrap();
+        let decoded: Stop = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "Main St Station");
+        assert_eq!(decoded.location_lat, 32.95);
+        assert_eq!(decoded.location_lon, -96.73);
+        assert_eq!(decoded.scheduled_time, Some(1700000000));
+        assert_eq!(decoded.stop_type, StopType::Pickup);
+    }
+
+    #[test]
+    fn stop_serde_roundtrip_without_scheduled_time() {
+        let stop = Stop {
+            route_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            name: "Flex Stop".to_string(),
+            location_lat: 33.45,
+            location_lon: -96.50,
+            scheduled_time: None,
+            stop_type: StopType::Dropoff,
+        };
+        let json = serde_json::to_string(&stop).unwrap();
+        let decoded: Stop = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "Flex Stop");
+        assert_eq!(decoded.scheduled_time, None);
+        assert_eq!(decoded.stop_type, StopType::Dropoff);
+    }
+
+    #[test]
+    fn stop_serde_all_stop_types() {
+        for st in [StopType::Pickup, StopType::Dropoff, StopType::Transfer] {
+            let stop = Stop {
+                route_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+                name: "Type Test".to_string(),
+                location_lat: 0.0,
+                location_lon: 0.0,
+                scheduled_time: None,
+                stop_type: st.clone(),
+            };
+            let json = serde_json::to_string(&stop).unwrap();
+            let decoded: Stop = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.stop_type, st);
+        }
+    }
+
+    // ========================================================================
+    // Vehicle struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn vehicle_serde_roundtrip() {
+        let vehicle = Vehicle {
+            id: "v-99".to_string(),
+            owner: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            vehicle_type: VehicleType::Van,
+            capacity_kg: 1200.0,
+            capacity_passengers: 8,
+            status: VehicleStatus::Available,
+        };
+        let json = serde_json::to_string(&vehicle).unwrap();
+        let decoded: Vehicle = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "v-99");
+        assert_eq!(decoded.vehicle_type, VehicleType::Van);
+        assert_eq!(decoded.capacity_kg, 1200.0);
+        assert_eq!(decoded.capacity_passengers, 8);
+        assert_eq!(decoded.status, VehicleStatus::Available);
+    }
+
+    #[test]
+    fn vehicle_serde_all_types_and_statuses() {
+        let types = [VehicleType::Bike, VehicleType::Bus, VehicleType::ElectricScooter];
+        let statuses = [VehicleStatus::InUse, VehicleStatus::Maintenance, VehicleStatus::Retired];
+        for (vt, vs) in types.iter().zip(statuses.iter()) {
+            let vehicle = Vehicle {
+                id: "v-combo".to_string(),
+                owner: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                vehicle_type: vt.clone(),
+                capacity_kg: 0.0,
+                capacity_passengers: 1,
+                status: vs.clone(),
+            };
+            let json = serde_json::to_string(&vehicle).unwrap();
+            let decoded: Vehicle = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.vehicle_type, *vt);
+            assert_eq!(decoded.status, *vs);
+        }
+    }
 }

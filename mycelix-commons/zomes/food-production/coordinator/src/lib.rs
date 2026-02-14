@@ -194,4 +194,278 @@ mod tests {
         assert!(json.contains("\"source_zome\""));
         assert!(json.contains("\"payload\""));
     }
+
+    // ========================================================================
+    // SoilType enum serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn soil_type_all_variants_serde_roundtrip() {
+        let variants = vec![
+            SoilType::Clay,
+            SoilType::Sandy,
+            SoilType::Loam,
+            SoilType::Silt,
+            SoilType::Peat,
+            SoilType::Chalk,
+            SoilType::Mixed,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: SoilType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // PlotStatus enum serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn plot_status_all_variants_serde_roundtrip() {
+        let variants = vec![
+            PlotStatus::Active,
+            PlotStatus::Fallow,
+            PlotStatus::Preparing,
+            PlotStatus::Retired,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: PlotStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // CropStatus enum serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn crop_status_all_variants_serde_roundtrip() {
+        let variants = vec![
+            CropStatus::Planned,
+            CropStatus::Planted,
+            CropStatus::Growing,
+            CropStatus::Ready,
+            CropStatus::Harvested,
+            CropStatus::Failed,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: CropStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // QualityGrade enum serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn quality_grade_all_variants_serde_roundtrip() {
+        let variants = vec![
+            QualityGrade::Premium,
+            QualityGrade::Standard,
+            QualityGrade::Processing,
+            QualityGrade::Compost,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: QualityGrade = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // Plot struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn plot_serde_roundtrip() {
+        let plot = Plot {
+            id: "plot-42".to_string(),
+            name: "Sunrise Garden".to_string(),
+            area_sqm: 250.5,
+            soil_type: SoilType::Loam,
+            location_lat: 32.95,
+            location_lon: -96.73,
+            steward: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            status: PlotStatus::Active,
+        };
+        let json = serde_json::to_string(&plot).unwrap();
+        let decoded: Plot = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "plot-42");
+        assert_eq!(decoded.name, "Sunrise Garden");
+        assert_eq!(decoded.area_sqm, 250.5);
+        assert_eq!(decoded.soil_type, SoilType::Loam);
+        assert_eq!(decoded.location_lat, 32.95);
+        assert_eq!(decoded.location_lon, -96.73);
+        assert_eq!(decoded.status, PlotStatus::Active);
+    }
+
+    #[test]
+    fn plot_serde_all_soil_and_status_combinations() {
+        let soils = [SoilType::Clay, SoilType::Peat, SoilType::Chalk];
+        let statuses = [PlotStatus::Fallow, PlotStatus::Preparing, PlotStatus::Retired];
+        for (soil, status) in soils.iter().zip(statuses.iter()) {
+            let plot = Plot {
+                id: "p-combo".to_string(),
+                name: "Combo Plot".to_string(),
+                area_sqm: 10.0,
+                soil_type: soil.clone(),
+                location_lat: 0.0,
+                location_lon: 0.0,
+                steward: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                status: status.clone(),
+            };
+            let json = serde_json::to_string(&plot).unwrap();
+            let decoded: Plot = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.soil_type, *soil);
+            assert_eq!(decoded.status, *status);
+        }
+    }
+
+    // ========================================================================
+    // Crop struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn crop_serde_roundtrip() {
+        let crop = Crop {
+            plot_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            name: "Tomato".to_string(),
+            variety: "Cherokee Purple".to_string(),
+            planted_at: 1700000000,
+            expected_harvest: 1708000000,
+            status: CropStatus::Growing,
+        };
+        let json = serde_json::to_string(&crop).unwrap();
+        let decoded: Crop = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "Tomato");
+        assert_eq!(decoded.variety, "Cherokee Purple");
+        assert_eq!(decoded.planted_at, 1700000000);
+        assert_eq!(decoded.expected_harvest, 1708000000);
+        assert_eq!(decoded.status, CropStatus::Growing);
+    }
+
+    #[test]
+    fn crop_serde_all_statuses() {
+        for status in [
+            CropStatus::Planned,
+            CropStatus::Planted,
+            CropStatus::Growing,
+            CropStatus::Ready,
+            CropStatus::Harvested,
+            CropStatus::Failed,
+        ] {
+            let crop = Crop {
+                plot_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+                name: "Basil".to_string(),
+                variety: "Genovese".to_string(),
+                planted_at: 1700000000,
+                expected_harvest: 1705000000,
+                status: status.clone(),
+            };
+            let json = serde_json::to_string(&crop).unwrap();
+            let decoded: Crop = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.status, status);
+        }
+    }
+
+    // ========================================================================
+    // YieldRecord struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn yield_record_serde_roundtrip_with_notes() {
+        let yr = YieldRecord {
+            crop_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            quantity_kg: 42.5,
+            quality_grade: QualityGrade::Premium,
+            harvested_at: 1708000000,
+            notes: Some("Excellent season".to_string()),
+        };
+        let json = serde_json::to_string(&yr).unwrap();
+        let decoded: YieldRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity_kg, 42.5);
+        assert_eq!(decoded.quality_grade, QualityGrade::Premium);
+        assert_eq!(decoded.harvested_at, 1708000000);
+        assert_eq!(decoded.notes, Some("Excellent season".to_string()));
+    }
+
+    #[test]
+    fn yield_record_serde_roundtrip_without_notes() {
+        let yr = YieldRecord {
+            crop_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            quantity_kg: 3.2,
+            quality_grade: QualityGrade::Compost,
+            harvested_at: 1709000000,
+            notes: None,
+        };
+        let json = serde_json::to_string(&yr).unwrap();
+        let decoded: YieldRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity_kg, 3.2);
+        assert_eq!(decoded.quality_grade, QualityGrade::Compost);
+        assert_eq!(decoded.notes, None);
+    }
+
+    #[test]
+    fn yield_record_serde_all_grades() {
+        for grade in [
+            QualityGrade::Premium,
+            QualityGrade::Standard,
+            QualityGrade::Processing,
+            QualityGrade::Compost,
+        ] {
+            let yr = YieldRecord {
+                crop_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+                quantity_kg: 10.0,
+                quality_grade: grade.clone(),
+                harvested_at: 1708000000,
+                notes: None,
+            };
+            let json = serde_json::to_string(&yr).unwrap();
+            let decoded: YieldRecord = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.quality_grade, grade);
+        }
+    }
+
+    // ========================================================================
+    // SeasonPlan struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn season_plan_serde_roundtrip_with_rotation_notes() {
+        let sp = SeasonPlan {
+            plot_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            year: 2026,
+            season: "Spring".to_string(),
+            planned_crops: vec!["Tomato".to_string(), "Basil".to_string(), "Pepper".to_string()],
+            rotation_notes: Some("Follow legumes with brassicas".to_string()),
+        };
+        let json = serde_json::to_string(&sp).unwrap();
+        let decoded: SeasonPlan = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.year, 2026);
+        assert_eq!(decoded.season, "Spring");
+        assert_eq!(decoded.planned_crops.len(), 3);
+        assert_eq!(decoded.planned_crops[0], "Tomato");
+        assert_eq!(decoded.rotation_notes, Some("Follow legumes with brassicas".to_string()));
+    }
+
+    #[test]
+    fn season_plan_serde_roundtrip_without_rotation_notes() {
+        let sp = SeasonPlan {
+            plot_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            year: 2027,
+            season: "Fall".to_string(),
+            planned_crops: vec!["Garlic".to_string()],
+            rotation_notes: None,
+        };
+        let json = serde_json::to_string(&sp).unwrap();
+        let decoded: SeasonPlan = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.year, 2027);
+        assert_eq!(decoded.season, "Fall");
+        assert_eq!(decoded.planned_crops, vec!["Garlic"]);
+        assert_eq!(decoded.rotation_notes, None);
+    }
 }

@@ -366,4 +366,253 @@ mod tests {
             assert_eq!(variant, back);
         }
     }
+
+    // ========================================================================
+    // STRUCT SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn traditional_practice_serde_roundtrip() {
+        let practice = TraditionalPractice {
+            id: "tp-001".to_string(),
+            title: "Qanat System".to_string(),
+            description: "Ancient underground water channel system for irrigation".to_string(),
+            practice_type: PracticeType::Irrigation,
+            region: "Middle East".to_string(),
+            culture_or_community: "Persian".to_string(),
+            recorded_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            access_level: AccessLevel::Public,
+            effectiveness_rating: Some(8),
+        };
+        let json = serde_json::to_string(&practice).unwrap();
+        let back: TraditionalPractice = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.id, "tp-001");
+        assert_eq!(back.title, "Qanat System");
+        assert_eq!(back.practice_type, PracticeType::Irrigation);
+        assert_eq!(back.region, "Middle East");
+        assert_eq!(back.culture_or_community, "Persian");
+        assert_eq!(back.access_level, AccessLevel::Public);
+        assert_eq!(back.effectiveness_rating, Some(8));
+    }
+
+    #[test]
+    fn traditional_practice_no_rating_serde() {
+        let practice = TraditionalPractice {
+            id: "tp-002".to_string(),
+            title: "Rain Ceremony".to_string(),
+            description: "Traditional ceremony to invite rain".to_string(),
+            practice_type: PracticeType::Ceremony,
+            region: "Southern Africa".to_string(),
+            culture_or_community: "Zulu".to_string(),
+            recorded_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            access_level: AccessLevel::Sacred,
+            effectiveness_rating: None,
+        };
+        let json = serde_json::to_string(&practice).unwrap();
+        let back: TraditionalPractice = serde_json::from_str(&json).unwrap();
+        assert!(back.effectiveness_rating.is_none());
+        assert_eq!(back.access_level, AccessLevel::Sacred);
+    }
+
+    #[test]
+    fn traditional_practice_clone_is_equal() {
+        let practice = TraditionalPractice {
+            id: "tp-003".to_string(),
+            title: "Fogwater Collection".to_string(),
+            description: "Using mesh nets to capture fog".to_string(),
+            practice_type: PracticeType::Harvesting,
+            region: "Atacama Desert".to_string(),
+            culture_or_community: "Chilean coastal communities".to_string(),
+            recorded_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            access_level: AccessLevel::CommunityOnly,
+            effectiveness_rating: Some(7),
+        };
+        let cloned = practice.clone();
+        assert_eq!(practice, cloned);
+    }
+
+    #[test]
+    fn conservation_method_serde_roundtrip() {
+        let method = ConservationMethod {
+            id: "cm-001".to_string(),
+            title: "Drip Irrigation".to_string(),
+            description: "Low-volume water delivery directly to plant roots".to_string(),
+            water_saved_percent: Some(60),
+            applicable_to: vec![
+                WaterClassification::Irrigation,
+                WaterClassification::Cooking,
+            ],
+            cost_level: CostLevel::Medium,
+            difficulty: DifficultyLevel::Intermediate,
+        };
+        let json = serde_json::to_string(&method).unwrap();
+        let back: ConservationMethod = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.id, "cm-001");
+        assert_eq!(back.title, "Drip Irrigation");
+        assert_eq!(back.water_saved_percent, Some(60));
+        assert_eq!(back.applicable_to.len(), 2);
+        assert_eq!(back.cost_level, CostLevel::Medium);
+        assert_eq!(back.difficulty, DifficultyLevel::Intermediate);
+    }
+
+    #[test]
+    fn conservation_method_no_savings_serde() {
+        let method = ConservationMethod {
+            id: "cm-002".to_string(),
+            title: "Water Quality Monitoring".to_string(),
+            description: "Regular testing of water sources".to_string(),
+            water_saved_percent: None,
+            applicable_to: vec![WaterClassification::Potable],
+            cost_level: CostLevel::Low,
+            difficulty: DifficultyLevel::Beginner,
+        };
+        let json = serde_json::to_string(&method).unwrap();
+        let back: ConservationMethod = serde_json::from_str(&json).unwrap();
+        assert!(back.water_saved_percent.is_none());
+        assert_eq!(back.applicable_to.len(), 1);
+    }
+
+    #[test]
+    fn conservation_method_clone_is_equal() {
+        let method = ConservationMethod {
+            id: "cm-003".to_string(),
+            title: "Rainwater Harvesting".to_string(),
+            description: "Collecting and storing rainwater from rooftops".to_string(),
+            water_saved_percent: Some(40),
+            applicable_to: vec![
+                WaterClassification::Irrigation,
+                WaterClassification::Hygiene,
+                WaterClassification::Greywater,
+            ],
+            cost_level: CostLevel::Low,
+            difficulty: DifficultyLevel::Beginner,
+        };
+        let cloned = method.clone();
+        assert_eq!(method, cloned);
+    }
+
+    #[test]
+    fn climate_water_pattern_serde_roundtrip() {
+        let pattern = ClimateWaterPattern {
+            region: "Southwest US".to_string(),
+            season: "Summer".to_string(),
+            pattern_type: PatternType::Drought,
+            description: "Extended drought conditions with below-average rainfall".to_string(),
+            observed_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            observed_at: Timestamp::from_micros(1_700_000_000),
+            indicators: vec![
+                "Reduced streamflow".to_string(),
+                "Lowered aquifer levels".to_string(),
+                "Increased wildfire risk".to_string(),
+            ],
+        };
+        let json = serde_json::to_string(&pattern).unwrap();
+        let back: ClimateWaterPattern = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.region, "Southwest US");
+        assert_eq!(back.season, "Summer");
+        assert_eq!(back.pattern_type, PatternType::Drought);
+        assert_eq!(back.indicators.len(), 3);
+        assert!(back.indicators.contains(&"Increased wildfire risk".to_string()));
+    }
+
+    #[test]
+    fn climate_water_pattern_no_indicators_serde() {
+        let pattern = ClimateWaterPattern {
+            region: "Northern Europe".to_string(),
+            season: "Autumn".to_string(),
+            pattern_type: PatternType::SeasonalShift,
+            description: "Delayed onset of autumn rains".to_string(),
+            observed_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            observed_at: Timestamp::from_micros(1_600_000_000),
+            indicators: vec![],
+        };
+        let json = serde_json::to_string(&pattern).unwrap();
+        let back: ClimateWaterPattern = serde_json::from_str(&json).unwrap();
+        assert!(back.indicators.is_empty());
+        assert_eq!(back.pattern_type, PatternType::SeasonalShift);
+    }
+
+    #[test]
+    fn climate_water_pattern_clone_is_equal() {
+        let pattern = ClimateWaterPattern {
+            region: "Mekong Delta".to_string(),
+            season: "Monsoon".to_string(),
+            pattern_type: PatternType::Flood,
+            description: "Severe monsoon flooding above historical norms".to_string(),
+            observed_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            observed_at: Timestamp::from_micros(1_500_000_000),
+            indicators: vec!["Rising river levels".to_string()],
+        };
+        let cloned = pattern.clone();
+        assert_eq!(pattern, cloned);
+    }
+
+    #[test]
+    fn traditional_practice_unicode_fields_serde() {
+        let practice = TraditionalPractice {
+            id: "tp-unicode".to_string(),
+            title: "\u{0642}\u{0646}\u{0627}\u{0629}".to_string(),
+            description: "\u{53e4}\u{4ee3}\u{306e}\u{6c34}\u{7ba1}\u{7406}\u{6280}\u{8853}".to_string(),
+            practice_type: PracticeType::Irrigation,
+            region: "\u{4e2d}\u{4e1c}".to_string(),
+            culture_or_community: "\u{0641}\u{0627}\u{0631}\u{0633}\u{06cc}".to_string(),
+            recorded_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            access_level: AccessLevel::ElderApproved,
+            effectiveness_rating: Some(9),
+        };
+        let json = serde_json::to_string(&practice).unwrap();
+        let back: TraditionalPractice = serde_json::from_str(&json).unwrap();
+        assert_eq!(practice, back);
+    }
+
+    #[test]
+    fn conservation_method_all_classifications_serde() {
+        let method = ConservationMethod {
+            id: "cm-all".to_string(),
+            title: "Comprehensive Water Reuse".to_string(),
+            description: "System covering all water classifications".to_string(),
+            water_saved_percent: Some(80),
+            applicable_to: vec![
+                WaterClassification::Potable,
+                WaterClassification::Cooking,
+                WaterClassification::Hygiene,
+                WaterClassification::Irrigation,
+                WaterClassification::Industrial,
+                WaterClassification::Recreation,
+                WaterClassification::Greywater,
+            ],
+            cost_level: CostLevel::High,
+            difficulty: DifficultyLevel::Expert,
+        };
+        let json = serde_json::to_string(&method).unwrap();
+        let back: ConservationMethod = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.applicable_to.len(), 7);
+        assert_eq!(back.cost_level, CostLevel::High);
+        assert_eq!(back.difficulty, DifficultyLevel::Expert);
+    }
+
+    #[test]
+    fn anchor_serde_roundtrip() {
+        let anchor = water_wisdom_integrity::Anchor("all_practices".to_string());
+        let json = serde_json::to_string(&anchor).unwrap();
+        let back: water_wisdom_integrity::Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(anchor, back);
+    }
+
+    #[test]
+    fn climate_water_pattern_many_indicators_serde() {
+        let pattern = ClimateWaterPattern {
+            region: "Amazon Basin".to_string(),
+            season: "Dry Season".to_string(),
+            pattern_type: PatternType::LevelChange,
+            description: "Unprecedented low water levels across tributaries".to_string(),
+            observed_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            observed_at: Timestamp::from_micros(1_800_000_000),
+            indicators: (0..20).map(|i| format!("Indicator {}: measurement data", i)).collect(),
+        };
+        let json = serde_json::to_string(&pattern).unwrap();
+        let back: ClimateWaterPattern = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.indicators.len(), 20);
+        assert_eq!(back.pattern_type, PatternType::LevelChange);
+    }
 }

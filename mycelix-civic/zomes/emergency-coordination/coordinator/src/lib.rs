@@ -347,8 +347,6 @@ pub fn get_disaster_context(_: ()) -> ExternResult<DisasterContextResult> {
     };
 
     let mut summaries = Vec::new();
-    let severity_order = ["Critical", "Severe", "Moderate", "Minor"];
-    let mut highest_idx = severity_order.len();
 
     for record in &disaster_records {
         if let Some(entry) = record.entry().as_option() {
@@ -360,13 +358,6 @@ pub fn get_disaster_context(_: ()) -> ExternResult<DisasterContextResult> {
                 let severity = value.get("severity").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
                 let disaster_type = value.get("disaster_type").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
 
-                // Track highest severity
-                if let Some(idx) = severity_order.iter().position(|s| *s == severity) {
-                    if idx < highest_idx {
-                        highest_idx = idx;
-                    }
-                }
-
                 summaries.push(DisasterSummary {
                     id,
                     title,
@@ -377,13 +368,8 @@ pub fn get_disaster_context(_: ()) -> ExternResult<DisasterContextResult> {
         }
     }
 
-    let highest_severity = if highest_idx < severity_order.len() {
-        Some(severity_order[highest_idx].to_string())
-    } else if !summaries.is_empty() {
-        Some("Unknown".to_string())
-    } else {
-        None
-    };
+    let severity_refs: Vec<&str> = summaries.iter().map(|s| s.severity.as_str()).collect();
+    let highest_severity = determine_highest_severity(&severity_refs);
 
     Ok(DisasterContextResult {
         active_disaster_count: summaries.len() as u32,
@@ -391,6 +377,35 @@ pub fn get_disaster_context(_: ()) -> ExternResult<DisasterContextResult> {
         highest_severity,
         error: None,
     })
+}
+
+/// Determine the highest severity from a list of severity strings.
+///
+/// Returns the most critical severity present, using the ordering:
+/// Critical > Severe > Moderate > Minor.
+/// Returns `Some("Unknown")` if severities are non-empty but contain no recognized values.
+/// Returns `None` if the input slice is empty.
+pub fn determine_highest_severity(severities: &[&str]) -> Option<String> {
+    if severities.is_empty() {
+        return None;
+    }
+
+    let severity_order = ["Critical", "Severe", "Moderate", "Minor"];
+    let mut highest_idx = severity_order.len();
+
+    for s in severities {
+        if let Some(idx) = severity_order.iter().position(|known| known == s) {
+            if idx < highest_idx {
+                highest_idx = idx;
+            }
+        }
+    }
+
+    if highest_idx < severity_order.len() {
+        Some(severity_order[highest_idx].to_string())
+    } else {
+        Some("Unknown".to_string())
+    }
 }
 
 /// Get the latest location for an agent
@@ -494,5 +509,313 @@ mod tests {
         let json = serde_json::to_string(&r).unwrap();
         let r2: DisasterContextResult = serde_json::from_str(&json).unwrap();
         assert!(r2.error.as_ref().unwrap().contains("timeout"));
+    }
+
+    // ========================================================================
+    // ENUM VARIANT SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn team_type_all_variants_serde() {
+        let variants = vec![
+            TeamType::SearchAndRescue,
+            TeamType::Medical,
+            TeamType::Logistics,
+            TeamType::Communications,
+            TeamType::Shelter,
+            TeamType::Assessment,
+            TeamType::HazMat,
+            TeamType::Volunteer,
+        ];
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: TeamType = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
+
+    #[test]
+    fn team_status_all_variants_serde() {
+        let variants = vec![
+            TeamStatus::Forming,
+            TeamStatus::Active,
+            TeamStatus::OnBreak,
+            TeamStatus::Disbanded,
+        ];
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: TeamStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
+
+    #[test]
+    fn agent_status_all_variants_serde() {
+        let variants = vec![
+            AgentStatus::Active,
+            AgentStatus::NeedsRelief,
+            AgentStatus::Injured,
+            AgentStatus::Evacuating,
+        ];
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: AgentStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
+
+    #[test]
+    fn connectivity_status_all_variants_serde() {
+        let variants = vec![
+            ConnectivityStatus::Online,
+            ConnectivityStatus::Intermittent,
+            ConnectivityStatus::Offline,
+        ];
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: ConnectivityStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
+
+    #[test]
+    fn access_status_all_variants_serde() {
+        let variants = vec![
+            AccessStatus::Open,
+            AccessStatus::Restricted,
+            AccessStatus::Blocked,
+            AccessStatus::Hazardous,
+            AccessStatus::Flooded,
+            AccessStatus::Collapsed,
+        ];
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: AccessStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
+
+    #[test]
+    fn assignment_status_all_variants_serde() {
+        let variants = vec![
+            AssignmentStatus::Active,
+            AssignmentStatus::Completed,
+            AssignmentStatus::Cancelled,
+            AssignmentStatus::Reassigned,
+        ];
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: AssignmentStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
+
+    // ========================================================================
+    // INPUT STRUCT SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn form_team_input_serde_roundtrip() {
+        let agent_a = AgentPubKey::from_raw_36(vec![0xab; 36]);
+        let agent_b = AgentPubKey::from_raw_36(vec![0xcd; 36]);
+        let input = FormTeamInput {
+            id: "team-alpha".to_string(),
+            name: "Search & Rescue Alpha".to_string(),
+            team_type: TeamType::SearchAndRescue,
+            members: vec![agent_a.clone(), agent_b],
+            lead: agent_a,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: FormTeamInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.id, "team-alpha");
+        assert_eq!(back.name, "Search & Rescue Alpha");
+        assert_eq!(back.members.len(), 2);
+    }
+
+    #[test]
+    fn assign_to_zone_input_serde_roundtrip() {
+        let input = AssignToZoneInput {
+            team_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            zone_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            zone_hash_for_team: ActionHash::from_raw_36(vec![0xcd; 36]),
+            objective: "Clear sector 7 for survivors".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: AssignToZoneInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.objective, "Clear sector 7 for survivors");
+    }
+
+    #[test]
+    fn submit_sitrep_input_serde_roundtrip() {
+        let input = SubmitSitrepInput {
+            team_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            zone_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            conditions: "Heavy flooding, partial building collapse".to_string(),
+            casualties_found: 3,
+            resources_needed: vec!["medical supplies".into(), "boats".into()],
+            hazards: vec!["downed power lines".into()],
+            access_status: AccessStatus::Restricted,
+            synced: false,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: SubmitSitrepInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.conditions, "Heavy flooding, partial building collapse");
+        assert_eq!(back.casualties_found, 3);
+        assert_eq!(back.resources_needed.len(), 2);
+        assert_eq!(back.hazards.len(), 1);
+        assert_eq!(back.access_status, AccessStatus::Restricted);
+        assert!(!back.synced);
+    }
+
+    #[test]
+    fn submit_sitrep_input_empty_vecs_serde() {
+        let input = SubmitSitrepInput {
+            team_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            zone_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            conditions: "All clear".to_string(),
+            casualties_found: 0,
+            resources_needed: vec![],
+            hazards: vec![],
+            access_status: AccessStatus::Open,
+            synced: true,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: SubmitSitrepInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.casualties_found, 0);
+        assert!(back.resources_needed.is_empty());
+        assert!(back.hazards.is_empty());
+        assert!(back.synced);
+    }
+
+    #[test]
+    fn checkin_input_serde_roundtrip() {
+        let input = CheckinInput {
+            lat: 32.9483,
+            lon: -96.7299,
+            status: AgentStatus::Active,
+            battery_level: Some(85),
+            connectivity: ConnectivityStatus::Online,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CheckinInput = serde_json::from_str(&json).unwrap();
+        assert!((back.lat - 32.9483).abs() < f64::EPSILON);
+        assert!((back.lon - (-96.7299)).abs() < f64::EPSILON);
+        assert_eq!(back.status, AgentStatus::Active);
+        assert_eq!(back.battery_level, Some(85));
+        assert_eq!(back.connectivity, ConnectivityStatus::Online);
+    }
+
+    #[test]
+    fn checkin_input_no_battery_serde() {
+        let input = CheckinInput {
+            lat: 0.0,
+            lon: 0.0,
+            status: AgentStatus::Injured,
+            battery_level: None,
+            connectivity: ConnectivityStatus::Offline,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CheckinInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.battery_level, None);
+        assert_eq!(back.status, AgentStatus::Injured);
+        assert_eq!(back.connectivity, ConnectivityStatus::Offline);
+    }
+
+    // ========================================================================
+    // SEVERITY ORDERING LOGIC TESTS
+    // ========================================================================
+
+    #[test]
+    fn severity_empty_returns_none() {
+        assert_eq!(determine_highest_severity(&[]), None);
+    }
+
+    #[test]
+    fn severity_single_critical() {
+        assert_eq!(
+            determine_highest_severity(&["Critical"]),
+            Some("Critical".to_string())
+        );
+    }
+
+    #[test]
+    fn severity_single_minor() {
+        assert_eq!(
+            determine_highest_severity(&["Minor"]),
+            Some("Minor".to_string())
+        );
+    }
+
+    #[test]
+    fn severity_critical_beats_severe() {
+        assert_eq!(
+            determine_highest_severity(&["Severe", "Critical"]),
+            Some("Critical".to_string())
+        );
+    }
+
+    #[test]
+    fn severity_critical_beats_all() {
+        assert_eq!(
+            determine_highest_severity(&["Minor", "Moderate", "Severe", "Critical"]),
+            Some("Critical".to_string())
+        );
+    }
+
+    #[test]
+    fn severity_severe_beats_moderate() {
+        assert_eq!(
+            determine_highest_severity(&["Moderate", "Severe"]),
+            Some("Severe".to_string())
+        );
+    }
+
+    #[test]
+    fn severity_moderate_beats_minor() {
+        assert_eq!(
+            determine_highest_severity(&["Minor", "Moderate"]),
+            Some("Moderate".to_string())
+        );
+    }
+
+    #[test]
+    fn severity_unknown_when_no_recognized_values() {
+        assert_eq!(
+            determine_highest_severity(&["LowPriority", "Advisory"]),
+            Some("Unknown".to_string())
+        );
+    }
+
+    #[test]
+    fn severity_recognized_beats_unknown() {
+        assert_eq!(
+            determine_highest_severity(&["Advisory", "Minor", "LowPriority"]),
+            Some("Minor".to_string())
+        );
+    }
+
+    #[test]
+    fn severity_case_sensitive() {
+        // "critical" (lowercase) is not recognized
+        assert_eq!(
+            determine_highest_severity(&["critical"]),
+            Some("Unknown".to_string())
+        );
+    }
+
+    #[test]
+    fn severity_duplicates_handled() {
+        assert_eq!(
+            determine_highest_severity(&["Severe", "Severe", "Severe"]),
+            Some("Severe".to_string())
+        );
+    }
+
+    #[test]
+    fn severity_single_unknown_returns_unknown() {
+        assert_eq!(
+            determine_highest_severity(&["Informational"]),
+            Some("Unknown".to_string())
+        );
     }
 }
