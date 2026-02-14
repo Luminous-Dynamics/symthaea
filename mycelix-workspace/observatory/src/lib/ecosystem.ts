@@ -376,7 +376,7 @@ export class EcosystemService {
     this.status = {
       healthy: true,
       totalNodes: 0,
-      byzantineTolerance: 45, // 45% BFT threshold
+      byzantineTolerance: 34, // 34% BFT threshold (validated maximum)
       happs: ECOSYSTEM_HAPPS.map((h) => ({ ...h, metrics: defaultMetrics() })),
       crossHappQueries: 0,
       bridgeMessageCount: 0,

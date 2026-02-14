@@ -2,15 +2,17 @@ name: Symthaea CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**', 'bugfix/**']
     paths:
       - 'symthaea/**'
+      - 'symthaea-core/**'
       - '.github/workflows/symthaea-ci.yml'
       - '.github/workflows/symthaea-nightly.yml'
   pull_request:
     branches: [main]
     paths:
       - 'symthaea/**'
+      - 'symthaea-core/**'
       - '.github/workflows/symthaea-ci.yml'
       - '.github/workflows/symthaea-nightly.yml'
 
