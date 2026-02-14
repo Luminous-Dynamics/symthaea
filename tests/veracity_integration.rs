@@ -420,6 +420,11 @@ async fn test_full_pipeline_respects_epistemic_status() {
 
     // Note: With a fresh mind and novel query, the system should recognize uncertainty
     // The exact behavior depends on the mind's state, but we can verify the pipeline works
+    assert!(thought.phi >= 0.0 && thought.phi <= 1.0,
+        "Phi should be in [0,1], got {}", thought.phi);
+    assert!(thought.coherence >= 0.0 && thought.coherence <= 1.0,
+        "Coherence should be in [0,1], got {}", thought.coherence);
+    assert!(!response.content.is_empty(), "Response content should not be empty");
 }
 
 #[tokio::test]
@@ -436,6 +441,9 @@ async fn test_greeting_produces_acknowledgment() {
 
     // A greeting should be handled with reasonable confidence
     // (greetings are within the system's capability)
+    assert!(!response.content.is_empty(), "Response content should not be empty");
+    assert!(thought.coherence >= 0.0 && thought.coherence <= 1.0,
+        "Coherence should be in [0,1], got {}", thought.coherence);
 }
 
 // ============================================================================

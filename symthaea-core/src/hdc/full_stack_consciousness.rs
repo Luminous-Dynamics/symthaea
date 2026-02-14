@@ -1273,8 +1273,9 @@ mod tests {
         // Query related
         let result = stack.comprehend("Sarah was always a good friend");
 
-        // Verify memory tracking initialized
-        let _ = result.memory.recalled_count;
+        // Phi should be valid after recall
+        assert!(result.consciousness_phi.is_finite(), "Phi should be finite after recall");
+        assert!(result.consciousness_phi >= 0.0, "Phi should be non-negative");
     }
 
     #[test]

@@ -79,10 +79,10 @@ fn main() {
 
     // Detailed breakdown
     println!("\nDetailed Analysis:");
-    let quark_phen = bridge.phenomenal_index(&model.up_quark);
-    let electron_phen = bridge.phenomenal_index(&model.electron);
-    let proton_phen = bridge.phenomenal_index(&hadrons.proton);
-    let neutron_phen = bridge.phenomenal_index(&hadrons.neutron);
+    let quark_phen = bridge.estimate_phenomenal_index(&model.up_quark);
+    let electron_phen = bridge.estimate_phenomenal_index(&model.electron);
+    let proton_phen = bridge.estimate_phenomenal_index(&hadrons.proton);
+    let neutron_phen = bridge.estimate_phenomenal_index(&hadrons.neutron);
 
     let h = table.element(1).unwrap();
     let c = table.element(6).unwrap();
@@ -93,10 +93,10 @@ fn main() {
     println!("  Electron:    {:+.4}", electron_phen);
     println!("  Proton:      {:+.4}", proton_phen);
     println!("  Neutron:     {:+.4}", neutron_phen);
-    println!("  Hydrogen:    {:+.4}", bridge.phenomenal_index(&h.vector));
-    println!("  Carbon:      {:+.4}", bridge.phenomenal_index(&c.vector));
-    println!("  Oxygen:      {:+.4}", bridge.phenomenal_index(&o.vector));
-    println!("  Water:       {:+.4}", bridge.phenomenal_index(&water.vector));
+    println!("  Hydrogen:    {:+.4}", bridge.estimate_phenomenal_index(&h.vector));
+    println!("  Carbon:      {:+.4}", bridge.estimate_phenomenal_index(&c.vector));
+    println!("  Oxygen:      {:+.4}", bridge.estimate_phenomenal_index(&o.vector));
+    println!("  Water:       {:+.4}", bridge.estimate_phenomenal_index(&water.vector));
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("EXPERIMENT 2: BINDING vs BUNDLING");
@@ -173,9 +173,9 @@ fn main() {
     let mut test_count = 0;
 
     for (name, vec) in &substrates {
-        let bare_phen = bridge.phenomenal_index(vec);
+        let bare_phen = bridge.estimate_phenomenal_index(vec);
         let embodied = bridge.embody_qualia(vec);
-        let embodied_phen = bridge.phenomenal_index(&embodied);
+        let embodied_phen = bridge.estimate_phenomenal_index(&embodied);
         let delta = embodied_phen - bare_phen;
 
         println!("{:<12} {:>+14.4} {:>+14.4} {:>+12.4}",
@@ -223,18 +223,18 @@ fn main() {
 
     println!("\nIndividual Phenomenal Indices:");
     println!("\n  Phenomenal Concepts:");
-    println!("    Qualia:     {:+.4}", bridge.phenomenal_index(&bridge.qualia));
-    println!("    Awareness:  {:+.4}", bridge.phenomenal_index(&bridge.awareness));
-    println!("    Subjective: {:+.4}", bridge.phenomenal_index(&bridge.subjective));
-    println!("    Experience: {:+.4}", bridge.phenomenal_index(&bridge.experience));
-    println!("    Unity:      {:+.4}", bridge.phenomenal_index(&bridge.unity));
+    println!("    Qualia:     {:+.4}", bridge.estimate_phenomenal_index(&bridge.qualia));
+    println!("    Awareness:  {:+.4}", bridge.estimate_phenomenal_index(&bridge.awareness));
+    println!("    Subjective: {:+.4}", bridge.estimate_phenomenal_index(&bridge.subjective));
+    println!("    Experience: {:+.4}", bridge.estimate_phenomenal_index(&bridge.experience));
+    println!("    Unity:      {:+.4}", bridge.estimate_phenomenal_index(&bridge.unity));
 
     println!("\n  Functional Concepts:");
-    println!("    Computation: {:+.4}", bridge.phenomenal_index(&bridge.computation));
-    println!("    Information: {:+.4}", bridge.phenomenal_index(&bridge.information));
-    println!("    Processing:  {:+.4}", bridge.phenomenal_index(&bridge.processing));
-    println!("    Algorithm:   {:+.4}", bridge.phenomenal_index(&bridge.algorithm));
-    println!("    Function:    {:+.4}", bridge.phenomenal_index(&bridge.function));
+    println!("    Computation: {:+.4}", bridge.estimate_phenomenal_index(&bridge.computation));
+    println!("    Information: {:+.4}", bridge.estimate_phenomenal_index(&bridge.information));
+    println!("    Processing:  {:+.4}", bridge.estimate_phenomenal_index(&bridge.processing));
+    println!("    Algorithm:   {:+.4}", bridge.estimate_phenomenal_index(&bridge.algorithm));
+    println!("    Function:    {:+.4}", bridge.estimate_phenomenal_index(&bridge.function));
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("EXPERIMENT 5: CROSS-DOMAIN ANALYSIS");

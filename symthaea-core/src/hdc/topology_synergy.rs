@@ -312,10 +312,12 @@ mod tests {
         let adaptive = AdaptiveTopology::new(24, 2048, 42);
 
         let metrics = synergy.analyze_adaptive(&adaptive);
-        println!("Adaptive topology: {}", metrics);
+        assert!(metrics.phi.is_finite(), "Phi should be finite");
+        assert!(metrics.beta_0 >= 1, "Beta_0 should be at least 1");
 
         let state = synergy.classify_state(&metrics);
-        println!("Classified as: {:?}", state);
+        let state2 = synergy.classify_state(&metrics);
+        assert_eq!(state, state2, "Classification should be deterministic");
     }
 
     #[test]
@@ -332,9 +334,9 @@ mod tests {
         let fractal = FractalConsciousness::new(config);
         let scale_metrics = synergy.analyze_fractal(&fractal);
 
-        println!("\nMulti-scale topological analysis:");
+        assert_eq!(scale_metrics.len(), 3, "Should have metrics for all 3 scales");
         for m in &scale_metrics {
-            println!("  Scale {:?}: {}", m.scale, m);
+            assert!(m.phi.is_finite(), "Phi at scale {:?} should be finite", m.scale);
         }
     }
 
@@ -342,7 +344,7 @@ mod tests {
     fn test_mode_transitions() {
         let synergy = TopologySynergy::new(2048);
         let report = synergy.mode_transition_analysis();
-        println!("\n{}", report);
+        assert!(!report.transitions.is_empty(), "Mode transition report should have transitions");
     }
 
     #[test]

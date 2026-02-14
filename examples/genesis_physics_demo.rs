@@ -221,9 +221,9 @@ fn main() {
     println!("Phenomenal Index (physics concepts):");
     println!("  (Range: -1 = functional, +1 = phenomenal)\n");
 
-    let electron_phen = bridge.phenomenal_index(&model.electron);
-    let water_phen = bridge.phenomenal_index(&water.vector);
-    let proton_phen = bridge.phenomenal_index(&hadrons.proton);
+    let electron_phen = bridge.estimate_phenomenal_index(&model.electron);
+    let water_phen = bridge.estimate_phenomenal_index(&water.vector);
+    let proton_phen = bridge.estimate_phenomenal_index(&hadrons.proton);
 
     println!("  Electron: {:+.4}", electron_phen);
     println!("  Proton:   {:+.4}", proton_phen);
@@ -239,7 +239,7 @@ fn main() {
 
     // Embodied qualia test
     let embodied = bridge.embody_qualia(&model.electron);
-    let embodied_phen = bridge.phenomenal_index(&embodied);
+    let embodied_phen = bridge.estimate_phenomenal_index(&embodied);
     println!("\nEmbodiment Effect:");
     println!("  Bare electron:    {:+.4}", electron_phen);
     println!("  Embodied qualia:  {:+.4}", embodied_phen);

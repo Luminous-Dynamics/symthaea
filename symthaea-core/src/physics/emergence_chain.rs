@@ -345,16 +345,12 @@ impl EmergenceChain {
         integrated.bind(self.level_vector(EmergenceLevel::Consciousness))
     }
 
-    /// Calculate phenomenal index for a vector at a given level
+    /// Estimate phenomenal index for a vector at a given level using level weight
+    /// and similarity to consciousness concepts.
     ///
-    /// NOTE: This is the legacy method using hardcoded level weights.
+    /// This is a fast heuristic used internally by trace/profile methods.
     /// For rigorous computation, use `phenomenal_index_rigorous()` instead.
-    #[deprecated(
-        since = "0.6.0",
-        note = "Use phenomenal_index_rigorous() for entropy-based computation. \
-                This method uses circular hardcoded level weights."
-    )]
-    pub fn phenomenal_index(&self, vector: &ContinuousHV, level: EmergenceLevel) -> f64 {
+    fn estimate_level_phenomenal_index(&self, vector: &ContinuousHV, level: EmergenceLevel) -> f64 {
         // Higher levels have more phenomenal character
         let level_weight = (level as usize) as f64 / 9.0;
 
@@ -544,12 +540,11 @@ impl EmergenceChain {
     }
 
     /// Get phenomenal profile across all levels for a concept
-    #[allow(deprecated)]
     pub fn phenomenal_profile(&self, concept: &ContinuousHV) -> Vec<(EmergenceLevel, f64)> {
         EmergenceLevel::all()
             .iter()
             .map(|level| {
-                let phi = self.phenomenal_index(concept, *level);
+                let phi = self.estimate_level_phenomenal_index(concept, *level);
                 (*level, phi)
             })
             .collect()
@@ -561,14 +556,13 @@ impl EmergenceChain {
     }
 
     /// Trace the full emergence path from quarks to a given concept
-    #[allow(deprecated)]
     pub fn trace_emergence(&self, concept: &ContinuousHV) -> Vec<EmergenceStep> {
         EmergenceLevel::all()
             .iter()
             .map(|level| {
                 let level_marker = self.level_vector(*level);
                 let at_level = concept.bind(level_marker);
-                let phi = self.phenomenal_index(&at_level, *level);
+                let phi = self.estimate_level_phenomenal_index(&at_level, *level);
                 EmergenceStep {
                     level: *level,
                     vector: at_level,
@@ -579,7 +573,6 @@ impl EmergenceChain {
     }
 
     /// Create a complete emergence trace from hydrogen to consciousness
-    #[allow(deprecated)]
     pub fn hydrogen_to_consciousness(&self) -> Vec<EmergenceStep> {
         let mut steps = Vec::new();
 
@@ -588,7 +581,7 @@ impl EmergenceChain {
         steps.push(EmergenceStep {
             level: EmergenceLevel::Quark,
             vector: quark.clone(),
-            phenomenal_index: self.phenomenal_index(quark, EmergenceLevel::Quark),
+            phenomenal_index: self.estimate_level_phenomenal_index(quark, EmergenceLevel::Quark),
         });
 
         // Hadron level - proton
@@ -596,7 +589,7 @@ impl EmergenceChain {
         steps.push(EmergenceStep {
             level: EmergenceLevel::Hadron,
             vector: hadron.clone(),
-            phenomenal_index: self.phenomenal_index(hadron, EmergenceLevel::Hadron),
+            phenomenal_index: self.estimate_level_phenomenal_index(hadron, EmergenceLevel::Hadron),
         });
 
         // Nucleus level - hydrogen nucleus (just a proton)
@@ -604,7 +597,7 @@ impl EmergenceChain {
         steps.push(EmergenceStep {
             level: EmergenceLevel::Nucleus,
             vector: nucleus.clone(),
-            phenomenal_index: self.phenomenal_index(&nucleus, EmergenceLevel::Nucleus),
+            phenomenal_index: self.estimate_level_phenomenal_index(&nucleus, EmergenceLevel::Nucleus),
         });
 
         // Atom level - hydrogen
@@ -612,7 +605,7 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Atom,
                 vector: atom.clone(),
-                phenomenal_index: self.phenomenal_index(&atom, EmergenceLevel::Atom),
+                phenomenal_index: self.estimate_level_phenomenal_index(&atom, EmergenceLevel::Atom),
             });
         }
 
@@ -622,7 +615,7 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Molecule,
                 vector: h2.clone(),
-                phenomenal_index: self.phenomenal_index(&h2, EmergenceLevel::Molecule),
+                phenomenal_index: self.estimate_level_phenomenal_index(&h2, EmergenceLevel::Molecule),
             });
 
             // Macromolecule level - simple chain
@@ -630,7 +623,7 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Macromolecule,
                 vector: macro_vec.clone(),
-                phenomenal_index: self.phenomenal_index(&macro_vec, EmergenceLevel::Macromolecule),
+                phenomenal_index: self.estimate_level_phenomenal_index(&macro_vec, EmergenceLevel::Macromolecule),
             });
 
             // Cell level
@@ -638,7 +631,7 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Cell,
                 vector: cell.clone(),
-                phenomenal_index: self.phenomenal_index(&cell, EmergenceLevel::Cell),
+                phenomenal_index: self.estimate_level_phenomenal_index(&cell, EmergenceLevel::Cell),
             });
 
             // Neuron level
@@ -646,7 +639,7 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Neuron,
                 vector: neuron.clone(),
-                phenomenal_index: self.phenomenal_index(&neuron, EmergenceLevel::Neuron),
+                phenomenal_index: self.estimate_level_phenomenal_index(&neuron, EmergenceLevel::Neuron),
             });
 
             // Circuit level
@@ -654,7 +647,7 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Circuit,
                 vector: circuit.clone(),
-                phenomenal_index: self.phenomenal_index(&circuit, EmergenceLevel::Circuit),
+                phenomenal_index: self.estimate_level_phenomenal_index(&circuit, EmergenceLevel::Circuit),
             });
 
             // Consciousness level
@@ -662,7 +655,7 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Consciousness,
                 vector: consciousness.clone(),
-                phenomenal_index: self.phenomenal_index(&consciousness, EmergenceLevel::Consciousness),
+                phenomenal_index: self.estimate_level_phenomenal_index(&consciousness, EmergenceLevel::Consciousness),
             });
         }
 
@@ -751,13 +744,13 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_phenomenal_index_increases_with_level() {
         let chain = setup();
         let test_vec = chain.genesis.hv("test::concept", PHYSICS_DIM);
 
-        let phi_quark = chain.phenomenal_index(&test_vec, EmergenceLevel::Quark);
-        let phi_consciousness = chain.phenomenal_index(&test_vec, EmergenceLevel::Consciousness);
+        let profile = chain.phenomenal_profile(&test_vec);
+        let phi_quark = profile.iter().find(|(l, _)| *l == EmergenceLevel::Quark).unwrap().1;
+        let phi_consciousness = profile.iter().find(|(l, _)| *l == EmergenceLevel::Consciousness).unwrap().1;
 
         assert!(phi_consciousness > phi_quark,
             "Consciousness level should have higher phenomenal index");
@@ -825,7 +818,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_circuit_to_consciousness() {
         let chain = setup();
         let circuit = chain.genesis.hv("test::circuit", PHYSICS_DIM);
@@ -835,8 +827,9 @@ mod tests {
         assert!(consciousness.norm() > 0.0, "Consciousness vector should be non-zero");
 
         // The consciousness level should have higher phenomenal index than lower levels
-        let phi_cons = chain.phenomenal_index(&consciousness, EmergenceLevel::Consciousness);
-        let phi_quark = chain.phenomenal_index(&consciousness, EmergenceLevel::Quark);
+        let profile = chain.phenomenal_profile(&consciousness);
+        let phi_cons = profile.iter().find(|(l, _)| *l == EmergenceLevel::Consciousness).unwrap().1;
+        let phi_quark = profile.iter().find(|(l, _)| *l == EmergenceLevel::Quark).unwrap().1;
         assert!(phi_cons > phi_quark, "Consciousness should have higher phenomenal index");
     }
 

@@ -637,9 +637,9 @@ mod tests {
 
         engine.learn_association("x", &pre_vec, "y", &post_vec, 0.5);
 
-        // Buffer should have entry (depends on surprise level)
-        // Note: May or may not have entry depending on surprise threshold
-        // Just verify no panic
+        // After processing, stats should reflect the learning attempt
+        let stats = engine.stats();
+        assert!(stats.gated_attempts >= 1, "Should have recorded at least 1 learning attempt");
     }
 
     #[test]

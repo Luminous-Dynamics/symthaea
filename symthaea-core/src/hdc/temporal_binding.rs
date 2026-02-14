@@ -515,10 +515,10 @@ mod tests {
         }
 
         let summary = engine.integration_summary();
-        println!("\nIntegration Summary:");
-        println!("  Past binding: {:.3}", summary.past_binding);
-        println!("  Future binding: {:.3}", summary.future_binding);
-        println!("  Coherence: {:.3}", summary.coherence);
+        assert!(summary.past_binding.is_finite(), "Past binding should be finite");
+        assert!(summary.future_binding.is_finite(), "Future binding should be finite");
+        assert!(summary.coherence.is_finite(), "Coherence should be finite");
+        assert!(summary.coherence >= 0.0, "Coherence should be non-negative");
     }
 
     #[test]
@@ -573,6 +573,8 @@ mod tests {
         }
 
         let health = stream.stream_health();
-        println!("\nFinal: {}", health);
+        assert!(health.coherence.is_finite(), "Stream coherence should be finite");
+        assert!(health.temporal_integration.is_finite(), "Temporal integration should be finite");
+        assert!(health.theta_rhythm.is_finite(), "Theta rhythm should be finite");
     }
 }

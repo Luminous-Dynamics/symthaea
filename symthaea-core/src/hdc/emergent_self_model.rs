@@ -489,7 +489,8 @@ mod tests {
         };
         let sac = SelfAwareConsciousness::new(config);
         let report = sac.introspect();
-        println!("{}", report);
+        assert!(report.believed_phi.is_finite(), "Believed phi should be finite");
+        assert!(report.self_model_confidence >= 0.0, "Self model confidence should be non-negative");
     }
 
     #[test]
@@ -501,18 +502,15 @@ mod tests {
         };
         let mut sac = SelfAwareConsciousness::new(config);
 
-        println!("\nSelf-aware processing:");
         for i in 0..15 {
             let input = ContinuousHV::random(1024, i * 100);
             let update = sac.process_aware(&input);
-
-            if i % 3 == 0 {
-                println!("{}", update);
-            }
+            assert!(update.prediction_error.is_finite(),
+                "Prediction error should be finite at step {}", i);
         }
 
-        println!("\nFinal introspection:");
-        println!("{}", sac.introspect());
+        let report = sac.introspect();
+        assert!(report.believed_phi.is_finite(), "Final believed phi should be finite");
     }
 
     #[test]
@@ -541,11 +539,9 @@ mod tests {
         let early_avg: f64 = early_errors.iter().sum::<f64>() / early_errors.len() as f64;
         let late_avg: f64 = late_errors.iter().sum::<f64>() / late_errors.len() as f64;
 
-        println!("Early prediction error: {:.4}", early_avg);
-        println!("Late prediction error: {:.4}", late_avg);
-        println!("Improvement: {:.1}%", (early_avg - late_avg) / early_avg * 100.0);
-
-        // Predictions should improve over time
-        // (This might not always pass due to randomness, but trend should be positive)
+        assert!(early_avg.is_finite(), "Early average error should be finite");
+        assert!(late_avg.is_finite(), "Late average error should be finite");
+        assert!(early_avg >= 0.0, "Early average error should be non-negative");
+        assert!(late_avg >= 0.0, "Late average error should be non-negative");
     }
 }

@@ -583,9 +583,11 @@ mod tests {
         let sim_cat_kitten = encoder.hamming_similarity(&cat, &kitten);
         let sim_cat_car = encoder.hamming_similarity(&cat, &car);
 
-        // Note: Without learned embeddings, this may not hold
-        // But n-gram similarity should give some signal
-        println!("cat-kitten: {}, cat-car: {}", sim_cat_kitten, sim_cat_car);
+        // Both similarities should be valid
+        assert!(sim_cat_kitten.is_finite(), "cat-kitten similarity should be finite");
+        assert!(sim_cat_car.is_finite(), "cat-car similarity should be finite");
+        assert!(sim_cat_kitten >= 0.0 && sim_cat_kitten <= 1.0, "Similarity should be in [0,1]");
+        assert!(sim_cat_car >= 0.0 && sim_cat_car <= 1.0, "Similarity should be in [0,1]");
     }
 
     #[test]
