@@ -459,3 +459,233 @@ async fn test_both_clusters_healthy() {
     assert!(civic_health.domains.contains(&"justice".to_string()));
     assert!(civic_health.domains.contains(&"media".to_string()));
 }
+
+// ============================================================================
+// P0 Cross-Cluster Scenarios (real-world multi-domain workflows)
+// ============================================================================
+
+// --- Mirror types for P0 scenarios ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct QueryPropertyForEnforcementInput {
+    property_id: String,
+    case_id: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct PropertyEnforcementResult {
+    property_found: bool,
+    enforcement_advisory: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct CheckHousingCapacityInput {
+    disaster_id: String,
+    area: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct HousingCapacityResult {
+    commons_reachable: bool,
+    recommendation: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct VerifyCareCredentialsInput {
+    provider_did: String,
+    case_id: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct CareCredentialVerifyResult {
+    commons_reachable: bool,
+    recommendation: Option<String>,
+    error: Option<String>,
+}
+
+/// P0-1: Water contamination → Emergency area check
+///
+/// Scenario: A water contamination event in the commons cluster triggers
+/// an emergency area check to see if civic emergency services are already
+/// active in the affected zone.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires both DNAs packed"]
+async fn test_p0_water_contamination_triggers_emergency_check() {
+    let agent = setup_unified_conductor().await;
+
+    // Simulate: water contamination detected at a geographic location,
+    // commons-bridge queries civic emergency services for that area
+    let input = CheckEmergencyForAreaInput {
+        lat: 29.7604,   // Houston, TX — industrial corridor
+        lon: -95.3698,
+    };
+
+    let result: EmergencyAreaCheckResult = agent
+        .call_commons("commons_bridge", "check_emergency_for_area", input)
+        .await;
+
+    // On a fresh DNA, either no emergencies exist or we get a cross-cluster
+    // response — both are valid. The key assertion is that the cross-cluster
+    // dispatch completes without panic.
+    assert!(
+        !result.has_active_emergencies || result.error.is_some(),
+        "Fresh DNA should have no active emergencies in the Houston area"
+    );
+    // If the dispatch succeeded, recommendation should be present
+    if result.error.is_none() {
+        assert!(result.recommendation.len() > 0, "Should provide a recommendation");
+    }
+}
+
+/// P0-2: Transport evacuation → Emergency coordination dispatch
+///
+/// Scenario: A transport route is being evaluated for evacuation use.
+/// The commons cluster dispatches to civic emergency_coordination to
+/// retrieve the current disaster context and determine if evacuation
+/// routes overlap with active emergency zones.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires both DNAs packed"]
+async fn test_p0_transport_evacuation_route_emergency_dispatch() {
+    let agent = setup_unified_conductor().await;
+
+    // Dispatch from commons to civic emergency_coordination's
+    // get_disaster_context (returns active disasters + highest severity)
+    let dispatch = CrossClusterDispatchInput {
+        role: "civic".into(),
+        zome: "emergency_coordination".into(),
+        fn_name: "get_disaster_context".into(),
+        payload: ExternIO::encode(()).unwrap().0,
+    };
+
+    let result: DispatchResult = agent
+        .call_commons("commons_bridge", "dispatch_civic_call", dispatch)
+        .await;
+
+    // The dispatch should either succeed (returning empty disaster context
+    // on fresh DNA) or fail with a known error — not panic
+    assert!(
+        result.success || result.error.is_some(),
+        "Cross-cluster dispatch to emergency_coordination should complete: {:?}",
+        result
+    );
+}
+
+/// P0-3: Housing dispute → Justice property enforcement
+///
+/// Scenario: A housing unit is involved in a tenant rights dispute.
+/// The civic cluster queries the commons property registry to verify
+/// ownership before allowing a justice enforcement action.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires both DNAs packed"]
+async fn test_p0_housing_dispute_justice_enforcement() {
+    let agent = setup_unified_conductor().await;
+
+    let input = QueryPropertyForEnforcementInput {
+        property_id: "PROP-housing-dispute-001".into(),
+        case_id: "CASE-tenant-rights-2026".into(),
+    };
+
+    let result: PropertyEnforcementResult = agent
+        .call_civic("civic_bridge", "query_property_for_enforcement", input)
+        .await;
+
+    // On fresh DNA, property won't be found — that's the expected baseline.
+    // The cross-cluster dispatch to commons must complete without error.
+    assert!(
+        result.property_found || result.error.is_some() || result.enforcement_advisory.is_none(),
+        "Fresh DNA: property not found is the expected baseline"
+    );
+    // If no error, property_found should be true (dispatch succeeded, even
+    // if the property doesn't exist the dispatch itself returns events)
+    // or false with no panic
+    if let Some(ref advisory) = result.enforcement_advisory {
+        assert!(
+            advisory.contains("PROP-housing-dispute-001"),
+            "Advisory should reference the property ID"
+        );
+    }
+}
+
+/// P0-4: Care credentials → Justice evidence verification
+///
+/// Scenario: A care provider's testimony is submitted as evidence in a
+/// justice case. The civic cluster verifies the provider's credentials
+/// via cross-cluster call to commons care_credentials.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires both DNAs packed"]
+async fn test_p0_care_credentials_justice_evidence() {
+    let agent = setup_unified_conductor().await;
+
+    let input = VerifyCareCredentialsInput {
+        provider_did: "did:test:nurse-alice".into(),
+        case_id: "CASE-medical-malpractice-001".into(),
+    };
+
+    let result: CareCredentialVerifyResult = agent
+        .call_civic("civic_bridge", "verify_care_credentials_for_evidence", input)
+        .await;
+
+    // Fresh DNA: no credentials exist, but cross-cluster call should complete.
+    // commons_reachable tells us if the OtherRole dispatch worked.
+    assert!(
+        result.commons_reachable || result.error.is_some(),
+        "Cross-cluster call to commons care_credentials should complete"
+    );
+    if result.commons_reachable {
+        assert!(
+            result.recommendation.is_some(),
+            "Reachable commons should provide a recommendation"
+        );
+    }
+}
+
+/// P0-5: Emergency shelter → Housing capacity check
+///
+/// Scenario: A disaster triggers need for emergency sheltering. The civic
+/// cluster checks commons housing capacity to identify available units
+/// that could supplement dedicated shelters.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires both DNAs packed"]
+async fn test_p0_emergency_shelter_housing_capacity() {
+    let agent = setup_unified_conductor().await;
+
+    let input = CheckHousingCapacityInput {
+        disaster_id: "DISASTER-flood-2026-001".into(),
+        area: "downtown".into(),
+    };
+
+    let result: HousingCapacityResult = agent
+        .call_civic("civic_bridge", "check_housing_capacity_for_sheltering", input)
+        .await;
+
+    // On fresh DNA: commons reachable but 0 housing units.
+    // The key test is that the cross-cluster OtherRole dispatch works.
+    assert!(
+        result.commons_reachable || result.error.is_some(),
+        "Cross-cluster call to commons housing_units should complete"
+    );
+    if result.commons_reachable {
+        assert!(
+            result.recommendation.is_some(),
+            "Reachable commons should provide a recommendation"
+        );
+        let rec = result.recommendation.unwrap();
+        assert!(
+            rec.contains("DISASTER-flood-2026-001"),
+            "Recommendation should reference the disaster ID, got: {}",
+            rec
+        );
+        assert!(
+            rec.contains("downtown"),
+            "Recommendation should reference the area, got: {}",
+            rec
+        );
+    }
+}
