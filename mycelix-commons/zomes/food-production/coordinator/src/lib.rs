@@ -151,3 +151,47 @@ pub fn get_season_plans(plot_hash: ActionHash) -> ExternResult<Vec<Record>> {
     )?;
     records_from_links(links)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bridge_event_signal_serde_roundtrip() {
+        let signal = BridgeEventSignal {
+            event_type: "harvest_recorded".to_string(),
+            source_zome: "food_production".to_string(),
+            payload: r#"{"yield_hash":"abc","crop_hash":"def","quantity_kg":42.5}"#.to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let decoded: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.event_type, "harvest_recorded");
+        assert_eq!(decoded.source_zome, "food_production");
+        assert!(decoded.payload.contains("42.5"));
+    }
+
+    #[test]
+    fn bridge_event_signal_empty_payload() {
+        let signal = BridgeEventSignal {
+            event_type: "test".to_string(),
+            source_zome: "food_production".to_string(),
+            payload: String::new(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let decoded: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.payload, "");
+    }
+
+    #[test]
+    fn bridge_event_signal_json_structure() {
+        let signal = BridgeEventSignal {
+            event_type: "harvest_recorded".to_string(),
+            source_zome: "food_production".to_string(),
+            payload: "{}".to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        assert!(json.contains("\"event_type\""));
+        assert!(json.contains("\"source_zome\""));
+        assert!(json.contains("\"payload\""));
+    }
+}

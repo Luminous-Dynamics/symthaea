@@ -203,3 +203,73 @@ pub fn get_my_orders(_: ()) -> ExternResult<Vec<Record>> {
     )?;
     records_from_links(links)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_order_status_input_serde_fulfilled() {
+        let input = UpdateOrderStatusInput {
+            order_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            new_status: OrderStatus::Fulfilled,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateOrderStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, OrderStatus::Fulfilled);
+    }
+
+    #[test]
+    fn update_order_status_input_serde_cancelled() {
+        let input = UpdateOrderStatusInput {
+            order_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            new_status: OrderStatus::Cancelled,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateOrderStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, OrderStatus::Cancelled);
+    }
+
+    #[test]
+    fn bridge_event_signal_food_bank_serde() {
+        let signal = BridgeEventSignal {
+            event_type: "food_bank_order_placed".to_string(),
+            source_zome: "food_distribution".to_string(),
+            payload: r#"{"order_hash":"abc","market_id":"m1","quantity_kg":10.0}"#.to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let decoded: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.event_type, "food_bank_order_placed");
+        assert!(decoded.payload.contains("market_id"));
+    }
+
+    #[test]
+    fn order_status_all_variants_serialize() {
+        let statuses = vec![
+            OrderStatus::Pending,
+            OrderStatus::Confirmed,
+            OrderStatus::Fulfilled,
+            OrderStatus::Cancelled,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let decoded: OrderStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, status);
+        }
+    }
+
+    #[test]
+    fn market_type_all_variants_serialize() {
+        let types = vec![
+            MarketType::Farmers,
+            MarketType::CSA,
+            MarketType::FoodBank,
+            MarketType::CoOp,
+        ];
+        for mt in types {
+            let json = serde_json::to_string(&mt).unwrap();
+            let decoded: MarketType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, mt);
+        }
+    }
+}

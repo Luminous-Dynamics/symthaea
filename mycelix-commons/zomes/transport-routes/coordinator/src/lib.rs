@@ -126,3 +126,62 @@ pub fn get_route_stops(route_hash: ActionHash) -> ExternResult<Vec<Record>> {
     )?;
     records_from_links(links)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_vehicle_status_input_serde_available() {
+        let input = UpdateVehicleStatusInput {
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            new_status: VehicleStatus::Available,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateVehicleStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, VehicleStatus::Available);
+    }
+
+    #[test]
+    fn update_vehicle_status_input_serde_maintenance() {
+        let input = UpdateVehicleStatusInput {
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            new_status: VehicleStatus::Maintenance,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateVehicleStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, VehicleStatus::Maintenance);
+    }
+
+    #[test]
+    fn vehicle_status_all_variants_serialize() {
+        let statuses = vec![
+            VehicleStatus::Available,
+            VehicleStatus::InUse,
+            VehicleStatus::Maintenance,
+            VehicleStatus::Retired,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let decoded: VehicleStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, status);
+        }
+    }
+
+    #[test]
+    fn vehicle_type_all_variants_serialize() {
+        let types = vec![
+            VehicleType::Car,
+            VehicleType::Van,
+            VehicleType::Bike,
+            VehicleType::Bus,
+            VehicleType::Cargo,
+            VehicleType::ElectricScooter,
+        ];
+        for vt in types {
+            let json = serde_json::to_string(&vt).unwrap();
+            let decoded: VehicleType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, vt);
+        }
+    }
+}

@@ -61,6 +61,112 @@ struct BridgeHealth {
     domains: Vec<String>,
 }
 
+// -- Food Production mirror types --
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum SoilType {
+    Clay,
+    Sandy,
+    Loam,
+    Silt,
+    Peat,
+    Chalk,
+    Mixed,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum PlotStatus {
+    Active,
+    Fallow,
+    Preparing,
+    Retired,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct Plot {
+    id: String,
+    name: String,
+    area_sqm: f64,
+    soil_type: SoilType,
+    location_lat: f64,
+    location_lon: f64,
+    steward: AgentPubKey,
+    status: PlotStatus,
+}
+
+// -- Food Distribution mirror types --
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum MarketType {
+    Farmers,
+    CSA,
+    FoodBank,
+    CoOp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct Market {
+    id: String,
+    name: String,
+    location_lat: f64,
+    location_lon: f64,
+    market_type: MarketType,
+    steward: AgentPubKey,
+    schedule: String,
+}
+
+// -- Transport Routes mirror types --
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum VehicleType {
+    Car,
+    Van,
+    Bike,
+    Bus,
+    Cargo,
+    ElectricScooter,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum VehicleStatus {
+    Available,
+    InUse,
+    Maintenance,
+    Retired,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct Vehicle {
+    id: String,
+    owner: AgentPubKey,
+    vehicle_type: VehicleType,
+    capacity_kg: f64,
+    capacity_passengers: u32,
+    status: VehicleStatus,
+}
+
+// -- Transport Sharing mirror types --
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum OfferStatus {
+    Open,
+    Full,
+    InProgress,
+    Completed,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct RideOffer {
+    vehicle_hash: ActionHash,
+    route_hash: Option<ActionHash>,
+    driver: AgentPubKey,
+    departure_time: u64,
+    seats_available: u32,
+    price_per_seat: f64,
+    status: OfferStatus,
+}
+
 /// Helper to get the commons DNA path
 fn commons_dna_path() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -171,6 +277,228 @@ async fn test_housing_queries_property_via_bridge() {
         .await;
 
     assert!(result.success, "Housing should be able to query property registry");
+}
+
+/// Test: Cross-domain dispatch from bridge to food_production's register_plot
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_cross_domain_dispatch_food_production() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let agent = cell.agent_pubkey().clone();
+    let plot = Plot {
+        id: "plot-sweet-1".to_string(),
+        name: "Community Garden Alpha".to_string(),
+        area_sqm: 250.0,
+        soil_type: SoilType::Loam,
+        location_lat: 32.9483,
+        location_lon: -96.7299,
+        steward: agent,
+        status: PlotStatus::Active,
+    };
+
+    // Call food_production directly first
+    let _record: Record = conductor
+        .call(&cell.zome("food_production"), "register_plot", plot.clone())
+        .await;
+
+    // Now dispatch through the bridge
+    let payload = ExternIO::encode(plot).unwrap().0;
+    let dispatch = DispatchInput {
+        zome: "food_production".to_string(),
+        fn_name: "register_plot".to_string(),
+        payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Food production dispatch should succeed");
+    assert!(result.response.is_some(), "Should have response payload");
+}
+
+/// Test: Cross-domain dispatch from bridge to food_distribution's create_market
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_cross_domain_dispatch_food_distribution() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let agent = cell.agent_pubkey().clone();
+    let market = Market {
+        id: "mkt-sweet-1".to_string(),
+        name: "Richardson Farmers Market".to_string(),
+        location_lat: 32.9483,
+        location_lon: -96.7299,
+        market_type: MarketType::Farmers,
+        steward: agent,
+        schedule: "Saturdays 8am-1pm".to_string(),
+    };
+
+    // Call food_distribution directly first
+    let _record: Record = conductor
+        .call(&cell.zome("food_distribution"), "create_market", market.clone())
+        .await;
+
+    // Now dispatch through the bridge
+    let payload = ExternIO::encode(market).unwrap().0;
+    let dispatch = DispatchInput {
+        zome: "food_distribution".to_string(),
+        fn_name: "create_market".to_string(),
+        payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Food distribution dispatch should succeed");
+    assert!(result.response.is_some(), "Should have response payload");
+}
+
+/// Test: Cross-domain dispatch from bridge to transport_routes's register_vehicle
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_cross_domain_dispatch_transport_routes() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let agent = cell.agent_pubkey().clone();
+    let vehicle = Vehicle {
+        id: "v-sweet-1".to_string(),
+        owner: agent,
+        vehicle_type: VehicleType::Car,
+        capacity_kg: 450.0,
+        capacity_passengers: 4,
+        status: VehicleStatus::Available,
+    };
+
+    // Call transport_routes directly first
+    let _record: Record = conductor
+        .call(&cell.zome("transport_routes"), "register_vehicle", vehicle.clone())
+        .await;
+
+    // Now dispatch through the bridge
+    let payload = ExternIO::encode(vehicle).unwrap().0;
+    let dispatch = DispatchInput {
+        zome: "transport_routes".to_string(),
+        fn_name: "register_vehicle".to_string(),
+        payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Transport routes dispatch should succeed");
+    assert!(result.response.is_some(), "Should have response payload");
+}
+
+/// Test: Cross-domain dispatch from bridge to transport_sharing's post_ride_offer
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_cross_domain_dispatch_transport_sharing() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let agent = cell.agent_pubkey().clone();
+
+    // First register a vehicle (ride offer needs a vehicle_hash)
+    let vehicle = Vehicle {
+        id: "v-sweet-ride".to_string(),
+        owner: agent.clone(),
+        vehicle_type: VehicleType::Van,
+        capacity_kg: 800.0,
+        capacity_passengers: 7,
+        status: VehicleStatus::Available,
+    };
+
+    let vehicle_record: Record = conductor
+        .call(&cell.zome("transport_routes"), "register_vehicle", vehicle)
+        .await;
+
+    let vehicle_hash = vehicle_record.action_address().clone();
+
+    let offer = RideOffer {
+        vehicle_hash: vehicle_hash.clone(),
+        route_hash: None,
+        driver: agent,
+        departure_time: 1700000000,
+        seats_available: 3,
+        price_per_seat: 5.0,
+        status: OfferStatus::Open,
+    };
+
+    // Dispatch through the bridge
+    let payload = ExternIO::encode(offer).unwrap().0;
+    let dispatch = DispatchInput {
+        zome: "transport_sharing".to_string(),
+        fn_name: "post_ride_offer".to_string(),
+        payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Transport sharing dispatch should succeed");
+    assert!(result.response.is_some(), "Should have response payload");
+}
+
+/// Test: food_production queries via bridge (get_all_plots)
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_food_queries_via_bridge() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let agent = cell.agent_pubkey().clone();
+
+    // Register a plot first
+    let plot = Plot {
+        id: "plot-query-1".to_string(),
+        name: "Herb Spiral".to_string(),
+        area_sqm: 50.0,
+        soil_type: SoilType::Sandy,
+        location_lat: 32.95,
+        location_lon: -96.73,
+        steward: agent,
+        status: PlotStatus::Preparing,
+    };
+
+    let _record: Record = conductor
+        .call(&cell.zome("food_production"), "register_plot", plot)
+        .await;
+
+    // Now use bridge to query all plots
+    let dispatch = DispatchInput {
+        zome: "food_production".to_string(),
+        fn_name: "get_all_plots".to_string(),
+        payload: ExternIO::encode(()).unwrap().0,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Food production query via bridge should succeed");
+}
+
+/// Test: transport_routes queries via bridge (get_all_routes)
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_transport_queries_via_bridge() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    // Use bridge to query all routes (may be empty, but dispatch should succeed)
+    let dispatch = DispatchInput {
+        zome: "transport_routes".to_string(),
+        fn_name: "get_all_routes".to_string(),
+        payload: ExternIO::encode(()).unwrap().0,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Transport routes query via bridge should succeed");
 }
 
 /// Helper to set up a conductor with the commons DNA

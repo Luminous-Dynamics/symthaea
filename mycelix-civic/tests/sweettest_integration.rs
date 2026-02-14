@@ -161,10 +161,10 @@ fn civic_dna_path() -> PathBuf {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_civic_bridge_query() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -192,10 +192,10 @@ async fn test_civic_bridge_query() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_civic_bridge_broadcast_event() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -231,10 +231,10 @@ async fn test_civic_bridge_broadcast_event() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_civic_bridge_health() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -257,10 +257,10 @@ async fn test_civic_bridge_health() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_media_publish_and_factcheck() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -318,10 +318,10 @@ async fn test_media_publish_and_factcheck() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_cross_domain_media_references_emergency() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -409,10 +409,10 @@ async fn test_cross_domain_media_references_emergency() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_cross_domain_justice_queries_media() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -684,10 +684,10 @@ pub struct AuditTrailInput {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_justice_file_case() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -727,10 +727,10 @@ async fn test_justice_file_case() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_justice_case_phase_escalation() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -805,10 +805,10 @@ async fn test_justice_case_phase_escalation() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_emergency_declare_disaster() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -850,10 +850,10 @@ async fn test_emergency_declare_disaster() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_emergency_register_shelter() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -888,10 +888,10 @@ async fn test_emergency_register_shelter() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_emergency_register_resource() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -923,10 +923,10 @@ async fn test_emergency_register_resource() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_emergency_full_workflow() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -1046,10 +1046,10 @@ async fn test_emergency_full_workflow() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_justice_case_with_media_evidence() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
@@ -1153,10 +1153,10 @@ async fn test_justice_case_with_media_evidence() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_bridge_audit_trail() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
     let (alice,) = conductor
-        .setup_app("test-app", &[&dna_file])
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();

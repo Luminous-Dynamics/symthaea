@@ -265,13 +265,52 @@ pub fn get_checker_stats(checker_did: String) -> ExternResult<CheckerStats> {
     })
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct CheckerStats {
     pub checker_did: String,
     pub total_checks: u32,
     pub true_count: u32,
     pub false_count: u32,
     pub mixed_count: u32,
+}
+
+/// Classify a single FactCheckVerdict into the stats buckets.
+///
+/// Returns (is_true, is_false, is_mixed) -- exactly one will be true,
+/// or all false for verdicts that fall into "other" (not counted).
+/// Extracted as a pure function for testability.
+pub fn classify_verdict(verdict: &FactCheckVerdict) -> (bool, bool, bool) {
+    match verdict {
+        FactCheckVerdict::True => (true, false, false),
+        FactCheckVerdict::False => (false, true, false),
+        FactCheckVerdict::PartiallyTrue | FactCheckVerdict::Misleading => (false, false, true),
+        _ => (false, false, false),
+    }
+}
+
+/// Aggregate a list of verdicts into CheckerStats.
+/// Pure function: no HDK calls.
+pub fn aggregate_checker_stats(checker_did: String, verdicts: &[FactCheckVerdict]) -> CheckerStats {
+    let mut total_checks = 0u32;
+    let mut true_count = 0u32;
+    let mut false_count = 0u32;
+    let mut mixed_count = 0u32;
+
+    for verdict in verdicts {
+        total_checks += 1;
+        let (t, f, m) = classify_verdict(verdict);
+        if t { true_count += 1; }
+        if f { false_count += 1; }
+        if m { mixed_count += 1; }
+    }
+
+    CheckerStats {
+        checker_did,
+        total_checks,
+        true_count,
+        false_count,
+        mixed_count,
+    }
 }
 
 /// Add additional evidence to fact check
@@ -499,5 +538,293 @@ pub fn verify_disaster_claim(input: VerifyDisasterClaimInput) -> ExternResult<Di
             active_disaster_count: 0,
             error: Some("Failed to query emergency incidents".into()),
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // VERDICT CLASSIFICATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn classify_verdict_true() {
+        let (t, f, m) = classify_verdict(&FactCheckVerdict::True);
+        assert!(t);
+        assert!(!f);
+        assert!(!m);
+    }
+
+    #[test]
+    fn classify_verdict_false() {
+        let (t, f, m) = classify_verdict(&FactCheckVerdict::False);
+        assert!(!t);
+        assert!(f);
+        assert!(!m);
+    }
+
+    #[test]
+    fn classify_verdict_partially_true_is_mixed() {
+        let (t, f, m) = classify_verdict(&FactCheckVerdict::PartiallyTrue);
+        assert!(!t);
+        assert!(!f);
+        assert!(m);
+    }
+
+    #[test]
+    fn classify_verdict_misleading_is_mixed() {
+        let (t, f, m) = classify_verdict(&FactCheckVerdict::Misleading);
+        assert!(!t);
+        assert!(!f);
+        assert!(m);
+    }
+
+    #[test]
+    fn classify_verdict_other_variants_are_uncounted() {
+        let others = vec![
+            FactCheckVerdict::MostlyTrue,
+            FactCheckVerdict::HalfTrue,
+            FactCheckVerdict::MostlyFalse,
+            FactCheckVerdict::Unverifiable,
+            FactCheckVerdict::OutOfContext,
+            FactCheckVerdict::Satire,
+            FactCheckVerdict::Opinion,
+        ];
+        for v in others {
+            let (t, f, m) = classify_verdict(&v);
+            assert!(!t && !f && !m, "Expected (false,false,false) for {:?}", v);
+        }
+    }
+
+    // ========================================================================
+    // AGGREGATE CHECKER STATS TESTS
+    // ========================================================================
+
+    #[test]
+    fn aggregate_empty_verdicts() {
+        let stats = aggregate_checker_stats("did:example:checker".into(), &[]);
+        assert_eq!(stats.total_checks, 0);
+        assert_eq!(stats.true_count, 0);
+        assert_eq!(stats.false_count, 0);
+        assert_eq!(stats.mixed_count, 0);
+    }
+
+    #[test]
+    fn aggregate_all_true() {
+        let verdicts = vec![FactCheckVerdict::True; 5];
+        let stats = aggregate_checker_stats("did:example:checker".into(), &verdicts);
+        assert_eq!(stats.total_checks, 5);
+        assert_eq!(stats.true_count, 5);
+        assert_eq!(stats.false_count, 0);
+        assert_eq!(stats.mixed_count, 0);
+    }
+
+    #[test]
+    fn aggregate_all_false() {
+        let verdicts = vec![FactCheckVerdict::False; 3];
+        let stats = aggregate_checker_stats("did:example:checker".into(), &verdicts);
+        assert_eq!(stats.total_checks, 3);
+        assert_eq!(stats.true_count, 0);
+        assert_eq!(stats.false_count, 3);
+        assert_eq!(stats.mixed_count, 0);
+    }
+
+    #[test]
+    fn aggregate_mixed_verdicts() {
+        let verdicts = vec![
+            FactCheckVerdict::True,
+            FactCheckVerdict::False,
+            FactCheckVerdict::PartiallyTrue,
+            FactCheckVerdict::Misleading,
+            FactCheckVerdict::Opinion,       // other
+            FactCheckVerdict::Unverifiable,  // other
+            FactCheckVerdict::True,
+        ];
+        let stats = aggregate_checker_stats("did:example:checker".into(), &verdicts);
+        assert_eq!(stats.total_checks, 7);
+        assert_eq!(stats.true_count, 2);
+        assert_eq!(stats.false_count, 1);
+        assert_eq!(stats.mixed_count, 2);
+    }
+
+    #[test]
+    fn aggregate_preserves_checker_did() {
+        let stats = aggregate_checker_stats("did:example:specific-checker".into(), &[FactCheckVerdict::True]);
+        assert_eq!(stats.checker_did, "did:example:specific-checker");
+    }
+
+    // ========================================================================
+    // CHECKER STATS SERDE TESTS
+    // ========================================================================
+
+    #[test]
+    fn checker_stats_serde_roundtrip() {
+        let stats = CheckerStats {
+            checker_did: "did:example:checker".into(),
+            total_checks: 10,
+            true_count: 5,
+            false_count: 3,
+            mixed_count: 2,
+        };
+        let json = serde_json::to_string(&stats).expect("serialize");
+        let parsed: CheckerStats = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed, stats);
+    }
+
+    #[test]
+    fn checker_stats_zero_values_serde() {
+        let stats = CheckerStats {
+            checker_did: "did:example:newchecker".into(),
+            total_checks: 0,
+            true_count: 0,
+            false_count: 0,
+            mixed_count: 0,
+        };
+        let json = serde_json::to_string(&stats).expect("serialize");
+        let parsed: CheckerStats = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed, stats);
+    }
+
+    // ========================================================================
+    // FACT CHECK VERDICT SERDE TESTS
+    // ========================================================================
+
+    #[test]
+    fn all_verdict_variants_serde_roundtrip() {
+        let variants = vec![
+            FactCheckVerdict::True,
+            FactCheckVerdict::MostlyTrue,
+            FactCheckVerdict::HalfTrue,
+            FactCheckVerdict::MostlyFalse,
+            FactCheckVerdict::False,
+            FactCheckVerdict::Unverifiable,
+            FactCheckVerdict::OutOfContext,
+            FactCheckVerdict::Satire,
+            FactCheckVerdict::Opinion,
+            FactCheckVerdict::PartiallyTrue,
+            FactCheckVerdict::Misleading,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).expect("serialize");
+            let parsed: FactCheckVerdict = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(parsed, variant, "Failed for {:?}", variant);
+        }
+    }
+
+    // ========================================================================
+    // DISPUTE STATUS SERDE TESTS
+    // ========================================================================
+
+    #[test]
+    fn all_dispute_status_variants_serde_roundtrip() {
+        let variants = vec![
+            DisputeStatus::Pending,
+            DisputeStatus::Upheld,
+            DisputeStatus::Rejected,
+            DisputeStatus::PartiallyUpheld,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).expect("serialize");
+            let parsed: DisputeStatus = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(parsed, variant);
+        }
+    }
+
+    // ========================================================================
+    // INPUT STRUCT SERDE TESTS
+    // ========================================================================
+
+    #[test]
+    fn submit_fact_check_input_serde_roundtrip() {
+        let input = SubmitFactCheckInput {
+            publication_id: "pub-1".into(),
+            claim_text: "Earth is round".into(),
+            claim_location: "paragraph 1".into(),
+            epistemic_position: EpistemicPosition {
+                empirical: 0.95,
+                normative: 0.1,
+                mythic: 0.0,
+            },
+            verdict: FactCheckVerdict::True,
+            evidence: vec![EvidenceItem {
+                source_type: SourceType::ScientificStudy,
+                source_url: Some("https://nasa.gov".into()),
+                source_did: None,
+                description: "NASA data".into(),
+                supports_claim: true,
+            }],
+            checker_did: "did:example:checker".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: SubmitFactCheckInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.publication_id, "pub-1");
+        assert_eq!(parsed.claim_text, "Earth is round");
+        assert_eq!(parsed.evidence.len(), 1);
+    }
+
+    #[test]
+    fn disaster_verification_result_serde_roundtrip() {
+        let result = DisasterVerificationResult {
+            verified: true,
+            disaster_id: Some("D-001".into()),
+            disaster_title: Some("Hurricane Test".into()),
+            severity: Some("Level5".into()),
+            active_disaster_count: 3,
+            error: None,
+        };
+        let json = serde_json::to_string(&result).expect("serialize");
+        let parsed: DisasterVerificationResult = serde_json::from_str(&json).expect("deserialize");
+        assert!(parsed.verified);
+        assert_eq!(parsed.disaster_id, Some("D-001".into()));
+        assert_eq!(parsed.active_disaster_count, 3);
+        assert!(parsed.error.is_none());
+    }
+
+    #[test]
+    fn disaster_verification_result_not_verified_serde() {
+        let result = DisasterVerificationResult {
+            verified: false,
+            disaster_id: None,
+            disaster_title: None,
+            severity: None,
+            active_disaster_count: 0,
+            error: Some("No disasters found".into()),
+        };
+        let json = serde_json::to_string(&result).expect("serialize");
+        let parsed: DisasterVerificationResult = serde_json::from_str(&json).expect("deserialize");
+        assert!(!parsed.verified);
+        assert!(parsed.error.is_some());
+    }
+
+    #[test]
+    fn update_credibility_input_serde_roundtrip() {
+        let input = UpdateCredibilityInput {
+            source_id: "src-1".into(),
+            source_type: SourceType::PrimarySource,
+            credibility_score: 0.85,
+            verification_count: 10,
+            dispute_count: 2,
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateCredibilityInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.source_id, "src-1");
+        assert!((parsed.credibility_score - 0.85).abs() < 1e-10);
+    }
+
+    #[test]
+    fn dispute_fact_check_input_serde_roundtrip() {
+        let input = DisputeFactCheckInput {
+            fact_check_id: "fc-1".into(),
+            disputer_did: "did:example:disputer".into(),
+            reason: "Outdated evidence".into(),
+            counter_evidence: vec![],
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: DisputeFactCheckInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.fact_check_id, "fc-1");
+        assert_eq!(parsed.reason, "Outdated evidence");
+        assert!(parsed.counter_evidence.is_empty());
     }
 }

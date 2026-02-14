@@ -173,3 +173,76 @@ pub fn get_my_rides(_: ()) -> ExternResult<Vec<Record>> {
 
     Ok(all)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_match_status_input_serde_confirmed() {
+        let input = UpdateMatchStatusInput {
+            match_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            new_status: MatchStatus::Confirmed,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateMatchStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, MatchStatus::Confirmed);
+    }
+
+    #[test]
+    fn update_match_status_input_serde_completed() {
+        let input = UpdateMatchStatusInput {
+            match_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            new_status: MatchStatus::Completed,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateMatchStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, MatchStatus::Completed);
+    }
+
+    #[test]
+    fn match_status_all_variants_serialize() {
+        let statuses = vec![
+            MatchStatus::Pending,
+            MatchStatus::Confirmed,
+            MatchStatus::InProgress,
+            MatchStatus::Completed,
+            MatchStatus::Cancelled,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let decoded: MatchStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, status);
+        }
+    }
+
+    #[test]
+    fn offer_status_all_variants_serialize() {
+        let statuses = vec![
+            OfferStatus::Open,
+            OfferStatus::Full,
+            OfferStatus::InProgress,
+            OfferStatus::Completed,
+            OfferStatus::Cancelled,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let decoded: OfferStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, status);
+        }
+    }
+
+    #[test]
+    fn request_status_all_variants_serialize() {
+        let statuses = vec![
+            RequestStatus::Open,
+            RequestStatus::Matched,
+            RequestStatus::Cancelled,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let decoded: RequestStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, status);
+        }
+    }
+}

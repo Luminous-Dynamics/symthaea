@@ -432,3 +432,170 @@ pub struct FindNearbySheltersInput {
     pub lon: f64,
     pub radius_km: f32,
 }
+
+/// Haversine distance between two (lat, lon) points in kilometres.
+///
+/// Uses the standard formula with Earth radius = 6371 km.
+/// Extracted as a pure function for testability.
+pub fn haversine_distance_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    let dlat = (lat2 - lat1).to_radians();
+    let dlon = (lon2 - lon1).to_radians();
+    let a = (dlat / 2.0).sin().powi(2)
+        + lat1.to_radians().cos()
+            * lat2.to_radians().cos()
+            * (dlon / 2.0).sin().powi(2);
+    let c = 2.0 * a.sqrt().asin();
+    6371.0 * c
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // HAVERSINE DISTANCE TESTS
+    // ========================================================================
+
+    #[test]
+    fn haversine_same_point_is_zero() {
+        let d = haversine_distance_km(40.7128, -74.0060, 40.7128, -74.0060);
+        assert!(d.abs() < 1e-10, "Same point should be 0, got {}", d);
+    }
+
+    #[test]
+    fn haversine_nyc_to_la() {
+        // NYC (40.7128, -74.0060) to LA (34.0522, -118.2437)
+        // Expected: ~3,944 km
+        let d = haversine_distance_km(40.7128, -74.0060, 34.0522, -118.2437);
+        assert!(
+            (d - 3944.0).abs() < 50.0,
+            "NYC to LA expected ~3944 km, got {} km",
+            d
+        );
+    }
+
+    #[test]
+    fn haversine_london_to_tokyo() {
+        // London (51.5074, -0.1278) to Tokyo (35.6762, 139.6503)
+        // Expected: ~9,560 km
+        let d = haversine_distance_km(51.5074, -0.1278, 35.6762, 139.6503);
+        assert!(
+            (d - 9560.0).abs() < 50.0,
+            "London to Tokyo expected ~9560 km, got {} km",
+            d
+        );
+    }
+
+    #[test]
+    fn haversine_antipodal_points() {
+        // North pole to south pole: exactly 20015.09 km (half circumference)
+        let d = haversine_distance_km(90.0, 0.0, -90.0, 0.0);
+        assert!(
+            (d - 20015.0).abs() < 100.0,
+            "Pole-to-pole expected ~20015 km, got {} km",
+            d
+        );
+    }
+
+    #[test]
+    fn haversine_equator_opposite_sides() {
+        // (0, 0) to (0, 180): half equatorial circumference ~20015 km
+        let d = haversine_distance_km(0.0, 0.0, 0.0, 180.0);
+        assert!(
+            (d - 20015.0).abs() < 100.0,
+            "Equator 0-180 expected ~20015 km, got {} km",
+            d
+        );
+    }
+
+    #[test]
+    fn haversine_symmetry() {
+        let d1 = haversine_distance_km(40.7128, -74.0060, 34.0522, -118.2437);
+        let d2 = haversine_distance_km(34.0522, -118.2437, 40.7128, -74.0060);
+        assert!(
+            (d1 - d2).abs() < 1e-10,
+            "Distance should be symmetric: {} vs {}",
+            d1,
+            d2
+        );
+    }
+
+    #[test]
+    fn haversine_short_distance() {
+        // Two points about 1 km apart in Richardson, TX
+        // (32.9483, -96.7299) to (32.9573, -96.7299) -- ~1 km north
+        let d = haversine_distance_km(32.9483, -96.7299, 32.9573, -96.7299);
+        assert!(
+            (d - 1.0).abs() < 0.1,
+            "Expected ~1 km, got {} km",
+            d
+        );
+    }
+
+    // ========================================================================
+    // INPUT STRUCT SERDE TESTS
+    // ========================================================================
+
+    #[test]
+    fn register_shelter_input_serde_roundtrip() {
+        let input = RegisterShelterInput {
+            id: "shelter-1".into(),
+            name: "Community Center".into(),
+            location_lat: 32.9483,
+            location_lon: -96.7299,
+            address: "123 Main St".into(),
+            capacity: 200,
+            shelter_type: ShelterType::Community,
+            amenities: vec![Amenity::Power, Amenity::Water],
+            contact: "555-0100".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: RegisterShelterInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.id, "shelter-1");
+        assert_eq!(parsed.name, "Community Center");
+        assert!((parsed.location_lat - 32.9483).abs() < 1e-10);
+        assert_eq!(parsed.capacity, 200);
+        assert_eq!(parsed.amenities.len(), 2);
+    }
+
+    #[test]
+    fn find_nearby_input_serde_roundtrip() {
+        let input = FindNearbySheltersInput {
+            lat: 32.9483,
+            lon: -96.7299,
+            radius_km: 10.0,
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: FindNearbySheltersInput = serde_json::from_str(&json).expect("deserialize");
+        assert!((parsed.lat - 32.9483).abs() < 1e-10);
+        assert!((parsed.lon - (-96.7299)).abs() < 1e-10);
+        assert!((parsed.radius_km - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn update_shelter_status_input_serde_roundtrip() {
+        // Can't construct ActionHash easily in tests, but we can test
+        // the ShelterStatus enum serde via the integrity crate
+        let statuses = vec![
+            ShelterStatus::Open,
+            ShelterStatus::Full,
+            ShelterStatus::Closed,
+            ShelterStatus::Evacuating,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).expect("serialize");
+            let parsed: ShelterStatus = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(parsed, status);
+        }
+    }
+
+    #[test]
+    fn check_in_person_input_serde_roundtrip() {
+        // Test the serializable parts of CheckInPersonInput
+        // (ActionHash field requires special handling, test the rest)
+        let special_needs: Vec<String> = vec!["wheelchair".into(), "oxygen".into()];
+        let json = serde_json::to_string(&special_needs).expect("serialize");
+        let parsed: Vec<String> = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed, vec!["wheelchair", "oxygen"]);
+    }
+}

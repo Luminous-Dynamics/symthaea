@@ -286,7 +286,7 @@ pub fn get_contributor_earnings(did: String) -> ExternResult<ContributorEarnings
     })
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct ContributorEarnings {
     pub contributor_did: String,
     pub publication_count: u32,
@@ -344,13 +344,53 @@ pub fn get_publication_shares(publication_id: String) -> ExternResult<Publicatio
     })
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct PublicationShares {
     pub publication_id: String,
     pub total_share_percentage: f64,
     pub contributor_count: u32,
     pub verified_count: u32,
     pub remaining_percentage: f64,
+}
+
+/// Pure function: compute publication share summary from individual share data.
+///
+/// Each entry is (share_percentage, verified).
+pub fn compute_publication_shares(
+    publication_id: String,
+    shares: &[(f64, bool)],
+) -> PublicationShares {
+    let mut total_percentage = 0.0;
+    let mut contributor_count = 0u32;
+    let mut verified_count = 0u32;
+
+    for &(pct, verified) in shares {
+        total_percentage += pct;
+        contributor_count += 1;
+        if verified {
+            verified_count += 1;
+        }
+    }
+
+    PublicationShares {
+        publication_id,
+        total_share_percentage: total_percentage,
+        contributor_count,
+        verified_count,
+        remaining_percentage: 100.0 - total_percentage,
+    }
+}
+
+/// Pure function: compute average share percentage from a list of share values.
+///
+/// Returns 0.0 for an empty list.
+pub fn compute_average_share(shares: &[f64]) -> f64 {
+    if shares.is_empty() {
+        0.0
+    } else {
+        let total: f64 = shares.iter().sum();
+        total / shares.len() as f64
+    }
 }
 
 /// Remove an attribution (only by original author/creator)
@@ -476,5 +516,337 @@ pub fn check_evidence_disputes_for_publication(input: CheckEvidenceDisputesInput
             warning: None,
             error: Some("Failed to query justice evidence zome".into()),
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // compute_publication_shares tests
+    // ========================================================================
+
+    #[test]
+    fn publication_shares_no_contributors() {
+        let result = compute_publication_shares("pub-1".into(), &[]);
+        assert_eq!(result.contributor_count, 0);
+        assert_eq!(result.verified_count, 0);
+        assert!((result.total_share_percentage - 0.0).abs() < f64::EPSILON);
+        assert!((result.remaining_percentage - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn publication_shares_single_contributor() {
+        let result = compute_publication_shares("pub-1".into(), &[(25.0, true)]);
+        assert_eq!(result.contributor_count, 1);
+        assert_eq!(result.verified_count, 1);
+        assert!((result.total_share_percentage - 25.0).abs() < f64::EPSILON);
+        assert!((result.remaining_percentage - 75.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn publication_shares_multiple_contributors() {
+        let shares = vec![(30.0, true), (20.0, false), (10.0, true)];
+        let result = compute_publication_shares("pub-2".into(), &shares);
+        assert_eq!(result.contributor_count, 3);
+        assert_eq!(result.verified_count, 2);
+        assert!((result.total_share_percentage - 60.0).abs() < f64::EPSILON);
+        assert!((result.remaining_percentage - 40.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn publication_shares_exactly_100_percent() {
+        let shares = vec![(50.0, true), (30.0, true), (20.0, false)];
+        let result = compute_publication_shares("pub-3".into(), &shares);
+        assert!((result.total_share_percentage - 100.0).abs() < f64::EPSILON);
+        assert!((result.remaining_percentage - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn publication_shares_over_100_percent() {
+        // Overshoot: remaining_percentage should be negative
+        let shares = vec![(60.0, false), (60.0, false)];
+        let result = compute_publication_shares("pub-4".into(), &shares);
+        assert!((result.total_share_percentage - 120.0).abs() < f64::EPSILON);
+        assert!((result.remaining_percentage - (-20.0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn publication_shares_all_unverified() {
+        let shares = vec![(10.0, false), (20.0, false)];
+        let result = compute_publication_shares("pub-5".into(), &shares);
+        assert_eq!(result.verified_count, 0);
+        assert_eq!(result.contributor_count, 2);
+    }
+
+    #[test]
+    fn publication_shares_preserves_publication_id() {
+        let result = compute_publication_shares("my-special-pub-id".into(), &[(5.0, false)]);
+        assert_eq!(result.publication_id, "my-special-pub-id");
+    }
+
+    // ========================================================================
+    // compute_average_share tests
+    // ========================================================================
+
+    #[test]
+    fn average_share_empty() {
+        assert!((compute_average_share(&[]) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn average_share_single() {
+        assert!((compute_average_share(&[42.0]) - 42.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn average_share_multiple() {
+        assert!((compute_average_share(&[10.0, 20.0, 30.0]) - 20.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn average_share_all_same() {
+        assert!((compute_average_share(&[25.0, 25.0, 25.0, 25.0]) - 25.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn average_share_fractional() {
+        // 10 + 20 + 30 = 60 / 3 = 20 (exact), but test a non-round case:
+        // 1 + 2 = 3 / 2 = 1.5
+        assert!((compute_average_share(&[1.0, 2.0]) - 1.5).abs() < f64::EPSILON);
+    }
+
+    // ========================================================================
+    // Serde roundtrip tests for coordinator-local structs
+    // ========================================================================
+
+    #[test]
+    fn add_attribution_input_serde_roundtrip() {
+        let input = AddAttributionInput {
+            publication_id: "pub-1".into(),
+            contributor_did: "did:mycelix:alice".into(),
+            role: ContributorRole::Author,
+            share_percentage: 50.0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: AddAttributionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.publication_id, "pub-1");
+        assert_eq!(input2.contributor_did, "did:mycelix:alice");
+        assert!((input2.share_percentage - 50.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn set_royalty_input_serde_roundtrip() {
+        let input = SetRoyaltyInput {
+            publication_id: "pub-2".into(),
+            rule_type: RoyaltyType::PerView,
+            percentage: 5.0,
+            minimum_amount: Some(0.01),
+            currency: "USD".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: SetRoyaltyInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.publication_id, "pub-2");
+        assert_eq!(input2.minimum_amount, Some(0.01));
+        assert_eq!(input2.currency, "USD");
+    }
+
+    #[test]
+    fn record_usage_input_serde_roundtrip() {
+        let input = RecordUsageInput {
+            publication_id: "pub-3".into(),
+            usage_type: UsageType::Download,
+            user_did: Some("did:mycelix:bob".into()),
+            royalty_paid: Some(1.50),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: RecordUsageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.publication_id, "pub-3");
+        assert_eq!(input2.user_did.as_deref(), Some("did:mycelix:bob"));
+        assert_eq!(input2.royalty_paid, Some(1.50));
+    }
+
+    #[test]
+    fn record_usage_input_serde_none_fields() {
+        let input = RecordUsageInput {
+            publication_id: "pub-4".into(),
+            usage_type: UsageType::View,
+            user_did: None,
+            royalty_paid: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: RecordUsageInput = serde_json::from_str(&json).unwrap();
+        assert!(input2.user_did.is_none());
+        assert!(input2.royalty_paid.is_none());
+    }
+
+    #[test]
+    fn verify_attribution_input_serde_roundtrip() {
+        let input = VerifyAttributionInput {
+            attribution_id: "attr-1".into(),
+            requester_did: "did:mycelix:alice".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: VerifyAttributionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.attribution_id, "attr-1");
+        assert_eq!(input2.requester_did, "did:mycelix:alice");
+    }
+
+    #[test]
+    fn update_share_input_serde_roundtrip() {
+        let input = UpdateShareInput {
+            attribution_id: "attr-2".into(),
+            new_share_percentage: 33.33,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: UpdateShareInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.attribution_id, "attr-2");
+        assert!((input2.new_share_percentage - 33.33).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn deactivate_royalty_input_serde_roundtrip() {
+        let input = DeactivateRoyaltyInput {
+            rule_id: "royalty-1".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: DeactivateRoyaltyInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.rule_id, "royalty-1");
+    }
+
+    #[test]
+    fn remove_attribution_input_serde_roundtrip() {
+        let input = RemoveAttributionInput {
+            attribution_id: "attr-3".into(),
+            requester_did: "did:mycelix:charlie".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: RemoveAttributionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.attribution_id, "attr-3");
+        assert_eq!(input2.requester_did, "did:mycelix:charlie");
+    }
+
+    #[test]
+    fn contributor_earnings_serde_roundtrip() {
+        let earnings = ContributorEarnings {
+            contributor_did: "did:mycelix:alice".into(),
+            publication_count: 5,
+            average_share_percentage: 40.0,
+            total_royalties_earned: 123.45,
+        };
+        let json = serde_json::to_string(&earnings).unwrap();
+        let earnings2: ContributorEarnings = serde_json::from_str(&json).unwrap();
+        assert_eq!(earnings, earnings2);
+    }
+
+    #[test]
+    fn publication_shares_serde_roundtrip() {
+        let shares = PublicationShares {
+            publication_id: "pub-99".into(),
+            total_share_percentage: 80.0,
+            contributor_count: 3,
+            verified_count: 2,
+            remaining_percentage: 20.0,
+        };
+        let json = serde_json::to_string(&shares).unwrap();
+        let shares2: PublicationShares = serde_json::from_str(&json).unwrap();
+        assert_eq!(shares, shares2);
+    }
+
+    #[test]
+    fn check_evidence_disputes_input_serde_roundtrip() {
+        let input = CheckEvidenceDisputesInput {
+            evidence_id: "ev-1".into(),
+            publication_id: "pub-1".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: CheckEvidenceDisputesInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.evidence_id, "ev-1");
+        assert_eq!(input2.publication_id, "pub-1");
+    }
+
+    #[test]
+    fn evidence_dispute_check_result_serde_no_disputes() {
+        let result = EvidenceDisputeCheckResult {
+            has_disputes: false,
+            dispute_count: 0,
+            unresolved_count: 0,
+            warning: None,
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let result2: EvidenceDisputeCheckResult = serde_json::from_str(&json).unwrap();
+        assert!(!result2.has_disputes);
+        assert_eq!(result2.dispute_count, 0);
+    }
+
+    #[test]
+    fn evidence_dispute_check_result_serde_with_warning() {
+        let result = EvidenceDisputeCheckResult {
+            has_disputes: true,
+            dispute_count: 3,
+            unresolved_count: 1,
+            warning: Some("Evidence has unresolved disputes".into()),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let result2: EvidenceDisputeCheckResult = serde_json::from_str(&json).unwrap();
+        assert!(result2.has_disputes);
+        assert_eq!(result2.dispute_count, 3);
+        assert_eq!(result2.unresolved_count, 1);
+        assert!(result2.warning.is_some());
+    }
+
+    #[test]
+    fn contributor_role_all_variants_serde() {
+        let roles = vec![
+            ContributorRole::Author,
+            ContributorRole::CoAuthor,
+            ContributorRole::Editor,
+            ContributorRole::Researcher,
+            ContributorRole::Photographer,
+            ContributorRole::Illustrator,
+            ContributorRole::Translator,
+            ContributorRole::Source,
+            ContributorRole::Other("custom-role".into()),
+        ];
+        for role in roles {
+            let json = serde_json::to_string(&role).unwrap();
+            let role2: ContributorRole = serde_json::from_str(&json).unwrap();
+            assert_eq!(role, role2);
+        }
+    }
+
+    #[test]
+    fn royalty_type_all_variants_serde() {
+        let types = vec![
+            RoyaltyType::PerView,
+            RoyaltyType::PerShare,
+            RoyaltyType::PerDownload,
+            RoyaltyType::PerDerivative,
+            RoyaltyType::Subscription,
+        ];
+        for rt in types {
+            let json = serde_json::to_string(&rt).unwrap();
+            let rt2: RoyaltyType = serde_json::from_str(&json).unwrap();
+            assert_eq!(rt, rt2);
+        }
+    }
+
+    #[test]
+    fn usage_type_all_variants_serde() {
+        let types = vec![
+            UsageType::View,
+            UsageType::Share,
+            UsageType::Download,
+            UsageType::Derivative,
+            UsageType::Citation,
+        ];
+        for ut in types {
+            let json = serde_json::to_string(&ut).unwrap();
+            let ut2: UsageType = serde_json::from_str(&json).unwrap();
+            assert_eq!(ut, ut2);
+        }
     }
 }

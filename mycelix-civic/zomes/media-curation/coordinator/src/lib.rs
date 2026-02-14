@@ -331,7 +331,7 @@ pub fn remove_endorsement(input: RemoveEndorsementInput) -> ExternResult<()> {
     Err(wasm_error!(WasmErrorInner::Guest("Endorsement not found".into())))
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct RemoveEndorsementInput {
     pub endorsement_id: String,
     pub requester_did: String,
@@ -373,6 +373,14 @@ pub fn get_quality_score(publication_id: String) -> ExternResult<Option<Record>>
     Ok(scores.into_iter().last())
 }
 
+/// Compute the base quality score from endorsement count.
+///
+/// Formula: min(endorsement_count / 100.0, 1.0)
+/// Extracted as a pure function for testability.
+pub fn compute_quality_base_score(endorsement_count: u32) -> f64 {
+    (endorsement_count as f64 / 100.0).min(1.0)
+}
+
 /// Get public collections
 #[hdk_extern]
 pub fn get_public_collections(_: ()) -> ExternResult<Vec<Record>> {
@@ -389,4 +397,194 @@ pub fn get_public_collections(_: ()) -> ExternResult<Vec<Record>> {
         }
     }
     Ok(results)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // QUALITY SCORE COMPUTATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn quality_score_zero_endorsements() {
+        let score = compute_quality_base_score(0);
+        assert!((score - 0.0).abs() < 1e-10, "0 endorsements = 0.0, got {}", score);
+    }
+
+    #[test]
+    fn quality_score_50_endorsements() {
+        let score = compute_quality_base_score(50);
+        assert!((score - 0.5).abs() < 1e-10, "50 endorsements = 0.5, got {}", score);
+    }
+
+    #[test]
+    fn quality_score_100_endorsements() {
+        let score = compute_quality_base_score(100);
+        assert!((score - 1.0).abs() < 1e-10, "100 endorsements = 1.0, got {}", score);
+    }
+
+    #[test]
+    fn quality_score_200_endorsements_clamped() {
+        let score = compute_quality_base_score(200);
+        assert!((score - 1.0).abs() < 1e-10, "200 endorsements should clamp to 1.0, got {}", score);
+    }
+
+    #[test]
+    fn quality_score_1_endorsement() {
+        let score = compute_quality_base_score(1);
+        assert!((score - 0.01).abs() < 1e-10, "1 endorsement = 0.01, got {}", score);
+    }
+
+    #[test]
+    fn quality_score_99_endorsements() {
+        let score = compute_quality_base_score(99);
+        assert!((score - 0.99).abs() < 1e-10, "99 endorsements = 0.99, got {}", score);
+    }
+
+    #[test]
+    fn quality_score_1000_endorsements_clamped() {
+        let score = compute_quality_base_score(1000);
+        assert!((score - 1.0).abs() < 1e-10, "1000 endorsements should clamp to 1.0, got {}", score);
+    }
+
+    #[test]
+    fn quality_score_max_u32_clamped() {
+        let score = compute_quality_base_score(u32::MAX);
+        assert!((score - 1.0).abs() < 1e-10, "u32::MAX endorsements should clamp to 1.0, got {}", score);
+    }
+
+    #[test]
+    fn quality_score_monotonically_increasing() {
+        let mut prev = compute_quality_base_score(0);
+        for i in 1..=100 {
+            let current = compute_quality_base_score(i);
+            assert!(current >= prev, "Score should be non-decreasing: {} < {} at i={}", current, prev, i);
+            prev = current;
+        }
+    }
+
+    // ========================================================================
+    // INPUT STRUCT SERDE TESTS
+    // ========================================================================
+
+    #[test]
+    fn endorse_input_serde_roundtrip() {
+        let input = EndorseInput {
+            publication_id: "pub-1".into(),
+            endorser_did: "did:example:endorser".into(),
+            endorsement_type: EndorsementType::Upvote,
+            comment: Some("Great work".into()),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: EndorseInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.publication_id, "pub-1");
+        assert_eq!(parsed.endorser_did, "did:example:endorser");
+        assert_eq!(parsed.comment, Some("Great work".into()));
+    }
+
+    #[test]
+    fn endorse_input_no_comment_serde_roundtrip() {
+        let input = EndorseInput {
+            publication_id: "pub-2".into(),
+            endorser_did: "did:example:e2".into(),
+            endorsement_type: EndorsementType::Bookmark,
+            comment: None,
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: EndorseInput = serde_json::from_str(&json).expect("deserialize");
+        assert!(parsed.comment.is_none());
+    }
+
+    #[test]
+    fn create_collection_input_serde_roundtrip() {
+        let input = CreateCollectionInput {
+            name: "Best of 2026".into(),
+            description: "Top articles of the year".into(),
+            curator_did: "did:example:curator".into(),
+            visibility: Visibility::Public,
+            publication_ids: vec!["pub-1".into(), "pub-2".into()],
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: CreateCollectionInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.name, "Best of 2026");
+        assert_eq!(parsed.publication_ids.len(), 2);
+    }
+
+    #[test]
+    fn feature_input_serde_roundtrip() {
+        let input = FeatureInput {
+            publication_id: "pub-1".into(),
+            featured_by: "did:example:editor".into(),
+            reason: "Outstanding reporting".into(),
+            featured_until: None,
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: FeatureInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.publication_id, "pub-1");
+        assert!(parsed.featured_until.is_none());
+    }
+
+    #[test]
+    fn add_to_collection_input_serde_roundtrip() {
+        let input = AddToCollectionInput {
+            collection_id: "col-1".into(),
+            publication_id: "pub-3".into(),
+            requester_did: "did:example:curator".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: AddToCollectionInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.collection_id, "col-1");
+        assert_eq!(parsed.publication_id, "pub-3");
+    }
+
+    #[test]
+    fn remove_from_collection_input_serde_roundtrip() {
+        let input = RemoveFromCollectionInput {
+            collection_id: "col-1".into(),
+            publication_id: "pub-2".into(),
+            requester_did: "did:example:curator".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: RemoveFromCollectionInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.collection_id, "col-1");
+    }
+
+    #[test]
+    fn update_collection_input_serde_roundtrip() {
+        let input = UpdateCollectionInput {
+            collection_id: "col-1".into(),
+            requester_did: "did:example:curator".into(),
+            name: Some("Updated Name".into()),
+            description: None,
+            visibility: Some(Visibility::Private),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateCollectionInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.name, Some("Updated Name".into()));
+        assert!(parsed.description.is_none());
+        assert_eq!(parsed.visibility, Some(Visibility::Private));
+    }
+
+    #[test]
+    fn remove_endorsement_input_serde_roundtrip() {
+        let input = RemoveEndorsementInput {
+            endorsement_id: "end-1".into(),
+            requester_did: "did:example:endorser".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: RemoveEndorsementInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed, input);
+    }
+
+    #[test]
+    fn unfeature_input_serde_roundtrip() {
+        let input = UnfeatureInput {
+            featured_id: "feat-1".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UnfeatureInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.featured_id, "feat-1");
+    }
 }

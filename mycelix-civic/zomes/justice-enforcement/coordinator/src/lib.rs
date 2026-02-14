@@ -378,6 +378,25 @@ pub fn verify_case_for_enforcement(input: VerifyCaseForEnforcementInput) -> Exte
 mod tests {
     use super::*;
 
+    // Helper to create a fake ActionHash for tests
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0xAB; 36])
+    }
+
+    fn fake_enforcement_action() -> EnforcementAction {
+        EnforcementAction {
+            action_type: EnforcementActionType::Notification,
+            target_happ: Some("mycelix-commons".into()),
+            target_entry: Some("entry-abc".into()),
+            executed_at: Timestamp::from_micros(1_000_000),
+            result: "Notification sent successfully".into(),
+        }
+    }
+
+    // ========================================================================
+    // Existing CaseVerificationResult + VerifyCaseForEnforcementInput tests
+    // ========================================================================
+
     #[test]
     fn case_verification_result_found_serde() {
         let r = CaseVerificationResult {
@@ -438,5 +457,213 @@ mod tests {
         assert!(r2.phase.is_none());
         assert!(r2.status.is_none());
         assert!(r2.error.is_none());
+    }
+
+    // ========================================================================
+    // RecordActionInput serde tests
+    // ========================================================================
+
+    #[test]
+    fn record_action_input_serde_roundtrip() {
+        let input = RecordActionInput {
+            enforcement_hash: fake_action_hash(),
+            action: fake_enforcement_action(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: RecordActionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.enforcement_hash, fake_action_hash());
+        assert_eq!(input2.action.result, "Notification sent successfully");
+        assert_eq!(input2.action.target_happ.as_deref(), Some("mycelix-commons"));
+    }
+
+    #[test]
+    fn record_action_input_minimal_action() {
+        let input = RecordActionInput {
+            enforcement_hash: fake_action_hash(),
+            action: EnforcementAction {
+                action_type: EnforcementActionType::ManualRequired,
+                target_happ: None,
+                target_entry: None,
+                executed_at: Timestamp::from_micros(0),
+                result: "Manual intervention needed".into(),
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: RecordActionInput = serde_json::from_str(&json).unwrap();
+        assert!(input2.action.target_happ.is_none());
+        assert!(input2.action.target_entry.is_none());
+    }
+
+    // ========================================================================
+    // UpdateEnforcementStatusInput serde tests
+    // ========================================================================
+
+    #[test]
+    fn update_enforcement_status_input_serde_pending() {
+        let input = UpdateEnforcementStatusInput {
+            enforcement_hash: fake_action_hash(),
+            new_status: EnforcementStatus::Pending,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: UpdateEnforcementStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.enforcement_hash, fake_action_hash());
+    }
+
+    #[test]
+    fn update_enforcement_status_input_serde_all_statuses() {
+        let statuses = vec![
+            EnforcementStatus::Pending,
+            EnforcementStatus::InProgress,
+            EnforcementStatus::PartiallyCompleted,
+            EnforcementStatus::Completed,
+            EnforcementStatus::Failed,
+            EnforcementStatus::Contested,
+        ];
+        for status in statuses {
+            let input = UpdateEnforcementStatusInput {
+                enforcement_hash: fake_action_hash(),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let input2: UpdateEnforcementStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(input2.enforcement_hash, fake_action_hash());
+            // Verify the JSON contains the status name
+            let json_val: serde_json::Value = serde_json::from_str(&json).unwrap();
+            assert!(json_val.get("new_status").is_some(), "Missing new_status for {:?}", status);
+        }
+    }
+
+    // ========================================================================
+    // CompleteEnforcementInput serde tests
+    // ========================================================================
+
+    #[test]
+    fn complete_enforcement_input_serde_with_final_action() {
+        let input = CompleteEnforcementInput {
+            enforcement_hash: fake_action_hash(),
+            final_action: Some(fake_enforcement_action()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: CompleteEnforcementInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.enforcement_hash, fake_action_hash());
+        assert!(input2.final_action.is_some());
+        assert_eq!(input2.final_action.unwrap().result, "Notification sent successfully");
+    }
+
+    #[test]
+    fn complete_enforcement_input_serde_no_final_action() {
+        let input = CompleteEnforcementInput {
+            enforcement_hash: fake_action_hash(),
+            final_action: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: CompleteEnforcementInput = serde_json::from_str(&json).unwrap();
+        assert!(input2.final_action.is_none());
+    }
+
+    // ========================================================================
+    // FailedEnforcementInput serde tests
+    // ========================================================================
+
+    #[test]
+    fn failed_enforcement_input_serde_roundtrip() {
+        let input = FailedEnforcementInput {
+            enforcement_hash: fake_action_hash(),
+            reason: "Target account no longer exists".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: FailedEnforcementInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.enforcement_hash, fake_action_hash());
+        assert_eq!(input2.reason, "Target account no longer exists");
+    }
+
+    #[test]
+    fn failed_enforcement_input_serde_empty_reason() {
+        let input = FailedEnforcementInput {
+            enforcement_hash: fake_action_hash(),
+            reason: "".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: FailedEnforcementInput = serde_json::from_str(&json).unwrap();
+        assert!(input2.reason.is_empty());
+    }
+
+    // ========================================================================
+    // CrossHappActionInput serde tests
+    // ========================================================================
+
+    #[test]
+    fn cross_happ_action_input_serde_roundtrip() {
+        let input = CrossHappActionInput {
+            enforcement_hash: fake_action_hash(),
+            target_happ: "mycelix-commons".into(),
+            target_entry: Some("property-entry-42".into()),
+            result: "Property transfer initiated".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: CrossHappActionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.target_happ, "mycelix-commons");
+        assert_eq!(input2.target_entry.as_deref(), Some("property-entry-42"));
+        assert_eq!(input2.result, "Property transfer initiated");
+    }
+
+    #[test]
+    fn cross_happ_action_input_serde_no_target_entry() {
+        let input = CrossHappActionInput {
+            enforcement_hash: fake_action_hash(),
+            target_happ: "mycelix-civic".into(),
+            target_entry: None,
+            result: "Broadcast notification".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: CrossHappActionInput = serde_json::from_str(&json).unwrap();
+        assert!(input2.target_entry.is_none());
+    }
+
+    // ========================================================================
+    // EnforcementAction serde tests
+    // ========================================================================
+
+    #[test]
+    fn enforcement_action_serde_all_action_types() {
+        let action_types = vec![
+            EnforcementActionType::FundsTransfer,
+            EnforcementActionType::AssetFreeze,
+            EnforcementActionType::ReputationUpdate,
+            EnforcementActionType::AccessRevocation,
+            EnforcementActionType::Notification,
+            EnforcementActionType::ManualRequired,
+            EnforcementActionType::CrossHappAction,
+        ];
+        for at in action_types {
+            let action = EnforcementAction {
+                action_type: at.clone(),
+                target_happ: None,
+                target_entry: None,
+                executed_at: Timestamp::from_micros(500),
+                result: "ok".into(),
+            };
+            let json = serde_json::to_string(&action).unwrap();
+            let action2: EnforcementAction = serde_json::from_str(&json).unwrap();
+            assert_eq!(action2.action_type, at);
+            assert_eq!(action2.result, "ok");
+        }
+    }
+
+    #[test]
+    fn enforcement_status_serde_all_variants() {
+        let statuses = vec![
+            EnforcementStatus::Pending,
+            EnforcementStatus::InProgress,
+            EnforcementStatus::PartiallyCompleted,
+            EnforcementStatus::Completed,
+            EnforcementStatus::Failed,
+            EnforcementStatus::Contested,
+        ];
+        for s in statuses {
+            let json = serde_json::to_string(&s).unwrap();
+            let s2: EnforcementStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(s, s2);
+        }
     }
 }
