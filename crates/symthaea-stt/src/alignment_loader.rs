@@ -225,15 +225,11 @@ fn get_nested_column(batch: &arrow::record_batch::RecordBatch, path: &[&str]) ->
     }
     let mut current: Option<ArrayRef> = batch.column_by_name(path[0]).map(Arc::clone);
     for name in &path[1..] {
-        if let Some(arr) = current {
-            if let Some(struct_arr) = arr.as_any().downcast_ref::<StructArray>() {
-                current = struct_arr.column_by_name(name).map(Arc::clone);
-            } else {
-                return None;
-            }
-        } else {
-            return None;
-        }
+        current = current.and_then(|arr| {
+            arr.as_any()
+                .downcast_ref::<StructArray>()
+                .and_then(|struct_arr| struct_arr.column_by_name(name).map(Arc::clone))
+        });
     }
     current
 }

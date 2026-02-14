@@ -6,8 +6,8 @@
 //!
 //! Run: `cargo run --example demo_narrative_generation`
 
-use symthaea::dynamics::story_session::StorySession;
 use symthaea::dynamics::narrative_dynamics::NarrativeSignal;
+use symthaea::dynamics::story_session::StorySession;
 use symthaea::hdc::narrative_algebra::NarrativeMood;
 use symthaea::language::narrative_compiler::{
     generate_narrative, NarrativeThought, PointOfView, TargetLength, Tense,
@@ -119,16 +119,24 @@ async fn main() {
         // Generate (uses SimulatedBackend for offline demo)
         let output = generate_narrative(&thought, Some(&backend)).await;
         println!("  LLM used: {}", output.used_llm());
-        println!("  Prompt (first 200 chars): {}...", &output.prompt[..output.prompt.len().min(200)]);
-        println!("  Prose (first 200 chars): {}...\n", &output.prose[..output.prose.len().min(200)]);
+        println!(
+            "  Prompt (first 200 chars): {}...",
+            &output.prompt[..output.prompt.len().min(200)]
+        );
+        println!(
+            "  Prose (first 200 chars): {}...\n",
+            &output.prose[..output.prose.len().min(200)]
+        );
 
         signals.push(signal);
     }
 
     // --- Summary ---
     println!("=== Signal Trajectory Summary ===");
-    println!("{:<25} {:>7} {:>7} {:>7} {:>7} {:>7} {:?}",
-        "Scene", "Energy", "Surpr.", "Valence", "Tension", "Moment.", "Phase");
+    println!(
+        "{:<25} {:>7} {:>7} {:>7} {:>7} {:>7} {:?}",
+        "Scene", "Energy", "Surpr.", "Valence", "Tension", "Moment.", "Phase"
+    );
     println!("{}", "-".repeat(90));
     for (i, sig) in signals.iter().enumerate() {
         let title = scenes[i].0;
@@ -139,8 +147,13 @@ async fn main() {
     }
 
     let state = session.get_story_state();
-    println!("\nStory state: {} scenes, {} characters, {} conflicts ({} unresolved)",
-        state.total_scenes, state.character_count, state.total_conflicts, state.unresolved_conflicts);
+    println!(
+        "\nStory state: {} scenes, {} characters, {} conflicts ({} unresolved)",
+        state.total_scenes,
+        state.character_count,
+        state.total_conflicts,
+        state.unresolved_conflicts
+    );
 
     println!("\nDone.");
 }

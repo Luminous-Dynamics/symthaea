@@ -642,7 +642,7 @@ impl UnifiedGrammar {
 
         let file = File::create(path)?;
         let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, &model).map_err(|e| std::io::Error::other(e))
+        serde_json::to_writer_pretty(writer, &model).map_err(std::io::Error::other)
     }
 
     /// Load trained model from file
@@ -650,7 +650,7 @@ impl UnifiedGrammar {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
         let model: SavedModel =
-            serde_json::from_reader(reader).map_err(|e| std::io::Error::other(e))?;
+            serde_json::from_reader(reader).map_err(std::io::Error::other)?;
 
         let sparsity = match model.sparsity.as_str() {
             "sparse10" => Sparsity::Sparse10,

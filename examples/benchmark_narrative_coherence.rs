@@ -141,12 +141,25 @@ fn compute_metrics(name: &str, scenes: &[BenchScene], signals: &[NarrativeSignal
     let symmetry_deviation = (peak_position - golden_ratio).abs();
 
     println!("\n  {} metrics:", name);
-    println!("  {:<30} {}", "Peak tension step:", format!("{}/{} (scene: {})", peak_idx + 1, n, scenes[peak_idx].title));
+    println!(
+        "  {:<30} {}",
+        "Peak tension step:",
+        format!("{}/{} (scene: {})", peak_idx + 1, n, scenes[peak_idx].title)
+    );
     println!("  {:<30} {:.4}", "Peak tension value:", peak_val.tension);
-    println!("  {:<30} {:.1}% ({}/{})", "Trend accuracy:", trend_accuracy * 100.0, correct, total);
+    println!(
+        "  {:<30} {:.1}% ({}/{})",
+        "Trend accuracy:",
+        trend_accuracy * 100.0,
+        correct,
+        total
+    );
     println!("  {:<30} {:.4}", "Within-half similarity:", within_mean);
     println!("  {:<30} {:.4}", "Across-half similarity:", across_mean);
-    println!("  {:<30} {:.4} (peak@{:.3}, golden={:.3})", "Arc symmetry deviation:", symmetry_deviation, peak_position, golden_ratio);
+    println!(
+        "  {:<30} {:.4} (peak@{:.3}, golden={:.3})",
+        "Arc symmetry deviation:", symmetry_deviation, peak_position, golden_ratio
+    );
 }
 
 fn main() {
@@ -154,13 +167,55 @@ fn main() {
 
     // ---- Hero's Journey (7 scenes) ----
     let heros_journey = vec![
-        BenchScene { title: "The Village", setting: "quiet village at dawn", conflict: "restless dreams", mood: NarrativeMood::Peaceful, expected_trend: 0 },
-        BenchScene { title: "The Call", setting: "forest edge", conflict: "mysterious stranger arrives", mood: NarrativeMood::Mysterious, expected_trend: 1 },
-        BenchScene { title: "Crossing Threshold", setting: "deep cave entrance", conflict: "point of no return", mood: NarrativeMood::Tense, expected_trend: 1 },
-        BenchScene { title: "The Ordeal", setting: "mountain peak in storm", conflict: "facing the dragon", mood: NarrativeMood::Tense, expected_trend: 1 },
-        BenchScene { title: "The Sanctum", setting: "inner sanctum of fire", conflict: "ultimate test", mood: NarrativeMood::Tense, expected_trend: 1 },
-        BenchScene { title: "The Road Back", setting: "winding road home", conflict: "pursued by shadows", mood: NarrativeMood::Melancholy, expected_trend: -1 },
-        BenchScene { title: "Return Home", setting: "village transformed", conflict: "acceptance of change", mood: NarrativeMood::Hopeful, expected_trend: -1 },
+        BenchScene {
+            title: "The Village",
+            setting: "quiet village at dawn",
+            conflict: "restless dreams",
+            mood: NarrativeMood::Peaceful,
+            expected_trend: 0,
+        },
+        BenchScene {
+            title: "The Call",
+            setting: "forest edge",
+            conflict: "mysterious stranger arrives",
+            mood: NarrativeMood::Mysterious,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "Crossing Threshold",
+            setting: "deep cave entrance",
+            conflict: "point of no return",
+            mood: NarrativeMood::Tense,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "The Ordeal",
+            setting: "mountain peak in storm",
+            conflict: "facing the dragon",
+            mood: NarrativeMood::Tense,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "The Sanctum",
+            setting: "inner sanctum of fire",
+            conflict: "ultimate test",
+            mood: NarrativeMood::Tense,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "The Road Back",
+            setting: "winding road home",
+            conflict: "pursued by shadows",
+            mood: NarrativeMood::Melancholy,
+            expected_trend: -1,
+        },
+        BenchScene {
+            title: "Return Home",
+            setting: "village transformed",
+            conflict: "acceptance of change",
+            mood: NarrativeMood::Hopeful,
+            expected_trend: -1,
+        },
     ];
 
     let hj_signals = run_arc("Hero's Journey", &heros_journey);
@@ -168,13 +223,55 @@ fn main() {
 
     // ---- Three-Act Structure (7 scenes) ----
     let three_act = vec![
-        BenchScene { title: "Normal Life", setting: "apartment morning", conflict: "boredom and routine", mood: NarrativeMood::Peaceful, expected_trend: 0 },
-        BenchScene { title: "Inciting Incident", setting: "office", conflict: "fired unexpectedly", mood: NarrativeMood::Tense, expected_trend: 1 },
-        BenchScene { title: "Rising Stakes", setting: "city streets at night", conflict: "discovers conspiracy", mood: NarrativeMood::Mysterious, expected_trend: 1 },
-        BenchScene { title: "Midpoint Twist", setting: "confrontation alley", conflict: "ally revealed as traitor", mood: NarrativeMood::Tense, expected_trend: 1 },
-        BenchScene { title: "Crisis Point", setting: "crisis meeting", conflict: "all options exhausted", mood: NarrativeMood::Tense, expected_trend: 1 },
-        BenchScene { title: "Climactic Battle", setting: "rooftop showdown", conflict: "final confrontation", mood: NarrativeMood::Tense, expected_trend: 1 },
-        BenchScene { title: "New Beginning", setting: "home renewed", conflict: "rebuilding life", mood: NarrativeMood::Hopeful, expected_trend: -1 },
+        BenchScene {
+            title: "Normal Life",
+            setting: "apartment morning",
+            conflict: "boredom and routine",
+            mood: NarrativeMood::Peaceful,
+            expected_trend: 0,
+        },
+        BenchScene {
+            title: "Inciting Incident",
+            setting: "office",
+            conflict: "fired unexpectedly",
+            mood: NarrativeMood::Tense,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "Rising Stakes",
+            setting: "city streets at night",
+            conflict: "discovers conspiracy",
+            mood: NarrativeMood::Mysterious,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "Midpoint Twist",
+            setting: "confrontation alley",
+            conflict: "ally revealed as traitor",
+            mood: NarrativeMood::Tense,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "Crisis Point",
+            setting: "crisis meeting",
+            conflict: "all options exhausted",
+            mood: NarrativeMood::Tense,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "Climactic Battle",
+            setting: "rooftop showdown",
+            conflict: "final confrontation",
+            mood: NarrativeMood::Tense,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "New Beginning",
+            setting: "home renewed",
+            conflict: "rebuilding life",
+            mood: NarrativeMood::Hopeful,
+            expected_trend: -1,
+        },
     ];
 
     let ta_signals = run_arc("Three-Act Structure", &three_act);
@@ -182,12 +279,48 @@ fn main() {
 
     // ---- Tragedy / Freytag (6 scenes) ----
     let tragedy = vec![
-        BenchScene { title: "Exposition", setting: "grand castle", conflict: "ambition stirs", mood: NarrativeMood::Triumphant, expected_trend: 0 },
-        BenchScene { title: "Rising Action", setting: "battlefield", conflict: "seizing power", mood: NarrativeMood::Tense, expected_trend: 1 },
-        BenchScene { title: "Climax", setting: "throne room", conflict: "crown won through betrayal", mood: NarrativeMood::Tense, expected_trend: 1 },
-        BenchScene { title: "Falling Action", setting: "palace corridors", conflict: "paranoia and isolation", mood: NarrativeMood::Melancholy, expected_trend: -1 },
-        BenchScene { title: "Catastrophe", setting: "dungeon", conflict: "allies turn enemies", mood: NarrativeMood::Tense, expected_trend: 1 },
-        BenchScene { title: "Denouement", setting: "castle ruins", conflict: "alone with consequences", mood: NarrativeMood::Melancholy, expected_trend: -1 },
+        BenchScene {
+            title: "Exposition",
+            setting: "grand castle",
+            conflict: "ambition stirs",
+            mood: NarrativeMood::Triumphant,
+            expected_trend: 0,
+        },
+        BenchScene {
+            title: "Rising Action",
+            setting: "battlefield",
+            conflict: "seizing power",
+            mood: NarrativeMood::Tense,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "Climax",
+            setting: "throne room",
+            conflict: "crown won through betrayal",
+            mood: NarrativeMood::Tense,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "Falling Action",
+            setting: "palace corridors",
+            conflict: "paranoia and isolation",
+            mood: NarrativeMood::Melancholy,
+            expected_trend: -1,
+        },
+        BenchScene {
+            title: "Catastrophe",
+            setting: "dungeon",
+            conflict: "allies turn enemies",
+            mood: NarrativeMood::Tense,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "Denouement",
+            setting: "castle ruins",
+            conflict: "alone with consequences",
+            mood: NarrativeMood::Melancholy,
+            expected_trend: -1,
+        },
     ];
 
     let tr_signals = run_arc("Tragedy (Freytag)", &tragedy);
@@ -195,8 +328,10 @@ fn main() {
 
     // ---- Summary Table ----
     println!("\n=== Summary ===\n");
-    println!("{:<25} {:>12} {:>12} {:>12} {:>12} {:>12}",
-        "Arc", "Peak Step", "Peak Val", "Trend Acc", "W-Half Sim", "Symmetry Dev");
+    println!(
+        "{:<25} {:>12} {:>12} {:>12} {:>12} {:>12}",
+        "Arc", "Peak Step", "Peak Val", "Trend Acc", "W-Half Sim", "Symmetry Dev"
+    );
     println!("{}", "-".repeat(85));
 
     let all = [
@@ -231,7 +366,11 @@ fn main() {
                 }
             }
         }
-        let trend_acc = if total > 0 { correct as f32 / total as f32 } else { 1.0 };
+        let trend_acc = if total > 0 {
+            correct as f32 / total as f32
+        } else {
+            1.0
+        };
         let sym_dev = (peak_pos - 0.618).abs();
 
         // Quick within-half mean (re-run session)
@@ -239,7 +378,13 @@ fn main() {
         let prot = session.algebra().primitives.protagonist.clone();
         session.register_character("Hero", &prot);
         for scene in scenes.iter() {
-            session.add_scene(scene.title, scene.setting, &["Hero"], scene.conflict, scene.mood);
+            session.add_scene(
+                scene.title,
+                scene.setting,
+                &["Hero"],
+                scene.conflict,
+                scene.mood,
+            );
         }
         let half = n / 2;
         let mut w_sims = Vec::new();
@@ -252,7 +397,11 @@ fn main() {
                 }
             }
         }
-        let w_mean = if w_sims.is_empty() { 0.0 } else { w_sims.iter().sum::<f32>() / w_sims.len() as f32 };
+        let w_mean = if w_sims.is_empty() {
+            0.0
+        } else {
+            w_sims.iter().sum::<f32>() / w_sims.len() as f32
+        };
 
         println!(
             "{:<25} {:>5}/{:<6} {:>12.4} {:>11.1}% {:>12.4} {:>12.4}",

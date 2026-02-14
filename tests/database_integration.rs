@@ -445,7 +445,11 @@ async fn test_default_config_creates_sqlite() {
         .expect("Default config should create a database");
 
     assert!(db.health_check().await.unwrap(), "Health check should pass");
-    assert_eq!(db.count().await.unwrap(), 0, "Fresh database should be empty");
+    assert_eq!(
+        db.count().await.unwrap(),
+        0,
+        "Fresh database should be empty"
+    );
 }
 
 // ============================================================================

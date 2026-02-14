@@ -367,7 +367,11 @@ impl HierarchicalCfCWorldModel {
 
         // ∂L/∂W_output = outer(∂L/∂y, h)
         // Update output weights
-        for (i, &dl) in d_loss.iter().enumerate().take(self.w_output.nrows().min(d_loss.len())) {
+        for (i, &dl) in d_loss
+            .iter()
+            .enumerate()
+            .take(self.w_output.nrows().min(d_loss.len()))
+        {
             for j in 0..self.w_output.ncols() {
                 self.w_output[[i, j]] -= lr * dl * next_hidden[j];
             }

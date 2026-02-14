@@ -395,8 +395,7 @@ impl LanceMemory {
         }
 
         // ── Pass 2: Fetch full records for top-k IDs ────────────────────
-        let similarities: std::collections::HashMap<String, f32> =
-            scored.iter().cloned().collect();
+        let similarities: std::collections::HashMap<String, f32> = scored.iter().cloned().collect();
         let quoted: Vec<String> = scored
             .iter()
             .map(|(id, _)| format!("'{}'", id.replace('\'', "''")))
