@@ -1061,7 +1061,7 @@ impl ConsciousnessPipeline {
         self.subsystems.push(sub);
         // Re-sort by descending priority so highest-priority subsystems run first
         self.subsystems
-            .sort_by(|a, b| b.priority().cmp(&a.priority()));
+            .sort_by_key(|s| std::cmp::Reverse(s.priority()));
     }
 
     /// Get the number of registered subsystems.

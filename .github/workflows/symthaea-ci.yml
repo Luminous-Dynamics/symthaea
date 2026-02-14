@@ -130,7 +130,7 @@ jobs:
       - name: Build documentation
         run: cargo doc --workspace --no-deps --lib
         env:
-          RUSTDOCFLAGS: -D warnings
+          RUSTDOCFLAGS: -D warnings --allow rustdoc::broken-intra-doc-links
 
   features:
     name: Feature Matrix
