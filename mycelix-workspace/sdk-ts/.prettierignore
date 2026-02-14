@@ -1,0 +1,33 @@
+# Build outputs
+dist/
+coverage/
+docs/
+
+# Dependencies
+node_modules/
+
+# Generated files
+*.min.js
+*.bundle.js
+*.d.ts.map
+*.js.map
+
+# Lock files (formatting can cause issues)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# IDE
+.idea/
+.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test snapshots
+**/__snapshots__/

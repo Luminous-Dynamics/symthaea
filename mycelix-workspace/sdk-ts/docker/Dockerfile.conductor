@@ -1,0 +1,61 @@
+# Holochain Conductor for Mycelix Integration Tests
+#
+# This Dockerfile provides a pre-configured Holochain conductor
+# for running integration tests against the Mycelix Civilizational OS.
+#
+# Usage:
+#   docker build -t mycelix-conductor -f docker/Dockerfile.conductor .
+#   docker run -p 8888:8888 -p 8889:8889 mycelix-conductor
+
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    ca-certificates \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Holochain (using prebuilt binary)
+ARG HOLOCHAIN_VERSION=0.6.0
+ENV HOLOCHAIN_VERSION=${HOLOCHAIN_VERSION}
+
+RUN curl -L "https://github.com/holochain/holochain/releases/download/holochain-${HOLOCHAIN_VERSION}/holochain-${HOLOCHAIN_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+    -o holochain.tar.gz \
+    && tar -xzf holochain.tar.gz \
+    && mv holochain /usr/local/bin/ \
+    && chmod +x /usr/local/bin/holochain \
+    && rm holochain.tar.gz
+
+# Install hc CLI tool
+RUN curl -L "https://github.com/holochain/holochain/releases/download/holochain-${HOLOCHAIN_VERSION}/hc-${HOLOCHAIN_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+    -o hc.tar.gz \
+    && tar -xzf hc.tar.gz \
+    && mv hc /usr/local/bin/ \
+    && chmod +x /usr/local/bin/hc \
+    && rm hc.tar.gz
+
+# Create data directory
+RUN mkdir -p /holochain/data /holochain/config /holochain/happs
+
+# Copy conductor configuration
+COPY docker/conductor-config.yaml /holochain/config/conductor-config.yaml
+
+# Copy startup script
+COPY docker/start-conductor.sh /holochain/start-conductor.sh
+RUN chmod +x /holochain/start-conductor.sh
+
+# Expose WebSocket ports
+# 8888 - App interface (for application connections)
+# 8889 - Admin interface (for conductor management)
+EXPOSE 8888 8889
+
+# Set working directory
+WORKDIR /holochain
+
+# Health check
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8889/ || exit 1
+
+# Start the conductor
+ENTRYPOINT ["/holochain/start-conductor.sh"]

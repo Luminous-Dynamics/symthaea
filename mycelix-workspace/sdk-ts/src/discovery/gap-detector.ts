@@ -1,0 +1,876 @@
+/**
+ * @mycelix/sdk Gap Detector
+ *
+ * Finds "unknown unknowns" - gaps in the knowledge graph where
+ * important information might be missing.
+ *
+ * CRITICAL: All gaps have humility flags indicating they are
+ * "relative to current schema" - we can only find gaps we can conceive of.
+ *
+ * @packageDocumentation
+ * @module discovery/gap-detector
+ */
+
+import {
+  getSCEIEventBus,
+  createSCEIEvent,
+  type SCEIEventBus,
+} from '../scei/event-bus.js';
+import { getSCEIMetrics, type SCEIMetricsCollector } from '../scei/metrics.js';
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+/**
+ * Types of knowledge gaps
+ */
+export type GapType =
+  | 'structural'      // Missing connections in the graph
+  | 'epistemic'       // Missing evidence levels
+  | 'measurement'     // Missing quantitative data
+  | 'perspective'     // Missing viewpoints
+  | 'temporal'        // Missing time periods
+  | 'cross_domain';   // Missing cross-domain links
+
+/**
+ * Humility flags for gap detection
+ *
+ * These acknowledge the limitations of our gap detection.
+ * Every gap is "relative to current schema" - we can only
+ * find gaps we can conceive of.
+ */
+export interface HumilityFlags {
+  /** This gap is relative to our current ontology/schema */
+  schemaRelative: boolean;
+
+  /** We might be missing entire categories of gaps */
+  unknownUnknownsAcknowledged: boolean;
+
+  /** Our detection method has known blind spots */
+  detectionBlindSpots: string[];
+
+  /** Confidence in gap detection itself (meta-uncertainty) */
+  detectionConfidence: number;
+
+  /** Schema version this was detected under */
+  schemaVersion: string;
+
+  /** Domains we did NOT search (scope limitations) */
+  unsearchedDomains: string[];
+
+  /** Assumptions made during detection */
+  assumptions: string[];
+}
+
+/**
+ * A detected knowledge gap
+ */
+export interface KnowledgeGap {
+  /** Unique identifier */
+  id: string;
+
+  /** Type of gap */
+  type: GapType;
+
+  /** Human-readable description */
+  description: string;
+
+  /** Domain(s) affected */
+  domains: string[];
+
+  /** Severity (0-1) */
+  severity: number;
+
+  /** Humility flags - ALWAYS present */
+  humility: HumilityFlags;
+
+  /** Claims adjacent to this gap */
+  adjacentClaims: string[];
+
+  /** Suggested actions to fill the gap */
+  suggestedActions: SuggestedAction[];
+
+  /** When detected */
+  detectedAt: number;
+
+  /** Priority for addressing */
+  priority: 'critical' | 'high' | 'medium' | 'low';
+
+  /** Whether this gap has been addressed */
+  addressed: boolean;
+
+  /** If addressed, how */
+  resolution?: GapResolution;
+}
+
+/**
+ * Suggested action to fill a gap
+ */
+export interface SuggestedAction {
+  /** Action type */
+  type: 'gather_evidence' | 'seek_expert' | 'create_claim' | 'link_domains' | 'wait_for_data';
+
+  /** Description */
+  description: string;
+
+  /** Estimated effort */
+  effort: 'minimal' | 'moderate' | 'significant';
+
+  /** Prerequisites */
+  prerequisites: string[];
+}
+
+/**
+ * Resolution of a gap
+ */
+export interface GapResolution {
+  /** How was it resolved */
+  method: 'filled' | 'determined_not_gap' | 'accepted' | 'merged';
+
+  /** Explanation */
+  explanation: string;
+
+  /** Claims created to fill the gap */
+  newClaims?: string[];
+
+  /** Resolved at */
+  resolvedAt: number;
+
+  /** Resolved by */
+  resolvedBy: string;
+}
+
+/**
+ * Gap detection configuration
+ */
+export interface GapDetectorConfig {
+  /** Minimum severity to report */
+  minSeverity: number;
+
+  /** Enable cross-domain gap detection */
+  enableCrossDomain: boolean;
+
+  /** Schema version for humility flags */
+  schemaVersion: string;
+
+  /** Known blind spots of this detector */
+  knownBlindSpots: string[];
+
+  /** Domains to search */
+  searchDomains: string[];
+
+  /** Domains explicitly not searched (for humility flags) */
+  unsearchedDomains: string[];
+}
+
+/**
+ * Default gap detector configuration
+ */
+export const DEFAULT_GAP_DETECTOR_CONFIG: GapDetectorConfig = {
+  minSeverity: 0.3,
+  enableCrossDomain: true,
+  schemaVersion: '1.0.0',
+  knownBlindSpots: [
+    'Gaps that require domain expertise we lack',
+    'Gaps in domains with no existing claims',
+    'Meta-level gaps about our gap detection',
+    'Culturally-specific knowledge gaps',
+    'Gaps requiring future knowledge',
+  ],
+  searchDomains: [],
+  unsearchedDomains: [],
+};
+
+// ============================================================================
+// GAP DETECTOR
+// ============================================================================
+
+/**
+ * Gap Detector
+ *
+ * Finds gaps in the knowledge graph while maintaining humility
+ * about the limitations of gap detection itself.
+ *
+ * @example
+ * ```typescript
+ * const detector = new GapDetector();
+ *
+ * // Detect gaps in a domain
+ * const gaps = await detector.detectGaps('climate_science');
+ *
+ * // Each gap has humility flags
+ * for (const gap of gaps) {
+ *   console.log(`Gap: ${gap.description}`);
+ *   console.log(`  Detection confidence: ${gap.humility.detectionConfidence}`);
+ *   console.log(`  Blind spots: ${gap.humility.detectionBlindSpots.join(', ')}`);
+ * }
+ * ```
+ */
+export class GapDetector {
+  private config: GapDetectorConfig;
+  private detectedGaps: Map<string, KnowledgeGap> = new Map();
+
+  // Mock knowledge graph (in real implementation, would query DHT)
+  private claims: Map<string, MockClaim> = new Map();
+  private domainClaims: Map<string, Set<string>> = new Map();
+  private claimLinks: Map<string, string[]> = new Map();
+
+  // SCEI Infrastructure
+  private sceiEventBus: SCEIEventBus;
+  private sceiMetrics: SCEIMetricsCollector;
+
+  constructor(config: Partial<GapDetectorConfig> = {}) {
+    this.config = { ...DEFAULT_GAP_DETECTOR_CONFIG, ...config };
+    this.sceiEventBus = getSCEIEventBus();
+    this.sceiMetrics = getSCEIMetrics();
+  }
+
+  // ==========================================================================
+  // MAIN DETECTION
+  // ==========================================================================
+
+  /**
+   * Detect gaps in a specific domain
+   */
+  async detectGaps(domain: string): Promise<KnowledgeGap[]> {
+    const gaps: KnowledgeGap[] = [];
+
+    // Create base humility flags for this detection run
+    const baseHumility = this.createHumilityFlags();
+
+    // 1. Structural gaps (missing connections)
+    const structuralGaps = await this.detectStructuralGaps(domain, baseHumility);
+    gaps.push(...structuralGaps);
+
+    // 2. Epistemic gaps (missing evidence levels)
+    const epistemicGaps = await this.detectEpistemicGaps(domain, baseHumility);
+    gaps.push(...epistemicGaps);
+
+    // 3. Measurement gaps (missing quantitative data)
+    const measurementGaps = await this.detectMeasurementGaps(domain, baseHumility);
+    gaps.push(...measurementGaps);
+
+    // 4. Perspective gaps (missing viewpoints)
+    const perspectiveGaps = await this.detectPerspectiveGaps(domain, baseHumility);
+    gaps.push(...perspectiveGaps);
+
+    // 5. Temporal gaps (missing time coverage)
+    const temporalGaps = await this.detectTemporalGaps(domain, baseHumility);
+    gaps.push(...temporalGaps);
+
+    // 6. Cross-domain gaps (if enabled)
+    if (this.config.enableCrossDomain) {
+      const crossDomainGaps = await this.detectCrossDomainGaps(domain, baseHumility);
+      gaps.push(...crossDomainGaps);
+    }
+
+    // Filter by minimum severity
+    const filteredGaps = gaps.filter((g) => g.severity >= this.config.minSeverity);
+
+    // Store detected gaps and emit SCEI events
+    for (const gap of filteredGaps) {
+      this.detectedGaps.set(gap.id, gap);
+
+      // Emit SCEI event for each gap
+      const sceiEvent = createSCEIEvent('discovery:gap_detected', 'discovery', {
+        gapId: gap.id,
+        gapType: gap.type,
+        severity: gap.severity,
+        domains: gap.domains,
+        priority: gap.priority,
+      });
+      void this.sceiEventBus.emit(sceiEvent);
+    }
+
+    // Record metrics
+    this.sceiMetrics.incrementCounter('discovery_scans_completed', {
+      domain,
+    });
+    this.sceiMetrics.incrementCounter('discovery_gaps_found', {
+      domain,
+    }, filteredGaps.length);
+    this.sceiMetrics.setGauge('discovery_total_gaps', this.detectedGaps.size);
+
+    return filteredGaps.sort((a, b) => b.severity - a.severity);
+  }
+
+  /**
+   * Detect gaps across the entire knowledge graph
+   */
+  async detectGlobalGaps(): Promise<KnowledgeGap[]> {
+    const allGaps: KnowledgeGap[] = [];
+    const domains = Array.from(this.domainClaims.keys());
+
+    for (const domain of domains) {
+      const domainGaps = await this.detectGaps(domain);
+      allGaps.push(...domainGaps);
+    }
+
+    // Add meta-gap: domains with no claims at all
+    const baseHumility = this.createHumilityFlags();
+    baseHumility.assumptions.push('We assume all important domains have some claims');
+
+    for (const unsearched of this.config.unsearchedDomains) {
+      allGaps.push(this.createGap({
+        type: 'structural',
+        description: `Domain "${unsearched}" has no claims in our knowledge graph`,
+        domains: [unsearched],
+        severity: 0.7,
+        humility: {
+          ...baseHumility,
+          detectionConfidence: 0.3,
+          assumptions: [
+            ...baseHumility.assumptions,
+            'This domain might be intentionally out of scope',
+            'Claims might exist under different domain labels',
+          ],
+        },
+        priority: 'medium',
+        suggestedActions: [
+          {
+            type: 'gather_evidence',
+            description: `Research existing knowledge in domain "${unsearched}"`,
+            effort: 'significant',
+            prerequisites: [],
+          },
+        ],
+      }));
+    }
+
+    return allGaps;
+  }
+
+  // ==========================================================================
+  // SPECIFIC GAP DETECTION
+  // ==========================================================================
+
+  private async detectStructuralGaps(
+    domain: string,
+    baseHumility: HumilityFlags
+  ): Promise<KnowledgeGap[]> {
+    const gaps: KnowledgeGap[] = [];
+    const domainClaimIds = this.domainClaims.get(domain) ?? new Set();
+
+    // Find isolated claims (no links to other claims)
+    for (const claimId of domainClaimIds) {
+      const links = this.claimLinks.get(claimId) ?? [];
+      if (links.length === 0) {
+        gaps.push(this.createGap({
+          type: 'structural',
+          description: `Claim "${claimId}" is isolated with no connections`,
+          domains: [domain],
+          severity: 0.5,
+          humility: {
+            ...baseHumility,
+            assumptions: [
+              ...baseHumility.assumptions,
+              'Isolated claims are assumed to need connections',
+              'Some claims may be validly standalone',
+            ],
+          },
+          adjacentClaims: [claimId],
+          priority: 'low',
+          suggestedActions: [
+            {
+              type: 'link_domains',
+              description: 'Find related claims to connect to',
+              effort: 'minimal',
+              prerequisites: [],
+            },
+          ],
+        }));
+      }
+    }
+
+    // Find claim clusters with weak inter-cluster links
+    // (simplified - would use graph analysis in real implementation)
+
+    return gaps;
+  }
+
+  private async detectEpistemicGaps(
+    domain: string,
+    baseHumility: HumilityFlags
+  ): Promise<KnowledgeGap[]> {
+    const gaps: KnowledgeGap[] = [];
+    const domainClaimIds = this.domainClaims.get(domain) ?? new Set();
+
+    // Find claims with low empirical levels that should be higher
+    for (const claimId of domainClaimIds) {
+      const claim = this.claims.get(claimId);
+      if (claim && claim.empiricalLevel <= 1 && claim.confidence > 0.7) {
+        gaps.push(this.createGap({
+          type: 'epistemic',
+          description: `High-confidence claim "${claimId}" has only testimonial evidence`,
+          domains: [domain],
+          severity: 0.7,
+          humility: {
+            ...baseHumility,
+            assumptions: [
+              ...baseHumility.assumptions,
+              'High confidence should require strong evidence',
+              'Some domains may validly rely on testimony',
+            ],
+          },
+          adjacentClaims: [claimId],
+          priority: 'high',
+          suggestedActions: [
+            {
+              type: 'gather_evidence',
+              description: 'Gather cryptographic or consensus-level evidence',
+              effort: 'moderate',
+              prerequisites: ['Identify available evidence sources'],
+            },
+          ],
+        }));
+      }
+    }
+
+    return gaps;
+  }
+
+  private async detectMeasurementGaps(
+    domain: string,
+    baseHumility: HumilityFlags
+  ): Promise<KnowledgeGap[]> {
+    const gaps: KnowledgeGap[] = [];
+    const domainClaimIds = this.domainClaims.get(domain) ?? new Set();
+
+    // Find qualitative claims that should have quantitative backing
+    for (const claimId of domainClaimIds) {
+      const claim = this.claims.get(claimId);
+      if (claim && claim.hasQuantitativeAspect && !claim.hasQuantitativeEvidence) {
+        gaps.push(this.createGap({
+          type: 'measurement',
+          description: `Claim "${claimId}" makes quantitative assertions without numerical evidence`,
+          domains: [domain],
+          severity: 0.6,
+          humility: {
+            ...baseHumility,
+            assumptions: [
+              ...baseHumility.assumptions,
+              'Quantitative claims benefit from numerical evidence',
+              'Some quantitative claims may be valid without precise numbers',
+            ],
+          },
+          adjacentClaims: [claimId],
+          priority: 'medium',
+          suggestedActions: [
+            {
+              type: 'gather_evidence',
+              description: 'Collect quantitative data to support the claim',
+              effort: 'moderate',
+              prerequisites: ['Identify measurement methodology'],
+            },
+          ],
+        }));
+      }
+    }
+
+    return gaps;
+  }
+
+  private async detectPerspectiveGaps(
+    domain: string,
+    baseHumility: HumilityFlags
+  ): Promise<KnowledgeGap[]> {
+    const gaps: KnowledgeGap[] = [];
+    const domainClaimIds = this.domainClaims.get(domain) ?? new Set();
+
+    // Check for perspective diversity
+    const authors = new Set<string>();
+    for (const claimId of domainClaimIds) {
+      const claim = this.claims.get(claimId);
+      if (claim) {
+        authors.add(claim.authorId);
+      }
+    }
+
+    if (domainClaimIds.size > 10 && authors.size < 3) {
+      gaps.push(this.createGap({
+        type: 'perspective',
+        description: `Domain "${domain}" has many claims but few unique perspectives`,
+        domains: [domain],
+        severity: 0.6,
+        humility: {
+          ...baseHumility,
+          assumptions: [
+            ...baseHumility.assumptions,
+            'Diverse perspectives are assumed to improve knowledge quality',
+            'Some domains may validly have few authoritative sources',
+            'Author count may not reflect true perspective diversity',
+          ],
+        },
+        priority: 'medium',
+        suggestedActions: [
+          {
+            type: 'seek_expert',
+            description: 'Seek additional domain experts for diverse viewpoints',
+            effort: 'significant',
+            prerequisites: ['Identify expert communities'],
+          },
+        ],
+      }));
+    }
+
+    return gaps;
+  }
+
+  private async detectTemporalGaps(
+    domain: string,
+    baseHumility: HumilityFlags
+  ): Promise<KnowledgeGap[]> {
+    const gaps: KnowledgeGap[] = [];
+    const domainClaimIds = this.domainClaims.get(domain) ?? new Set();
+
+    // Check for temporal coverage
+    const timestamps: number[] = [];
+    for (const claimId of domainClaimIds) {
+      const claim = this.claims.get(claimId);
+      if (claim) {
+        timestamps.push(claim.createdAt);
+      }
+    }
+
+    if (timestamps.length > 0) {
+      timestamps.sort((a, b) => a - b);
+      const newest = timestamps[timestamps.length - 1];
+      const daysSinceNewest = (Date.now() - newest) / (1000 * 60 * 60 * 24);
+
+      if (daysSinceNewest > 365) {
+        gaps.push(this.createGap({
+          type: 'temporal',
+          description: `Domain "${domain}" has no claims in the last ${Math.floor(daysSinceNewest)} days`,
+          domains: [domain],
+          severity: 0.5,
+          humility: {
+            ...baseHumility,
+            assumptions: [
+              ...baseHumility.assumptions,
+              'Recent activity is assumed to indicate relevance',
+              'Some domains may be stable and not require updates',
+            ],
+          },
+          priority: 'medium',
+          suggestedActions: [
+            {
+              type: 'gather_evidence',
+              description: 'Check for recent developments in this domain',
+              effort: 'moderate',
+              prerequisites: [],
+            },
+          ],
+        }));
+      }
+    }
+
+    return gaps;
+  }
+
+  private async detectCrossDomainGaps(
+    domain: string,
+    baseHumility: HumilityFlags
+  ): Promise<KnowledgeGap[]> {
+    const gaps: KnowledgeGap[] = [];
+    const domainClaimIds = this.domainClaims.get(domain) ?? new Set();
+
+    // Find claims that reference other domains without links
+    for (const claimId of domainClaimIds) {
+      const claim = this.claims.get(claimId);
+      if (claim?.referencedDomains) {
+        for (const refDomain of claim.referencedDomains) {
+          const links = this.claimLinks.get(claimId) ?? [];
+          const hasLinkToRefDomain = links.some((linkId) => {
+            const linkedClaim = this.claims.get(linkId);
+            return linkedClaim?.domain === refDomain;
+          });
+
+          if (!hasLinkToRefDomain) {
+            gaps.push(this.createGap({
+              type: 'cross_domain',
+              description: `Claim "${claimId}" references domain "${refDomain}" but has no links to it`,
+              domains: [domain, refDomain],
+              severity: 0.5,
+              humility: {
+                ...baseHumility,
+                assumptions: [
+                  ...baseHumility.assumptions,
+                  'Cross-domain references should have explicit links',
+                  'Some references may be tangential and not require links',
+                ],
+              },
+              adjacentClaims: [claimId],
+              priority: 'low',
+              suggestedActions: [
+                {
+                  type: 'link_domains',
+                  description: `Find relevant claims in "${refDomain}" to link to`,
+                  effort: 'minimal',
+                  prerequisites: [],
+                },
+              ],
+            }));
+          }
+        }
+      }
+    }
+
+    return gaps;
+  }
+
+  // ==========================================================================
+  // GAP MANAGEMENT
+  // ==========================================================================
+
+  /**
+   * Mark a gap as addressed
+   */
+  resolveGap(gapId: string, resolution: GapResolution): boolean {
+    const gap = this.detectedGaps.get(gapId);
+    if (!gap) return false;
+
+    gap.addressed = true;
+    gap.resolution = resolution;
+
+    // Emit SCEI event
+    const sceiEvent = createSCEIEvent('discovery:gap_resolved', 'discovery', {
+      gapId,
+      gapType: gap.type,
+      resolutionMethod: resolution.method,
+      newClaimsCount: resolution.newClaims?.length ?? 0,
+    });
+    void this.sceiEventBus.emit(sceiEvent);
+
+    // Record metrics
+    this.sceiMetrics.incrementCounter('discovery_gaps_resolved', {
+      method: resolution.method,
+      gap_type: gap.type,
+    });
+    this.sceiMetrics.setGauge(
+      'discovery_unresolved_gaps',
+      Array.from(this.detectedGaps.values()).filter((g) => !g.addressed).length
+    );
+
+    return true;
+  }
+
+  /**
+   * Get all unresolved gaps
+   */
+  getUnresolvedGaps(): KnowledgeGap[] {
+    return Array.from(this.detectedGaps.values()).filter((g) => !g.addressed);
+  }
+
+  /**
+   * Get gaps by priority
+   */
+  getGapsByPriority(priority: KnowledgeGap['priority']): KnowledgeGap[] {
+    return Array.from(this.detectedGaps.values()).filter(
+      (g) => g.priority === priority && !g.addressed
+    );
+  }
+
+  /**
+   * Get a specific gap by ID
+   */
+  getGap(id: string): KnowledgeGap | undefined {
+    return this.detectedGaps.get(id);
+  }
+
+  // ==========================================================================
+  // KNOWLEDGE GRAPH MANAGEMENT (for testing/simulation)
+  // ==========================================================================
+
+  /**
+   * Register a claim (for testing)
+   *
+   * Accepts either:
+   * - A full MockClaim object
+   * - An id string and a partial claim object (for convenience)
+   */
+  registerClaim(
+    idOrClaim: string | MockClaim,
+    options?: Partial<Omit<MockClaim, 'id'>>
+  ): void {
+    let claim: MockClaim;
+
+    if (typeof idOrClaim === 'string') {
+      // Called with (id, options)
+      claim = {
+        id: idOrClaim,
+        domain: options?.domain ?? 'unknown',
+        authorId: options?.authorId ?? 'test-author',
+        empiricalLevel: options?.empiricalLevel ?? 1,
+        confidence: options?.confidence ?? 0.5,
+        createdAt: options?.createdAt ?? Date.now(),
+        content: options?.content,
+        hasQuantitativeAspect: options?.hasQuantitativeAspect,
+        hasQuantitativeEvidence: options?.hasQuantitativeEvidence,
+        referencedDomains: options?.referencedDomains,
+      };
+    } else {
+      // Called with (claim)
+      claim = idOrClaim;
+    }
+
+    this.claims.set(claim.id, claim);
+
+    // Update domain index
+    if (!this.domainClaims.has(claim.domain)) {
+      this.domainClaims.set(claim.domain, new Set());
+    }
+    this.domainClaims.get(claim.domain)!.add(claim.id);
+  }
+
+  /**
+   * Add a link between claims
+   */
+  addLink(fromClaimId: string, toClaimId: string): void {
+    // Add link from -> to
+    if (!this.claimLinks.has(fromClaimId)) {
+      this.claimLinks.set(fromClaimId, []);
+    }
+    this.claimLinks.get(fromClaimId)!.push(toClaimId);
+
+    // Add reverse link to -> from (bidirectional for structural connectivity)
+    if (!this.claimLinks.has(toClaimId)) {
+      this.claimLinks.set(toClaimId, []);
+    }
+    this.claimLinks.get(toClaimId)!.push(fromClaimId);
+  }
+
+  /**
+   * Check if a link exists between two claims (in either direction)
+   */
+  hasLink(claimIdA: string, claimIdB: string): boolean {
+    const linksFromA = this.claimLinks.get(claimIdA) ?? [];
+    const linksFromB = this.claimLinks.get(claimIdB) ?? [];
+    return linksFromA.includes(claimIdB) || linksFromB.includes(claimIdA);
+  }
+
+  // ==========================================================================
+  // HELPERS
+  // ==========================================================================
+
+  private createHumilityFlags(): HumilityFlags {
+    return {
+      schemaRelative: true,
+      unknownUnknownsAcknowledged: true,
+      detectionBlindSpots: [...this.config.knownBlindSpots],
+      detectionConfidence: 0.6, // Default moderate confidence
+      schemaVersion: this.config.schemaVersion,
+      unsearchedDomains: [...this.config.unsearchedDomains],
+      assumptions: [
+        'Gap detection is relative to current schema',
+        'We may be missing entire categories of gaps',
+      ],
+    };
+  }
+
+  private createGap(input: {
+    type: GapType;
+    description: string;
+    domains: string[];
+    severity: number;
+    humility: HumilityFlags;
+    adjacentClaims?: string[];
+    priority: KnowledgeGap['priority'];
+    suggestedActions: SuggestedAction[];
+  }): KnowledgeGap {
+    return {
+      id: `gap_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      type: input.type,
+      description: input.description,
+      domains: input.domains,
+      severity: input.severity,
+      humility: input.humility,
+      adjacentClaims: input.adjacentClaims ?? [],
+      suggestedActions: input.suggestedActions,
+      detectedAt: Date.now(),
+      priority: input.priority,
+      addressed: false,
+    };
+  }
+
+  // ==========================================================================
+  // STATISTICS
+  // ==========================================================================
+
+  getStats(): GapDetectorStats {
+    const gaps = Array.from(this.detectedGaps.values());
+    const byType: Record<GapType, number> = {
+      structural: 0,
+      epistemic: 0,
+      measurement: 0,
+      perspective: 0,
+      temporal: 0,
+      cross_domain: 0,
+    };
+    const byPriority: Record<KnowledgeGap['priority'], number> = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+    };
+
+    for (const gap of gaps) {
+      byType[gap.type]++;
+      byPriority[gap.priority]++;
+    }
+
+    return {
+      totalGaps: gaps.length,
+      unresolvedGaps: gaps.filter((g) => !g.addressed).length,
+      resolvedGaps: gaps.filter((g) => g.addressed).length,
+      byType,
+      byPriority,
+      averageSeverity:
+        gaps.length > 0
+          ? gaps.reduce((sum, g) => sum + g.severity, 0) / gaps.length
+          : 0,
+    };
+  }
+}
+
+/**
+ * Mock claim for testing
+ */
+interface MockClaim {
+  id: string;
+  domain: string;
+  authorId: string;
+  empiricalLevel: number;
+  confidence: number;
+  createdAt: number;
+  content?: string;
+  hasQuantitativeAspect?: boolean;
+  hasQuantitativeEvidence?: boolean;
+  referencedDomains?: string[];
+}
+
+/**
+ * Statistics for gap detection
+ */
+export interface GapDetectorStats {
+  totalGaps: number;
+  unresolvedGaps: number;
+  resolvedGaps: number;
+  byType: Record<GapType, number>;
+  byPriority: Record<KnowledgeGap['priority'], number>;
+  averageSeverity: number;
+}
+
+// Singleton
+let instance: GapDetector | null = null;
+
+export function getGapDetector(config?: Partial<GapDetectorConfig>): GapDetector {
+  if (!instance) {
+    instance = new GapDetector(config);
+  }
+  return instance;
+}
+
+export function resetGapDetector(): void {
+  instance = null;
+}

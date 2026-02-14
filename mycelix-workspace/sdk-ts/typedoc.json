@@ -1,0 +1,37 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "docs",
+  "name": "@mycelix/sdk",
+  "readme": "README.md",
+  "theme": "default",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeInternal": true,
+  "disableSources": false,
+  "navigationLinks": {
+    "GitHub": "https://github.com/Luminous-Dynamics/mycelix",
+    "npm": "https://www.npmjs.com/package/@mycelix/sdk"
+  },
+  "plugin": [],
+  "categorizeByGroup": true,
+  "categoryOrder": [
+    "Core",
+    "MATL",
+    "Epistemic",
+    "Bridge",
+    "Federated Learning",
+    "Client",
+    "Security",
+    "Configuration",
+    "Utilities",
+    "Errors",
+    "*"
+  ],
+  "sort": ["source-order"],
+  "visibilityFilters": {
+    "protected": true,
+    "@internal": false
+  }
+}

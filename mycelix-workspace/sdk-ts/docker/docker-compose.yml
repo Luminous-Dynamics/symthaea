@@ -1,0 +1,55 @@
+# Docker Compose for Mycelix SDK Integration Tests
+#
+# Usage:
+#   docker compose -f docker/docker-compose.yml up -d
+#   npm run test:conductor
+#   docker compose -f docker/docker-compose.yml down
+#
+# Or use the convenience script:
+#   ./scripts/conductor-tests.sh
+
+version: '3.8'
+
+services:
+  # Holochain conductor for integration tests
+  conductor:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.conductor
+    container_name: mycelix-conductor
+    ports:
+      - "8888:8888"   # App interface
+      - "8889:8889"   # Admin interface
+    environment:
+      - MYCELIX_APP_ID=mycelix_ecosystem
+      - RUST_LOG=info
+    volumes:
+      # Mount hApp files for installation
+      - ../happs:/holochain/happs:ro
+      # Persist conductor data between restarts (optional)
+      - conductor-data:/holochain/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8889/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  # Optional: Signal server for P2P networking
+  signal-server:
+    image: holochain/signal-srv:0.1.0
+    container_name: mycelix-signal
+    ports:
+      - "8787:8787"
+    profiles:
+      - network
+    restart: unless-stopped
+
+volumes:
+  conductor-data:
+    driver: local
+
+networks:
+  default:
+    name: mycelix-test-network

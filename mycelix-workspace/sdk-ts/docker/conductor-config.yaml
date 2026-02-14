@@ -1,0 +1,44 @@
+# Holochain Conductor Configuration for Mycelix Integration Tests
+#
+# This configuration provides a test conductor with:
+# - App WebSocket interface on port 8888
+# - Admin WebSocket interface on port 8889
+# - Ephemeral storage (data lost on container stop)
+# - Development-friendly settings
+
+---
+environment_path: /holochain/data
+use_dangerous_test_keystore: true
+
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 8889
+      allowed_origins: "*"
+
+network:
+  transport_pool:
+    - type: webrtc
+      signal_url: wss://signal.holotest.net/
+  bootstrap_service: https://bootstrap.holotest.net/
+
+  # Lower timeouts for faster test feedback
+  tuning_params:
+    gossip_loop_iteration_delay_ms: 100
+    gossip_peer_on_success_next_gossip_delay_ms: 100
+    gossip_peer_on_error_next_gossip_delay_ms: 500
+    gossip_local_sync_delay_ms: 100
+    gossip_redundancy_target: 3
+
+# Database configuration
+db_sync_strategy: Fast
+
+# Development settings
+signing_service_uri: null
+encryption_service_uri: null
+decryption_service_uri: null
+
+# Enable tracing for debugging
+tracing:
+  type: file
+  path: /holochain/data/conductor.log
