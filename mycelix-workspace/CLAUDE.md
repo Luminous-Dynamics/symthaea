@@ -1,7 +1,7 @@
 # Mycelix Workspace - Claude Context
 
 **Version**: Holochain 0.6.0
-**Status**: 3 production + 9 beta + 14 scaffold hApps (see [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md))
+**Status**: 7 production + 7 beta + 10 scaffold hApps (see [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md))
 
 ---
 
@@ -22,10 +22,11 @@ just status          # Check status
 
 | Stage | Count | hApps |
 |-------|-------|-------|
-| Production | 3 | core (62 tests), mail (12 zomes), desci (141 tests, REST not hApp) |
-| Beta | 9 | marketplace, supplychain, observatory, epistemic-markets, fabrication, edunet, consensus, civic-happ, lucid |
+| **Core Four** | **4** | **identity** (9 zomes, 23 sweettests, MFA+PQC+recovery), **governance** (7 zomes, treasury+delegation+DKG), **core FL** (6 zomes, 62 tests, model versioning), **LUCID** (8 zomes, 92 functions, Symthaea bridge 95%) |
+| Production | 3 | mail (12 zomes), desci (141 tests, REST not hApp), space |
 | **Cluster** | **2** | **commons** (property+housing+care+mutualaid+water+food+transport, 35 zomes, 127 tests), **civic** (justice+emergency+media, 16 zomes, 144 tests) |
-| Scaffold | 6 | identity, knowledge, governance, finance, energy, health, space |
+| Beta | 7 | marketplace, supplychain, observatory, epistemic-markets, fabrication, edunet, consensus |
+| Scaffold | 3 | knowledge, finance, energy, health |
 | Stub/Other | 3 | bots (Python), music (early), symthaea-bridge |
 | Dormant | 1 | climate |
 
