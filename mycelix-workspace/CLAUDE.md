@@ -105,7 +105,7 @@ hc dna pack .
 | Mycelix-Core | 62 | Verified |
 | DeSci | 141 | Verified |
 | Rust SDK | 996 pass (1002 w/ parallel) | Verified 2026-02-04 |
-| TypeScript SDK | 6,316 pass / 15 skip | All pass (libsodium ESM compat fixed) |
+| TypeScript SDK | 6,650 pass / 196 skip | All pass, types aligned to Rust serde values (2026-02-14) |
 | Identity unit | 23 | Pass (recovery + trust_credential) |
 | Commons cluster unit | 2,588 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation across all 35 zomes (35/35 integrity tested) |
 | Civic cluster unit | 1,320 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation across all 16 zomes |
