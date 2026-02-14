@@ -141,7 +141,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_vehicle(v: Vehicle) -> ExternResult<ValidateCallbackResult> {
-    if v.id.is_empty() {
+    if v.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Vehicle ID cannot be empty".into()));
     }
     if v.capacity_kg < 0.0 {
@@ -151,10 +151,10 @@ fn validate_vehicle(v: Vehicle) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_route(r: Route) -> ExternResult<ValidateCallbackResult> {
-    if r.id.is_empty() {
+    if r.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Route ID cannot be empty".into()));
     }
-    if r.name.is_empty() {
+    if r.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Route name cannot be empty".into()));
     }
     if r.waypoints.len() < 2 {
@@ -167,7 +167,7 @@ fn validate_route(r: Route) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_stop(s: Stop) -> ExternResult<ValidateCallbackResult> {
-    if s.name.is_empty() {
+    if s.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Stop name cannot be empty".into()));
     }
     if s.location_lat < -90.0 || s.location_lat > 90.0 {

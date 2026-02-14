@@ -159,22 +159,22 @@ fn validate_create_resource(
     _action: Create,
     resource: EmergencyResource,
 ) -> ExternResult<ValidateCallbackResult> {
-    if resource.id.is_empty() {
+    if resource.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resource ID cannot be empty".into(),
         ));
     }
-    if resource.name.is_empty() {
+    if resource.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resource name cannot be empty".into(),
         ));
     }
-    if resource.unit.is_empty() {
+    if resource.unit.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resource unit cannot be empty".into(),
         ));
     }
-    if resource.location.is_empty() {
+    if resource.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resource location cannot be empty".into(),
         ));
@@ -183,7 +183,7 @@ fn validate_create_resource(
 }
 
 fn validate_update_resource(resource: EmergencyResource) -> ExternResult<ValidateCallbackResult> {
-    if resource.id.is_empty() {
+    if resource.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resource ID cannot be empty".into(),
         ));
@@ -200,7 +200,7 @@ fn validate_create_request(
             "Quantity needed must be greater than 0".into(),
         ));
     }
-    if request.location.is_empty() {
+    if request.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Request location cannot be empty".into(),
         ));
@@ -209,7 +209,7 @@ fn validate_create_request(
 }
 
 fn validate_update_request(request: ResourceRequest) -> ExternResult<ValidateCallbackResult> {
-    if request.location.is_empty() {
+    if request.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Request location cannot be empty".into(),
         ));
@@ -613,19 +613,19 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn create_resource_whitespace_only_id_passes() {
+    fn create_resource_whitespace_only_id_rejected() {
         let mut r = make_resource();
         r.id = "   ".into();
         let result = validate_create_resource(fake_create(), r);
-        assert!(is_valid(&result));
+        assert!(!is_valid(&result));
     }
 
     #[test]
-    fn create_resource_whitespace_only_name_passes() {
+    fn create_resource_whitespace_only_name_rejected() {
         let mut r = make_resource();
         r.name = " \t\n".into();
         let result = validate_create_resource(fake_create(), r);
-        assert!(is_valid(&result));
+        assert!(!is_valid(&result));
     }
 
     // ========================================================================
@@ -862,15 +862,15 @@ mod tests {
     }
 
     // ========================================================================
-    // validate_create_request - EDGE: whitespace-only location passes
+    // validate_create_request - EDGE: whitespace-only location rejected
     // ========================================================================
 
     #[test]
-    fn create_request_whitespace_only_location_passes() {
+    fn create_request_whitespace_only_location_rejected() {
         let mut req = make_request();
         req.location = "   ".into();
         let result = validate_create_request(fake_create(), req);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
     }
 
     // ========================================================================
@@ -918,11 +918,11 @@ mod tests {
     }
 
     #[test]
-    fn update_request_whitespace_only_location_passes() {
+    fn update_request_whitespace_only_location_rejected() {
         let mut req = make_request();
         req.location = " \t ".into();
         let result = validate_update_request(req);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
     }
 
     // ========================================================================

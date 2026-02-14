@@ -307,6 +307,35 @@ mod tests {
         AgentPubKey::from_raw_36(vec![1u8; 36])
     }
 
+    fn make_building() -> Building {
+        Building {
+            id: "bldg-001".to_string(),
+            name: "Oak Terrace".to_string(),
+            address: "123 Main St".to_string(),
+            location_lat: 45.5,
+            location_lon: -122.6,
+            total_units: 24,
+            year_built: Some(1985),
+            building_type: BuildingType::Apartment,
+            cooperative_hash: None,
+        }
+    }
+
+    fn make_unit() -> Unit {
+        Unit {
+            building_hash: fake_action_hash(),
+            unit_number: "4B".to_string(),
+            unit_type: UnitType::TwoBedroom,
+            square_meters: 75,
+            floor: 4,
+            bedrooms: 2,
+            bathrooms: 1,
+            accessibility_features: vec![AccessFeature::Elevator, AccessFeature::WideDoorways],
+            current_occupant: Some(fake_agent()),
+            status: UnitStatus::Occupied,
+        }
+    }
+
     // ── Coordinator struct serde roundtrips ────────────────────────────
 
     #[test]
@@ -406,36 +435,110 @@ mod tests {
 
     #[test]
     fn building_serde_roundtrip() {
-        let building = Building {
-            id: "bldg-001".to_string(),
-            name: "Oak Terrace".to_string(),
-            address: "123 Main St".to_string(),
-            location_lat: 45.5,
-            location_lon: -122.6,
-            total_units: 24,
-            year_built: Some(1985),
-            building_type: BuildingType::Apartment,
-            cooperative_hash: None,
-        };
+        let building = make_building();
         let json = serde_json::to_string(&building).unwrap();
         let decoded: Building = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, building);
     }
 
     #[test]
-    fn unit_serde_roundtrip() {
-        let unit = Unit {
-            building_hash: fake_action_hash(),
-            unit_number: "4B".to_string(),
-            unit_type: UnitType::TwoBedroom,
-            square_meters: 75,
-            floor: 4,
-            bedrooms: 2,
-            bathrooms: 1,
-            accessibility_features: vec![AccessFeature::Elevator, AccessFeature::WideDoorways],
-            current_occupant: Some(fake_agent()),
-            status: UnitStatus::Occupied,
+    fn building_no_year_built_no_cooperative() {
+        let building = Building {
+            id: "bldg-002".to_string(),
+            name: "New Build".to_string(),
+            address: "456 Elm St".to_string(),
+            location_lat: 0.0,
+            location_lon: 0.0,
+            total_units: 1,
+            year_built: None,
+            building_type: BuildingType::SingleFamily,
+            cooperative_hash: None,
         };
+        let json = serde_json::to_string(&building).unwrap();
+        let decoded: Building = serde_json::from_str(&json).unwrap();
+        assert!(decoded.year_built.is_none());
+        assert!(decoded.cooperative_hash.is_none());
+    }
+
+    #[test]
+    fn building_with_cooperative_hash() {
+        let mut building = make_building();
+        building.cooperative_hash = Some(fake_action_hash());
+        let json = serde_json::to_string(&building).unwrap();
+        let decoded: Building = serde_json::from_str(&json).unwrap();
+        assert!(decoded.cooperative_hash.is_some());
+    }
+
+    #[test]
+    fn building_boundary_lat_lon() {
+        let building = Building {
+            id: "edge".to_string(),
+            name: "North Pole".to_string(),
+            address: "Arctic".to_string(),
+            location_lat: 90.0,
+            location_lon: 180.0,
+            total_units: 1,
+            year_built: None,
+            building_type: BuildingType::CoHousing,
+            cooperative_hash: None,
+        };
+        let json = serde_json::to_string(&building).unwrap();
+        let decoded: Building = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.location_lat, 90.0);
+        assert_eq!(decoded.location_lon, 180.0);
+    }
+
+    #[test]
+    fn building_negative_lat_lon() {
+        let building = Building {
+            id: "south".to_string(),
+            name: "South Pole".to_string(),
+            address: "Antarctic".to_string(),
+            location_lat: -90.0,
+            location_lon: -180.0,
+            total_units: 1,
+            year_built: None,
+            building_type: BuildingType::Duplex,
+            cooperative_hash: None,
+        };
+        let json = serde_json::to_string(&building).unwrap();
+        let decoded: Building = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.location_lat, -90.0);
+        assert_eq!(decoded.location_lon, -180.0);
+    }
+
+    #[test]
+    fn building_unicode_name_address() {
+        let building = Building {
+            id: "uni".to_string(),
+            name: "\u{5927}\u{5EC8}".to_string(),
+            address: "\u{00C9}dimbourg, \u{00C9}cosse".to_string(),
+            location_lat: 55.95,
+            location_lon: -3.19,
+            total_units: 10,
+            year_built: Some(1800),
+            building_type: BuildingType::Townhouse,
+            cooperative_hash: None,
+        };
+        let json = serde_json::to_string(&building).unwrap();
+        let decoded: Building = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "\u{5927}\u{5EC8}");
+    }
+
+    #[test]
+    fn building_u16_max_total_units() {
+        let mut building = make_building();
+        building.total_units = u16::MAX;
+        building.year_built = Some(u16::MAX);
+        let json = serde_json::to_string(&building).unwrap();
+        let decoded: Building = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_units, u16::MAX);
+        assert_eq!(decoded.year_built, Some(u16::MAX));
+    }
+
+    #[test]
+    fn unit_serde_roundtrip() {
+        let unit = make_unit();
         let json = serde_json::to_string(&unit).unwrap();
         let decoded: Unit = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, unit);
@@ -460,6 +563,57 @@ mod tests {
         assert_eq!(decoded, unit);
     }
 
+    #[test]
+    fn unit_all_accessibility_features() {
+        let unit = Unit {
+            building_hash: fake_action_hash(),
+            unit_number: "ADA-1".to_string(),
+            unit_type: UnitType::Accessible,
+            square_meters: 80,
+            floor: 1,
+            bedrooms: 1,
+            bathrooms: 1,
+            accessibility_features: vec![
+                AccessFeature::WheelchairAccessible,
+                AccessFeature::Elevator,
+                AccessFeature::GrabBars,
+                AccessFeature::WideDoorways,
+                AccessFeature::LowCounters,
+                AccessFeature::VisualAlerts,
+                AccessFeature::HearingLoop,
+            ],
+            current_occupant: None,
+            status: UnitStatus::Available,
+        };
+        let json = serde_json::to_string(&unit).unwrap();
+        let decoded: Unit = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.accessibility_features.len(), 7);
+    }
+
+    #[test]
+    fn unit_u32_max_square_meters() {
+        let mut unit = make_unit();
+        unit.square_meters = u32::MAX;
+        unit.floor = u8::MAX;
+        unit.bedrooms = u8::MAX;
+        unit.bathrooms = u8::MAX;
+        let json = serde_json::to_string(&unit).unwrap();
+        let decoded: Unit = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.square_meters, u32::MAX);
+        assert_eq!(decoded.floor, u8::MAX);
+        assert_eq!(decoded.bedrooms, u8::MAX);
+        assert_eq!(decoded.bathrooms, u8::MAX);
+    }
+
+    #[test]
+    fn unit_unicode_unit_number() {
+        let mut unit = make_unit();
+        unit.unit_number = "\u{00C9}tage 3, Apt \u{00B0}7".to_string();
+        let json = serde_json::to_string(&unit).unwrap();
+        let decoded: Unit = serde_json::from_str(&json).unwrap();
+        assert!(decoded.unit_number.contains('\u{00C9}'));
+    }
+
     // ── UpdateUnitStatusInput with all statuses ───────────────────────
 
     #[test]
@@ -479,5 +633,55 @@ mod tests {
             let decoded: UpdateUnitStatusInput = serde_json::from_str(&json).unwrap();
             assert_eq!(decoded.new_status, status);
         }
+    }
+
+    // ── Clone / equality tests ────────────────────────────────────────
+
+    #[test]
+    fn building_clone_equals() {
+        let building = make_building();
+        let cloned = building.clone();
+        assert_eq!(building, cloned);
+    }
+
+    #[test]
+    fn unit_clone_equals() {
+        let unit = make_unit();
+        let cloned = unit.clone();
+        assert_eq!(unit, cloned);
+    }
+
+    #[test]
+    fn unit_status_clone_eq() {
+        let s = UnitStatus::Renovation;
+        assert_eq!(s.clone(), UnitStatus::Renovation);
+    }
+
+    #[test]
+    fn building_type_clone_eq() {
+        let bt = BuildingType::MixedUse;
+        assert_eq!(bt.clone(), BuildingType::MixedUse);
+    }
+
+    // ── Edge case: empty unit number ──────────────────────────────────
+
+    #[test]
+    fn unit_empty_unit_number() {
+        let unit = Unit {
+            building_hash: fake_action_hash(),
+            unit_number: String::new(),
+            unit_type: UnitType::Studio,
+            square_meters: 0,
+            floor: 0,
+            bedrooms: 0,
+            bathrooms: 0,
+            accessibility_features: vec![],
+            current_occupant: None,
+            status: UnitStatus::Available,
+        };
+        let json = serde_json::to_string(&unit).unwrap();
+        let decoded: Unit = serde_json::from_str(&json).unwrap();
+        assert!(decoded.unit_number.is_empty());
+        assert_eq!(decoded.square_meters, 0);
     }
 }

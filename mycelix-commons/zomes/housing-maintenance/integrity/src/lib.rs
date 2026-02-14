@@ -179,7 +179,7 @@ fn validate_create_request(
     _action: Create,
     req: MaintenanceRequest,
 ) -> ExternResult<ValidateCallbackResult> {
-    if req.title.is_empty() {
+    if req.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Request title cannot be empty".into(),
         ));
@@ -189,7 +189,7 @@ fn validate_create_request(
             "Request title must be at most 256 characters".into(),
         ));
     }
-    if req.description.is_empty() {
+    if req.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Request description cannot be empty".into(),
         ));
@@ -206,12 +206,12 @@ fn validate_create_work_order(
     _action: Create,
     order: WorkOrder,
 ) -> ExternResult<ValidateCallbackResult> {
-    if order.assigned_to.is_empty() {
+    if order.assigned_to.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Work order must be assigned to someone".into(),
         ));
     }
-    if order.description.is_empty() {
+    if order.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Work order description cannot be empty".into(),
         ));
@@ -225,7 +225,7 @@ fn validate_create_work_order(
 }
 
 fn validate_update_work_order(order: WorkOrder) -> ExternResult<ValidateCallbackResult> {
-    if order.assigned_to.is_empty() {
+    if order.assigned_to.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Work order must be assigned to someone".into(),
         ));
@@ -251,7 +251,7 @@ fn validate_create_inspection(
         ));
     }
     for finding in &inspection.findings {
-        if finding.is_empty() {
+        if finding.trim().is_empty() {
             return Ok(ValidateCallbackResult::Invalid(
                 "Inspection findings cannot be empty strings".into(),
             ));

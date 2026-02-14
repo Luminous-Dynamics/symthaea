@@ -71,7 +71,7 @@ fn validate_evidence(evidence: &Evidence) -> ExternResult<ValidateCallbackResult
     if !evidence.submitter.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Submitter must be a valid DID".into()));
     }
-    if evidence.content_hash.is_empty() {
+    if evidence.content_hash.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Content hash required".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -81,7 +81,7 @@ fn validate_evidence_verification(v: &EvidenceVerification) -> ExternResult<Vali
     if !v.verifier.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Verifier must be a valid DID".into()));
     }
-    if v.evidence_id.is_empty() {
+    if v.evidence_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Evidence ID required".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -91,7 +91,7 @@ fn validate_evidence_dispute(d: &EvidenceDispute) -> ExternResult<ValidateCallba
     if !d.disputant.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Disputant must be a valid DID".into()));
     }
-    if d.evidence_id.is_empty() {
+    if d.evidence_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Evidence ID required".into()));
     }
     if d.reason.trim().is_empty() {
@@ -304,12 +304,11 @@ mod tests {
     }
 
     #[test]
-    fn evidence_whitespace_only_content_hash_passes() {
-        // content_hash uses is_empty(), not trim().is_empty()
+    fn evidence_whitespace_only_content_hash_rejected() {
         let mut ev = make_evidence();
         ev.content_hash = "   ".into();
         let result = validate_evidence(&ev);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
     }
 
     #[test]

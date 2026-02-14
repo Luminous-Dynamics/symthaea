@@ -88,14 +88,14 @@ fn validate_create_entry(entry: EntryTypes) -> ExternResult<ValidateCallbackResu
 /// Validate a shared resource
 fn validate_shared_resource(resource: SharedResource) -> ExternResult<ValidateCallbackResult> {
     // ID must not be empty
-    if resource.id.is_empty() {
+    if resource.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resource ID cannot be empty".to_string(),
         ));
     }
 
     // Name must not be empty
-    if resource.name.is_empty() {
+    if resource.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resource name cannot be empty".to_string(),
         ));
@@ -151,7 +151,7 @@ fn validate_shared_resource(resource: SharedResource) -> ExternResult<ValidateCa
 /// Validate a booking
 fn validate_booking(booking: Booking) -> ExternResult<ValidateCallbackResult> {
     // ID must not be empty
-    if booking.id.is_empty() {
+    if booking.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Booking ID cannot be empty".to_string(),
         ));
@@ -205,7 +205,7 @@ fn validate_usage(usage: Usage) -> ExternResult<ValidateCallbackResult> {
 /// Validate a maintenance record
 fn validate_maintenance(maintenance: Maintenance) -> ExternResult<ValidateCallbackResult> {
     // Description must not be empty
-    if maintenance.description.is_empty() {
+    if maintenance.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Maintenance description cannot be empty".to_string(),
         ));

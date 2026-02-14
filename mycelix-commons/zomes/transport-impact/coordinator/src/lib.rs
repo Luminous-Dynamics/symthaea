@@ -220,6 +220,31 @@ pub fn get_community_impact_summary(_: ()) -> ExternResult<CommunityImpactSummar
 mod tests {
     use super::*;
 
+    fn fake_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    fn make_trip(mode: TripMode, distance: f64, passengers: u32) -> TripLog {
+        TripLog {
+            vehicle_hash: None,
+            route_hash: None,
+            distance_km: distance,
+            mode,
+            passengers,
+            cargo_kg: 0.0,
+            emissions_kg_co2: 0.0,
+            logged_at: 0,
+        }
+    }
+
+    // ========================================================================
+    // Pure function: emissions_factor tests
+    // ========================================================================
+
     #[test]
     fn emissions_factor_driving() {
         assert!((emissions_factor(&TripMode::Driving) - 0.21).abs() < f64::EPSILON);
@@ -246,48 +271,46 @@ mod tests {
     }
 
     #[test]
+    fn emissions_factor_transit_value() {
+        assert!((emissions_factor(&TripMode::Transit) - 0.089).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn emissions_factor_ev_value() {
+        assert!((emissions_factor(&TripMode::ElectricVehicle) - 0.05).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn emissions_factor_carpool_value() {
+        assert!((emissions_factor(&TripMode::Carpool) - 0.07).abs() < f64::EPSILON);
+    }
+
+    // ========================================================================
+    // Pure function: calculate_trip_emissions tests
+    // ========================================================================
+
+    #[test]
     fn calculate_trip_emissions_cycling() {
-        let trip = TripLog {
-            vehicle_hash: None,
-            route_hash: None,
-            distance_km: 20.0,
-            mode: TripMode::Cycling,
-            passengers: 1,
-            cargo_kg: 0.0,
-            emissions_kg_co2: 0.0,
-            logged_at: 0,
-        };
+        let trip = make_trip(TripMode::Cycling, 20.0, 1);
+        assert_eq!(calculate_trip_emissions(&trip), 0.0);
+    }
+
+    #[test]
+    fn calculate_trip_emissions_walking() {
+        let trip = make_trip(TripMode::Walking, 5.0, 1);
         assert_eq!(calculate_trip_emissions(&trip), 0.0);
     }
 
     #[test]
     fn calculate_trip_emissions_solo_driving() {
-        let trip = TripLog {
-            vehicle_hash: None,
-            route_hash: None,
-            distance_km: 100.0,
-            mode: TripMode::Driving,
-            passengers: 1,
-            cargo_kg: 0.0,
-            emissions_kg_co2: 0.0,
-            logged_at: 0,
-        };
+        let trip = make_trip(TripMode::Driving, 100.0, 1);
         let emissions = calculate_trip_emissions(&trip);
         assert!((emissions - 21.0).abs() < 0.01); // 100km * 0.21
     }
 
     #[test]
     fn calculate_trip_emissions_carpool_splits() {
-        let trip = TripLog {
-            vehicle_hash: None,
-            route_hash: None,
-            distance_km: 100.0,
-            mode: TripMode::Carpool,
-            passengers: 4,
-            cargo_kg: 0.0,
-            emissions_kg_co2: 0.0,
-            logged_at: 0,
-        };
+        let trip = make_trip(TripMode::Carpool, 100.0, 4);
         let emissions = calculate_trip_emissions(&trip);
         // 100km * 0.07 / 4 passengers = 1.75
         assert!((emissions - 1.75).abs() < 0.01);
@@ -295,16 +318,7 @@ mod tests {
 
     #[test]
     fn calculate_trip_emissions_driving_multi_passenger_splits() {
-        let trip = TripLog {
-            vehicle_hash: None,
-            route_hash: None,
-            distance_km: 100.0,
-            mode: TripMode::Driving,
-            passengers: 2,
-            cargo_kg: 0.0,
-            emissions_kg_co2: 0.0,
-            logged_at: 0,
-        };
+        let trip = make_trip(TripMode::Driving, 100.0, 2);
         let emissions = calculate_trip_emissions(&trip);
         // 100km * 0.21 / 2 = 10.5
         assert!((emissions - 10.5).abs() < 0.01);
@@ -312,18 +326,270 @@ mod tests {
 
     #[test]
     fn calculate_trip_emissions_transit_no_split() {
-        let trip = TripLog {
-            vehicle_hash: None,
-            route_hash: None,
-            distance_km: 50.0,
-            mode: TripMode::Transit,
-            passengers: 3,
-            cargo_kg: 0.0,
-            emissions_kg_co2: 0.0,
-            logged_at: 0,
-        };
+        let trip = make_trip(TripMode::Transit, 50.0, 3);
         let emissions = calculate_trip_emissions(&trip);
         // Transit doesn't split by passengers: 50 * 0.089 = 4.45
         assert!((emissions - 4.45).abs() < 0.01);
+    }
+
+    #[test]
+    fn calculate_trip_emissions_ev_no_split_with_passengers() {
+        // EV with multiple passengers should NOT split (not Driving/Carpool)
+        let trip = make_trip(TripMode::ElectricVehicle, 100.0, 4);
+        let emissions = calculate_trip_emissions(&trip);
+        // 100km * 0.05 = 5.0 (no split)
+        assert!((emissions - 5.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn calculate_trip_emissions_zero_distance() {
+        let trip = make_trip(TripMode::Driving, 0.0, 1);
+        assert_eq!(calculate_trip_emissions(&trip), 0.0);
+    }
+
+    #[test]
+    fn calculate_trip_emissions_very_small_distance() {
+        let trip = make_trip(TripMode::Driving, 0.001, 1);
+        let emissions = calculate_trip_emissions(&trip);
+        assert!((emissions - 0.00021).abs() < 1e-10);
+    }
+
+    #[test]
+    fn calculate_trip_emissions_driving_single_passenger_no_split() {
+        // passengers == 1 should NOT trigger split even for Driving
+        let trip = make_trip(TripMode::Driving, 10.0, 1);
+        let emissions = calculate_trip_emissions(&trip);
+        assert!((emissions - 2.1).abs() < 0.01);
+    }
+
+    // ========================================================================
+    // Coordinator input/output struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn emissions_calc_input_serde_roundtrip() {
+        let input = EmissionsCalcInput {
+            distance_km: 42.5,
+            mode: TripMode::Transit,
+            passengers: 1,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: EmissionsCalcInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.distance_km, 42.5);
+        assert_eq!(decoded.mode, TripMode::Transit);
+        assert_eq!(decoded.passengers, 1);
+    }
+
+    #[test]
+    fn emissions_calc_input_all_modes() {
+        for mode in [
+            TripMode::Driving,
+            TripMode::Cycling,
+            TripMode::Walking,
+            TripMode::Transit,
+            TripMode::Carpool,
+            TripMode::ElectricVehicle,
+        ] {
+            let input = EmissionsCalcInput {
+                distance_km: 10.0,
+                mode: mode.clone(),
+                passengers: 1,
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: EmissionsCalcInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.mode, mode);
+        }
+    }
+
+    #[test]
+    fn emissions_calc_result_serde_roundtrip() {
+        let result = EmissionsCalcResult {
+            emissions_kg_co2: 2.1,
+            baseline_emissions: 2.1,
+            savings_kg_co2: 0.0,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: EmissionsCalcResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.emissions_kg_co2, 2.1);
+        assert_eq!(decoded.savings_kg_co2, 0.0);
+    }
+
+    #[test]
+    fn emissions_calc_result_with_savings() {
+        let result = EmissionsCalcResult {
+            emissions_kg_co2: 0.0,
+            baseline_emissions: 2.1,
+            savings_kg_co2: 2.1,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: EmissionsCalcResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.savings_kg_co2, 2.1);
+    }
+
+    #[test]
+    fn community_impact_summary_serde_roundtrip() {
+        let summary = CommunityImpactSummary {
+            total_trips: 100,
+            total_distance_km: 5000.0,
+            total_emissions_kg_co2: 800.0,
+            total_credits_earned: 250.0,
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        let decoded: CommunityImpactSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_trips, 100);
+        assert_eq!(decoded.total_distance_km, 5000.0);
+        assert_eq!(decoded.total_emissions_kg_co2, 800.0);
+        assert_eq!(decoded.total_credits_earned, 250.0);
+    }
+
+    #[test]
+    fn community_impact_summary_zero_values() {
+        let summary = CommunityImpactSummary {
+            total_trips: 0,
+            total_distance_km: 0.0,
+            total_emissions_kg_co2: 0.0,
+            total_credits_earned: 0.0,
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        let decoded: CommunityImpactSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_trips, 0);
+    }
+
+    #[test]
+    fn bridge_event_signal_serde_roundtrip() {
+        let signal = BridgeEventSignal {
+            event_type: "carbon_credits_awarded".to_string(),
+            source_zome: "transport_impact".to_string(),
+            payload: r#"{"credits":1.5}"#.to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let decoded: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.event_type, "carbon_credits_awarded");
+        assert_eq!(decoded.source_zome, "transport_impact");
+        assert!(decoded.payload.contains("credits"));
+    }
+
+    // ========================================================================
+    // Integrity entry struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn trip_log_serde_roundtrip_with_hashes() {
+        let trip = TripLog {
+            vehicle_hash: Some(fake_hash()),
+            route_hash: Some(fake_hash()),
+            distance_km: 15.0,
+            mode: TripMode::Driving,
+            passengers: 2,
+            cargo_kg: 50.0,
+            emissions_kg_co2: 1.575,
+            logged_at: 1700000000,
+        };
+        let json = serde_json::to_string(&trip).unwrap();
+        let decoded: TripLog = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, trip);
+    }
+
+    #[test]
+    fn trip_log_serde_roundtrip_no_hashes() {
+        let trip = make_trip(TripMode::Walking, 3.0, 1);
+        let json = serde_json::to_string(&trip).unwrap();
+        let decoded: TripLog = serde_json::from_str(&json).unwrap();
+        assert!(decoded.vehicle_hash.is_none());
+        assert!(decoded.route_hash.is_none());
+    }
+
+    #[test]
+    fn carbon_credit_serde_roundtrip() {
+        let credit = CarbonCredit {
+            holder: fake_agent(),
+            credits_kg_co2: 3.15,
+            earned_from: CreditSource::Cycling,
+            earned_at: 1700000000,
+        };
+        let json = serde_json::to_string(&credit).unwrap();
+        let decoded: CarbonCredit = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, credit);
+    }
+
+    #[test]
+    fn carbon_credit_all_sources() {
+        for source in [
+            CreditSource::Cycling,
+            CreditSource::Transit,
+            CreditSource::Carpool,
+            CreditSource::ElectricVehicle,
+            CreditSource::Walking,
+        ] {
+            let credit = CarbonCredit {
+                holder: fake_agent(),
+                credits_kg_co2: 1.0,
+                earned_from: source.clone(),
+                earned_at: 0,
+            };
+            let json = serde_json::to_string(&credit).unwrap();
+            let decoded: CarbonCredit = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.earned_from, source);
+        }
+    }
+
+    // ========================================================================
+    // Clone / equality tests
+    // ========================================================================
+
+    #[test]
+    fn trip_log_clone_equals() {
+        let trip = make_trip(TripMode::Transit, 25.0, 1);
+        let cloned = trip.clone();
+        assert_eq!(trip, cloned);
+    }
+
+    #[test]
+    fn trip_mode_clone_eq() {
+        let mode = TripMode::ElectricVehicle;
+        assert_eq!(mode.clone(), TripMode::ElectricVehicle);
+    }
+
+    // ========================================================================
+    // Edge case / boundary value tests
+    // ========================================================================
+
+    #[test]
+    fn emissions_calc_input_u32_max_passengers() {
+        let input = EmissionsCalcInput {
+            distance_km: 10.0,
+            mode: TripMode::Carpool,
+            passengers: u32::MAX,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: EmissionsCalcInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.passengers, u32::MAX);
+    }
+
+    #[test]
+    fn community_impact_summary_u32_max_trips() {
+        let summary = CommunityImpactSummary {
+            total_trips: u32::MAX,
+            total_distance_km: f64::MAX,
+            total_emissions_kg_co2: f64::MAX,
+            total_credits_earned: f64::MAX,
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        let decoded: CommunityImpactSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_trips, u32::MAX);
+    }
+
+    #[test]
+    fn bridge_event_signal_empty_fields() {
+        let signal = BridgeEventSignal {
+            event_type: String::new(),
+            source_zome: String::new(),
+            payload: String::new(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let decoded: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert!(decoded.event_type.is_empty());
+        assert!(decoded.source_zome.is_empty());
+        assert!(decoded.payload.is_empty());
     }
 }

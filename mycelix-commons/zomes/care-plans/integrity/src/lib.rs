@@ -165,7 +165,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<ValidateCallbackResult> {
-    if plan.title.is_empty() {
+    if plan.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Plan title cannot be empty".into(),
         ));
@@ -175,7 +175,7 @@ fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<Validat
             "Plan title must be 256 characters or fewer".into(),
         ));
     }
-    if plan.description.is_empty() {
+    if plan.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Plan description cannot be empty".into(),
         ));
@@ -185,7 +185,7 @@ fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<Validat
             "Plan description must be 4096 characters or fewer".into(),
         ));
     }
-    if plan.schedule.is_empty() {
+    if plan.schedule.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Schedule cannot be empty".into(),
         ));
@@ -224,7 +224,7 @@ fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<Validat
 }
 
 fn validate_update_plan(plan: CarePlan) -> ExternResult<ValidateCallbackResult> {
-    if plan.title.is_empty() {
+    if plan.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Plan title cannot be empty".into(),
         ));

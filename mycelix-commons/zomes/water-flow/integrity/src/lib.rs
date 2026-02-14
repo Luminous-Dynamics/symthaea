@@ -298,12 +298,12 @@ fn validate_create_water_source(
     _action: Create,
     source: WaterSource,
 ) -> ExternResult<ValidateCallbackResult> {
-    if source.id.is_empty() {
+    if source.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Water source ID cannot be empty".into(),
         ));
     }
-    if source.name.is_empty() {
+    if source.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Water source name cannot be empty".into(),
         ));

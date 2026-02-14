@@ -166,10 +166,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_plot(plot: Plot) -> ExternResult<ValidateCallbackResult> {
-    if plot.id.is_empty() {
+    if plot.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Plot ID cannot be empty".into()));
     }
-    if plot.name.is_empty() {
+    if plot.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Plot name cannot be empty".into()));
     }
     if plot.area_sqm <= 0.0 {
@@ -185,10 +185,10 @@ fn validate_plot(plot: Plot) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_crop(crop: Crop) -> ExternResult<ValidateCallbackResult> {
-    if crop.name.is_empty() {
+    if crop.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Crop name cannot be empty".into()));
     }
-    if crop.variety.is_empty() {
+    if crop.variety.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Crop variety cannot be empty".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -202,7 +202,7 @@ fn validate_yield(yr: YieldRecord) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_season_plan(sp: SeasonPlan) -> ExternResult<ValidateCallbackResult> {
-    if sp.season.is_empty() {
+    if sp.season.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Season cannot be empty".into()));
     }
     if sp.planned_crops.is_empty() {

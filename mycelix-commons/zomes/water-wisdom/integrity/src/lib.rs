@@ -260,27 +260,27 @@ fn validate_create_practice(
     _action: Create,
     practice: TraditionalPractice,
 ) -> ExternResult<ValidateCallbackResult> {
-    if practice.id.is_empty() {
+    if practice.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Practice ID cannot be empty".into(),
         ));
     }
-    if practice.title.is_empty() {
+    if practice.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Practice title cannot be empty".into(),
         ));
     }
-    if practice.description.is_empty() {
+    if practice.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Practice description cannot be empty".into(),
         ));
     }
-    if practice.region.is_empty() {
+    if practice.region.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Region cannot be empty".into(),
         ));
     }
-    if practice.culture_or_community.is_empty() {
+    if practice.culture_or_community.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Culture or community cannot be empty".into(),
         ));
@@ -299,17 +299,17 @@ fn validate_create_conservation_method(
     _action: Create,
     method: ConservationMethod,
 ) -> ExternResult<ValidateCallbackResult> {
-    if method.id.is_empty() {
+    if method.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Conservation method ID cannot be empty".into(),
         ));
     }
-    if method.title.is_empty() {
+    if method.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Conservation method title cannot be empty".into(),
         ));
     }
-    if method.description.is_empty() {
+    if method.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Conservation method description cannot be empty".into(),
         ));
@@ -333,17 +333,17 @@ fn validate_create_climate_pattern(
     _action: Create,
     pattern: ClimateWaterPattern,
 ) -> ExternResult<ValidateCallbackResult> {
-    if pattern.region.is_empty() {
+    if pattern.region.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Region cannot be empty".into(),
         ));
     }
-    if pattern.season.is_empty() {
+    if pattern.season.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Season cannot be empty".into(),
         ));
     }
-    if pattern.description.is_empty() {
+    if pattern.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Description cannot be empty".into(),
         ));
@@ -354,7 +354,7 @@ fn validate_create_climate_pattern(
         ));
     }
     for indicator in &pattern.indicators {
-        if indicator.is_empty() || indicator.len() > 512 {
+        if indicator.trim().is_empty() || indicator.len() > 512 {
             return Ok(ValidateCallbackResult::Invalid(
                 "Each indicator must be 1-512 characters".into(),
             ));

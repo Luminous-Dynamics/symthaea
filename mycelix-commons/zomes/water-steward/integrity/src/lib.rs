@@ -299,12 +299,12 @@ fn validate_create_watershed(
     _action: Create,
     ws: Watershed,
 ) -> ExternResult<ValidateCallbackResult> {
-    if ws.id.is_empty() {
+    if ws.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Watershed ID cannot be empty".into(),
         ));
     }
-    if ws.name.is_empty() {
+    if ws.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Watershed name cannot be empty".into(),
         ));
@@ -370,7 +370,7 @@ fn validate_create_water_right(
         ));
     }
     for condition in &right.conditions {
-        if condition.is_empty() || condition.len() > 1024 {
+        if condition.trim().is_empty() || condition.len() > 1024 {
             return Ok(ValidateCallbackResult::Invalid(
                 "Each condition must be 1-1024 characters".into(),
             ));
@@ -400,7 +400,7 @@ fn validate_create_water_dispute(
     _action: Create,
     dispute: WaterDispute,
 ) -> ExternResult<ValidateCallbackResult> {
-    if dispute.description.is_empty() {
+    if dispute.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Dispute description cannot be empty".into(),
         ));

@@ -267,7 +267,7 @@ fn validate_create_offer(
     _action: Create,
     offer: ServiceOffer,
 ) -> ExternResult<ValidateCallbackResult> {
-    if offer.title.is_empty() {
+    if offer.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Offer title cannot be empty".into(),
         ));
@@ -277,7 +277,7 @@ fn validate_create_offer(
             "Offer title must be 256 characters or fewer".into(),
         ));
     }
-    if offer.description.is_empty() {
+    if offer.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Offer description cannot be empty".into(),
         ));
@@ -297,7 +297,7 @@ fn validate_create_offer(
             "Hours available cannot exceed 168 per week".into(),
         ));
     }
-    if offer.location.is_empty() {
+    if offer.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Location cannot be empty".into(),
         ));
@@ -331,7 +331,7 @@ fn validate_create_request(
     _action: Create,
     request: ServiceRequest,
 ) -> ExternResult<ValidateCallbackResult> {
-    if request.title.is_empty() {
+    if request.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Request title cannot be empty".into(),
         ));
@@ -341,7 +341,7 @@ fn validate_create_request(
             "Request title must be 256 characters or fewer".into(),
         ));
     }
-    if request.description.is_empty() {
+    if request.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Request description cannot be empty".into(),
         ));
@@ -361,7 +361,7 @@ fn validate_create_request(
             "Hours needed cannot exceed 168".into(),
         ));
     }
-    if request.location.is_empty() {
+    if request.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Location cannot be empty".into(),
         ));
@@ -423,7 +423,7 @@ fn validate_create_credit(
 }
 
 fn validate_update_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackResult> {
-    if offer.title.is_empty() {
+    if offer.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Offer title cannot be empty".into(),
         ));
@@ -437,7 +437,7 @@ fn validate_update_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackRe
 }
 
 fn validate_update_request(request: ServiceRequest) -> ExternResult<ValidateCallbackResult> {
-    if request.title.is_empty() {
+    if request.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Request title cannot be empty".into(),
         ));

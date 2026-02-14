@@ -251,7 +251,7 @@ impl std::fmt::Display for PoolsError {
 
 /// Validate that a DID has a valid format
 fn validate_did(did: &str) -> ExternResult<()> {
-    if did.is_empty() {
+    if did.trim().is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
             PoolsError::InvalidDid("DID cannot be empty".to_string()).to_string()
         )));
@@ -267,7 +267,7 @@ fn validate_did(did: &str) -> ExternResult<()> {
 
 /// Validate that an ID is non-empty
 fn validate_id(id: &str, field_name: &str) -> ExternResult<()> {
-    if id.is_empty() {
+    if id.trim().is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
             PoolsError::InvalidId(format!("{} cannot be empty", field_name)).to_string()
         )));

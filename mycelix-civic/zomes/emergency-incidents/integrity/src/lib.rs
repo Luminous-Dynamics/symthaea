@@ -201,17 +201,17 @@ fn validate_create_disaster(
     _action: Create,
     disaster: Disaster,
 ) -> ExternResult<ValidateCallbackResult> {
-    if disaster.id.is_empty() {
+    if disaster.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Disaster ID cannot be empty".into(),
         ));
     }
-    if disaster.title.is_empty() {
+    if disaster.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Disaster title cannot be empty".into(),
         ));
     }
-    if disaster.description.is_empty() {
+    if disaster.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Disaster description cannot be empty".into(),
         ));
@@ -235,12 +235,12 @@ fn validate_create_disaster(
 }
 
 fn validate_update_disaster(disaster: Disaster) -> ExternResult<ValidateCallbackResult> {
-    if disaster.id.is_empty() {
+    if disaster.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Disaster ID cannot be empty".into(),
         ));
     }
-    if disaster.title.is_empty() {
+    if disaster.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Disaster title cannot be empty".into(),
         ));
@@ -252,7 +252,7 @@ fn validate_create_update(
     _action: Create,
     update: IncidentUpdate,
 ) -> ExternResult<ValidateCallbackResult> {
-    if update.content.is_empty() {
+    if update.content.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Update content cannot be empty".into(),
         ));

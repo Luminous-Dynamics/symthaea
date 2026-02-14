@@ -171,17 +171,17 @@ fn validate_create_trust(
     _action: Create,
     trust: LandTrust,
 ) -> ExternResult<ValidateCallbackResult> {
-    if trust.id.is_empty() {
+    if trust.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Trust ID cannot be empty".into(),
         ));
     }
-    if trust.name.is_empty() {
+    if trust.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Trust name cannot be empty".into(),
         ));
     }
-    if trust.mission.is_empty() {
+    if trust.mission.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Trust mission cannot be empty".into(),
         ));

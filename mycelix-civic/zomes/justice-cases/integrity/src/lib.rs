@@ -836,7 +836,7 @@ fn validate_evidence(evidence: &Evidence) -> ExternResult<ValidateCallbackResult
     }
 
     // Content hash required
-    if evidence.content.hash.is_empty() {
+    if evidence.content.hash.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Evidence content hash required".into(),
         ));

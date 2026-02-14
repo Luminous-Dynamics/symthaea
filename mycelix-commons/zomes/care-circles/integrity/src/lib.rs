@@ -154,7 +154,7 @@ fn validate_create_circle(
     _action: Create,
     circle: CareCircle,
 ) -> ExternResult<ValidateCallbackResult> {
-    if circle.name.is_empty() {
+    if circle.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Circle name cannot be empty".into(),
         ));
@@ -164,7 +164,7 @@ fn validate_create_circle(
             "Circle name must be 128 characters or fewer".into(),
         ));
     }
-    if circle.description.is_empty() {
+    if circle.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Circle description cannot be empty".into(),
         ));
@@ -184,7 +184,7 @@ fn validate_create_circle(
             "Circle cannot have more than 500 members".into(),
         ));
     }
-    if circle.location.is_empty() {
+    if circle.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Location cannot be empty".into(),
         ));
@@ -198,7 +198,7 @@ fn validate_create_circle(
 }
 
 fn validate_update_circle(circle: CareCircle) -> ExternResult<ValidateCallbackResult> {
-    if circle.name.is_empty() {
+    if circle.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Circle name cannot be empty".into(),
         ));

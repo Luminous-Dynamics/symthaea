@@ -125,10 +125,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_market(m: Market) -> ExternResult<ValidateCallbackResult> {
-    if m.id.is_empty() {
+    if m.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Market ID cannot be empty".into()));
     }
-    if m.name.is_empty() {
+    if m.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Market name cannot be empty".into()));
     }
     if m.location_lat < -90.0 || m.location_lat > 90.0 {
@@ -141,7 +141,7 @@ fn validate_market(m: Market) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_listing(l: Listing) -> ExternResult<ValidateCallbackResult> {
-    if l.product_name.is_empty() {
+    if l.product_name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Product name cannot be empty".into()));
     }
     if l.quantity_kg <= 0.0 {
@@ -308,10 +308,10 @@ mod tests {
     }
 
     #[test]
-    fn market_whitespace_id_accepted() {
+    fn market_whitespace_id_rejected() {
         let mut m = valid_market();
         m.id = " ".into();
-        assert_valid(validate_market(m));
+        assert_invalid(validate_market(m), "Market ID cannot be empty");
     }
 
     // ── validate_market: name ───────────────────────────────────────────
@@ -324,10 +324,10 @@ mod tests {
     }
 
     #[test]
-    fn market_whitespace_name_accepted() {
+    fn market_whitespace_name_rejected() {
         let mut m = valid_market();
         m.name = "  ".into();
-        assert_valid(validate_market(m));
+        assert_invalid(validate_market(m), "Market name cannot be empty");
     }
 
     // ── validate_market: latitude ───────────────────────────────────────
@@ -457,10 +457,10 @@ mod tests {
     }
 
     #[test]
-    fn listing_whitespace_product_accepted() {
+    fn listing_whitespace_product_rejected() {
         let mut l = valid_listing();
         l.product_name = " ".into();
-        assert_valid(validate_listing(l));
+        assert_invalid(validate_listing(l), "Product name cannot be empty");
     }
 
     // ── validate_listing: quantity_kg ────────────────────────────────────

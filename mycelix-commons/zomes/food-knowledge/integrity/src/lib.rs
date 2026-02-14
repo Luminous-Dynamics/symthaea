@@ -107,10 +107,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_seed(s: SeedVariety) -> ExternResult<ValidateCallbackResult> {
-    if s.name.is_empty() {
+    if s.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Seed name cannot be empty".into()));
     }
-    if s.species.is_empty() {
+    if s.species.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Species cannot be empty".into()));
     }
     if s.days_to_maturity == 0 {
@@ -120,23 +120,23 @@ fn validate_seed(s: SeedVariety) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_practice(p: TraditionalPractice) -> ExternResult<ValidateCallbackResult> {
-    if p.name.is_empty() {
+    if p.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Practice name cannot be empty".into()));
     }
-    if p.description.is_empty() {
+    if p.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_recipe(r: Recipe) -> ExternResult<ValidateCallbackResult> {
-    if r.name.is_empty() {
+    if r.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Recipe name cannot be empty".into()));
     }
     if r.ingredients.is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Must have at least one ingredient".into()));
     }
-    if r.instructions.is_empty() {
+    if r.instructions.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Instructions cannot be empty".into()));
     }
     if r.servings == 0 {
@@ -310,10 +310,10 @@ mod tests {
     }
 
     #[test]
-    fn seed_whitespace_name_accepted() {
+    fn seed_whitespace_name_rejected() {
         let mut s = valid_seed();
         s.name = " ".into();
-        assert_valid(validate_seed(s));
+        assert_invalid(validate_seed(s), "Seed name cannot be empty");
     }
 
     // ── validate_seed: species ──────────────────────────────────────────
@@ -326,10 +326,10 @@ mod tests {
     }
 
     #[test]
-    fn seed_whitespace_species_accepted() {
+    fn seed_whitespace_species_rejected() {
         let mut s = valid_seed();
         s.species = "  ".into();
-        assert_valid(validate_seed(s));
+        assert_invalid(validate_seed(s), "Species cannot be empty");
     }
 
     // ── validate_seed: days_to_maturity ─────────────────────────────────
@@ -425,10 +425,10 @@ mod tests {
     }
 
     #[test]
-    fn practice_whitespace_name_accepted() {
+    fn practice_whitespace_name_rejected() {
         let mut p = valid_practice();
         p.name = " ".into();
-        assert_valid(validate_practice(p));
+        assert_invalid(validate_practice(p), "Practice name cannot be empty");
     }
 
     // ── validate_practice: description ──────────────────────────────────
@@ -441,10 +441,10 @@ mod tests {
     }
 
     #[test]
-    fn practice_whitespace_description_accepted() {
+    fn practice_whitespace_description_rejected() {
         let mut p = valid_practice();
         p.description = "  ".into();
-        assert_valid(validate_practice(p));
+        assert_invalid(validate_practice(p), "Description cannot be empty");
     }
 
     // ── validate_practice: category variants ────────────────────────────
@@ -508,10 +508,10 @@ mod tests {
     }
 
     #[test]
-    fn recipe_whitespace_name_accepted() {
+    fn recipe_whitespace_name_rejected() {
         let mut r = valid_recipe();
         r.name = " ".into();
-        assert_valid(validate_recipe(r));
+        assert_invalid(validate_recipe(r), "Recipe name cannot be empty");
     }
 
     // ── validate_recipe: ingredients ────────────────────────────────────
@@ -547,10 +547,10 @@ mod tests {
     }
 
     #[test]
-    fn recipe_whitespace_instructions_accepted() {
+    fn recipe_whitespace_instructions_rejected() {
         let mut r = valid_recipe();
         r.instructions = " ".into();
-        assert_valid(validate_recipe(r));
+        assert_invalid(validate_recipe(r), "Instructions cannot be empty");
     }
 
     // ── validate_recipe: servings ───────────────────────────────────────

@@ -259,12 +259,12 @@ fn validate_create_harvest_system(
     _action: Create,
     system: HarvestSystem,
 ) -> ExternResult<ValidateCallbackResult> {
-    if system.id.is_empty() {
+    if system.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Harvest system ID cannot be empty".into(),
         ));
     }
-    if system.name.is_empty() {
+    if system.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Harvest system name cannot be empty".into(),
         ));
@@ -296,12 +296,12 @@ fn validate_create_storage_tank(
     _action: Create,
     tank: StorageTank,
 ) -> ExternResult<ValidateCallbackResult> {
-    if tank.id.is_empty() {
+    if tank.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Tank ID cannot be empty".into(),
         ));
     }
-    if tank.name.is_empty() {
+    if tank.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Tank name cannot be empty".into(),
         ));
@@ -350,17 +350,17 @@ fn validate_create_recharge_project(
     _action: Create,
     project: RechargeProject,
 ) -> ExternResult<ValidateCallbackResult> {
-    if project.id.is_empty() {
+    if project.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Recharge project ID cannot be empty".into(),
         ));
     }
-    if project.name.is_empty() {
+    if project.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Recharge project name cannot be empty".into(),
         ));
     }
-    if project.aquifer_id.is_empty() {
+    if project.aquifer_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Aquifer ID cannot be empty".into(),
         ));

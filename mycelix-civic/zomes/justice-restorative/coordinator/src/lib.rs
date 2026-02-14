@@ -266,6 +266,35 @@ mod tests {
         Timestamp::from_micros(0)
     }
 
+    fn fake_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn make_participant(did: &str, role: CircleRole, consented: bool) -> CircleParticipant {
+        CircleParticipant {
+            did: did.to_string(),
+            role,
+            consented,
+            attended_sessions: vec![],
+        }
+    }
+
+    fn make_circle() -> RestorativeCircle {
+        RestorativeCircle {
+            id: "circle-001".to_string(),
+            case_id: "case-001".to_string(),
+            facilitator: "did:example:facilitator".to_string(),
+            participants: vec![
+                make_participant("did:example:alice", CircleRole::HarmReceiver, false),
+                make_participant("did:example:bob", CircleRole::HarmDoer, false),
+            ],
+            status: CircleStatus::Forming,
+            sessions: vec![],
+            agreements: vec![],
+            created_at: ts(),
+        }
+    }
+
     // ========================================================================
     // Coordinator input struct serde roundtrip tests
     // ========================================================================
@@ -273,12 +302,34 @@ mod tests {
     #[test]
     fn consent_input_serde_roundtrip() {
         let input = ConsentInput {
-            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            circle_hash: fake_hash(),
             participant_did: "did:example:alice".to_string(),
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: ConsentInput = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.participant_did, "did:example:alice");
+    }
+
+    #[test]
+    fn consent_input_unicode_did() {
+        let input = ConsentInput {
+            circle_hash: fake_hash(),
+            participant_did: "did:example:\u{1F600}\u{4E16}\u{754C}".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ConsentInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.participant_did.contains('\u{1F600}'));
+    }
+
+    #[test]
+    fn consent_input_empty_did() {
+        let input = ConsentInput {
+            circle_hash: fake_hash(),
+            participant_did: String::new(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ConsentInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.participant_did.is_empty());
     }
 
     #[test]
@@ -291,7 +342,7 @@ mod tests {
             next_steps: vec!["Schedule follow-up".to_string()],
         };
         let input = RecordSessionInput {
-            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            circle_hash: fake_hash(),
             session,
             attendees: vec!["did:example:alice".to_string(), "did:example:bob".to_string()],
         };
@@ -303,9 +354,50 @@ mod tests {
     }
 
     #[test]
+    fn record_session_input_empty_attendees_and_next_steps() {
+        let session = CircleSession {
+            session_number: 0,
+            held_at: ts(),
+            attendees: vec![],
+            summary: String::new(),
+            next_steps: vec![],
+        };
+        let input = RecordSessionInput {
+            circle_hash: fake_hash(),
+            session,
+            attendees: vec![],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordSessionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.session.session_number, 0);
+        assert!(decoded.session.attendees.is_empty());
+        assert!(decoded.session.next_steps.is_empty());
+        assert!(decoded.attendees.is_empty());
+    }
+
+    #[test]
+    fn record_session_input_max_session_number() {
+        let session = CircleSession {
+            session_number: u32::MAX,
+            held_at: ts(),
+            attendees: vec!["did:one".to_string()],
+            summary: "Final session".to_string(),
+            next_steps: vec![],
+        };
+        let input = RecordSessionInput {
+            circle_hash: fake_hash(),
+            session,
+            attendees: vec!["did:one".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordSessionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.session.session_number, u32::MAX);
+    }
+
+    #[test]
     fn add_agreement_input_serde_roundtrip() {
         let input = AddAgreementInput {
-            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            circle_hash: fake_hash(),
             agreement: "Both parties agree to mediated settlement terms".to_string(),
         };
         let json = serde_json::to_string(&input).unwrap();
@@ -314,9 +406,20 @@ mod tests {
     }
 
     #[test]
+    fn add_agreement_input_empty_agreement() {
+        let input = AddAgreementInput {
+            circle_hash: fake_hash(),
+            agreement: String::new(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddAgreementInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.agreement.is_empty());
+    }
+
+    #[test]
     fn update_circle_status_input_serde_roundtrip() {
         let input = UpdateCircleStatusInput {
-            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            circle_hash: fake_hash(),
             new_status: CircleStatus::AgreementReached,
         };
         let json = serde_json::to_string(&input).unwrap();
@@ -325,9 +428,29 @@ mod tests {
     }
 
     #[test]
+    fn update_circle_status_all_variants_serde() {
+        for status in [
+            CircleStatus::Forming,
+            CircleStatus::Active,
+            CircleStatus::AgreementReached,
+            CircleStatus::Monitoring,
+            CircleStatus::Completed,
+            CircleStatus::Discontinued,
+        ] {
+            let input = UpdateCircleStatusInput {
+                circle_hash: fake_hash(),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdateCircleStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+
+    #[test]
     fn complete_circle_input_serde_roundtrip() {
         let input = CompleteCircleInput {
-            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            circle_hash: fake_hash(),
             final_agreements: vec![
                 "Restitution payment of 500 credits".to_string(),
                 "Public apology within 7 days".to_string(),
@@ -342,7 +465,7 @@ mod tests {
     #[test]
     fn complete_circle_input_empty_agreements_serde() {
         let input = CompleteCircleInput {
-            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            circle_hash: fake_hash(),
             final_agreements: vec![],
         };
         let json = serde_json::to_string(&input).unwrap();
@@ -386,5 +509,182 @@ mod tests {
             let decoded: CircleRole = serde_json::from_str(&json).unwrap();
             assert_eq!(decoded, variant);
         }
+    }
+
+    // ========================================================================
+    // Entry type serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn restorative_circle_serde_roundtrip() {
+        let circle = make_circle();
+        let json = serde_json::to_string(&circle).unwrap();
+        let decoded: RestorativeCircle = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "circle-001");
+        assert_eq!(decoded.case_id, "case-001");
+        assert_eq!(decoded.facilitator, "did:example:facilitator");
+        assert_eq!(decoded.participants.len(), 2);
+        assert_eq!(decoded.status, CircleStatus::Forming);
+        assert!(decoded.sessions.is_empty());
+        assert!(decoded.agreements.is_empty());
+    }
+
+    #[test]
+    fn restorative_circle_with_sessions_and_agreements() {
+        let mut circle = make_circle();
+        circle.sessions.push(CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec!["did:example:alice".to_string()],
+            summary: "Session 1 summary".to_string(),
+            next_steps: vec!["Follow up".to_string()],
+        });
+        circle.agreements.push("Agreement one".to_string());
+        circle.status = CircleStatus::AgreementReached;
+
+        let json = serde_json::to_string(&circle).unwrap();
+        let decoded: RestorativeCircle = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.sessions.len(), 1);
+        assert_eq!(decoded.agreements.len(), 1);
+        assert_eq!(decoded.status, CircleStatus::AgreementReached);
+    }
+
+    #[test]
+    fn circle_participant_serde_roundtrip() {
+        let p = CircleParticipant {
+            did: "did:example:alice".to_string(),
+            role: CircleRole::HarmReceiver,
+            consented: true,
+            attended_sessions: vec![1, 2, 3],
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let decoded: CircleParticipant = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.did, "did:example:alice");
+        assert_eq!(decoded.role, CircleRole::HarmReceiver);
+        assert!(decoded.consented);
+        assert_eq!(decoded.attended_sessions, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn circle_participant_empty_attended_sessions() {
+        let p = CircleParticipant {
+            did: String::new(),
+            role: CircleRole::Elder,
+            consented: false,
+            attended_sessions: vec![],
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let decoded: CircleParticipant = serde_json::from_str(&json).unwrap();
+        assert!(decoded.did.is_empty());
+        assert!(!decoded.consented);
+        assert!(decoded.attended_sessions.is_empty());
+    }
+
+    #[test]
+    fn circle_session_serde_roundtrip() {
+        let session = CircleSession {
+            session_number: 5,
+            held_at: Timestamp::from_micros(1_000_000),
+            attendees: vec!["a".to_string(), "b".to_string(), "c".to_string()],
+            summary: "Productive session with all parties present".to_string(),
+            next_steps: vec!["Draft agreement".to_string(), "Schedule review".to_string()],
+        };
+        let json = serde_json::to_string(&session).unwrap();
+        let decoded: CircleSession = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.session_number, 5);
+        assert_eq!(decoded.attendees.len(), 3);
+        assert_eq!(decoded.next_steps.len(), 2);
+    }
+
+    // ========================================================================
+    // Clone / equality tests
+    // ========================================================================
+
+    #[test]
+    fn restorative_circle_clone_equals_original() {
+        let circle = make_circle();
+        let cloned = circle.clone();
+        assert_eq!(circle.id, cloned.id);
+        assert_eq!(circle.case_id, cloned.case_id);
+        assert_eq!(circle.status, cloned.status);
+        assert_eq!(circle.participants.len(), cloned.participants.len());
+    }
+
+    #[test]
+    fn circle_status_clone_preserves_variant() {
+        let status = CircleStatus::Monitoring;
+        let cloned = status.clone();
+        assert_eq!(status, cloned);
+    }
+
+    // ========================================================================
+    // Edge case / boundary value tests
+    // ========================================================================
+
+    #[test]
+    fn restorative_circle_unicode_fields() {
+        let circle = RestorativeCircle {
+            id: "\u{1F600}".to_string(),
+            case_id: "\u{4E16}\u{754C}".to_string(),
+            facilitator: "\u{00E9}\u{00F1}".to_string(),
+            participants: vec![],
+            status: CircleStatus::Forming,
+            sessions: vec![],
+            agreements: vec!["\u{2764} Peace".to_string()],
+            created_at: ts(),
+        };
+        let json = serde_json::to_string(&circle).unwrap();
+        let decoded: RestorativeCircle = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "\u{1F600}");
+        assert_eq!(decoded.agreements[0], "\u{2764} Peace");
+    }
+
+    #[test]
+    fn circle_session_unicode_summary() {
+        let session = CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec![],
+            summary: "\u{00C0}\u{00DF}\u{00E7} summary".to_string(),
+            next_steps: vec!["\u{2714} complete".to_string()],
+        };
+        let json = serde_json::to_string(&session).unwrap();
+        let decoded: CircleSession = serde_json::from_str(&json).unwrap();
+        assert!(decoded.summary.contains('\u{00C0}'));
+    }
+
+    #[test]
+    fn restorative_circle_many_participants() {
+        let participants: Vec<CircleParticipant> = (0..100)
+            .map(|i| make_participant(&format!("did:{}", i), CircleRole::CommunityMember, i % 2 == 0))
+            .collect();
+        let circle = RestorativeCircle {
+            id: "large".to_string(),
+            case_id: "case-big".to_string(),
+            facilitator: "did:f".to_string(),
+            participants,
+            status: CircleStatus::Active,
+            sessions: vec![],
+            agreements: vec![],
+            created_at: ts(),
+        };
+        let json = serde_json::to_string(&circle).unwrap();
+        let decoded: RestorativeCircle = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.participants.len(), 100);
+        assert!(decoded.participants[0].consented);
+        assert!(!decoded.participants[1].consented);
+    }
+
+    #[test]
+    fn circle_participant_max_u32_session_number() {
+        let p = CircleParticipant {
+            did: "did:max".to_string(),
+            role: CircleRole::Facilitator,
+            consented: true,
+            attended_sessions: vec![u32::MAX, 0, 1],
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let decoded: CircleParticipant = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.attended_sessions[0], u32::MAX);
     }
 }

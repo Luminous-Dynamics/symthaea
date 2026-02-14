@@ -116,12 +116,12 @@ fn validate_create_triage(
     _action: Create,
     record: TriageRecord,
 ) -> ExternResult<ValidateCallbackResult> {
-    if record.patient_id.is_empty() {
+    if record.patient_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Patient ID cannot be empty".into(),
         ));
     }
-    if record.location.is_empty() {
+    if record.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Location cannot be empty".into(),
         ));
@@ -133,7 +133,7 @@ fn validate_update_triage(
     _action: Update,
     record: TriageRecord,
 ) -> ExternResult<ValidateCallbackResult> {
-    if record.patient_id.is_empty() {
+    if record.patient_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Patient ID cannot be empty".into(),
         ));
@@ -580,21 +580,21 @@ mod tests {
     // ── Edge cases: Whitespace-only strings ───────────────────────────
 
     #[test]
-    fn test_validate_create_triage_whitespace_patient_id() {
+    fn test_validate_create_triage_whitespace_patient_id_rejected() {
         let mut record = valid_triage_record();
         record.patient_id = "   ".into();
-        // Whitespace-only is not empty, so validation passes
+        // Whitespace-only is rejected by trim().is_empty()
         let result = validate_create_triage(fake_create(), record);
-        assert!(is_valid(result));
+        assert!(!is_valid(result));
     }
 
     #[test]
-    fn test_validate_create_triage_whitespace_location() {
+    fn test_validate_create_triage_whitespace_location_rejected() {
         let mut record = valid_triage_record();
         record.location = "   ".into();
-        // Whitespace-only is not empty, so validation passes
+        // Whitespace-only is rejected by trim().is_empty()
         let result = validate_create_triage(fake_create(), record);
-        assert!(is_valid(result));
+        assert!(!is_valid(result));
     }
 
     // ── Edge cases: Single-character strings ──────────────────────────

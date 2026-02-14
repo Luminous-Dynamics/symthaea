@@ -125,10 +125,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_batch(b: PreservationBatch) -> ExternResult<ValidateCallbackResult> {
-    if b.id.is_empty() {
+    if b.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Batch ID cannot be empty".into()));
     }
-    if b.method.is_empty() {
+    if b.method.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Method cannot be empty".into()));
     }
     if b.quantity_kg <= 0.0 {
@@ -138,20 +138,20 @@ fn validate_batch(b: PreservationBatch) -> ExternResult<ValidateCallbackResult> 
 }
 
 fn validate_method(m: PreservationMethod) -> ExternResult<ValidateCallbackResult> {
-    if m.name.is_empty() {
+    if m.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Method name cannot be empty".into()));
     }
-    if m.description.is_empty() {
+    if m.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_storage(s: StorageUnit) -> ExternResult<ValidateCallbackResult> {
-    if s.id.is_empty() {
+    if s.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Storage ID cannot be empty".into()));
     }
-    if s.name.is_empty() {
+    if s.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Storage name cannot be empty".into()));
     }
     if s.capacity_kg <= 0.0 {

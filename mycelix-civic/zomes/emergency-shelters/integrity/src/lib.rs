@@ -147,17 +147,17 @@ fn validate_create_shelter(
     _action: Create,
     shelter: Shelter,
 ) -> ExternResult<ValidateCallbackResult> {
-    if shelter.id.is_empty() {
+    if shelter.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Shelter ID cannot be empty".into(),
         ));
     }
-    if shelter.name.is_empty() {
+    if shelter.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Shelter name cannot be empty".into(),
         ));
     }
-    if shelter.address.is_empty() {
+    if shelter.address.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Shelter address cannot be empty".into(),
         ));
@@ -182,7 +182,7 @@ fn validate_create_shelter(
             "Longitude must be between -180 and 180".into(),
         ));
     }
-    if shelter.contact.is_empty() {
+    if shelter.contact.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Contact information cannot be empty".into(),
         ));
@@ -191,7 +191,7 @@ fn validate_create_shelter(
 }
 
 fn validate_update_shelter(shelter: Shelter) -> ExternResult<ValidateCallbackResult> {
-    if shelter.id.is_empty() {
+    if shelter.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Shelter ID cannot be empty".into(),
         ));
@@ -208,7 +208,7 @@ fn validate_create_registration(
     _action: Create,
     reg: ShelterRegistration,
 ) -> ExternResult<ValidateCallbackResult> {
-    if reg.person_name.is_empty() {
+    if reg.person_name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Person name cannot be empty".into(),
         ));

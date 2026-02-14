@@ -216,7 +216,7 @@ fn validate_create_meeting(
     _action: Create,
     meeting: BoardMeeting,
 ) -> ExternResult<ValidateCallbackResult> {
-    if meeting.title.is_empty() {
+    if meeting.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Meeting title cannot be empty".into(),
         ));
@@ -231,7 +231,7 @@ fn validate_create_meeting(
             "Meeting must have at least one agenda item".into(),
         ));
     }
-    if meeting.location.is_empty() {
+    if meeting.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Meeting location cannot be empty".into(),
         ));
@@ -243,12 +243,12 @@ fn validate_create_resolution(
     _action: Create,
     resolution: Resolution,
 ) -> ExternResult<ValidateCallbackResult> {
-    if resolution.title.is_empty() {
+    if resolution.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resolution title cannot be empty".into(),
         ));
     }
-    if resolution.description.is_empty() {
+    if resolution.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resolution description cannot be empty".into(),
         ));
@@ -257,17 +257,17 @@ fn validate_create_resolution(
 }
 
 fn validate_create_bylaw(_action: Create, bylaw: ByLaw) -> ExternResult<ValidateCallbackResult> {
-    if bylaw.id.is_empty() {
+    if bylaw.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "ByLaw ID cannot be empty".into(),
         ));
     }
-    if bylaw.title.is_empty() {
+    if bylaw.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "ByLaw title cannot be empty".into(),
         ));
     }
-    if bylaw.content.is_empty() {
+    if bylaw.content.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "ByLaw content cannot be empty".into(),
         ));
@@ -284,7 +284,7 @@ fn validate_create_election(
     _action: Create,
     election: Election,
 ) -> ExternResult<ValidateCallbackResult> {
-    if election.title.is_empty() {
+    if election.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Election title cannot be empty".into(),
         ));
@@ -312,7 +312,7 @@ fn validate_create_election(
                 candidate.position
             )));
         }
-        if candidate.statement.is_empty() {
+        if candidate.statement.trim().is_empty() {
             return Ok(ValidateCallbackResult::Invalid(
                 "Candidate statement cannot be empty".into(),
             ));

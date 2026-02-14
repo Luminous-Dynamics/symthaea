@@ -217,7 +217,7 @@ fn validate_create_fund(
     _action: Create,
     fund: ReserveFund,
 ) -> ExternResult<ValidateCallbackResult> {
-    if fund.name.is_empty() {
+    if fund.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Fund name cannot be empty".into(),
         ));
@@ -242,7 +242,7 @@ fn validate_create_budget(_action: Create, budget: Budget) -> ExternResult<Valid
         ));
     }
     for cat in &budget.categories {
-        if cat.name.is_empty() {
+        if cat.name.trim().is_empty() {
             return Ok(ValidateCallbackResult::Invalid(
                 "Budget category name cannot be empty".into(),
             ));

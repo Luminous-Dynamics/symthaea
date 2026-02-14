@@ -156,7 +156,7 @@ fn validate_create_message(
     _action: Create,
     msg: EmergencyMessage,
 ) -> ExternResult<ValidateCallbackResult> {
-    if msg.content.is_empty() {
+    if msg.content.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Message content cannot be empty".into(),
         ));
@@ -190,7 +190,7 @@ fn validate_create_channel(
     _action: Create,
     channel: EmergencyChannel,
 ) -> ExternResult<ValidateCallbackResult> {
-    if channel.name.is_empty() {
+    if channel.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Channel name cannot be empty".into(),
         ));
@@ -207,7 +207,7 @@ fn validate_create_broadcast(
     _action: Create,
     broadcast: Broadcast,
 ) -> ExternResult<ValidateCallbackResult> {
-    if broadcast.content.is_empty() {
+    if broadcast.content.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Broadcast content cannot be empty".into(),
         ));

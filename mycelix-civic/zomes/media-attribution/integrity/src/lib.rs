@@ -204,7 +204,7 @@ fn validate_create_usage_record(
         return Ok(ValidateCallbackResult::Invalid("Usage record publication_id cannot be empty".into()));
     }
     if let Some(ref did) = record.user_did {
-        if !did.is_empty() && !did.starts_with("did:") {
+        if !did.trim().is_empty() && !did.starts_with("did:") {
             return Ok(ValidateCallbackResult::Invalid("User DID must be a valid DID".into()));
         }
     }

@@ -163,17 +163,17 @@ fn validate_create_building(
     _action: Create,
     building: Building,
 ) -> ExternResult<ValidateCallbackResult> {
-    if building.id.is_empty() {
+    if building.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Building ID cannot be empty".into(),
         ));
     }
-    if building.name.is_empty() {
+    if building.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Building name cannot be empty".into(),
         ));
     }
-    if building.address.is_empty() {
+    if building.address.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Building address cannot be empty".into(),
         ));
@@ -204,7 +204,7 @@ fn validate_create_building(
 }
 
 fn validate_create_unit(_action: Create, unit: Unit) -> ExternResult<ValidateCallbackResult> {
-    if unit.unit_number.is_empty() {
+    if unit.unit_number.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Unit number cannot be empty".into(),
         ));
@@ -223,7 +223,7 @@ fn validate_create_unit(_action: Create, unit: Unit) -> ExternResult<ValidateCal
 }
 
 fn validate_update_unit(unit: Unit) -> ExternResult<ValidateCallbackResult> {
-    if unit.unit_number.is_empty() {
+    if unit.unit_number.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Unit number cannot be empty".into(),
         ));

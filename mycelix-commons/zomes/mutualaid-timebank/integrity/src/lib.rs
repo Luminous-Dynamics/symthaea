@@ -93,14 +93,14 @@ fn validate_create_entry(entry: EntryTypes) -> ExternResult<ValidateCallbackResu
 /// Validate a service offer
 fn validate_service_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackResult> {
     // ID must not be empty
-    if offer.id.is_empty() {
+    if offer.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Service offer ID cannot be empty".to_string(),
         ));
     }
 
     // Title must not be empty
-    if offer.title.is_empty() {
+    if offer.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Service offer title cannot be empty".to_string(),
         ));
@@ -149,14 +149,14 @@ fn validate_service_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackR
 /// Validate a service request
 fn validate_service_request(request: ServiceRequest) -> ExternResult<ValidateCallbackResult> {
     // ID must not be empty
-    if request.id.is_empty() {
+    if request.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Service request ID cannot be empty".to_string(),
         ));
     }
 
     // Title must not be empty
-    if request.title.is_empty() {
+    if request.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Service request title cannot be empty".to_string(),
         ));
@@ -196,7 +196,7 @@ fn validate_service_request(request: ServiceRequest) -> ExternResult<ValidateCal
 /// Validate a time exchange
 fn validate_time_exchange(exchange: TimeExchange) -> ExternResult<ValidateCallbackResult> {
     // ID must not be empty
-    if exchange.id.is_empty() {
+    if exchange.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Time exchange ID cannot be empty".to_string(),
         ));
@@ -224,7 +224,7 @@ fn validate_time_exchange(exchange: TimeExchange) -> ExternResult<ValidateCallba
     }
 
     // Description must not be empty
-    if exchange.description.is_empty() {
+    if exchange.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Exchange description cannot be empty".to_string(),
         ));
@@ -274,7 +274,7 @@ fn validate_time_credit(credit: TimeCredit) -> ExternResult<ValidateCallbackResu
     }
 
     // Description must not be empty
-    if credit.description.is_empty() {
+    if credit.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Credit description cannot be empty".to_string(),
         ));

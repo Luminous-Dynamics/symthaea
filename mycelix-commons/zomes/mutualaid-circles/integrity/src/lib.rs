@@ -86,14 +86,14 @@ fn validate_create_entry(entry: EntryTypes) -> ExternResult<ValidateCallbackResu
 /// Validate a credit circle
 fn validate_credit_circle(circle: CreditCircle) -> ExternResult<ValidateCallbackResult> {
     // ID must not be empty
-    if circle.id.is_empty() {
+    if circle.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Circle ID cannot be empty".to_string(),
         ));
     }
 
     // Name must not be empty
-    if circle.name.is_empty() {
+    if circle.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Circle name cannot be empty".to_string(),
         ));
@@ -114,14 +114,14 @@ fn validate_credit_circle(circle: CreditCircle) -> ExternResult<ValidateCallback
     }
 
     // Currency name must not be empty
-    if circle.currency_name.is_empty() {
+    if circle.currency_name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Currency name cannot be empty".to_string(),
         ));
     }
 
     // Currency symbol must not be empty
-    if circle.currency_symbol.is_empty() {
+    if circle.currency_symbol.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Currency symbol cannot be empty".to_string(),
         ));
@@ -194,7 +194,7 @@ fn validate_credit_line(line: CreditLine) -> ExternResult<ValidateCallbackResult
 /// Validate a credit transaction
 fn validate_credit_transaction(tx: CreditTransaction) -> ExternResult<ValidateCallbackResult> {
     // ID must not be empty
-    if tx.id.is_empty() {
+    if tx.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Transaction ID cannot be empty".to_string(),
         ));

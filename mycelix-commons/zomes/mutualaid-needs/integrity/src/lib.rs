@@ -92,14 +92,14 @@ fn validate_create_entry(entry: EntryTypes) -> ExternResult<ValidateCallbackResu
 /// Validate a need
 fn validate_need(need: Need) -> ExternResult<ValidateCallbackResult> {
     // ID must not be empty
-    if need.id.is_empty() {
+    if need.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Need ID cannot be empty".to_string(),
         ));
     }
 
     // Title must not be empty
-    if need.title.is_empty() {
+    if need.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Need title cannot be empty".to_string(),
         ));
@@ -132,14 +132,14 @@ fn validate_need(need: Need) -> ExternResult<ValidateCallbackResult> {
 /// Validate an offer
 fn validate_offer(offer: Offer) -> ExternResult<ValidateCallbackResult> {
     // ID must not be empty
-    if offer.id.is_empty() {
+    if offer.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Offer ID cannot be empty".to_string(),
         ));
     }
 
     // Title must not be empty
-    if offer.title.is_empty() {
+    if offer.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Offer title cannot be empty".to_string(),
         ));
@@ -172,7 +172,7 @@ fn validate_offer(offer: Offer) -> ExternResult<ValidateCallbackResult> {
 /// Validate a match
 fn validate_match(m: Match) -> ExternResult<ValidateCallbackResult> {
     // ID must not be empty
-    if m.id.is_empty() {
+    if m.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Match ID cannot be empty".to_string(),
         ));

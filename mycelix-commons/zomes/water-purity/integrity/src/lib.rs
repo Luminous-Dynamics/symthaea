@@ -268,7 +268,7 @@ fn validate_create_alert(
     _action: Create,
     alert: ContaminationAlert,
 ) -> ExternResult<ValidateCallbackResult> {
-    if alert.contaminant.is_empty() {
+    if alert.contaminant.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Contaminant name cannot be empty".into(),
         ));
@@ -305,7 +305,7 @@ fn validate_create_remediation(
     _action: Create,
     remediation: Remediation,
 ) -> ExternResult<ValidateCallbackResult> {
-    if remediation.method.is_empty() {
+    if remediation.method.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Remediation method cannot be empty".into(),
         ));

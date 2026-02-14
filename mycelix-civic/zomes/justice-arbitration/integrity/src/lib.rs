@@ -836,7 +836,7 @@ fn validate_evidence(evidence: &Evidence) -> ExternResult<ValidateCallbackResult
     }
 
     // Content hash required
-    if evidence.content.hash.is_empty() {
+    if evidence.content.hash.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Evidence content hash required".into(),
         ));
@@ -2088,12 +2088,11 @@ mod tests {
     }
 
     #[test]
-    fn evidence_whitespace_content_hash_passes() {
-        // content.hash uses is_empty(), not trim().is_empty()
+    fn evidence_whitespace_content_hash_rejected() {
         let mut ev = make_evidence();
         ev.content.hash = "   ".into();
         let result = validate_evidence(&ev);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
     }
 
     #[test]

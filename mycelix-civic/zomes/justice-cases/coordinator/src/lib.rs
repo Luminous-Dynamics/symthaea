@@ -262,6 +262,38 @@ mod tests {
         Timestamp::from_micros(0)
     }
 
+    fn fake_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn make_context() -> CaseContext {
+        CaseContext {
+            happ: Some("mycelix-civic".to_string()),
+            reference_id: Some("tx-123".to_string()),
+            community: Some("Downtown DAO".to_string()),
+            jurisdiction: Some("community-rules-v2".to_string()),
+        }
+    }
+
+    fn make_case() -> Case {
+        Case {
+            id: "case-001".to_string(),
+            title: "Property boundary dispute".to_string(),
+            description: "Disagreement over shared garden boundary".to_string(),
+            case_type: CaseType::PropertyDispute,
+            complainant: "did:example:alice".to_string(),
+            respondent: "did:example:bob".to_string(),
+            parties: vec![],
+            phase: CasePhase::Filed,
+            status: CaseStatus::Active,
+            severity: CaseSeverity::Moderate,
+            context: make_context(),
+            created_at: ts(),
+            updated_at: ts(),
+            phase_deadline: None,
+        }
+    }
+
     // ========================================================================
     // Coordinator input struct serde roundtrip tests
     // ========================================================================
@@ -269,7 +301,7 @@ mod tests {
     #[test]
     fn update_phase_input_serde_roundtrip() {
         let input = UpdatePhaseInput {
-            case_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            case_hash: fake_hash(),
             new_phase: CasePhase::Mediation,
             deadline: Some(ts()),
         };
@@ -282,7 +314,7 @@ mod tests {
     #[test]
     fn update_phase_input_no_deadline_serde() {
         let input = UpdatePhaseInput {
-            case_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            case_hash: fake_hash(),
             new_phase: CasePhase::Closed,
             deadline: None,
         };
@@ -293,9 +325,31 @@ mod tests {
     }
 
     #[test]
+    fn update_phase_input_all_phases() {
+        for phase in [
+            CasePhase::Filed,
+            CasePhase::Negotiation,
+            CasePhase::Mediation,
+            CasePhase::Arbitration,
+            CasePhase::Appeal,
+            CasePhase::Enforcement,
+            CasePhase::Closed,
+        ] {
+            let input = UpdatePhaseInput {
+                case_hash: fake_hash(),
+                new_phase: phase.clone(),
+                deadline: None,
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdatePhaseInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_phase, phase);
+        }
+    }
+
+    #[test]
     fn update_status_input_serde_roundtrip() {
         let input = UpdateStatusInput {
-            case_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            case_hash: fake_hash(),
             new_status: CaseStatus::Resolved,
         };
         let json = serde_json::to_string(&input).unwrap();
@@ -304,9 +358,32 @@ mod tests {
     }
 
     #[test]
+    fn update_status_input_all_statuses() {
+        for status in [
+            CaseStatus::Active,
+            CaseStatus::OnHold,
+            CaseStatus::AwaitingResponse,
+            CaseStatus::InDeliberation,
+            CaseStatus::DecisionRendered,
+            CaseStatus::Enforcing,
+            CaseStatus::Resolved,
+            CaseStatus::Dismissed,
+            CaseStatus::Withdrawn,
+        ] {
+            let input = UpdateStatusInput {
+                case_hash: fake_hash(),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdateStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+
+    #[test]
     fn add_party_input_serde_roundtrip() {
         let input = AddPartyInput {
-            case_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            case_hash: fake_hash(),
             party_did: "did:example:witness1".to_string(),
             role: PartyRole::Witness,
         };
@@ -314,6 +391,30 @@ mod tests {
         let decoded: AddPartyInput = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.party_did, "did:example:witness1");
         assert_eq!(decoded.role, PartyRole::Witness);
+    }
+
+    #[test]
+    fn add_party_input_empty_did() {
+        let input = AddPartyInput {
+            case_hash: fake_hash(),
+            party_did: String::new(),
+            role: PartyRole::Affected,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddPartyInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.party_did.is_empty());
+    }
+
+    #[test]
+    fn add_party_input_unicode_did() {
+        let input = AddPartyInput {
+            case_hash: fake_hash(),
+            party_did: "did:\u{00E9}\u{00F1}\u{00FC}".to_string(),
+            role: PartyRole::Expert,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddPartyInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.party_did.contains('\u{00E9}'));
     }
 
     // ========================================================================
@@ -407,5 +508,169 @@ mod tests {
             let decoded: CaseType = serde_json::from_str(&json).unwrap();
             assert_eq!(decoded, variant);
         }
+    }
+
+    #[test]
+    fn case_type_other_empty_category() {
+        let ct = CaseType::Other { category: String::new() };
+        let json = serde_json::to_string(&ct).unwrap();
+        let decoded: CaseType = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, ct);
+    }
+
+    #[test]
+    fn case_type_other_unicode_category() {
+        let ct = CaseType::Other { category: "\u{1F3E0} Housing".to_string() };
+        let json = serde_json::to_string(&ct).unwrap();
+        let decoded: CaseType = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, ct);
+    }
+
+    // ========================================================================
+    // Entry type serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn case_serde_roundtrip() {
+        let case = make_case();
+        let json = serde_json::to_string(&case).unwrap();
+        let decoded: Case = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "case-001");
+        assert_eq!(decoded.title, "Property boundary dispute");
+        assert_eq!(decoded.case_type, CaseType::PropertyDispute);
+        assert_eq!(decoded.phase, CasePhase::Filed);
+        assert_eq!(decoded.status, CaseStatus::Active);
+        assert_eq!(decoded.severity, CaseSeverity::Moderate);
+        assert!(decoded.phase_deadline.is_none());
+        assert!(decoded.parties.is_empty());
+    }
+
+    #[test]
+    fn case_with_deadline_and_parties() {
+        let mut case = make_case();
+        case.phase_deadline = Some(Timestamp::from_micros(86_400_000_000));
+        case.parties.push(CaseParty {
+            did: "did:example:witness".to_string(),
+            role: PartyRole::Witness,
+            joined_at: ts(),
+        });
+        let json = serde_json::to_string(&case).unwrap();
+        let decoded: Case = serde_json::from_str(&json).unwrap();
+        assert!(decoded.phase_deadline.is_some());
+        assert_eq!(decoded.parties.len(), 1);
+        assert_eq!(decoded.parties[0].role, PartyRole::Witness);
+    }
+
+    #[test]
+    fn case_context_all_none() {
+        let ctx = CaseContext {
+            happ: None,
+            reference_id: None,
+            community: None,
+            jurisdiction: None,
+        };
+        let json = serde_json::to_string(&ctx).unwrap();
+        let decoded: CaseContext = serde_json::from_str(&json).unwrap();
+        assert!(decoded.happ.is_none());
+        assert!(decoded.reference_id.is_none());
+        assert!(decoded.community.is_none());
+        assert!(decoded.jurisdiction.is_none());
+    }
+
+    #[test]
+    fn case_context_all_some() {
+        let ctx = make_context();
+        let json = serde_json::to_string(&ctx).unwrap();
+        let decoded: CaseContext = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.happ, Some("mycelix-civic".to_string()));
+        assert_eq!(decoded.reference_id, Some("tx-123".to_string()));
+    }
+
+    #[test]
+    fn case_party_serde_roundtrip() {
+        let party = CaseParty {
+            did: "did:example:expert42".to_string(),
+            role: PartyRole::Expert,
+            joined_at: Timestamp::from_micros(5_000_000),
+        };
+        let json = serde_json::to_string(&party).unwrap();
+        let decoded: CaseParty = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.did, "did:example:expert42");
+        assert_eq!(decoded.role, PartyRole::Expert);
+    }
+
+    // ========================================================================
+    // Clone tests
+    // ========================================================================
+
+    #[test]
+    fn case_clone_preserves_all_fields() {
+        let case = make_case();
+        let cloned = case.clone();
+        assert_eq!(case.id, cloned.id);
+        assert_eq!(case.title, cloned.title);
+        assert_eq!(case.case_type, cloned.case_type);
+        assert_eq!(case.phase, cloned.phase);
+        assert_eq!(case.status, cloned.status);
+        assert_eq!(case.severity, cloned.severity);
+    }
+
+    // ========================================================================
+    // Edge case tests
+    // ========================================================================
+
+    #[test]
+    fn case_unicode_title_and_description() {
+        let mut case = make_case();
+        case.title = "\u{1F3DB} Dispute \u{2696}".to_string();
+        case.description = "\u{4E89}\u{8BAE}\u{89E3}\u{51B3}".to_string();
+        let json = serde_json::to_string(&case).unwrap();
+        let decoded: Case = serde_json::from_str(&json).unwrap();
+        assert!(decoded.title.contains('\u{2696}'));
+        assert_eq!(decoded.description.len(), case.description.len());
+    }
+
+    #[test]
+    fn case_empty_string_fields() {
+        let case = Case {
+            id: String::new(),
+            title: String::new(),
+            description: String::new(),
+            case_type: CaseType::ContractDispute,
+            complainant: String::new(),
+            respondent: String::new(),
+            parties: vec![],
+            phase: CasePhase::Filed,
+            status: CaseStatus::Active,
+            severity: CaseSeverity::Minor,
+            context: CaseContext {
+                happ: None,
+                reference_id: None,
+                community: None,
+                jurisdiction: None,
+            },
+            created_at: ts(),
+            updated_at: ts(),
+            phase_deadline: None,
+        };
+        let json = serde_json::to_string(&case).unwrap();
+        let decoded: Case = serde_json::from_str(&json).unwrap();
+        assert!(decoded.id.is_empty());
+        assert!(decoded.title.is_empty());
+    }
+
+    #[test]
+    fn case_many_parties() {
+        let mut case = make_case();
+        for i in 0..50 {
+            case.parties.push(CaseParty {
+                did: format!("did:example:party-{}", i),
+                role: PartyRole::Affected,
+                joined_at: ts(),
+            });
+        }
+        let json = serde_json::to_string(&case).unwrap();
+        let decoded: Case = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.parties.len(), 50);
     }
 }

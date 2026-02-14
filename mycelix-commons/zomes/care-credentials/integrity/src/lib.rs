@@ -152,7 +152,7 @@ fn validate_create_credential(
     _action: Create,
     cred: CareCredential,
 ) -> ExternResult<ValidateCallbackResult> {
-    if cred.issuer.is_empty() {
+    if cred.issuer.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Issuer cannot be empty".into(),
         ));
@@ -168,7 +168,7 @@ fn validate_create_credential(
         ));
     }
     // If metadata is non-empty, validate it is valid JSON
-    if !cred.metadata.is_empty()
+    if !cred.metadata.trim().is_empty()
         && serde_json::from_str::<serde_json::Value>(&cred.metadata).is_err() {
             return Ok(ValidateCallbackResult::Invalid(
                 "Metadata must be valid JSON".into(),
@@ -194,7 +194,7 @@ fn validate_create_reference(
             "Rating must be between 1 and 5".into(),
         ));
     }
-    if reference.comment.is_empty() {
+    if reference.comment.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Comment cannot be empty".into(),
         ));
@@ -204,7 +204,7 @@ fn validate_create_reference(
             "Comment must be 2048 characters or fewer".into(),
         ));
     }
-    if reference.care_type.is_empty() {
+    if reference.care_type.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Care type cannot be empty".into(),
         ));

@@ -181,7 +181,7 @@ fn validate_create_collection(
     if !collection.curator_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Curator must be a valid DID".into()));
     }
-    if collection.name.is_empty() {
+    if collection.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Collection name required".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -191,7 +191,7 @@ fn validate_update_collection(
     _action: Update,
     collection: Collection,
 ) -> ExternResult<ValidateCallbackResult> {
-    if collection.name.is_empty() {
+    if collection.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Collection name required".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -542,12 +542,11 @@ mod tests {
     }
 
     #[test]
-    fn collection_name_whitespace_passes() {
-        // Validation uses is_empty(), not trim().is_empty()
+    fn collection_name_whitespace_rejected() {
         let mut c = make_collection();
         c.name = "   ".into();
         let result = validate_create_collection(fake_entry_creation_action(), c);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
     }
 
     #[test]
@@ -629,11 +628,11 @@ mod tests {
     }
 
     #[test]
-    fn update_collection_name_whitespace_passes() {
+    fn update_collection_name_whitespace_rejected() {
         let mut c = make_collection();
         c.name = "   ".into();
         let result = validate_update_collection(fake_update(), c);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
     }
 
     #[test]

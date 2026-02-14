@@ -207,12 +207,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_create_team(_action: Create, team: Team) -> ExternResult<ValidateCallbackResult> {
-    if team.id.is_empty() {
+    if team.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Team ID cannot be empty".into(),
         ));
     }
-    if team.name.is_empty() {
+    if team.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Team name cannot be empty".into(),
         ));
@@ -234,7 +234,7 @@ fn validate_create_assignment(
     _action: Create,
     assignment: Assignment,
 ) -> ExternResult<ValidateCallbackResult> {
-    if assignment.objective.is_empty() {
+    if assignment.objective.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Assignment objective cannot be empty".into(),
         ));
@@ -246,7 +246,7 @@ fn validate_create_sitrep(
     _action: Create,
     sitrep: SituationReport,
 ) -> ExternResult<ValidateCallbackResult> {
-    if sitrep.conditions.is_empty() {
+    if sitrep.conditions.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "SITREP conditions cannot be empty".into(),
         ));
@@ -524,12 +524,11 @@ mod tests {
     }
 
     #[test]
-    fn assignment_whitespace_only_objective_passes() {
-        // The validation uses is_empty(), not trim().is_empty()
+    fn assignment_whitespace_only_objective_rejected() {
         let mut assignment = make_assignment();
         assignment.objective = "   ".into();
         let result = validate_create_assignment(fake_create(), assignment);
-        assert!(is_valid(&result));
+        assert!(!is_valid(&result));
     }
 
     #[test]
@@ -571,12 +570,11 @@ mod tests {
     }
 
     #[test]
-    fn sitrep_whitespace_only_conditions_passes() {
-        // The validation uses is_empty(), not trim().is_empty()
+    fn sitrep_whitespace_only_conditions_rejected() {
         let mut sitrep = make_sitrep();
         sitrep.conditions = "  \t  ".into();
         let result = validate_create_sitrep(fake_create(), sitrep);
-        assert!(is_valid(&result));
+        assert!(!is_valid(&result));
     }
 
     #[test]

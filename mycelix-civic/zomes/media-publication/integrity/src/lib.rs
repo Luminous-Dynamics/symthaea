@@ -162,10 +162,10 @@ fn validate_create_publication(
     if !publication.author_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Author must be a valid DID".into()));
     }
-    if publication.title.is_empty() {
+    if publication.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Title cannot be empty".into()));
     }
-    if publication.content_hash.is_empty() {
+    if publication.content_hash.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Content hash required".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -175,7 +175,7 @@ fn validate_update_publication(
     _action: Update,
     publication: Publication,
 ) -> ExternResult<ValidateCallbackResult> {
-    if publication.title.is_empty() {
+    if publication.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Title cannot be empty".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -188,7 +188,7 @@ fn validate_create_content_block(
     if block.publication_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Content block publication_id cannot be empty".into()));
     }
-    if block.content.is_empty() && block.encrypted_content.is_none() {
+    if block.content.trim().is_empty() && block.encrypted_content.is_none() {
         return Ok(ValidateCallbackResult::Invalid("Content block must have content or encrypted_content".into()));
     }
     Ok(ValidateCallbackResult::Valid)
