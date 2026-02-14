@@ -359,7 +359,7 @@ pub struct AudioProjector {
     /// LTC cells
     ltc: LtcCell,
     /// Frame duration
-    frame_duration: f32,
+    _frame_duration: f32,
 }
 
 impl AudioProjector {
@@ -372,7 +372,7 @@ impl AudioProjector {
         Self {
             frontend,
             ltc,
-            frame_duration,
+            _frame_duration: frame_duration,
         }
     }
 
