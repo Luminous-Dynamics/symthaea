@@ -198,12 +198,12 @@ impl ModelPackage {
     pub fn save<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
         let file = File::create(path)?;
         let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, self).map_err(|e| std::io::Error::other(e.to_string()))
+        serde_json::to_writer_pretty(writer, self).map_err(std::io::Error::other)
     }
 
     /// Save model to compressed binary format
     pub fn save_binary<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
-        let json = serde_json::to_vec(self).map_err(|e| std::io::Error::other(e.to_string()))?;
+        let json = serde_json::to_vec(self).map_err(std::io::Error::other)?;
 
         // Simple compression: just store as-is for now
         // In production, could use flate2 or similar
@@ -216,14 +216,14 @@ impl ModelPackage {
     pub fn load<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        serde_json::from_reader(reader).map_err(|e| std::io::Error::other(e.to_string()))
+        serde_json::from_reader(reader).map_err(std::io::Error::other)
     }
 
     /// Load model from binary format
     pub fn load_binary<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        serde_json::from_reader(reader).map_err(|e| std::io::Error::other(e.to_string()))
+        serde_json::from_reader(reader).map_err(std::io::Error::other)
     }
 
     /// Get model summary as string
@@ -308,14 +308,14 @@ impl ModelRegistry {
     pub fn save<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
         let file = File::create(path)?;
         let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, self).map_err(|e| std::io::Error::other(e.to_string()))
+        serde_json::to_writer_pretty(writer, self).map_err(std::io::Error::other)
     }
 
     /// Load registry from file
     pub fn load<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        serde_json::from_reader(reader).map_err(|e| std::io::Error::other(e.to_string()))
+        serde_json::from_reader(reader).map_err(std::io::Error::other)
     }
 }
 

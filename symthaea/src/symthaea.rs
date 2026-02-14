@@ -16,7 +16,7 @@ use std::sync::Arc;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::databases::{
-    ConsciousnessDatabase, DatabaseConfig, MemoryRecord, MemoryType, create_database,
+    create_database, ConsciousnessDatabase, DatabaseConfig, MemoryRecord, MemoryType,
 };
 
 #[cfg(feature = "neural-bridge")]
@@ -465,7 +465,10 @@ impl Symthaea {
         // Drain evicted working memory items for graduation tracking
         let evicted = self.mind.take_evicted();
         if !evicted.is_empty() {
-            tracing::trace!(evicted_count = evicted.len(), "Working memory items evicted during tick");
+            tracing::trace!(
+                evicted_count = evicted.len(),
+                "Working memory items evicted during tick"
+            );
 
             if let Some(ref db) = self.database {
                 let db = Arc::clone(db);
@@ -482,7 +485,10 @@ impl Symthaea {
                             id: format!("wm-{}-{}", timestamp_ms, i),
                             memory_type: MemoryType::Working,
                             encoding: hv.to_binary(0.0),
-                            content: format!("Working memory eviction at step {}", interaction_count),
+                            content: format!(
+                                "Working memory eviction at step {}",
+                                interaction_count
+                            ),
                             timestamp_ms,
                             valence: 0.0,
                             arousal: 0.0,

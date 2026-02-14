@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 //! Symthaea Speech-to-Text Library
 //!
 //! A neuromorphic speech recognition system built on:

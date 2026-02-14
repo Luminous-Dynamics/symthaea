@@ -452,66 +452,57 @@ pub struct EvaluationReport {
     pub confusion_matrix: Option<ConfusionMatrix>,
 }
 
-impl EvaluationReport {
-    /// Format as string
-    pub fn to_string(&self) -> String {
-        let mut s = String::new();
-
-        s.push_str(&format!(
+impl std::fmt::Display for EvaluationReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
             "Evaluation Report ({} utterances)\n",
             self.num_utterances
-        ));
-        s.push_str(&"=".repeat(50));
-        s.push('\n');
+        )?;
+        write!(f, "{}\n", "=".repeat(50))?;
 
         if let Some(ref per) = self.phoneme_results {
-            s.push_str("\nPhoneme Error Rate (PER)\n");
-            s.push_str(&"-".repeat(30));
-            s.push_str(&format!(
-                "\n  Reference phonemes: {}\n",
-                per.reference_length
-            ));
-            s.push_str(&format!(
-                "  Hypothesis phonemes: {}\n",
-                per.hypothesis_length
-            ));
-            s.push_str(&format!("  Correct: {}\n", per.correct));
-            s.push_str(&format!("  Substitutions: {}\n", per.substitutions));
-            s.push_str(&format!("  Insertions: {}\n", per.insertions));
-            s.push_str(&format!("  Deletions: {}\n", per.deletions));
-            s.push_str(&format!("  PER: {:.2}%\n", per.error_rate() * 100.0));
-            s.push_str(&format!("  Accuracy: {:.2}%\n", per.accuracy() * 100.0));
+            write!(f, "\nPhoneme Error Rate (PER)\n")?;
+            write!(f, "{}", "-".repeat(30))?;
+            write!(f, "\n  Reference phonemes: {}\n", per.reference_length)?;
+            write!(f, "  Hypothesis phonemes: {}\n", per.hypothesis_length)?;
+            write!(f, "  Correct: {}\n", per.correct)?;
+            write!(f, "  Substitutions: {}\n", per.substitutions)?;
+            write!(f, "  Insertions: {}\n", per.insertions)?;
+            write!(f, "  Deletions: {}\n", per.deletions)?;
+            write!(f, "  PER: {:.2}%\n", per.error_rate() * 100.0)?;
+            write!(f, "  Accuracy: {:.2}%\n", per.accuracy() * 100.0)?;
         }
 
         if let Some(ref wer) = self.word_results {
-            s.push_str("\nWord Error Rate (WER)\n");
-            s.push_str(&"-".repeat(30));
-            s.push_str(&format!("\n  Reference words: {}\n", wer.reference_length));
-            s.push_str(&format!("  Hypothesis words: {}\n", wer.hypothesis_length));
-            s.push_str(&format!("  Correct: {}\n", wer.correct));
-            s.push_str(&format!("  Substitutions: {}\n", wer.substitutions));
-            s.push_str(&format!("  Insertions: {}\n", wer.insertions));
-            s.push_str(&format!("  Deletions: {}\n", wer.deletions));
-            s.push_str(&format!("  WER: {:.2}%\n", wer.error_rate() * 100.0));
-            s.push_str(&format!("  Accuracy: {:.2}%\n", wer.accuracy() * 100.0));
+            write!(f, "\nWord Error Rate (WER)\n")?;
+            write!(f, "{}", "-".repeat(30))?;
+            write!(f, "\n  Reference words: {}\n", wer.reference_length)?;
+            write!(f, "  Hypothesis words: {}\n", wer.hypothesis_length)?;
+            write!(f, "  Correct: {}\n", wer.correct)?;
+            write!(f, "  Substitutions: {}\n", wer.substitutions)?;
+            write!(f, "  Insertions: {}\n", wer.insertions)?;
+            write!(f, "  Deletions: {}\n", wer.deletions)?;
+            write!(f, "  WER: {:.2}%\n", wer.error_rate() * 100.0)?;
+            write!(f, "  Accuracy: {:.2}%\n", wer.accuracy() * 100.0)?;
         }
 
         if let Some(ref cer) = self.char_results {
-            s.push_str("\nCharacter Error Rate (CER)\n");
-            s.push_str(&"-".repeat(30));
-            s.push_str(&format!("\n  CER: {:.2}%\n", cer.error_rate() * 100.0));
+            write!(f, "\nCharacter Error Rate (CER)\n")?;
+            write!(f, "{}", "-".repeat(30))?;
+            write!(f, "\n  CER: {:.2}%\n", cer.error_rate() * 100.0)?;
         }
 
         if let Some(ref cm) = self.confusion_matrix {
-            s.push_str("\nTop Confusions\n");
-            s.push_str(&"-".repeat(30));
+            write!(f, "\nTop Confusions\n")?;
+            write!(f, "{}", "-".repeat(30))?;
             for ((r, h), count) in cm.top_confusions(10) {
-                s.push_str(&format!("\n  {} -> {}: {}", r, h, count));
+                write!(f, "\n  {} -> {}: {}", r, h, count)?;
             }
-            s.push('\n');
+            write!(f, "\n")?;
         }
 
-        s
+        Ok(())
     }
 }
 
