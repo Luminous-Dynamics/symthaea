@@ -1280,4 +1280,279 @@ mod tests {
         assert_eq!(config.bridge_intermediate_dim, 1024);
         assert_eq!(config.bridge_attention_heads, 8);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ADDITIONAL COVERAGE TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_default_config_values() {
+        let config = TwoTrackConfig::default();
+
+        assert_eq!(config.input_dim, 256);
+        assert_eq!(config.hdc_dim, HDC_DIMENSION);
+        assert_eq!(config.cfc_hidden_dim, 128);
+        assert_eq!(config.cfc_layers, 2);
+        assert_eq!(config.cfc_output_dim, 64);
+        assert_eq!(config.fusion_weights, (0.6, 0.4));
+        assert!(config.normalize_before_fusion);
+        assert_eq!(config.seed, 0x5954_2154);
+        assert!(config.genesis_phrase.is_none());
+        assert!((config.cfc_delta_t - 0.02).abs() < 1e-6);
+        assert!((config.cfc_learning_rate - 0.001).abs() < 1e-6);
+        assert!(!config.enable_bridge);
+        assert_eq!(config.bridge_intermediate_dim, 512);
+        assert_eq!(config.bridge_attention_heads, 4);
+    }
+
+    #[test]
+    fn test_semantic_heavy_config() {
+        let config = TwoTrackConfig::semantic_heavy();
+
+        assert_eq!(config.fusion_weights, (0.8, 0.2));
+        // All other fields should be default
+        assert_eq!(config.input_dim, 256);
+        assert_eq!(config.hdc_dim, HDC_DIMENSION);
+        assert_eq!(config.cfc_hidden_dim, 128);
+    }
+
+    #[test]
+    fn test_temporal_heavy_config() {
+        let config = TwoTrackConfig::temporal_heavy();
+
+        assert_eq!(config.fusion_weights, (0.3, 0.7));
+        assert_eq!(config.cfc_hidden_dim, 256);
+        assert_eq!(config.cfc_layers, 3);
+        // input_dim should remain default
+        assert_eq!(config.input_dim, 256);
+    }
+
+    #[test]
+    fn test_output_dimensions_invariant() {
+        let config = TwoTrackConfig::default();
+        let mut processor = TwoTrackProcessor::new(config.clone());
+
+        let embedding: Vec<f32> = vec![0.3; 256];
+        let output = processor.process(&embedding);
+
+        assert_eq!(output.semantic_hv.dim(), config.hdc_dim,
+            "Semantic HV must match configured hdc_dim");
+        assert_eq!(output.temporal_state.len(), config.cfc_output_dim,
+            "Temporal state must match cfc_output_dim");
+        assert_eq!(output.fused.dim(), config.hdc_dim,
+            "Fused HV must match hdc_dim");
+    }
+
+    #[test]
+    fn test_output_values_are_finite() {
+        let config = TwoTrackConfig::default();
+        let mut processor = TwoTrackProcessor::new(config);
+
+        let embedding: Vec<f32> = (0..256).map(|i| (i as f32 * 0.037).sin()).collect();
+
+        // Process multiple steps to exercise temporal dynamics
+        for _ in 0..5 {
+            let output = processor.process(&embedding);
+
+            for (i, v) in output.semantic_hv.values.iter().enumerate() {
+                assert!(v.is_finite(), "semantic_hv[{}] = {} is not finite", i, v);
+            }
+            for (i, v) in output.temporal_state.iter().enumerate() {
+                assert!(v.is_finite(), "temporal_state[{}] = {} is not finite", i, v);
+            }
+            for (i, v) in output.fused.values.iter().enumerate() {
+                assert!(v.is_finite(), "fused[{}] = {} is not finite", i, v);
+            }
+            assert!(output.semantic_stability.is_finite(),
+                "semantic_stability must be finite");
+            assert!(output.temporal_confidence.is_finite(),
+                "temporal_confidence must be finite");
+        }
+    }
+
+    #[test]
+    fn test_total_steps_increments() {
+        let config = TwoTrackConfig::default();
+        let mut processor = TwoTrackProcessor::new(config);
+
+        assert_eq!(processor.total_steps(), 0);
+
+        let embedding: Vec<f32> = vec![0.1; 256];
+
+        processor.process(&embedding);
+        assert_eq!(processor.total_steps(), 1);
+
+        processor.process(&embedding);
+        assert_eq!(processor.total_steps(), 2);
+
+        // reset does not clear total_steps
+        processor.reset();
+        processor.process(&embedding);
+        assert_eq!(processor.total_steps(), 3);
+    }
+
+    #[test]
+    fn test_step_temporal_returns_correct_dim() {
+        let config = TwoTrackConfig::default();
+        let mut processor = TwoTrackProcessor::new(config.clone());
+
+        let embedding: Vec<f32> = vec![0.2; 256];
+        let temporal = processor.step_temporal(&embedding);
+
+        assert_eq!(temporal.len(), config.cfc_output_dim,
+            "step_temporal output must match cfc_output_dim");
+
+        for (i, v) in temporal.iter().enumerate() {
+            assert!(v.is_finite(), "step_temporal[{}] = {} is not finite", i, v);
+        }
+    }
+
+    #[test]
+    fn test_semantic_only_does_not_mutate_state() {
+        let config = TwoTrackConfig::default();
+        let processor = TwoTrackProcessor::new(config.clone());
+
+        let embedding: Vec<f32> = (0..256).map(|i| (i as f32 * 0.01).cos()).collect();
+
+        // Capture temporal state before
+        let state_before = processor.temporal_state();
+        let steps_before = processor.total_steps();
+
+        let hv = processor.semantic_only(&embedding);
+
+        // Verify the semantic_only result
+        assert_eq!(hv.dim(), config.hdc_dim);
+
+        // State and step count should be unchanged
+        let state_after = processor.temporal_state();
+        assert_eq!(steps_before, processor.total_steps(),
+            "semantic_only must not increment total_steps");
+        assert_eq!(state_before.len(), state_after.len(),
+            "semantic_only must not alter temporal state count");
+    }
+
+    #[test]
+    fn test_empty_input_padded_to_input_dim() {
+        let config = TwoTrackConfig::default();
+        let mut processor = TwoTrackProcessor::new(config.clone());
+
+        // Empty input should be zero-padded to input_dim
+        let empty: Vec<f32> = vec![];
+        let output = processor.process(&empty);
+
+        assert_eq!(output.semantic_hv.dim(), config.hdc_dim);
+        assert_eq!(output.temporal_state.len(), config.cfc_output_dim);
+        assert_eq!(output.fused.dim(), config.hdc_dim);
+
+        // All values should be finite
+        for v in output.fused.values.iter() {
+            assert!(v.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_short_input_padded() {
+        let config = TwoTrackConfig::default();
+        let mut processor = TwoTrackProcessor::new(config.clone());
+
+        // Input shorter than input_dim (10 < 256)
+        let short: Vec<f32> = vec![1.0; 10];
+        let output = processor.process(&short);
+
+        assert_eq!(output.semantic_hv.dim(), config.hdc_dim);
+        assert_eq!(output.temporal_state.len(), config.cfc_output_dim);
+        assert_eq!(output.fused.dim(), config.hdc_dim);
+    }
+
+    #[test]
+    fn test_long_input_truncated() {
+        let config = TwoTrackConfig::default();
+        let mut processor = TwoTrackProcessor::new(config.clone());
+
+        // Input longer than input_dim (500 > 256)
+        let long: Vec<f32> = vec![0.5; 500];
+        let output = processor.process(&long);
+
+        assert_eq!(output.semantic_hv.dim(), config.hdc_dim);
+        assert_eq!(output.temporal_state.len(), config.cfc_output_dim);
+        assert_eq!(output.fused.dim(), config.hdc_dim);
+    }
+
+    #[test]
+    fn test_zero_input_produces_finite_output() {
+        let config = TwoTrackConfig::default();
+        let mut processor = TwoTrackProcessor::new(config);
+
+        let zeros: Vec<f32> = vec![0.0; 256];
+        let output = processor.process(&zeros);
+
+        for v in output.semantic_hv.values.iter() {
+            assert!(v.is_finite(), "zero input should produce finite semantic HV");
+        }
+        for v in output.temporal_state.iter() {
+            assert!(v.is_finite(), "zero input should produce finite temporal state");
+        }
+        for v in output.fused.values.iter() {
+            assert!(v.is_finite(), "zero input should produce finite fused HV");
+        }
+    }
+
+    #[test]
+    fn test_temporal_confidence_bounded() {
+        let config = TwoTrackConfig::default();
+        let mut processor = TwoTrackProcessor::new(config);
+
+        let embedding: Vec<f32> = (0..256).map(|i| (i as f32 * 0.05).sin()).collect();
+
+        for _ in 0..10 {
+            let output = processor.process(&embedding);
+            assert!(output.temporal_confidence > 0.0,
+                "temporal_confidence must be positive, got {}",
+                output.temporal_confidence);
+            assert!(output.temporal_confidence <= 1.0,
+                "temporal_confidence must be <= 1.0, got {}",
+                output.temporal_confidence);
+        }
+    }
+
+    #[test]
+    fn test_semantic_hv16_and_fused_hv16_conversions() {
+        let config = TwoTrackConfig::default();
+        let mut processor = TwoTrackProcessor::new(config);
+
+        let embedding: Vec<f32> = (0..256).map(|i| (i as f32 * 0.01).sin()).collect();
+        let output = processor.process(&embedding);
+
+        // The hv16 conversions should produce valid BinaryHV objects
+        let sem_hv16 = output.semantic_hv16();
+        let fused_hv16 = output.fused_hv16();
+
+        // BinaryHV has DIM = 16384 bits represented in 2048 bytes
+        assert_eq!(sem_hv16.0.len(), 2048,
+            "semantic_hv16 should have 2048 bytes");
+        assert_eq!(fused_hv16.0.len(), 2048,
+            "fused_hv16 should have 2048 bytes");
+
+        // Verify bipolar roundtrip: to_bipolar should produce -1.0 or +1.0 values only
+        let bipolar = sem_hv16.to_bipolar();
+        for (i, v) in bipolar.iter().enumerate() {
+            assert!(*v == -1.0 || *v == 1.0,
+                "bipolar[{}] should be -1.0 or 1.0, got {}", i, v);
+        }
+    }
+
+    #[test]
+    fn test_process_and_train_without_target() {
+        let config = TwoTrackConfig::default();
+        let mut processor = TwoTrackProcessor::new(config);
+
+        let embedding: Vec<f32> = vec![0.1; 256];
+
+        let result = processor.process_and_train(&embedding, None);
+        assert!(result.is_ok());
+
+        let (output, loss) = result.unwrap();
+        assert!(loss.is_none(), "No target means no loss");
+        assert_eq!(output.semantic_hv.dim(), HDC_DIMENSION);
+    }
 }

@@ -86,9 +86,13 @@ impl<'a> UserInputEncoder<'a> {
     }
 
     /// Detect action verbs and encode them.
+    ///
+    /// Iterates tokens in input order so that earlier words (which tend to
+    /// express the user's primary intent) take priority over later words
+    /// that might incidentally match a different action category.
     fn encode_action_intent(&mut self, tokens: &[&str]) -> Option<ContinuousHV> {
-        for (canonical, synonyms) in ACTION_VERBS {
-            for token in tokens {
+        for token in tokens {
+            for (canonical, synonyms) in ACTION_VERBS {
                 if synonyms.contains(token) {
                     return Some(self.codebook.get_or_create(canonical).clone());
                 }
@@ -143,10 +147,31 @@ impl<'a> UserInputEncoder<'a> {
     }
 
     /// Encode remaining content tokens (lower weight, contextual).
+    ///
+    /// Filters out stopwords and known action verbs to avoid duplicating
+    /// signal already captured by `encode_action_intent` and `encode_entities`.
     fn encode_content_tokens(&mut self, tokens: &[&str]) -> ContinuousHV {
+        let stopwords = [
+            "i", "my", "me", "the", "a", "an", "is", "are", "was", "it",
+            "do", "does", "did", "can", "could", "would", "should", "will",
+            "to", "for", "in", "on", "at", "of", "with", "by", "from",
+            "how", "what", "why", "when", "where", "please", "want", "need",
+            "like", "make", "help", "up", "out", "not", "don't", "this",
+            "that", "some", "all", "very", "too", "also", "just", "about",
+        ];
+
+        let action_words: Vec<&str> = ACTION_VERBS
+            .iter()
+            .flat_map(|(_, synonyms)| synonyms.iter().copied())
+            .collect();
+
         let encoded: Vec<ContinuousHV> = tokens
             .iter()
-            .filter(|t| t.len() > 2)
+            .filter(|t| {
+                t.len() > 2
+                    && !stopwords.contains(t)
+                    && !action_words.contains(t)
+            })
             .take(10)
             .map(|tok| self.codebook.get_or_create(tok).clone())
             .collect();
