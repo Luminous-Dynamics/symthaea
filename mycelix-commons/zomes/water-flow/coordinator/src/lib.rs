@@ -1055,4 +1055,222 @@ mod tests {
         let decoded: UpdateSourceStatusInput = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.new_status, SourceStatus::UnderMaintenance);
     }
+
+    // ========================================================================
+    // ERROR-PATH & FAILURE-MODE TESTS
+    // ========================================================================
+
+    /// Verify that invalid SourceStatus JSON strings fail to deserialize
+    /// rather than silently producing a wrong variant.
+    #[test]
+    fn source_status_invalid_variant_deser_fails() {
+        let bad_json = r#""Frozen""#;
+        let result = serde_json::from_str::<SourceStatus>(bad_json);
+        assert!(result.is_err(), "Unknown status variant should fail deserialization");
+
+        let bad_json2 = r#""active""#; // lowercase
+        let result2 = serde_json::from_str::<SourceStatus>(bad_json2);
+        assert!(result2.is_err(), "Lowercase variant should fail deserialization");
+
+        let bad_json3 = r#""""#; // empty string
+        let result3 = serde_json::from_str::<SourceStatus>(bad_json3);
+        assert!(result3.is_err(), "Empty string should fail deserialization");
+    }
+
+    /// Verify that depleted and contaminated statuses correctly roundtrip in
+    /// UpdateSourceStatusInput -- these are the statuses that block allocation
+    /// in the coordinator (allocate_shares rejects them).
+    #[test]
+    fn update_source_status_allocation_blocking_statuses_roundtrip() {
+        for blocking_status in [SourceStatus::Depleted, SourceStatus::Contaminated] {
+            let input = UpdateSourceStatusInput {
+                source_hash: fake_action_hash(),
+                new_status: blocking_status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdateSourceStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, blocking_status);
+            // Confirm these are indeed the statuses that would block allocation
+            assert!(
+                decoded.new_status == SourceStatus::Depleted
+                    || decoded.new_status == SourceStatus::Contaminated
+            );
+        }
+    }
+
+    /// TransferCreditsInput: verify that zero liters serializes correctly --
+    /// the coordinator rejects this at runtime with "Transfer amount must be
+    /// greater than zero", but the struct itself must serialize it faithfully.
+    #[test]
+    fn transfer_credits_zero_liters_roundtrip_preserves_zero() {
+        let input = TransferCreditsInput {
+            to_agent: fake_agent_2(),
+            liters: 0,
+            transaction_type: TransactionType::Transfer,
+            source_hash: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferCreditsInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.liters, 0, "Zero liters must survive serde roundtrip");
+    }
+
+    /// TransferCreditsInput: same agent as sender/receiver is rejected by
+    /// the coordinator at runtime. Verify the struct itself faithfully
+    /// serializes identical agent pub keys and they compare equal after
+    /// deserialization.
+    #[test]
+    fn transfer_credits_same_agent_serde_preserves_equality() {
+        let same_agent = fake_agent();
+        let input = TransferCreditsInput {
+            to_agent: same_agent.clone(),
+            liters: 100,
+            transaction_type: TransactionType::Transfer,
+            source_hash: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferCreditsInput = serde_json::from_str(&json).unwrap();
+        // After roundtrip, the to_agent must still match the original agent --
+        // the coordinator uses this equality check to reject self-transfers
+        assert_eq!(decoded.to_agent, same_agent);
+    }
+
+    /// WaterSource with an empty ID: verify serde roundtrip preserves the
+    /// empty string. The coordinator rejects empty IDs with
+    /// "Source ID must be 1-256 characters" but the struct must serialize it.
+    #[test]
+    fn water_source_empty_id_roundtrip_preserves_empty() {
+        let source = WaterSource {
+            id: "".to_string(),
+            name: "Valid Name".to_string(),
+            source_type: WaterSourceType::Well,
+            max_capacity_liters: 1000,
+            recharge_rate_liters_per_day: 100,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            steward: fake_agent(),
+            status: SourceStatus::Active,
+        };
+        let json = serde_json::to_string(&source).unwrap();
+        let decoded: WaterSource = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "", "Empty ID must survive roundtrip");
+    }
+
+    /// WaterSource with an overlong ID (>256 chars): verify serde roundtrip
+    /// preserves the full string. The coordinator rejects this at runtime.
+    #[test]
+    fn water_source_overlong_id_roundtrip() {
+        let long_id = "X".repeat(300);
+        let source = WaterSource {
+            id: long_id.clone(),
+            name: "Valid Name".to_string(),
+            source_type: WaterSourceType::River,
+            max_capacity_liters: 5000,
+            recharge_rate_liters_per_day: 500,
+            location_lat: 10.0,
+            location_lon: 20.0,
+            steward: fake_agent(),
+            status: SourceStatus::Active,
+        };
+        let json = serde_json::to_string(&source).unwrap();
+        let decoded: WaterSource = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id.len(), 300, "Overlong ID must survive roundtrip");
+        assert_eq!(decoded.id, long_id);
+    }
+
+    /// H2OCredit: verify that extreme negative balance (i64::MIN) roundtrips.
+    /// The system allows negative balances (overdraft), so the minimum value
+    /// must serialize and deserialize correctly.
+    #[test]
+    fn h2o_credit_i64_min_balance_roundtrip() {
+        let credit = H2OCredit {
+            holder: fake_agent(),
+            balance_liters: i64::MIN,
+            total_earned: 0,
+            total_spent: 0,
+        };
+        let json = serde_json::to_string(&credit).unwrap();
+        let decoded: H2OCredit = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.balance_liters, i64::MIN);
+    }
+
+    /// H2OCredit: verify that i64::MAX balance roundtrips correctly.
+    #[test]
+    fn h2o_credit_i64_max_balance_roundtrip() {
+        let credit = H2OCredit {
+            holder: fake_agent(),
+            balance_liters: i64::MAX,
+            total_earned: u64::MAX,
+            total_spent: u64::MAX,
+        };
+        let json = serde_json::to_string(&credit).unwrap();
+        let decoded: H2OCredit = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.balance_liters, i64::MAX);
+        assert_eq!(decoded.total_earned, u64::MAX);
+        assert_eq!(decoded.total_spent, u64::MAX);
+    }
+
+    /// WaterShare: verify boundary priority values (0 = highest, 255 = lowest)
+    /// serde roundtrip correctly, specifically testing that the u8 extremes
+    /// are not truncated or misinterpreted.
+    #[test]
+    fn water_share_priority_0_and_255_serde_roundtrip() {
+        for (priority, expected_desc) in [(0u8, "highest"), (255u8, "lowest")] {
+            let share = WaterShare {
+                source_hash: fake_action_hash(),
+                holder: fake_agent(),
+                allocation_type: AllocationType::Priority,
+                volume_per_period_liters: 500,
+                period_days: 7,
+                priority,
+                usage_category: WaterClassification::Potable,
+            };
+            let json = serde_json::to_string(&share).unwrap();
+            let decoded: WaterShare = serde_json::from_str(&json).unwrap();
+            assert_eq!(
+                decoded.priority, priority,
+                "Priority {} ({}) must survive roundtrip",
+                priority, expected_desc
+            );
+        }
+    }
+
+    /// WaterTransaction: verify that a transaction with from_agent == to_agent
+    /// roundtrips correctly. The coordinator rejects self-transfers, but the
+    /// integrity layer validation also catches this. The serde layer must
+    /// preserve the data faithfully regardless.
+    #[test]
+    fn water_transaction_self_transfer_serde_roundtrip() {
+        let same_agent = fake_agent();
+        let tx = WaterTransaction {
+            from_agent: same_agent.clone(),
+            to_agent: same_agent.clone(),
+            liters: 100,
+            credit_type: TransactionType::Transfer,
+            timestamp: Timestamp::from_micros(42_000),
+            source_hash: None,
+        };
+        let json = serde_json::to_string(&tx).unwrap();
+        let decoded: WaterTransaction = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.from_agent, decoded.to_agent, "Self-transfer agents must match after roundtrip");
+        assert_eq!(decoded.liters, 100);
+    }
+
+    /// TransferCreditsInput: verify invalid JSON for the transaction_type field
+    /// causes deserialization failure.
+    #[test]
+    fn transfer_credits_input_invalid_transaction_type_deser_fails() {
+        // Manually craft JSON with an invalid transaction type
+        let bad_json = r#"{"to_agent":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"liters":100,"transaction_type":"Barter","source_hash":null}"#;
+        let result = serde_json::from_str::<TransferCreditsInput>(bad_json);
+        assert!(result.is_err(), "Invalid transaction type 'Barter' should fail deserialization");
+    }
+
+    /// RecordUsageInput: verify invalid JSON for the usage_category field
+    /// causes deserialization failure.
+    #[test]
+    fn record_usage_input_invalid_classification_deser_fails() {
+        let bad_json = r#"{"source_hash":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"liters_used":50,"usage_category":"Sewage","meter_reference":null}"#;
+        let result = serde_json::from_str::<RecordUsageInput>(bad_json);
+        assert!(result.is_err(), "Invalid classification 'Sewage' should fail deserialization");
+    }
 }

@@ -1050,4 +1050,232 @@ mod tests {
         assert!(decoded.boundaries.is_none());
         assert!(decoded.area_sqm.is_none());
     }
+
+    // ========================================================================
+    // ERROR-PATH & FAILURE-MODE TESTS
+    // ========================================================================
+
+    /// RegisterPropertyInput with empty owner_did: verify the empty string
+    /// roundtrips faithfully. The integrity layer rejects non-"did:" prefixed
+    /// owner_did, but the coordinator struct must serialize it correctly.
+    #[test]
+    fn register_input_empty_owner_did_roundtrip() {
+        let input = RegisterPropertyInput {
+            property_type: PropertyType::Land,
+            title: "Test".to_string(),
+            description: "Test".to_string(),
+            owner_did: "".to_string(),
+            co_owners: vec![],
+            geolocation: None,
+            address: None,
+            metadata: PropertyMetadata { appraised_value: None, currency: None, legal_description: None, parcel_number: None, attachments: vec![] },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RegisterPropertyInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.owner_did, "", "Empty owner_did must survive roundtrip");
+    }
+
+    /// AddEncumbranceInput with empty property_id: the coordinator's
+    /// add_encumbrance function searches for a deed matching the property_id
+    /// and returns "Property not found" when none matches. Verify the empty
+    /// string roundtrips for the error path input.
+    #[test]
+    fn add_encumbrance_empty_property_id_roundtrip() {
+        let input = AddEncumbranceInput {
+            property_id: "".to_string(),
+            encumbrance_type: EncumbranceType::Lien,
+            holder_did: "did:key:z6MkBank".to_string(),
+            amount: Some(1000.0),
+            expires: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddEncumbranceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "", "Empty property_id must survive roundtrip");
+    }
+
+    /// LocationSearchInput with invalid coordinates: lat > 90 and lon > 180.
+    /// The integrity validation rejects these for Property entries, but the
+    /// search input struct has no validation -- verify these extreme values
+    /// roundtrip correctly so the search function can handle them.
+    #[test]
+    fn location_search_invalid_lat_over_90_roundtrip() {
+        let input = LocationSearchInput {
+            latitude: 91.5,
+            longitude: 0.0,
+            radius_km: 10.0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: LocationSearchInput = serde_json::from_str(&json).unwrap();
+        assert!((decoded.latitude - 91.5).abs() < f64::EPSILON, "Lat > 90 must survive roundtrip");
+    }
+
+    #[test]
+    fn location_search_invalid_lon_over_180_roundtrip() {
+        let input = LocationSearchInput {
+            latitude: 0.0,
+            longitude: 200.0,
+            radius_km: 10.0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: LocationSearchInput = serde_json::from_str(&json).unwrap();
+        assert!((decoded.longitude - 200.0).abs() < f64::EPSILON, "Lon > 180 must survive roundtrip");
+    }
+
+    #[test]
+    fn location_search_negative_radius_roundtrip() {
+        let input = LocationSearchInput {
+            latitude: 32.0,
+            longitude: -96.0,
+            radius_km: -5.0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: LocationSearchInput = serde_json::from_str(&json).unwrap();
+        assert!((decoded.radius_km - (-5.0)).abs() < f64::EPSILON, "Negative radius must survive roundtrip");
+    }
+
+    /// GeoLocation with zero area: the integrity validation rejects area <= 0.
+    /// Verify the struct roundtrips the zero value that would trigger rejection.
+    #[test]
+    fn geolocation_zero_area_roundtrip() {
+        let geo = GeoLocation {
+            latitude: 32.9,
+            longitude: -96.7,
+            boundaries: None,
+            area_sqm: Some(0.0),
+        };
+        let json = serde_json::to_string(&geo).unwrap();
+        let decoded: GeoLocation = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.area_sqm, Some(0.0), "Zero area must survive roundtrip");
+    }
+
+    /// GeoLocation with negative area: the integrity validation rejects this.
+    /// Verify the struct roundtrips the negative value correctly.
+    #[test]
+    fn geolocation_negative_area_roundtrip() {
+        let geo = GeoLocation {
+            latitude: 32.9,
+            longitude: -96.7,
+            boundaries: None,
+            area_sqm: Some(-500.0),
+        };
+        let json = serde_json::to_string(&geo).unwrap();
+        let decoded: GeoLocation = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.area_sqm, Some(-500.0), "Negative area must survive roundtrip");
+    }
+
+    /// GeoLocation with extremely large area: verify f64 precision is
+    /// maintained at large magnitudes.
+    #[test]
+    fn geolocation_very_large_area_roundtrip() {
+        let large_area = 1.0e15; // 1 quadrillion sqm
+        let geo = GeoLocation {
+            latitude: 0.0,
+            longitude: 0.0,
+            boundaries: None,
+            area_sqm: Some(large_area),
+        };
+        let json = serde_json::to_string(&geo).unwrap();
+        let decoded: GeoLocation = serde_json::from_str(&json).unwrap();
+        assert!((decoded.area_sqm.unwrap() - large_area).abs() < 1.0, "Very large area must survive roundtrip");
+    }
+
+    /// PropertyMetadata with negative appraised_value: the integrity
+    /// validation rejects appraised_value < 0. Verify the struct roundtrips
+    /// the negative value correctly for the error path.
+    #[test]
+    fn property_metadata_negative_appraised_value_roundtrip() {
+        let meta = PropertyMetadata {
+            appraised_value: Some(-100_000.0),
+            currency: Some("USD".to_string()),
+            legal_description: None,
+            parcel_number: None,
+            attachments: vec![],
+        };
+        let json = serde_json::to_string(&meta).unwrap();
+        let decoded: PropertyMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.appraised_value, Some(-100_000.0), "Negative value must survive roundtrip");
+    }
+
+    /// TransferOwnershipInput: verify that from_did == to_did (transferring
+    /// to self) roundtrips correctly. The coordinator checks ownership against
+    /// from_did at runtime, but the struct must preserve self-transfer data.
+    #[test]
+    fn transfer_ownership_self_transfer_roundtrip() {
+        let input = TransferOwnershipInput {
+            property_id: "prop-001".to_string(),
+            from_did: "did:key:z6Mk001".to_string(),
+            to_did: "did:key:z6Mk001".to_string(),
+            transfer_type: "Sale".to_string(),
+            transfer_id: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferOwnershipInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.from_did, decoded.to_did, "Self-transfer DIDs must match after roundtrip");
+    }
+
+    /// TransferOwnershipInput with empty property_id: the coordinator returns
+    /// "Property not found" for this. Verify the struct roundtrips the empty
+    /// string.
+    #[test]
+    fn transfer_ownership_empty_property_id_roundtrip() {
+        let input = TransferOwnershipInput {
+            property_id: "".to_string(),
+            from_did: "did:key:z6Mk001".to_string(),
+            to_did: "did:key:z6Mk002".to_string(),
+            transfer_type: "Sale".to_string(),
+            transfer_id: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferOwnershipInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "", "Empty property_id must survive roundtrip");
+    }
+
+    /// PropertyType::Other with empty string: verify that the Other variant
+    /// can hold an empty string and roundtrip correctly.
+    #[test]
+    fn property_type_other_empty_string_roundtrip() {
+        let pt = PropertyType::Other("".to_string());
+        let json = serde_json::to_string(&pt).unwrap();
+        let decoded: PropertyType = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, PropertyType::Other("".to_string()));
+    }
+
+    /// Invalid PropertyType deserialization: verify that an unknown variant
+    /// in JSON fails to deserialize.
+    #[test]
+    fn property_type_invalid_variant_deser_fails() {
+        let bad_json = r#""Spacecraft""#;
+        let result = serde_json::from_str::<PropertyType>(bad_json);
+        assert!(result.is_err(), "Unknown PropertyType variant should fail deserialization");
+    }
+
+    /// Invalid EncumbranceType deserialization: verify that an unknown variant
+    /// fails to deserialize.
+    #[test]
+    fn encumbrance_type_invalid_variant_deser_fails() {
+        let bad_json = r#""Tax""#;
+        let result = serde_json::from_str::<EncumbranceType>(bad_json);
+        assert!(result.is_err(), "Unknown EncumbranceType variant should fail deserialization");
+
+        let bad_json2 = r#""mortgage""#; // lowercase
+        let result2 = serde_json::from_str::<EncumbranceType>(bad_json2);
+        assert!(result2.is_err(), "Lowercase variant should fail deserialization");
+    }
+
+    /// AddEncumbranceInput with negative amount: the integrity validation
+    /// rejects negative encumbrance amounts. Verify the struct roundtrips
+    /// the negative value for the error path.
+    #[test]
+    fn add_encumbrance_negative_amount_roundtrip() {
+        let input = AddEncumbranceInput {
+            property_id: "prop-001".to_string(),
+            encumbrance_type: EncumbranceType::Mortgage,
+            holder_did: "did:key:z6MkBank".to_string(),
+            amount: Some(-50_000.0),
+            expires: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddEncumbranceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.amount, Some(-50_000.0), "Negative encumbrance amount must survive roundtrip");
+    }
 }

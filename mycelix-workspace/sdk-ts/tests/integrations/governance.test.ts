@@ -511,6 +511,225 @@ describe('Governance Integration', () => {
       });
     });
 
+    describe('error paths and edge cases', () => {
+      it('should throw for quorum percentage above 1.0', () => {
+        service.registerMember({
+          did: 'did:mycelix:proposer',
+          daoId: 'test-dao',
+          role: 'member',
+          votingPower: 100,
+          delegatedPower: 0,
+          joinedAt: Date.now(),
+        });
+
+        expect(() => {
+          service.createProposal({
+            title: 'Invalid Quorum',
+            description: 'Test',
+            proposerId: 'did:mycelix:proposer',
+            daoId: 'test-dao',
+            votingPeriodHours: 24,
+            quorumPercentage: 1.5,
+          });
+        }).toThrow('Quorum percentage must be <= 1');
+      });
+
+      it('should throw for negative quorum percentage', () => {
+        service.registerMember({
+          did: 'did:mycelix:proposer',
+          daoId: 'test-dao',
+          role: 'member',
+          votingPower: 100,
+          delegatedPower: 0,
+          joinedAt: Date.now(),
+        });
+
+        expect(() => {
+          service.createProposal({
+            title: 'Negative Quorum',
+            description: 'Test',
+            proposerId: 'did:mycelix:proposer',
+            daoId: 'test-dao',
+            votingPeriodHours: 24,
+            quorumPercentage: -0.5,
+          });
+        }).toThrow('Quorum percentage must be >= 0');
+      });
+
+      it('should throw for negative voting period', () => {
+        service.registerMember({
+          did: 'did:mycelix:proposer',
+          daoId: 'test-dao',
+          role: 'member',
+          votingPower: 100,
+          delegatedPower: 0,
+          joinedAt: Date.now(),
+        });
+
+        expect(() => {
+          service.createProposal({
+            title: 'Negative Period',
+            description: 'Test',
+            proposerId: 'did:mycelix:proposer',
+            daoId: 'test-dao',
+            votingPeriodHours: -24,
+            quorumPercentage: 0.5,
+          });
+        }).toThrow('Voting period must be positive');
+      });
+
+      it('should throw for zero voting period', () => {
+        service.registerMember({
+          did: 'did:mycelix:proposer',
+          daoId: 'test-dao',
+          role: 'member',
+          votingPower: 100,
+          delegatedPower: 0,
+          joinedAt: Date.now(),
+        });
+
+        expect(() => {
+          service.createProposal({
+            title: 'Zero Period',
+            description: 'Test',
+            proposerId: 'did:mycelix:proposer',
+            daoId: 'test-dao',
+            votingPeriodHours: 0,
+            quorumPercentage: 0.5,
+          });
+        }).toThrow('Voting period must be positive');
+      });
+
+      it('should throw for voting period exceeding maximum (90 days)', () => {
+        service.registerMember({
+          did: 'did:mycelix:proposer',
+          daoId: 'test-dao',
+          role: 'member',
+          votingPower: 100,
+          delegatedPower: 0,
+          joinedAt: Date.now(),
+        });
+
+        expect(() => {
+          service.createProposal({
+            title: 'Excessive Period',
+            description: 'Test',
+            proposerId: 'did:mycelix:proposer',
+            daoId: 'test-dao',
+            votingPeriodHours: 3000, // > 2160 (90 days)
+            quorumPercentage: 0.5,
+          });
+        }).toThrow('Voting period must be <= 2160');
+      });
+
+      it('should throw when voting on a finalized (non-active) proposal', () => {
+        service.registerMember({
+          did: 'did:mycelix:proposer',
+          daoId: 'test-dao',
+          role: 'member',
+          votingPower: 100,
+          delegatedPower: 0,
+          joinedAt: Date.now(),
+        });
+        service.registerMember({
+          did: 'did:mycelix:voter1',
+          daoId: 'test-dao',
+          role: 'member',
+          votingPower: 100,
+          delegatedPower: 0,
+          joinedAt: Date.now(),
+        });
+        service.registerMember({
+          did: 'did:mycelix:voter2',
+          daoId: 'test-dao',
+          role: 'member',
+          votingPower: 100,
+          delegatedPower: 0,
+          joinedAt: Date.now(),
+        });
+
+        const proposal = service.createProposal({
+          title: 'Finalize Test',
+          description: 'Test',
+          proposerId: 'did:mycelix:proposer',
+          daoId: 'test-dao',
+          votingPeriodHours: 1,
+          quorumPercentage: 0.5,
+        });
+
+        service.castVote({ proposalId: proposal.id, voterId: 'did:mycelix:voter1', choice: 'approve', weight: 100 });
+        service.finalizeProposal(proposal.id);
+
+        // Proposal is now 'passed' - voting should fail
+        expect(() => {
+          service.castVote({
+            proposalId: proposal.id,
+            voterId: 'did:mycelix:voter2',
+            choice: 'approve',
+            weight: 100,
+          });
+        }).toThrow('Proposal is not active');
+      });
+
+      it('should return 0 participation rate when no members exist in DAO', () => {
+        service.registerMember({
+          did: 'did:mycelix:proposer',
+          daoId: 'test-dao',
+          role: 'member',
+          votingPower: 100,
+          delegatedPower: 0,
+          joinedAt: Date.now(),
+        });
+
+        const proposal = service.createProposal({
+          title: 'No Votes',
+          description: 'Test',
+          proposerId: 'did:mycelix:proposer',
+          daoId: 'test-dao',
+          votingPeriodHours: 1,
+          quorumPercentage: 0.5,
+        });
+
+        // Finalize without any votes
+        const result = service.finalizeProposal(proposal.id);
+
+        expect(result.passed).toBe(false);
+        expect(result.totalVotes).toBe(0);
+        expect(result.approvalPercentage).toBe(0);
+      });
+
+      it('should reject proposal when quorum is not met', () => {
+        // Register 5 members but only 1 votes
+        for (let i = 0; i < 5; i++) {
+          service.registerMember({
+            did: `did:mycelix:member${i}`,
+            daoId: 'test-dao',
+            role: 'member',
+            votingPower: 100,
+            delegatedPower: 0,
+            joinedAt: Date.now(),
+          });
+        }
+
+        const proposal = service.createProposal({
+          title: 'Low Participation',
+          description: 'Test',
+          proposerId: 'did:mycelix:member0',
+          daoId: 'test-dao',
+          votingPeriodHours: 1,
+          quorumPercentage: 0.6, // 60% quorum
+        });
+
+        // Only 1 out of 5 members votes (20% participation < 60% quorum)
+        service.castVote({ proposalId: proposal.id, voterId: 'did:mycelix:member1', choice: 'approve', weight: 100 });
+
+        const result = service.finalizeProposal(proposal.id);
+
+        expect(result.quorumMet).toBe(false);
+        expect(result.passed).toBe(false);
+      });
+    });
+
     describe('getActiveProposals', () => {
       it('should return only active proposals for a DAO', () => {
         // Register proposers

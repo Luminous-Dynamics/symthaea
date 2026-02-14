@@ -118,6 +118,148 @@ describe('Finance Integration', () => {
       });
     });
 
+    describe('transfer error paths', () => {
+      it('should throw for negative transfer amount', () => {
+        const sender = service.createWallet('did:mycelix:sender');
+        const receiver = service.createWallet('did:mycelix:receiver');
+        sender.creditLimit = 1000;
+
+        expect(() => {
+          service.transfer(sender.id, receiver.id, -100, 'MCX');
+        }).toThrow('Transfer amount must be positive');
+      });
+
+      it('should throw for zero transfer amount', () => {
+        const sender = service.createWallet('did:mycelix:sender');
+        const receiver = service.createWallet('did:mycelix:receiver');
+        sender.creditLimit = 1000;
+
+        expect(() => {
+          service.transfer(sender.id, receiver.id, 0, 'MCX');
+        }).toThrow('Transfer amount must be positive');
+      });
+
+      it('should throw for NaN transfer amount', () => {
+        const sender = service.createWallet('did:mycelix:sender');
+        const receiver = service.createWallet('did:mycelix:receiver');
+        sender.creditLimit = 1000;
+
+        expect(() => {
+          service.transfer(sender.id, receiver.id, NaN, 'MCX');
+        }).toThrow('Transfer amount must be a valid number');
+      });
+
+      it('should throw when sender wallet does not exist', () => {
+        const receiver = service.createWallet('did:mycelix:receiver');
+
+        expect(() => {
+          service.transfer('wallet-nonexistent', receiver.id, 100, 'MCX');
+        }).toThrow('Wallet not found');
+      });
+
+      it('should throw for overdraft beyond credit limit', () => {
+        const sender = service.createWallet('did:mycelix:sender');
+        const receiver = service.createWallet('did:mycelix:receiver');
+        sender.creditLimit = 100; // Only 100 credit
+
+        expect(() => {
+          service.transfer(sender.id, receiver.id, 200, 'MCX');
+        }).toThrow('Insufficient funds');
+      });
+
+      it('should throw for transfer in unsupported currency when balance is zero', () => {
+        const sender = service.createWallet('did:mycelix:sender');
+        const receiver = service.createWallet('did:mycelix:receiver');
+        // No credit limit, no balance in ETH
+
+        expect(() => {
+          service.transfer(sender.id, receiver.id, 50, 'ETH');
+        }).toThrow('Insufficient funds');
+      });
+    });
+
+    describe('requestLoan error paths', () => {
+      it('should throw for negative loan amount', () => {
+        expect(() => {
+          service.requestLoan({
+            borrowerId: 'did:mycelix:borrower',
+            amount: -5000,
+            currency: 'MCX',
+            purpose: 'Test',
+            termMonths: 12,
+            interestRate: 0.05,
+          });
+        }).toThrow('Loan amount must be positive');
+      });
+
+      it('should throw for zero loan amount', () => {
+        expect(() => {
+          service.requestLoan({
+            borrowerId: 'did:mycelix:borrower',
+            amount: 0,
+            currency: 'MCX',
+            purpose: 'Test',
+            termMonths: 12,
+            interestRate: 0.05,
+          });
+        }).toThrow('Loan amount must be positive');
+      });
+
+      it('should throw for negative loan term', () => {
+        expect(() => {
+          service.requestLoan({
+            borrowerId: 'did:mycelix:borrower',
+            amount: 5000,
+            currency: 'MCX',
+            purpose: 'Test',
+            termMonths: -6,
+            interestRate: 0.05,
+          });
+        }).toThrow('Loan term must be positive');
+      });
+
+      it('should throw for non-integer loan term', () => {
+        expect(() => {
+          service.requestLoan({
+            borrowerId: 'did:mycelix:borrower',
+            amount: 5000,
+            currency: 'MCX',
+            purpose: 'Test',
+            termMonths: 6.5,
+            interestRate: 0.05,
+          });
+        }).toThrow('Loan term must be a whole number of months');
+      });
+
+      it('should throw for negative interest rate', () => {
+        expect(() => {
+          service.requestLoan({
+            borrowerId: 'did:mycelix:borrower',
+            amount: 5000,
+            currency: 'MCX',
+            purpose: 'Test',
+            termMonths: 12,
+            interestRate: -0.05,
+          });
+        }).toThrow('Interest rate cannot be negative');
+      });
+
+      it('should allow zero interest rate (interest-free loan)', () => {
+        const loan = service.requestLoan({
+          borrowerId: 'did:mycelix:borrower',
+          amount: 1000,
+          currency: 'MCX',
+          purpose: 'Community support',
+          termMonths: 6,
+          interestRate: 0,
+        });
+
+        expect(loan).toBeDefined();
+        expect(loan.interestRate).toBe(0);
+        expect(loan.status).toBe('pending');
+      });
+    });
+
     describe('calculateCreditLimit', () => {
       it('should calculate credit limit based on trust factors', () => {
         const wallet = service.createWallet('did:mycelix:user');

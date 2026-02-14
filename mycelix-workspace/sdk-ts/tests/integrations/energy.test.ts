@@ -318,6 +318,88 @@ describe('Energy Integration', () => {
       });
     });
 
+    describe('error paths and edge cases', () => {
+      it('should throw for negative production in submitReading', () => {
+        const participant = service.registerParticipant('did:mycelix:user', 'prosumer', ['solar'], 10);
+
+        expect(() => {
+          service.submitReading(participant.id, -5, 2, 'solar');
+        }).toThrow('Production cannot be negative');
+      });
+
+      it('should throw for negative consumption in submitReading', () => {
+        const participant = service.registerParticipant('did:mycelix:user', 'prosumer', ['solar'], 10);
+
+        expect(() => {
+          service.submitReading(participant.id, 5, -2, 'solar');
+        }).toThrow('Consumption cannot be negative');
+      });
+
+      it('should throw for NaN production in submitReading', () => {
+        const participant = service.registerParticipant('did:mycelix:user', 'prosumer', ['solar'], 10);
+
+        expect(() => {
+          service.submitReading(participant.id, NaN, 2, 'solar');
+        }).toThrow('Production must be a valid number');
+      });
+
+      it('should throw for negative trade price', () => {
+        const seller = service.registerParticipant('did:mycelix:seller', 'producer', ['solar'], 100);
+        const buyer = service.registerParticipant('did:mycelix:buyer', 'consumer', [], 0);
+
+        service.submitReading(seller.id, 50, 0, 'solar');
+
+        expect(() => {
+          service.tradeEnergy(seller.id, buyer.id, 30, 'solar', -0.10);
+        }).toThrow('Energy price cannot be negative');
+      });
+
+      it('should throw when seller has no credits of the requested source type', () => {
+        const seller = service.registerParticipant('did:mycelix:seller', 'producer', ['solar'], 100);
+        const buyer = service.registerParticipant('did:mycelix:buyer', 'consumer', [], 0);
+
+        service.submitReading(seller.id, 50, 0, 'solar'); // Credits are solar
+
+        expect(() => {
+          service.tradeEnergy(seller.id, buyer.id, 30, 'wind'); // Request wind credits
+        }).toThrow('Insufficient energy credits');
+      });
+
+      it('should handle zero production and zero consumption reading', () => {
+        const participant = service.registerParticipant('did:mycelix:user', 'prosumer', ['solar'], 10);
+
+        const reading = service.submitReading(participant.id, 0, 0, 'solar');
+
+        expect(reading.production).toBe(0);
+        expect(reading.consumption).toBe(0);
+        expect(reading.netExport).toBe(0);
+
+        // Should not issue credits for zero net export
+        const credits = service.getCredits(participant.id);
+        expect(credits.length).toBe(0);
+      });
+
+      it('should not issue credits when consumption exceeds production', () => {
+        const participant = service.registerParticipant('did:mycelix:user', 'prosumer', ['solar'], 10);
+
+        const reading = service.submitReading(participant.id, 2, 8, 'solar');
+
+        expect(reading.netExport).toBe(-6);
+
+        // No credits should be issued for negative net export
+        const credits = service.getCredits(participant.id);
+        expect(credits.length).toBe(0);
+      });
+
+      it('should throw when trading with non-existent seller', () => {
+        const buyer = service.registerParticipant('did:mycelix:buyer', 'consumer', [], 0);
+
+        expect(() => {
+          service.tradeEnergy('participant-fake', buyer.id, 10, 'solar');
+        }).toThrow('Participant not found');
+      });
+    });
+
     describe('getGridStats', () => {
       it('should return aggregated grid statistics', () => {
         const p1 = service.registerParticipant('did:mycelix:p1', 'producer', ['solar'], 100);
