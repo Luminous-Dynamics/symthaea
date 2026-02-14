@@ -21,6 +21,16 @@ use subtle::ConstantTimeEq;
 use mycelix_crypto::AlgorithmId;
 
 // =============================================================================
+// RATE LIMITING CONFIGURATION
+// =============================================================================
+
+/// Maximum failed verification attempts before lockout
+const MAX_FAILED_ATTEMPTS: usize = 5;
+
+/// Rate limit window in microseconds (15 minutes)
+const RATE_LIMIT_WINDOW_MICROS: u64 = 15 * 60 * 1_000_000;
+
+// =============================================================================
 // CROSS-ZOME HELPERS
 // =============================================================================
 
@@ -1557,8 +1567,6 @@ fn verify_security_questions(
     // Query FactorVerification entries linked from the DID to detect brute-force attempts.
     {
         let now_micros = sys_time()?.as_micros() as u64;
-        let fifteen_minutes_micros: u64 = 15 * 60 * 1_000_000;
-        let max_attempts: usize = 5;
 
         // We use the factor_id hash as a lookup key for recent verifications.
         // The factor_id is unique per security question factor.
@@ -1584,7 +1592,7 @@ fn verify_security_questions(
                                 let age = now_micros.saturating_sub(
                                     verification.timestamp.as_micros() as u64
                                 );
-                                if age < fifteen_minutes_micros {
+                                if age < RATE_LIMIT_WINDOW_MICROS {
                                     recent_failures += 1;
                                 }
                             }
@@ -1593,7 +1601,7 @@ fn verify_security_questions(
                 }
             }
 
-            if recent_failures >= max_attempts {
+            if recent_failures >= MAX_FAILED_ATTEMPTS {
                 return Err(wasm_error!(WasmErrorInner::Guest(
                     format!(
                         "Too many failed attempts ({} in last 15 minutes). \
