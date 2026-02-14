@@ -76,3 +76,15 @@ tla/*.jar
 
 # Audio test data (large wav files)
 crates/symthaea-sentinel/test-data/
+
+# Large data files
+LibriSpeech-Alignments.zip
+*.rlib
+
+# Benchmark output
+*_output.txt
+
+# LaTeX byproducts
+papers/latex/*.aux
+papers/latex/*.blg
+papers/latex/*.out
