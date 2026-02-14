@@ -91,6 +91,41 @@ pub struct GuardianVeto {
     pub vetoed_at: Timestamp,
 }
 
+/// Status of a fund allocation
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum AllocationStatus {
+    /// Funds locked in escrow awaiting execution
+    Locked,
+    /// Funds released after successful execution
+    Released,
+    /// Funds returned after veto or expiration
+    Refunded,
+}
+
+/// Fund allocation — tracks locked funds for a proposal's execution
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct FundAllocation {
+    /// Allocation identifier
+    pub id: String,
+    /// Associated proposal ID
+    pub proposal_id: String,
+    /// Associated timelock ID
+    pub timelock_id: String,
+    /// Account the funds are locked from
+    pub source_account: String,
+    /// Amount locked
+    pub amount: f64,
+    /// Currency denomination (e.g., "credits")
+    pub currency: String,
+    /// When funds were locked
+    pub locked_at: Timestamp,
+    /// Current allocation status
+    pub status: AllocationStatus,
+    /// Reason for status change (refund reason, release confirmation, etc.)
+    pub status_reason: Option<String>,
+}
+
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
@@ -98,6 +133,7 @@ pub enum EntryTypes {
     Timelock(Timelock),
     Execution(Execution),
     GuardianVeto(GuardianVeto),
+    FundAllocation(FundAllocation),
 }
 
 #[hdk_link_types]
@@ -110,6 +146,8 @@ pub enum LinkTypes {
     PendingTimelocks,
     /// Guardian to vetoes
     GuardianToVeto,
+    /// Proposal to fund allocation
+    ProposalToFundAllocation,
 }
 
 /// HDI 0.7 single validation callback using FlatOp pattern
@@ -122,6 +160,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Timelock(timelock) => validate_create_timelock(action, timelock),
                 EntryTypes::Execution(execution) => validate_create_execution(action, execution),
                 EntryTypes::GuardianVeto(veto) => validate_create_veto(action, veto),
+                EntryTypes::FundAllocation(alloc) => validate_create_fund_allocation(action, alloc),
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -145,6 +184,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         "Vetoes cannot be modified".into(),
                     ))
                 }
+                EntryTypes::FundAllocation(alloc) => {
+                    validate_update_fund_allocation(action, alloc, original_action_hash)
+                }
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -159,6 +201,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::TimelockToExecution => Ok(ValidateCallbackResult::Valid),
             LinkTypes::PendingTimelocks => Ok(ValidateCallbackResult::Valid),
             LinkTypes::GuardianToVeto => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ProposalToFundAllocation => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
             link_type,
@@ -288,4 +331,70 @@ fn validate_create_veto(
     }
 
     Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate fund allocation creation
+fn validate_create_fund_allocation(
+    _action: Create,
+    alloc: FundAllocation,
+) -> ExternResult<ValidateCallbackResult> {
+    if alloc.amount <= 0.0 || !alloc.amount.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fund allocation amount must be positive and finite".into(),
+        ));
+    }
+    if alloc.source_account.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Source account is required".into(),
+        ));
+    }
+    if alloc.currency.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Currency is required".into(),
+        ));
+    }
+    if alloc.status != AllocationStatus::Locked {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Initial allocation status must be Locked".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate fund allocation update (status transitions)
+fn validate_update_fund_allocation(
+    _action: Update,
+    alloc: FundAllocation,
+    original_action_hash: ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash)?;
+    let original: FundAllocation = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original fund allocation not found".into()
+        )))?;
+
+    // Cannot change proposal or amount
+    if alloc.proposal_id != original.proposal_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change allocation proposal ID".into(),
+        ));
+    }
+    if (alloc.amount - original.amount).abs() > f64::EPSILON {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change allocation amount".into(),
+        ));
+    }
+
+    // Valid transitions: Locked → Released, Locked → Refunded
+    match (&original.status, &alloc.status) {
+        (AllocationStatus::Locked, AllocationStatus::Released) => Ok(ValidateCallbackResult::Valid),
+        (AllocationStatus::Locked, AllocationStatus::Refunded) => Ok(ValidateCallbackResult::Valid),
+        _ => Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid allocation status transition: {:?} → {:?}",
+            original.status, alloc.status
+        ))),
+    }
 }
