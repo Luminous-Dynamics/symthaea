@@ -164,6 +164,8 @@ fn validate_order(o: Order) -> ExternResult<ValidateCallbackResult> {
 mod tests {
     use super::*;
 
+    // ── Helpers ──────────────────────────────────────────────────────────
+
     fn fake_agent() -> AgentPubKey {
         AgentPubKey::from_raw_36(vec![0u8; 36])
     }
@@ -183,44 +185,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn valid_market_passes() {
-        assert_eq!(validate_market(valid_market()).unwrap(), ValidateCallbackResult::Valid);
-    }
-
-    #[test]
-    fn market_empty_id_rejected() {
-        let mut m = valid_market();
-        m.id = String::new();
-        assert!(matches!(validate_market(m).unwrap(), ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn market_empty_name_rejected() {
-        let mut m = valid_market();
-        m.name = String::new();
-        assert!(matches!(validate_market(m).unwrap(), ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn market_invalid_lat_rejected() {
-        let mut m = valid_market();
-        m.location_lat = -91.0;
-        assert!(matches!(validate_market(m).unwrap(), ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn market_all_types_valid() {
-        for mt in [MarketType::Farmers, MarketType::CSA, MarketType::FoodBank, MarketType::CoOp] {
-            let mut m = valid_market();
-            m.market_type = mt;
-            assert_eq!(validate_market(m).unwrap(), ValidateCallbackResult::Valid);
-        }
-    }
-
-    #[test]
-    fn valid_listing_passes() {
-        let l = Listing {
+    fn valid_listing() -> Listing {
+        Listing {
             market_hash: fake_action_hash(),
             producer: fake_agent(),
             product_name: "Heirloom Tomatoes".into(),
@@ -228,85 +194,418 @@ mod tests {
             price_per_kg: 5.50,
             available_from: 1700000000,
             status: ListingStatus::Available,
-        };
-        assert_eq!(validate_listing(l).unwrap(), ValidateCallbackResult::Valid);
+        }
+    }
+
+    fn valid_order() -> Order {
+        Order {
+            listing_hash: fake_action_hash(),
+            buyer: fake_agent(),
+            quantity_kg: 5.0,
+            status: OrderStatus::Pending,
+        }
+    }
+
+    fn assert_valid(result: ExternResult<ValidateCallbackResult>) {
+        match result {
+            Ok(ValidateCallbackResult::Valid) => {}
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                panic!("Expected Valid, got Invalid: {msg}")
+            }
+            other => panic!("Expected Valid, got {other:?}"),
+        }
+    }
+
+    fn assert_invalid(result: ExternResult<ValidateCallbackResult>, expected_substr: &str) {
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                assert!(
+                    msg.contains(expected_substr),
+                    "Expected Invalid containing '{expected_substr}', got: '{msg}'"
+                );
+            }
+            Ok(ValidateCallbackResult::Valid) => {
+                panic!("Expected Invalid containing '{expected_substr}', got Valid")
+            }
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
+    }
+
+    // ── Serde roundtrip tests ───────────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_market_type() {
+        let types = vec![MarketType::Farmers, MarketType::CSA, MarketType::FoodBank, MarketType::CoOp];
+        for t in &types {
+            let json = serde_json::to_string(t).unwrap();
+            let back: MarketType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, t);
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_listing_status() {
+        let statuses = vec![
+            ListingStatus::Available, ListingStatus::Reserved,
+            ListingStatus::Sold, ListingStatus::Expired,
+        ];
+        for s in &statuses {
+            let json = serde_json::to_string(s).unwrap();
+            let back: ListingStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, s);
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_order_status() {
+        let statuses = vec![
+            OrderStatus::Pending, OrderStatus::Confirmed,
+            OrderStatus::Fulfilled, OrderStatus::Cancelled,
+        ];
+        for s in &statuses {
+            let json = serde_json::to_string(s).unwrap();
+            let back: OrderStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, s);
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_market() {
+        let m = valid_market();
+        let json = serde_json::to_string(&m).unwrap();
+        let back: Market = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, m);
+    }
+
+    #[test]
+    fn serde_roundtrip_listing() {
+        let l = valid_listing();
+        let json = serde_json::to_string(&l).unwrap();
+        let back: Listing = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, l);
+    }
+
+    #[test]
+    fn serde_roundtrip_order() {
+        let o = valid_order();
+        let json = serde_json::to_string(&o).unwrap();
+        let back: Order = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, o);
+    }
+
+    // ── validate_market: id ─────────────────────────────────────────────
+
+    #[test]
+    fn valid_market_passes() {
+        assert_valid(validate_market(valid_market()));
+    }
+
+    #[test]
+    fn market_empty_id_rejected() {
+        let mut m = valid_market();
+        m.id = String::new();
+        assert_invalid(validate_market(m), "Market ID cannot be empty");
+    }
+
+    #[test]
+    fn market_whitespace_id_accepted() {
+        let mut m = valid_market();
+        m.id = " ".into();
+        assert_valid(validate_market(m));
+    }
+
+    // ── validate_market: name ───────────────────────────────────────────
+
+    #[test]
+    fn market_empty_name_rejected() {
+        let mut m = valid_market();
+        m.name = String::new();
+        assert_invalid(validate_market(m), "Market name cannot be empty");
+    }
+
+    #[test]
+    fn market_whitespace_name_accepted() {
+        let mut m = valid_market();
+        m.name = "  ".into();
+        assert_valid(validate_market(m));
+    }
+
+    // ── validate_market: latitude ───────────────────────────────────────
+
+    #[test]
+    fn market_lat_too_low_rejected() {
+        let mut m = valid_market();
+        m.location_lat = -91.0;
+        assert_invalid(validate_market(m), "Latitude must be between -90 and 90");
+    }
+
+    #[test]
+    fn market_lat_too_high_rejected() {
+        let mut m = valid_market();
+        m.location_lat = 91.0;
+        assert_invalid(validate_market(m), "Latitude must be between -90 and 90");
+    }
+
+    #[test]
+    fn market_lat_at_boundary_neg90_valid() {
+        let mut m = valid_market();
+        m.location_lat = -90.0;
+        assert_valid(validate_market(m));
+    }
+
+    #[test]
+    fn market_lat_at_boundary_pos90_valid() {
+        let mut m = valid_market();
+        m.location_lat = 90.0;
+        assert_valid(validate_market(m));
+    }
+
+    #[test]
+    fn market_lat_zero_valid() {
+        let mut m = valid_market();
+        m.location_lat = 0.0;
+        assert_valid(validate_market(m));
+    }
+
+    // ── validate_market: longitude ──────────────────────────────────────
+
+    #[test]
+    fn market_lon_too_low_rejected() {
+        let mut m = valid_market();
+        m.location_lon = -181.0;
+        assert_invalid(validate_market(m), "Longitude must be between -180 and 180");
+    }
+
+    #[test]
+    fn market_lon_too_high_rejected() {
+        let mut m = valid_market();
+        m.location_lon = 181.0;
+        assert_invalid(validate_market(m), "Longitude must be between -180 and 180");
+    }
+
+    #[test]
+    fn market_lon_at_boundary_neg180_valid() {
+        let mut m = valid_market();
+        m.location_lon = -180.0;
+        assert_valid(validate_market(m));
+    }
+
+    #[test]
+    fn market_lon_at_boundary_pos180_valid() {
+        let mut m = valid_market();
+        m.location_lon = 180.0;
+        assert_valid(validate_market(m));
+    }
+
+    #[test]
+    fn market_lon_zero_valid() {
+        let mut m = valid_market();
+        m.location_lon = 0.0;
+        assert_valid(validate_market(m));
+    }
+
+    // ── validate_market: type variants ──────────────────────────────────
+
+    #[test]
+    fn market_all_types_valid() {
+        for mt in [MarketType::Farmers, MarketType::CSA, MarketType::FoodBank, MarketType::CoOp] {
+            let mut m = valid_market();
+            m.market_type = mt;
+            assert_valid(validate_market(m));
+        }
+    }
+
+    // ── validate_market: combined invalid ───────────────────────────────
+
+    #[test]
+    fn market_empty_id_with_empty_name_rejects_id_first() {
+        let mut m = valid_market();
+        m.id = String::new();
+        m.name = String::new();
+        assert_invalid(validate_market(m), "Market ID cannot be empty");
+    }
+
+    #[test]
+    fn market_empty_name_with_invalid_lat_rejects_name_first() {
+        let mut m = valid_market();
+        m.name = String::new();
+        m.location_lat = 91.0;
+        assert_invalid(validate_market(m), "Market name cannot be empty");
+    }
+
+    // ── validate_market: schedule is not validated ───────────────────────
+
+    #[test]
+    fn market_empty_schedule_accepted() {
+        let mut m = valid_market();
+        m.schedule = String::new();
+        assert_valid(validate_market(m));
+    }
+
+    // ── validate_listing: product_name ──────────────────────────────────
+
+    #[test]
+    fn valid_listing_passes() {
+        assert_valid(validate_listing(valid_listing()));
     }
 
     #[test]
     fn listing_empty_product_rejected() {
-        let l = Listing {
-            market_hash: fake_action_hash(),
-            producer: fake_agent(),
-            product_name: String::new(),
-            quantity_kg: 10.0,
-            price_per_kg: 5.50,
-            available_from: 1700000000,
-            status: ListingStatus::Available,
-        };
-        assert!(matches!(validate_listing(l).unwrap(), ValidateCallbackResult::Invalid(_)));
+        let mut l = valid_listing();
+        l.product_name = String::new();
+        assert_invalid(validate_listing(l), "Product name cannot be empty");
     }
+
+    #[test]
+    fn listing_whitespace_product_accepted() {
+        let mut l = valid_listing();
+        l.product_name = " ".into();
+        assert_valid(validate_listing(l));
+    }
+
+    // ── validate_listing: quantity_kg ────────────────────────────────────
 
     #[test]
     fn listing_zero_quantity_rejected() {
-        let l = Listing {
-            market_hash: fake_action_hash(),
-            producer: fake_agent(),
-            product_name: "Basil".into(),
-            quantity_kg: 0.0,
-            price_per_kg: 3.00,
-            available_from: 1700000000,
-            status: ListingStatus::Available,
-        };
-        assert!(matches!(validate_listing(l).unwrap(), ValidateCallbackResult::Invalid(_)));
+        let mut l = valid_listing();
+        l.quantity_kg = 0.0;
+        assert_invalid(validate_listing(l), "Quantity must be positive");
     }
 
     #[test]
+    fn listing_negative_quantity_rejected() {
+        let mut l = valid_listing();
+        l.quantity_kg = -10.0;
+        assert_invalid(validate_listing(l), "Quantity must be positive");
+    }
+
+    #[test]
+    fn listing_barely_positive_quantity_valid() {
+        let mut l = valid_listing();
+        l.quantity_kg = 0.001;
+        assert_valid(validate_listing(l));
+    }
+
+    #[test]
+    fn listing_large_quantity_valid() {
+        let mut l = valid_listing();
+        l.quantity_kg = 99999.0;
+        assert_valid(validate_listing(l));
+    }
+
+    // ── validate_listing: price_per_kg ──────────────────────────────────
+
+    #[test]
     fn listing_negative_price_rejected() {
-        let l = Listing {
-            market_hash: fake_action_hash(),
-            producer: fake_agent(),
-            product_name: "Basil".into(),
-            quantity_kg: 5.0,
-            price_per_kg: -1.0,
-            available_from: 1700000000,
-            status: ListingStatus::Available,
-        };
-        assert!(matches!(validate_listing(l).unwrap(), ValidateCallbackResult::Invalid(_)));
+        let mut l = valid_listing();
+        l.price_per_kg = -1.0;
+        assert_invalid(validate_listing(l), "Price cannot be negative");
+    }
+
+    #[test]
+    fn listing_barely_negative_price_rejected() {
+        let mut l = valid_listing();
+        l.price_per_kg = -0.001;
+        assert_invalid(validate_listing(l), "Price cannot be negative");
     }
 
     #[test]
     fn listing_zero_price_valid() {
-        let l = Listing {
-            market_hash: fake_action_hash(),
-            producer: fake_agent(),
-            product_name: "Donated Produce".into(),
-            quantity_kg: 20.0,
-            price_per_kg: 0.0,
-            available_from: 1700000000,
-            status: ListingStatus::Available,
-        };
-        assert_eq!(validate_listing(l).unwrap(), ValidateCallbackResult::Valid);
+        let mut l = valid_listing();
+        l.price_per_kg = 0.0;
+        assert_valid(validate_listing(l));
     }
 
     #[test]
+    fn listing_large_price_valid() {
+        let mut l = valid_listing();
+        l.price_per_kg = 9999.0;
+        assert_valid(validate_listing(l));
+    }
+
+    // ── validate_listing: status variants ───────────────────────────────
+
+    #[test]
+    fn listing_all_statuses_valid() {
+        for status in [ListingStatus::Available, ListingStatus::Reserved,
+                       ListingStatus::Sold, ListingStatus::Expired] {
+            let mut l = valid_listing();
+            l.status = status;
+            assert_valid(validate_listing(l));
+        }
+    }
+
+    // ── validate_listing: combined invalid ──────────────────────────────
+
+    #[test]
+    fn listing_empty_product_with_zero_quantity_rejects_product_first() {
+        let mut l = valid_listing();
+        l.product_name = String::new();
+        l.quantity_kg = 0.0;
+        assert_invalid(validate_listing(l), "Product name cannot be empty");
+    }
+
+    // ── validate_order: quantity_kg ─────────────────────────────────────
+
+    #[test]
     fn valid_order_passes() {
-        let o = Order {
-            listing_hash: fake_action_hash(),
-            buyer: fake_agent(),
-            quantity_kg: 5.0,
-            status: OrderStatus::Pending,
-        };
-        assert_eq!(validate_order(o).unwrap(), ValidateCallbackResult::Valid);
+        assert_valid(validate_order(valid_order()));
     }
 
     #[test]
     fn order_zero_quantity_rejected() {
-        let o = Order {
-            listing_hash: fake_action_hash(),
-            buyer: fake_agent(),
-            quantity_kg: 0.0,
-            status: OrderStatus::Pending,
-        };
-        assert!(matches!(validate_order(o).unwrap(), ValidateCallbackResult::Invalid(_)));
+        let mut o = valid_order();
+        o.quantity_kg = 0.0;
+        assert_invalid(validate_order(o), "Order quantity must be positive");
+    }
+
+    #[test]
+    fn order_negative_quantity_rejected() {
+        let mut o = valid_order();
+        o.quantity_kg = -5.0;
+        assert_invalid(validate_order(o), "Order quantity must be positive");
+    }
+
+    #[test]
+    fn order_barely_positive_quantity_valid() {
+        let mut o = valid_order();
+        o.quantity_kg = 0.001;
+        assert_valid(validate_order(o));
+    }
+
+    #[test]
+    fn order_large_quantity_valid() {
+        let mut o = valid_order();
+        o.quantity_kg = 99999.0;
+        assert_valid(validate_order(o));
+    }
+
+    #[test]
+    fn order_barely_negative_quantity_rejected() {
+        let mut o = valid_order();
+        o.quantity_kg = -0.001;
+        assert_invalid(validate_order(o), "Order quantity must be positive");
+    }
+
+    // ── validate_order: status variants ─────────────────────────────────
+
+    #[test]
+    fn order_all_statuses_valid() {
+        for status in [OrderStatus::Pending, OrderStatus::Confirmed,
+                       OrderStatus::Fulfilled, OrderStatus::Cancelled] {
+            let mut o = valid_order();
+            o.status = status;
+            assert_valid(validate_order(o));
+        }
+    }
+
+    // ── Anchor test ─────────────────────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_anchor() {
+        let a = Anchor("all_markets".to_string());
+        let json = serde_json::to_string(&a).unwrap();
+        let back: Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, a);
     }
 }

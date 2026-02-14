@@ -267,4 +267,200 @@ mod tests {
         assert_eq!(decoded.capacity_kg, 500.0);
         assert_eq!(decoded.storage_type, StorageType::RootCellar);
     }
+
+    // ========================================================================
+    // Clone/equality tests
+    // ========================================================================
+
+    #[test]
+    fn preservation_batch_clone_equals_original() {
+        let batch = PreservationBatch {
+            id: "batch-clone".to_string(),
+            source_crop_hash: Some(ActionHash::from_raw_36(vec![1u8; 36])),
+            method: "Smoking".to_string(),
+            quantity_kg: 3.5,
+            started_at: 1700000000,
+            expected_ready: 1700500000,
+            status: BatchStatus::InProgress,
+            notes: Some("Hickory chips".to_string()),
+        };
+        assert_eq!(batch, batch.clone());
+    }
+
+    #[test]
+    fn preservation_batch_ne_different_status() {
+        let a = PreservationBatch {
+            id: "batch-ne".to_string(),
+            source_crop_hash: None,
+            method: "Drying".to_string(),
+            quantity_kg: 1.0,
+            started_at: 0,
+            expected_ready: 1,
+            status: BatchStatus::InProgress,
+            notes: None,
+        };
+        let mut b = a.clone();
+        b.status = BatchStatus::Failed;
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn preservation_method_clone_equals_original() {
+        let method = PreservationMethod {
+            name: "Canning".to_string(),
+            description: "Seal in jars".to_string(),
+            shelf_life_days: 730,
+            equipment_needed: vec!["Jars".to_string(), "Lids".to_string()],
+            skill_level: SkillLevel::Advanced,
+        };
+        assert_eq!(method, method.clone());
+    }
+
+    #[test]
+    fn storage_unit_clone_equals_original() {
+        let unit = StorageUnit {
+            id: "s-clone".to_string(),
+            name: "Pantry".to_string(),
+            capacity_kg: 50.0,
+            storage_type: StorageType::Pantry,
+            steward: fake_agent(),
+        };
+        assert_eq!(unit, unit.clone());
+    }
+
+    // ========================================================================
+    // Edge case tests
+    // ========================================================================
+
+    #[test]
+    fn preservation_batch_with_source_crop_hash() {
+        let batch = PreservationBatch {
+            id: "batch-crop".to_string(),
+            source_crop_hash: Some(ActionHash::from_raw_36(vec![99u8; 36])),
+            method: "Pickling".to_string(),
+            quantity_kg: 10.0,
+            started_at: 1700000000,
+            expected_ready: 1702000000,
+            status: BatchStatus::Completed,
+            notes: Some("Pickled cucumbers".to_string()),
+        };
+        let json = serde_json::to_string(&batch).unwrap();
+        let decoded: PreservationBatch = serde_json::from_str(&json).unwrap();
+        assert!(decoded.source_crop_hash.is_some());
+        assert_eq!(decoded.status, BatchStatus::Completed);
+    }
+
+    #[test]
+    fn preservation_batch_zero_quantity_serde() {
+        let batch = PreservationBatch {
+            id: "batch-zero".to_string(),
+            source_crop_hash: None,
+            method: "Freeze-drying".to_string(),
+            quantity_kg: 0.0,
+            started_at: 0,
+            expected_ready: 0,
+            status: BatchStatus::Failed,
+            notes: None,
+        };
+        let json = serde_json::to_string(&batch).unwrap();
+        let decoded: PreservationBatch = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity_kg, 0.0);
+        assert_eq!(decoded.status, BatchStatus::Failed);
+    }
+
+    #[test]
+    fn preservation_batch_consumed_status_serde() {
+        let batch = PreservationBatch {
+            id: "batch-consumed".to_string(),
+            source_crop_hash: None,
+            method: "Fermenting".to_string(),
+            quantity_kg: 2.5,
+            started_at: 1700000000,
+            expected_ready: 1700500000,
+            status: BatchStatus::Consumed,
+            notes: Some("Kimchi consumed by community".to_string()),
+        };
+        let json = serde_json::to_string(&batch).unwrap();
+        let decoded: PreservationBatch = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, BatchStatus::Consumed);
+    }
+
+    #[test]
+    fn preservation_method_empty_equipment_serde() {
+        let method = PreservationMethod {
+            name: "Sun drying".to_string(),
+            description: "Dry in direct sunlight".to_string(),
+            shelf_life_days: 90,
+            equipment_needed: vec![],
+            skill_level: SkillLevel::Beginner,
+        };
+        let json = serde_json::to_string(&method).unwrap();
+        let decoded: PreservationMethod = serde_json::from_str(&json).unwrap();
+        assert!(decoded.equipment_needed.is_empty());
+    }
+
+    #[test]
+    fn preservation_method_u32_max_shelf_life() {
+        let method = PreservationMethod {
+            name: "Ancient method".to_string(),
+            description: "Lasts forever".to_string(),
+            shelf_life_days: u32::MAX,
+            equipment_needed: vec!["Magic jar".to_string()],
+            skill_level: SkillLevel::Advanced,
+        };
+        let json = serde_json::to_string(&method).unwrap();
+        let decoded: PreservationMethod = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.shelf_life_days, u32::MAX);
+    }
+
+    #[test]
+    fn storage_unit_all_types_serde() {
+        for st in [
+            StorageType::RootCellar,
+            StorageType::Cellar,
+            StorageType::Freezer,
+            StorageType::Dehydrator,
+            StorageType::Fermenter,
+            StorageType::Pantry,
+        ] {
+            let unit = StorageUnit {
+                id: "s".to_string(),
+                name: "T".to_string(),
+                capacity_kg: 1.0,
+                storage_type: st.clone(),
+                steward: fake_agent(),
+            };
+            let json = serde_json::to_string(&unit).unwrap();
+            let decoded: StorageUnit = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.storage_type, st);
+        }
+    }
+
+    #[test]
+    fn preservation_method_unicode_name_serde() {
+        let method = PreservationMethod {
+            name: "\u{767D}\u{83DC}\u{306E}\u{6F2C}\u{7269}".to_string(),
+            description: "Japanese pickling".to_string(),
+            shelf_life_days: 30,
+            equipment_needed: vec!["\u{6F2C}\u{7269}\u{77F3}".to_string()],
+            skill_level: SkillLevel::Intermediate,
+        };
+        let json = serde_json::to_string(&method).unwrap();
+        let decoded: PreservationMethod = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "\u{767D}\u{83DC}\u{306E}\u{6F2C}\u{7269}");
+    }
+
+    #[test]
+    fn storage_unit_large_capacity_serde() {
+        let unit = StorageUnit {
+            id: "s-big".to_string(),
+            name: "Warehouse".to_string(),
+            capacity_kg: f64::MAX,
+            storage_type: StorageType::Freezer,
+            steward: fake_agent(),
+        };
+        let json = serde_json::to_string(&unit).unwrap();
+        let decoded: StorageUnit = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.capacity_kg, f64::MAX);
+    }
 }

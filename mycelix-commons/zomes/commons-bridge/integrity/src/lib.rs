@@ -90,6 +90,8 @@ fn validate_event(event: &BridgeEventEntry) -> ExternResult<ValidateCallbackResu
 mod tests {
     use super::*;
 
+    // ── Helpers ──────────────────────────────────────────────────────────
+
     fn fake_agent() -> AgentPubKey {
         AgentPubKey::from_raw_36(vec![0u8; 36])
     }
@@ -118,7 +120,7 @@ mod tests {
         }
     }
 
-    // ---- VALID_DOMAINS ----
+    // ── VALID_DOMAINS ───────────────────────────────────────────────────
 
     #[test]
     fn valid_domains_covers_all_commons_domains() {
@@ -136,7 +138,14 @@ mod tests {
         assert_eq!(VALID_DOMAINS.len(), 7, "expected 7 commons domains");
     }
 
-    // ---- Query validation per domain ----
+    #[test]
+    fn valid_domains_does_not_contain_civic_domains() {
+        assert!(!VALID_DOMAINS.contains(&"justice"), "justice is a civic domain");
+        assert!(!VALID_DOMAINS.contains(&"emergency"), "emergency is a civic domain");
+        assert!(!VALID_DOMAINS.contains(&"media"), "media is a civic domain");
+    }
+
+    // ── Query validation: domain ────────────────────────────────────────
 
     #[test]
     fn query_all_commons_domains_valid() {
@@ -151,7 +160,7 @@ mod tests {
     }
 
     #[test]
-    fn query_civic_domain_rejected() {
+    fn query_civic_domain_justice_rejected() {
         let q = make_query("justice", "{}");
         let err = validate_query_fields(&q, VALID_DOMAINS).unwrap_err();
         assert!(err.contains("Invalid domain"));
@@ -159,10 +168,51 @@ mod tests {
     }
 
     #[test]
-    fn query_oversized_params_rejected() {
-        let big = "x".repeat(8193);
-        let q = make_query("property", &big);
+    fn query_civic_domain_emergency_rejected() {
+        let q = make_query("emergency", "{}");
+        let err = validate_query_fields(&q, VALID_DOMAINS).unwrap_err();
+        assert!(err.contains("Invalid domain"));
+    }
+
+    #[test]
+    fn query_civic_domain_media_rejected() {
+        let q = make_query("media", "{}");
+        let err = validate_query_fields(&q, VALID_DOMAINS).unwrap_err();
+        assert!(err.contains("Invalid domain"));
+    }
+
+    #[test]
+    fn query_empty_domain_rejected() {
+        let q = make_query("", "{}");
         assert!(validate_query_fields(&q, VALID_DOMAINS).is_err());
+    }
+
+    #[test]
+    fn query_nonexistent_domain_rejected() {
+        let q = make_query("finance", "{}");
+        let err = validate_query_fields(&q, VALID_DOMAINS).unwrap_err();
+        assert!(err.contains("Invalid domain"));
+    }
+
+    #[test]
+    fn query_case_sensitive_domain_rejected() {
+        let q = make_query("Property", "{}");
+        let err = validate_query_fields(&q, VALID_DOMAINS).unwrap_err();
+        assert!(err.contains("Invalid domain"));
+    }
+
+    // ── Query validation: params ────────────────────────────────────────
+
+    #[test]
+    fn query_empty_params_accepted() {
+        let q = make_query("property", "");
+        assert!(validate_query_fields(&q, VALID_DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn query_valid_json_params_accepted() {
+        let q = make_query("property", r#"{"key":"value","nested":{"a":1}}"#);
+        assert!(validate_query_fields(&q, VALID_DOMAINS).is_ok());
     }
 
     #[test]
@@ -172,7 +222,56 @@ mod tests {
         assert!(err.contains("valid JSON"));
     }
 
-    // ---- Event validation per domain ----
+    #[test]
+    fn query_params_at_boundary_8192_accepted() {
+        let wrapper_len = r#"{"k":""}"#.len();
+        let padding = "x".repeat(8192 - wrapper_len);
+        let json = format!(r#"{{"k":"{}"}}"#, padding);
+        assert_eq!(json.len(), 8192);
+        let q = make_query("property", &json);
+        assert!(validate_query_fields(&q, VALID_DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn query_oversized_params_rejected() {
+        let big = "x".repeat(8193);
+        let q = make_query("property", &big);
+        let err = validate_query_fields(&q, VALID_DOMAINS).unwrap_err();
+        assert!(err.contains("8192"));
+    }
+
+    #[test]
+    fn query_json_array_params_accepted() {
+        let q = make_query("care", r#"[1, 2, 3]"#);
+        assert!(validate_query_fields(&q, VALID_DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn query_json_string_params_accepted() {
+        let q = make_query("water", r#""just a string""#);
+        assert!(validate_query_fields(&q, VALID_DOMAINS).is_ok());
+    }
+
+    // ── Query validation: optional fields ───────────────────────────────
+
+    #[test]
+    fn query_with_result_and_success() {
+        let mut q = make_query("property", "{}");
+        q.result = Some("resolved data".into());
+        q.resolved_at = Some(Timestamp::from_micros(1_000_000));
+        q.success = Some(true);
+        assert!(validate_query_fields(&q, VALID_DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn query_with_failed_result() {
+        let mut q = make_query("housing", "{}");
+        q.result = Some("error: not found".into());
+        q.success = Some(false);
+        assert!(validate_query_fields(&q, VALID_DOMAINS).is_ok());
+    }
+
+    // ── Event validation: domain ────────────────────────────────────────
 
     #[test]
     fn event_all_commons_domains_valid() {
@@ -187,28 +286,138 @@ mod tests {
     }
 
     #[test]
-    fn event_civic_domain_rejected() {
+    fn event_civic_domain_emergency_rejected() {
         let e = make_event("emergency", "{}");
         let err = validate_event_fields(&e, VALID_DOMAINS).unwrap_err();
         assert!(err.contains("Invalid domain"));
     }
 
     #[test]
-    fn event_oversized_payload_rejected() {
-        let big = "x".repeat(8193);
-        let e = make_event("water", &big);
+    fn event_civic_domain_justice_rejected() {
+        let e = make_event("justice", "{}");
+        let err = validate_event_fields(&e, VALID_DOMAINS).unwrap_err();
+        assert!(err.contains("Invalid domain"));
+    }
+
+    #[test]
+    fn event_civic_domain_media_rejected() {
+        let e = make_event("media", "{}");
+        let err = validate_event_fields(&e, VALID_DOMAINS).unwrap_err();
+        assert!(err.contains("Invalid domain"));
+    }
+
+    #[test]
+    fn event_empty_domain_rejected() {
+        let e = make_event("", "{}");
         assert!(validate_event_fields(&e, VALID_DOMAINS).is_err());
     }
 
     #[test]
-    fn event_too_many_related_hashes_rejected() {
+    fn event_nonexistent_domain_rejected() {
+        let e = make_event("governance", "{}");
+        let err = validate_event_fields(&e, VALID_DOMAINS).unwrap_err();
+        assert!(err.contains("Invalid domain"));
+    }
+
+    #[test]
+    fn event_case_sensitive_domain_rejected() {
+        let e = make_event("Water", "{}");
+        let err = validate_event_fields(&e, VALID_DOMAINS).unwrap_err();
+        assert!(err.contains("Invalid domain"));
+    }
+
+    // ── Event validation: payload ───────────────────────────────────────
+
+    #[test]
+    fn event_empty_payload_accepted() {
+        let e = make_event("property", "");
+        assert!(validate_event_fields(&e, VALID_DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn event_payload_at_boundary_8192_accepted() {
+        let payload = "x".repeat(8192);
+        let e = make_event("property", &payload);
+        assert!(validate_event_fields(&e, VALID_DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn event_oversized_payload_rejected() {
+        let big = "x".repeat(8193);
+        let e = make_event("water", &big);
+        let err = validate_event_fields(&e, VALID_DOMAINS).unwrap_err();
+        assert!(err.contains("8192"));
+    }
+
+    // ── Event validation: related_hashes ────────────────────────────────
+
+    #[test]
+    fn event_zero_hashes_accepted() {
+        let e = make_event("care", "{}");
+        assert!(validate_event_fields(&e, VALID_DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn event_exactly_20_hashes_accepted() {
+        let mut e = make_event("care", "{}");
+        e.related_hashes = (0..20).map(|i| format!("hash_{}", i)).collect();
+        assert!(validate_event_fields(&e, VALID_DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn event_21_hashes_rejected() {
         let mut e = make_event("food", "{}");
         e.related_hashes = (0..21).map(|i| format!("hash_{}", i)).collect();
         let err = validate_event_fields(&e, VALID_DOMAINS).unwrap_err();
         assert!(err.contains("20 related hashes"));
     }
 
-    // ---- Type alias ----
+    #[test]
+    fn event_one_hash_accepted() {
+        let mut e = make_event("transport", "{}");
+        e.related_hashes = vec!["single_hash".into()];
+        assert!(validate_event_fields(&e, VALID_DOMAINS).is_ok());
+    }
+
+    // ── Serde roundtrip tests ───────────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_query() {
+        let q = make_query("property", r#"{"key":"value"}"#);
+        let json = serde_json::to_string(&q).unwrap();
+        let back: BridgeQueryEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, q);
+    }
+
+    #[test]
+    fn serde_roundtrip_query_with_result() {
+        let mut q = make_query("housing", "{}");
+        q.result = Some("data here".into());
+        q.resolved_at = Some(Timestamp::from_micros(5_000_000));
+        q.success = Some(true);
+        let json = serde_json::to_string(&q).unwrap();
+        let back: BridgeQueryEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, q);
+    }
+
+    #[test]
+    fn serde_roundtrip_event() {
+        let mut e = make_event("care", r#"{"action":"help"}"#);
+        e.related_hashes = vec!["hash_a".into(), "hash_b".into()];
+        let json = serde_json::to_string(&e).unwrap();
+        let back: BridgeEventEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, e);
+    }
+
+    #[test]
+    fn serde_roundtrip_event_no_hashes() {
+        let e = make_event("mutualaid", "{}");
+        let json = serde_json::to_string(&e).unwrap();
+        let back: BridgeEventEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, e);
+    }
+
+    // ── Type alias tests ────────────────────────────────────────────────
 
     #[test]
     fn stored_query_alias_is_bridge_query() {
@@ -220,5 +429,15 @@ mod tests {
     fn stored_event_alias_is_bridge_event() {
         let e = make_event("property", "{}");
         let _stored: StoredEvent = e;
+    }
+
+    // ── Anchor test ─────────────────────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_anchor() {
+        let a = Anchor("all_queries".to_string());
+        let json = serde_json::to_string(&a).unwrap();
+        let back: Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, a);
     }
 }

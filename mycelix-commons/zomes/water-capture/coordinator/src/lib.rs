@@ -392,4 +392,332 @@ mod tests {
             assert_eq!(variant, back);
         }
     }
+
+    // ========================================================================
+    // Entry type serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn harvest_system_full_serde_roundtrip() {
+        let sys = HarvestSystem {
+            id: "hs-001".to_string(),
+            name: "Roof Catchment Alpha".to_string(),
+            system_type: HarvestType::RoofRainwater,
+            capacity_liters: 5_000,
+            location_lat: 35.6762,
+            location_lon: 139.6503,
+            owner: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            installed_at: Timestamp::from_micros(1_700_000_000),
+            catchment_area_sqm: Some(200),
+            efficiency_percent: 85,
+        };
+        let json = serde_json::to_string(&sys).unwrap();
+        let decoded: HarvestSystem = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "hs-001");
+        assert_eq!(decoded.system_type, HarvestType::RoofRainwater);
+        assert_eq!(decoded.capacity_liters, 5_000);
+        assert_eq!(decoded.catchment_area_sqm, Some(200));
+        assert_eq!(decoded.efficiency_percent, 85);
+    }
+
+    #[test]
+    fn harvest_system_none_catchment_serde() {
+        let sys = HarvestSystem {
+            id: "hs-fog".to_string(),
+            name: "Fog Net".to_string(),
+            system_type: HarvestType::FogCollection,
+            capacity_liters: 100,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            installed_at: Timestamp::from_micros(0),
+            catchment_area_sqm: None,
+            efficiency_percent: 10,
+        };
+        let json = serde_json::to_string(&sys).unwrap();
+        let decoded: HarvestSystem = serde_json::from_str(&json).unwrap();
+        assert!(decoded.catchment_area_sqm.is_none());
+    }
+
+    #[test]
+    fn storage_tank_full_serde_roundtrip() {
+        let tank = StorageTank {
+            id: "tank-001".to_string(),
+            name: "Underground Cistern".to_string(),
+            capacity_liters: 10_000,
+            current_level_liters: 7_500,
+            tank_type: TankType::Underground,
+            connected_system: Some(fake_action_hash()),
+            location_lat: 40.0,
+            location_lon: -74.0,
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&tank).unwrap();
+        let decoded: StorageTank = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "tank-001");
+        assert_eq!(decoded.capacity_liters, 10_000);
+        assert_eq!(decoded.current_level_liters, 7_500);
+        assert_eq!(decoded.tank_type, TankType::Underground);
+        assert!(decoded.connected_system.is_some());
+    }
+
+    #[test]
+    fn storage_tank_none_connected_system_serde() {
+        let tank = StorageTank {
+            id: "tank-standalone".to_string(),
+            name: "Bladder Tank".to_string(),
+            capacity_liters: 500,
+            current_level_liters: 0,
+            tank_type: TankType::Bladder,
+            connected_system: None,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&tank).unwrap();
+        let decoded: StorageTank = serde_json::from_str(&json).unwrap();
+        assert!(decoded.connected_system.is_none());
+    }
+
+    #[test]
+    fn harvest_record_full_serde_roundtrip() {
+        let rec = HarvestRecord {
+            system_hash: fake_action_hash(),
+            liters_collected: 150,
+            collection_period_start: Timestamp::from_micros(0),
+            collection_period_end: Timestamp::from_micros(1_000_000),
+            weather_conditions: Some("Heavy rain".to_string()),
+            credited_to: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&rec).unwrap();
+        let decoded: HarvestRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.liters_collected, 150);
+        assert_eq!(decoded.weather_conditions, Some("Heavy rain".to_string()));
+    }
+
+    #[test]
+    fn harvest_record_none_weather_serde() {
+        let rec = HarvestRecord {
+            system_hash: fake_action_hash(),
+            liters_collected: 10,
+            collection_period_start: Timestamp::from_micros(0),
+            collection_period_end: Timestamp::from_micros(1),
+            weather_conditions: None,
+            credited_to: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&rec).unwrap();
+        let decoded: HarvestRecord = serde_json::from_str(&json).unwrap();
+        assert!(decoded.weather_conditions.is_none());
+    }
+
+    #[test]
+    fn recharge_project_full_serde_roundtrip() {
+        let proj = RechargeProject {
+            id: "rp-001".to_string(),
+            name: "Basin Recharge Alpha".to_string(),
+            aquifer_id: "aquifer-12".to_string(),
+            method: RechargeMethod::Basin,
+            capacity_liters_per_day: 50_000,
+            location_lat: 40.0,
+            location_lon: -110.0,
+            status: RechargeStatus::Active,
+        };
+        let json = serde_json::to_string(&proj).unwrap();
+        let decoded: RechargeProject = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "rp-001");
+        assert_eq!(decoded.aquifer_id, "aquifer-12");
+        assert_eq!(decoded.method, RechargeMethod::Basin);
+        assert_eq!(decoded.status, RechargeStatus::Active);
+    }
+
+    // ========================================================================
+    // Clone/equality tests
+    // ========================================================================
+
+    #[test]
+    fn harvest_system_clone_equals_original() {
+        let sys = HarvestSystem {
+            id: "hs-clone".to_string(),
+            name: "Clone Test".to_string(),
+            system_type: HarvestType::Snowmelt,
+            capacity_liters: 1,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            installed_at: Timestamp::from_micros(0),
+            catchment_area_sqm: None,
+            efficiency_percent: 50,
+        };
+        assert_eq!(sys, sys.clone());
+    }
+
+    #[test]
+    fn storage_tank_clone_equals_original() {
+        let tank = StorageTank {
+            id: "t-clone".to_string(),
+            name: "Clone".to_string(),
+            capacity_liters: 100,
+            current_level_liters: 50,
+            tank_type: TankType::Cistern,
+            connected_system: None,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        assert_eq!(tank, tank.clone());
+    }
+
+    #[test]
+    fn recharge_project_clone_equals_original() {
+        let proj = RechargeProject {
+            id: "rp-clone".to_string(),
+            name: "Clone".to_string(),
+            aquifer_id: "aq".to_string(),
+            method: RechargeMethod::Injection,
+            capacity_liters_per_day: 1,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            status: RechargeStatus::Proposed,
+        };
+        assert_eq!(proj, proj.clone());
+    }
+
+    #[test]
+    fn harvest_system_ne_different_type() {
+        let a = HarvestSystem {
+            id: "hs".to_string(),
+            name: "N".to_string(),
+            system_type: HarvestType::RoofRainwater,
+            capacity_liters: 1,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            installed_at: Timestamp::from_micros(0),
+            catchment_area_sqm: None,
+            efficiency_percent: 0,
+        };
+        let mut b = a.clone();
+        b.system_type = HarvestType::DewCollection;
+        assert_ne!(a, b);
+    }
+
+    // ========================================================================
+    // Edge case tests
+    // ========================================================================
+
+    #[test]
+    fn update_tank_level_input_u64_max_serde() {
+        let input = UpdateTankLevelInput {
+            tank_hash: fake_action_hash(),
+            new_level_liters: u64::MAX,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTankLevelInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_level_liters, u64::MAX);
+    }
+
+    #[test]
+    fn harvest_system_boundary_coordinates_serde() {
+        let sys = HarvestSystem {
+            id: "hs-boundary".to_string(),
+            name: "Boundary".to_string(),
+            system_type: HarvestType::GroundCatchment,
+            capacity_liters: 1,
+            location_lat: -90.0,
+            location_lon: 180.0,
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            installed_at: Timestamp::from_micros(0),
+            catchment_area_sqm: Some(u32::MAX),
+            efficiency_percent: 100,
+        };
+        let json = serde_json::to_string(&sys).unwrap();
+        let decoded: HarvestSystem = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.location_lat, -90.0);
+        assert_eq!(decoded.location_lon, 180.0);
+        assert_eq!(decoded.catchment_area_sqm, Some(u32::MAX));
+        assert_eq!(decoded.efficiency_percent, 100);
+    }
+
+    #[test]
+    fn harvest_system_unicode_name_serde() {
+        let sys = HarvestSystem {
+            id: "hs-unicode".to_string(),
+            name: "\u{96E8}\u{6C34}\u{6536}\u{96C6}\u{7CFB}\u{7EDF}".to_string(),
+            system_type: HarvestType::RoofRainwater,
+            capacity_liters: 1000,
+            location_lat: 30.0,
+            location_lon: 120.0,
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            installed_at: Timestamp::from_micros(0),
+            catchment_area_sqm: None,
+            efficiency_percent: 70,
+        };
+        let json = serde_json::to_string(&sys).unwrap();
+        let decoded: HarvestSystem = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "\u{96E8}\u{6C34}\u{6536}\u{96C6}\u{7CFB}\u{7EDF}");
+    }
+
+    #[test]
+    fn harvest_record_u64_max_liters_serde() {
+        let rec = HarvestRecord {
+            system_hash: fake_action_hash(),
+            liters_collected: u64::MAX,
+            collection_period_start: Timestamp::from_micros(0),
+            collection_period_end: Timestamp::from_micros(1),
+            weather_conditions: None,
+            credited_to: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&rec).unwrap();
+        let decoded: HarvestRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.liters_collected, u64::MAX);
+    }
+
+    #[test]
+    fn recharge_project_all_methods_serde() {
+        for method in [
+            RechargeMethod::Basin,
+            RechargeMethod::Injection,
+            RechargeMethod::Spreading,
+            RechargeMethod::Infiltration,
+        ] {
+            let proj = RechargeProject {
+                id: "rp".to_string(),
+                name: "N".to_string(),
+                aquifer_id: "aq".to_string(),
+                method: method.clone(),
+                capacity_liters_per_day: 1,
+                location_lat: 0.0,
+                location_lon: 0.0,
+                status: RechargeStatus::Active,
+            };
+            let json = serde_json::to_string(&proj).unwrap();
+            let decoded: RechargeProject = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.method, method);
+        }
+    }
+
+    #[test]
+    fn recharge_project_all_statuses_entry_serde() {
+        for status in [
+            RechargeStatus::Proposed,
+            RechargeStatus::Active,
+            RechargeStatus::Paused,
+            RechargeStatus::Completed,
+            RechargeStatus::Abandoned,
+        ] {
+            let proj = RechargeProject {
+                id: "rp".to_string(),
+                name: "N".to_string(),
+                aquifer_id: "aq".to_string(),
+                method: RechargeMethod::Basin,
+                capacity_liters_per_day: 1,
+                location_lat: 0.0,
+                location_lon: 0.0,
+                status: status.clone(),
+            };
+            let json = serde_json::to_string(&proj).unwrap();
+            let decoded: RechargeProject = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.status, status);
+        }
+    }
 }

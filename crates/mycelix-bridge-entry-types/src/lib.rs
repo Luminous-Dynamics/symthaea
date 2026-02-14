@@ -176,7 +176,10 @@ mod tests {
         }
     }
 
-    const DOMAINS: &[&str] = &["property", "housing", "care", "justice"];
+    const DOMAINS: &[&str] = &[
+        "property", "housing", "care", "justice",
+        "mutualaid", "water", "food", "transport",
+    ];
 
     // ---- validate_query_fields ----
 
@@ -325,6 +328,49 @@ mod tests {
         let bytes = serde_json::to_vec(&e).unwrap();
         let e2: BridgeEventEntry = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(e, e2);
+    }
+
+    // ---- Food & transport domain validation ----
+
+    #[test]
+    fn query_food_domain_accepted() {
+        let q = make_query("food", r#"{"product":"tomatoes"}"#);
+        assert!(validate_query_fields(&q, DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn query_transport_domain_accepted() {
+        let q = make_query("transport", r#"{"route_id":"r1"}"#);
+        assert!(validate_query_fields(&q, DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn event_food_domain_accepted() {
+        let e = make_event("food", r#"{"event":"harvest_recorded"}"#);
+        assert!(validate_event_fields(&e, DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn event_transport_domain_accepted() {
+        let mut e = make_event("transport", r#"{"event":"trip_logged"}"#);
+        e.related_hashes = vec!["vehicle_hash_1".into()];
+        assert!(validate_event_fields(&e, DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn query_all_domains_accepted() {
+        for domain in DOMAINS {
+            let q = make_query(domain, "{}");
+            assert!(validate_query_fields(&q, DOMAINS).is_ok(), "domain '{}' should be valid", domain);
+        }
+    }
+
+    #[test]
+    fn event_all_domains_accepted() {
+        for domain in DOMAINS {
+            let e = make_event(domain, "{}");
+            assert!(validate_event_fields(&e, DOMAINS).is_ok(), "domain '{}' should be valid", domain);
+        }
     }
 
     // ---- Empty domain list ----

@@ -116,13 +116,14 @@ fn validate_credit(c: CarbonCredit) -> ExternResult<ValidateCallbackResult> {
 mod tests {
     use super::*;
 
+    // ── Helpers ──────────────────────────────────────────────────────────
+
     fn fake_agent() -> AgentPubKey {
         AgentPubKey::from_raw_36(vec![0u8; 36])
     }
 
-    #[test]
-    fn valid_trip_passes() {
-        let t = TripLog {
+    fn valid_trip() -> TripLog {
+        TripLog {
             vehicle_hash: None,
             route_hash: None,
             distance_km: 15.0,
@@ -131,117 +132,315 @@ mod tests {
             cargo_kg: 0.0,
             emissions_kg_co2: 0.0,
             logged_at: 1700000000,
-        };
-        assert_eq!(validate_trip(t).unwrap(), ValidateCallbackResult::Valid);
+        }
+    }
+
+    fn valid_carbon_credit() -> CarbonCredit {
+        CarbonCredit {
+            holder: fake_agent(),
+            credits_kg_co2: 2.1,
+            earned_from: CreditSource::Cycling,
+            earned_at: 1700000000,
+        }
+    }
+
+    fn assert_valid(result: ExternResult<ValidateCallbackResult>) {
+        match result {
+            Ok(ValidateCallbackResult::Valid) => {}
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                panic!("Expected Valid, got Invalid: {msg}")
+            }
+            other => panic!("Expected Valid, got {other:?}"),
+        }
+    }
+
+    fn assert_invalid(result: ExternResult<ValidateCallbackResult>, expected_substr: &str) {
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                assert!(
+                    msg.contains(expected_substr),
+                    "Expected Invalid containing '{expected_substr}', got: '{msg}'"
+                );
+            }
+            Ok(ValidateCallbackResult::Valid) => {
+                panic!("Expected Invalid containing '{expected_substr}', got Valid")
+            }
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
+    }
+
+    // ── Serde roundtrip tests ───────────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_trip_mode() {
+        let modes = vec![
+            TripMode::Driving, TripMode::Cycling, TripMode::Walking,
+            TripMode::Transit, TripMode::Carpool, TripMode::ElectricVehicle,
+        ];
+        for mode in &modes {
+            let json = serde_json::to_string(mode).unwrap();
+            let back: TripMode = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, mode);
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_credit_source() {
+        let sources = vec![
+            CreditSource::Cycling, CreditSource::Transit, CreditSource::Carpool,
+            CreditSource::ElectricVehicle, CreditSource::Walking,
+        ];
+        for src in &sources {
+            let json = serde_json::to_string(src).unwrap();
+            let back: CreditSource = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, src);
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_trip_log() {
+        let t = valid_trip();
+        let json = serde_json::to_string(&t).unwrap();
+        let back: TripLog = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, t);
+    }
+
+    #[test]
+    fn serde_roundtrip_trip_log_with_hashes() {
+        let mut t = valid_trip();
+        t.vehicle_hash = Some(ActionHash::from_raw_36(vec![10u8; 36]));
+        t.route_hash = Some(ActionHash::from_raw_36(vec![11u8; 36]));
+        let json = serde_json::to_string(&t).unwrap();
+        let back: TripLog = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, t);
+    }
+
+    #[test]
+    fn serde_roundtrip_carbon_credit() {
+        let c = valid_carbon_credit();
+        let json = serde_json::to_string(&c).unwrap();
+        let back: CarbonCredit = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, c);
+    }
+
+    // ── validate_trip: distance_km ──────────────────────────────────────
+
+    #[test]
+    fn valid_trip_passes() {
+        assert_valid(validate_trip(valid_trip()));
     }
 
     #[test]
     fn trip_zero_distance_rejected() {
-        let t = TripLog {
-            vehicle_hash: None,
-            route_hash: None,
-            distance_km: 0.0,
-            mode: TripMode::Walking,
-            passengers: 1,
-            cargo_kg: 0.0,
-            emissions_kg_co2: 0.0,
-            logged_at: 1700000000,
-        };
-        assert!(matches!(validate_trip(t).unwrap(), ValidateCallbackResult::Invalid(_)));
+        let mut t = valid_trip();
+        t.distance_km = 0.0;
+        assert_invalid(validate_trip(t), "Distance must be positive");
     }
 
     #[test]
     fn trip_negative_distance_rejected() {
-        let t = TripLog {
-            vehicle_hash: None,
-            route_hash: None,
-            distance_km: -5.0,
-            mode: TripMode::Driving,
-            passengers: 1,
-            cargo_kg: 0.0,
-            emissions_kg_co2: 0.0,
-            logged_at: 1700000000,
-        };
-        assert!(matches!(validate_trip(t).unwrap(), ValidateCallbackResult::Invalid(_)));
+        let mut t = valid_trip();
+        t.distance_km = -5.0;
+        assert_invalid(validate_trip(t), "Distance must be positive");
     }
 
     #[test]
-    fn trip_negative_emissions_rejected() {
-        let t = TripLog {
-            vehicle_hash: None,
-            route_hash: None,
-            distance_km: 10.0,
-            mode: TripMode::Driving,
-            passengers: 1,
-            cargo_kg: 0.0,
-            emissions_kg_co2: -0.5,
-            logged_at: 1700000000,
-        };
-        assert!(matches!(validate_trip(t).unwrap(), ValidateCallbackResult::Invalid(_)));
+    fn trip_barely_positive_distance_valid() {
+        let mut t = valid_trip();
+        t.distance_km = 0.001;
+        assert_valid(validate_trip(t));
     }
+
+    #[test]
+    fn trip_large_distance_valid() {
+        let mut t = valid_trip();
+        t.distance_km = 50000.0;
+        assert_valid(validate_trip(t));
+    }
+
+    // ── validate_trip: emissions_kg_co2 ─────────────────────────────────
+
+    #[test]
+    fn trip_negative_emissions_rejected() {
+        let mut t = valid_trip();
+        t.emissions_kg_co2 = -0.5;
+        assert_invalid(validate_trip(t), "Emissions cannot be negative");
+    }
+
+    #[test]
+    fn trip_negative_emissions_large_rejected() {
+        let mut t = valid_trip();
+        t.emissions_kg_co2 = -100.0;
+        assert_invalid(validate_trip(t), "Emissions cannot be negative");
+    }
+
+    #[test]
+    fn trip_zero_emissions_valid() {
+        let mut t = valid_trip();
+        t.emissions_kg_co2 = 0.0;
+        assert_valid(validate_trip(t));
+    }
+
+    #[test]
+    fn trip_positive_emissions_valid() {
+        let mut t = valid_trip();
+        t.emissions_kg_co2 = 42.5;
+        assert_valid(validate_trip(t));
+    }
+
+    #[test]
+    fn trip_barely_negative_emissions_rejected() {
+        let mut t = valid_trip();
+        t.emissions_kg_co2 = -0.001;
+        assert_invalid(validate_trip(t), "Emissions cannot be negative");
+    }
+
+    // ── validate_trip: mode ─────────────────────────────────────────────
 
     #[test]
     fn all_trip_modes_valid() {
         for mode in [TripMode::Driving, TripMode::Cycling, TripMode::Walking,
                       TripMode::Transit, TripMode::Carpool, TripMode::ElectricVehicle] {
-            let t = TripLog {
-                vehicle_hash: None,
-                route_hash: None,
-                distance_km: 10.0,
-                mode,
-                passengers: 1,
-                cargo_kg: 0.0,
-                emissions_kg_co2: 0.0,
-                logged_at: 1700000000,
-            };
-            assert_eq!(validate_trip(t).unwrap(), ValidateCallbackResult::Valid);
+            let mut t = valid_trip();
+            t.mode = mode;
+            assert_valid(validate_trip(t));
         }
     }
 
+    // ── validate_trip: optional hashes ──────────────────────────────────
+
+    #[test]
+    fn trip_with_vehicle_hash_valid() {
+        let mut t = valid_trip();
+        t.vehicle_hash = Some(ActionHash::from_raw_36(vec![10u8; 36]));
+        assert_valid(validate_trip(t));
+    }
+
+    #[test]
+    fn trip_with_route_hash_valid() {
+        let mut t = valid_trip();
+        t.route_hash = Some(ActionHash::from_raw_36(vec![11u8; 36]));
+        assert_valid(validate_trip(t));
+    }
+
+    #[test]
+    fn trip_with_both_hashes_valid() {
+        let mut t = valid_trip();
+        t.vehicle_hash = Some(ActionHash::from_raw_36(vec![10u8; 36]));
+        t.route_hash = Some(ActionHash::from_raw_36(vec![11u8; 36]));
+        assert_valid(validate_trip(t));
+    }
+
+    // ── validate_trip: passengers and cargo ─────────────────────────────
+
+    #[test]
+    fn trip_zero_passengers_valid() {
+        let mut t = valid_trip();
+        t.passengers = 0;
+        assert_valid(validate_trip(t));
+    }
+
+    #[test]
+    fn trip_many_passengers_valid() {
+        let mut t = valid_trip();
+        t.passengers = 50;
+        assert_valid(validate_trip(t));
+    }
+
+    #[test]
+    fn trip_zero_cargo_valid() {
+        let mut t = valid_trip();
+        t.cargo_kg = 0.0;
+        assert_valid(validate_trip(t));
+    }
+
+    #[test]
+    fn trip_large_cargo_valid() {
+        let mut t = valid_trip();
+        t.cargo_kg = 10000.0;
+        assert_valid(validate_trip(t));
+    }
+
+    // ── validate_trip: combined invalid ─────────────────────────────────
+
+    #[test]
+    fn trip_zero_distance_with_negative_emissions_rejects_distance_first() {
+        let mut t = valid_trip();
+        t.distance_km = 0.0;
+        t.emissions_kg_co2 = -1.0;
+        // Distance check comes first
+        assert_invalid(validate_trip(t), "Distance must be positive");
+    }
+
+    // ── validate_credit: credits_kg_co2 ─────────────────────────────────
+
     #[test]
     fn valid_credit_passes() {
-        let c = CarbonCredit {
-            holder: fake_agent(),
-            credits_kg_co2: 2.1,
-            earned_from: CreditSource::Cycling,
-            earned_at: 1700000000,
-        };
-        assert_eq!(validate_credit(c).unwrap(), ValidateCallbackResult::Valid);
+        assert_valid(validate_credit(valid_carbon_credit()));
     }
 
     #[test]
     fn credit_zero_rejected() {
-        let c = CarbonCredit {
-            holder: fake_agent(),
-            credits_kg_co2: 0.0,
-            earned_from: CreditSource::Transit,
-            earned_at: 1700000000,
-        };
-        assert!(matches!(validate_credit(c).unwrap(), ValidateCallbackResult::Invalid(_)));
+        let mut c = valid_carbon_credit();
+        c.credits_kg_co2 = 0.0;
+        assert_invalid(validate_credit(c), "Credits must be positive");
     }
 
     #[test]
     fn credit_negative_rejected() {
-        let c = CarbonCredit {
-            holder: fake_agent(),
-            credits_kg_co2: -1.0,
-            earned_from: CreditSource::Carpool,
-            earned_at: 1700000000,
-        };
-        assert!(matches!(validate_credit(c).unwrap(), ValidateCallbackResult::Invalid(_)));
+        let mut c = valid_carbon_credit();
+        c.credits_kg_co2 = -1.0;
+        assert_invalid(validate_credit(c), "Credits must be positive");
     }
+
+    #[test]
+    fn credit_barely_positive_valid() {
+        let mut c = valid_carbon_credit();
+        c.credits_kg_co2 = 0.001;
+        assert_valid(validate_credit(c));
+    }
+
+    #[test]
+    fn credit_large_value_valid() {
+        let mut c = valid_carbon_credit();
+        c.credits_kg_co2 = 999999.0;
+        assert_valid(validate_credit(c));
+    }
+
+    #[test]
+    fn credit_barely_negative_rejected() {
+        let mut c = valid_carbon_credit();
+        c.credits_kg_co2 = -0.001;
+        assert_invalid(validate_credit(c), "Credits must be positive");
+    }
+
+    // ── validate_credit: source variants ────────────────────────────────
 
     #[test]
     fn all_credit_sources_valid() {
         for src in [CreditSource::Cycling, CreditSource::Transit, CreditSource::Carpool,
                      CreditSource::ElectricVehicle, CreditSource::Walking] {
-            let c = CarbonCredit {
-                holder: fake_agent(),
-                credits_kg_co2: 1.0,
-                earned_from: src,
-                earned_at: 1700000000,
-            };
-            assert_eq!(validate_credit(c).unwrap(), ValidateCallbackResult::Valid);
+            let mut c = valid_carbon_credit();
+            c.earned_from = src;
+            assert_valid(validate_credit(c));
         }
+    }
+
+    // ── Anchor tests ────────────────────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_anchor() {
+        let a = Anchor("all_trips".to_string());
+        let json = serde_json::to_string(&a).unwrap();
+        let back: Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, a);
+    }
+
+    #[test]
+    fn anchor_empty_string_ok() {
+        let a = Anchor(String::new());
+        let json = serde_json::to_string(&a).unwrap();
+        let back: Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, a);
     }
 }

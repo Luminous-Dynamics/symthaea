@@ -389,4 +389,214 @@ mod tests {
             assert_eq!(decoded, variant);
         }
     }
+
+    // ========================================================================
+    // Entry type serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn triage_record_full_serde_roundtrip() {
+        let record = TriageRecord {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            patient_id: "PAT-full-001".to_string(),
+            patient_hash: Some(ActionHash::from_raw_36(vec![1u8; 36])),
+            category: TriageCategory::Immediate,
+            injuries: "Multiple fractures, internal bleeding".to_string(),
+            location: "Zone A, Building 3".to_string(),
+            timestamp: Timestamp::from_micros(1_700_000_000),
+            triaged_by: AgentPubKey::from_raw_36(vec![2u8; 36]),
+            transport_priority: TransportPriority::Urgent,
+            notes: "Requires surgical intervention".to_string(),
+        };
+        let json = serde_json::to_string(&record).unwrap();
+        let decoded: TriageRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.patient_id, "PAT-full-001");
+        assert_eq!(decoded.category, TriageCategory::Immediate);
+        assert_eq!(decoded.transport_priority, TransportPriority::Urgent);
+        assert!(decoded.patient_hash.is_some());
+        assert_eq!(decoded.injuries, "Multiple fractures, internal bleeding");
+        assert_eq!(decoded.notes, "Requires surgical intervention");
+    }
+
+    #[test]
+    fn triage_record_minimal_serde_roundtrip() {
+        let record = TriageRecord {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            patient_id: "X".to_string(),
+            patient_hash: None,
+            category: TriageCategory::Minor,
+            injuries: "".to_string(),
+            location: "A".to_string(),
+            timestamp: Timestamp::from_micros(0),
+            triaged_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            transport_priority: TransportPriority::None,
+            notes: "".to_string(),
+        };
+        let json = serde_json::to_string(&record).unwrap();
+        let decoded: TriageRecord = serde_json::from_str(&json).unwrap();
+        assert!(decoded.patient_hash.is_none());
+        assert_eq!(decoded.injuries, "");
+        assert_eq!(decoded.notes, "");
+    }
+
+    // ========================================================================
+    // Clone/equality tests
+    // ========================================================================
+
+    #[test]
+    fn triage_record_clone_equals_original() {
+        let record = TriageRecord {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            patient_id: "PAT-clone".to_string(),
+            patient_hash: None,
+            category: TriageCategory::Delayed,
+            injuries: "Burns".to_string(),
+            location: "Tent B".to_string(),
+            timestamp: Timestamp::from_micros(0),
+            triaged_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            transport_priority: TransportPriority::Priority,
+            notes: "Stable".to_string(),
+        };
+        let cloned = record.clone();
+        assert_eq!(record, cloned);
+    }
+
+    #[test]
+    fn triage_record_ne_different_category() {
+        let a = TriageRecord {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            patient_id: "PAT-001".to_string(),
+            patient_hash: None,
+            category: TriageCategory::Immediate,
+            injuries: "Fracture".to_string(),
+            location: "Zone A".to_string(),
+            timestamp: Timestamp::from_micros(0),
+            triaged_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            transport_priority: TransportPriority::Urgent,
+            notes: "".to_string(),
+        };
+        let mut b = a.clone();
+        b.category = TriageCategory::Expectant;
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn triage_record_ne_different_transport_priority() {
+        let a = TriageRecord {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            patient_id: "PAT-002".to_string(),
+            patient_hash: None,
+            category: TriageCategory::Minor,
+            injuries: "Abrasion".to_string(),
+            location: "Zone B".to_string(),
+            timestamp: Timestamp::from_micros(0),
+            triaged_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            transport_priority: TransportPriority::Routine,
+            notes: "".to_string(),
+        };
+        let mut b = a.clone();
+        b.transport_priority = TransportPriority::Urgent;
+        assert_ne!(a, b);
+    }
+
+    // ========================================================================
+    // Edge case tests
+    // ========================================================================
+
+    #[test]
+    fn triage_patient_input_unicode_patient_id() {
+        let input = TriagePatientInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            patient_id: "\u{60A3}\u{8005}-\u{4E00}\u{53F7}".to_string(),
+            patient_hash: None,
+            category: TriageCategory::Minor,
+            injuries: "None".to_string(),
+            location: "\u{6771}\u{4EAC}".to_string(),
+            transport_priority: TransportPriority::Routine,
+            notes: "".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TriagePatientInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.patient_id, "\u{60A3}\u{8005}-\u{4E00}\u{53F7}");
+    }
+
+    #[test]
+    fn triage_patient_input_empty_strings_serde() {
+        let input = TriagePatientInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            patient_id: "P".to_string(),
+            patient_hash: None,
+            category: TriageCategory::Dead,
+            injuries: "".to_string(),
+            location: "X".to_string(),
+            transport_priority: TransportPriority::None,
+            notes: "".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TriagePatientInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.injuries, "");
+        assert_eq!(decoded.notes, "");
+        assert_eq!(decoded.category, TriageCategory::Dead);
+    }
+
+    #[test]
+    fn update_triage_input_all_some_fields() {
+        let input = UpdateTriageInput {
+            original_triage_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            original_disaster_hash: ActionHash::from_raw_36(vec![1u8; 36]),
+            old_category: TriageCategory::Minor,
+            new_category: TriageCategory::Immediate,
+            injuries: Some("Condition worsened".to_string()),
+            transport_priority: Some(TransportPriority::Urgent),
+            notes: Some("Re-triaged urgently".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTriageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.injuries, Some("Condition worsened".to_string()));
+        assert_eq!(decoded.transport_priority, Some(TransportPriority::Urgent));
+        assert_eq!(decoded.notes, Some("Re-triaged urgently".to_string()));
+    }
+
+    #[test]
+    fn triage_by_category_input_all_categories() {
+        for category in [
+            TriageCategory::Immediate,
+            TriageCategory::Delayed,
+            TriageCategory::Minor,
+            TriageCategory::Expectant,
+            TriageCategory::Dead,
+        ] {
+            let input = TriageByCategoryInput {
+                disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                category: category.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: TriageByCategoryInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.category, category);
+        }
+    }
+
+    #[test]
+    fn triage_category_clone_eq() {
+        let cat = TriageCategory::Immediate;
+        assert_eq!(cat, cat.clone());
+    }
+
+    #[test]
+    fn transport_priority_clone_eq() {
+        let prio = TransportPriority::Priority;
+        assert_eq!(prio, prio.clone());
+    }
+
+    #[test]
+    fn triage_category_ne_different_variants() {
+        assert_ne!(TriageCategory::Immediate, TriageCategory::Delayed);
+        assert_ne!(TriageCategory::Minor, TriageCategory::Dead);
+    }
+
+    #[test]
+    fn transport_priority_ne_different_variants() {
+        assert_ne!(TransportPriority::Urgent, TransportPriority::None);
+        assert_ne!(TransportPriority::Priority, TransportPriority::Routine);
+    }
 }
