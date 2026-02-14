@@ -3,8 +3,8 @@
 //! Apply Universal Temporal Grammar to phoneme sequences for improved
 //! speech recognition. Learns phonotactic patterns from training data.
 
-use symthaea_stt::temporal_grammar::{TemporalGrammar, TemporalEvent, DomainConfig, Sparsity};
 use std::collections::HashMap;
+use symthaea_stt::temporal_grammar::{DomainConfig, Sparsity, TemporalEvent, TemporalGrammar};
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
@@ -33,28 +33,27 @@ fn speech_grammar_config() -> DomainConfig {
         // Vowels
         "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
         // Consonants - Stops
-        "B", "D", "G", "K", "P", "T",
-        // Consonants - Fricatives
-        "CH", "DH", "F", "JH", "S", "SH", "TH", "V", "Z", "ZH",
-        // Consonants - Nasals
-        "M", "N", "NG",
-        // Consonants - Liquids/Glides
-        "L", "R", "W", "Y", "HH",
-        // Silence
+        "B", "D", "G", "K", "P", "T", // Consonants - Fricatives
+        "CH", "DH", "F", "JH", "S", "SH", "TH", "V", "Z", "ZH", // Consonants - Nasals
+        "M", "N", "NG", // Consonants - Liquids/Glides
+        "L", "R", "W", "Y", "HH", // Silence
         "SIL",
-    ].into_iter().map(String::from).collect();
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
 
     DomainConfig {
         name: "speech_phoneme".to_string(),
         categories: phonemes,
         sample_rate: 16000.0,
-        frame_size: 400,  // 25ms at 16kHz
+        frame_size: 400, // 25ms at 16kHz
         sparsity: Sparsity::Sparse5,
         duration_bins: 8,
         intensity_bins: 4,
         predictive_feedback: true,
         prediction_boost: 0.35,
-        hierarchy_depth: 3,  // phoneme → syllable → word
+        hierarchy_depth: 3, // phoneme → syllable → word
     }
 }
 
@@ -129,9 +128,9 @@ fn word_to_events(word: &str, start_time: &mut f32) -> Vec<TemporalEvent> {
         for (i, phoneme) in phonemes.iter().enumerate() {
             // Estimate duration based on phoneme type
             let duration = if "AEIOU".chars().any(|v| phoneme.starts_with(v)) {
-                0.08  // Vowels longer
+                0.08 // Vowels longer
             } else {
-                0.05  // Consonants shorter
+                0.05 // Consonants shorter
             };
 
             // Estimate intensity (vowels louder)
@@ -143,7 +142,7 @@ fn word_to_events(word: &str, start_time: &mut f32) -> Vec<TemporalEvent> {
 
             events.push(TemporalEvent::new(
                 phoneme,
-                i,  // Will be remapped by grammar
+                i, // Will be remapped by grammar
                 *start_time,
                 duration,
                 intensity,
@@ -162,7 +161,8 @@ fn sentence_to_events(sentence: &str) -> Vec<TemporalEvent> {
     let mut time = 0.0f32;
 
     for word in sentence.split_whitespace() {
-        let clean_word: String = word.chars()
+        let clean_word: String = word
+            .chars()
             .filter(|c| c.is_alphabetic())
             .collect::<String>()
             .to_uppercase();
@@ -181,16 +181,11 @@ fn sentence_to_events(sentence: &str) -> Vec<TemporalEvent> {
 
 /// Remap event class IDs to grammar categories
 fn remap_events(events: &[TemporalEvent], grammar: &TemporalGrammar) -> Vec<TemporalEvent> {
-    events.iter()
+    events
+        .iter()
         .filter_map(|e| {
             grammar.category_id(&e.category).map(|cid| {
-                TemporalEvent::new(
-                    &e.category,
-                    cid,
-                    e.start_time,
-                    e.duration,
-                    e.intensity,
-                )
+                TemporalEvent::new(&e.category, cid, e.start_time, e.duration, e.intensity)
             })
         })
         .collect()
@@ -251,7 +246,10 @@ fn main() {
     }
 
     let stats = grammar.stats();
-    println!("\n    Grammar density after training: {:.3}", stats.grammar_density);
+    println!(
+        "\n    Grammar density after training: {:.3}",
+        stats.grammar_density
+    );
 
     // Test sentences
     subheader("Phase 2: Scoring Test Sentences");
@@ -285,10 +283,19 @@ fn main() {
                 _ => {}
             }
 
-            println!("    [{}] \"{}\": {:+.4} ({} phonemes)",
-                     category.to_uppercase(), sentence, score, remapped.len());
+            println!(
+                "    [{}] \"{}\": {:+.4} ({} phonemes)",
+                category.to_uppercase(),
+                sentence,
+                score,
+                remapped.len()
+            );
         } else {
-            println!("    [{}] \"{}\" - not in dictionary", category.to_uppercase(), sentence);
+            println!(
+                "    [{}] \"{}\" - not in dictionary",
+                category.to_uppercase(),
+                sentence
+            );
         }
     }
 
@@ -297,25 +304,25 @@ fn main() {
 
     // Valid English onsets (simplified)
     let valid_onsets = vec![
-        vec!["S", "T", "R"],  // "str" - strong, string
-        vec!["S", "P", "L"],  // "spl" - split
-        vec!["S", "T"],       // "st" - stop, store
-        vec!["S", "P"],       // "sp" - speak
-        vec!["S", "K"],       // "sk" - skip
-        vec!["P", "R"],       // "pr" - pretty
-        vec!["B", "R"],       // "br" - brown
-        vec!["T", "R"],       // "tr" - tree
-        vec!["D", "R"],       // "dr" - drive
-        vec!["K", "R"],       // "cr" - cry
-        vec!["G", "R"],       // "gr" - green
+        vec!["S", "T", "R"], // "str" - strong, string
+        vec!["S", "P", "L"], // "spl" - split
+        vec!["S", "T"],      // "st" - stop, store
+        vec!["S", "P"],      // "sp" - speak
+        vec!["S", "K"],      // "sk" - skip
+        vec!["P", "R"],      // "pr" - pretty
+        vec!["B", "R"],      // "br" - brown
+        vec!["T", "R"],      // "tr" - tree
+        vec!["D", "R"],      // "dr" - drive
+        vec!["K", "R"],      // "cr" - cry
+        vec!["G", "R"],      // "gr" - green
     ];
 
     // Invalid English onsets
     let invalid_onsets = vec![
-        vec!["T", "L"],  // No "tl-" words
-        vec!["S", "R"],  // No "sr-" words
-        vec!["N", "G"],  // "ng" only as coda
-        vec!["Z", "T"],  // No "zt-" words
+        vec!["T", "L"], // No "tl-" words
+        vec!["S", "R"], // No "sr-" words
+        vec!["N", "G"], // "ng" only as coda
+        vec!["Z", "T"], // No "zt-" words
     ];
 
     println!("    Valid English syllable onsets:");

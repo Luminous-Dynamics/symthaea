@@ -54,7 +54,7 @@ fn test_bundle_preserves_component_similarity() {
         let c = BinaryHV::random(seed_base * 11 + 20);
 
         // Bundle all three
-        let abc = BinaryHV::bundle(&[a.clone(), b.clone(), c.clone()]);
+        let abc = BinaryHV::bundle(&[a, b, c]);
 
         // Bundle should be more similar to each component than random
         // Random similarity is ~0.5, bundled should be > 0.5
@@ -116,7 +116,7 @@ fn test_random_vectors_half_similar() {
 #[test]
 fn test_permute_cyclic() {
     let original = BinaryHV::random(42);
-    let mut current = original.clone();
+    let mut current = original;
 
     // Permute by dimension should return to original
     for _ in 0..HDC_DIMENSION {

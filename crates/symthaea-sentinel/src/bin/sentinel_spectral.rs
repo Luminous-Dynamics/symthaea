@@ -1,15 +1,17 @@
 //! Analyze spectral characteristics of test sounds
 
 use symthaea_sentinel::{
-    compute_spectral_centroid, compute_spectral_flatness,
-    FileAudioPump, FileAudioConfig,
+    compute_spectral_centroid, compute_spectral_flatness, FileAudioConfig, FileAudioPump,
 };
 
 fn analyze_file(path: &str) {
     let config = FileAudioConfig::default();
     let mut pump = match FileAudioPump::new(path, config) {
         Ok(p) => p,
-        Err(e) => { println!("  Failed: {}", e); return; }
+        Err(e) => {
+            println!("  Failed: {}", e);
+            return;
+        }
     };
 
     let mut centroid_sum = 0.0f32;
@@ -29,22 +31,34 @@ fn analyze_file(path: &str) {
         count += 1;
     }
 
-    if count == 0 { return; }
+    if count == 0 {
+        return;
+    }
 
     let mean_centroid = centroid_sum / count as f32;
     let mean_flatness = flatness_sum / count as f32;
 
     // Compute variance
-    let centroid_var: f32 = centroid_values.iter()
+    let centroid_var: f32 = centroid_values
+        .iter()
         .map(|&c| (c - mean_centroid).powi(2))
-        .sum::<f32>() / count as f32;
-    let flatness_var: f32 = flatness_values.iter()
+        .sum::<f32>()
+        / count as f32;
+    let flatness_var: f32 = flatness_values
+        .iter()
         .map(|&f| (f - mean_flatness).powi(2))
-        .sum::<f32>() / count as f32;
+        .sum::<f32>()
+        / count as f32;
 
     let name = path.rsplit('/').next().unwrap_or(path);
-    println!("{:15} Centroid: {:7.1} Hz (σ={:6.1})  Flatness: {:.4} (σ={:.4})",
-        name, mean_centroid, centroid_var.sqrt(), mean_flatness, flatness_var.sqrt());
+    println!(
+        "{:15} Centroid: {:7.1} Hz (σ={:6.1})  Flatness: {:.4} (σ={:.4})",
+        name,
+        mean_centroid,
+        centroid_var.sqrt(),
+        mean_flatness,
+        flatness_var.sqrt()
+    );
 }
 
 fn main() {
@@ -70,7 +84,10 @@ fn main() {
         "test-data/clock/clock1.wav",
     ];
 
-    println!("{:15} {:28} {:20}", "File", "Spectral Centroid", "Spectral Flatness");
+    println!(
+        "{:15} {:28} {:20}",
+        "File", "Spectral Centroid", "Spectral Flatness"
+    );
     println!("{}", "-".repeat(65));
 
     for path in files {

@@ -38,31 +38,33 @@
 //! // println!("Detected: {} ({:.1}%)", result.detected_pattern, result.confidence * 100.0);
 //! ```
 
-pub mod hdc;
-pub mod temporal;
-pub mod features;
 pub mod encoding;
+pub mod features;
+pub mod hdc;
+pub mod io;
 pub mod patterns;
 pub mod sentinel;
-pub mod io;
+pub mod temporal;
 
 // Re-exports for convenient access
-pub use hdc::{HV, SparseProjector, RffProjector, HDC_DIM};
-pub use temporal::{CfcCell, HierarchicalCfc, HierarchicalLtc, LtcPreset, TemporalWindow};
+pub use encoding::{AudioHdcEncoder, AudioHdcVectors, EncoderMode, PremiumHdcEncoder};
 pub use features::{
-    AudioFeatures, FeatureExtractor, MelFilterbank,
-    MEL_BANDS, NUM_MFCC, FFT_SIZE, HOP_SIZE, SAMPLE_RATE, CONTROL_RATE, FREQ_BINS,
-    compute_mfcc, compute_mfcc_delta, compute_temporal_regularity, compute_power_spectrum,
+    compute_mfcc, compute_mfcc_delta, compute_power_spectrum, compute_temporal_regularity,
+    AudioFeatures, FeatureExtractor, MelFilterbank, CONTROL_RATE, FFT_SIZE, FREQ_BINS, HOP_SIZE,
+    MEL_BANDS, NUM_MFCC, SAMPLE_RATE,
 };
-pub use encoding::{AudioHdcEncoder, PremiumHdcEncoder, AudioHdcVectors, EncoderMode};
-pub use patterns::{AudioPattern, AudioCategory, PatternSimilarity, AmbientContexts, NUM_LTC_LEVELS, MAX_EXEMPLARS};
-pub use sentinel::{AudioSentinel, AudioDetectionResult};
+pub use hdc::{RffProjector, SparseProjector, HDC_DIM, HV};
 pub use io::{
-    AudioConfig, FileAudioConfig, FileAudioPump, DatasetProcessor, FileProcessingResult,
-    compute_onset_strength, compute_spectral_centroid, compute_spectral_flatness,
-    compute_temporal_regularity as io_compute_temporal_regularity,
-    spectrum_to_mel_bands, compute_burst_density, compute_ioi_variance,
+    compute_burst_density, compute_ioi_variance, compute_onset_strength, compute_spectral_centroid,
+    compute_spectral_flatness, compute_temporal_regularity as io_compute_temporal_regularity,
+    spectrum_to_mel_bands, AudioConfig, DatasetProcessor, FileAudioConfig, FileAudioPump,
+    FileProcessingResult,
 };
+pub use patterns::{
+    AmbientContexts, AudioCategory, AudioPattern, PatternSimilarity, MAX_EXEMPLARS, NUM_LTC_LEVELS,
+};
+pub use sentinel::{AudioDetectionResult, AudioSentinel};
+pub use temporal::{CfcCell, HierarchicalCfc, HierarchicalLtc, LtcPreset, TemporalWindow};
 
 #[cfg(feature = "live-audio")]
 pub use io::AudioPump;

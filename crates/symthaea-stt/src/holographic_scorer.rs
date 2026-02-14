@@ -13,7 +13,7 @@
 //! This allows "soft matching" - similar sequences have similar resonance scores,
 //! unlike traditional n-grams which return 0 for unseen sequences.
 
-use crate::hdc::{HV16, bundle, HDC_DIM, HDC_WORDS};
+use crate::hdc::{bundle, HDC_DIM, HDC_WORDS, HV16};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -54,11 +54,9 @@ impl HolographicScorer {
 
         // Generate random basis vectors for all phonemes using string seeds
         let phonemes = [
-            "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH",
-            "EH", "ER", "EY", "F", "G", "HH", "IH", "IY", "JH", "K",
-            "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH",
-            "T", "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH",
-            "SIL", "UNK",
+            "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH", "EH", "ER", "EY", "F", "G",
+            "HH", "IH", "IY", "JH", "K", "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH", "T",
+            "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH", "SIL", "UNK",
         ];
 
         for phoneme in phonemes.iter() {
@@ -182,15 +180,12 @@ impl HolographicScorer {
     /// Update context with new phoneme and return resonance score
     pub fn score(&mut self, phoneme: &Phoneme) -> f32 {
         // Get phoneme vector (or unknown if not found)
-        let phoneme_hv = self.phoneme_basis
-            .get(phoneme)
-            .cloned()
-            .unwrap_or_else(|| {
-                self.phoneme_basis
-                    .get("UNK")
-                    .cloned()
-                    .unwrap_or_else(|| HV16::random("unknown_phoneme"))
-            });
+        let phoneme_hv = self.phoneme_basis.get(phoneme).cloned().unwrap_or_else(|| {
+            self.phoneme_basis
+                .get("UNK")
+                .cloned()
+                .unwrap_or_else(|| HV16::random("unknown_phoneme"))
+        });
 
         // Update context: shift history and bind new phoneme
         // H_t = Π(H_{t-1}) ⊕ Φ_current
@@ -208,15 +203,12 @@ impl HolographicScorer {
 
     /// Score a phoneme without updating state (for beam search)
     pub fn score_candidate(&self, phoneme: &Phoneme) -> f32 {
-        let phoneme_hv = self.phoneme_basis
-            .get(phoneme)
-            .cloned()
-            .unwrap_or_else(|| {
-                self.phoneme_basis
-                    .get("UNK")
-                    .cloned()
-                    .unwrap_or_else(|| HV16::random("unknown_phoneme"))
-            });
+        let phoneme_hv = self.phoneme_basis.get(phoneme).cloned().unwrap_or_else(|| {
+            self.phoneme_basis
+                .get("UNK")
+                .cloned()
+                .unwrap_or_else(|| HV16::random("unknown_phoneme"))
+        });
 
         let shifted = Self::permute(&self.context_state);
         let candidate_state = shifted.bind(&phoneme_hv);
@@ -226,7 +218,10 @@ impl HolographicScorer {
 
     /// Train grammar memory from a corpus of phoneme sequences
     pub fn train_grammar(&mut self, sequences: &[Vec<Phoneme>]) {
-        println!("Training grammar memory on {} sequences...", sequences.len());
+        println!(
+            "Training grammar memory on {} sequences...",
+            sequences.len()
+        );
 
         let mut grammar_accumulator = HV16::zero();
         let mut count = 0;
@@ -260,10 +255,7 @@ impl HolographicScorer {
                 let key = (window[0].clone(), window[1].clone());
                 let next = window[2].clone();
 
-                self.trigram_constraints
-                    .entry(key)
-                    .or_default()
-                    .push(next);
+                self.trigram_constraints.entry(key).or_default().push(next);
             }
         }
 
@@ -273,7 +265,10 @@ impl HolographicScorer {
             nexts.dedup();
         }
 
-        println!("Built {} trigram constraints", self.trigram_constraints.len());
+        println!(
+            "Built {} trigram constraints",
+            self.trigram_constraints.len()
+        );
     }
 
     /// Check if a phoneme is valid given the previous two
@@ -286,12 +281,7 @@ impl HolographicScorer {
     }
 
     /// Combined scoring: HDC resonance + trigram validity
-    pub fn combined_score(
-        &self,
-        prev2: &Phoneme,
-        prev1: &Phoneme,
-        candidate: &Phoneme,
-    ) -> f32 {
+    pub fn combined_score(&self, prev2: &Phoneme, prev1: &Phoneme, candidate: &Phoneme) -> f32 {
         let hdc_score = self.score_candidate(candidate);
 
         // Trigram validity as a binary gate
@@ -371,8 +361,14 @@ mod tests {
 
         // Train on some simple sequences
         let sequences = vec![
-            vec!["HH", "EH", "L", "OW"].iter().map(|s| s.to_string()).collect(),
-            vec!["W", "ER", "L", "D"].iter().map(|s| s.to_string()).collect(),
+            vec!["HH", "EH", "L", "OW"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            vec!["W", "ER", "L", "D"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             vec!["T", "IY", "M"].iter().map(|s| s.to_string()).collect(),
         ];
 
@@ -382,8 +378,8 @@ mod tests {
         scorer.reset();
         let _ = scorer.score(&"HH".to_string());
         let _ = scorer.score(&"EH".to_string());
-        let s_l = scorer.score_candidate(&"L".to_string());  // Should resonate
-        let s_x = scorer.score_candidate(&"K".to_string());  // Should not resonate as much
+        let s_l = scorer.score_candidate(&"L".to_string()); // Should resonate
+        let s_x = scorer.score_candidate(&"K".to_string()); // Should not resonate as much
 
         println!("After HH-EH: L score={:.3}, K score={:.3}", s_l, s_x);
         // L should score higher than K in this context
@@ -395,7 +391,10 @@ mod tests {
 
         let sequences = vec![
             vec!["T", "IY", "M"].iter().map(|s| s.to_string()).collect(),
-            vec!["T", "IY", "CH"].iter().map(|s| s.to_string()).collect(),
+            vec!["T", "IY", "CH"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             vec!["S", "T", "R"].iter().map(|s| s.to_string()).collect(),
         ];
 

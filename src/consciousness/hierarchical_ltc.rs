@@ -818,9 +818,9 @@ mod tests {
         println!("  B (binding):     {:.3}", binding);
 
         // Metrics should be in valid range
-        assert!(phi >= 0.0 && phi <= 1.0);
-        assert!(workspace >= 0.0 && workspace <= 1.0);
-        assert!(binding >= 0.0 && binding <= 1.0);
+        assert!((0.0..=1.0).contains(&phi));
+        assert!((0.0..=1.0).contains(&workspace));
+        assert!((0.0..=1.0).contains(&binding));
     }
 
     #[test]

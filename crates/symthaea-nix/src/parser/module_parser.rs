@@ -9,7 +9,7 @@
 //! This structural information feeds into the causal graph and HDC
 //! encoding pipeline for understanding module relationships.
 
-use super::nix_parser::{NixParser, NixConfig};
+use super::nix_parser::{NixConfig, NixParser};
 
 /// Parses NixOS modules into structured representations of options and config.
 pub struct ModuleParser {
@@ -71,7 +71,9 @@ impl ModuleParser {
 
     /// Parse a NixOS module source string.
     pub fn parse(&mut self, source: &str) -> Result<ModuleInfo, String> {
-        let config = self.parser.parse(source)
+        let config = self
+            .parser
+            .parse(source)
             .map_err(|e| format!("Failed to parse module: {}", e.message))?;
 
         let is_nixos_module = Self::detect_nixos_module(&config);
@@ -123,7 +125,8 @@ impl ModuleParser {
     /// Check if a parsed option looks like an mkOption/mkEnableOption declaration.
     fn is_option_decl(option: &super::nix_parser::NixOption) -> bool {
         let raw = &option.raw_value;
-        raw.contains("mkOption") || raw.contains("mkEnableOption")
+        raw.contains("mkOption")
+            || raw.contains("mkEnableOption")
             || option.path.starts_with("options.")
     }
 
@@ -140,20 +143,27 @@ impl ModuleParser {
         // Try to extract type from mkOption { type = ...; }
         let option_type = Self::extract_field(raw, "type");
         let default_value = Self::extract_field(raw, "default");
-        let description = Self::extract_field(raw, "description")
-            .or_else(|| {
-                // mkEnableOption "description text"
-                if is_enable {
-                    Self::extract_mk_enable_desc(raw)
-                } else {
-                    None
-                }
-            });
+        let description = Self::extract_field(raw, "description").or_else(|| {
+            // mkEnableOption "description text"
+            if is_enable {
+                Self::extract_mk_enable_desc(raw)
+            } else {
+                None
+            }
+        });
 
         OptionDecl {
             path: option.path.clone(),
-            option_type: if is_enable { Some("bool".to_string()) } else { option_type },
-            default_value: if is_enable { Some("false".to_string()) } else { default_value },
+            option_type: if is_enable {
+                Some("bool".to_string())
+            } else {
+                option_type
+            },
+            default_value: if is_enable {
+                Some("false".to_string())
+            } else {
+                default_value
+            },
             description,
             is_enable,
             line: option.line,
@@ -264,18 +274,29 @@ impl ModuleParser {
         let mut parts = Vec::new();
 
         if info.is_nixos_module {
-            parts.push(format!("NixOS module (args: {})", info.module_args.join(", ")));
+            parts.push(format!(
+                "NixOS module (args: {})",
+                info.module_args.join(", ")
+            ));
         } else {
             parts.push("Nix expression (not a standard NixOS module)".to_string());
         }
 
         if !info.imports.is_empty() {
-            parts.push(format!("Imports ({}): {}", info.imports.len(), info.imports.join(", ")));
+            parts.push(format!(
+                "Imports ({}): {}",
+                info.imports.len(),
+                info.imports.join(", ")
+            ));
         }
 
         if !info.option_decls.is_empty() {
             let paths: Vec<&str> = info.option_decls.iter().map(|d| d.path.as_str()).collect();
-            parts.push(format!("Option declarations ({}): {}", info.option_decls.len(), paths.join(", ")));
+            parts.push(format!(
+                "Option declarations ({}): {}",
+                info.option_decls.len(),
+                paths.join(", ")
+            ));
         }
 
         if !info.config_settings.is_empty() {
@@ -325,14 +346,15 @@ in
 "#;
         let mut parser = ModuleParser::new();
         let info = parser.parse(source).unwrap();
-        assert!(!info.is_nixos_module, "Plain expression should not be detected as module");
+        assert!(
+            !info.is_nixos_module,
+            "Plain expression should not be detected as module"
+        );
     }
 
     #[test]
     fn test_extract_mk_enable_description() {
-        let desc = ModuleParser::extract_mk_enable_desc(
-            r#"mkEnableOption "the nginx web server""#
-        );
+        let desc = ModuleParser::extract_mk_enable_desc(r#"mkEnableOption "the nginx web server""#);
         assert_eq!(desc, Some("the nginx web server".to_string()));
     }
 
@@ -372,7 +394,11 @@ in {
         assert!(info.is_nixos_module);
         // Should find mkEnableOption and mkOption via scanning
         let enable_decl = info.option_decls.iter().find(|d| d.path.contains("enable"));
-        assert!(enable_decl.is_some(), "Should find enable option declaration. Found: {:?}", info.option_decls);
+        assert!(
+            enable_decl.is_some(),
+            "Should find enable option declaration. Found: {:?}",
+            info.option_decls
+        );
         if let Some(decl) = enable_decl {
             assert!(decl.is_enable, "Should detect mkEnableOption");
         }
@@ -392,7 +418,11 @@ in {
         let info = parser.parse(source).unwrap();
 
         assert!(info.is_nixos_module);
-        assert!(info.imports.len() >= 1, "Should find imports, got: {:?}", info.imports);
+        assert!(
+            !info.imports.is_empty(),
+            "Should find imports, got: {:?}",
+            info.imports
+        );
     }
 
     #[test]

@@ -29,7 +29,10 @@ fn main() {
             println!("  Duration:          {} seconds", header.duration_sec);
             println!("  Channels:          {}", header.num_channels);
             println!("  Samples/channel:   {}", data.len());
-            println!("  Sample rate:       ~{:.1} Hz", data.len() as f64 / header.duration_sec as f64);
+            println!(
+                "  Sample rate:       ~{:.1} Hz",
+                data.len() as f64 / header.duration_sec as f64
+            );
 
             // Normalize data to [0, 1]
             let min_val = data.iter().cloned().fold(f64::INFINITY, f64::min);
@@ -72,7 +75,10 @@ fn test_on_eeg(data: &[f64], name: &str) {
     let sub_train = (subsampled.len() * 8) / 10;
     let sub_test = subsampled.len() - sub_train - 1;
 
-    println!("  Subsampled by:     {}x (for faster processing)", subsample);
+    println!(
+        "  Subsampled by:     {}x (for faster processing)",
+        subsample
+    );
     println!("  Effective train:   {}", sub_train);
     println!("  Effective test:    {}", sub_test);
 
@@ -135,7 +141,9 @@ fn read_edf_channel(path: &str, channel: usize) -> Result<(Vec<f64>, EdfHeader),
 
     // Read header (256 bytes fixed + 256 bytes per channel)
     let mut header_buf = [0u8; 256];
-    reader.read_exact(&mut header_buf).map_err(|e| format!("Cannot read header: {}", e))?;
+    reader
+        .read_exact(&mut header_buf)
+        .map_err(|e| format!("Cannot read header: {}", e))?;
 
     // Parse header fields
     let patient_id = String::from_utf8_lossy(&header_buf[8..88]).to_string();
@@ -171,7 +179,9 @@ fn read_edf_channel(path: &str, channel: usize) -> Result<(Vec<f64>, EdfHeader),
     // Read channel-specific headers
     let channel_header_size = 256 * num_channels;
     let mut channel_headers = vec![0u8; channel_header_size];
-    reader.read_exact(&mut channel_headers).map_err(|e| format!("Cannot read channel headers: {}", e))?;
+    reader
+        .read_exact(&mut channel_headers)
+        .map_err(|e| format!("Cannot read channel headers: {}", e))?;
 
     // Parse samples per record for each channel (at offset 216-224 per channel block)
     let mut samples_per_record = Vec::new();
@@ -182,7 +192,8 @@ fn read_edf_channel(path: &str, channel: usize) -> Result<(Vec<f64>, EdfHeader),
             // But we need to look at the ns field which is after the other fields
             let samples_offset = 216 * num_channels + ch * 8;
             if samples_offset + 8 <= channel_headers.len() {
-                let samples_str = String::from_utf8_lossy(&channel_headers[samples_offset..samples_offset + 8]);
+                let samples_str =
+                    String::from_utf8_lossy(&channel_headers[samples_offset..samples_offset + 8]);
                 let samples: usize = samples_str.trim().parse().unwrap_or(256);
                 samples_per_record.push(samples);
             } else {
@@ -209,7 +220,9 @@ fn read_edf_channel(path: &str, channel: usize) -> Result<(Vec<f64>, EdfHeader),
     };
 
     // Seek to data start
-    reader.seek(SeekFrom::Start(header_bytes as u64)).map_err(|e| format!("Cannot seek: {}", e))?;
+    reader
+        .seek(SeekFrom::Start(header_bytes as u64))
+        .map_err(|e| format!("Cannot seek: {}", e))?;
 
     // Read data for the specified channel
     let samples_per_ch = samples_per_record.get(channel).copied().unwrap_or(256);

@@ -5,8 +5,8 @@
 //! - `AudioCategory`: Category classification enum
 //! - `PatternSimilarity`: Similarity scores structure
 
-use crate::hdc::HV;
 use crate::features::MEL_BANDS;
+use crate::hdc::HV;
 
 /// Number of LTC timescale levels for multi-scale prototypes
 pub const NUM_LTC_LEVELS: usize = 5;
@@ -127,12 +127,8 @@ impl AudioPattern {
             rhythm_exemplars: Vec::new(),
             trajectory_exemplars: Vec::new(),
             trajectory_prototype: HV::zero(),
-            timbre_scale_prototypes: [
-                HV::zero(), HV::zero(), HV::zero(), HV::zero(), HV::zero()
-            ],
-            rhythm_scale_prototypes: [
-                HV::zero(), HV::zero(), HV::zero(), HV::zero(), HV::zero()
-            ],
+            timbre_scale_prototypes: [HV::zero(), HV::zero(), HV::zero(), HV::zero(), HV::zero()],
+            rhythm_scale_prototypes: [HV::zero(), HV::zero(), HV::zero(), HV::zero(), HV::zero()],
             rhythm_freq_signature: [0.0; 8],
             timbre_freq_signature: [0.0; 8],
             mean_spectral_centroid: 0.0,
@@ -206,6 +202,12 @@ impl AmbientContexts {
         cafe.rhythm_freq_signature = [0.1, 0.15, 0.2, 0.15, 0.1, 0.05, 0.02, 0.01];
         cafe.timbre_freq_signature = [0.1, 0.1, 0.15, 0.1, 0.05, 0.02, 0.01, 0.0];
 
-        Self { office, traffic, nature, home_quiet, cafe }
+        Self {
+            office,
+            traffic,
+            nature,
+            home_quiet,
+            cafe,
+        }
     }
 }

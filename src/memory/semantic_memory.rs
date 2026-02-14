@@ -627,7 +627,7 @@ mod tests {
 
         // Should return 1.0 (neutral) since no similar entries found
         // (or if threshold is low enough, might still find some)
-        assert!(lr >= 0.5 && lr <= 1.5);
+        assert!((0.5..=1.5).contains(&lr));
     }
 
     #[test]

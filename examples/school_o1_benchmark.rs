@@ -20,12 +20,11 @@
 //! ```
 
 use std::time::{Duration, Instant};
-use symthaea::school::{
-    School, SchoolConfig, Curriculum, CurriculumType,
-    LearningObjective, Difficulty, Domain,
-};
-use symthaea::hdc::HDC_DIMENSION;
 use symthaea::hdc::unified_hv::ContinuousHV;
+use symthaea::hdc::HDC_DIMENSION;
+use symthaea::school::{
+    Curriculum, CurriculumType, Difficulty, Domain, LearningObjective, School, SchoolConfig,
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NAIVE O(N) EVALUATOR (FOR COMPARISON)
@@ -78,7 +77,13 @@ impl NaiveEvaluator {
 
         let obj_enc = objective.encoding.values.as_slice();
         let input: Vec<f32> = (0..self.neurons)
-            .map(|i| if i < obj_enc.len() { obj_enc[i] * 0.01 } else { 0.0 })
+            .map(|i| {
+                if i < obj_enc.len() {
+                    obj_enc[i] * 0.01
+                } else {
+                    0.0
+                }
+            })
             .collect();
 
         // Simulate N timesteps with matrix operations
@@ -154,10 +159,12 @@ where
     }
     let total = start.elapsed();
 
-    println!("  {}: {:?} total, {:?} per iteration",
-             name,
-             total,
-             total / iterations as u32);
+    println!(
+        "  {}: {:?} total, {:?} per iteration",
+        name,
+        total,
+        total / iterations as u32
+    );
 
     total
 }
@@ -209,7 +216,9 @@ fn main() {
         let obj = &objectives[0];
 
         let cfc_time = benchmark("  CfC O(1)", iterations, || {
-            let _ = school.lookahead_engine().evaluate(obj, &consciousness_state);
+            let _ = school
+                .lookahead_engine()
+                .evaluate(obj, &consciousness_state);
         });
 
         // O(N) Simple Naive evaluation (for faster benchmarking)
@@ -228,19 +237,25 @@ fn main() {
     // BENCHMARK 2: Batch Objective Ranking
     // ─────────────────────────────────────────────────────────────────────────────
 
-    println!("\n═══ Benchmark 2: Ranking {} Objectives ═══\n", objectives.len());
+    println!(
+        "\n═══ Benchmark 2: Ranking {} Objectives ═══\n",
+        objectives.len()
+    );
 
     let obj_refs: Vec<&LearningObjective> = objectives.iter().collect();
 
     let iterations = 100;
 
     let cfc_batch = benchmark("CfC O(1) batch", iterations, || {
-        let _ = school.lookahead_engine().rank_objectives(&obj_refs, &consciousness_state);
+        let _ = school
+            .lookahead_engine()
+            .rank_objectives(&obj_refs, &consciousness_state);
     });
 
     let naive = SimpleNaiveEvaluator::new(1000, 0.001); // 1 second horizon
     let naive_batch = benchmark("Naive O(1000) batch", iterations, || {
-        let mut results: Vec<(usize, f32)> = objectives.iter()
+        let mut results: Vec<(usize, f32)> = objectives
+            .iter()
             .enumerate()
             .map(|(i, obj)| (i, naive.evaluate(obj, &initial_state)))
             .collect();
@@ -265,7 +280,9 @@ fn main() {
         // CfC (constant time)
         let cfc_start = Instant::now();
         for _ in 0..iterations {
-            let _ = school.lookahead_engine().evaluate(obj, &consciousness_state);
+            let _ = school
+                .lookahead_engine()
+                .evaluate(obj, &consciousness_state);
         }
         let cfc_per = cfc_start.elapsed() / iterations as u32;
 
@@ -281,8 +298,10 @@ fn main() {
 
         let speedup = naive_per.as_nanos() as f64 / cfc_per.as_nanos() as f64;
 
-        println!("│ {:>7.1} │ {:>8.1?} │ {:>10.1?} │ {:>6.1}x │",
-                 horizon, cfc_per, naive_per, speedup);
+        println!(
+            "│ {:>7.1} │ {:>8.1?} │ {:>10.1?} │ {:>6.1}x │",
+            horizon, cfc_per, naive_per, speedup
+        );
     }
 
     println!("└─────────┴──────────┴────────────┴─────────┘");

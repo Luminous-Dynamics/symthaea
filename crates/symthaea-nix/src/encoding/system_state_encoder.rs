@@ -4,8 +4,8 @@
 //! into a single ContinuousHV. This is the "system fingerprint" — the
 //! world model's representation of the current system.
 
-use symthaea_core::hdc::ContinuousHV;
 use super::codebook::NixCodebook;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Snapshot of observable system state for encoding.
 #[derive(Debug, Clone, Default)]
@@ -174,11 +174,7 @@ mod tests {
                 ("postgresql".to_string(), ServiceState::Running),
                 ("sshd".to_string(), ServiceState::Running),
             ],
-            packages: vec![
-                "firefox".to_string(),
-                "vim".to_string(),
-                "git".to_string(),
-            ],
+            packages: vec!["firefox".to_string(), "vim".to_string(), "git".to_string()],
             config_options: vec![
                 ("services.nginx.enable".to_string(), "true".to_string()),
                 ("services.postgresql.enable".to_string(), "true".to_string()),
@@ -228,9 +224,7 @@ mod tests {
 
         // snap_c: completely different
         let snap_c = SystemStateSnapshot {
-            services: vec![
-                ("docker".to_string(), ServiceState::Running),
-            ],
+            services: vec![("docker".to_string(), ServiceState::Running)],
             packages: vec!["python3".to_string()],
             ..Default::default()
         };
@@ -254,7 +248,8 @@ mod tests {
         assert!(
             sim_ab > sim_ac,
             "Similar states ({:.3}) should have higher similarity than different states ({:.3})",
-            sim_ab, sim_ac,
+            sim_ab,
+            sim_ac,
         );
     }
 

@@ -29,12 +29,11 @@ use std::path::Path;
 use std::time::Instant;
 
 use symthaea::dynamics::hmm::HiddenMarkovModel;
-use symthaea::dynamics::wavelet::{WaveletAnalyzer, DwtConfig, WaveletFamily, ExtensionMode};
-use symthaea::perception::physio::{
-    EdfFile, IntegrationMetrics, SleepSentinel, SleepSentinelConfig, SleepStage,
-    ConsciousnessState,
-};
 use symthaea::dynamics::spectral_analysis::{SpectralAnalyzer, SpectralConfig, WindowType};
+use symthaea::dynamics::wavelet::{DwtConfig, ExtensionMode, WaveletAnalyzer, WaveletFamily};
+use symthaea::perception::physio::{
+    ConsciousnessState, EdfFile, IntegrationMetrics, SleepSentinel, SleepSentinelConfig, SleepStage,
+};
 
 const DATA_DIR: &str = "data/benchmarks/sleep-edf";
 
@@ -88,7 +87,7 @@ fn main() {
         integration_window: 300,
         tau_base: 100.0,
         enable_adaptive_thresholds: true,
-        steps_per_epoch: 100, // Reduced for faster benchmarking
+        steps_per_epoch: 100,        // Reduced for faster benchmarking
         use_spectral_analysis: true, // Welch PSD with recalibrated thresholds for proper spectral ratios
         ..SleepSentinelConfig::default()
     };
@@ -115,9 +114,8 @@ fn main() {
     for (i, psg_path) in psg_files[..n_train].iter().enumerate() {
         // Sleep-EDF naming: SC4001E0-PSG.edf -> SC4001E*-Hypnogram.edf
         let psg_str = psg_path.to_str().unwrap();
-        let hyp_path = find_hypnogram(psg_str).unwrap_or_else(|| {
-            psg_str.replace("-PSG.edf", "-Hypnogram.edf")
-        });
+        let hyp_path = find_hypnogram(psg_str)
+            .unwrap_or_else(|| psg_str.replace("-PSG.edf", "-Hypnogram.edf"));
 
         let mut edf = match EdfFile::load(psg_path) {
             Ok(e) => e,
@@ -163,7 +161,10 @@ fn main() {
             let mut feat_mean = [0.0f64; N_FEAT];
             let mut feat_sq = [0.0f64; N_FEAT];
             for &(_, ref feats) in &recording_features {
-                for f in 0..N_FEAT { feat_mean[f] += feats[f]; feat_sq[f] += feats[f] * feats[f]; }
+                for f in 0..N_FEAT {
+                    feat_mean[f] += feats[f];
+                    feat_sq[f] += feats[f] * feats[f];
+                }
             }
             for f in 0..N_FEAT {
                 feat_mean[f] /= nr;
@@ -171,7 +172,9 @@ fn main() {
             }
             for (stage_idx, feats) in recording_features {
                 let mut z = [0.0f64; N_FEAT];
-                for f in 0..N_FEAT { z[f] = (feats[f] - feat_mean[f]) / feat_sq[f]; }
+                for f in 0..N_FEAT {
+                    z[f] = (feats[f] - feat_mean[f]) / feat_sq[f];
+                }
                 training_features.push((stage_idx, z));
             }
         }
@@ -189,15 +192,23 @@ fn main() {
     let stage_stats = StageFeatureStats::from_training_data(&training_features);
     let feat_stage_names = ["Wake", "N1", "N2", "N3", "REM"];
     println!("\n  Learned feature distributions (mean):");
-    println!("  {:>5} {:>4} {:>6} {:>6} {:>6} {:>6} {:>8} {:>7} {:>6}",
-        "", "n", "delta", "theta", "alpha", "beta", "logPow", "logRMS", "ZCR");
+    println!(
+        "  {:>5} {:>4} {:>6} {:>6} {:>6} {:>6} {:>8} {:>7} {:>6}",
+        "", "n", "delta", "theta", "alpha", "beta", "logPow", "logRMS", "ZCR"
+    );
     for s in 0..5 {
-        println!("  {:>5} {:>4} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>8.2} {:>7.2} {:>6.4}",
-            feat_stage_names[s], stage_stats.counts[s],
-            stage_stats.means[s][0], stage_stats.means[s][1],
-            stage_stats.means[s][2], stage_stats.means[s][3],
-            stage_stats.means[s][4], stage_stats.means[s][5],
-            stage_stats.means[s][6]);
+        println!(
+            "  {:>5} {:>4} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>8.2} {:>7.2} {:>6.4}",
+            feat_stage_names[s],
+            stage_stats.counts[s],
+            stage_stats.means[s][0],
+            stage_stats.means[s][1],
+            stage_stats.means[s][2],
+            stage_stats.means[s][3],
+            stage_stats.means[s][4],
+            stage_stats.means[s][5],
+            stage_stats.means[s][6]
+        );
     }
 
     // Testing phase
@@ -216,9 +227,8 @@ fn main() {
     for (i, psg_path) in psg_files[n_train..n_train + n_test].iter().enumerate() {
         // Sleep-EDF naming: SC4001E0-PSG.edf -> SC4001E*-Hypnogram.edf
         let psg_str = psg_path.to_str().unwrap();
-        let hyp_path = find_hypnogram(psg_str).unwrap_or_else(|| {
-            psg_str.replace("-PSG.edf", "-Hypnogram.edf")
-        });
+        let hyp_path = find_hypnogram(psg_str)
+            .unwrap_or_else(|| psg_str.replace("-PSG.edf", "-Hypnogram.edf"));
 
         let mut edf = match EdfFile::load(psg_path) {
             Ok(e) => e,
@@ -262,21 +272,35 @@ fn main() {
         // Gaussian model is good at Wake detection (z-normalized features)
         // Rule-based model is good at N2/N3 separation (sigmoid thresholds)
         let emission_gaussian = compute_emission_probs_learned(&epoch_signals, &stage_stats, 100.0);
-        let emission_rules = compute_emission_probs_enhanced(&epoch_metrics, &epoch_signals, 100.0, Some(&stage_stats));
-        let emission_sequence: Vec<Vec<f64>> = emission_gaussian.iter().zip(emission_rules.iter())
+        let emission_rules = compute_emission_probs_enhanced(
+            &epoch_metrics,
+            &epoch_signals,
+            100.0,
+            Some(&stage_stats),
+        );
+        let emission_sequence: Vec<Vec<f64>> = emission_gaussian
+            .iter()
+            .zip(emission_rules.iter())
             .map(|(g, r)| {
                 // Geometric mean gives balanced combination
-                let mut combined: Vec<f64> = g.iter().zip(r.iter())
+                let mut combined: Vec<f64> = g
+                    .iter()
+                    .zip(r.iter())
                     .map(|(&gp, &rp)| (gp * rp).sqrt())
                     .collect();
                 let sum: f64 = combined.iter().sum();
                 if sum > 0.0 {
-                    for p in combined.iter_mut() { *p = (*p / sum).max(0.01); }
+                    for p in combined.iter_mut() {
+                        *p = (*p / sum).max(0.01);
+                    }
                     let sum2: f64 = combined.iter().sum();
-                    for p in combined.iter_mut() { *p /= sum2; }
+                    for p in combined.iter_mut() {
+                        *p /= sum2;
+                    }
                 }
                 combined
-            }).collect();
+            })
+            .collect();
 
         // Run Viterbi smoothing on the full recording
         let smoothed = hmm.viterbi(&emission_sequence);
@@ -293,15 +317,27 @@ fn main() {
             confusion_raw[actual][raw_pred] += 1;
             confusion_hmm[actual][hmm_pred] += 1;
 
-            if actual == raw_pred { correct_raw += 1; }
-            if actual == hmm_pred { correct_hmm += 1; }
+            if actual == raw_pred {
+                correct_raw += 1;
+            }
+            if actual == hmm_pred {
+                correct_hmm += 1;
+            }
         }
 
         total_test_epochs += actual_indices.len();
 
         let n_valid = actual_indices.len();
-        let acc_raw = if n_valid > 0 { correct_raw as f64 / n_valid as f64 * 100.0 } else { 0.0 };
-        let acc_hmm = if n_valid > 0 { correct_hmm as f64 / n_valid as f64 * 100.0 } else { 0.0 };
+        let acc_raw = if n_valid > 0 {
+            correct_raw as f64 / n_valid as f64 * 100.0
+        } else {
+            0.0
+        };
+        let acc_hmm = if n_valid > 0 {
+            correct_hmm as f64 / n_valid as f64 * 100.0
+        } else {
+            0.0
+        };
         println!(
             "  [{}/{}] {} - raw {:.1}% / HMM {:.1}% ({} epochs)",
             i + 1,
@@ -410,7 +446,7 @@ fn run_synthetic_benchmark() {
         integration_window: 300,
         tau_base: 100.0,
         enable_adaptive_thresholds: true,
-        steps_per_epoch: 500, // Reduced from 3000 for faster benchmark
+        steps_per_epoch: 500,        // Reduced from 3000 for faster benchmark
         use_spectral_analysis: true, // Welch PSD with recalibrated thresholds for proper spectral ratios
         ..SleepSentinelConfig::default()
     };
@@ -465,8 +501,7 @@ fn run_synthetic_benchmark() {
     for (stage_idx, (stage, _name)) in stages.iter().enumerate() {
         for epoch_i in 0..test_epochs_per_stage {
             let seed = 10000 + epoch_i as u64;
-            let (frontal, occipital) =
-                generate_synthetic_eeg(stage, epoch_len, sample_rate, seed);
+            let (frontal, occipital) = generate_synthetic_eeg(stage, epoch_len, sample_rate, seed);
             let (predicted, metrics) = sentinel.process_epoch(&frontal, &occipital);
             let pred_idx = consciousness_to_idx(&predicted);
 
@@ -478,7 +513,8 @@ fn run_synthetic_benchmark() {
     }
 
     // Compute emission probabilities with wavelet/PAC enhancement
-    let emission_sequence = compute_emission_probs_enhanced(&all_metrics, &all_signals, sample_rate, None);
+    let emission_sequence =
+        compute_emission_probs_enhanced(&all_metrics, &all_signals, sample_rate, None);
     let smoothed = hmm.viterbi(&emission_sequence);
 
     // Score both raw and HMM-smoothed
@@ -653,7 +689,11 @@ fn build_sleep_hmm() -> HiddenMarkovModel {
     let initial = vec![0.40, 0.15, 0.25, 0.10, 0.10];
 
     let state_names = vec![
-        "Wake".into(), "N1".into(), "N2".into(), "N3".into(), "REM".into(),
+        "Wake".into(),
+        "N1".into(),
+        "N2".into(),
+        "N3".into(),
+        "REM".into(),
     ];
 
     HiddenMarkovModel::with_params(initial, transitions, state_names)
@@ -690,10 +730,15 @@ fn extract_spectral_features(signal: &[f64], spectral: &SpectralAnalyzer) -> [f6
     for (i, &p) in spectrum.psd.iter().enumerate() {
         let f = spectrum.frequencies[i];
         let pv = p.max(0.0);
-        if f >= 0.5 && f < 4.0 { delta += pv; }
-        else if f >= 4.0 && f < 8.0 { theta += pv; }
-        else if f >= 8.0 && f < 12.0 { alpha += pv; }
-        else if f >= 12.0 && f < 30.0 { beta += pv; }
+        if f >= 0.5 && f < 4.0 {
+            delta += pv;
+        } else if f >= 4.0 && f < 8.0 {
+            theta += pv;
+        } else if f >= 8.0 && f < 12.0 {
+            alpha += pv;
+        } else if f >= 12.0 && f < 30.0 {
+            beta += pv;
+        }
 
         // Spectral slope: linear regression of log(PSD) vs log(f) in 1-30 Hz
         if f >= 1.0 && f <= 30.0 && pv > 1e-20 {
@@ -732,15 +777,22 @@ fn extract_spectral_features(signal: &[f64], spectral: &SpectralAnalyzer) -> [f6
         0.0
     };
 
-    [delta / total_eeg, theta / total_eeg, alpha / total_eeg, beta / total_eeg,
-     log_power, log_rms, spectral_slope]
+    [
+        delta / total_eeg,
+        theta / total_eeg,
+        alpha / total_eeg,
+        beta / total_eeg,
+        log_power,
+        log_rms,
+        spectral_slope,
+    ]
 }
 
 /// Per-stage feature statistics learned from training data.
 /// Uses diagonal Gaussian model for emission probability computation.
 struct StageFeatureStats {
-    means: [[f64; N_FEAT]; 5],   // [stage][feature]
-    vars: [[f64; N_FEAT]; 5],    // [stage][feature]
+    means: [[f64; N_FEAT]; 5], // [stage][feature]
+    vars: [[f64; N_FEAT]; 5],  // [stage][feature]
     counts: [usize; 5],
 }
 
@@ -751,7 +803,9 @@ impl StageFeatureStats {
         let mut counts = [0usize; 5];
 
         for &(stage, ref feats) in features {
-            if stage >= 5 { continue; }
+            if stage >= 5 {
+                continue;
+            }
             counts[stage] += 1;
             for f in 0..N_FEAT {
                 sums[stage][f] += feats[f];
@@ -769,7 +823,11 @@ impl StageFeatureStats {
             }
         }
 
-        Self { means, vars, counts }
+        Self {
+            means,
+            vars,
+            counts,
+        }
     }
 
     /// Compute emission probability vector for all 5 stages given observed features.
@@ -791,9 +849,13 @@ impl StageFeatureStats {
         let mut probs: Vec<f64> = log_likes.iter().map(|&ll| (ll - max_ll).exp()).collect();
         let sum: f64 = probs.iter().sum();
         if sum > 0.0 {
-            for p in probs.iter_mut() { *p = (*p / sum).max(0.01); }
+            for p in probs.iter_mut() {
+                *p = (*p / sum).max(0.01);
+            }
             let sum2: f64 = probs.iter().sum();
-            for p in probs.iter_mut() { *p /= sum2; }
+            for p in probs.iter_mut() {
+                *p /= sum2;
+            }
         } else {
             probs = vec![0.2; 5];
         }
@@ -816,7 +878,8 @@ fn compute_emission_probs_learned(
     });
 
     // First pass: extract raw features for all epochs
-    let raw_features: Vec<[f64; N_FEAT]> = signals.iter()
+    let raw_features: Vec<[f64; N_FEAT]> = signals
+        .iter()
         .map(|signal| extract_spectral_features(signal, &spectral))
         .collect();
 
@@ -825,7 +888,10 @@ fn compute_emission_probs_learned(
     let mut mean = [0.0f64; N_FEAT];
     let mut sq = [0.0f64; N_FEAT];
     for feats in &raw_features {
-        for f in 0..N_FEAT { mean[f] += feats[f]; sq[f] += feats[f] * feats[f]; }
+        for f in 0..N_FEAT {
+            mean[f] += feats[f];
+            sq[f] += feats[f] * feats[f];
+        }
     }
     for f in 0..N_FEAT {
         mean[f] /= n;
@@ -833,11 +899,16 @@ fn compute_emission_probs_learned(
     }
 
     // Z-normalize and compute emission probabilities
-    raw_features.iter().map(|feats| {
-        let mut z = [0.0f64; N_FEAT];
-        for f in 0..N_FEAT { z[f] = (feats[f] - mean[f]) / sq[f]; }
-        stats.emission_probs(&z)
-    }).collect()
+    raw_features
+        .iter()
+        .map(|feats| {
+            let mut z = [0.0f64; N_FEAT];
+            for f in 0..N_FEAT {
+                z[f] = (feats[f] - mean[f]) / sq[f];
+            }
+            stats.emission_probs(&z)
+        })
+        .collect()
 }
 
 /// Enhanced emission probabilities combining spectral, wavelet, and PAC features.
@@ -871,140 +942,173 @@ fn compute_emission_probs_enhanced(
         sample_rate,
     });
 
-    metrics.iter().zip(signals.iter()).map(|(m, signal)| {
-        // Compute band powers from raw EEG signal via Welch PSD.
-        // IntegrationMetrics come from CfC network state and don't reflect
-        // epoch-to-epoch frequency variation needed for classification.
-        let (delta_ratio, theta_ratio, alpha_ratio, beta_ratio, _entropy) = if signal.len() >= 256 {
-            let spectrum = spectral.welch(signal);
+    metrics
+        .iter()
+        .zip(signals.iter())
+        .map(|(m, signal)| {
+            // Compute band powers from raw EEG signal via Welch PSD.
+            // IntegrationMetrics come from CfC network state and don't reflect
+            // epoch-to-epoch frequency variation needed for classification.
+            let (delta_ratio, theta_ratio, alpha_ratio, beta_ratio, _entropy) = if signal.len()
+                >= 256
+            {
+                let spectrum = spectral.welch(signal);
 
-            let mut delta = 0.0f64;
-            let mut theta = 0.0f64;
-            let mut alpha = 0.0f64;
-            let mut beta = 0.0f64;
-            let mut total = 0.0f64;
-            for (i, &p) in spectrum.psd.iter().enumerate() {
-                let f = spectrum.frequencies[i];
-                let pv = p.max(0.0);
-                total += pv;
-                if f >= 0.5 && f < 4.0 { delta += pv; }
-                else if f >= 4.0 && f < 8.0 { theta += pv; }
-                else if f >= 8.0 && f < 12.0 { alpha += pv; }
-                else if f >= 12.0 && f < 30.0 { beta += pv; }
-            }
-            let t = total.max(1e-10);
-            // Spectral entropy from PSD
-            let ent: f64 = spectrum.psd.iter().map(|&p| {
-                let n = (p.max(0.0) / t).max(1e-20);
-                -n * n.ln()
-            }).sum::<f64>() / (spectrum.psd.len() as f64).ln().max(1.0);
+                let mut delta = 0.0f64;
+                let mut theta = 0.0f64;
+                let mut alpha = 0.0f64;
+                let mut beta = 0.0f64;
+                let mut total = 0.0f64;
+                for (i, &p) in spectrum.psd.iter().enumerate() {
+                    let f = spectrum.frequencies[i];
+                    let pv = p.max(0.0);
+                    total += pv;
+                    if f >= 0.5 && f < 4.0 {
+                        delta += pv;
+                    } else if f >= 4.0 && f < 8.0 {
+                        theta += pv;
+                    } else if f >= 8.0 && f < 12.0 {
+                        alpha += pv;
+                    } else if f >= 12.0 && f < 30.0 {
+                        beta += pv;
+                    }
+                }
+                let t = total.max(1e-10);
+                // Spectral entropy from PSD
+                let ent: f64 = spectrum
+                    .psd
+                    .iter()
+                    .map(|&p| {
+                        let n = (p.max(0.0) / t).max(1e-20);
+                        -n * n.ln()
+                    })
+                    .sum::<f64>()
+                    / (spectrum.psd.len() as f64).ln().max(1.0);
 
-            (delta / t, theta / t, alpha / t, beta / t, ent)
-        } else {
-            // Fallback to IntegrationMetrics for short signals
-            let total_power = (m.delta_power + m.theta_power + m.alpha_power + m.beta_power + m.gamma_power).max(1e-10);
-            (m.delta_power as f64 / total_power as f64,
-             m.theta_power as f64 / total_power as f64,
-             m.alpha_power as f64 / total_power as f64,
-             m.beta_power as f64 / total_power as f64,
-             m.spectral_entropy as f64)
-        };
+                (delta / t, theta / t, alpha / t, beta / t, ent)
+            } else {
+                // Fallback to IntegrationMetrics for short signals
+                let total_power =
+                    (m.delta_power + m.theta_power + m.alpha_power + m.beta_power + m.gamma_power)
+                        .max(1e-10);
+                (
+                    m.delta_power as f64 / total_power as f64,
+                    m.theta_power as f64 / total_power as f64,
+                    m.alpha_power as f64 / total_power as f64,
+                    m.beta_power as f64 / total_power as f64,
+                    m.spectral_entropy as f64,
+                )
+            };
 
-        // --- Wavelet features ---
-        // Spindle count (12-14 Hz bursts characteristic of N2)
-        let spindles = wavelet.detect_spindles(signal);
-        let spindle_count = spindles.len() as f64;
-        // Normalized: 0-3+ spindles per 30s epoch
-        let spindle_score = (spindle_count / 3.0).min(1.0);
+            // --- Wavelet features ---
+            // Spindle count (12-14 Hz bursts characteristic of N2)
+            let spindles = wavelet.detect_spindles(signal);
+            let spindle_count = spindles.len() as f64;
+            // Normalized: 0-3+ spindles per 30s epoch
+            let spindle_score = (spindle_count / 3.0).min(1.0);
 
-        // Wavelet entropy (multi-scale complexity)
-        let w_entropy = wavelet.wavelet_entropy(signal);
+            // Wavelet entropy (multi-scale complexity)
+            let w_entropy = wavelet.wavelet_entropy(signal);
 
-        // --- Cross-frequency proxies (fast approximation of PAC) ---
-        // Delta-beta co-activation: strong in deep sleep (delta dominant + low beta)
-        // Using band power product as PAC proxy (avoids expensive FIR+Hilbert)
-        let pac_score = (delta_ratio * (1.0 - beta_ratio) * 4.0).min(1.0);
+            // --- Cross-frequency proxies (fast approximation of PAC) ---
+            // Delta-beta co-activation: strong in deep sleep (delta dominant + low beta)
+            // Using band power product as PAC proxy (avoids expensive FIR+Hilbert)
+            let pac_score = (delta_ratio * (1.0 - beta_ratio) * 4.0).min(1.0);
 
-        // Theta-gamma proxy: theta dominant with some high-freq activity = REM
-        // True PAC requires FIR filtering (~30ms/epoch), proxy is O(1)
-        let theta_gamma_score = (theta_ratio * beta_ratio * 20.0).min(1.0);
+            // Theta-gamma proxy: theta dominant with some high-freq activity = REM
+            // True PAC requires FIR filtering (~30ms/epoch), proxy is O(1)
+            let theta_gamma_score = (theta_ratio * beta_ratio * 20.0).min(1.0);
 
-        // --- Adaptive thresholds from training statistics ---
-        // Use training means as sigmoid centers instead of hardcoded values.
-        // Fallback to hardcoded if no stats provided.
-        let (wake_alpha_c, wake_delta_c, n1_theta_c, n1_delta_c,
-             n2_delta_c, n3_delta_c, rem_theta_c, rem_delta_c) =
-            if let Some(ss) = stage_stats {
+            // --- Adaptive thresholds from training statistics ---
+            // Use training means as sigmoid centers instead of hardcoded values.
+            // Fallback to hardcoded if no stats provided.
+            let (
+                wake_alpha_c,
+                wake_delta_c,
+                n1_theta_c,
+                n1_delta_c,
+                n2_delta_c,
+                n3_delta_c,
+                rem_theta_c,
+                rem_delta_c,
+            ) = if let Some(ss) = stage_stats {
                 // means[stage][feature]: 0=delta, 1=theta, 2=alpha, 3=beta
-                (ss.means[0][2].max(0.05),  // Wake alpha center
-                 ss.means[0][0].min(0.45),  // Wake delta center (upper bound)
-                 ss.means[1][1].max(0.08),  // N1 theta center
-                 ss.means[1][0],            // N1 delta center
-                 ss.means[2][0],            // N2 delta center
-                 ss.means[3][0].max(0.50),  // N3 delta center
-                 ss.means[4][1].max(0.08),  // REM theta center
-                 ss.means[4][0].min(0.55))  // REM delta center (upper bound)
+                (
+                    ss.means[0][2].max(0.05), // Wake alpha center
+                    ss.means[0][0].min(0.45), // Wake delta center (upper bound)
+                    ss.means[1][1].max(0.08), // N1 theta center
+                    ss.means[1][0],           // N1 delta center
+                    ss.means[2][0],           // N2 delta center
+                    ss.means[3][0].max(0.50), // N3 delta center
+                    ss.means[4][1].max(0.08), // REM theta center
+                    ss.means[4][0].min(0.55),
+                ) // REM delta center (upper bound)
             } else {
                 (0.08, 0.40, 0.10, 0.35, 0.42, 0.55, 0.12, 0.50)
             };
 
-        // --- Compute enhanced scores ---
-        // Use thresholded features, not linear scaling.
-        // Delta dominates in most EEG epochs; linear weighting biases everything to N3.
-        let mut scores = [0.0f64; 5];
+            // --- Compute enhanced scores ---
+            // Use thresholded features, not linear scaling.
+            // Delta dominates in most EEG epochs; linear weighting biases everything to N3.
+            let mut scores = [0.0f64; 5];
 
-        // Sigmoid-like threshold: sharp transition at cutoff
-        let sigmoid = |x: f64, center: f64, sharpness: f64| -> f64 {
-            1.0 / (1.0 + (-(x - center) * sharpness).exp())
-        };
+            // Sigmoid-like threshold: sharp transition at cutoff
+            let sigmoid = |x: f64, center: f64, sharpness: f64| -> f64 {
+                1.0 / (1.0 + (-(x - center) * sharpness).exp())
+            };
 
-        // Wake: alpha relatively high, delta NOT dominant, high wavelet entropy
-        let wake_alpha = sigmoid(alpha_ratio, wake_alpha_c, 30.0);
-        let wake_low_delta = sigmoid(-delta_ratio, -wake_delta_c, 15.0);
-        let wake_high_wentropy = sigmoid(w_entropy, 1.5, 8.0); // broadband = Wake
-        scores[0] = wake_alpha * 2.0 + wake_low_delta * 1.5 + wake_high_wentropy * 1.2
-            + beta_ratio * 1.0 + (1.0 - spindle_score) * 0.3;
+            // Wake: alpha relatively high, delta NOT dominant, high wavelet entropy
+            let wake_alpha = sigmoid(alpha_ratio, wake_alpha_c, 30.0);
+            let wake_low_delta = sigmoid(-delta_ratio, -wake_delta_c, 15.0);
+            let wake_high_wentropy = sigmoid(w_entropy, 1.5, 8.0); // broadband = Wake
+            scores[0] = wake_alpha * 2.0
+                + wake_low_delta * 1.5
+                + wake_high_wentropy * 1.2
+                + beta_ratio * 1.0
+                + (1.0 - spindle_score) * 0.3;
 
-        // N1: theta dominant relative to alpha, moderate delta
-        let n1_theta = sigmoid(theta_ratio, n1_theta_c, 25.0);
-        let n1_mod_delta = 1.0 - (delta_ratio - n1_delta_c).abs() * 3.0;
-        let n1_low_alpha = sigmoid(-alpha_ratio, -0.10, 20.0);
-        let n1_mid_wentropy = 1.0 - (w_entropy - 1.3).abs() * 2.0; // peaks mid-range
-        scores[1] = n1_theta * 2.0 + n1_mod_delta.max(0.0) * 1.0 + n1_low_alpha * 0.8
-            + n1_mid_wentropy.max(0.0) * 0.8
-            + (1.0 - spindle_score) * 0.3;
+            // N1: theta dominant relative to alpha, moderate delta
+            let n1_theta = sigmoid(theta_ratio, n1_theta_c, 25.0);
+            let n1_mod_delta = 1.0 - (delta_ratio - n1_delta_c).abs() * 3.0;
+            let n1_low_alpha = sigmoid(-alpha_ratio, -0.10, 20.0);
+            let n1_mid_wentropy = 1.0 - (w_entropy - 1.3).abs() * 2.0; // peaks mid-range
+            scores[1] = n1_theta * 2.0
+                + n1_mod_delta.max(0.0) * 1.0
+                + n1_low_alpha * 0.8
+                + n1_mid_wentropy.max(0.0) * 0.8
+                + (1.0 - spindle_score) * 0.3;
 
-        // N2: moderate delta, spindles are the hallmark
-        let n2_mod_delta = 1.0 - (delta_ratio - n2_delta_c).abs() * 2.5;
-        scores[2] = n2_mod_delta.max(0.0) * 1.5 + theta_ratio * 1.0
+            // N2: moderate delta, spindles are the hallmark
+            let n2_mod_delta = 1.0 - (delta_ratio - n2_delta_c).abs() * 2.5;
+            scores[2] = n2_mod_delta.max(0.0) * 1.5 + theta_ratio * 1.0
             + spindle_score * 2.5 // Spindles are THE N2 marker
             + (1.0 - wake_alpha) * 0.3;
 
-        // N3: delta MUST be dominant, low wavelet entropy, low alpha/beta
-        let n3_high_delta = sigmoid(delta_ratio, n3_delta_c, 20.0);
-        let n3_low_fast = sigmoid(-(alpha_ratio + beta_ratio), -0.10, 20.0);
-        let n3_low_wentropy = sigmoid(-w_entropy, -0.8, 10.0); // concentrated = N3
-        scores[3] = n3_high_delta * 3.0 + n3_low_fast * 1.0
-            + n3_low_wentropy * 1.0
-            + pac_score * 0.8;
+            // N3: delta MUST be dominant, low wavelet entropy, low alpha/beta
+            let n3_high_delta = sigmoid(delta_ratio, n3_delta_c, 20.0);
+            let n3_low_fast = sigmoid(-(alpha_ratio + beta_ratio), -0.10, 20.0);
+            let n3_low_wentropy = sigmoid(-w_entropy, -0.8, 10.0); // concentrated = N3
+            scores[3] =
+                n3_high_delta * 3.0 + n3_low_fast * 1.0 + n3_low_wentropy * 1.0 + pac_score * 0.8;
 
-        // REM: theta high, delta NOT dominant, theta-gamma coupling, no spindles
-        let rem_theta = sigmoid(theta_ratio, rem_theta_c, 25.0);
-        let rem_low_delta = sigmoid(-delta_ratio, -rem_delta_c, 15.0);
-        let rem_beta = sigmoid(beta_ratio, 0.05, 30.0);
-        scores[4] = rem_theta * 1.5 + rem_low_delta * 1.5 + rem_beta * 1.0
+            // REM: theta high, delta NOT dominant, theta-gamma coupling, no spindles
+            let rem_theta = sigmoid(theta_ratio, rem_theta_c, 25.0);
+            let rem_low_delta = sigmoid(-delta_ratio, -rem_delta_c, 15.0);
+            let rem_beta = sigmoid(beta_ratio, 0.05, 30.0);
+            scores[4] = rem_theta * 1.5 + rem_low_delta * 1.5 + rem_beta * 1.0
             + theta_gamma_score * 1.2 // Theta-gamma coupling = REM marker
             + (1.0 - spindle_score) * 0.3
             + (1.0 - pac_score) * 0.3;
 
-        // Normalize to proper probability distribution
-        let sum: f64 = scores.iter().sum();
-        if sum > 0.0 {
-            scores.iter().map(|&s| (s / sum).max(0.01)).collect()
-        } else {
-            vec![0.2; 5] // uniform fallback
-        }
-    }).collect()
+            // Normalize to proper probability distribution
+            let sum: f64 = scores.iter().sum();
+            if sum > 0.0 {
+                scores.iter().map(|&s| (s / sum).max(0.01)).collect()
+            } else {
+                vec![0.2; 5] // uniform fallback
+            }
+        })
+        .collect()
 }
 
 /// Find the hypnogram file for a PSG file in Sleep-EDF format.

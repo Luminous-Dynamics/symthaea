@@ -77,18 +77,15 @@ async fn send_request(stream: &mut TcpStream, request: Value) -> Result<Value, B
 /// Wait for service to be ready by polling with ping
 async fn wait_for_service(addr: &str, max_attempts: u32) -> Result<(), Box<dyn std::error::Error>> {
     for attempt in 1..=max_attempts {
-        match TcpStream::connect(addr).await {
-            Ok(mut stream) => {
-                let ping = json!({"type": "ping"});
-                match send_request(&mut stream, ping).await {
-                    Ok(resp) if resp["type"] == "pong" => {
-                        println!("  ✓ Service ready after {} attempts", attempt);
-                        return Ok(());
-                    }
-                    _ => {}
+        if let Ok(mut stream) = TcpStream::connect(addr).await {
+            let ping = json!({"type": "ping"});
+            match send_request(&mut stream, ping).await {
+                Ok(resp) if resp["type"] == "pong" => {
+                    println!("  ✓ Service ready after {} attempts", attempt);
+                    return Ok(());
                 }
+                _ => {}
             }
-            Err(_) => {}
         }
         sleep(Duration::from_millis(500)).await;
     }

@@ -10,15 +10,12 @@ use anyhow::Result;
 
 #[cfg(feature = "neural-bridge")]
 use symthaea::perception::modern_embeddings::{
-    UnifiedEmbedder, EmbeddingConfig, ModelBackend,
-    PhenomenalLayerAnalyzer, print_model_summary,
+    print_model_summary, EmbeddingConfig, ModelBackend, PhenomenalLayerAnalyzer, UnifiedEmbedder,
 };
 
 fn main() -> Result<()> {
     // Initialize logging
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("========================================================================");
     println!("            MODERN EMBEDDINGS DEMO - Unified Interface                  ");
@@ -68,7 +65,10 @@ fn run_demo() -> Result<()> {
     println!("  Name: {}", embedder.model_name());
     println!("  Dimension: {}", embedder.dimension());
     println!("  Layers: {}", embedder.num_layers());
-    println!("  Phenomenal Corridor: Layer {}", embedder.phenomenal_corridor_layer());
+    println!(
+        "  Phenomenal Corridor: Layer {}",
+        embedder.phenomenal_corridor_layer()
+    );
     println!("  Using GPU: {}", embedder.is_gpu());
     println!();
 
@@ -88,8 +88,13 @@ fn run_demo() -> Result<()> {
         let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
         println!("Text: \"{}\"", &text[..text.len().min(50)]);
-        println!("  Embedding: [{:.4}, {:.4}, {:.4}, ... ] (dim={})",
-                 embedding[0], embedding[1], embedding[2], embedding.len());
+        println!(
+            "  Embedding: [{:.4}, {:.4}, {:.4}, ... ] (dim={})",
+            embedding[0],
+            embedding[1],
+            embedding[2],
+            embedding.len()
+        );
         println!("  Time: {:.2}ms", elapsed_ms);
         println!();
     }
@@ -109,13 +114,15 @@ fn run_demo() -> Result<()> {
         let output = embedder.extract_layer(phenomenal_text, layer_idx)?;
         let depth = output.layer_idx as f64 / (embedder.num_layers() - 1) as f64;
 
-        println!("{:5} | {:5.1}% | [{:7.4}, {:7.4}, {:7.4}] | {:4}us",
-                 output.layer_idx,
-                 depth * 100.0,
-                 output.activation[0],
-                 output.activation[1],
-                 output.activation[2],
-                 output.processing_time_us);
+        println!(
+            "{:5} | {:5.1}% | [{:7.4}, {:7.4}, {:7.4}] | {:4}us",
+            output.layer_idx,
+            depth * 100.0,
+            output.activation[0],
+            output.activation[1],
+            output.activation[2],
+            output.processing_time_us
+        );
     }
     println!();
 
@@ -136,13 +143,27 @@ fn run_demo() -> Result<()> {
 
         println!("  Analysis time: {}us", result.total_time_us);
         println!("  Phenomenal corridor:");
-        println!("    Peak layer: {} (depth: {:.1}%)",
-                 result.phenomenal_corridor.peak_layer,
-                 result.phenomenal_corridor.peak_depth * 100.0);
-        println!("    Peak score: {:.4}", result.phenomenal_corridor.peak_score);
-        println!("    Corridor width: {} layers", result.phenomenal_corridor.width);
-        println!("    Matches H2 prediction (~92%): {}",
-                 if result.phenomenal_corridor.matches_h2_prediction { "YES" } else { "NO" });
+        println!(
+            "    Peak layer: {} (depth: {:.1}%)",
+            result.phenomenal_corridor.peak_layer,
+            result.phenomenal_corridor.peak_depth * 100.0
+        );
+        println!(
+            "    Peak score: {:.4}",
+            result.phenomenal_corridor.peak_score
+        );
+        println!(
+            "    Corridor width: {} layers",
+            result.phenomenal_corridor.width
+        );
+        println!(
+            "    Matches H2 prediction (~92%): {}",
+            if result.phenomenal_corridor.matches_h2_prediction {
+                "YES"
+            } else {
+                "NO"
+            }
+        );
 
         // Show layer scores
         println!("  Layer scores (top 5 by phenomenal score):");
@@ -150,12 +171,14 @@ fn run_demo() -> Result<()> {
         sorted_scores.sort_by(|a, b| b.phenomenal_score.partial_cmp(&a.phenomenal_score).unwrap());
 
         for score in sorted_scores.iter().take(5) {
-            println!("    Layer {:2} ({:5.1}%): phen={:.4}, unity={:.4}, phi={:.4}",
-                     score.layer_idx,
-                     score.depth_fraction * 100.0,
-                     score.phenomenal_score,
-                     score.unity,
-                     score.phi_loading);
+            println!(
+                "    Layer {:2} ({:5.1}%): phen={:.4}, unity={:.4}, phi={:.4}",
+                score.layer_idx,
+                score.depth_fraction * 100.0,
+                score.phenomenal_score,
+                score.unity,
+                score.phi_loading
+            );
         }
         println!();
     }

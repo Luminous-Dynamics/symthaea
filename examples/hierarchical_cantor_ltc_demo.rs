@@ -8,10 +8,10 @@
 //!
 //! Run with: cargo run --example hierarchical_cantor_ltc_demo --release
 
-use symthaea::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig};
+use std::time::Instant;
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
-use std::time::Instant;
+use symthaea::hierarchical_cantor_ltc::{CantorLtcConfig, HierarchicalCantorLtcNetwork};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -44,11 +44,24 @@ fn main() {
     println!("  Configuration:");
     println!("    • HDC Dimension:     {:>6}", config.dimension);
     println!("    • Max Depth:         {:>6}", config.max_depth);
-    println!("    • Total Nodes:       {:>6} (2^{} - 1)", config.total_nodes(), config.max_depth + 1);
-    println!("    • τ Ratio:           {:>6.4} (Cantor ternary)", config.tau_ratio);
+    println!(
+        "    • Total Nodes:       {:>6} (2^{} - 1)",
+        config.total_nodes(),
+        config.max_depth + 1
+    );
+    println!(
+        "    • τ Ratio:           {:>6.4} (Cantor ternary)",
+        config.tau_ratio
+    );
     println!("    • Root τ:            {:>6.1} ms", config.base_tau);
-    println!("    • Leaf τ:            {:>6.2} ms", config.tau_at_level(config.max_depth));
-    println!("    • Creation Time:     {:>6.2} ms\n", creation_time.as_secs_f64() * 1000.0);
+    println!(
+        "    • Leaf τ:            {:>6.2} ms",
+        config.tau_at_level(config.max_depth)
+    );
+    println!(
+        "    • Creation Time:     {:>6.2} ms\n",
+        creation_time.as_secs_f64() * 1000.0
+    );
 
     // Show time constants at each level
     println!("  Time Constants by Level (Scale-Depth Theory):");
@@ -69,8 +82,10 @@ fn main() {
 
     for level in 0..=config.max_depth {
         let tau = config.tau_at_level(level);
-        println!("  │    {}    │  {:>8.2} │  {:<28} │",
-                 level, tau, functions[level]);
+        println!(
+            "  │    {}    │  {:>8.2} │  {:<28} │",
+            level, tau, functions[level]
+        );
     }
     println!("  └─────────┴────────────┴──────────────────────────────┘\n");
 
@@ -104,8 +119,14 @@ fn main() {
     println!("    • Duration:    {:>6.1} ms", sim_duration);
     println!("    • Timestep:    {:>6.3} ms", dt);
     println!("    • Steps:       {:>6}", steps);
-    println!("    • Wall Time:   {:>6.2} ms", sim_time.as_secs_f64() * 1000.0);
-    println!("    • Real-time:   {:>6.1}x\n", sim_duration as f64 / (sim_time.as_secs_f64() * 1000.0));
+    println!(
+        "    • Wall Time:   {:>6.2} ms",
+        sim_time.as_secs_f64() * 1000.0
+    );
+    println!(
+        "    • Real-time:   {:>6.1}x\n",
+        sim_duration as f64 / (sim_time.as_secs_f64() * 1000.0)
+    );
 
     // =========================================================================
     // PHASE 3: Hierarchical Φ Measurement
@@ -131,7 +152,10 @@ fn main() {
     println!("  ├─────────┼──────────┼──────────┤");
     println!("  │  Global │  {:.4}  │   --    │", global_phi);
     println!("  └─────────┴──────────┴──────────┘");
-    println!("\n  Computation Time: {:.2} ms\n", phi_time.as_secs_f64() * 1000.0);
+    println!(
+        "\n  Computation Time: {:.2} ms\n",
+        phi_time.as_secs_f64() * 1000.0
+    );
 
     // =========================================================================
     // PHASE 4: Query Demonstration
@@ -151,10 +175,16 @@ fn main() {
     println!("  │  Level  │  Index  │ Similarity │");
     println!("  ├─────────┼─────────┼────────────┤");
     for (level, index, similarity) in &results {
-        println!("  │    {}    │  {:>4}   │   {:.4}   │", level, index, similarity);
+        println!(
+            "  │    {}    │  {:>4}   │   {:.4}   │",
+            level, index, similarity
+        );
     }
     println!("  └─────────┴─────────┴────────────┘");
-    println!("\n  Query Time: {:.3} ms\n", query_time.as_secs_f64() * 1000.0);
+    println!(
+        "\n  Query Time: {:.3} ms\n",
+        query_time.as_secs_f64() * 1000.0
+    );
 
     // =========================================================================
     // PHASE 5: Cross-Level Analysis
@@ -173,12 +203,18 @@ fn main() {
 
     for level in 0..=config.max_depth {
         let level_states = network.get_level_states(level);
-        let avg_sim: f32 = level_states.iter()
+        let avg_sim: f32 = level_states
+            .iter()
             .map(|s| root_state.similarity(s))
-            .sum::<f32>() / level_states.len() as f32;
+            .sum::<f32>()
+            / level_states.len() as f32;
 
-        println!("  │    {}    │     {:.4}       │      {:>3}        │",
-                 level, avg_sim, level_states.len());
+        println!(
+            "  │    {}    │     {:.4}       │      {:>3}        │",
+            level,
+            avg_sim,
+            level_states.len()
+        );
     }
     println!("  └─────────┴──────────────────┴─────────────────┘\n");
 

@@ -11,11 +11,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use symthaea_stt::{
-    AudioFrontend, AudioConfig,
-    LtcCell, LtcConfig,
-    LiquidProjection,
-    CmuDictionary, TextToPhonemes,
-    EvalResult,
+    AudioConfig, AudioFrontend, CmuDictionary, EvalResult, LiquidProjection, LtcCell, LtcConfig,
+    TextToPhonemes,
 };
 
 #[derive(Parser)]
@@ -65,7 +62,11 @@ struct Cli {
 
 /// Stack multiple frames together for temporal context
 fn stack_frames(features: &[Vec<f32>], center: usize, context_frames: usize) -> Vec<f32> {
-    let n_mels = if features.is_empty() { 40 } else { features[0].len() };
+    let n_mels = if features.is_empty() {
+        40
+    } else {
+        features[0].len()
+    };
     let half = context_frames / 2;
     let mut stacked = Vec::with_capacity(n_mels * context_frames);
 
@@ -147,10 +148,9 @@ fn decode_with_voting(
         let run_len = run_end - run_start;
 
         // Only emit if run is long enough and different from last emission
-        if run_len >= min_duration && !current.is_empty()
-            && result.last() != Some(current) {
-                result.push(current.clone());
-            }
+        if run_len >= min_duration && !current.is_empty() && result.last() != Some(current) {
+            result.push(current.clone());
+        }
 
         run_start = run_end;
     }
@@ -161,9 +161,20 @@ fn decode_with_voting(
 fn main() {
     let cli = Cli::parse();
 
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("         LIQUID PROJECTION EVALUATION                             ").bold().cyan());
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("         LIQUID PROJECTION EVALUATION                             ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
     println!();
 
     // Load encoder
@@ -171,7 +182,11 @@ fn main() {
     let encoder = match LiquidProjection::load(&cli.encoder) {
         Ok(e) => e,
         Err(e) => {
-            eprintln!("{} Failed to load encoder: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to load encoder: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -191,7 +206,11 @@ fn main() {
             }
         }
     } else {
-        eprintln!("{} Dictionary not found: {:?}", style("WARNING:").yellow().bold(), cli.dictionary);
+        eprintln!(
+            "{} Dictionary not found: {:?}",
+            style("WARNING:").yellow().bold(),
+            cli.dictionary
+        );
         None
     };
 
@@ -200,7 +219,11 @@ fn main() {
     let utterances = match scan_librispeech_dir(&cli.test_dir) {
         Ok(u) => u,
         Err(e) => {
-            eprintln!("{} Failed to scan test directory: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to scan test directory: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -211,7 +234,11 @@ fn main() {
         utterances.len()
     };
 
-    println!("  ✓ Found {} utterances, evaluating {}", utterances.len(), total_utterances);
+    println!(
+        "  ✓ Found {} utterances, evaluating {}",
+        utterances.len(),
+        total_utterances
+    );
 
     // Create audio frontend
     let audio_config = AudioConfig::default();
@@ -226,16 +253,29 @@ fn main() {
 
     // Run evaluation
     println!();
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("                     RUNNING EVALUATION                           ").bold().cyan());
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("                     RUNNING EVALUATION                           ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
     println!();
 
     let pb = ProgressBar::new(total_utterances as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-        .unwrap()
-        .progress_chars("#>-"));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+            .unwrap()
+            .progress_chars("#>-"),
+    );
 
     let mut total_phoneme_result = EvalResult::default();
     let mut total_audio_seconds = 0.0f32;
@@ -244,7 +284,14 @@ fn main() {
     let text_to_phonemes = dictionary.as_ref().map(|d| TextToPhonemes::new(d.clone()));
 
     for (i, utterance) in utterances.iter().take(total_utterances).enumerate() {
-        pb.set_message(utterance.audio_path.file_name().unwrap_or_default().to_string_lossy().to_string());
+        pb.set_message(
+            utterance
+                .audio_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+        );
 
         // Load audio
         let (audio, sample_rate) = match AudioFrontend::load_audio(&utterance.audio_path) {
@@ -281,11 +328,8 @@ fn main() {
         }
 
         // Apply voting window to smooth predictions
-        let hyp_phonemes = decode_with_voting(
-            &frame_predictions,
-            cli.vote_window,
-            cli.min_similarity,
-        );
+        let hyp_phonemes =
+            decode_with_voting(&frame_predictions, cli.vote_window, cli.min_similarity);
 
         let inference_time = start.elapsed().as_secs_f32();
         total_inference_seconds += inference_time;
@@ -323,9 +367,20 @@ fn main() {
 
     // Print results
     println!();
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("                     EVALUATION RESULTS                           ").bold().cyan());
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("                     EVALUATION RESULTS                           ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
     println!();
 
     println!("{}:", style("Summary").bold());
@@ -336,10 +391,19 @@ fn main() {
     println!();
 
     println!("{}:", style("Phoneme Error Rate (PER)").bold());
-    println!("  Reference phonemes: {}", total_phoneme_result.reference_length);
-    println!("  Hypothesis phonemes:{}", total_phoneme_result.hypothesis_length);
+    println!(
+        "  Reference phonemes: {}",
+        total_phoneme_result.reference_length
+    );
+    println!(
+        "  Hypothesis phonemes:{}",
+        total_phoneme_result.hypothesis_length
+    );
     println!("  Correct:            {}", total_phoneme_result.correct);
-    println!("  Substitutions:      {}", total_phoneme_result.substitutions);
+    println!(
+        "  Substitutions:      {}",
+        total_phoneme_result.substitutions
+    );
     println!("  Insertions:         {}", total_phoneme_result.insertions);
     println!("  Deletions:          {}", total_phoneme_result.deletions);
     println!("  {}:               {:.1}%", style("PER").bold(), per);
@@ -349,13 +413,22 @@ fn main() {
     let status = if per < 30.0 {
         (style("PASS").green().bold(), "System is learning phonemes!")
     } else if per < 60.0 {
-        (style("PROGRESSING").yellow().bold(), "Better than random, needs improvement")
+        (
+            style("PROGRESSING").yellow().bold(),
+            "Better than random, needs improvement",
+        )
     } else {
-        (style("NEEDS WORK").red().bold(), "Still struggling with phoneme discrimination")
+        (
+            style("NEEDS WORK").red().bold(),
+            "Still struggling with phoneme discrimination",
+        )
     };
 
     println!("╔═══════════════════════════════════════════════════════════════╗");
-    println!("║           LIQUID PROJECTION: {}                    ║", status.0);
+    println!(
+        "║           LIQUID PROJECTION: {}                    ║",
+        status.0
+    );
     println!("╠═══════════════════════════════════════════════════════════════╣");
     println!("║  PER: {:.1}% - {}║", per, status.1);
     println!("╚═══════════════════════════════════════════════════════════════╝");
@@ -368,8 +441,7 @@ fn scan_librispeech_dir(base_dir: &Path) -> Result<Vec<Utterance>, String> {
     // LibriSpeech structure: base/speaker_id/chapter_id/speaker_id-chapter_id-utterance_id.flac
     // Transcript: base/speaker_id/chapter_id/speaker_id-chapter_id.trans.txt
 
-    let entries = fs::read_dir(base_dir)
-        .map_err(|e| format!("Failed to read directory: {}", e))?;
+    let entries = fs::read_dir(base_dir).map_err(|e| format!("Failed to read directory: {}", e))?;
 
     for speaker_entry in entries.flatten() {
         if !speaker_entry.path().is_dir() {
@@ -396,8 +468,8 @@ fn scan_librispeech_dir(base_dir: &Path) -> Result<Vec<Utterance>, String> {
             }
 
             // Read transcripts
-            let file = File::open(&trans_file)
-                .map_err(|e| format!("Failed to open transcript: {}", e))?;
+            let file =
+                File::open(&trans_file).map_err(|e| format!("Failed to open transcript: {}", e))?;
             let reader = BufReader::new(file);
 
             for line in reader.lines().flatten() {

@@ -6,9 +6,7 @@
 //!   cargo run --example cognitive_loop_validation --release
 
 use symthaea::benchmarks::{
-    CognitiveLoopValidation,
-    CognitiveLoopValidationConfig,
-    print_cognitive_loop_validation_summary,
+    print_cognitive_loop_validation_summary, CognitiveLoopValidation, CognitiveLoopValidationConfig,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -34,8 +32,14 @@ fn main() -> anyhow::Result<()> {
     println!("  Cycles per task: {}", config.num_cycles);
     println!("  Warmup cycles: {}", config.warmup_cycles);
     println!("  Convergence window: {}", config.convergence_window);
-    println!("  Attention emergence threshold: {}", config.attention_emergence_threshold);
-    println!("  Convergence threshold: {}\n", config.convergence_threshold);
+    println!(
+        "  Attention emergence threshold: {}",
+        config.attention_emergence_threshold
+    );
+    println!(
+        "  Convergence threshold: {}\n",
+        config.convergence_threshold
+    );
 
     println!("Running 5 validation tasks...\n");
 
@@ -56,17 +60,25 @@ fn main() -> anyhow::Result<()> {
         // Error trend
         if exp.prediction_errors.len() >= 10 {
             let first_10: f32 = exp.prediction_errors[..10].iter().sum::<f32>() / 10.0;
-            let last_10: f32 = exp.prediction_errors[exp.prediction_errors.len()-10..].iter().sum::<f32>() / 10.0;
+            let last_10: f32 = exp.prediction_errors[exp.prediction_errors.len() - 10..]
+                .iter()
+                .sum::<f32>()
+                / 10.0;
             let improvement = ((first_10 - last_10) / first_10 * 100.0).max(-100.0);
 
-            println!("   Error trend: {:.4} → {:.4} ({:+.1}% change)",
-                     first_10, last_10, -improvement);
+            println!(
+                "   Error trend: {:.4} → {:.4} ({:+.1}% change)",
+                first_10, last_10, -improvement
+            );
         }
 
         // Attention trend
         if exp.attention_variances.len() >= 10 {
             let first_10: f32 = exp.attention_variances[..10].iter().sum::<f32>() / 10.0;
-            let last_10: f32 = exp.attention_variances[exp.attention_variances.len()-10..].iter().sum::<f32>() / 10.0;
+            let last_10: f32 = exp.attention_variances[exp.attention_variances.len() - 10..]
+                .iter()
+                .sum::<f32>()
+                / 10.0;
 
             println!("   Attention variance: {:.4} → {:.4}", first_10, last_10);
         }

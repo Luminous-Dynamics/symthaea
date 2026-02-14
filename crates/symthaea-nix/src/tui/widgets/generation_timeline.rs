@@ -26,7 +26,10 @@ pub struct GenerationTimeline<'a> {
 
 impl<'a> GenerationTimeline<'a> {
     pub fn new(entries: Vec<TimelineEntry>) -> Self {
-        Self { entries, block: None }
+        Self {
+            entries,
+            block: None,
+        }
     }
 
     pub fn block(mut self, block: Block<'a>) -> Self {
@@ -38,7 +41,9 @@ impl<'a> GenerationTimeline<'a> {
 impl Widget for GenerationTimeline<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let block = self.block.unwrap_or_else(|| {
-            Block::default().title(" Generations ").borders(Borders::ALL)
+            Block::default()
+                .title(" Generations ")
+                .borders(Borders::ALL)
         });
         let inner = block.inner(area);
         block.render(area, buf);
@@ -62,7 +67,9 @@ impl Widget for GenerationTimeline<'_> {
             }
 
             let style = if entry.current {
-                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::DarkGray)
             };
@@ -78,12 +85,22 @@ impl Widget for GenerationTimeline<'_> {
                 } else {
                     &entry.date
                 };
-                buf.set_string(x, bar_y + 1, date_short, Style::default().fg(Color::DarkGray));
+                buf.set_string(
+                    x,
+                    bar_y + 1,
+                    date_short,
+                    Style::default().fg(Color::DarkGray),
+                );
             }
 
             // Arrow connector
             if x + 7 < inner.x + inner.width {
-                buf.set_string(x + label.len() as u16, bar_y, "->", Style::default().fg(Color::DarkGray));
+                buf.set_string(
+                    x + label.len() as u16,
+                    bar_y,
+                    "->",
+                    Style::default().fg(Color::DarkGray),
+                );
             }
 
             x += 8;
@@ -93,7 +110,12 @@ impl Widget for GenerationTimeline<'_> {
         if inner.height > 2 {
             let summary = format!("{} generations", self.entries.len());
             let sy = inner.y + inner.height.saturating_sub(1);
-            buf.set_string(inner.x + 1, sy, &summary, Style::default().fg(Color::DarkGray));
+            buf.set_string(
+                inner.x + 1,
+                sy,
+                &summary,
+                Style::default().fg(Color::DarkGray),
+            );
         }
     }
 }
@@ -105,9 +127,21 @@ mod tests {
     #[test]
     fn test_render_with_entries() {
         let entries = vec![
-            TimelineEntry { number: 42, date: "2025-01-05".into(), current: false },
-            TimelineEntry { number: 43, date: "2025-01-10".into(), current: false },
-            TimelineEntry { number: 44, date: "2025-01-15".into(), current: true },
+            TimelineEntry {
+                number: 42,
+                date: "2025-01-05".into(),
+                current: false,
+            },
+            TimelineEntry {
+                number: 43,
+                date: "2025-01-10".into(),
+                current: false,
+            },
+            TimelineEntry {
+                number: 44,
+                date: "2025-01-15".into(),
+                current: true,
+            },
         ];
         let widget = GenerationTimeline::new(entries)
             .block(Block::default().title("Gens").borders(Borders::ALL));

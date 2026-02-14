@@ -17,7 +17,7 @@
 use std::time::Instant;
 
 use ndarray::Array1;
-use symthaea::dynamics::cfc::{CfCNetwork, CfCNetworkConfig, CfCConfig, ActivationType};
+use symthaea::dynamics::cfc::{ActivationType, CfCConfig, CfCNetwork, CfCNetworkConfig};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -25,7 +25,7 @@ fn main() {
     println!("║       Continuous-Time Neural Network Benchmark             ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-    let input_dim = 6;  // Plasma diagnostics: Ip, ne, Te, q95, li, betaN
+    let input_dim = 6; // Plasma diagnostics: Ip, ne, Te, q95, li, betaN
     let hidden_dim = 64;
     let output_dim = 1; // Disruption probability
 
@@ -62,9 +62,9 @@ fn main() {
     let t = Instant::now();
     let mut network = CfCNetwork::new(config.clone());
 
-    let n_shots = 200;  // Tokamak shots (some disruptive, some stable)
+    let n_shots = 200; // Tokamak shots (some disruptive, some stable)
     let steps_per_shot = 50;
-    let lr = 0.02;  // Higher LR for BPTT with Adam
+    let lr = 0.02; // Higher LR for BPTT with Adam
 
     let mut epoch_losses = Vec::new();
 
@@ -74,14 +74,14 @@ fn main() {
 
         for shot in 0..n_shots {
             let is_disruptive = shot % 2 != 0; // 50% disruptive (balanced classes)
-            let (inputs, targets, dts) = generate_plasma_shot(
-                shot as u64, is_disruptive, steps_per_shot, input_dim,
-            );
+            let (inputs, targets, dts) =
+                generate_plasma_shot(shot as u64, is_disruptive, steps_per_shot, input_dim);
 
             network.reset();
 
             // Train with full sequence for proper BPTT through temporal dynamics
-            let loss = network.train_step_bptt_optimized(&inputs, &targets, &dts, lr)
+            let loss = network
+                .train_step_bptt_optimized(&inputs, &targets, &dts, lr)
                 .unwrap_or(1.0);
             total_loss += loss;
             count += 1;
@@ -114,9 +114,8 @@ fn main() {
 
     for shot in 0..n_test {
         let is_disruptive = shot % 2 != 0;
-        let (inputs, _targets, dts) = generate_plasma_shot(
-            1000 + shot as u64, is_disruptive, steps_per_shot, input_dim,
-        );
+        let (inputs, _targets, dts) =
+            generate_plasma_shot(1000 + shot as u64, is_disruptive, steps_per_shot, input_dim);
 
         network.reset();
         let late_start = (inputs.len() as f32 * 0.7) as usize;
@@ -144,24 +143,44 @@ fn main() {
     // Debug: show score distributions
     let dis_mean = disruptive_scores.iter().sum::<f32>() / disruptive_scores.len().max(1) as f32;
     let sta_mean = stable_scores.iter().sum::<f32>() / stable_scores.len().max(1) as f32;
-    println!("  Disruptive late-mean scores: mean={:.6}, min={:.6}, max={:.6}",
+    println!(
+        "  Disruptive late-mean scores: mean={:.6}, min={:.6}, max={:.6}",
         dis_mean,
-        disruptive_scores.iter().cloned().fold(f32::INFINITY, f32::min),
-        disruptive_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max));
-    println!("  Stable late-mean scores:     mean={:.6}, min={:.6}, max={:.6}",
+        disruptive_scores
+            .iter()
+            .cloned()
+            .fold(f32::INFINITY, f32::min),
+        disruptive_scores
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max)
+    );
+    println!(
+        "  Stable late-mean scores:     mean={:.6}, min={:.6}, max={:.6}",
         sta_mean,
         stable_scores.iter().cloned().fold(f32::INFINITY, f32::min),
-        stable_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max));
+        stable_scores
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max)
+    );
 
     // Adaptive threshold: Youden's J statistic (maximize sensitivity + specificity - 1)
-    let mut all_scores: Vec<f32> = disruptive_scores.iter().chain(stable_scores.iter()).copied().collect();
+    let mut all_scores: Vec<f32> = disruptive_scores
+        .iter()
+        .chain(stable_scores.iter())
+        .copied()
+        .collect();
     all_scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
     all_scores.dedup();
 
     let mut best_threshold = 0.5f32;
     let mut best_j = f32::NEG_INFINITY;
     for &candidate in &all_scores {
-        let tp = disruptive_scores.iter().filter(|&&s| s >= candidate).count() as f32;
+        let tp = disruptive_scores
+            .iter()
+            .filter(|&&s| s >= candidate)
+            .count() as f32;
         let fn_ = disruptive_scores.iter().filter(|&&s| s < candidate).count() as f32;
         let tn = stable_scores.iter().filter(|&&s| s < candidate).count() as f32;
         let fp = stable_scores.iter().filter(|&&s| s >= candidate).count() as f32;
@@ -177,10 +196,16 @@ fn main() {
     // If J is near zero (no discrimination), fall back to median threshold
     let threshold = if best_j <= 0.0 {
         let midpoint = (dis_mean + sta_mean) / 2.0;
-        println!("  No discriminative threshold found (J={:.3}), using midpoint: {:.6}", best_j, midpoint);
+        println!(
+            "  No discriminative threshold found (J={:.3}), using midpoint: {:.6}",
+            best_j, midpoint
+        );
         midpoint
     } else {
-        println!("  Adaptive threshold (Youden's J): {:.4} (J={:.3})", best_threshold, best_j);
+        println!(
+            "  Adaptive threshold (Youden's J): {:.4} (J={:.3})",
+            best_threshold, best_j
+        );
         best_threshold
     };
 
@@ -193,9 +218,8 @@ fn main() {
 
     for shot in 0..n_test {
         let is_disruptive = shot % 2 != 0;
-        let (inputs, _targets, dts) = generate_plasma_shot(
-            1000 + shot as u64, is_disruptive, steps_per_shot, input_dim,
-        );
+        let (inputs, _targets, dts) =
+            generate_plasma_shot(1000 + shot as u64, is_disruptive, steps_per_shot, input_dim);
 
         network.reset();
 
@@ -322,10 +346,16 @@ fn main() {
     let mut passed = 0;
     for (name, pass) in &checks {
         println!("║  {} {:50}   ║", if *pass { "PASS" } else { "FAIL" }, name);
-        if *pass { passed += 1; }
+        if *pass {
+            passed += 1;
+        }
     }
     println!("╟──────────────────────────────────────────────────────────────╢");
-    println!("║  Result: {}/{} tests passed                                 ║", passed, checks.len());
+    println!(
+        "║  Result: {}/{} tests passed                                 ║",
+        passed,
+        checks.len()
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Save
@@ -388,22 +418,22 @@ fn generate_plasma_shot(
             };
 
             (
-                1.0 - instability * 0.5 + precursor,      // Ip drops
+                1.0 - instability * 0.5 + precursor,       // Ip drops
                 0.5 + t * 0.3 + instability * 0.5,         // ne rises (density limit)
-                0.6 - instability * 0.3,                    // Te drops
-                3.0 - instability * 1.5 + precursor * 0.5,  // q95 drops (MHD unstable)
-                0.8 + instability * 0.4,                    // li increases
-                2.0 + instability * 1.5,                    // betaN exceeds limit
+                0.6 - instability * 0.3,                   // Te drops
+                3.0 - instability * 1.5 + precursor * 0.5, // q95 drops (MHD unstable)
+                0.8 + instability * 0.4,                   // li increases
+                2.0 + instability * 1.5,                   // betaN exceeds limit
             )
         } else {
             // Stable shot
             (
-                1.0 + rand() * 0.05,        // Ip stable
-                0.5 + t * 0.1,               // ne gentle ramp
-                0.6 + rand() * 0.05,         // Te stable
-                3.0 + rand() * 0.1,          // q95 safe
-                0.8 + rand() * 0.05,         // li stable
-                1.5 + rand() * 0.1,          // betaN within limits
+                1.0 + rand() * 0.05, // Ip stable
+                0.5 + t * 0.1,       // ne gentle ramp
+                0.6 + rand() * 0.05, // Te stable
+                3.0 + rand() * 0.1,  // q95 safe
+                0.8 + rand() * 0.05, // li stable
+                1.5 + rand() * 0.1,  // betaN within limits
             )
         };
 
@@ -423,8 +453,8 @@ fn generate_plasma_shot(
             if step >= disruption_onset {
                 1.0
             } else if step > disruption_onset / 2 {
-                (step as f32 - disruption_onset as f32 / 2.0) /
-                    (disruption_onset as f32 / 2.0) * 0.5
+                (step as f32 - disruption_onset as f32 / 2.0) / (disruption_onset as f32 / 2.0)
+                    * 0.5
             } else {
                 0.0
             }

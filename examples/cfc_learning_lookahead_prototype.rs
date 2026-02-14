@@ -34,9 +34,9 @@ use std::time::Instant;
 
 // Symthaea imports
 use symthaea::cfc::CfCNetwork;
+use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
 use symthaea::phi_engine::PhiEngine;
-use symthaea::hdc::unified_hv::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LEARNING OBJECTIVE: A concept that could be learned
@@ -90,7 +90,9 @@ impl LearningObjective {
     fn to_cfc_input(&self, input_size: usize) -> Array1<f32> {
         // Downsample HDC encoding to CfC input size
         let step = HDC_DIMENSION / input_size;
-        let values: Vec<f32> = self.encoding.values
+        let values: Vec<f32> = self
+            .encoding
+            .values
             .iter()
             .step_by(step)
             .take(input_size)
@@ -249,9 +251,10 @@ impl CfCLearningLookahead {
         // Add current CfC state as context
         let current_state = self.cfc.read_state()?;
         let combined_input: Array1<f32> = Array1::from_iter(
-            objective_input.iter()
+            objective_input
+                .iter()
                 .zip(current_state.iter())
-                .map(|(o, s)| (o + s) / 2.0)
+                .map(|(o, s)| (o + s) / 2.0),
         );
 
         // CfC MAGIC: O(1) jump to future state
@@ -259,20 +262,21 @@ impl CfCLearningLookahead {
 
         // Estimate future Φ from CfC state
         // (In production, this would integrate with full consciousness equation)
-        let future_activity = future_state.iter()
-            .map(|&x| x.clamp(0.0, 1.0))
-            .sum::<f32>() / future_state.len() as f32;
+        let future_activity = future_state.iter().map(|&x| x.clamp(0.0, 1.0)).sum::<f32>()
+            / future_state.len() as f32;
 
         let state_variance = {
             let mean = future_activity;
-            future_state.iter()
+            future_state
+                .iter()
                 .map(|&x| (x.clamp(0.0, 1.0) - mean).powi(2))
-                .sum::<f32>() / future_state.len() as f32
+                .sum::<f32>()
+                / future_state.len() as f32
         };
 
         // Φ estimate: activity × diversity (simplified consciousness proxy)
-        let predicted_phi = (current_phi + (future_activity * state_variance.sqrt() * 0.3))
-            .clamp(0.0, 1.0);
+        let predicted_phi =
+            (current_phi + (future_activity * state_variance.sqrt() * 0.3)).clamp(0.0, 1.0);
 
         let predicted_delta = predicted_phi - current_phi;
 
@@ -282,15 +286,18 @@ impl CfCLearningLookahead {
         // Generate recommendation
         let recommendation = if predicted_delta >= self.min_phi_gain {
             LearningRecommendation::LearnNow {
-                priority: predicted_delta / objective.difficulty
+                priority: predicted_delta / objective.difficulty,
             }
         } else if predicted_delta >= 0.0 {
             LearningRecommendation::Defer {
-                reason: format!("Low gain ({:.4}), wait for better opportunity", predicted_delta)
+                reason: format!(
+                    "Low gain ({:.4}), wait for better opportunity",
+                    predicted_delta
+                ),
             }
         } else {
             LearningRecommendation::Skip {
-                reason: format!("Negative impact predicted ({:.4})", predicted_delta)
+                reason: format!("Negative impact predicted ({:.4})", predicted_delta),
             }
         };
 
@@ -308,16 +315,19 @@ impl CfCLearningLookahead {
     }
 
     /// Rank multiple objectives by predicted learning value
-    fn rank_objectives(&self, objectives: &[LearningObjective]) -> Result<Vec<(LearningObjective, LookaheadResult)>> {
-        let mut results: Vec<_> = objectives.iter()
-            .filter_map(|obj| {
-                self.evaluate_objective(obj).ok().map(|r| (obj.clone(), r))
-            })
+    fn rank_objectives(
+        &self,
+        objectives: &[LearningObjective],
+    ) -> Result<Vec<(LearningObjective, LookaheadResult)>> {
+        let mut results: Vec<_> = objectives
+            .iter()
+            .filter_map(|obj| self.evaluate_objective(obj).ok().map(|r| (obj.clone(), r)))
             .collect();
 
         // Sort by predicted_delta (highest first)
         results.sort_by(|a, b| {
-            b.1.predicted_delta.partial_cmp(&a.1.predicted_delta)
+            b.1.predicted_delta
+                .partial_cmp(&a.1.predicted_delta)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -330,15 +340,20 @@ impl CfCLearningLookahead {
 
         // Inject objective into consciousness state
         let objective_hv = ContinuousHV::from_vec(
-            objective.encoding.values.iter()
+            objective
+                .encoding
+                .values
+                .iter()
                 .take(512)
                 .cloned()
-                .collect()
+                .collect(),
         );
 
         // Blend into existing state
         for state in &mut self.consciousness_state {
-            let blended: Vec<f32> = state.values.iter()
+            let blended: Vec<f32> = state
+                .values
+                .iter()
                 .zip(objective_hv.values.iter())
                 .map(|(s, o)| s * 0.9 + o * 0.1)
                 .collect();
@@ -357,7 +372,12 @@ impl CfCLearningLookahead {
     ///
     /// Compares predicted vs actual Φ gain and feeds error back to CfC.
     /// This is what prevents "hallucinated value" predictions.
-    fn reality_check(&mut self, predicted_delta: f32, actual_delta: f32, objective: &LearningObjective) -> Result<RealityCheck> {
+    fn reality_check(
+        &mut self,
+        predicted_delta: f32,
+        actual_delta: f32,
+        objective: &LearningObjective,
+    ) -> Result<RealityCheck> {
         let check = RealityCheck::new(predicted_delta, actual_delta);
 
         // Feed error back to CfC weights
@@ -378,9 +398,14 @@ impl CfCLearningLookahead {
 
         // Log if hallucination detected
         if check.is_hallucination {
-            println!("    ⚠️  HALLUCINATION DETECTED: predicted {:.4}, actual {:.4}",
-                     predicted_delta, actual_delta);
-            println!("        CfC weights adjusted with feedback signal: {:.4}", feedback);
+            println!(
+                "    ⚠️  HALLUCINATION DETECTED: predicted {:.4}, actual {:.4}",
+                predicted_delta, actual_delta
+            );
+            println!(
+                "        CfC weights adjusted with feedback signal: {:.4}",
+                feedback
+            );
         }
 
         Ok(check)
@@ -393,13 +418,19 @@ impl CfCLearningLookahead {
         }
 
         let n = self.reality_history.len();
-        let avg_error = self.reality_history.iter()
+        let avg_error = self
+            .reality_history
+            .iter()
             .map(|r| r.error.abs())
-            .sum::<f32>() / n as f32;
+            .sum::<f32>()
+            / n as f32;
 
-        let hallucination_rate = self.reality_history.iter()
+        let hallucination_rate = self
+            .reality_history
+            .iter()
             .filter(|r| r.is_hallucination)
-            .count() as f32 / n as f32;
+            .count() as f32
+            / n as f32;
 
         (avg_error, hallucination_rate, n)
     }
@@ -426,14 +457,17 @@ fn main() -> Result<()> {
     println!("━━━ PHASE 1: Initialize CfC Lookahead Engine ━━━\n");
 
     let mut engine = CfCLearningLookahead::new(
-        256,    // CfC neurons
-        1.0,    // 1 second lookahead horizon
-        0.01,   // Minimum 1% Φ improvement to recommend
+        256,  // CfC neurons
+        1.0,  // 1 second lookahead horizon
+        0.01, // Minimum 1% Φ improvement to recommend
     )?;
 
     println!("  CfC Network: {} neurons", engine.cfc.num_neurons);
     println!("  Lookahead Horizon: {} seconds", engine.horizon);
-    println!("  Min Φ Gain Threshold: {:.2}%", engine.min_phi_gain * 100.0);
+    println!(
+        "  Min Φ Gain Threshold: {:.2}%",
+        engine.min_phi_gain * 100.0
+    );
     println!("  Initial Φ: {:.4}", engine.current_phi());
     println!();
 
@@ -444,15 +478,45 @@ fn main() -> Result<()> {
     println!("━━━ PHASE 2: Define Learning Objectives ━━━\n");
 
     let objectives = vec![
-        LearningObjective::new("nix-basics", "Nix Expression Language Basics", "NixOS", 0.3, 100),
-        LearningObjective::new("derivations", "Understanding Derivations", "NixOS", 0.5, 200)
-            .with_prerequisites(&["nix-basics"]),
+        LearningObjective::new(
+            "nix-basics",
+            "Nix Expression Language Basics",
+            "NixOS",
+            0.3,
+            100,
+        ),
+        LearningObjective::new(
+            "derivations",
+            "Understanding Derivations",
+            "NixOS",
+            0.5,
+            200,
+        )
+        .with_prerequisites(&["nix-basics"]),
         LearningObjective::new("flakes-intro", "Introduction to Flakes", "Flakes", 0.4, 300),
-        LearningObjective::new("flakes-inputs", "Flake Inputs and Outputs", "Flakes", 0.6, 400)
-            .with_prerequisites(&["flakes-intro", "nix-basics"]),
-        LearningObjective::new("nixos-config", "NixOS Configuration Structure", "SystemAdmin", 0.5, 500),
-        LearningObjective::new("systemd-nix", "Systemd Services in NixOS", "SystemAdmin", 0.7, 600)
-            .with_prerequisites(&["nixos-config"]),
+        LearningObjective::new(
+            "flakes-inputs",
+            "Flake Inputs and Outputs",
+            "Flakes",
+            0.6,
+            400,
+        )
+        .with_prerequisites(&["flakes-intro", "nix-basics"]),
+        LearningObjective::new(
+            "nixos-config",
+            "NixOS Configuration Structure",
+            "SystemAdmin",
+            0.5,
+            500,
+        ),
+        LearningObjective::new(
+            "systemd-nix",
+            "Systemd Services in NixOS",
+            "SystemAdmin",
+            0.7,
+            600,
+        )
+        .with_prerequisites(&["nixos-config"]),
         LearningObjective::new("home-manager", "Home Manager Setup", "UserConfig", 0.4, 700),
         LearningObjective::new("overlays", "Creating Nix Overlays", "Advanced", 0.8, 800)
             .with_prerequisites(&["derivations", "nix-basics"]),
@@ -460,7 +524,11 @@ fn main() -> Result<()> {
 
     for obj in &objectives {
         println!("  📚 {} ({})", obj.name, obj.domain);
-        println!("      Difficulty: {:.0}% | ID: {}", obj.difficulty * 100.0, obj.id);
+        println!(
+            "      Difficulty: {:.0}% | ID: {}",
+            obj.difficulty * 100.0,
+            obj.id
+        );
     }
     println!();
 
@@ -469,7 +537,10 @@ fn main() -> Result<()> {
     // ─────────────────────────────────────────────────────────────────────────────
 
     println!("━━━ PHASE 3: O(1) Lookahead Evaluation (The Magic) ━━━\n");
-    println!("  Evaluating {} objectives using CfC predict_forward()...\n", objectives.len());
+    println!(
+        "  Evaluating {} objectives using CfC predict_forward()...\n",
+        objectives.len()
+    );
 
     let eval_start = Instant::now();
     let ranked = engine.rank_objectives(&objectives)?;
@@ -481,25 +552,34 @@ fn main() -> Result<()> {
 
     for (rank, (obj, result)) in ranked.iter().enumerate() {
         let decision = match &result.recommendation {
-            LearningRecommendation::LearnNow { priority } =>
-                format!("✅ LEARN (p={:.2})", priority),
+            LearningRecommendation::LearnNow { priority } => {
+                format!("✅ LEARN (p={:.2})", priority)
+            }
             LearningRecommendation::Defer { .. } => "⏸️  DEFER".to_string(),
             LearningRecommendation::Skip { .. } => "❌ SKIP".to_string(),
         };
 
-        println!("  │  {:2}  │ {:22} │ {:+.4}    │ {:.2}  │ {:4}μs │ {} │",
-                 rank + 1,
-                 &obj.name[..obj.name.len().min(22)],
-                 result.predicted_delta,
-                 result.confidence,
-                 result.prediction_time_us,
-                 decision);
+        println!(
+            "  │  {:2}  │ {:22} │ {:+.4}    │ {:.2}  │ {:4}μs │ {} │",
+            rank + 1,
+            &obj.name[..obj.name.len().min(22)],
+            result.predicted_delta,
+            result.confidence,
+            result.prediction_time_us,
+            decision
+        );
     }
     println!("  └─────────────────────────────────────────────────────────────────────┘");
     println!();
-    println!("  ⚡ Total evaluation time: {:?} for {} objectives", total_eval_time, objectives.len());
-    println!("  ⚡ Average per objective: {:.2}μs (O(1) complexity!)",
-             total_eval_time.as_micros() as f64 / objectives.len() as f64);
+    println!(
+        "  ⚡ Total evaluation time: {:?} for {} objectives",
+        total_eval_time,
+        objectives.len()
+    );
+    println!(
+        "  ⚡ Average per objective: {:.2}μs (O(1) complexity!)",
+        total_eval_time.as_micros() as f64 / objectives.len() as f64
+    );
     println!();
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -545,7 +625,10 @@ fn main() -> Result<()> {
 
     println!("  📊 Reality Check Statistics (n={})", n_checks);
     println!("     Average Prediction Error: {:.4}", avg_error);
-    println!("     Hallucination Rate: {:.1}%", hallucination_rate * 100.0);
+    println!(
+        "     Hallucination Rate: {:.1}%",
+        hallucination_rate * 100.0
+    );
     println!("     Cumulative Error: {:.4}", engine.cumulative_error);
     println!();
 
@@ -558,13 +641,15 @@ fn main() -> Result<()> {
 
     // Create more objectives for the correction demo
     let more_objectives: Vec<_> = (0..10)
-        .map(|i| LearningObjective::new(
-            &format!("extra-{}", i),
-            &format!("Extra Concept {}", i),
-            "Demo",
-            0.3 + (i as f32 * 0.05),
-            10000 + i as u64,
-        ))
+        .map(|i| {
+            LearningObjective::new(
+                &format!("extra-{}", i),
+                &format!("Extra Concept {}", i),
+                "Demo",
+                0.3 + (i as f32 * 0.05),
+                10000 + i as u64,
+            )
+        })
         .collect();
 
     let mut errors_over_time = Vec::new();
@@ -591,7 +676,10 @@ fn main() -> Result<()> {
     println!();
     println!("  First half avg error:  {:.4}", first_half_avg);
     println!("  Second half avg error: {:.4}", second_half_avg);
-    println!("  Improvement: {:.1}%", (1.0 - second_half_avg / first_half_avg) * 100.0);
+    println!(
+        "  Improvement: {:.1}%",
+        (1.0 - second_half_avg / first_half_avg) * 100.0
+    );
     println!();
 
     // ─────────────────────────────────────────────────────────────────────────────

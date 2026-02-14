@@ -549,7 +549,7 @@ mod tests {
     #[test]
     fn test_modal_input_creation() {
         let features = BinaryHV::random(42);
-        let input = ModalInput::new(Modality::Visual, features.clone(), 0.9)
+        let input = ModalInput::new(Modality::Visual, features, 0.9)
             .with_source("test");
 
         assert_eq!(input.modality, Modality::Visual);
@@ -591,13 +591,13 @@ mod tests {
         let mut last_coherence = 0.0;
         for _ in 0..5 {
             let inputs = vec![
-                visual_input(features.clone(), 0.9),
+                visual_input(features, 0.9),
             ];
             let result = integrator.integrate(&inputs);
             last_coherence = result.binding_coherence;
         }
         // Coherence should be in valid range after repeated input
-        assert!(last_coherence >= 0.0 && last_coherence <= 1.0,
+        assert!((0.0..=1.0).contains(&last_coherence),
             "Binding coherence must be in [0,1]: {last_coherence}");
     }
 

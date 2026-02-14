@@ -14,9 +14,9 @@ use std::time::Instant;
 
 // Symthaea imports
 use symthaea::cfc::CfCNetwork;
+use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
 use symthaea::phi_engine::{PhiEngine, PhiMethod};
-use symthaea::hdc::unified_hv::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COPY OF CORE STRUCTURES (from prototype - will be in src/school/ later)
@@ -120,9 +120,10 @@ impl CfCLearningLookahead {
 
         let current_state = self.cfc.read_state()?;
         let combined_input: Array1<f32> = Array1::from_iter(
-            objective_input.iter()
+            objective_input
+                .iter()
                 .zip(current_state.iter())
-                .map(|(a, b)| (a + b) / 2.0)
+                .map(|(a, b)| (a + b) / 2.0),
         );
 
         let predicted_state = self.cfc.predict_forward(&combined_input, self.horizon)?;
@@ -138,13 +139,9 @@ impl CfCLearningLookahead {
         let confidence = if self.reality_history.is_empty() {
             0.0
         } else {
-            let recent: Vec<_> = self.reality_history.iter()
-                .rev()
-                .take(10)
-                .collect();
-            let accuracy: f32 = recent.iter()
-                .filter(|r| !r.is_hallucination)
-                .count() as f32 / recent.len() as f32;
+            let recent: Vec<_> = self.reality_history.iter().rev().take(10).collect();
+            let accuracy: f32 =
+                recent.iter().filter(|r| !r.is_hallucination).count() as f32 / recent.len() as f32;
             accuracy
         };
 
@@ -172,7 +169,12 @@ impl CfCLearningLookahead {
         Ok(post_phi - pre_phi)
     }
 
-    fn reality_check(&mut self, predicted: f32, actual: f32, _obj: &LearningObjective) -> Result<RealityCheck> {
+    fn reality_check(
+        &mut self,
+        predicted: f32,
+        actual: f32,
+        _obj: &LearningObjective,
+    ) -> Result<RealityCheck> {
         let error = predicted - actual;
         let is_hallucination = error.abs() > 0.2 * predicted.abs().max(0.001);
 
@@ -195,13 +197,19 @@ impl CfCLearningLookahead {
         }
 
         let n = self.reality_history.len();
-        let avg_error = self.reality_history.iter()
+        let avg_error = self
+            .reality_history
+            .iter()
             .map(|r| r.error.abs())
-            .sum::<f32>() / n as f32;
+            .sum::<f32>()
+            / n as f32;
 
-        let hallucination_rate = self.reality_history.iter()
+        let hallucination_rate = self
+            .reality_history
+            .iter()
             .filter(|r| r.is_hallucination)
-            .count() as f32 / n as f32;
+            .count() as f32
+            / n as f32;
 
         (avg_error, hallucination_rate, n)
     }
@@ -335,7 +343,10 @@ fn run_unit_tests() -> Result<(usize, usize)> {
             println!("✅ PASS");
             passed += 1;
         } else {
-            println!("❌ FAIL (check1={}, check2={})", check1.is_hallucination, check2.is_hallucination);
+            println!(
+                "❌ FAIL (check1={}, check2={})",
+                check1.is_hallucination, check2.is_hallucination
+            );
             failed += 1;
         }
     }
@@ -388,7 +399,12 @@ fn run_stress_test() -> Result<(bool, f32, f32)> {
         if (i + 1) % 20 == 0 {
             let avg_err = errors.iter().sum::<f32>() / errors.len() as f32;
             let avg_time = eval_times.iter().sum::<u64>() / eval_times.len() as u64;
-            println!("  Cycle {:3}: avg_error={:.5}, avg_time={}μs", i + 1, avg_err, avg_time);
+            println!(
+                "  Cycle {:3}: avg_error={:.5}, avg_time={}μs",
+                i + 1,
+                avg_err,
+                avg_time
+            );
         }
     }
 
@@ -410,14 +426,35 @@ fn run_stress_test() -> Result<(bool, f32, f32)> {
     println!("  ├────────────────────────────────────────────────────┤");
     println!("  │ Total cycles:        100                           │");
     println!("  │ Total time:          {:?}              │", total_time);
-    println!("  │ Avg eval time:       {}μs                       │", avg_time);
-    println!("  │ Eval time range:     {}μs - {}μs                │", min_time, max_time);
+    println!(
+        "  │ Avg eval time:       {}μs                       │",
+        avg_time
+    );
+    println!(
+        "  │ Eval time range:     {}μs - {}μs                │",
+        min_time, max_time
+    );
     println!("  ├────────────────────────────────────────────────────┤");
-    println!("  │ First quarter error: {:.5}                       │", first_quarter);
-    println!("  │ Last quarter error:  {:.5}                       │", last_quarter);
-    println!("  │ Error improvement:   {:+.1}%                       │", improvement);
-    println!("  │ Hallucination rate:  {:.1}%                        │", hallucination_rate * 100.0);
-    println!("  │ Avg error overall:   {:.5}                       │", avg_error);
+    println!(
+        "  │ First quarter error: {:.5}                       │",
+        first_quarter
+    );
+    println!(
+        "  │ Last quarter error:  {:.5}                       │",
+        last_quarter
+    );
+    println!(
+        "  │ Error improvement:   {:+.1}%                       │",
+        improvement
+    );
+    println!(
+        "  │ Hallucination rate:  {:.1}%                        │",
+        hallucination_rate * 100.0
+    );
+    println!(
+        "  │ Avg error overall:   {:.5}                       │",
+        avg_error
+    );
     println!("  └────────────────────────────────────────────────────┘");
 
     // Success criteria:
@@ -434,7 +471,10 @@ fn run_stress_test() -> Result<(bool, f32, f32)> {
             println!("     - Eval time too slow ({}μs >= 500μs)", avg_time);
         }
         if hallucination_rate >= 0.5 {
-            println!("     - Hallucination rate too high ({:.1}% >= 50%)", hallucination_rate * 100.0);
+            println!(
+                "     - Hallucination rate too high ({:.1}% >= 50%)",
+                hallucination_rate * 100.0
+            );
         }
     }
 
@@ -471,7 +511,11 @@ fn run_phi_sanity_check() -> Result<bool> {
     if (new_phi - initial_phi - delta).abs() < 0.0001 {
         println!("✅ PASS (Δ = {:.6})", delta);
     } else {
-        println!("❌ FAIL (reported Δ={:.6}, actual Δ={:.6})", delta, new_phi - initial_phi);
+        println!(
+            "❌ FAIL (reported Δ={:.6}, actual Δ={:.6})",
+            delta,
+            new_phi - initial_phi
+        );
         return Ok(false);
     }
 
@@ -500,7 +544,10 @@ fn run_phi_sanity_check() -> Result<bool> {
     if (delta_easy - delta_hard).abs() > 0.00001 {
         println!("✅ PASS (easy={:.6}, hard={:.6})", delta_easy, delta_hard);
     } else {
-        println!("⚠️  WARN: Very similar (easy={:.6}, hard={:.6})", delta_easy, delta_hard);
+        println!(
+            "⚠️  WARN: Very similar (easy={:.6}, hard={:.6})",
+            delta_easy, delta_hard
+        );
         // This is a warning, not a failure - could be coincidence
     }
 
@@ -766,17 +813,38 @@ fn main() -> Result<()> {
     println!("║                        FINAL TEST SUMMARY                            ║");
     println!("╠══════════════════════════════════════════════════════════════════════╣");
     println!("║                                                                      ║");
-    println!("║  TEST 1 - Unit Tests:     {}/{} passed                              ║",
-             unit_passed, unit_passed + unit_failed);
-    println!("║  TEST 2 - Stress Test:    {} (improvement: {:+.1}%)             ║",
-             if stress_passed { "✅ PASS" } else { "❌ FAIL" }, improvement);
-    println!("║  TEST 3 - Φ Sanity:       {}                                      ║",
-             if phi_passed { "✅ PASS" } else { "❌ FAIL" });
-    println!("║  TEST 4 - Edge Cases:     {}/{} passed                             ║",
-             edge_passed, edge_passed + edge_failed);
+    println!(
+        "║  TEST 1 - Unit Tests:     {}/{} passed                              ║",
+        unit_passed,
+        unit_passed + unit_failed
+    );
+    println!(
+        "║  TEST 2 - Stress Test:    {} (improvement: {:+.1}%)             ║",
+        if stress_passed {
+            "✅ PASS"
+        } else {
+            "❌ FAIL"
+        },
+        improvement
+    );
+    println!(
+        "║  TEST 3 - Φ Sanity:       {}                                      ║",
+        if phi_passed { "✅ PASS" } else { "❌ FAIL" }
+    );
+    println!(
+        "║  TEST 4 - Edge Cases:     {}/{} passed                             ║",
+        edge_passed,
+        edge_passed + edge_failed
+    );
     println!("║                                                                      ║");
-    println!("║  Total Time: {:?}                                         ║", total_time);
-    println!("║  Hallucination Rate: {:.1}%                                         ║", hallucination_rate * 100.0);
+    println!(
+        "║  Total Time: {:?}                                         ║",
+        total_time
+    );
+    println!(
+        "║  Hallucination Rate: {:.1}%                                         ║",
+        hallucination_rate * 100.0
+    );
     println!("║                                                                      ║");
 
     let all_passed = unit_failed == 0 && stress_passed && phi_passed && edge_failed == 0;

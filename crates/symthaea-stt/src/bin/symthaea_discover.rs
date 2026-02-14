@@ -136,7 +136,9 @@ static LINK: Emoji<'_, '_> = Emoji("🔗 ", "");
 struct HV16([u8; 256]);
 
 impl HV16 {
-    fn zero() -> Self { Self([0u8; 256]) }
+    fn zero() -> Self {
+        Self([0u8; 256])
+    }
 
     fn from_seed(seed: &[u8]) -> Self {
         use blake3::Hasher;
@@ -159,7 +161,9 @@ impl HV16 {
     }
 
     fn similarity(&self, other: &Self) -> f32 {
-        let matching: u32 = self.0.iter()
+        let matching: u32 = self
+            .0
+            .iter()
             .zip(other.0.iter())
             .map(|(a, b)| (!(a ^ b)).count_ones())
             .sum();
@@ -168,7 +172,9 @@ impl HV16 {
 }
 
 fn bundle(vectors: &[HV16]) -> HV16 {
-    if vectors.is_empty() { return HV16::zero(); }
+    if vectors.is_empty() {
+        return HV16::zero();
+    }
 
     let mut counts = [0i32; 2048];
     for vec in vectors {
@@ -309,7 +315,7 @@ struct DiscoveryEngine {
     next_id: usize,
     config: DiscoveryConfig,
     previous: Option<String>,
-    segments: Vec<(f32, f32, String)>,  // (start, end, unit_id)
+    segments: Vec<(f32, f32, String)>, // (start, end, unit_id)
 }
 
 impl DiscoveryEngine {
@@ -335,9 +341,10 @@ impl DiscoveryEngine {
         for (id, unit) in &self.units {
             let sim = unit.similarity(&hv);
             if sim > self.config.similarity_threshold
-                && best.as_ref().map(|(_, s)| sim > *s).unwrap_or(true) {
-                    best = Some((id.clone(), sim));
-                }
+                && best.as_ref().map(|(_, s)| sim > *s).unwrap_or(true)
+            {
+                best = Some((id.clone(), sim));
+            }
         }
 
         let unit_id = if let Some((id, _)) = best {
@@ -348,11 +355,13 @@ impl DiscoveryEngine {
         } else if self.units.len() < self.config.max_units {
             let id = format!("UNIT_{:03}", self.next_id);
             self.next_id += 1;
-            self.units.insert(id.clone(), DiscoveredUnit::new(&id, hv, duration));
+            self.units
+                .insert(id.clone(), DiscoveredUnit::new(&id, hv, duration));
             id
         } else {
             // At capacity - assign to closest
-            self.units.iter()
+            self.units
+                .iter()
                 .map(|(id, u)| (id.clone(), u.similarity(&hv)))
                 .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
                 .map(|(id, _)| id)
@@ -374,7 +383,9 @@ impl DiscoveryEngine {
     }
 
     fn stable_units(&self) -> Vec<&DiscoveredUnit> {
-        let mut units: Vec<_> = self.units.values()
+        let mut units: Vec<_> = self
+            .units
+            .values()
             .filter(|u| u.instance_count >= self.config.min_instances)
             .collect();
         units.sort_by_key(|u| std::cmp::Reverse(u.instance_count));
@@ -392,12 +403,14 @@ fn load_audio(path: &PathBuf) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
         let reader = hound::WavReader::open(path)?;
         let spec = reader.spec();
         let samples: Vec<f32> = if spec.bits_per_sample == 16 {
-            reader.into_samples::<i16>()
+            reader
+                .into_samples::<i16>()
                 .filter_map(|s| s.ok())
                 .map(|s| s as f32 / 32768.0)
                 .collect()
         } else {
-            reader.into_samples::<i32>()
+            reader
+                .into_samples::<i32>()
                 .filter_map(|s| s.ok())
                 .map(|s| s as f32 / 2147483648.0)
                 .collect()
@@ -408,12 +421,17 @@ fn load_audio(path: &PathBuf) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
     // Use ffmpeg for other formats
     let output = Command::new("ffmpeg")
         .args([
-            "-i", path.to_str().unwrap(),
-            "-f", "f32le",
-            "-acodec", "pcm_f32le",
-            "-ar", "16000",
-            "-ac", "1",
-            "-"
+            "-i",
+            path.to_str().unwrap(),
+            "-f",
+            "f32le",
+            "-acodec",
+            "pcm_f32le",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            "-",
         ])
         .output()?;
 
@@ -421,7 +439,8 @@ fn load_audio(path: &PathBuf) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
         return Err("ffmpeg failed".into());
     }
 
-    let samples: Vec<f32> = output.stdout
+    let samples: Vec<f32> = output
+        .stdout
         .chunks_exact(4)
         .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
         .collect();
@@ -444,12 +463,12 @@ fn project_audio(audio: &[f32]) -> (Vec<HV16>, Vec<f32>, Vec<f32>) {
         let end = (start + frame_samples).min(audio.len());
 
         // Frame energy
-        let energy: f32 = audio[start..end].iter()
-            .map(|s| s * s)
-            .sum::<f32>() / frame_samples as f32;
+        let energy: f32 =
+            audio[start..end].iter().map(|s| s * s).sum::<f32>() / frame_samples as f32;
 
         // Spectral features (simplified)
-        let zero_crossings: usize = audio[start..end].windows(2)
+        let zero_crossings: usize = audio[start..end]
+            .windows(2)
             .filter(|w| w[0].signum() != w[1].signum())
             .count();
 
@@ -480,14 +499,15 @@ fn detect_boundaries(
     }
 
     let mean: f32 = salience.iter().sum::<f32>() / salience.len() as f32;
-    let std: f32 = (salience.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / salience.len() as f32).sqrt();
+    let std: f32 =
+        (salience.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / salience.len() as f32).sqrt();
     let thresh = mean + std * threshold;
 
     let mut boundaries = vec![(0.0, 0)];
     let mut last_time = -min_gap;
 
     for i in 1..salience.len() - 1 {
-        let is_peak = salience[i] > salience[i-1] && salience[i] > salience[i+1];
+        let is_peak = salience[i] > salience[i - 1] && salience[i] > salience[i + 1];
         if is_peak && salience[i] > thresh && timestamps[i] - last_time > min_gap {
             boundaries.push((timestamps[i], i));
             last_time = timestamps[i];
@@ -530,16 +550,30 @@ fn generate_report(
         writeln!(json, "    {{")?;
         writeln!(json, "      \"id\": \"{}\",", unit.id)?;
         writeln!(json, "      \"instances\": {},", unit.instance_count)?;
-        writeln!(json, "      \"mean_duration_ms\": {:.1},", unit.mean_duration_ms)?;
-        writeln!(json, "      \"duration_range\": [{:.1}, {:.1}],", unit.min_duration_ms, unit.max_duration_ms)?;
+        writeln!(
+            json,
+            "      \"mean_duration_ms\": {:.1},",
+            unit.mean_duration_ms
+        )?;
+        writeln!(
+            json,
+            "      \"duration_range\": [{:.1}, {:.1}],",
+            unit.min_duration_ms, unit.max_duration_ms
+        )?;
 
         // Most common following units
         let mut following: Vec<_> = unit.following.iter().collect();
         following.sort_by_key(|(_, c)| std::cmp::Reverse(**c));
-        let top_following: Vec<_> = following.iter().take(3)
+        let top_following: Vec<_> = following
+            .iter()
+            .take(3)
             .map(|(id, c)| format!("\"{}:{}\"", id, c))
             .collect();
-        writeln!(json, "      \"common_following\": [{}]", top_following.join(", "))?;
+        writeln!(
+            json,
+            "      \"common_following\": [{}]",
+            top_following.join(", ")
+        )?;
 
         writeln!(json, "    }}{}", comma)?;
     }
@@ -549,8 +583,16 @@ fn generate_report(
     // Segments
     writeln!(json, "  \"segments\": [")?;
     for (i, (start, end, label)) in engine.segments.iter().enumerate() {
-        let comma = if i < engine.segments.len() - 1 { "," } else { "" };
-        writeln!(json, "    {{ \"start\": {:.3}, \"end\": {:.3}, \"unit\": \"{}\" }}{}", start, end, label, comma)?;
+        let comma = if i < engine.segments.len() - 1 {
+            ","
+        } else {
+            ""
+        };
+        writeln!(
+            json,
+            "    {{ \"start\": {:.3}, \"end\": {:.3}, \"unit\": \"{}\" }}{}",
+            start, end, label, comma
+        )?;
     }
     writeln!(json, "  ]")?;
     writeln!(json, "}}")?;
@@ -596,7 +638,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Header
     if !cli.quiet {
         println!("\n{}", style("═".repeat(70)).magenta());
-        println!("{}", style("               SYMTHAEA UNIVERSAL DISCOVERY").magenta().bold());
+        println!(
+            "{}",
+            style("               SYMTHAEA UNIVERSAL DISCOVERY")
+                .magenta()
+                .bold()
+        );
         println!("{}", style("═".repeat(70)).magenta());
         println!();
 
@@ -632,9 +679,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if !cli.quiet {
         println!("  {}Configuration:", DNA);
-        println!("    Similarity threshold: {:.2}", config.similarity_threshold);
+        println!(
+            "    Similarity threshold: {:.2}",
+            config.similarity_threshold
+        );
         println!("    Max units: {}", config.max_units);
-        println!("    Duration range: {:.1}ms - {:.1}ms", config.min_segment_ms, config.max_segment_ms);
+        println!(
+            "    Duration range: {:.1}ms - {:.1}ms",
+            config.min_segment_ms, config.max_segment_ms
+        );
         println!();
     }
 
@@ -647,19 +700,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let duration_sec = audio.len() as f32 / 16000.0;
 
     if !cli.quiet {
-        println!("  {}Loaded {:.2} seconds ({} samples)", CHECK, duration_sec, audio.len());
+        println!(
+            "  {}Loaded {:.2} seconds ({} samples)",
+            CHECK,
+            duration_sec,
+            audio.len()
+        );
     }
 
     // Project
     if !cli.quiet {
-        println!("\n{}{}Projecting through LTC dynamics...", BRAIN, style("Step 2/3: ").bold());
+        println!(
+            "\n{}{}Projecting through LTC dynamics...",
+            BRAIN,
+            style("Step 2/3: ").bold()
+        );
     }
 
     let start_time = Instant::now();
     let (frames, salience, timestamps) = project_audio(&audio);
 
     if !cli.quiet {
-        println!("  {}Generated {} frames in {:?}", CHECK, frames.len(), start_time.elapsed());
+        println!(
+            "  {}Generated {} frames in {:?}",
+            CHECK,
+            frames.len(),
+            start_time.elapsed()
+        );
     }
 
     // Detect boundaries
@@ -667,12 +734,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let boundaries = detect_boundaries(&salience, &timestamps, config.salience_threshold, min_gap);
 
     if !cli.quiet {
-        println!("  {}Detected {} acoustic boundaries", CHECK, boundaries.len());
+        println!(
+            "  {}Detected {} acoustic boundaries",
+            CHECK,
+            boundaries.len()
+        );
     }
 
     // Discover units
     if !cli.quiet {
-        println!("\n{}{}Discovering acoustic units...", ALIEN, style("Step 3/3: ").bold());
+        println!(
+            "\n{}{}Discovering acoustic units...",
+            ALIEN,
+            style("Step 3/3: ").bold()
+        );
         println!();
     }
 
@@ -680,9 +755,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let bar = if !cli.quiet {
         let b = ProgressBar::new(boundaries.len().saturating_sub(1) as u64);
-        b.set_style(ProgressStyle::default_bar()
-            .template("{prefix:.bold} {spinner:.green} [{bar:40.magenta/blue}] {pos}/{len}")
-            .unwrap());
+        b.set_style(
+            ProgressStyle::default_bar()
+                .template("{prefix:.bold} {spinner:.green} [{bar:40.magenta/blue}] {pos}/{len}")
+                .unwrap(),
+        );
         b.set_prefix("Clustering");
         Some(b)
     } else {
@@ -724,7 +801,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let units = engine.stable_units();
 
         println!("\n{}", style("═".repeat(70)).green());
-        println!("{}", style("                    DISCOVERY COMPLETE").green().bold());
+        println!(
+            "{}",
+            style("                    DISCOVERY COMPLETE")
+                .green()
+                .bold()
+        );
         println!("{}", style("═".repeat(70)).green());
         println!();
         println!("  {}Duration analyzed: {:.2}s", CHART, duration_sec);
@@ -768,7 +850,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         all_transitions.sort_by_key(|(_, _, c)| std::cmp::Reverse(*c));
 
         for (from, to, count) in all_transitions.iter().take(10) {
-            println!("    {} → {}  (×{})", style(from).cyan(), style(to).yellow(), count);
+            println!(
+                "    {} → {}  (×{})",
+                style(from).cyan(),
+                style(to).yellow(),
+                count
+            );
         }
 
         println!();
@@ -802,7 +889,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("    Correlate with any available context data");
             }
             Species::Human => {
-                println!("  {}Note: For human speech, use 'symthaea-train' instead", WARN);
+                println!(
+                    "  {}Note: For human speech, use 'symthaea-train' instead",
+                    WARN
+                );
             }
         }
         println!();

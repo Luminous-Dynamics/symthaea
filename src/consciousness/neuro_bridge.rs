@@ -228,7 +228,7 @@ mod tests {
 
         // Either tau changed or it's within bounds (both are valid)
         assert!(
-            initial_tau != new_tau || (new_tau >= 0.1 && new_tau <= 10.0),
+            initial_tau != new_tau || (0.1..=10.0).contains(&new_tau),
             "Tau should either change or be within valid bounds"
         );
     }

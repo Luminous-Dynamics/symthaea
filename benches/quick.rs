@@ -19,10 +19,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator,
-    binary_hv::BinaryHV,
-    HDC_DIMENSION,
+    binary_hv::BinaryHV, consciousness_topology_generators::ConsciousnessTopology,
+    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
 
 // =============================================================================
@@ -37,18 +35,12 @@ fn bench_hdc_quick(c: &mut Criterion) {
     let hv2 = BinaryHV::random(43);
 
     // Core operations only
-    group.bench_function("bind", |b| {
-        b.iter(|| black_box(hv1.bind(&hv2)))
-    });
+    group.bench_function("bind", |b| b.iter(|| black_box(hv1.bind(&hv2))));
 
-    group.bench_function("similarity", |b| {
-        b.iter(|| black_box(hv1.similarity(&hv2)))
-    });
+    group.bench_function("similarity", |b| b.iter(|| black_box(hv1.similarity(&hv2))));
 
     let hvs: Vec<BinaryHV> = (0..5).map(|i| BinaryHV::random(i)).collect();
-    group.bench_function("bundle_5", |b| {
-        b.iter(|| black_box(BinaryHV::bundle(&hvs)))
-    });
+    group.bench_function("bundle_5", |b| b.iter(|| black_box(BinaryHV::bundle(&hvs))));
 
     group.finish();
 }

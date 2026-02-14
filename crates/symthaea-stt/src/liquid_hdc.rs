@@ -36,8 +36,8 @@
 //! - A "short loud click" ≠ "long quiet click"
 //! - Duration and intensity become part of the symbolic representation
 
-use crate::hdc::{HV16, BundleAccumulator, HDC_DIM};
-use crate::liquid::{LiquidBank, LiquidFeatures, LiquidEventType, TimeAwareBinder, LiquidEvent};
+use crate::hdc::{BundleAccumulator, HDC_DIM, HV16};
+use crate::liquid::{LiquidBank, LiquidEvent, LiquidEventType, LiquidFeatures, TimeAwareBinder};
 use std::collections::HashMap;
 
 /// Liquid-HDC Fusion Scorer
@@ -113,7 +113,8 @@ impl LiquidHDC {
 
     /// Get basis HV for an event type
     fn get_event_basis(&self, event_type: &LiquidEventType) -> HV16 {
-        self.event_basis.get(event_type)
+        self.event_basis
+            .get(event_type)
             .copied()
             .unwrap_or_else(|| HV16::random("unknown_event"))
     }
@@ -402,8 +403,10 @@ mod tests {
 
         println!("Click audio: detected {} events", events.len());
         for event in &events {
-            println!("  {:?}: dur={:.3}s, int={:.4}",
-                event.event_type, event.duration, event.intensity);
+            println!(
+                "  {:?}: dur={:.3}s, int={:.4}",
+                event.event_type, event.duration, event.intensity
+            );
         }
 
         // Should detect some events (clicks or bursts)
@@ -421,8 +424,10 @@ mod tests {
 
         println!("Whistle audio: detected {} events", events.len());
         for event in &events {
-            println!("  {:?}: dur={:.3}s, int={:.4}",
-                event.event_type, event.duration, event.intensity);
+            println!(
+                "  {:?}: dur={:.3}s, int={:.4}",
+                event.event_type, event.duration, event.intensity
+            );
         }
     }
 
@@ -491,8 +496,12 @@ mod tests {
         println!("Discrimination: {:+.4}", trained_score - different_score);
 
         // Trained should score higher
-        assert!(trained_score > different_score,
-            "Trained should beat different: {:.4} vs {:.4}", trained_score, different_score);
+        assert!(
+            trained_score > different_score,
+            "Trained should beat different: {:.4} vs {:.4}",
+            trained_score,
+            different_score
+        );
     }
 
     #[test]
@@ -500,35 +509,41 @@ mod tests {
         let mut scorer = LiquidHDC::new(44100.0, 1024);
 
         // Train on SHORT LOUD clicks
-        let short_loud: Vec<LiquidEvent> = (0..5).map(|i| LiquidEvent {
-            event_type: LiquidEventType::Click,
-            start_time: i as f32 * 0.1,
-            duration: 0.02, // SHORT
-            intensity: 0.9,  // LOUD
-            hv: HV16::random(&format!("sl{}", i)),
-        }).collect();
+        let short_loud: Vec<LiquidEvent> = (0..5)
+            .map(|i| LiquidEvent {
+                event_type: LiquidEventType::Click,
+                start_time: i as f32 * 0.1,
+                duration: 0.02, // SHORT
+                intensity: 0.9, // LOUD
+                hv: HV16::random(&format!("sl{}", i)),
+            })
+            .collect();
 
         for _ in 0..30 {
             scorer.train_events(&short_loud);
         }
 
         // Test: short loud (should match)
-        let test_short_loud: Vec<LiquidEvent> = (0..3).map(|i| LiquidEvent {
-            event_type: LiquidEventType::Click,
-            start_time: i as f32 * 0.1,
-            duration: 0.02,
-            intensity: 0.85,
-            hv: HV16::random(&format!("tsl{}", i)),
-        }).collect();
+        let test_short_loud: Vec<LiquidEvent> = (0..3)
+            .map(|i| LiquidEvent {
+                event_type: LiquidEventType::Click,
+                start_time: i as f32 * 0.1,
+                duration: 0.02,
+                intensity: 0.85,
+                hv: HV16::random(&format!("tsl{}", i)),
+            })
+            .collect();
 
         // Test: LONG QUIET (should not match as well)
-        let test_long_quiet: Vec<LiquidEvent> = (0..3).map(|i| LiquidEvent {
-            event_type: LiquidEventType::Click,
-            start_time: i as f32 * 0.5,
-            duration: 0.5, // LONG
-            intensity: 0.2, // QUIET
-            hv: HV16::random(&format!("tlq{}", i)),
-        }).collect();
+        let test_long_quiet: Vec<LiquidEvent> = (0..3)
+            .map(|i| LiquidEvent {
+                event_type: LiquidEventType::Click,
+                start_time: i as f32 * 0.5,
+                duration: 0.5,  // LONG
+                intensity: 0.2, // QUIET
+                hv: HV16::random(&format!("tlq{}", i)),
+            })
+            .collect();
 
         let score_sl = scorer.score_events(&test_short_loud);
         let score_lq = scorer.score_events(&test_long_quiet);
@@ -539,8 +554,12 @@ mod tests {
 
         // Time-aware binding should distinguish
         // Note: Both are "Click" type, but duration/intensity differ
-        assert!(score_sl > score_lq,
-            "Time-aware should distinguish: {:.4} vs {:.4}", score_sl, score_lq);
+        assert!(
+            score_sl > score_lq,
+            "Time-aware should distinguish: {:.4} vs {:.4}",
+            score_sl,
+            score_lq
+        );
     }
 
     #[test]
@@ -562,7 +581,9 @@ mod tests {
         pipeline.train_all();
 
         let stats = pipeline.stats();
-        println!("After training: {} patterns, density {:.3}",
-            stats.training_count, stats.grammar_density);
+        println!(
+            "After training: {} patterns, density {:.3}",
+            stats.training_count, stats.grammar_density
+        );
     }
 }

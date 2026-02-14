@@ -4,10 +4,10 @@
 //! single ContinuousHV ensemble. This is the "configuration fingerprint" —
 //! two similar configs produce similar vectors.
 
-use symthaea_core::hdc::ContinuousHV;
 use super::codebook::NixCodebook;
 use super::option_encoder::OptionEncoder;
 use crate::parser::nix_parser::{NixConfig, NixValue};
+use symthaea_core::hdc::ContinuousHV;
 
 /// Encodes a full NixOS configuration into a composite hypervector.
 pub struct ConfigEncoder<'a> {
@@ -82,15 +82,12 @@ impl<'a> ConfigEncoder<'a> {
             NixValue::String(s) => s.clone(),
             NixValue::Path(p) => p.clone(),
             NixValue::Null => "null".to_string(),
-            NixValue::List(items) => {
-                items.iter()
-                    .map(Self::value_to_string)
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            }
-            NixValue::AttrSet(attrs) => {
-                attrs.keys().cloned().collect::<Vec<_>>().join(" ")
-            }
+            NixValue::List(items) => items
+                .iter()
+                .map(Self::value_to_string)
+                .collect::<Vec<_>>()
+                .join(" "),
+            NixValue::AttrSet(attrs) => attrs.keys().cloned().collect::<Vec<_>>().join(" "),
             NixValue::Expression(e) => e.clone(),
             NixValue::Apply(expr) => expr.clone(),
             NixValue::With { scope, body } => {
@@ -145,26 +142,38 @@ mod tests {
         let mut parser = NixParser::new();
         let mut cb = NixCodebook::new();
 
-        let config_a = parser.parse(r#"
+        let config_a = parser
+            .parse(
+                r#"
 { config, pkgs, ... }: {
     services.nginx.enable = true;
     services.nginx.port = 80;
 }
-"#).unwrap();
+"#,
+            )
+            .unwrap();
 
-        let config_b = parser.parse(r#"
+        let config_b = parser
+            .parse(
+                r#"
 { config, pkgs, ... }: {
     services.nginx.enable = true;
     services.nginx.port = 443;
 }
-"#).unwrap();
+"#,
+            )
+            .unwrap();
 
-        let config_c = parser.parse(r#"
+        let config_c = parser
+            .parse(
+                r#"
 { config, pkgs, ... }: {
     boot.loader.grub.enable = true;
     boot.loader.grub.device = "/dev/sda";
 }
-"#).unwrap();
+"#,
+            )
+            .unwrap();
 
         let hv_a = {
             let mut enc = ConfigEncoder::new(&mut cb);
@@ -186,7 +195,8 @@ mod tests {
         assert!(
             sim_ab > sim_ac,
             "Similar configs ({:.3}) should have higher similarity than dissimilar ({:.3})",
-            sim_ab, sim_ac,
+            sim_ab,
+            sim_ac,
         );
     }
 }

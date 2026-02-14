@@ -113,7 +113,7 @@ fn test_consolidation() {
     }
 
     // Should have some experiences
-    assert!(service.buffer.len() > 0);
+    assert!(!service.buffer.is_empty());
 
     // Run consolidation
     let loss = service.consolidate().unwrap();
@@ -134,7 +134,7 @@ fn test_prediction_confidence() {
 
     // Confidence should be tracked
     let confidence = service.prediction_confidence();
-    assert!(confidence >= 0.0 && confidence <= 1.0);
+    assert!((0.0..=1.0).contains(&confidence));
 
     // Reset should restore neutral confidence
     service.reset();
@@ -633,7 +633,7 @@ fn test_consciousness_level() {
     }
 
     let level = service.consciousness_level();
-    assert!(level >= 0.0 && level <= 1.0);
+    assert!((0.0..=1.0).contains(&level));
 }
 
 #[test]

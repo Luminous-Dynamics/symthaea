@@ -12,12 +12,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use symthaea_stt::{
-    AudioFrontend, AudioConfig,
-    LtcCell, LtcConfig,
-    DirectClassifier,
-    CmuDictionary, TextToPhonemes,
-    EvalResult,
-    load_alignments,
+    load_alignments, AudioConfig, AudioFrontend, CmuDictionary, DirectClassifier, EvalResult,
+    LtcCell, LtcConfig, TextToPhonemes,
 };
 
 #[derive(Parser)]
@@ -161,12 +157,12 @@ fn decode_sequence(
             let avg_conf: f32 = predictions[run_start..run_end]
                 .iter()
                 .map(|(_, c)| c)
-                .sum::<f32>() / run_len as f32;
+                .sum::<f32>()
+                / run_len as f32;
 
-            if avg_conf >= min_confidence
-                && result.last() != Some(current) {
-                    result.push(current.clone());
-                }
+            if avg_conf >= min_confidence && result.last() != Some(current) {
+                result.push(current.clone());
+            }
         }
 
         run_start = run_end;
@@ -177,7 +173,11 @@ fn decode_sequence(
 
 /// Stack multiple frames together for temporal context
 fn stack_frames(features: &[Vec<f32>], center: usize, context_frames: usize) -> Vec<f32> {
-    let n_dims = if features.is_empty() { 0 } else { features[0].len() };
+    let n_dims = if features.is_empty() {
+        0
+    } else {
+        features[0].len()
+    };
     let half = context_frames / 2;
     let mut stacked = Vec::with_capacity(n_dims * context_frames);
 
@@ -273,12 +273,16 @@ fn build_bigram_lm(alignments_path: &Path, phonemes: &[String]) -> Result<Bigram
     let alignments = load_alignments(alignments_path)?;
 
     let n_states = phonemes.len();
-    let phone_to_idx: HashMap<String, usize> = phonemes.iter().enumerate()
+    let phone_to_idx: HashMap<String, usize> = phonemes
+        .iter()
+        .enumerate()
         .map(|(i, p)| (p.clone(), i))
         .collect();
 
     // Detect if phonemes are stress-collapsed (no digits in any phoneme name)
-    let is_collapsed = phonemes.iter().all(|p| !p.bytes().last().is_some_and(|b| b.is_ascii_digit()));
+    let is_collapsed = phonemes
+        .iter()
+        .all(|p| !p.bytes().last().is_some_and(|b| b.is_ascii_digit()));
 
     // Count bigrams and unigrams
     let mut bigram_counts = vec![vec![0u64; n_states]; n_states];
@@ -287,9 +291,15 @@ fn build_bigram_lm(alignments_path: &Path, phonemes: &[String]) -> Result<Bigram
     let mut total_unigrams = 0u64;
 
     for alignment in alignments.values() {
-        let phone_indices: Vec<usize> = alignment.phonemes.iter()
+        let phone_indices: Vec<usize> = alignment
+            .phonemes
+            .iter()
             .filter_map(|seg| {
-                let key = if is_collapsed { strip_stress(&seg.phoneme) } else { seg.phoneme.clone() };
+                let key = if is_collapsed {
+                    strip_stress(&seg.phoneme)
+                } else {
+                    seg.phoneme.clone()
+                };
                 phone_to_idx.get(&key).copied()
             })
             .collect();
@@ -323,8 +333,12 @@ fn build_bigram_lm(alignments_path: &Path, phonemes: &[String]) -> Result<Bigram
         unigram_log_probs[s] = ((unigram_counts[s] as f32 + 1.0) / uni_denom).ln();
     }
 
-    println!("  ✓ Built bigram LM from {} alignments ({} bigrams, {} unigrams)",
-        alignments.len(), total_bigrams, total_unigrams);
+    println!(
+        "  ✓ Built bigram LM from {} alignments ({} bigrams, {} unigrams)",
+        alignments.len(),
+        total_bigrams,
+        total_unigrams
+    );
 
     // Show some statistics
     let mut top_bigrams: Vec<(usize, usize, u64)> = Vec::new();
@@ -339,10 +353,16 @@ fn build_bigram_lm(alignments_path: &Path, phonemes: &[String]) -> Result<Bigram
     println!("    Top 5 bigrams:");
     for &(prev, next, count) in top_bigrams.iter().take(5) {
         let pct = count as f32 / total_bigrams as f32 * 100.0;
-        println!("      {} -> {}: {} ({:.1}%)", phonemes[prev], phonemes[next], count, pct);
+        println!(
+            "      {} -> {}: {} ({:.1}%)",
+            phonemes[prev], phonemes[next], count, pct
+        );
     }
 
-    Ok(BigramLM { log_probs, unigram_log_probs })
+    Ok(BigramLM {
+        log_probs,
+        unigram_log_probs,
+    })
 }
 
 /// Viterbi decoder with bigram language model
@@ -455,7 +475,11 @@ fn build_stress_collapse_map(phonemes: &[String]) -> (Vec<String>, Vec<usize>) {
 }
 
 /// Collapse logits by taking max over stress variants (preserves logit scale)
-fn collapse_logits(all_logits: &[Vec<f32>], mapping: &[usize], n_collapsed: usize) -> Vec<Vec<f32>> {
+fn collapse_logits(
+    all_logits: &[Vec<f32>],
+    mapping: &[usize],
+    n_collapsed: usize,
+) -> Vec<Vec<f32>> {
     let mut collapsed = Vec::with_capacity(all_logits.len());
     for logits in all_logits {
         let mut c = vec![f32::NEG_INFINITY; n_collapsed];
@@ -473,9 +497,20 @@ fn collapse_logits(all_logits: &[Vec<f32>], mapping: &[usize], n_collapsed: usiz
 fn main() {
     let cli = Cli::parse();
 
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("         DIRECT CLASSIFIER EVALUATION                            ").bold().cyan());
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("         DIRECT CLASSIFIER EVALUATION                            ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
     println!();
 
     // Load classifier
@@ -483,7 +518,11 @@ fn main() {
     let mut classifier = match DirectClassifier::load(&cli.classifier) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("{} Failed to load classifier: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to load classifier: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -499,13 +538,21 @@ fn main() {
         println!("  ✓ Weight vectors normalized to unit norm");
     }
 
-    println!("  ✓ Loaded classifier with {} phonemes, reservoir={}, prior_scale={}",
-        classifier.phonemes.len(), classifier.config.reservoir_size, classifier.prior_scale);
+    println!(
+        "  ✓ Loaded classifier with {} phonemes, reservoir={}, prior_scale={}",
+        classifier.phonemes.len(),
+        classifier.config.reservoir_size,
+        classifier.prior_scale
+    );
 
     // Build stress collapse map if requested
     let (collapsed_phonemes, collapse_mapping) = if cli.collapse_stress {
         let (cp, cm) = build_stress_collapse_map(&classifier.phonemes);
-        println!("  ✓ Stress collapsing: {} → {} phoneme classes", classifier.phonemes.len(), cp.len());
+        println!(
+            "  ✓ Stress collapsing: {} → {} phoneme classes",
+            classifier.phonemes.len(),
+            cp.len()
+        );
         (Some(cp), Some(cm))
     } else {
         (None, None)
@@ -524,7 +571,11 @@ fn main() {
         match build_bigram_lm(bigram_path, decode_phonemes) {
             Ok(lm) => Some(lm),
             Err(e) => {
-                eprintln!("{} Failed to build bigram LM: {}", style("ERROR:").red().bold(), e);
+                eprintln!(
+                    "{} Failed to build bigram LM: {}",
+                    style("ERROR:").red().bold(),
+                    e
+                );
                 None
             }
         }
@@ -546,7 +597,11 @@ fn main() {
             }
         }
     } else {
-        eprintln!("{} Dictionary not found: {:?}", style("WARNING:").yellow().bold(), cli.dictionary);
+        eprintln!(
+            "{} Dictionary not found: {:?}",
+            style("WARNING:").yellow().bold(),
+            cli.dictionary
+        );
         None
     };
 
@@ -555,7 +610,11 @@ fn main() {
     let utterances = match scan_librispeech_dir(&cli.test_dir) {
         Ok(u) => u,
         Err(e) => {
-            eprintln!("{} Failed to scan test directory: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to scan test directory: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -566,7 +625,11 @@ fn main() {
         utterances.len()
     };
 
-    println!("  ✓ Found {} utterances, evaluating {}", utterances.len(), total_utterances);
+    println!(
+        "  ✓ Found {} utterances, evaluating {}",
+        utterances.len(),
+        total_utterances
+    );
 
     // Create audio frontend
     let audio_config = AudioConfig::default();
@@ -589,31 +652,59 @@ fn main() {
     let frame_hop = classifier.config.frame_duration;
 
     println!("\n  Eval config:");
-    println!("    Input: {} dims ({}mel × {}Δ × {}ctx)", input_size, n_mels,
-        if cli.use_deltas { 3 } else { 1 }, context_frames);
+    println!(
+        "    Input: {} dims ({}mel × {}Δ × {}ctx)",
+        input_size,
+        n_mels,
+        if cli.use_deltas { 3 } else { 1 },
+        context_frames
+    );
     println!("    Min duration: {} frames", cli.min_duration);
     println!("    Min confidence: {}", cli.min_confidence);
     if bigram_lm.is_some() {
-        let penalty = if cli.viterbi_penalty > 0.0 { cli.viterbi_penalty } else { 0.95 };
-        println!("    Decoder: Viterbi + bigram LM (penalty={}, lm_weight={})", penalty, cli.lm_weight);
+        let penalty = if cli.viterbi_penalty > 0.0 {
+            cli.viterbi_penalty
+        } else {
+            0.95
+        };
+        println!(
+            "    Decoder: Viterbi + bigram LM (penalty={}, lm_weight={})",
+            penalty, cli.lm_weight
+        );
     } else if cli.viterbi_penalty > 0.0 {
         println!("    Decoder: Viterbi (penalty={})", cli.viterbi_penalty);
     } else {
-        println!("    Decoder: Greedy (min_dur={}, min_conf={})", cli.min_duration, cli.min_confidence);
+        println!(
+            "    Decoder: Greedy (min_dur={}, min_conf={})",
+            cli.min_duration, cli.min_confidence
+        );
     }
 
     // Run evaluation
     println!();
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("                     RUNNING EVALUATION                           ").bold().cyan());
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("                     RUNNING EVALUATION                           ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
     println!();
 
     let pb = ProgressBar::new(total_utterances as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-        .unwrap()
-        .progress_chars("#>-"));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+            .unwrap()
+            .progress_chars("#>-"),
+    );
 
     let mut total_phoneme_result = EvalResult::default();
     let mut total_audio_seconds = 0.0f32;
@@ -623,7 +714,14 @@ fn main() {
     let text_to_phonemes = dictionary.as_ref().map(|d| TextToPhonemes::new(d.clone()));
 
     for (i, utterance) in utterances.iter().take(total_utterances).enumerate() {
-        pb.set_message(utterance.audio_path.file_name().unwrap_or_default().to_string_lossy().to_string());
+        pb.set_message(
+            utterance
+                .audio_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+        );
 
         // Load audio
         let (audio, sample_rate) = match AudioFrontend::load_audio(&utterance.audio_path) {
@@ -747,18 +845,30 @@ fn main() {
 
         // Collapse stress variants if requested
         let decode_logits: Vec<Vec<f32>>;
-        let logits_ref = if let (Some(ref cm), Some(ref cp)) = (&collapse_mapping, &collapsed_phonemes) {
-            decode_logits = collapse_logits(&all_logits, cm, cp.len());
-            &decode_logits
-        } else {
-            &all_logits
-        };
+        let logits_ref =
+            if let (Some(ref cm), Some(ref cp)) = (&collapse_mapping, &collapsed_phonemes) {
+                decode_logits = collapse_logits(&all_logits, cm, cp.len());
+                &decode_logits
+            } else {
+                &all_logits
+            };
 
         // Decode phoneme sequence
         let hyp_phonemes = if let Some(ref lm) = bigram_lm {
             // Viterbi + bigram LM (penalty defaults to 0.95 if not specified)
-            let penalty = if cli.viterbi_penalty > 0.0 { cli.viterbi_penalty } else { 0.95 };
-            viterbi_decode_bigram(logits_ref, lm, cli.lm_weight, penalty, cli.insertion_penalty, decode_phonemes)
+            let penalty = if cli.viterbi_penalty > 0.0 {
+                cli.viterbi_penalty
+            } else {
+                0.95
+            };
+            viterbi_decode_bigram(
+                logits_ref,
+                lm,
+                cli.lm_weight,
+                penalty,
+                cli.insertion_penalty,
+                decode_phonemes,
+            )
         } else if cli.viterbi_penalty > 0.0 {
             // Viterbi decoding with uniform transition penalty
             viterbi_decode(logits_ref, cli.viterbi_penalty, decode_phonemes)
@@ -825,13 +935,28 @@ fn main() {
 
     // Calculate metrics
     let per = total_phoneme_result.error_rate() * 100.0;
-    let rtf = if total_audio_seconds > 0.0 { total_inference_seconds / total_audio_seconds } else { 0.0 };
+    let rtf = if total_audio_seconds > 0.0 {
+        total_inference_seconds / total_audio_seconds
+    } else {
+        0.0
+    };
 
     // Print results
     println!();
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("                     EVALUATION RESULTS                           ").bold().cyan());
-    println!("{}", style("══════════════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("                     EVALUATION RESULTS                           ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("══════════════════════════════════════════════════════════════════").cyan()
+    );
     println!();
 
     println!("{}:", style("Summary").bold());
@@ -842,10 +967,19 @@ fn main() {
     println!();
 
     println!("{}:", style("Phoneme Error Rate (PER)").bold());
-    println!("  Reference phonemes: {}", total_phoneme_result.reference_length);
-    println!("  Hypothesis phonemes:{}", total_phoneme_result.hypothesis_length);
+    println!(
+        "  Reference phonemes: {}",
+        total_phoneme_result.reference_length
+    );
+    println!(
+        "  Hypothesis phonemes:{}",
+        total_phoneme_result.hypothesis_length
+    );
     println!("  Correct:            {}", total_phoneme_result.correct);
-    println!("  Substitutions:      {}", total_phoneme_result.substitutions);
+    println!(
+        "  Substitutions:      {}",
+        total_phoneme_result.substitutions
+    );
     println!("  Insertions:         {}", total_phoneme_result.insertions);
     println!("  Deletions:          {}", total_phoneme_result.deletions);
     println!("  {}:               {:.1}%", style("PER").bold(), per);
@@ -864,17 +998,29 @@ fn main() {
 
     // Assessment
     let status = if per < 30.0 {
-        (style("EXCELLENT").green().bold(), "System is learning phonemes!")
+        (
+            style("EXCELLENT").green().bold(),
+            "System is learning phonemes!",
+        )
     } else if per < 50.0 {
-        (style("GOOD").green().bold(), "Meaningful phoneme discrimination")
+        (
+            style("GOOD").green().bold(),
+            "Meaningful phoneme discrimination",
+        )
     } else if per < 70.0 {
-        (style("PROGRESSING").yellow().bold(), "Better than random, improving")
+        (
+            style("PROGRESSING").yellow().bold(),
+            "Better than random, improving",
+        )
     } else {
         (style("NEEDS WORK").red().bold(), "Still needs improvement")
     };
 
     println!("╔═══════════════════════════════════════════════════════════════╗");
-    println!("║           DIRECT CLASSIFIER: {}                   ║", status.0);
+    println!(
+        "║           DIRECT CLASSIFIER: {}                   ║",
+        status.0
+    );
     println!("╠═══════════════════════════════════════════════════════════════╣");
     println!("║  PER: {:.1}% - {}║", per, status.1);
     println!("╚═══════════════════════════════════════════════════════════════╝");
@@ -884,8 +1030,7 @@ fn main() {
 fn scan_librispeech_dir(base_dir: &Path) -> Result<Vec<Utterance>, String> {
     let mut utterances = Vec::new();
 
-    let entries = fs::read_dir(base_dir)
-        .map_err(|e| format!("Failed to read directory: {}", e))?;
+    let entries = fs::read_dir(base_dir).map_err(|e| format!("Failed to read directory: {}", e))?;
 
     for speaker_entry in entries.flatten() {
         if !speaker_entry.path().is_dir() {
@@ -910,8 +1055,8 @@ fn scan_librispeech_dir(base_dir: &Path) -> Result<Vec<Utterance>, String> {
                 continue;
             }
 
-            let file = File::open(&trans_file)
-                .map_err(|e| format!("Failed to open transcript: {}", e))?;
+            let file =
+                File::open(&trans_file).map_err(|e| format!("Failed to open transcript: {}", e))?;
             let reader = BufReader::new(file);
 
             for line in reader.lines().flatten() {

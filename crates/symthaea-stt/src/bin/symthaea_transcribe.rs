@@ -22,11 +22,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use symthaea_stt::{
-    AudioFrontend, AudioProjector,
-    PhonemeDecoder, PhonemeResonator, PhonemeInventory,
-    CmuDictionary,
-    TrainedPrototypes, BootstrapConfig,
-    HV16,
+    AudioFrontend, AudioProjector, BootstrapConfig, CmuDictionary, PhonemeDecoder,
+    PhonemeInventory, PhonemeResonator, TrainedPrototypes, HV16,
 };
 
 // ============================================================================
@@ -192,7 +189,8 @@ impl TranscriptionEngine {
         }
 
         // Filter out silence and noise tokens
-        let filtered: Vec<String> = phonemes.iter()
+        let filtered: Vec<String> = phonemes
+            .iter()
             .filter(|p| *p != "sil" && *p != "SIL" && !p.starts_with('<'))
             .cloned()
             .collect();
@@ -239,7 +237,10 @@ fn cmd_transcribe(
     let duration_sec = audio.len() as f32 / sample_rate as f32;
 
     if verbose {
-        println!("  Duration: {:.2}s, Sample rate: {}Hz", duration_sec, sample_rate);
+        println!(
+            "  Duration: {:.2}s, Sample rate: {}Hz",
+            duration_sec, sample_rate
+        );
     }
 
     // Initialize engine
@@ -252,7 +253,10 @@ fn cmd_transcribe(
         }
         engine.load_model(model)?;
     } else {
-        println!("{}", style("Warning: No model found, using random prototypes").yellow());
+        println!(
+            "{}",
+            style("Warning: No model found, using random prototypes").yellow()
+        );
         // Initialize with phoneme inventory defaults
         let inventory = PhonemeInventory::new();
         for phoneme in inventory.all() {
@@ -284,8 +288,10 @@ fn cmd_transcribe(
             println!("  \"phonemes\": {:?},", result.phonemes);
             println!("  \"num_frames\": {},", result.num_frames);
             println!("  \"duration_sec\": {:.2},", duration_sec);
-            println!("  \"realtime_factor\": {:.2},",
-                     duration_sec * 1000.0 / (result.projection_time_ms + result.decode_time_ms));
+            println!(
+                "  \"realtime_factor\": {:.2},",
+                duration_sec * 1000.0 / (result.projection_time_ms + result.decode_time_ms)
+            );
             println!("}}");
         }
         "phonemes" => {
@@ -303,8 +309,10 @@ fn cmd_transcribe(
                 println!("  Frames: {}", result.num_frames);
                 println!("  Projection: {:.1}ms", result.projection_time_ms);
                 println!("  Decoding: {:.1}ms", result.decode_time_ms);
-                println!("  Realtime factor: {:.1}x",
-                         duration_sec * 1000.0 / (result.projection_time_ms + result.decode_time_ms));
+                println!(
+                    "  Realtime factor: {:.1}x",
+                    duration_sec * 1000.0 / (result.projection_time_ms + result.decode_time_ms)
+                );
             }
         }
     }
@@ -321,7 +329,10 @@ fn cmd_download(output: &Path, force: bool) -> std::io::Result<()> {
     let dict_path = output.join("cmudict.dict");
 
     if dict_path.exists() && !force {
-        println!("{}", style("CMU Dictionary already exists. Use --force to re-download.").yellow());
+        println!(
+            "{}",
+            style("CMU Dictionary already exists. Use --force to re-download.").yellow()
+        );
         return Ok(());
     }
 
@@ -494,7 +505,11 @@ SYMTHAEA  S IH0 M TH EY1 AH0
 
     std::fs::write(&dict_path, mini_dict_content)?;
 
-    println!("{} Created mini dictionary at {:?}", style("✓").green(), dict_path);
+    println!(
+        "{} Created mini dictionary at {:?}",
+        style("✓").green(),
+        dict_path
+    );
     println!();
     println!("For full dictionary, download from:");
     println!("  https://github.com/cmusphinx/cmudict/raw/master/cmudict.dict");
@@ -528,11 +543,18 @@ fn cmd_init(output: &Path) -> std::io::Result<()> {
     // Save
     prototypes.save(output)?;
 
-    println!("{} Created initial prototypes at {:?}", style("✓").green(), output);
+    println!(
+        "{} Created initial prototypes at {:?}",
+        style("✓").green(),
+        output
+    );
     println!("  Phonemes: {}", prototypes.len());
     println!();
     println!("Note: These are random prototypes. Train on real data for accuracy:");
-    println!("  symthaea-train bootstrap --data <librispeech-path> --output {:?}", output);
+    println!(
+        "  symthaea-train bootstrap --data <librispeech-path> --output {:?}",
+        output
+    );
 
     Ok(())
 }
@@ -589,9 +611,11 @@ fn cmd_benchmark(audio_file: &Path, iterations: usize) -> std::io::Result<()> {
 
     // Benchmark
     let pb = ProgressBar::new(iterations as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
-        .unwrap());
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
+            .unwrap(),
+    );
 
     let mut times = Vec::with_capacity(iterations);
     for _ in 0..iterations {
@@ -630,21 +654,20 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Transcribe { audio_file, model, dictionary, format, verbose } => {
-            cmd_transcribe(&audio_file, &model, &dictionary, &format, verbose)
-        }
-        Commands::Download { output, force } => {
-            cmd_download(&output, force)
-        }
-        Commands::Init { output } => {
-            cmd_init(&output)
-        }
-        Commands::Info { model } => {
-            cmd_info(&model)
-        }
-        Commands::Benchmark { audio_file, iterations } => {
-            cmd_benchmark(&audio_file, iterations)
-        }
+        Commands::Transcribe {
+            audio_file,
+            model,
+            dictionary,
+            format,
+            verbose,
+        } => cmd_transcribe(&audio_file, &model, &dictionary, &format, verbose),
+        Commands::Download { output, force } => cmd_download(&output, force),
+        Commands::Init { output } => cmd_init(&output),
+        Commands::Info { model } => cmd_info(&model),
+        Commands::Benchmark {
+            audio_file,
+            iterations,
+        } => cmd_benchmark(&audio_file, iterations),
     };
 
     if let Err(e) = result {

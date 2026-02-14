@@ -12,10 +12,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use symthaea_stt::{
-    AudioFrontend, AudioConfig,
-    CrystalReservoir, OnlinePrototypeClassifier,
-    RandomProjection, RFActivation,
-    load_alignments, id_to_audio_path,
+    id_to_audio_path, load_alignments, AudioConfig, AudioFrontend, CrystalReservoir,
+    OnlinePrototypeClassifier, RFActivation, RandomProjection,
 };
 
 #[derive(Parser)]
@@ -77,7 +75,11 @@ struct Cli {
 
 /// Stack multiple frames together for temporal context
 fn stack_frames(features: &[Vec<f32>], center: usize, context_frames: usize) -> Vec<f32> {
-    let n_dims = if features.is_empty() { 0 } else { features[0].len() };
+    let n_dims = if features.is_empty() {
+        0
+    } else {
+        features[0].len()
+    };
     let half = context_frames / 2;
     let mut stacked = Vec::with_capacity(n_dims * context_frames);
 
@@ -93,10 +95,24 @@ fn stack_frames(features: &[Vec<f32>], center: usize, context_frames: usize) -> 
 fn main() {
     let cli = Cli::parse();
 
-    println!("{}", style("═══════════════════════════════════════════════════════════").magenta());
-    println!("{}", style("    CRYSTAL RESERVOIR TRAINING                             ").bold().magenta());
-    println!("{}", style("    Gabor STRFs + Online Prototype Learning                ").magenta());
-    println!("{}", style("═══════════════════════════════════════════════════════════").magenta());
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").magenta()
+    );
+    println!(
+        "{}",
+        style("    CRYSTAL RESERVOIR TRAINING                             ")
+            .bold()
+            .magenta()
+    );
+    println!(
+        "{}",
+        style("    Gabor STRFs + Online Prototype Learning                ").magenta()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").magenta()
+    );
     println!();
     println!("  Architecture: Mel+Δ+ΔΔ -> Context Stack -> Gabor Bank -> Prototype Classifier");
     println!("  Training: Online prototype averaging (one-shot geometric learning)");
@@ -105,11 +121,19 @@ fn main() {
 
     // Check paths
     if !cli.alignments.exists() {
-        eprintln!("{} Alignments file not found: {:?}", style("ERROR:").red().bold(), cli.alignments);
+        eprintln!(
+            "{} Alignments file not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.alignments
+        );
         std::process::exit(1);
     }
     if !cli.audio_dir.exists() {
-        eprintln!("{} Audio directory not found: {:?}", style("ERROR:").red().bold(), cli.audio_dir);
+        eprintln!(
+            "{} Audio directory not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.audio_dir
+        );
         std::process::exit(1);
     }
 
@@ -118,7 +142,11 @@ fn main() {
     let alignments = match load_alignments(&cli.alignments) {
         Ok(a) => a,
         Err(e) => {
-            eprintln!("{} Failed to load alignments: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to load alignments: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -167,7 +195,10 @@ fn main() {
         random_proj = None;
         println!("    Gabor filters: {}", cli.n_filters);
         println!("    Input dimensions: {}", input_size);
-        println!("    Filter coverage: {} time steps × {} mel bins", cli.context_frames, n_mels);
+        println!(
+            "    Filter coverage: {} time steps × {} mel bins",
+            cli.context_frames, n_mels
+        );
     }
 
     // Create online prototype classifier
@@ -179,8 +210,14 @@ fn main() {
     } else {
         println!("    Mode: CRYSTAL RESERVOIR (Gabor STRFs)");
     }
-    println!("    Feature dim: {} (mel={}, deltas={})", feature_dim, n_mels, cli.use_deltas);
-    println!("    Context frames: {} -> {} input dims", cli.context_frames, input_size);
+    println!(
+        "    Feature dim: {} (mel={}, deltas={})",
+        feature_dim, n_mels, cli.use_deltas
+    );
+    println!(
+        "    Context frames: {} -> {} input dims",
+        cli.context_frames, input_size
+    );
     println!("    Output features: {}", cli.n_filters);
     println!("    CMVN: {}", cli.cmvn);
     println!("    Phoneme classes: {}", phonemes.len());
@@ -199,10 +236,12 @@ fn main() {
     println!("\n  Processing {} utterances...", total);
 
     let pb = ProgressBar::new(total as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.magenta} [{bar:40.magenta/blue}] {pos}/{len} ({eta}) {msg}")
-        .unwrap()
-        .progress_chars("◆◇-"));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.magenta} [{bar:40.magenta/blue}] {pos}/{len} ({eta}) {msg}")
+            .unwrap()
+            .progress_chars("◆◇-"),
+    );
 
     let mut processed = 0;
     let mut skipped = 0;
@@ -294,7 +333,10 @@ fn main() {
             let segment_len = end_frame.saturating_sub(start_frame);
             let margin = segment_len / 4;
             let center_start = (start_frame + margin).min(features.len().saturating_sub(1));
-            let center_end = end_frame.saturating_sub(margin).min(features.len()).max(center_start + 1);
+            let center_end = end_frame
+                .saturating_sub(margin)
+                .min(features.len())
+                .max(center_start + 1);
 
             for frame_idx in center_start..center_end {
                 if frame_idx < features.len() {
@@ -343,14 +385,19 @@ fn main() {
             max_count = max_count.max(count);
         }
     }
-    println!("    Initialized prototypes: {}/{}", initialized, phonemes.len());
+    println!(
+        "    Initialized prototypes: {}/{}",
+        initialized,
+        phonemes.len()
+    );
     if initialized > 0 {
         println!("    Sample counts: {} - {}", min_count, max_count);
     }
 
     // Show class distribution
     if cli.verbose {
-        let mut indexed: Vec<(usize, usize)> = classifier.counts.iter().copied().enumerate().collect();
+        let mut indexed: Vec<(usize, usize)> =
+            classifier.counts.iter().copied().enumerate().collect();
         indexed.sort_by(|a, b| b.1.cmp(&a.1));
         println!("\n  Top 10 phoneme frequencies:");
         for &(idx, count) in indexed.iter().take(10) {
@@ -445,7 +492,10 @@ fn main() {
 
         if total_test > 0 {
             let accuracy = correct as f32 / total_test as f32 * 100.0;
-            println!("    Frame accuracy: {:.1}% ({}/{})", accuracy, correct, total_test);
+            println!(
+                "    Frame accuracy: {:.1}% ({}/{})",
+                accuracy, correct, total_test
+            );
         }
     }
 
@@ -470,20 +520,40 @@ fn main() {
     let data = match bincode::serialize(&serialized) {
         Ok(d) => d,
         Err(e) => {
-            eprintln!("{} Failed to serialize classifier: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to serialize classifier: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
     if let Err(e) = std::fs::write(&cli.output, &data) {
-        eprintln!("{} Failed to write file {:?}: {}", style("ERROR:").red().bold(), cli.output, e);
+        eprintln!(
+            "{} Failed to write file {:?}: {}",
+            style("ERROR:").red().bold(),
+            cli.output,
+            e
+        );
         std::process::exit(1);
     }
 
     println!("  ✓ Saved Crystal Classifier");
 
-    println!("\n{}", style("═══════════════════════════════════════════════════════════").magenta());
-    println!("{}", style("         CRYSTAL RESERVOIR TRAINING COMPLETE               ").bold().green());
-    println!("{}", style("═══════════════════════════════════════════════════════════").magenta());
+    println!(
+        "\n{}",
+        style("═══════════════════════════════════════════════════════════").magenta()
+    );
+    println!(
+        "{}",
+        style("         CRYSTAL RESERVOIR TRAINING COMPLETE               ")
+            .bold()
+            .green()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").magenta()
+    );
     println!("\n  Next: eval-crystal --classifier {:?}", cli.output);
 }
 

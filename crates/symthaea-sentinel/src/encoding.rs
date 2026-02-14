@@ -6,9 +6,9 @@
 //! - `AudioHdcVectors`: Container for encoded HDC vectors
 //! - `EncoderMode`: Selection between standard and premium encoding
 
-use crate::hdc::{HV, SparseProjector, RffProjector, HDC_DIM, RFF_GAMMA};
+use crate::features::{AudioFeatures, CONTROL_RATE, NUM_MFCC};
+use crate::hdc::{RffProjector, SparseProjector, HDC_DIM, HV, RFF_GAMMA};
 use crate::temporal::{HierarchicalCfc, TemporalWindow};
-use crate::features::{AudioFeatures, NUM_MFCC, CONTROL_RATE};
 
 /// Number of TIMBRE features for sparse projection
 const NUM_TIMBRE_FEATURES: usize = 16;
@@ -109,7 +109,9 @@ impl AudioHdcEncoder {
         // SPARSE BINARY PROJECTION
         let timbre = self.timbre_projector.project_masked(&timbre_features, 0.05);
         let rhythm = self.rhythm_projector.project_masked(&rhythm_features, 0.05);
-        let envelope = self.envelope_projector.project_masked(&envelope_features, 0.05);
+        let envelope = self
+            .envelope_projector
+            .project_masked(&envelope_features, 0.05);
 
         // Phase-sensitive binding
         let phase_position = features.frame_index % 64;
@@ -163,8 +165,14 @@ impl PremiumHdcEncoder {
         let phase_space_dim = CFC_STATE_DIM * 2 * 5;
 
         Self {
-            cfc_timbre: HierarchicalCfc::with_taus(CFC_STATE_DIM, &[500.0, 200.0, 80.0, 40.0, 30.0]),
-            cfc_rhythm: HierarchicalCfc::with_taus(CFC_STATE_DIM, &[500.0, 200.0, 80.0, 40.0, 30.0]),
+            cfc_timbre: HierarchicalCfc::with_taus(
+                CFC_STATE_DIM,
+                &[500.0, 200.0, 80.0, 40.0, 30.0],
+            ),
+            cfc_rhythm: HierarchicalCfc::with_taus(
+                CFC_STATE_DIM,
+                &[500.0, 200.0, 80.0, 40.0, 30.0],
+            ),
             rff_timbre: RffProjector::with_gamma(phase_space_dim, HDC_DIM, 50000, RFF_GAMMA),
             rff_rhythm: RffProjector::with_gamma(phase_space_dim, HDC_DIM, 60000, RFF_GAMMA),
             window_timbre: TemporalWindow::new(NUM_TIMBRE_FEATURES),
@@ -221,15 +229,24 @@ impl PremiumHdcEncoder {
         let rhythm = self.rff_rhythm.project_normalized(&rhythm_phase_space);
 
         // Step 7: Envelope vector
-        let envelope_features = [(features.envelope_delta * 10.0).clamp(0.0, 1.0),
-            (features.envelope_variance * 100.0).clamp(0.0, 1.0)];
+        let envelope_features = [
+            (features.envelope_delta * 10.0).clamp(0.0, 1.0),
+            (features.envelope_variance * 100.0).clamp(0.0, 1.0),
+        ];
         let mut envelope_values = vec![0.0f32; HDC_DIM];
         for i in 0..HDC_DIM {
             let idx = i % envelope_features.len();
-            let basis_sign = if (i / envelope_features.len()).is_multiple_of(2) { 1.0 } else { -1.0 };
+            let basis_sign = if (i / envelope_features.len()).is_multiple_of(2) {
+                1.0
+            } else {
+                -1.0
+            };
             envelope_values[i] = basis_sign * (envelope_features[idx] * 2.0 - 1.0);
         }
-        let envelope = HV { values: envelope_values }.normalize();
+        let envelope = HV {
+            values: envelope_values,
+        }
+        .normalize();
 
         // Step 8: Context vector
         let timbre_bound = timbre.xor_bind(&self.timbre_role);

@@ -14,12 +14,12 @@
 //!
 //! Run with: cargo run --example hdc_coarticulation_benchmark
 
-use symthaea::voice::{
-    ArticulatorySynthesizer, ArticulatoryConfig, FormantFrame, FormantVocoder,
-    LTCPacing, PhonemeHdcCodec,
-};
 use std::sync::Arc;
 use std::time::Instant;
+use symthaea::voice::{
+    ArticulatoryConfig, ArticulatorySynthesizer, FormantFrame, FormantVocoder, LTCPacing,
+    PhonemeHdcCodec,
+};
 
 fn main() {
     println!("=== HDC Coarticulation Benchmark ===\n");
@@ -27,8 +27,8 @@ fn main() {
     // Test phrases with different phonetic characteristics
     let test_phrases = [
         ("Hello World", "HH AH0 L OW1 | W ER1 L D"),
-        ("Similar Sounds", "S IH1 M AH0 L ER0 | S AW1 N D Z"),  // S-S transition
-        ("Contrasting", "K AA1 N T R AE2 S T IH0 NG"),  // Many consonant clusters
+        ("Similar Sounds", "S IH1 M AH0 L ER0 | S AW1 N D Z"), // S-S transition
+        ("Contrasting", "K AA1 N T R AE2 S T IH0 NG"),         // Many consonant clusters
         ("Flowing Vowels", "F L OW1 IH0 NG | V AW1 AH0 L Z"),  // Vowel-heavy
     ];
 
@@ -44,47 +44,64 @@ fn main() {
         println!("  Phonemes: {}\n", arpabet);
 
         // Mode 1: No coarticulation
-        let (frames_none, time_none) = synthesize_with_mode(
-            arpabet,
-            CoarticulationMode::None,
-            codec.clone(),
-        );
+        let (frames_none, time_none) =
+            synthesize_with_mode(arpabet, CoarticulationMode::None, codec.clone());
         let metrics_none = analyze_frames(&frames_none);
 
         // Mode 2: Basic coarticulation (fixed blend)
-        let (frames_basic, time_basic) = synthesize_with_mode(
-            arpabet,
-            CoarticulationMode::Basic,
-            codec.clone(),
-        );
+        let (frames_basic, time_basic) =
+            synthesize_with_mode(arpabet, CoarticulationMode::Basic, codec.clone());
         let metrics_basic = analyze_frames(&frames_basic);
 
         // Mode 3: HDC-driven coarticulation
-        let (frames_hdc, time_hdc) = synthesize_with_mode(
-            arpabet,
-            CoarticulationMode::HDC,
-            codec.clone(),
-        );
+        let (frames_hdc, time_hdc) =
+            synthesize_with_mode(arpabet, CoarticulationMode::HDC, codec.clone());
         let metrics_hdc = analyze_frames(&frames_hdc);
 
         // Print comparison table
-        println!("  {:20} {:>12} {:>12} {:>12}", "Metric", "None", "Basic", "HDC");
+        println!(
+            "  {:20} {:>12} {:>12} {:>12}",
+            "Metric", "None", "Basic", "HDC"
+        );
         println!("  {:-<58}", "");
-        println!("  {:20} {:>12.4} {:>12.4} {:>12.4}",
-                 "F1 Smoothness", metrics_none.f1_smoothness, metrics_basic.f1_smoothness, metrics_hdc.f1_smoothness);
-        println!("  {:20} {:>12.4} {:>12.4} {:>12.4}",
-                 "F2 Smoothness", metrics_none.f2_smoothness, metrics_basic.f2_smoothness, metrics_hdc.f2_smoothness);
-        println!("  {:20} {:>12.4} {:>12.4} {:>12.4}",
-                 "Transition Jerk", metrics_none.transition_jerk, metrics_basic.transition_jerk, metrics_hdc.transition_jerk);
-        println!("  {:20} {:>12.4} {:>12.4} {:>12.4}",
-                 "Energy Variance", metrics_none.energy_variance, metrics_basic.energy_variance, metrics_hdc.energy_variance);
-        println!("  {:20} {:>10.0}µs {:>10.0}µs {:>10.0}µs",
-                 "Synthesis Time", time_none, time_basic, time_hdc);
+        println!(
+            "  {:20} {:>12.4} {:>12.4} {:>12.4}",
+            "F1 Smoothness",
+            metrics_none.f1_smoothness,
+            metrics_basic.f1_smoothness,
+            metrics_hdc.f1_smoothness
+        );
+        println!(
+            "  {:20} {:>12.4} {:>12.4} {:>12.4}",
+            "F2 Smoothness",
+            metrics_none.f2_smoothness,
+            metrics_basic.f2_smoothness,
+            metrics_hdc.f2_smoothness
+        );
+        println!(
+            "  {:20} {:>12.4} {:>12.4} {:>12.4}",
+            "Transition Jerk",
+            metrics_none.transition_jerk,
+            metrics_basic.transition_jerk,
+            metrics_hdc.transition_jerk
+        );
+        println!(
+            "  {:20} {:>12.4} {:>12.4} {:>12.4}",
+            "Energy Variance",
+            metrics_none.energy_variance,
+            metrics_basic.energy_variance,
+            metrics_hdc.energy_variance
+        );
+        println!(
+            "  {:20} {:>10.0}µs {:>10.0}µs {:>10.0}µs",
+            "Synthesis Time", time_none, time_basic, time_hdc
+        );
 
         // Calculate improvement
-        let smoothness_improvement = (metrics_hdc.f1_smoothness + metrics_hdc.f2_smoothness) /
-            (metrics_none.f1_smoothness + metrics_none.f2_smoothness + 0.0001);
-        let jerk_reduction = 1.0 - (metrics_hdc.transition_jerk / (metrics_none.transition_jerk + 0.0001));
+        let smoothness_improvement = (metrics_hdc.f1_smoothness + metrics_hdc.f2_smoothness)
+            / (metrics_none.f1_smoothness + metrics_none.f2_smoothness + 0.0001);
+        let jerk_reduction =
+            1.0 - (metrics_hdc.transition_jerk / (metrics_none.transition_jerk + 0.0001));
 
         println!("\n  HDC vs None:");
         println!("    Smoothness: {:.1}x better", smoothness_improvement);
@@ -99,18 +116,20 @@ fn main() {
 
     std::fs::create_dir_all("audio_output").ok();
 
-    let test_phrase = "HH AH0 L OW1 | W ER1 L D";  // "Hello World"
+    let test_phrase = "HH AH0 L OW1 | W ER1 L D"; // "Hello World"
     let pacing = LTCPacing::default();
     let mut vocoder = FormantVocoder::new();
 
     // Generate with no coarticulation
-    let (frames_none, _) = synthesize_with_mode(test_phrase, CoarticulationMode::None, codec.clone());
+    let (frames_none, _) =
+        synthesize_with_mode(test_phrase, CoarticulationMode::None, codec.clone());
     let audio_none = vocoder.synthesize(&frames_none);
     write_wav("audio_output/coarticulation_none.wav", &audio_none, 24000);
     println!("  Written: audio_output/coarticulation_none.wav");
 
     // Generate with basic coarticulation
-    let (frames_basic, _) = synthesize_with_mode(test_phrase, CoarticulationMode::Basic, codec.clone());
+    let (frames_basic, _) =
+        synthesize_with_mode(test_phrase, CoarticulationMode::Basic, codec.clone());
     let audio_basic = vocoder.synthesize(&frames_basic);
     write_wav("audio_output/coarticulation_basic.wav", &audio_basic, 24000);
     println!("  Written: audio_output/coarticulation_basic.wav");
@@ -152,9 +171,9 @@ fn main() {
 
 #[derive(Clone, Copy)]
 enum CoarticulationMode {
-    None,   // Discrete transitions
-    Basic,  // Fixed anticipatory blend
-    HDC,    // HDC-driven blend + tau
+    None,  // Discrete transitions
+    Basic, // Fixed anticipatory blend
+    HDC,   // HDC-driven blend + tau
 }
 
 fn synthesize_with_mode(
@@ -212,17 +231,17 @@ fn analyze_frames(frames: &[FormantFrame]) -> FrameMetrics {
     let mut f2_derivs: Vec<f32> = Vec::new();
 
     for i in 1..frames.len() {
-        let dt = frames[i].time - frames[i-1].time;
+        let dt = frames[i].time - frames[i - 1].time;
         if dt > 0.0 {
-            f1_derivs.push((frames[i].f1 - frames[i-1].f1) / dt);
-            f2_derivs.push((frames[i].f2 - frames[i-1].f2) / dt);
+            f1_derivs.push((frames[i].f1 - frames[i - 1].f1) / dt);
+            f2_derivs.push((frames[i].f2 - frames[i - 1].f2) / dt);
         }
     }
 
     // Calculate second derivatives (jerk indicator)
     let mut f1_jerk: Vec<f32> = Vec::new();
     for i in 1..f1_derivs.len() {
-        f1_jerk.push((f1_derivs[i] - f1_derivs[i-1]).abs());
+        f1_jerk.push((f1_derivs[i] - f1_derivs[i - 1]).abs());
     }
 
     // Smoothness = 1 / (1 + variance of derivatives)
@@ -241,7 +260,7 @@ fn analyze_frames(frames: &[FormantFrame]) -> FrameMetrics {
     FrameMetrics {
         f1_smoothness,
         f2_smoothness,
-        transition_jerk: transition_jerk / 1000.0,  // Scale for readability
+        transition_jerk: transition_jerk / 1000.0, // Scale for readability
         energy_variance,
     }
 }
@@ -262,7 +281,8 @@ fn write_wav(path: &str, samples: &[f32], sample_rate: u32) {
     let mut file = File::create(path).expect("Failed to create WAV file");
 
     // Convert to i16
-    let samples_i16: Vec<i16> = samples.iter()
+    let samples_i16: Vec<i16> = samples
+        .iter()
         .map(|&s| (s.clamp(-1.0, 1.0) * 32767.0) as i16)
         .collect();
 
@@ -274,13 +294,13 @@ fn write_wav(path: &str, samples: &[f32], sample_rate: u32) {
     file.write_all(&file_size.to_le_bytes()).unwrap();
     file.write_all(b"WAVE").unwrap();
     file.write_all(b"fmt ").unwrap();
-    file.write_all(&16u32.to_le_bytes()).unwrap();  // fmt chunk size
-    file.write_all(&1u16.to_le_bytes()).unwrap();   // PCM
-    file.write_all(&1u16.to_le_bytes()).unwrap();   // mono
+    file.write_all(&16u32.to_le_bytes()).unwrap(); // fmt chunk size
+    file.write_all(&1u16.to_le_bytes()).unwrap(); // PCM
+    file.write_all(&1u16.to_le_bytes()).unwrap(); // mono
     file.write_all(&sample_rate.to_le_bytes()).unwrap();
-    file.write_all(&(sample_rate * 2).to_le_bytes()).unwrap();  // byte rate
-    file.write_all(&2u16.to_le_bytes()).unwrap();   // block align
-    file.write_all(&16u16.to_le_bytes()).unwrap();  // bits per sample
+    file.write_all(&(sample_rate * 2).to_le_bytes()).unwrap(); // byte rate
+    file.write_all(&2u16.to_le_bytes()).unwrap(); // block align
+    file.write_all(&16u16.to_le_bytes()).unwrap(); // bits per sample
     file.write_all(b"data").unwrap();
     file.write_all(&data_size.to_le_bytes()).unwrap();
 

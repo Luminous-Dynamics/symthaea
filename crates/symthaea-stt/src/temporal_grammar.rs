@@ -34,7 +34,7 @@
 //!                    └──────────────────────────────────────────┘
 //! ```
 
-use crate::hdc::{HV16, BundleAccumulator, HDC_DIM};
+use crate::hdc::{BundleAccumulator, HDC_DIM, HV16};
 use crate::liquid::CfcCell;
 use std::collections::HashMap;
 
@@ -204,11 +204,13 @@ impl DomainConfig {
     /// Create speech domain config
     pub fn speech() -> Self {
         let phonemes = vec![
-            "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH",
-            "EH", "ER", "EY", "F", "G", "HH", "IH", "IY", "JH", "K",
-            "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH",
-            "T", "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH", "SIL",
-        ].into_iter().map(String::from).collect();
+            "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH", "EH", "ER", "EY", "F", "G",
+            "HH", "IH", "IY", "JH", "K", "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH", "T",
+            "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH", "SIL",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         Self {
             name: "speech".to_string(),
@@ -226,12 +228,16 @@ impl DomainConfig {
 
     /// Create music domain config
     pub fn music() -> Self {
-        let notes: Vec<String> = (0..88).map(|i| {
-            let names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-            let octave = (i + 9) / 12;
-            let name = names[i % 12];
-            format!("{}{}", name, octave)
-        }).collect();
+        let notes: Vec<String> = (0..88)
+            .map(|i| {
+                let names = [
+                    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+                ];
+                let octave = (i + 9) / 12;
+                let name = names[i % 12];
+                format!("{}{}", name, octave)
+            })
+            .collect();
 
         Self {
             name: "music".to_string(),
@@ -240,7 +246,7 @@ impl DomainConfig {
             frame_size: 2048,
             sparsity: Sparsity::Sparse10,
             duration_bins: 16, // More duration resolution for music
-            intensity_bins: 8,  // dynamics: ppp to fff
+            intensity_bins: 8, // dynamics: ppp to fff
             predictive_feedback: true,
             prediction_boost: 0.3,
             hierarchy_depth: 3, // notes → chords → phrases
@@ -250,9 +256,19 @@ impl DomainConfig {
     /// Create cetacean (whale) domain config
     pub fn cetacean() -> Self {
         let calls = vec![
-            "click", "whistle_up", "whistle_down", "whistle_flat",
-            "burst", "moan", "grunt", "pulse_train", "silence",
-        ].into_iter().map(String::from).collect();
+            "click",
+            "whistle_up",
+            "whistle_down",
+            "whistle_flat",
+            "burst",
+            "moan",
+            "grunt",
+            "pulse_train",
+            "silence",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         Self {
             name: "cetacean".to_string(),
@@ -272,9 +288,12 @@ impl DomainConfig {
     pub fn ecg() -> Self {
         let waves = vec![
             "P", "Q", "R", "S", "T", "U", // Standard ECG waves
-            "PVC", "PAC", "AF", "VT",     // Arrhythmias
+            "PVC", "PAC", "AF", "VT", // Arrhythmias
             "baseline", "artifact",
-        ].into_iter().map(String::from).collect();
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         Self {
             name: "ecg".to_string(),
@@ -293,11 +312,24 @@ impl DomainConfig {
     /// Create EEG (brain) domain config
     pub fn eeg() -> Self {
         let patterns = vec![
-            "delta", "theta", "alpha", "beta", "gamma", // Frequency bands
-            "spindle", "k_complex", "vertex_sharp",     // Sleep patterns
-            "spike", "sharp_wave", "seizure",           // Abnormal
-            "eye_blink", "muscle", "baseline",
-        ].into_iter().map(String::from).collect();
+            "delta",
+            "theta",
+            "alpha",
+            "beta",
+            "gamma", // Frequency bands
+            "spindle",
+            "k_complex",
+            "vertex_sharp", // Sleep patterns
+            "spike",
+            "sharp_wave",
+            "seizure", // Abnormal
+            "eye_blink",
+            "muscle",
+            "baseline",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         Self {
             name: "eeg".to_string(),
@@ -356,7 +388,9 @@ impl TemporalGrammar {
         let sparsity = config.sparsity;
 
         // Build category basis vectors
-        let category_basis: Vec<HV16> = config.categories.iter()
+        let category_basis: Vec<HV16> = config
+            .categories
+            .iter()
             .map(|cat| sparsity.random_hv(&format!("{}_{}", config.name, cat)))
             .collect();
 
@@ -376,13 +410,17 @@ impl TemporalGrammar {
             .collect();
 
         // Build category map
-        let category_map: HashMap<String, usize> = config.categories.iter()
+        let category_map: HashMap<String, usize> = config
+            .categories
+            .iter()
             .enumerate()
             .map(|(i, cat)| (cat.clone(), i))
             .collect();
 
         // Create CfC cells for each category
-        let cfc_cells: Vec<CfcCell> = config.categories.iter()
+        let cfc_cells: Vec<CfcCell> = config
+            .categories
+            .iter()
             .enumerate()
             .map(|(i, _)| {
                 // Vary time constants across categories
@@ -609,8 +647,10 @@ mod tests {
         let d_s5 = s5.popcount() as f32 / HDC_DIM as f32;
         let d_s1 = s1.popcount() as f32 / HDC_DIM as f32;
 
-        println!("Densities: dense={:.3}, s10={:.3}, s5={:.3}, s1={:.3}",
-            d_dense, d_s10, d_s5, d_s1);
+        println!(
+            "Densities: dense={:.3}, s10={:.3}, s5={:.3}, s1={:.3}",
+            d_dense, d_s10, d_s5, d_s1
+        );
 
         assert!(d_s10 < d_dense);
         assert!(d_s5 < d_s10);
@@ -652,8 +692,11 @@ mod tests {
         }
 
         let stats = grammar.stats();
-        println!("Speech grammar: {} categories, {:.1}% sparsity",
-            stats.num_categories, stats.sparsity * 100.0);
+        println!(
+            "Speech grammar: {} categories, {:.1}% sparsity",
+            stats.num_categories,
+            stats.sparsity * 100.0
+        );
 
         // Score trained vs different
         let dog: Vec<TemporalEvent> = vec![
@@ -693,7 +736,13 @@ mod tests {
         // PVC (premature ventricular contraction) - abnormal
         let pvc: Vec<TemporalEvent> = vec![
             TemporalEvent::new("PVC", grammar.category_id("PVC").unwrap(), 0.0, 0.15, 0.9),
-            TemporalEvent::new("baseline", grammar.category_id("baseline").unwrap(), 0.15, 0.3, 0.1),
+            TemporalEvent::new(
+                "baseline",
+                grammar.category_id("baseline").unwrap(),
+                0.15,
+                0.3,
+                0.1,
+            ),
         ];
 
         let score_normal = grammar.score_sequence(&normal_beat);
@@ -703,7 +752,10 @@ mod tests {
         println!("PVC: {:.4}", score_pvc);
         println!("Discrimination: {:+.4}", score_normal - score_pvc);
 
-        assert!(score_normal > score_pvc, "Should distinguish normal from PVC");
+        assert!(
+            score_normal > score_pvc,
+            "Should distinguish normal from PVC"
+        );
     }
 
     #[test]

@@ -118,13 +118,16 @@ impl NixCodebook {
         // Pre-compute level markers for up to 8 hierarchy levels
         // (e.g., services.xserver.displayManager.gdm.enable = 5 levels)
         let level_markers: Vec<ContinuousHV> = (0..8)
-            .map(|level| {
-                ContinuousHV::random(dim, CODEBOOK_SEED_BASE.wrapping_add(0x100 + level))
-            })
+            .map(|level| ContinuousHV::random(dim, CODEBOOK_SEED_BASE.wrapping_add(0x100 + level)))
             .collect();
 
         let lsh_tables: Vec<LshTable> = (0..LSH_NUM_TABLES)
-            .map(|t| LshTable::new(dim, CODEBOOK_SEED_BASE.wrapping_add(0x1000 + t as u64 * 100)))
+            .map(|t| {
+                LshTable::new(
+                    dim,
+                    CODEBOOK_SEED_BASE.wrapping_add(0x1000 + t as u64 * 100),
+                )
+            })
             .collect();
 
         let mut cb = Self {
@@ -191,22 +194,70 @@ impl NixCodebook {
     pub fn preload_common_segments(&mut self) {
         let common = [
             // Top-level NixOS option categories
-            "services", "networking", "boot", "hardware", "environment",
-            "programs", "users", "security", "system", "fileSystems",
-            "swapDevices", "nix", "nixpkgs", "systemd", "virtualisation",
-            "fonts", "sound", "i18n", "console", "time", "powerManagement",
+            "services",
+            "networking",
+            "boot",
+            "hardware",
+            "environment",
+            "programs",
+            "users",
+            "security",
+            "system",
+            "fileSystems",
+            "swapDevices",
+            "nix",
+            "nixpkgs",
+            "systemd",
+            "virtualisation",
+            "fonts",
+            "sound",
+            "i18n",
+            "console",
+            "time",
+            "powerManagement",
             // Common second-level segments
-            "enable", "package", "settings", "config", "extraConfig",
-            "openFirewall", "user", "group", "dataDir", "port",
-            "nginx", "postgresql", "mysql", "openssh", "xserver",
-            "firewall", "wireguard", "docker", "podman", "pipewire",
-            "grub", "systemd-boot", "loader", "kernelPackages",
-            "allowedTCPPorts", "allowedUDPPorts", "systemPackages",
+            "enable",
+            "package",
+            "settings",
+            "config",
+            "extraConfig",
+            "openFirewall",
+            "user",
+            "group",
+            "dataDir",
+            "port",
+            "nginx",
+            "postgresql",
+            "mysql",
+            "openssh",
+            "xserver",
+            "firewall",
+            "wireguard",
+            "docker",
+            "podman",
+            "pipewire",
+            "grub",
+            "systemd-boot",
+            "loader",
+            "kernelPackages",
+            "allowedTCPPorts",
+            "allowedUDPPorts",
+            "systemPackages",
             // Value type tokens
-            "true", "false", "null",
+            "true",
+            "false",
+            "null",
             // Action-related tokens
-            "install", "remove", "enable", "disable", "search",
-            "rebuild", "switch", "rollback", "update", "upgrade",
+            "install",
+            "remove",
+            "enable",
+            "disable",
+            "search",
+            "rebuild",
+            "switch",
+            "rollback",
+            "update",
+            "upgrade",
         ];
         for seg in &common {
             self.get_or_create(seg);
@@ -255,7 +306,9 @@ impl NixCodebook {
             .into_iter()
             .filter_map(|idx| {
                 self.token_order.get(idx).and_then(|token| {
-                    self.cache.get(token).map(|hv| (token.clone(), query.similarity(hv)))
+                    self.cache
+                        .get(token)
+                        .map(|hv| (token.clone(), query.similarity(hv)))
                 })
             })
             .collect();
@@ -266,7 +319,9 @@ impl NixCodebook {
 
     /// Brute-force search over all cached vectors.
     fn search_brute_force(&self, query: &ContinuousHV, top_k: usize) -> Vec<(String, f32)> {
-        let mut results: Vec<(String, f32)> = self.cache.iter()
+        let mut results: Vec<(String, f32)> = self
+            .cache
+            .iter()
             .map(|(token, hv)| (token.clone(), query.similarity(hv)))
             .collect();
         results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -294,8 +349,8 @@ impl NixCodebook {
     /// Uses a simple hash to map strings to u64 seeds, ensuring the same
     /// string always produces the same basis vector.
     fn token_seed(token: &str) -> u64 {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
         // Include namespace to avoid collisions
         CODEBOOK_SEED_BASE.hash(&mut hasher);
@@ -334,7 +389,11 @@ mod tests {
 
         // Different tokens → nearly orthogonal
         let sim = hv_services.similarity(&hv_boot).abs();
-        assert!(sim < 0.1, "Expected near-orthogonal, got similarity {}", sim);
+        assert!(
+            sim < 0.1,
+            "Expected near-orthogonal, got similarity {}",
+            sim
+        );
     }
 
     #[test]
@@ -344,7 +403,11 @@ mod tests {
         let l1 = cb.level_marker(1);
 
         let sim = l0.similarity(l1).abs();
-        assert!(sim < 0.1, "Level markers should be quasi-orthogonal, got {}", sim);
+        assert!(
+            sim < 0.1,
+            "Level markers should be quasi-orthogonal, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -356,7 +419,11 @@ mod tests {
         let s1 = cb.encode_segment("services", 1);
 
         let sim = s0.similarity(&s1).abs();
-        assert!(sim < 0.15, "Same segment at different levels should differ, got {}", sim);
+        assert!(
+            sim < 0.15,
+            "Same segment at different levels should differ, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -380,7 +447,13 @@ mod tests {
         for i in 0..roles.len() {
             for j in (i + 1)..roles.len() {
                 let sim = roles[i].similarity(roles[j]).abs();
-                assert!(sim < 0.1, "Role markers {} and {} should be quasi-orthogonal, got {}", i, j, sim);
+                assert!(
+                    sim < 0.1,
+                    "Role markers {} and {} should be quasi-orthogonal, got {}",
+                    i,
+                    j,
+                    sim
+                );
             }
         }
     }

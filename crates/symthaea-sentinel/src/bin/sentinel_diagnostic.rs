@@ -2,11 +2,9 @@
 
 use std::collections::HashMap;
 use symthaea_sentinel::{
-    AudioSentinel, AudioFeatures, AudioCategory,
-    MEL_BANDS,
-    compute_mfcc, compute_onset_strength, compute_spectral_centroid,
-    compute_spectral_flatness, compute_temporal_regularity, spectrum_to_mel_bands,
-    FileAudioPump, FileAudioConfig,
+    compute_mfcc, compute_onset_strength, compute_spectral_centroid, compute_spectral_flatness,
+    compute_temporal_regularity, spectrum_to_mel_bands, AudioCategory, AudioFeatures,
+    AudioSentinel, FileAudioConfig, FileAudioPump, MEL_BANDS,
 };
 
 /// State for feature extraction with envelope tracking
@@ -34,7 +32,10 @@ fn learn_file(path: &str, name: &str, sentinel: &mut AudioSentinel) {
     let config = FileAudioConfig::default();
     let mut pump = match FileAudioPump::new(path, config) {
         Ok(p) => p,
-        Err(e) => { println!("  Failed: {}", e); return; }
+        Err(e) => {
+            println!("  Failed: {}", e);
+            return;
+        }
     };
 
     sentinel.start_learning(name, AudioCategory::Unknown);
@@ -47,11 +48,17 @@ fn learn_file(path: &str, name: &str, sentinel: &mut AudioSentinel) {
     sentinel.stop_learning();
 }
 
-fn test_file(path: &str, sentinel: &mut AudioSentinel) -> HashMap<String, (f32, f32, f32, f32, f32)> {
+fn test_file(
+    path: &str,
+    sentinel: &mut AudioSentinel,
+) -> HashMap<String, (f32, f32, f32, f32, f32)> {
     let config = FileAudioConfig::default();
     let mut pump = match FileAudioPump::new(path, config) {
         Ok(p) => p,
-        Err(e) => { println!("  Failed: {}", e); return HashMap::new(); }
+        Err(e) => {
+            println!("  Failed: {}", e);
+            return HashMap::new();
+        }
     };
 
     let mut state = FeatureState::new();
@@ -62,7 +69,9 @@ fn test_file(path: &str, sentinel: &mut AudioSentinel) -> HashMap<String, (f32, 
         let result = sentinel.process(&features);
 
         for (name, sim) in &result.similarities {
-            let entry = accum.entry(name.clone()).or_insert((0.0, 0.0, 0.0, 0.0, 0.0, 0));
+            let entry = accum
+                .entry(name.clone())
+                .or_insert((0.0, 0.0, 0.0, 0.0, 0.0, 0));
             entry.0 += sim.rhythm;
             entry.1 += sim.timbre;
             entry.2 += sim.rhythm_freq;
@@ -73,18 +82,28 @@ fn test_file(path: &str, sentinel: &mut AudioSentinel) -> HashMap<String, (f32, 
     }
 
     // Average
-    accum.into_iter().map(|(k, v)| {
-        let n = v.5 as f32;
-        (k, (v.0/n, v.1/n, v.2/n, v.3/n, v.4/n))
-    }).collect()
+    accum
+        .into_iter()
+        .map(|(k, v)| {
+            let n = v.5 as f32;
+            (k, (v.0 / n, v.1 / n, v.2 / n, v.3 / n, v.4 / n))
+        })
+        .collect()
 }
 
-fn extract_features(spectrum: &[f32], state: &mut FeatureState, pump: &FileAudioPump) -> AudioFeatures {
+fn extract_features(
+    spectrum: &[f32],
+    state: &mut FeatureState,
+    pump: &FileAudioPump,
+) -> AudioFeatures {
     let mel_bands = spectrum_to_mel_bands(spectrum, MEL_BANDS, pump.sample_rate());
     let mfcc = compute_mfcc(&mel_bands);
-    let spectral_centroid = compute_spectral_centroid(spectrum, pump.sample_rate(), pump.window_size());
+    let spectral_centroid =
+        compute_spectral_centroid(spectrum, pump.sample_rate(), pump.window_size());
     let spectral_flatness = compute_spectral_flatness(spectrum);
-    let onset_strength = if state.prev_spectrum.is_empty() { 0.0 } else {
+    let onset_strength = if state.prev_spectrum.is_empty() {
+        0.0
+    } else {
         compute_onset_strength(&state.prev_spectrum, spectrum)
     };
     state.prev_spectrum = spectrum.to_vec();
@@ -107,7 +126,12 @@ fn extract_features(spectrum: &[f32], state: &mut FeatureState, pump: &FileAudio
     state.prev_rms = rms_energy;
     let envelope_variance = if state.rms_history.len() > 2 {
         let mean: f32 = state.rms_history.iter().sum::<f32>() / state.rms_history.len() as f32;
-        state.rms_history.iter().map(|&x| (x - mean).powi(2)).sum::<f32>() / state.rms_history.len() as f32
+        state
+            .rms_history
+            .iter()
+            .map(|&x| (x - mean).powi(2))
+            .sum::<f32>()
+            / state.rms_history.len() as f32
     } else {
         0.0
     };
@@ -117,7 +141,10 @@ fn extract_features(spectrum: &[f32], state: &mut FeatureState, pump: &FileAudio
     let mut rolloff_bin = 0;
     for (i, &p) in spectrum.iter().enumerate() {
         cumsum += p;
-        if cumsum >= total * 0.85 { rolloff_bin = i; break; }
+        if cumsum >= total * 0.85 {
+            rolloff_bin = i;
+            break;
+        }
     }
     let spectral_rolloff = rolloff_bin as f32 * (pump.sample_rate() / pump.window_size() as f32);
     let high_freq_energy: f32 = spectrum.iter().skip(spectrum.len() / 2).sum();
@@ -127,9 +154,18 @@ fn extract_features(spectrum: &[f32], state: &mut FeatureState, pump: &FileAudio
     state.frame_counter += 1;
 
     AudioFeatures {
-        mel_bands, mfcc, spectral_centroid, spectral_rolloff, onset_strength, rms_energy,
-        zero_crossing_rate, spectral_flatness, temporal_regularity,
-        envelope_delta, envelope_variance, frame_index,
+        mel_bands,
+        mfcc,
+        spectral_centroid,
+        spectral_rolloff,
+        onset_strength,
+        rms_energy,
+        zero_crossing_rate,
+        spectral_flatness,
+        temporal_regularity,
+        envelope_delta,
+        envelope_variance,
+        frame_index,
         spectral_flux: 0.1,
         harmonic_ratio: 0.5,
         cfc_theta_gamma: 0.5,
@@ -143,21 +179,29 @@ fn extract_features(spectrum: &[f32], state: &mut FeatureState, pump: &FileAudio
 
 fn main() {
     let mut sentinel = AudioSentinel::new();
-    
+
     println!("\n╔══════════════════════════════════════════════════════════════════════╗");
     println!("║              SIMILARITY COMPONENT DIAGNOSTIC                        ║");
     println!("╚══════════════════════════════════════════════════════════════════════╝\n");
-    
+
     // Learn Dog
     println!("Learning 'Dog' from dog1.wav...");
     learn_file("test-data/dog/dog1.wav", "Dog", &mut sentinel);
-    
-    println!("\nTesting similarity components (Rhythm HDC, Timbre HDC, RhyFreq, TmbFreq, Combined):");
-    println!("─────────────────────────────────────────────────────────────────────────────────────");
-    println!("{:14} {:>9} {:>9} {:>9} {:>9} │ {:>9} │ {:>8}",
-        "Sound", "Rhy HDC", "Tmb HDC", "RhyFreq", "TmbFreq", "Combined", "Expect");
-    println!("─────────────────────────────────────────────────────────────────────────────────────");
-    
+
+    println!(
+        "\nTesting similarity components (Rhythm HDC, Timbre HDC, RhyFreq, TmbFreq, Combined):"
+    );
+    println!(
+        "─────────────────────────────────────────────────────────────────────────────────────"
+    );
+    println!(
+        "{:14} {:>9} {:>9} {:>9} {:>9} │ {:>9} │ {:>8}",
+        "Sound", "Rhy HDC", "Tmb HDC", "RhyFreq", "TmbFreq", "Combined", "Expect"
+    );
+    println!(
+        "─────────────────────────────────────────────────────────────────────────────────────"
+    );
+
     let tests = [
         ("test-data/dog/dog2.wav", "Dog2", "MATCH"),
         ("test-data/dog/dog3.wav", "Dog3", "MATCH"),
@@ -166,17 +210,25 @@ fn main() {
         ("test-data/rain/rain1.wav", "Rain", "REJECT"),
         ("test-data/clock/clock1.wav", "Clock", "REJECT"),
     ];
-    
+
     for (path, label, expect) in tests {
         let sims = test_file(path, &mut sentinel);
         if let Some((rhythm, timbre, rhy_freq, tmb_freq, combined)) = sims.get("Dog") {
-            let color = if *combined > 0.5 { "\x1b[32m" } else { "\x1b[31m" };
-            println!("{:14} {:9.3} {:9.3} {:9.3} {:9.3} │ {}{:9.3}\x1b[0m │ {}",
-                label, rhythm, timbre, rhy_freq, tmb_freq, color, combined, expect);
+            let color = if *combined > 0.5 {
+                "\x1b[32m"
+            } else {
+                "\x1b[31m"
+            };
+            println!(
+                "{:14} {:9.3} {:9.3} {:9.3} {:9.3} │ {}{:9.3}\x1b[0m │ {}",
+                label, rhythm, timbre, rhy_freq, tmb_freq, color, combined, expect
+            );
         }
     }
-    
-    println!("─────────────────────────────────────────────────────────────────────────────────────");
+
+    println!(
+        "─────────────────────────────────────────────────────────────────────────────────────"
+    );
     println!("\nWeights: Combined = 0.20*RhyHDC + 0.15*TmbHDC + 0.40*RhyFreq + 0.25*TmbFreq");
     println!("\nObservation: Which component has the LEAST variance between MATCH and REJECT?");
 }

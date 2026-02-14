@@ -79,12 +79,12 @@ impl MeditationState {
 /// Meditation categories
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum MeditationCategory {
-    Flow,           // Peak performance, gamma-theta coupling
-    Absorption,     // Deep meditative state
-    Focused,        // Concentrated attention
-    OpenAwareness,  // Panoramic awareness
-    Relaxed,        // Light relaxation
-    Wandering,      // Mind wandering
+    Flow,          // Peak performance, gamma-theta coupling
+    Absorption,    // Deep meditative state
+    Focused,       // Concentrated attention
+    OpenAwareness, // Panoramic awareness
+    Relaxed,       // Light relaxation
+    Wandering,     // Mind wandering
 }
 
 impl MeditationCategory {
@@ -100,16 +100,20 @@ impl MeditationCategory {
     }
 
     fn is_meditative(&self) -> bool {
-        matches!(self,
-            MeditationCategory::Flow |
-            MeditationCategory::Absorption |
-            MeditationCategory::Focused |
-            MeditationCategory::OpenAwareness
+        matches!(
+            self,
+            MeditationCategory::Flow
+                | MeditationCategory::Absorption
+                | MeditationCategory::Focused
+                | MeditationCategory::OpenAwareness
         )
     }
 
     fn is_peak(&self) -> bool {
-        matches!(self, MeditationCategory::Flow | MeditationCategory::Absorption)
+        matches!(
+            self,
+            MeditationCategory::Flow | MeditationCategory::Absorption
+        )
     }
 
     fn emoji(&self) -> &'static str {
@@ -185,7 +189,8 @@ impl FieldElement {
     }
 
     fn to_hex(&self) -> String {
-        self.bytes[0..16].iter()
+        self.bytes[0..16]
+            .iter()
             .map(|b| format!("{:02x}", b))
             .collect()
     }
@@ -201,7 +206,9 @@ impl PedersenCommitment {
     fn commit(value: u64, blinding: u64) -> Self {
         let v = FieldElement::from_u64(value);
         let r = FieldElement::from_u64(blinding);
-        Self { commitment: v.add(&r) }
+        Self {
+            commitment: v.add(&r),
+        }
     }
 }
 
@@ -327,11 +334,11 @@ struct FocusReward {
 
 #[derive(Debug, Clone)]
 enum RewardType {
-    FlowBonus,        // Peak flow state
-    DeepMeditation,   // Deep absorption
-    FocusedWork,      // Concentrated attention
-    Mindfulness,      // Open awareness
-    BaseReward,       // Light relaxation
+    FlowBonus,      // Peak flow state
+    DeepMeditation, // Deep absorption
+    FocusedWork,    // Concentrated attention
+    Mindfulness,    // Open awareness
+    BaseReward,     // Light relaxation
 }
 
 /// FOCUS token validator
@@ -366,7 +373,11 @@ impl FocusValidator {
 
     fn validate_and_reward(&mut self, proof: &FocusProof) -> Result<FocusReward, String> {
         match proof.verify() {
-            ProofVerificationResult::Valid { category, duration_sec, confidence } => {
+            ProofVerificationResult::Valid {
+                category,
+                duration_sec,
+                confidence,
+            } => {
                 let base_rate = *self.reward_rates.get(&category).unwrap_or(&0.0);
                 let amount = base_rate * (duration_sec as f64 / 60.0) * confidence;
 
@@ -418,46 +429,79 @@ impl MeditationSession {
         let mut rng_seed: u64 = 42;
 
         // Phase 1: Settling (5 min) - Mind wandering → Relaxed
-        for i in 0..60 {  // 60 snapshots @ 5 sec each = 5 min
-            let t = i as f64 / 60.0;  // Progress through phase
+        for i in 0..60 {
+            // 60 snapshots @ 5 sec each = 5 min
+            let t = i as f64 / 60.0; // Progress through phase
             let (focus, calm, flow) = (
-                0.2 + t * 0.2,  // Gradually increasing focus
-                0.3 + t * 0.2,  // Gradually increasing calm
-                0.0,             // No flow yet
+                0.2 + t * 0.2, // Gradually increasing focus
+                0.3 + t * 0.2, // Gradually increasing calm
+                0.0,           // No flow yet
             );
-            add_snapshot(&mut snapshots, &mut rng_seed, focus, calm, flow, timestamp_base, i);
+            add_snapshot(
+                &mut snapshots,
+                &mut rng_seed,
+                focus,
+                calm,
+                flow,
+                timestamp_base,
+                i,
+            );
         }
 
         // Phase 2: Deepening (10 min) - Focused → Absorption
         for i in 0..120 {
             let t = i as f64 / 120.0;
             let (focus, calm, flow) = (
-                0.5 + t * 0.3,  // Deepening focus
-                0.5 + t * 0.3,  // Deepening calm
-                0.1 + t * 0.2,  // Emerging flow
+                0.5 + t * 0.3, // Deepening focus
+                0.5 + t * 0.3, // Deepening calm
+                0.1 + t * 0.2, // Emerging flow
             );
-            add_snapshot(&mut snapshots, &mut rng_seed, focus, calm, flow, timestamp_base, 60 + i);
+            add_snapshot(
+                &mut snapshots,
+                &mut rng_seed,
+                focus,
+                calm,
+                flow,
+                timestamp_base,
+                60 + i,
+            );
         }
 
         // Phase 3: Peak (10 min) - Flow state
         for i in 0..120 {
             let (focus, calm, flow) = (
-                0.75 + 0.1 * ((i as f64 * 0.1).sin()),  // High focus with slight variation
+                0.75 + 0.1 * ((i as f64 * 0.1).sin()), // High focus with slight variation
                 0.75 + 0.05 * ((i as f64 * 0.05).sin()),
-                0.7 + 0.15 * ((i as f64 * 0.02).sin()),  // Peak flow
+                0.7 + 0.15 * ((i as f64 * 0.02).sin()), // Peak flow
             );
-            add_snapshot(&mut snapshots, &mut rng_seed, focus, calm, flow, timestamp_base, 180 + i);
+            add_snapshot(
+                &mut snapshots,
+                &mut rng_seed,
+                focus,
+                calm,
+                flow,
+                timestamp_base,
+                180 + i,
+            );
         }
 
         // Phase 4: Integration (5 min) - Gentle return
         for i in 0..60 {
             let t = i as f64 / 60.0;
             let (focus, calm, flow) = (
-                0.8 - t * 0.3,  // Gradually releasing focus
-                0.8 - t * 0.2,  // Maintaining some calm
-                0.7 - t * 0.5,  // Flow fading
+                0.8 - t * 0.3, // Gradually releasing focus
+                0.8 - t * 0.2, // Maintaining some calm
+                0.7 - t * 0.5, // Flow fading
             );
-            add_snapshot(&mut snapshots, &mut rng_seed, focus, calm, flow, timestamp_base, 300 + i);
+            add_snapshot(
+                &mut snapshots,
+                &mut rng_seed,
+                focus,
+                calm,
+                flow,
+                timestamp_base,
+                300 + i,
+            );
         }
 
         Self { snapshots }
@@ -476,9 +520,15 @@ impl MeditationSession {
         // Warm-up (5 min)
         for i in 0..60 {
             let t = i as f64 / 60.0;
-            add_snapshot(&mut snapshots, &mut rng_seed,
-                0.3 + t * 0.3, 0.4, 0.1,
-                timestamp_base, i);
+            add_snapshot(
+                &mut snapshots,
+                &mut rng_seed,
+                0.3 + t * 0.3,
+                0.4,
+                0.1,
+                timestamp_base,
+                i,
+            );
         }
 
         // Deep focus (25 min)
@@ -486,26 +536,42 @@ impl MeditationSession {
             let t = i as f64 / 300.0;
             // Oscillating focus with occasional flow bursts
             let flow_burst = if (i % 50) < 10 { 0.3 } else { 0.0 };
-            add_snapshot(&mut snapshots, &mut rng_seed,
+            add_snapshot(
+                &mut snapshots,
+                &mut rng_seed,
                 0.7 + 0.1 * ((t * 10.0).sin()),
                 0.5,
                 0.2 + flow_burst,
-                timestamp_base, 60 + i);
+                timestamp_base,
+                60 + i,
+            );
         }
 
         // Short break simulation (5 min) - relaxed but present
         for i in 0..60 {
-            add_snapshot(&mut snapshots, &mut rng_seed,
-                0.3, 0.6, 0.0,
-                timestamp_base, 360 + i);
+            add_snapshot(
+                &mut snapshots,
+                &mut rng_seed,
+                0.3,
+                0.6,
+                0.0,
+                timestamp_base,
+                360 + i,
+            );
         }
 
         // Second deep focus (25 min)
         for i in 0..300 {
             let flow_burst = if (i % 40) < 15 { 0.4 } else { 0.1 };
-            add_snapshot(&mut snapshots, &mut rng_seed,
-                0.75, 0.55, flow_burst,
-                timestamp_base, 420 + i);
+            add_snapshot(
+                &mut snapshots,
+                &mut rng_seed,
+                0.75,
+                0.55,
+                flow_burst,
+                timestamp_base,
+                420 + i,
+            );
         }
 
         Self { snapshots }
@@ -611,8 +677,11 @@ fn run_session(name: &str, session: MeditationSession) {
     // Step 1: Load data
     println!("  STEP 1: SENSOR - Loading {} EEG Data", name);
     println!();
-    println!("   Loaded {} snapshots ({:.0} minutes)",
-             session.snapshots.len(), session.duration_sec() / 60.0);
+    println!(
+        "   Loaded {} snapshots ({:.0} minutes)",
+        session.snapshots.len(),
+        session.duration_sec() / 60.0
+    );
     println!();
 
     // Step 2: Detect states
@@ -658,7 +727,12 @@ fn run_session(name: &str, session: MeditationSession) {
             let avg_fl = sum_fl / *count as f64;
             println!(
                 "   │ {:16} │ {:>6} │ {:>7.3} │ {:>7.3} │ {:>7.3} │ {:4} │",
-                cat.name(), count, avg_f, avg_c, avg_fl, cat.emoji()
+                cat.name(),
+                count,
+                avg_f,
+                avg_c,
+                avg_fl,
+                cat.emoji()
             );
         }
     }
@@ -673,8 +747,11 @@ fn run_session(name: &str, session: MeditationSession) {
     for (category, (count, _, _, _)) in &category_counts {
         if let Some(snapshot) = session.snapshots.iter().find(|s| {
             let state = MeditationState {
-                focus: s.focus, calm: s.calm, flow: s.flow,
-                presence: 0.5, confidence: 0.85,
+                focus: s.focus,
+                calm: s.calm,
+                flow: s.flow,
+                presence: 0.5,
+                confidence: 0.85,
             };
             state.classify() == *category
         }) {
@@ -682,8 +759,14 @@ fn run_session(name: &str, session: MeditationSession) {
             let proof = FocusProof::create(snapshot, duration);
 
             println!("   {} {} Proof:", category.emoji(), category.name());
-            println!("      Focus Commitment: {}", proof.focus_commitment.commitment.to_hex());
-            println!("      Flow Commitment:  {}", proof.flow_commitment.commitment.to_hex());
+            println!(
+                "      Focus Commitment: {}",
+                proof.focus_commitment.commitment.to_hex()
+            );
+            println!(
+                "      Flow Commitment:  {}",
+                proof.flow_commitment.commitment.to_hex()
+            );
             println!("      Duration:         {} seconds", proof.duration_sec);
             println!();
 
@@ -702,8 +785,15 @@ fn run_session(name: &str, session: MeditationSession) {
         match validator.validate_and_reward(proof) {
             Ok(reward) => {
                 println!("✅ VALID");
-                println!("      Reward: {:.4} FOCUS tokens ({:?})", reward.amount, reward.reward_type);
-                println!("      Duration: {} seconds ({:.1} min)", reward.duration_sec, reward.duration_sec as f64 / 60.0);
+                println!(
+                    "      Reward: {:.4} FOCUS tokens ({:?})",
+                    reward.amount, reward.reward_type
+                );
+                println!(
+                    "      Duration: {} seconds ({:.1} min)",
+                    reward.duration_sec,
+                    reward.duration_sec as f64 / 60.0
+                );
                 println!();
             }
             Err(e) => {
@@ -714,26 +804,42 @@ fn run_session(name: &str, session: MeditationSession) {
     }
 
     // Summary
-    let meditative_time: u32 = category_counts.iter()
+    let meditative_time: u32 = category_counts
+        .iter()
         .filter(|(cat, _)| cat.is_meditative())
         .map(|(_, (count, _, _, _))| (*count as u32) * 5)
         .sum();
 
-    let peak_time: u32 = category_counts.iter()
+    let peak_time: u32 = category_counts
+        .iter()
         .filter(|(cat, _)| cat.is_peak())
         .map(|(_, (count, _, _, _))| (*count as u32) * 5)
         .sum();
 
     println!("  RESULTS:");
     println!("   ┌─────────────────────────────────────────────────────────────────┐");
-    println!("   │ Total Duration:           {:>6} seconds ({:.1} min)            │",
-             session.duration_sec() as u32, session.duration_sec() / 60.0);
-    println!("   │ Meditative Time:          {:>6} seconds ({:.1} min)            │",
-             meditative_time, meditative_time as f64 / 60.0);
-    println!("   │ Peak States (Flow+Abs):   {:>6} seconds ({:.1} min)            │",
-             peak_time, peak_time as f64 / 60.0);
-    println!("   │ FOCUS Tokens Issued:      {:>6.4}                              │", validator.total_issued);
-    println!("   │ Meditative Efficiency:    {:>6.1}%                              │",
-             100.0 * meditative_time as f64 / session.duration_sec());
+    println!(
+        "   │ Total Duration:           {:>6} seconds ({:.1} min)            │",
+        session.duration_sec() as u32,
+        session.duration_sec() / 60.0
+    );
+    println!(
+        "   │ Meditative Time:          {:>6} seconds ({:.1} min)            │",
+        meditative_time,
+        meditative_time as f64 / 60.0
+    );
+    println!(
+        "   │ Peak States (Flow+Abs):   {:>6} seconds ({:.1} min)            │",
+        peak_time,
+        peak_time as f64 / 60.0
+    );
+    println!(
+        "   │ FOCUS Tokens Issued:      {:>6.4}                              │",
+        validator.total_issued
+    );
+    println!(
+        "   │ Meditative Efficiency:    {:>6.1}%                              │",
+        100.0 * meditative_time as f64 / session.duration_sec()
+    );
     println!("   └─────────────────────────────────────────────────────────────────┘");
 }

@@ -713,7 +713,7 @@ mod tests {
         let view = engine.synthesize(vec![p1, p2]);
 
         assert!(view.contributing_harmonies.len() == 2);
-        assert!(!view.agreements.is_empty() || view.unified_view.len() > 0);
+        assert!(!view.agreements.is_empty() || !view.unified_view.is_empty());
     }
 
     #[test]

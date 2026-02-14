@@ -14,9 +14,9 @@
 #[cfg(feature = "reasoning_engine")]
 fn main() {
     use symthaea::consciousness::epistemic_conflict::MultiTheoryMetrics;
-    use symthaea::consciousness::tool_gate::types::ToolDescriptor;
-    use symthaea::consciousness::temporal_planning::types::PlannedAction;
     use symthaea::consciousness::reasoning_engine::{ConsciousReasoningEngine, ReasoningContext};
+    use symthaea::consciousness::temporal_planning::types::PlannedAction;
+    use symthaea::consciousness::tool_gate::types::ToolDescriptor;
 
     println!("═══════════════════════════════════════════════════════════");
     println!("  Symthaea Conscious Reasoning Engine v0.2 Demo");
@@ -28,16 +28,31 @@ fn main() {
     println!("── Scenario 1: Theories in consensus ──");
     let ctx1 = ReasoningContext {
         theory_metrics: MultiTheoryMetrics {
-            phi: 0.85, gwt: 0.82, ast: 0.80, pp: 0.83, rpt: 0.81, embodiment: 0.79,
+            phi: 0.85,
+            gwt: 0.82,
+            ast: 0.80,
+            pp: 0.83,
+            rpt: 0.81,
+            embodiment: 0.79,
             unified: 0.82,
         },
         phi: 0.85,
         available_budget_us: 25_000,
         available_actions: vec![
-            PlannedAction { id: "explore".into(), description: "Explore environment".into(),
-                embedding: vec![0.5; 4], prior: 0.4, is_epistemic: true },
-            PlannedAction { id: "act".into(), description: "Take action".into(),
-                embedding: vec![1.0; 4], prior: 0.6, is_epistemic: false },
+            PlannedAction {
+                id: "explore".into(),
+                description: "Explore environment".into(),
+                embedding: vec![0.5; 4],
+                prior: 0.4,
+                is_epistemic: true,
+            },
+            PlannedAction {
+                id: "act".into(),
+                description: "Take action".into(),
+                embedding: vec![1.0; 4],
+                prior: 0.6,
+                is_epistemic: false,
+            },
         ],
         tool: Some(ToolDescriptor::read_only("nix search nixpkgs firefox")),
         recent_utility: 0.5,
@@ -46,11 +61,28 @@ fn main() {
 
     let r1 = engine.reason(&ctx1);
     println!("  Tier:        {:?}", r1.tier);
-    println!("  Φ_eff:       {:.4} (raw Φ={:.2}, R={:.2}, γ={:.1})", r1.phi_eff, ctx1.phi, r1.reliability, r1.gamma);
-    println!("  Conflicts:   max={:.3}, entropy={:.3}", r1.conflicts.max_magnitude(), r1.conflicts.total_entropy);
-    println!("  Gate:        {}", if r1.action_allowed() { "ALLOWED" } else { "BLOCKED" });
+    println!(
+        "  Φ_eff:       {:.4} (raw Φ={:.2}, R={:.2}, γ={:.1})",
+        r1.phi_eff, ctx1.phi, r1.reliability, r1.gamma
+    );
+    println!(
+        "  Conflicts:   max={:.3}, entropy={:.3}",
+        r1.conflicts.max_magnitude(),
+        r1.conflicts.total_entropy
+    );
+    println!(
+        "  Gate:        {}",
+        if r1.action_allowed() {
+            "ALLOWED"
+        } else {
+            "BLOCKED"
+        }
+    );
     if let Some(ref plan) = r1.plan {
-        println!("  Plan:        {} iterations, confidence={:.2}", plan.iterations, plan.confidence);
+        println!(
+            "  Plan:        {} iterations, confidence={:.2}",
+            plan.iterations, plan.confidence
+        );
     }
     if let Some(ref narrative) = r1.narrative {
         println!("  Narrative:   {}", narrative);
@@ -61,15 +93,23 @@ fn main() {
     println!("── Scenario 2: Theories in conflict ──");
     let ctx2 = ReasoningContext {
         theory_metrics: MultiTheoryMetrics {
-            phi: 0.90, gwt: 0.15, ast: 0.88, pp: 0.12, rpt: 0.85, embodiment: 0.10,
+            phi: 0.90,
+            gwt: 0.15,
+            ast: 0.88,
+            pp: 0.12,
+            rpt: 0.85,
+            embodiment: 0.10,
             unified: 0.50,
         },
         phi: 0.90,
         available_budget_us: 25_000,
-        available_actions: vec![
-            PlannedAction { id: "cautious".into(), description: "Cautious action".into(),
-                embedding: vec![0.2; 4], prior: 0.7, is_epistemic: true },
-        ],
+        available_actions: vec![PlannedAction {
+            id: "cautious".into(),
+            description: "Cautious action".into(),
+            embedding: vec![0.2; 4],
+            prior: 0.7,
+            is_epistemic: true,
+        }],
         tool: Some(
             ToolDescriptor::from_command("nixos-rebuild switch")
                 .with_domain("nixos")
@@ -82,12 +122,26 @@ fn main() {
 
     let r2 = engine.reason(&ctx2);
     println!("  Tier:        {:?}", r2.tier);
-    println!("  Φ_eff:       {:.4} (raw Φ={:.2}, R={:.2}, γ={:.1})", r2.phi_eff, ctx2.phi, r2.reliability, r2.gamma);
-    println!("  Conflicts:   max={:.3}, entropy={:.3}", r2.conflicts.max_magnitude(), r2.conflicts.total_entropy);
+    println!(
+        "  Φ_eff:       {:.4} (raw Φ={:.2}, R={:.2}, γ={:.1})",
+        r2.phi_eff, ctx2.phi, r2.reliability, r2.gamma
+    );
+    println!(
+        "  Conflicts:   max={:.3}, entropy={:.3}",
+        r2.conflicts.max_magnitude(),
+        r2.conflicts.total_entropy
+    );
     if let Some((a, b)) = r2.conflicts.dominant {
         println!("  Dominant:    {:?} vs {:?}", a, b);
     }
-    println!("  Gate:        {}", if r2.action_allowed() { "ALLOWED" } else { "BLOCKED" });
+    println!(
+        "  Gate:        {}",
+        if r2.action_allowed() {
+            "ALLOWED"
+        } else {
+            "BLOCKED"
+        }
+    );
     if let Some(ref gate) = r2.gate {
         if let Some(ref fallback) = gate.fallback {
             println!("  Fallback:    {:?}", fallback);
@@ -102,7 +156,12 @@ fn main() {
     println!("── Scenario 3: Tight budget (Tier 0) ──");
     let ctx3 = ReasoningContext {
         theory_metrics: MultiTheoryMetrics {
-            phi: 0.75, gwt: 0.70, ast: 0.72, pp: 0.71, rpt: 0.73, embodiment: 0.69,
+            phi: 0.75,
+            gwt: 0.70,
+            ast: 0.72,
+            pp: 0.71,
+            rpt: 0.73,
+            embodiment: 0.69,
             unified: 0.72,
         },
         phi: 0.75,
@@ -117,7 +176,14 @@ fn main() {
     println!("  Tier:        {:?}", r3.tier);
     println!("  Φ_eff:       {:.4}", r3.phi_eff);
     println!("  Wall time:   {}μs", r3.wall_time_us);
-    println!("  Plan:        {}", if r3.plan.is_some() { "yes" } else { "none (budget too tight)" });
+    println!(
+        "  Plan:        {}",
+        if r3.plan.is_some() {
+            "yes"
+        } else {
+            "none (budget too tight)"
+        }
+    );
     println!();
 
     // ── Engine Statistics ─────────────────────────────────────────────

@@ -13,12 +13,12 @@
 use std::time::Instant;
 
 // Import core HDC types from symthaea_core
-use symthaea_core::hdc::unified_hv::{ContinuousHV, BinaryHV, HDC_DIMENSION};
+use symthaea_core::hdc::unified_hv::{BinaryHV, ContinuousHV, HDC_DIMENSION};
 use symthaea_core::phi_engine::{PhiEngine, PhiMethod};
 
 // Import LTC and cognitive components from symthaea
-use symthaea::hdc::{HdcLtcUnifiedNeuron, UnifiedConfig, UnifiedActivation};
-use symthaea::cognitive_loop::{CognitiveLoopService, CognitiveLoopConfig};
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+use symthaea::hdc::{HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig};
 
 fn main() {
     println!("===============================================================================");
@@ -71,9 +71,21 @@ fn demo_hypervectors() {
     let hv_fruit = ContinuousHV::random(HDC_DIMENSION, 44);
 
     println!("  Created three hypervectors:");
-    println!("    - hv_apple:  {} dimensions, norm = {:.4}", hv_apple.dim(), hv_apple.norm());
-    println!("    - hv_orange: {} dimensions, norm = {:.4}", hv_orange.dim(), hv_orange.norm());
-    println!("    - hv_fruit:  {} dimensions, norm = {:.4}", hv_fruit.dim(), hv_fruit.norm());
+    println!(
+        "    - hv_apple:  {} dimensions, norm = {:.4}",
+        hv_apple.dim(),
+        hv_apple.norm()
+    );
+    println!(
+        "    - hv_orange: {} dimensions, norm = {:.4}",
+        hv_orange.dim(),
+        hv_orange.norm()
+    );
+    println!(
+        "    - hv_fruit:  {} dimensions, norm = {:.4}",
+        hv_fruit.dim(),
+        hv_fruit.norm()
+    );
     println!();
 
     // Key property: random vectors are nearly orthogonal
@@ -81,15 +93,24 @@ fn demo_hypervectors() {
     let sim_apple_fruit = hv_apple.similarity(&hv_fruit);
 
     println!("  Key Property - Random vectors are nearly orthogonal:");
-    println!("    similarity(apple, orange) = {:.4} (expected: ~0)", sim_apple_orange);
-    println!("    similarity(apple, fruit)  = {:.4} (expected: ~0)", sim_apple_fruit);
+    println!(
+        "    similarity(apple, orange) = {:.4} (expected: ~0)",
+        sim_apple_orange
+    );
+    println!(
+        "    similarity(apple, fruit)  = {:.4} (expected: ~0)",
+        sim_apple_fruit
+    );
     println!();
 
     // Same seed = same vector (deterministic)
     let hv_apple_copy = ContinuousHV::random(HDC_DIMENSION, 42);
     let sim_identical = hv_apple.similarity(&hv_apple_copy);
     println!("  Determinism - Same seed produces identical vectors:");
-    println!("    similarity(apple, apple_copy) = {:.4} (expected: 1.0)", sim_identical);
+    println!(
+        "    similarity(apple, apple_copy) = {:.4} (expected: 1.0)",
+        sim_identical
+    );
     println!();
 
     // Binary hypervectors are more memory efficient
@@ -97,9 +118,20 @@ fn demo_hypervectors() {
     let binary_b = BinaryHV::random(101);
 
     println!("  Binary vs Continuous:");
-    println!("    ContinuousHV: {} bytes ({} x 4 bytes)", HDC_DIMENSION * 4, HDC_DIMENSION);
-    println!("    BinaryHV:     {} bytes ({} bits packed)", HDC_DIMENSION / 8, HDC_DIMENSION);
-    println!("    Similarity(binary_a, binary_b) = {:.4}", binary_a.similarity(&binary_b));
+    println!(
+        "    ContinuousHV: {} bytes ({} x 4 bytes)",
+        HDC_DIMENSION * 4,
+        HDC_DIMENSION
+    );
+    println!(
+        "    BinaryHV:     {} bytes ({} bits packed)",
+        HDC_DIMENSION / 8,
+        HDC_DIMENSION
+    );
+    println!(
+        "    Similarity(binary_a, binary_b) = {:.4}",
+        binary_a.similarity(&binary_b)
+    );
     println!();
 }
 
@@ -135,14 +167,23 @@ fn demo_hdc_operations() {
 
     // Key property: bound result is dissimilar to both inputs
     println!("    Property: Binding produces vectors dissimilar to inputs:");
-    println!("      similarity(red_is_color, red)    = {:.4} (~0)", red_is_color.similarity(&hv_red));
-    println!("      similarity(red_is_color, color)  = {:.4} (~0)", red_is_color.similarity(&hv_color));
+    println!(
+        "      similarity(red_is_color, red)    = {:.4} (~0)",
+        red_is_color.similarity(&hv_red)
+    );
+    println!(
+        "      similarity(red_is_color, color)  = {:.4} (~0)",
+        red_is_color.similarity(&hv_color)
+    );
     println!();
 
     // Binding is invertible: A ⊗ B ⊗ B = A
     let recovered_red = red_is_color.bind(&hv_color);
     println!("    Property: Binding is invertible (A ⊗ B ⊗ B = A):");
-    println!("      similarity(recovered_red, red) = {:.4} (~1.0)", recovered_red.similarity(&hv_red));
+    println!(
+        "      similarity(recovered_red, red) = {:.4} (~1.0)",
+        recovered_red.similarity(&hv_red)
+    );
     println!();
 
     // Bundling: Create superpositions
@@ -157,17 +198,29 @@ fn demo_hdc_operations() {
 
     // Key property: bundled result is similar to both inputs
     println!("    Property: Bundling produces vectors similar to all inputs:");
-    println!("      similarity(red_circle, red_is_color)    = {:.4} (~0.7)", red_circle.similarity(&red_is_color));
-    println!("      similarity(red_circle, circle_is_shape) = {:.4} (~0.7)", red_circle.similarity(&circle_is_shape));
+    println!(
+        "      similarity(red_circle, red_is_color)    = {:.4} (~0.7)",
+        red_circle.similarity(&red_is_color)
+    );
+    println!(
+        "      similarity(red_circle, circle_is_shape) = {:.4} (~0.7)",
+        red_circle.similarity(&circle_is_shape)
+    );
     println!();
 
     // Query the bundled representation
-    let query_color = red_circle.bind(&hv_color);  // Unbind color role
-    let query_shape = red_circle.bind(&hv_shape);  // Unbind shape role
+    let query_color = red_circle.bind(&hv_color); // Unbind color role
+    let query_shape = red_circle.bind(&hv_shape); // Unbind shape role
 
     println!("    Querying the bundled representation:");
-    println!("      Query 'what color?': similarity to red   = {:.4}", query_color.similarity(&hv_red));
-    println!("      Query 'what shape?': similarity to circle = {:.4}", query_shape.similarity(&hv_circle));
+    println!(
+        "      Query 'what color?': similarity to red   = {:.4}",
+        query_color.similarity(&hv_red)
+    );
+    println!(
+        "      Query 'what shape?': similarity to circle = {:.4}",
+        query_shape.similarity(&hv_circle)
+    );
     println!();
 }
 
@@ -185,8 +238,8 @@ fn demo_ltc_neuron() {
     // Create an LTC neuron with default configuration
     let config = UnifiedConfig {
         dimension: HDC_DIMENSION,
-        tau_base: 0.1,        // Base time constant
-        backbone_tau: 0.5,    // State-dependent modulation
+        tau_base: 0.1,     // Base time constant
+        backbone_tau: 0.5, // State-dependent modulation
         activation: UnifiedActivation::Tanh,
         ..Default::default()
     };
@@ -226,8 +279,14 @@ fn demo_ltc_neuron() {
     // Compare results
     let similarity = euler_state.similarity(neuron_cf.state());
     println!("  Comparison:");
-    println!("    State similarity (Euler vs Closed-form): {:.4}", similarity);
-    println!("    Speedup: {:.1}x", euler_time.as_secs_f64() / cf_time.as_secs_f64().max(1e-9));
+    println!(
+        "    State similarity (Euler vs Closed-form): {:.4}",
+        similarity
+    );
+    println!(
+        "    Speedup: {:.1}x",
+        euler_time.as_secs_f64() / cf_time.as_secs_f64().max(1e-9)
+    );
     println!();
 
     // State-dependent time constant
@@ -254,7 +313,10 @@ fn demo_phi_measurement() {
         .map(|i| ContinuousHV::random(HDC_DIMENSION, i as u64 * 100))
         .collect();
 
-    println!("  Created network of {} nodes for phi measurement", nodes.len());
+    println!(
+        "  Created network of {} nodes for phi measurement",
+        nodes.len()
+    );
     println!();
 
     // Create phi engine with spectral connectivity method
@@ -321,7 +383,14 @@ fn demo_cognitive_loop() {
 
                 println!("    Input {}: \"{}\"", i + 1, input);
                 println!("      Prediction Error: {:.4}", result.prediction_error);
-                println!("      Learning:         {}", if result.learning_occurred { "Yes" } else { "No" });
+                println!(
+                    "      Learning:         {}",
+                    if result.learning_occurred {
+                        "Yes"
+                    } else {
+                        "No"
+                    }
+                );
                 println!("      Cycle Time:       {}us", result.cycle_time_us);
                 println!();
             }
@@ -343,7 +412,10 @@ fn demo_cognitive_loop() {
             println!("  Loop Statistics:");
             println!("    Total cycles:           {}", stats.total_cycles);
             println!("    Learning cycles:        {}", stats.learning_cycles);
-            println!("    Avg prediction error:   {:.4}", stats.avg_prediction_error);
+            println!(
+                "    Avg prediction error:   {:.4}",
+                stats.avg_prediction_error
+            );
             println!("    Cycles/second:          {:.1}", stats.cycles_per_second);
             println!();
         }

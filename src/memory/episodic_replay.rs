@@ -1001,7 +1001,7 @@ mod tests {
             memory.store_if_significant(episode);
         }
 
-        assert!(memory.len() > 0);
+        assert!(!memory.is_empty());
 
         memory.clear();
 

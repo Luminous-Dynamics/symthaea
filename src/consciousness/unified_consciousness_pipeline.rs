@@ -670,9 +670,9 @@ mod tests {
         println!("Initial sync: {:.3}, Final sync: {:.3}", initial_sync, final_sync);
 
         // Both sync values should be in valid range [0, 1]
-        assert!(final_sync >= 0.0 && final_sync <= 1.0,
+        assert!((0.0..=1.0).contains(&final_sync),
             "Final synchronization should be in valid range");
-        assert!(initial_sync >= 0.0 && initial_sync <= 1.0,
+        assert!((0.0..=1.0).contains(&initial_sync),
             "Initial synchronization should be in valid range");
     }
 

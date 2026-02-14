@@ -36,15 +36,13 @@ mod calibration_tests {
 
     #[test]
     fn test_harmony_names() {
-        let expected = vec![
-            "Resonant Coherence",
+        let expected = ["Resonant Coherence",
             "Pan-Sentient Flourishing",
             "Integral Wisdom",
             "Infinite Play",
             "Universal Interconnectedness",
             "Sacred Reciprocity",
-            "Evolutionary Progression",
-        ];
+            "Evolutionary Progression"];
 
         // Verify all harmonies are present with correct names
         let all_harmonies = Harmony::all();
@@ -53,7 +51,7 @@ mod calibration_tests {
         for harmony in all_harmonies {
             let name = harmony.name();
             assert!(
-                expected.iter().any(|e| *e == name),
+                expected.contains(&name),
                 "Harmony name '{}' should be in expected list",
                 name
             );

@@ -52,9 +52,11 @@ pub struct WordSegment {
 /// - phonemes: list of structs with {phoneme, start, end}
 ///
 /// Returns a HashMap mapping utterance IDs to their alignment data
-pub fn load_alignments<P: AsRef<Path>>(path: P) -> Result<HashMap<String, UtteranceAlignment>, String> {
-    let file = File::open(path.as_ref())
-        .map_err(|e| format!("Failed to open parquet file: {}", e))?;
+pub fn load_alignments<P: AsRef<Path>>(
+    path: P,
+) -> Result<HashMap<String, UtteranceAlignment>, String> {
+    let file =
+        File::open(path.as_ref()).map_err(|e| format!("Failed to open parquet file: {}", e))?;
 
     let builder = ParquetRecordBatchReaderBuilder::try_new(file)
         .map_err(|e| format!("Failed to create parquet reader: {}", e))?;
@@ -66,7 +68,8 @@ pub fn load_alignments<P: AsRef<Path>>(path: P) -> Result<HashMap<String, Uttera
         eprintln!("  {}: {:?}", field.name(), field.data_type());
     }
 
-    let reader = builder.build()
+    let reader = builder
+        .build()
         .map_err(|e| format!("Failed to build reader: {}", e))?;
 
     let mut alignments = HashMap::new();
@@ -75,8 +78,7 @@ pub fn load_alignments<P: AsRef<Path>>(path: P) -> Result<HashMap<String, Uttera
         let batch = batch_result.map_err(|e| format!("Failed to read batch: {}", e))?;
 
         // Get the ID column
-        let id_col = batch.column_by_name("id")
-            .ok_or("Missing 'id' column")?;
+        let id_col = batch.column_by_name("id").ok_or("Missing 'id' column")?;
         let ids = id_col.as_string::<i32>();
 
         // Try to find phonemes column (might be nested)
@@ -84,7 +86,15 @@ pub fn load_alignments<P: AsRef<Path>>(path: P) -> Result<HashMap<String, Uttera
 
         // Debug: print available columns
         if alignments.is_empty() {
-            eprintln!("Batch columns: {:?}", batch.schema().fields().iter().map(|f| f.name()).collect::<Vec<_>>());
+            eprintln!(
+                "Batch columns: {:?}",
+                batch
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| f.name())
+                    .collect::<Vec<_>>()
+            );
         }
 
         for row_idx in 0..batch.num_rows() {
@@ -103,7 +113,9 @@ pub fn load_alignments<P: AsRef<Path>>(path: P) -> Result<HashMap<String, Uttera
                         let phoneme_list = list_array.value(row_idx);
 
                         // The list elements should be structs with phoneme, start, end
-                        if let Some(struct_array) = phoneme_list.as_any().downcast_ref::<StructArray>() {
+                        if let Some(struct_array) =
+                            phoneme_list.as_any().downcast_ref::<StructArray>()
+                        {
                             phonemes = extract_phonemes_from_struct(struct_array);
                         }
                     }
@@ -115,8 +127,10 @@ pub fn load_alignments<P: AsRef<Path>>(path: P) -> Result<HashMap<String, Uttera
             if phonemes.is_empty() {
                 if let (Some(ph_col), Some(start_col), Some(end_col)) = (
                     batch.column_by_name("phoneme").cloned(),
-                    get_nested_column(&batch, &["phonemes", "start"]).or_else(|| batch.column_by_name("start").cloned()),
-                    get_nested_column(&batch, &["phonemes", "end"]).or_else(|| batch.column_by_name("end").cloned()),
+                    get_nested_column(&batch, &["phonemes", "start"])
+                        .or_else(|| batch.column_by_name("start").cloned()),
+                    get_nested_column(&batch, &["phonemes", "end"])
+                        .or_else(|| batch.column_by_name("end").cloned()),
                 ) {
                     // Try as list arrays (one list per utterance)
                     if let (Some(ph_list), Some(start_list), Some(end_list)) = (
@@ -145,35 +159,56 @@ pub fn load_alignments<P: AsRef<Path>>(path: P) -> Result<HashMap<String, Uttera
                         let phoneme = ph_arr.value(row_idx).to_string();
                         let start = start_arr.value(row_idx);
                         let end = end_arr.value(row_idx);
-                        phonemes.push(PhonemeSegment { phoneme, start, end });
+                        phonemes.push(PhonemeSegment {
+                            phoneme,
+                            start,
+                            end,
+                        });
                     }
                 }
             }
 
             // Sort phonemes by start time
-            phonemes.sort_by(|a, b| a.start.partial_cmp(&b.start).unwrap_or(std::cmp::Ordering::Equal));
+            phonemes.sort_by(|a, b| {
+                a.start
+                    .partial_cmp(&b.start)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             // Merge with existing or insert new
-            let entry = alignments.entry(id.clone()).or_insert_with(|| UtteranceAlignment {
-                id: id.clone(),
-                audio_path: None,
-                phonemes: Vec::new(),
-                words: None,
-            });
+            let entry = alignments
+                .entry(id.clone())
+                .or_insert_with(|| UtteranceAlignment {
+                    id: id.clone(),
+                    audio_path: None,
+                    phonemes: Vec::new(),
+                    words: None,
+                });
             entry.phonemes.extend(phonemes);
         }
     }
 
     // Sort all phonemes by start time (in case of multiple batches)
     for alignment in alignments.values_mut() {
-        alignment.phonemes.sort_by(|a, b| a.start.partial_cmp(&b.start).unwrap_or(std::cmp::Ordering::Equal));
+        alignment.phonemes.sort_by(|a, b| {
+            a.start
+                .partial_cmp(&b.start)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
-    eprintln!("Loaded {} utterance alignments from parquet", alignments.len());
+    eprintln!(
+        "Loaded {} utterance alignments from parquet",
+        alignments.len()
+    );
 
     // Print first alignment for debugging
     if let Some(first) = alignments.values().next() {
-        eprintln!("First alignment: {} has {} phonemes", first.id, first.phonemes.len());
+        eprintln!(
+            "First alignment: {} has {} phonemes",
+            first.id,
+            first.phonemes.len()
+        );
         if !first.phonemes.is_empty() {
             eprintln!("  First phoneme: {:?}", first.phonemes[0]);
             eprintln!("  Last phoneme: {:?}", first.phonemes.last().unwrap());
@@ -233,7 +268,11 @@ fn extract_phonemes_from_struct(struct_array: &StructArray) -> Vec<PhonemeSegmen
 }
 
 /// Extract phonemes from parallel arrays
-fn extract_phonemes_from_arrays(ph_arr: &dyn Array, start_arr: &dyn Array, end_arr: &dyn Array) -> Vec<PhonemeSegment> {
+fn extract_phonemes_from_arrays(
+    ph_arr: &dyn Array,
+    start_arr: &dyn Array,
+    end_arr: &dyn Array,
+) -> Vec<PhonemeSegment> {
     let mut phonemes = Vec::new();
 
     if let (Some(ph), Some(st), Some(en)) = (
@@ -269,7 +308,12 @@ pub fn id_to_audio_path(id: &str, base_dir: &Path) -> Option<std::path::PathBuf>
     let speaker = parts[0];
     let chapter = parts[1];
 
-    Some(base_dir.join(speaker).join(chapter).join(format!("{}.flac", id)))
+    Some(
+        base_dir
+            .join(speaker)
+            .join(chapter)
+            .join(format!("{}.flac", id)),
+    )
 }
 
 #[cfg(test)]

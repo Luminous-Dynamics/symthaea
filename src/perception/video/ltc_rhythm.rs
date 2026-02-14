@@ -686,7 +686,7 @@ mod tests {
     fn create_test_features(brightness: f32, seq: u64) -> TemporalFeatures {
         let mut features = [0.0f32; 32];
         features[28] = brightness;
-        features[30] = if seq % 2 == 0 { 0.5 } else { 0.0 }; // Alternating motion
+        features[30] = if seq.is_multiple_of(2) { 0.5 } else { 0.0 }; // Alternating motion
 
         TemporalFeatures {
             features,

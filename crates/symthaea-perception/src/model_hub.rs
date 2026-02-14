@@ -98,7 +98,7 @@ impl ModelSpec {
             ModelSpec::SigLIP => 768,
             ModelSpec::Moondream => 0, // VLM, not embedding
             ModelSpec::BGE => 768,
-            ModelSpec::Kokoro => 0,    // TTS, not embedding
+            ModelSpec::Kokoro => 0,          // TTS, not embedding
             ModelSpec::OcrsDetection => 0,   // OCR, not embedding
             ModelSpec::OcrsRecognition => 0, // OCR, not embedding
         }
@@ -149,15 +149,13 @@ impl ModelHub {
     /// Create a new ModelHub with default models directory
     pub fn new() -> Result<Self> {
         let hub = Self::default();
-        std::fs::create_dir_all(&hub.models_dir)
-            .context("Failed to create models directory")?;
+        std::fs::create_dir_all(&hub.models_dir).context("Failed to create models directory")?;
         Ok(hub)
     }
 
     /// Create a ModelHub with custom models directory
     pub fn with_dir(models_dir: PathBuf) -> Result<Self> {
-        std::fs::create_dir_all(&models_dir)
-            .context("Failed to create models directory")?;
+        std::fs::create_dir_all(&models_dir).context("Failed to create models directory")?;
         Ok(Self { models_dir })
     }
 
@@ -174,14 +172,12 @@ impl ModelHub {
         }
 
         // Check all required files exist (also check onnx/ subfolder)
-        spec.required_files()
-            .iter()
-            .all(|file| {
-                model_dir.join(file).exists()
+        spec.required_files().iter().all(|file| {
+            model_dir.join(file).exists()
                 || model_dir.join("onnx").join(file).exists()
                 // For SigLIP, vision_model.onnx is preferred over model.onnx
                 || (spec == ModelSpec::SigLIP && model_dir.join("onnx/vision_model.onnx").exists())
-            })
+        })
     }
 
     /// Ensure a model is available, downloading if necessary
@@ -233,8 +229,7 @@ impl ModelHub {
         let repo = api.model(spec.repo_id().to_string());
         let model_dir = self.model_path(spec);
 
-        std::fs::create_dir_all(&model_dir)
-            .context("Failed to create model directory")?;
+        std::fs::create_dir_all(&model_dir).context("Failed to create model directory")?;
 
         // Download each required file
         for file in spec.required_files() {
@@ -257,13 +252,25 @@ impl ModelHub {
     /// List all available models
     pub fn list_available(&self) -> Vec<(ModelSpec, bool)> {
         vec![
-            (ModelSpec::Qwen3Embedding, self.is_downloaded(ModelSpec::Qwen3Embedding)),
+            (
+                ModelSpec::Qwen3Embedding,
+                self.is_downloaded(ModelSpec::Qwen3Embedding),
+            ),
             (ModelSpec::SigLIP, self.is_downloaded(ModelSpec::SigLIP)),
-            (ModelSpec::Moondream, self.is_downloaded(ModelSpec::Moondream)),
+            (
+                ModelSpec::Moondream,
+                self.is_downloaded(ModelSpec::Moondream),
+            ),
             (ModelSpec::BGE, self.is_downloaded(ModelSpec::BGE)),
             (ModelSpec::Kokoro, self.is_downloaded(ModelSpec::Kokoro)),
-            (ModelSpec::OcrsDetection, self.is_downloaded(ModelSpec::OcrsDetection)),
-            (ModelSpec::OcrsRecognition, self.is_downloaded(ModelSpec::OcrsRecognition)),
+            (
+                ModelSpec::OcrsDetection,
+                self.is_downloaded(ModelSpec::OcrsDetection),
+            ),
+            (
+                ModelSpec::OcrsRecognition,
+                self.is_downloaded(ModelSpec::OcrsRecognition),
+            ),
         ]
     }
 
@@ -285,7 +292,11 @@ impl ModelHub {
     pub fn download_all(&self) -> Result<()> {
         for spec in Self::all_specs() {
             if !self.is_downloaded(*spec) {
-                tracing::info!("Downloading {} ({} MB)...", spec.description(), spec.size_mb());
+                tracing::info!(
+                    "Downloading {} ({} MB)...",
+                    spec.description(),
+                    spec.size_mb()
+                );
                 self.download_model(*spec)?;
             } else {
                 tracing::info!("{} already downloaded", spec.description());
@@ -339,13 +350,22 @@ mod tests {
 
     #[test]
     fn test_model_spec_repo_id() {
-        assert_eq!(ModelSpec::Qwen3Embedding.repo_id(), "Qwen/Qwen3-Embedding-0.6B");
-        assert_eq!(ModelSpec::SigLIP.repo_id(), "google/siglip-so400m-patch14-384");
+        assert_eq!(
+            ModelSpec::Qwen3Embedding.repo_id(),
+            "Qwen/Qwen3-Embedding-0.6B"
+        );
+        assert_eq!(
+            ModelSpec::SigLIP.repo_id(),
+            "google/siglip-so400m-patch14-384"
+        );
     }
 
     #[test]
     fn test_model_spec_local_name() {
-        assert_eq!(ModelSpec::Qwen3Embedding.local_name(), "qwen3-embedding-0.6b");
+        assert_eq!(
+            ModelSpec::Qwen3Embedding.local_name(),
+            "qwen3-embedding-0.6b"
+        );
         assert_eq!(ModelSpec::SigLIP.local_name(), "siglip-so400m");
     }
 

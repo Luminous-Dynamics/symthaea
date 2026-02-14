@@ -12,12 +12,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use symthaea_stt::{
-    AudioFrontend, AudioConfig,
-    RandomProjection, RFActivation,
-    CrystalReservoir,
-    FastRlsClassifier,
-    load_alignments, id_to_audio_path,
-    DirectClassifier, DirectClassifierConfig,
+    id_to_audio_path, load_alignments, AudioConfig, AudioFrontend, CrystalReservoir,
+    DirectClassifier, DirectClassifierConfig, FastRlsClassifier, RFActivation, RandomProjection,
 };
 
 #[derive(Parser)]
@@ -87,7 +83,11 @@ struct Cli {
 
 /// Stack multiple frames together for temporal context
 fn stack_frames(features: &[Vec<f32>], center: usize, context_frames: usize) -> Vec<f32> {
-    let n_dims = if features.is_empty() { 0 } else { features[0].len() };
+    let n_dims = if features.is_empty() {
+        0
+    } else {
+        features[0].len()
+    };
     let half = context_frames / 2;
     let mut stacked = Vec::with_capacity(n_dims * context_frames);
 
@@ -103,10 +103,24 @@ fn stack_frames(features: &[Vec<f32>], center: usize, context_frames: usize) -> 
 fn main() {
     let cli = Cli::parse();
 
-    println!("{}", style("═══════════════════════════════════════════════════════════").yellow());
-    println!("{}", style("    RLS CLASSIFIER TRAINING                                ").bold().yellow());
-    println!("{}", style("    Online Discriminative Learning (Sherman-Morrison)      ").yellow());
-    println!("{}", style("═══════════════════════════════════════════════════════════").yellow());
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").yellow()
+    );
+    println!(
+        "{}",
+        style("    RLS CLASSIFIER TRAINING                                ")
+            .bold()
+            .yellow()
+    );
+    println!(
+        "{}",
+        style("    Online Discriminative Learning (Sherman-Morrison)      ").yellow()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").yellow()
+    );
     println!();
     println!("  Architecture: Mel+Δ+ΔΔ -> Context Stack -> Projection -> RLS");
     println!("  Training: Online Ridge Regression (O(D²) per sample)");
@@ -115,11 +129,19 @@ fn main() {
 
     // Check paths
     if !cli.alignments.exists() {
-        eprintln!("{} Alignments file not found: {:?}", style("ERROR:").red().bold(), cli.alignments);
+        eprintln!(
+            "{} Alignments file not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.alignments
+        );
         std::process::exit(1);
     }
     if !cli.audio_dir.exists() {
-        eprintln!("{} Audio directory not found: {:?}", style("ERROR:").red().bold(), cli.audio_dir);
+        eprintln!(
+            "{} Audio directory not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.audio_dir
+        );
         std::process::exit(1);
     }
 
@@ -128,7 +150,11 @@ fn main() {
     let alignments = match load_alignments(&cli.alignments) {
         Ok(a) => a,
         Err(e) => {
-            eprintln!("{} Failed to load alignments: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to load alignments: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -178,12 +204,8 @@ fn main() {
 
     // Create RLS classifier
     println!("\n  Creating RLS Classifier...");
-    let mut classifier = FastRlsClassifier::new(
-        phonemes.clone(),
-        cli.n_features,
-        cli.delta,
-        cli.lambda,
-    );
+    let mut classifier =
+        FastRlsClassifier::new(phonemes.clone(), cli.n_features, cli.delta, cli.lambda);
     println!("    Feature dim: {}", cli.n_features);
     println!("    Delta (regularization): {}", cli.delta);
     println!("    Lambda (forgetting): {}", cli.lambda);
@@ -194,7 +216,10 @@ fn main() {
     } else {
         println!("    Mode: RANDOM FEATURES + RLS");
     }
-    println!("    Input: {} dims -> {} projected dims", input_size, cli.n_features);
+    println!(
+        "    Input: {} dims -> {} projected dims",
+        input_size, cli.n_features
+    );
     println!("    CMVN: {}", cli.cmvn);
     println!("    Phoneme classes: {}", phonemes.len());
 
@@ -212,10 +237,12 @@ fn main() {
     println!("\n  Processing {} utterances...", total);
 
     let pb = ProgressBar::new(total as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.yellow} [{bar:40.yellow/blue}] {pos}/{len} ({eta}) {msg}")
-        .unwrap()
-        .progress_chars("█▓-"));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.yellow} [{bar:40.yellow/blue}] {pos}/{len} ({eta}) {msg}")
+            .unwrap()
+            .progress_chars("█▓-"),
+    );
 
     let mut processed = 0;
     let mut skipped = 0;
@@ -307,7 +334,10 @@ fn main() {
             let segment_len = end_frame.saturating_sub(start_frame);
             let margin = segment_len / 4;
             let center_start = (start_frame + margin).min(features.len().saturating_sub(1));
-            let center_end = end_frame.saturating_sub(margin).min(features.len()).max(center_start + 1);
+            let center_end = end_frame
+                .saturating_sub(margin)
+                .min(features.len())
+                .max(center_start + 1);
 
             for frame_idx in center_start..center_end {
                 if frame_idx < features.len() {
@@ -346,7 +376,8 @@ fn main() {
 
     // Show class distribution
     if cli.verbose {
-        let mut indexed: Vec<(usize, usize)> = classifier.counts.iter().copied().enumerate().collect();
+        let mut indexed: Vec<(usize, usize)> =
+            classifier.counts.iter().copied().enumerate().collect();
         indexed.sort_by(|a, b| b.1.cmp(&a.1));
         println!("\n  Top 10 phoneme frequencies:");
         for &(idx, count) in indexed.iter().take(10) {
@@ -441,7 +472,10 @@ fn main() {
 
         if total_test > 0 {
             let accuracy = correct as f32 / total_test as f32 * 100.0;
-            println!("    Frame accuracy: {:.1}% ({}/{})", accuracy, correct, total_test);
+            println!(
+                "    Frame accuracy: {:.1}% ({}/{})",
+                accuracy, correct, total_test
+            );
         }
     }
 
@@ -486,8 +520,19 @@ fn main() {
 
     println!("  ✓ Saved RLS Classifier (DirectClassifier format)");
 
-    println!("\n{}", style("═══════════════════════════════════════════════════════════").yellow());
-    println!("{}", style("         RLS CLASSIFIER TRAINING COMPLETE                  ").bold().green());
-    println!("{}", style("═══════════════════════════════════════════════════════════").yellow());
+    println!(
+        "\n{}",
+        style("═══════════════════════════════════════════════════════════").yellow()
+    );
+    println!(
+        "{}",
+        style("         RLS CLASSIFIER TRAINING COMPLETE                  ")
+            .bold()
+            .green()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").yellow()
+    );
     println!("\n  Next: eval-direct --classifier {:?} --skip-reservoir --use-deltas --viterbi-penalty 0.95", cli.output);
 }

@@ -19,7 +19,7 @@ use std::time::Instant;
 use anyhow::Result;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::binary_hv::BinaryHV;
@@ -74,10 +74,16 @@ fn run_analysis() -> Result<()> {
         ..Default::default()
     };
     let extractor = LayerExtractor::load(config)?;
-    println!("  Model loaded in {:.2}s", load_start.elapsed().as_secs_f64());
+    println!(
+        "  Model loaded in {:.2}s",
+        load_start.elapsed().as_secs_f64()
+    );
     println!("  Layers: {}", extractor.num_layers());
     println!("  Hidden dim: {}", extractor.hidden_dim());
-    println!("  Device: {}\n", if extractor.is_cuda() { "CUDA" } else { "CPU" });
+    println!(
+        "  Device: {}\n",
+        if extractor.is_cuda() { "CUDA" } else { "CPU" }
+    );
 
     // Analyze layers [0, 6, 12, 18, 23] for efficiency
     let layers_to_analyze = vec![0, 6, 12, 18, 23];
@@ -135,12 +141,7 @@ fn run_analysis() -> Result<()> {
 
         println!(
             "{:5}  │ {:10.4} │ {:10.4} │ {:+10.4} │ {:7.2} │ {:7.2}",
-            layer_idx,
-            phen_unity.0,
-            func_unity.0,
-            diff,
-            phen_unity.1,
-            func_unity.1
+            layer_idx, phen_unity.0, func_unity.0, diff, phen_unity.1, func_unity.1
         );
     }
 

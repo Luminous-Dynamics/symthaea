@@ -27,18 +27,18 @@
 //! cargo run --example hdc_ltc_primitives_demo
 //! ```
 
-use symthaea::language::{
-    ConsciousnessLanguageCore, ConsciousnessLanguageConfig,
-    ExecutionStrategy, ConsciousnessQuadrant,
-};
 use anyhow::Result;
+use symthaea::language::{
+    ConsciousnessLanguageConfig, ConsciousnessLanguageCore, ConsciousnessQuadrant,
+    ExecutionStrategy,
+};
 
 fn quadrant_symbol(quadrant: ConsciousnessQuadrant) -> &'static str {
     match quadrant {
-        ConsciousnessQuadrant::Confident => "●",  // Full confidence
-        ConsciousnessQuadrant::Curious => "◐",    // Half-exploring
-        ConsciousnessQuadrant::Autopilot => "○",  // Hollow/routine
-        ConsciousnessQuadrant::Lost => "◌",       // Dotted/confused
+        ConsciousnessQuadrant::Confident => "●", // Full confidence
+        ConsciousnessQuadrant::Curious => "◐",   // Half-exploring
+        ConsciousnessQuadrant::Autopilot => "○", // Hollow/routine
+        ConsciousnessQuadrant::Lost => "◌",      // Dotted/confused
     }
 }
 
@@ -84,8 +84,10 @@ fn main() -> Result<()> {
     println!("                              │");
     println!("                        Low Confidence");
     println!("");
-    println!("   Φ Threshold: {:.2}  │  Confidence Threshold: {:.2}",
-        config.phi_threshold, config.confidence_threshold);
+    println!(
+        "   Φ Threshold: {:.2}  │  Confidence Threshold: {:.2}",
+        config.phi_threshold, config.confidence_threshold
+    );
     println!("");
 
     println!("═══════════════════════════════════════════════════════════════════");
@@ -108,11 +110,17 @@ fn main() -> Result<()> {
 
     // Test queries designed to hit different quadrants
     let test_queries = [
-        ("install firefox", "Clear intent, should have high confidence"),
+        (
+            "install firefox",
+            "Clear intent, should have high confidence",
+        ),
         ("search for video editor", "Clear search intent"),
         ("rebuild switch", "NixOS-specific, clear action"),
         ("do the thing with stuff", "Ambiguous - should be Lost!"),
-        ("maybe update something", "Vague - should have low confidence"),
+        (
+            "maybe update something",
+            "Vague - should have low confidence",
+        ),
         ("configure nginx service", "Specific but needs parameters"),
         ("garbage collect", "Routine maintenance operation"),
         ("xyz123 foobar baz", "Nonsense - should be Lost"),
@@ -138,22 +146,33 @@ fn main() -> Result<()> {
         // Display 2D consciousness metrics
         println!("│");
         println!("│ 📐 2D Position:");
-        println!("│    Φ (Integration): {:.3}  │  Confidence: {:.3}",
-            space.phi, space.confidence);
-        println!("│    Quadrant: {} {}", quadrant_symbol(quadrant), quadrant_name(quadrant));
+        println!(
+            "│    Φ (Integration): {:.3}  │  Confidence: {:.3}",
+            space.phi, space.confidence
+        );
+        println!(
+            "│    Quadrant: {} {}",
+            quadrant_symbol(quadrant),
+            quadrant_name(quadrant)
+        );
 
         // Show integration signals
         let signals = &result.integration_signals;
         println!("│");
         println!("│ 🔗 Integration Signals:");
-        println!("│    Primes: {}  Frames: {}  Agreement: {:.2}",
-            signals.primes_activated, signals.frames_matched, signals.subsystem_agreement);
-        println!("│    Depth: {}  Links: {}  Memory: {:.2}",
-            signals.reasoning_depth, signals.cross_domain_links, signals.memory_coherence);
+        println!(
+            "│    Primes: {}  Frames: {}  Agreement: {:.2}",
+            signals.primes_activated, signals.frames_matched, signals.subsystem_agreement
+        );
+        println!(
+            "│    Depth: {}  Links: {}  Memory: {:.2}",
+            signals.reasoning_depth, signals.cross_domain_links, signals.memory_coherence
+        );
 
         // Show NixOS understanding
         println!("│");
-        println!("│ 🎯 Intent: {:?} (raw confidence: {:.0}%)",
+        println!(
+            "│ 🎯 Intent: {:?} (raw confidence: {:.0}%)",
             result.nix_understanding.intent,
             result.nix_understanding.confidence * 100.0
         );
@@ -163,7 +182,10 @@ fn main() -> Result<()> {
         println!("│");
         println!("│ 🚀 Journey: {}", journey.narrative());
         if journey.transitions > 0 {
-            println!("│    Transitions: {} quadrant change(s)", journey.transitions);
+            println!(
+                "│    Transitions: {} quadrant change(s)",
+                journey.transitions
+            );
         }
 
         // Show rich explanation
@@ -198,7 +220,8 @@ fn main() -> Result<()> {
             ExecutionStrategy::Lost { .. } => ("Lost", true),
         };
         println!("│");
-        println!("│ ⚡ Strategy: {} | LLM: {}",
+        println!(
+            "│ ⚡ Strategy: {} | LLM: {}",
             strategy_name,
             if llm_needed { "Needed" } else { "Not needed" }
         );
@@ -215,15 +238,27 @@ fn main() -> Result<()> {
     println!("   Inputs Processed: {}", stats.inputs_processed);
     println!("   Average Φ: {:.3}", stats.avg_phi);
     println!("   Average Free Energy: {:.3}", stats.avg_free_energy);
-    println!("   Optimal Understanding: {} ({:.1}%)",
+    println!(
+        "   Optimal Understanding: {} ({:.1}%)",
         stats.optimal_count,
-        if stats.inputs_processed > 0 { stats.optimal_count as f64 / stats.inputs_processed as f64 * 100.0 } else { 0.0 });
+        if stats.inputs_processed > 0 {
+            stats.optimal_count as f64 / stats.inputs_processed as f64 * 100.0
+        } else {
+            0.0
+        }
+    );
     println!("");
     println!("   Adaptive Thresholds:");
-    println!("     Current Φ: {:.2}  Confidence: {:.2}",
-        adaptive.phi_threshold, adaptive.confidence_threshold);
-    println!("     Successes: {}  Failures: {}  Accuracy: {:.1}%",
-        adaptive.successes, adaptive.failures, adaptive.accuracy() * 100.0);
+    println!(
+        "     Current Φ: {:.2}  Confidence: {:.2}",
+        adaptive.phi_threshold, adaptive.confidence_threshold
+    );
+    println!(
+        "     Successes: {}  Failures: {}  Accuracy: {:.1}%",
+        adaptive.successes,
+        adaptive.failures,
+        adaptive.accuracy() * 100.0
+    );
 
     println!("\n═══════════════════════════════════════════════════════════════════");
     println!("  Key Improvements in v2");

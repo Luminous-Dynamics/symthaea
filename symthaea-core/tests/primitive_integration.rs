@@ -47,9 +47,7 @@ mod bootstrapping_integration {
             let prims = bootstrapper.primitives_for_category(*category);
             // Each primitive from bootstrapper should be findable in system
             for (name, hv) in prims {
-                let lookup = system.get(name).expect(&format!(
-                    "Bootstrapper references '{}' but system.get() returned None", name
-                ));
+                let lookup = system.get(name).unwrap_or_else(|| panic!("Bootstrapper references '{}' but system.get() returned None", name));
                 assert_eq!(
                     lookup.encoding.similarity(hv), 1.0,
                     "Encoding mismatch for primitive '{}'", name
@@ -420,7 +418,7 @@ mod cross_feature_integration {
         let encodings: Vec<BinaryHV> = ["CAUSE", "EFFECT", "BEFORE", "AFTER"]
             .iter()
             .filter_map(|n| system.get(n))
-            .map(|p| p.encoding.clone())
+            .map(|p| p.encoding)
             .collect();
 
         let pairs = system.pairwise_similarities(&encodings);

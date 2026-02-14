@@ -18,29 +18,51 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{
-    ConsciousnessProbeV2, Concept,
-};
+use symthaea::perception::{Concept, ConsciousnessProbeV2};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::BinaryHV;
 
 /// Phenomenal concept pairs that humans report as unified experiences
 const UNIFIED_PHENOMENAL_PAIRS: &[(&str, &str)] = &[
-    ("The vivid experience of seeing red", "The felt warmth of sunlight"),
-    ("The taste of sweet chocolate", "The sensation of smooth texture"),
+    (
+        "The vivid experience of seeing red",
+        "The felt warmth of sunlight",
+    ),
+    (
+        "The taste of sweet chocolate",
+        "The sensation of smooth texture",
+    ),
     ("The feeling of deep sadness", "The heaviness in the chest"),
     ("The sound of a violin", "The emotional stirring it evokes"),
-    ("The smell of fresh coffee", "The anticipation of the first sip"),
+    (
+        "The smell of fresh coffee",
+        "The anticipation of the first sip",
+    ),
 ];
 
 /// Functional concept pairs (control)
 const FUNCTIONAL_PAIRS: &[(&str, &str)] = &[
-    ("The recursive algorithm terminates", "Memory is allocated on the heap"),
-    ("Hash tables provide O(1) lookup", "TCP ensures reliable delivery"),
-    ("The compiler optimizes bytecode", "Garbage collection frees memory"),
-    ("Binary search has logarithmic complexity", "The function returns an integer"),
-    ("The database indexes the primary key", "Matrix multiplication computes dot products"),
+    (
+        "The recursive algorithm terminates",
+        "Memory is allocated on the heap",
+    ),
+    (
+        "Hash tables provide O(1) lookup",
+        "TCP ensures reliable delivery",
+    ),
+    (
+        "The compiler optimizes bytecode",
+        "Garbage collection frees memory",
+    ),
+    (
+        "Binary search has logarithmic complexity",
+        "The function returns an integer",
+    ),
+    (
+        "The database indexes the primary key",
+        "Matrix multiplication computes dot products",
+    ),
 ];
 
 /// Single phenomenal concepts for comparison
@@ -88,20 +110,40 @@ fn main() -> Result<()> {
     println!("Probing single phenomenal concepts...");
     for text in SINGLE_PHENOMENAL {
         let result = probe.probe_text(text)?;
-        results.get_mut("single_phenomenal_unity").unwrap().push(result.unity_score);
-        results.get_mut("single_phenomenal_betti0").unwrap().push(result.betti.beta_0 as f64);
-        println!("  {} -> unity={:.4}, β₀={}",
-                 &text[..40.min(text.len())], result.unity_score, result.betti.beta_0);
+        results
+            .get_mut("single_phenomenal_unity")
+            .unwrap()
+            .push(result.unity_score);
+        results
+            .get_mut("single_phenomenal_betti0")
+            .unwrap()
+            .push(result.betti.beta_0 as f64);
+        println!(
+            "  {} -> unity={:.4}, β₀={}",
+            &text[..40.min(text.len())],
+            result.unity_score,
+            result.betti.beta_0
+        );
     }
 
     // 2. Probe single functional concepts
     println!("\nProbing single functional concepts...");
     for text in SINGLE_FUNCTIONAL {
         let result = probe.probe_text(text)?;
-        results.get_mut("single_functional_unity").unwrap().push(result.unity_score);
-        results.get_mut("single_functional_betti0").unwrap().push(result.betti.beta_0 as f64);
-        println!("  {} -> unity={:.4}, β₀={}",
-                 &text[..40.min(text.len())], result.unity_score, result.betti.beta_0);
+        results
+            .get_mut("single_functional_unity")
+            .unwrap()
+            .push(result.unity_score);
+        results
+            .get_mut("single_functional_betti0")
+            .unwrap()
+            .push(result.betti.beta_0 as f64);
+        println!(
+            "  {} -> unity={:.4}, β₀={}",
+            &text[..40.min(text.len())],
+            result.unity_score,
+            result.betti.beta_0
+        );
     }
 
     // 3. Probe BOUND phenomenal pairs
@@ -128,11 +170,20 @@ fn main() -> Result<()> {
         };
         let result = probe.probe_concept_from_hv(&concept, &hv_bound)?;
 
-        results.get_mut("bound_phenomenal_unity").unwrap().push(result.unity_score);
-        results.get_mut("bound_phenomenal_betti0").unwrap().push(result.betti.beta_0 as f64);
+        results
+            .get_mut("bound_phenomenal_unity")
+            .unwrap()
+            .push(result.unity_score);
+        results
+            .get_mut("bound_phenomenal_betti0")
+            .unwrap()
+            .push(result.betti.beta_0 as f64);
 
         println!("  {} ⊗ {}", &a[..30.min(a.len())], &b[..30.min(b.len())]);
-        println!("    -> unity={:.4}, β₀={}", result.unity_score, result.betti.beta_0);
+        println!(
+            "    -> unity={:.4}, β₀={}",
+            result.unity_score, result.betti.beta_0
+        );
     }
 
     // 4. Probe BOUND functional pairs (control)
@@ -154,11 +205,20 @@ fn main() -> Result<()> {
         };
         let result = probe.probe_concept_from_hv(&concept, &hv_bound)?;
 
-        results.get_mut("bound_functional_unity").unwrap().push(result.unity_score);
-        results.get_mut("bound_functional_betti0").unwrap().push(result.betti.beta_0 as f64);
+        results
+            .get_mut("bound_functional_unity")
+            .unwrap()
+            .push(result.unity_score);
+        results
+            .get_mut("bound_functional_betti0")
+            .unwrap()
+            .push(result.betti.beta_0 as f64);
 
         println!("  {} ⊗ {}", &a[..30.min(a.len())], &b[..30.min(b.len())]);
-        println!("    -> unity={:.4}, β₀={}", result.unity_score, result.betti.beta_0);
+        println!(
+            "    -> unity={:.4}, β₀={}",
+            result.unity_score, result.betti.beta_0
+        );
     }
 
     // Summary statistics
@@ -177,12 +237,35 @@ fn main() -> Result<()> {
     let bp_unity = &results["bound_phenomenal_unity"];
     let bf_unity = &results["bound_functional_unity"];
 
-    println!("{:<30} {:>12} {:>12}", "Condition", "Unity (mean)", "Unity (std)");
+    println!(
+        "{:<30} {:>12} {:>12}",
+        "Condition", "Unity (mean)", "Unity (std)"
+    );
     println!("{}", "-".repeat(54));
-    println!("{:<30} {:>12.4} {:>12.4}", "Single Phenomenal", mean(sp_unity), std(sp_unity));
-    println!("{:<30} {:>12.4} {:>12.4}", "Single Functional", mean(sf_unity), std(sf_unity));
-    println!("{:<30} {:>12.4} {:>12.4}", "Bound Phenomenal", mean(bp_unity), std(bp_unity));
-    println!("{:<30} {:>12.4} {:>12.4}", "Bound Functional", mean(bf_unity), std(bf_unity));
+    println!(
+        "{:<30} {:>12.4} {:>12.4}",
+        "Single Phenomenal",
+        mean(sp_unity),
+        std(sp_unity)
+    );
+    println!(
+        "{:<30} {:>12.4} {:>12.4}",
+        "Single Functional",
+        mean(sf_unity),
+        std(sf_unity)
+    );
+    println!(
+        "{:<30} {:>12.4} {:>12.4}",
+        "Bound Phenomenal",
+        mean(bp_unity),
+        std(bp_unity)
+    );
+    println!(
+        "{:<30} {:>12.4} {:>12.4}",
+        "Bound Functional",
+        mean(bf_unity),
+        std(bf_unity)
+    );
 
     // Effect sizes
     println!("\n{}", "-".repeat(70));
@@ -205,8 +288,14 @@ fn main() -> Result<()> {
 
     println!("Single phenomenal vs functional:     d = {:+.3}", d_single);
     println!("Bound phenomenal vs functional:      d = {:+.3}", d_bound);
-    println!("Binding effect (phenomenal):         d = {:+.3}", d_binding_phen);
-    println!("Binding effect (functional):         d = {:+.3}", d_binding_func);
+    println!(
+        "Binding effect (phenomenal):         d = {:+.3}",
+        d_binding_phen
+    );
+    println!(
+        "Binding effect (functional):         d = {:+.3}",
+        d_binding_func
+    );
 
     // Key finding
     println!("\n{}", "=".repeat(70));
@@ -216,10 +305,16 @@ fn main() -> Result<()> {
     if d_bound > d_single && d_bound > 0.5 {
         println!("✓ COMBINED H1+H2 SUPPORTED");
         println!("  Bound phenomenal concepts show STRONGER topological signature");
-        println!("  than single concepts (d={:.3} vs d={:.3})", d_bound, d_single);
+        println!(
+            "  than single concepts (d={:.3} vs d={:.3})",
+            d_bound, d_single
+        );
     } else if d_bound > 0.2 {
         println!("◐ PARTIAL SUPPORT");
-        println!("  Bound phenomenal concepts show moderate effect (d={:.3})", d_bound);
+        println!(
+            "  Bound phenomenal concepts show moderate effect (d={:.3})",
+            d_bound
+        );
     } else {
         println!("✗ NOT SUPPORTED");
         println!("  Binding does not enhance phenomenal topological signature");
@@ -282,6 +377,8 @@ fn packed_to_hv16(packed: &symthaea_core::hdc::PackedBipolar) -> BinaryHV {
 #[cfg(not(feature = "neural-bridge"))]
 fn main() {
     eprintln!("This example requires the 'neural-bridge' feature.");
-    eprintln!("Run with: cargo run --example bound_phenomenal_probe --features neural-bridge --release");
+    eprintln!(
+        "Run with: cargo run --example bound_phenomenal_probe --features neural-bridge --release"
+    );
     std::process::exit(1);
 }

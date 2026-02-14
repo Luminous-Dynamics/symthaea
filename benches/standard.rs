@@ -18,10 +18,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator,
-    phi_resonant::ResonantPhiCalculator,
-    binary_hv::BinaryHV,
+    binary_hv::BinaryHV, consciousness_topology_generators::ConsciousnessTopology,
+    phi_resonant::ResonantPhiCalculator, spectral_connectivity::ConnectivityCalculator,
     HDC_DIMENSION,
 };
 // Note: temporal_primitives module is not yet implemented - benchmark removed
@@ -38,39 +36,29 @@ fn bench_hdc_comprehensive(c: &mut Criterion) {
     let hv2 = BinaryHV::random(43);
 
     // All core operations
-    group.bench_function("bind", |b| {
-        b.iter(|| black_box(hv1.bind(&hv2)))
-    });
+    group.bench_function("bind", |b| b.iter(|| black_box(hv1.bind(&hv2))));
 
-    group.bench_function("similarity", |b| {
-        b.iter(|| black_box(hv1.similarity(&hv2)))
-    });
+    group.bench_function("similarity", |b| b.iter(|| black_box(hv1.similarity(&hv2))));
 
     group.bench_function("hamming_distance", |b| {
         b.iter(|| black_box(hv1.hamming_distance(&hv2)))
     });
 
-    group.bench_function("popcount", |b| {
-        b.iter(|| black_box(hv1.popcount()))
-    });
+    group.bench_function("popcount", |b| b.iter(|| black_box(hv1.popcount())));
 
     // Bundle scaling
     for size in [2, 5, 10, 20] {
         let hvs: Vec<BinaryHV> = (0..size).map(|i| BinaryHV::random(i)).collect();
-        group.bench_with_input(
-            BenchmarkId::new("bundle", size),
-            &hvs,
-            |b, hvs| b.iter(|| black_box(BinaryHV::bundle(hvs))),
-        );
+        group.bench_with_input(BenchmarkId::new("bundle", size), &hvs, |b, hvs| {
+            b.iter(|| black_box(BinaryHV::bundle(hvs)))
+        });
     }
 
     // Permute scaling
     for steps in [1, 10, 100] {
-        group.bench_with_input(
-            BenchmarkId::new("permute", steps),
-            &steps,
-            |b, &steps| b.iter(|| black_box(hv1.permute(steps))),
-        );
+        group.bench_with_input(BenchmarkId::new("permute", steps), &steps, |b, &steps| {
+            b.iter(|| black_box(hv1.permute(steps)))
+        });
     }
 
     group.finish();
@@ -88,13 +76,28 @@ fn bench_standard_topologies(c: &mut Criterion) {
 
     let topologies = vec![
         ("Ring", ConsciousnessTopology::ring(8, HDC_DIMENSION, 42)),
-        ("Torus", ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, 42)),
-        ("Dense", ConsciousnessTopology::dense_network(8, HDC_DIMENSION, None, 42)),
-        ("Lattice", ConsciousnessTopology::lattice(8, HDC_DIMENSION, 42)),
-        ("Modular", ConsciousnessTopology::modular(8, HDC_DIMENSION, 2, 42)),
+        (
+            "Torus",
+            ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, 42),
+        ),
+        (
+            "Dense",
+            ConsciousnessTopology::dense_network(8, HDC_DIMENSION, None, 42),
+        ),
+        (
+            "Lattice",
+            ConsciousnessTopology::lattice(8, HDC_DIMENSION, 42),
+        ),
+        (
+            "Modular",
+            ConsciousnessTopology::modular(8, HDC_DIMENSION, 2, 42),
+        ),
         ("Line", ConsciousnessTopology::line(8, HDC_DIMENSION, 42)),
         ("Star", ConsciousnessTopology::star(8, HDC_DIMENSION, 42)),
-        ("Random", ConsciousnessTopology::random(8, HDC_DIMENSION, 42)),
+        (
+            "Random",
+            ConsciousnessTopology::random(8, HDC_DIMENSION, 42),
+        ),
     ];
 
     for (name, topo) in topologies {
@@ -132,7 +135,8 @@ fn bench_scalability(c: &mut Criterion) {
             &corpus,
             |b, corpus| {
                 b.iter(|| {
-                    let max_sim = corpus.iter()
+                    let max_sim = corpus
+                        .iter()
                         .map(|hv| query.similarity(hv))
                         .max_by(|a, b| a.partial_cmp(b).unwrap());
                     black_box(max_sim)
@@ -144,14 +148,10 @@ fn bench_scalability(c: &mut Criterion) {
     // Φ scaling
     let calc = ResonantPhiCalculator::fast();
     for n_nodes in [8, 16, 32] {
-        group.bench_with_input(
-            BenchmarkId::new("phi_ring", n_nodes),
-            &n_nodes,
-            |b, &n| {
-                let topo = ConsciousnessTopology::ring(n, HDC_DIMENSION, 42);
-                b.iter(|| black_box(calc.compute(&topo.node_representations)))
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("phi_ring", n_nodes), &n_nodes, |b, &n| {
+            let topo = ConsciousnessTopology::ring(n, HDC_DIMENSION, 42);
+            b.iter(|| black_box(calc.compute(&topo.node_representations)))
+        });
     }
 
     group.finish();

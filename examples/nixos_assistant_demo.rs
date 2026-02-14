@@ -54,15 +54,13 @@
 //! cargo run --example nixos_assistant_demo
 //! ```
 
+use anyhow::Result;
+use std::io::{self, Write};
 use symthaea::integration::{
     ConsciousPipeline, PipelineConfig, PipelineResult, UnderstandingSource,
 };
-use symthaea::language::{
-    ConsciousnessLanguageConfig, ExecutionStrategy, ConsciousnessQuadrant,
-};
 use symthaea::language::llm_organ::LlmConfig;
-use anyhow::Result;
-use std::io::{self, Write};
+use symthaea::language::{ConsciousnessLanguageConfig, ConsciousnessQuadrant, ExecutionStrategy};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -219,8 +217,8 @@ fn display_result(result: &PipelineResult) {
 
     // Show understanding source (should be HDC+LTC most of the time!)
     let source_icon = match result.understanding_source {
-        UnderstandingSource::HdcLtcPrimitives => "🧬",  // DNA = semantic primitives
-        UnderstandingSource::LlmClarification => "💬",  // Speech = LLM helped
+        UnderstandingSource::HdcLtcPrimitives => "🧬", // DNA = semantic primitives
+        UnderstandingSource::LlmClarification => "💬", // Speech = LLM helped
     };
     let source_name = match result.understanding_source {
         UnderstandingSource::HdcLtcPrimitives => "HDC+LTC+Primitives",
@@ -231,15 +229,24 @@ fn display_result(result: &PipelineResult) {
     // Show 2D consciousness space position
     println!("\n📊 2D Consciousness Space:");
     println!("   Φ (Integration):  {:.3}", result.phi);
-    println!("   Confidence:       {:.3}", result.consciousness_understanding.epistemic_confidence);
+    println!(
+        "   Confidence:       {:.3}",
+        result.consciousness_understanding.epistemic_confidence
+    );
     println!("   Free Energy:      {:.3}", result.free_energy);
 
     // Show quadrant
     let quadrant = result.consciousness_understanding.quadrant;
     let quadrant_desc = match quadrant {
-        ConsciousnessQuadrant::Confident => "Confident (High Φ + High Confidence) - Deep understanding, execute with trust",
-        ConsciousnessQuadrant::Curious => "Curious (High Φ + Low Confidence) - Deep processing, exploring",
-        ConsciousnessQuadrant::Autopilot => "Autopilot (Low Φ + High Confidence) - Pattern-matched routine",
+        ConsciousnessQuadrant::Confident => {
+            "Confident (High Φ + High Confidence) - Deep understanding, execute with trust"
+        }
+        ConsciousnessQuadrant::Curious => {
+            "Curious (High Φ + Low Confidence) - Deep processing, exploring"
+        }
+        ConsciousnessQuadrant::Autopilot => {
+            "Autopilot (Low Φ + High Confidence) - Pattern-matched routine"
+        }
         ConsciousnessQuadrant::Lost => "Lost (Low Φ + Low Confidence) - Need clarification",
     };
     println!("   Quadrant:         {:?}", quadrant);
@@ -248,12 +255,20 @@ fn display_result(result: &PipelineResult) {
     // Show execution strategy
     println!("\n⚡ Execution Strategy:");
     match &result.execution_strategy {
-        ExecutionStrategy::Confident { execute_immediately, explain_reasoning, .. } => {
+        ExecutionStrategy::Confident {
+            execute_immediately,
+            explain_reasoning,
+            ..
+        } => {
             println!("   Strategy: CONFIDENT");
             println!("   → Execute immediately: {}", execute_immediately);
             println!("   → Explain reasoning: {}", explain_reasoning);
         }
-        ExecutionStrategy::Curious { explore_first, targeted_questions, .. } => {
+        ExecutionStrategy::Curious {
+            explore_first,
+            targeted_questions,
+            ..
+        } => {
             println!("   Strategy: CURIOUS");
             println!("   → Explore first (dry-run): {}", explore_first);
             if !targeted_questions.is_empty() {
@@ -263,12 +278,20 @@ fn display_result(result: &PipelineResult) {
                 }
             }
         }
-        ExecutionStrategy::Autopilot { execute_efficiently, minimal_response, .. } => {
+        ExecutionStrategy::Autopilot {
+            execute_efficiently,
+            minimal_response,
+            ..
+        } => {
             println!("   Strategy: AUTOPILOT");
             println!("   → Execute efficiently: {}", execute_efficiently);
             println!("   → Minimal response: {}", minimal_response);
         }
-        ExecutionStrategy::Lost { request_help, generic_questions, .. } => {
+        ExecutionStrategy::Lost {
+            request_help,
+            generic_questions,
+            ..
+        } => {
             println!("   Strategy: LOST");
             println!("   → Request help: {}", request_help);
             if !generic_questions.is_empty() {
@@ -298,7 +321,14 @@ fn display_result(result: &PipelineResult) {
         println!("\n🎯 Detected Action:");
         println!("   Type:     {:?}", intent.action_type);
         println!("   Safety:   {:?}", intent.safety_level);
-        println!("   Allowed:  {}", if result.action_allowed { "✅ Yes" } else { "❌ No" });
+        println!(
+            "   Allowed:  {}",
+            if result.action_allowed {
+                "✅ Yes"
+            } else {
+                "❌ No"
+            }
+        );
         if let Some(ref cmd) = intent.command {
             let (program, args) = cmd.to_command();
             println!("   Command:  {} {}", program, args.join(" "));
@@ -315,7 +345,11 @@ fn display_result(result: &PipelineResult) {
     if !result.clarifying_questions.is_empty() {
         println!("\n❓ Clarifying Questions:");
         for q in &result.clarifying_questions {
-            println!("   • {} (uncertainty: {:.0}%)", q.question, q.uncertainty * 100.0);
+            println!(
+                "   • {} (uncertainty: {:.0}%)",
+                q.question,
+                q.uncertainty * 100.0
+            );
         }
     }
 
@@ -344,7 +378,10 @@ fn show_status(pipeline: &ConsciousPipeline) {
     println!("   Requests:      {}", stats.total_requests);
     println!("   Actions allowed:  {}", stats.actions_allowed);
     println!("   Actions blocked:  {}", stats.actions_blocked);
-    println!("   Pending confirmation: {}", stats.actions_pending_confirmation);
+    println!(
+        "   Pending confirmation: {}",
+        stats.actions_pending_confirmation
+    );
     println!("   Successful executions: {}", stats.successful_executions);
     println!("   Failed executions: {}", stats.failed_executions);
 }
@@ -364,8 +401,14 @@ fn show_journey(result: &PipelineResult) {
 
     println!("   Snapshots:");
     for (i, snap) in journey.snapshots.iter().enumerate() {
-        println!("   {}. Φ={:.3} Conf={:.3} [{:?}] - {}",
-            i + 1, snap.phi, snap.confidence, snap.quadrant, snap.trigger);
+        println!(
+            "   {}. Φ={:.3} Conf={:.3} [{:?}] - {}",
+            i + 1,
+            snap.phi,
+            snap.confidence,
+            snap.quadrant,
+            snap.trigger
+        );
     }
 
     println!();
@@ -377,10 +420,10 @@ fn show_journey(result: &PipelineResult) {
 /// Format a quadrant indicator for the prompt
 fn format_quadrant_indicator(phi: f64) -> &'static str {
     if phi >= 0.7 {
-        "⬆️"  // High Φ
+        "⬆️" // High Φ
     } else if phi >= 0.4 {
-        "➡️"  // Medium Φ
+        "➡️" // Medium Φ
     } else {
-        "⬇️"  // Low Φ
+        "⬇️" // Low Φ
     }
 }

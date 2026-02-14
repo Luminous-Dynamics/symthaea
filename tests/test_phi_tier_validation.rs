@@ -36,7 +36,7 @@ fn generate_star_topology(n: usize) -> Vec<BinaryHV> {
 
     // Hub: random hypervector
     let hub = BinaryHV::random(42);
-    components.push(hub.clone());
+    components.push(hub);
 
     // Spokes: each similar to hub but dissimilar to each other
     for i in 1..n {
@@ -48,7 +48,7 @@ fn generate_star_topology(n: usize) -> Vec<BinaryHV> {
             hub.bind(&pattern)  // ~0.5 similarity to hub
         } else {
             // Bundle hub with pattern for higher similarity
-            BinaryHV::bundle(&[hub.clone(), pattern])
+            BinaryHV::bundle(&[hub, pattern])
         };
         components.push(spoke);
     }
@@ -63,22 +63,22 @@ fn generate_ring_topology(n: usize) -> Vec<BinaryHV> {
 
     // Start with random base
     let mut prev = BinaryHV::random(200);
-    components.push(prev.clone());
+    components.push(prev);
 
     // Each subsequent node is derived from previous (neighbor similarity)
     for i in 1..n {
         let noise = BinaryHV::random(200 + i as u64);
         // Bundle with previous to create neighbor similarity
-        let current = BinaryHV::bundle(&[prev.clone(), noise]);
-        components.push(current.clone());
+        let current = BinaryHV::bundle(&[prev, noise]);
+        components.push(current);
         prev = current;
     }
 
     // Connect last to first (ring closure)
     if n > 2 {
-        let first = components[0].clone();
+        let first = components[0];
         let last_idx = n - 1;
-        components[last_idx] = BinaryHV::bundle(&[components[last_idx].clone(), first]);
+        components[last_idx] = BinaryHV::bundle(&[components[last_idx], first]);
     }
 
     components
@@ -98,14 +98,14 @@ fn generate_modular_topology(n: usize) -> Vec<BinaryHV> {
     let cluster_a_base = BinaryHV::random(400);
     for i in 0..half {
         let noise = BinaryHV::random(410 + i as u64);
-        components.push(BinaryHV::bundle(&[cluster_a_base.clone(), noise]));
+        components.push(BinaryHV::bundle(&[cluster_a_base, noise]));
     }
 
     // Cluster B: all similar to cluster_b_base (different from A)
     let cluster_b_base = BinaryHV::random(500);
     for i in half..n {
         let noise = BinaryHV::random(510 + i as u64);
-        components.push(BinaryHV::bundle(&[cluster_b_base.clone(), noise]));
+        components.push(BinaryHV::bundle(&[cluster_b_base, noise]));
     }
 
     components

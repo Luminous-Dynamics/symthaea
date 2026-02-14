@@ -28,8 +28,8 @@
 use std::time::Instant;
 
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::phi_engine::PhiEngine;
+use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 
 const HDC_DIM: usize = 256; // Smaller dim for scalability testing
 
@@ -79,8 +79,14 @@ fn main() {
     let time_ratio = largest_time / smallest_time.max(0.001);
     let empirical_exponent = time_ratio.ln() / size_ratio.ln();
 
-    println!("\n  Size ratio: {:.0}x, Time ratio: {:.1}x", size_ratio, time_ratio);
-    println!("  Empirical scaling exponent: {:.2} (want < 3.0 for practical use)", empirical_exponent);
+    println!(
+        "\n  Size ratio: {:.0}x, Time ratio: {:.1}x",
+        size_ratio, time_ratio
+    );
+    println!(
+        "  Empirical scaling exponent: {:.2} (want < 3.0 for practical use)",
+        empirical_exponent
+    );
 
     // ═══════════════════════════════════════════════════════════════
     // Test 2: Modular vs Random Topology
@@ -92,11 +98,26 @@ fn main() {
 
     let n = 128;
     let topologies = vec![
-        ("Random (uniform)", generate_random_network(n, HDC_DIM, 0.3, 42)),
-        ("Modular (4 modules)", generate_modular_network_v2(n, HDC_DIM, 0.3, 0.1, 4, 42)),
-        ("Modular (8 modules)", generate_modular_network_v2(n, HDC_DIM, 0.3, 0.1, 8, 42)),
-        ("Small-world", generate_small_world_network(n, HDC_DIM, 6, 0.1, 42)),
-        ("Scale-free (hub)", generate_scale_free_network(n, HDC_DIM, 3, 42)),
+        (
+            "Random (uniform)",
+            generate_random_network(n, HDC_DIM, 0.3, 42),
+        ),
+        (
+            "Modular (4 modules)",
+            generate_modular_network_v2(n, HDC_DIM, 0.3, 0.1, 4, 42),
+        ),
+        (
+            "Modular (8 modules)",
+            generate_modular_network_v2(n, HDC_DIM, 0.3, 0.1, 8, 42),
+        ),
+        (
+            "Small-world",
+            generate_small_world_network(n, HDC_DIM, 6, 0.1, 42),
+        ),
+        (
+            "Scale-free (hub)",
+            generate_scale_free_network(n, HDC_DIM, 3, 42),
+        ),
     ];
 
     let mut topo_phis = Vec::new();
@@ -140,7 +161,14 @@ fn main() {
     for (idx, (name, n, intra_density, inter_density, modules)) in regions.iter().enumerate() {
         // Use region index as seed offset so each region gets unique connectivity
         let seed = 42 + idx as u64 * 1000;
-        let hvs = generate_modular_network_v2(*n, HDC_DIM, *intra_density, *inter_density, *modules, seed);
+        let hvs = generate_modular_network_v2(
+            *n,
+            HDC_DIM,
+            *intra_density,
+            *inter_density,
+            *modules,
+            seed,
+        );
 
         let t = Instant::now();
         let phi_result = phi_engine.compute(&hvs);
@@ -200,19 +228,34 @@ fn main() {
     let checks = vec![
         ("Scales to ≥2048 neurons", max_computed >= 2048),
         ("Scaling exponent < 3.0", empirical_exponent < 3.0),
-        ("Modular ≠ random Φ", (topo_phis[0].1 - topo_phis[1].1).abs() > 1e-6),
-        ("MB Φ ≥ OL Φ (integration > feedforward)", mb_phi >= ol_phi - 0.01),
+        (
+            "Modular ≠ random Φ",
+            (topo_phis[0].1 - topo_phis[1].1).abs() > 1e-6,
+        ),
+        (
+            "MB Φ ≥ OL Φ (integration > feedforward)",
+            mb_phi >= ol_phi - 0.01,
+        ),
         ("CX Φ > random control", cx_phi > region_phis[4].1 - 0.01),
-        ("Φ computable at all scales", scale_results.iter().all(|r| r.1.is_finite())),
+        (
+            "Φ computable at all scales",
+            scale_results.iter().all(|r| r.1.is_finite()),
+        ),
     ];
 
     let mut passed = 0;
     for (name, pass) in &checks {
         println!("║  {} {:50}   ║", if *pass { "PASS" } else { "FAIL" }, name);
-        if *pass { passed += 1; }
+        if *pass {
+            passed += 1;
+        }
     }
     println!("╟──────────────────────────────────────────────────────────────╢");
-    println!("║  Result: {}/{} tests passed                                 ║", passed, checks.len());
+    println!(
+        "║  Result: {}/{} tests passed                                 ║",
+        passed,
+        checks.len()
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Save results
@@ -238,19 +281,16 @@ fn main() {
 }
 
 /// Generate a random network with uniform connectivity
-fn generate_random_network(
-    n: usize,
-    dim: usize,
-    density: f32,
-    seed: u64,
-) -> Vec<ContinuousHV> {
+fn generate_random_network(n: usize, dim: usize, density: f32, seed: u64) -> Vec<ContinuousHV> {
     let base_hvs: Vec<ContinuousHV> = (0..n)
         .map(|i| ContinuousHV::random(dim, seed * 1000 + i as u64))
         .collect();
 
     let mut rng = seed;
     let mut rand_f32 = || -> f32 {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (rng >> 33) as f32 / (1u64 << 31) as f32
     };
 
@@ -288,7 +328,9 @@ fn generate_modular_network_v2(
 
     let mut rng = seed.wrapping_add(7777);
     let mut rand_f32 = || -> f32 {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (rng >> 33) as f32 / (1u64 << 31) as f32
     };
 
@@ -322,8 +364,8 @@ fn generate_modular_network_v2(
 fn generate_small_world_network(
     n: usize,
     dim: usize,
-    k: usize,       // each node connects to k nearest neighbors
-    p_rewire: f32,   // probability of rewiring
+    k: usize,      // each node connects to k nearest neighbors
+    p_rewire: f32, // probability of rewiring
     seed: u64,
 ) -> Vec<ContinuousHV> {
     let base_hvs: Vec<ContinuousHV> = (0..n)
@@ -339,20 +381,32 @@ fn generate_small_world_network(
 
             // Connect to k/2 neighbors on each side (ring lattice)
             for offset in 1..=k / 2 {
-                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let r1 = (rng >> 33) as f32 / (1u64 << 31) as f32;
-                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let r2 = (rng >> 33) as usize % n;
 
                 let j = if r1 < p_rewire { r2 } else { (i + offset) % n };
                 val += base_hvs[j].values[d] * 0.2;
 
-                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let r3 = (rng >> 33) as f32 / (1u64 << 31) as f32;
-                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let r4 = (rng >> 33) as usize % n;
 
-                let j2 = if r3 < p_rewire { r4 } else { (i + n - offset) % n };
+                let j2 = if r3 < p_rewire {
+                    r4
+                } else {
+                    (i + n - offset) % n
+                };
                 val += base_hvs[j2].values[d] * 0.2;
             }
             result[i][d] = val;
@@ -394,13 +448,18 @@ fn generate_scale_free_network(
         let mut attempts = 0;
 
         while connected < m && attempts < n * 10 {
-            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let r = (rng >> 33) as usize % total_degree;
             let mut cumulative = 0;
             for j in 0..i {
                 cumulative += degrees[j];
                 if cumulative > r {
-                    if !edges.iter().any(|&(a, b)| (a == i && b == j) || (a == j && b == i)) {
+                    if !edges
+                        .iter()
+                        .any(|&(a, b)| (a == i && b == j) || (a == j && b == i))
+                    {
                         edges.push((i, j));
                         degrees[i] += 1;
                         degrees[j] += 1;

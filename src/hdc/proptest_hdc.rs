@@ -167,7 +167,7 @@ proptest! {
         // 3σ ≈ 0.047, so bounds are roughly [0.45, 0.55]
         // We use wider bounds [0.3, 0.7] to account for test randomness
         prop_assert!(
-            sim >= 0.3 && sim <= 0.7,
+            (0.3..=0.7).contains(&sim),
             "Random vectors should have ~50% similarity, got {}",
             sim
         );
@@ -387,7 +387,7 @@ fn test_packed_memory_efficiency() {
     let packed = PackedBipolar::from_bipolar(&v);
 
     // Should use dim/8 bytes (2KB for 16K dimensions)
-    let expected = (dim + 63) / 64 * 8;
+    let expected = dim.div_ceil(64) * 8;
     assert_eq!(packed.memory_bytes(), expected);
 
     // Much smaller than raw i8 vector

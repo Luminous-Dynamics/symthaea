@@ -1014,7 +1014,7 @@ mod tests {
 
             // All coefficients should be in [0, 1]
             for &c in &w {
-                assert!(c >= 0.0 && c <= 1.0, "{:?} coeff {c} out of [0,1]", wt);
+                assert!((0.0..=1.0).contains(&c), "{:?} coeff {c} out of [0,1]", wt);
             }
 
             // Rectangular should be all 1s

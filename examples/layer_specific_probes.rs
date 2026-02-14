@@ -11,11 +11,11 @@
 //! cargo run --example layer_specific_probes --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -40,7 +40,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal = load_corpus("data/consciousness_probe/phenomenal_concepts_expanded.json")?;
     let functional = load_corpus("data/consciousness_probe/functional_concepts_expanded.json")?;
 
-    println!("Loaded {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Loaded {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     // Load model
     println!("Loading BGE-M3...");
@@ -65,7 +69,9 @@ fn run_experiment() -> Result<()> {
 
     println!("Processing phenomenal concepts...");
     for (i, concept) in phenomenal.iter().enumerate() {
-        if i % 20 == 0 { print!("  {}/{}\r", i, phenomenal.len()); }
+        if i % 20 == 0 {
+            print!("  {}/{}\r", i, phenomenal.len());
+        }
         let acts = extractor.extract_layers(concept, &layers)?;
         for (j, act) in acts.into_iter().enumerate() {
             phen_by_layer[j].push(act.activation);
@@ -75,7 +81,9 @@ fn run_experiment() -> Result<()> {
 
     println!("Processing functional concepts...");
     for (i, concept) in functional.iter().enumerate() {
-        if i % 20 == 0 { print!("  {}/{}\r", i, functional.len()); }
+        if i % 20 == 0 {
+            print!("  {}/{}\r", i, functional.len());
+        }
         let acts = extractor.extract_layers(concept, &layers)?;
         for (j, act) in acts.into_iter().enumerate() {
             func_by_layer[j].push(act.activation);
@@ -133,8 +141,14 @@ fn run_experiment() -> Result<()> {
         let auc = compute_auc(&y_test, &predict_proba(&X_test, &weights));
         let f1 = f1_score(&y_test, &test_preds);
 
-        println!("{:5} │ {:9.2}% │ {:8.2}% │ {:7.4} │ {:7.4}",
-                 layer, train_acc * 100.0, test_acc * 100.0, auc, f1);
+        println!(
+            "{:5} │ {:9.2}% │ {:8.2}% │ {:7.4} │ {:7.4}",
+            layer,
+            train_acc * 100.0,
+            test_acc * 100.0,
+            auc,
+            f1
+        );
 
         layer_metrics.push((layer, train_acc, test_acc, auc, f1));
     }
@@ -145,12 +159,14 @@ fn run_experiment() -> Result<()> {
     println!("================================================================\n");
 
     // Find best layer by test accuracy
-    let best_by_acc = layer_metrics.iter()
+    let best_by_acc = layer_metrics
+        .iter()
         .max_by(|a, b| a.2.partial_cmp(&b.2).unwrap())
         .unwrap();
 
     // Find best layer by AUC
-    let best_by_auc = layer_metrics.iter()
+    let best_by_auc = layer_metrics
+        .iter()
         .max_by(|a, b| a.3.partial_cmp(&b.3).unwrap())
         .unwrap();
 
@@ -217,9 +233,12 @@ fn train_logistic_regression(X: &[Vec<f32>], y: &[f64], epochs: usize, lr: f64) 
 
         for (xi, &yi) in X.iter().zip(y.iter()) {
             // Compute prediction
-            let z: f64 = xi.iter().zip(weights.iter())
+            let z: f64 = xi
+                .iter()
+                .zip(weights.iter())
                 .map(|(&x, &w)| (x as f64) * w)
-                .sum::<f64>() + weights[dim]; // bias
+                .sum::<f64>()
+                + weights[dim]; // bias
 
             let pred = sigmoid(z);
             let error = pred - yi;
@@ -249,24 +268,32 @@ fn sigmoid(z: f64) -> f64 {
 #[cfg(feature = "neural-bridge")]
 fn predict_proba(X: &[Vec<f32>], weights: &[f64]) -> Vec<f64> {
     let dim = X[0].len();
-    X.iter().map(|xi| {
-        let z: f64 = xi.iter().zip(weights.iter())
-            .map(|(&x, &w)| (x as f64) * w)
-            .sum::<f64>() + weights[dim];
-        sigmoid(z)
-    }).collect()
+    X.iter()
+        .map(|xi| {
+            let z: f64 = xi
+                .iter()
+                .zip(weights.iter())
+                .map(|(&x, &w)| (x as f64) * w)
+                .sum::<f64>()
+                + weights[dim];
+            sigmoid(z)
+        })
+        .collect()
 }
 
 #[cfg(feature = "neural-bridge")]
 fn predict(X: &[Vec<f32>], weights: &[f64]) -> Vec<f64> {
-    predict_proba(X, weights).iter()
+    predict_proba(X, weights)
+        .iter()
         .map(|&p| if p >= 0.5 { 1.0 } else { 0.0 })
         .collect()
 }
 
 #[cfg(feature = "neural-bridge")]
 fn accuracy(y_true: &[f64], y_pred: &[f64]) -> f64 {
-    let correct = y_true.iter().zip(y_pred.iter())
+    let correct = y_true
+        .iter()
+        .zip(y_pred.iter())
         .filter(|(&t, &p)| (t - p).abs() < 0.5)
         .count();
     correct as f64 / y_true.len() as f64
@@ -275,7 +302,9 @@ fn accuracy(y_true: &[f64], y_pred: &[f64]) -> f64 {
 #[cfg(feature = "neural-bridge")]
 fn compute_auc(y_true: &[f64], y_proba: &[f64]) -> f64 {
     // Simple AUC calculation
-    let mut pairs: Vec<(f64, f64)> = y_proba.iter().zip(y_true.iter())
+    let mut pairs: Vec<(f64, f64)> = y_proba
+        .iter()
+        .zip(y_true.iter())
         .map(|(&p, &t)| (p, t))
         .collect();
 
@@ -309,9 +338,13 @@ fn f1_score(y_true: &[f64], y_pred: &[f64]) -> f64 {
     let mut fn_ = 0.0;
 
     for (&t, &p) in y_true.iter().zip(y_pred.iter()) {
-        if p > 0.5 && t > 0.5 { tp += 1.0; }
-        else if p > 0.5 && t <= 0.5 { fp += 1.0; }
-        else if p <= 0.5 && t > 0.5 { fn_ += 1.0; }
+        if p > 0.5 && t > 0.5 {
+            tp += 1.0;
+        } else if p > 0.5 && t <= 0.5 {
+            fp += 1.0;
+        } else if p <= 0.5 && t > 0.5 {
+            fn_ += 1.0;
+        }
     }
 
     let precision = if tp + fp > 0.0 { tp / (tp + fp) } else { 0.0 };

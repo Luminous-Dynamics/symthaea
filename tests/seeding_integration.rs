@@ -26,7 +26,7 @@ fn test_seeding_populates_working_memory() {
     let result = mind.seed_memory();
 
     // After seeding
-    assert!(mind.working_memory().len() > 0, "Working memory should have entries after seeding");
+    assert!(!mind.working_memory().is_empty(), "Working memory should have entries after seeding");
     assert!(mind.is_seeded(), "Mind should be seeded");
     assert!(result.prototypes_seeded >= 20, "Should seed at least 20 prototypes, got {}", result.prototypes_seeded);
 

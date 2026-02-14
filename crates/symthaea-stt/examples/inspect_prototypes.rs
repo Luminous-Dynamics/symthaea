@@ -11,7 +11,10 @@ use symthaea_stt::bootstrap::TrainedPrototypes;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let model_path = args.get(1).map(|s| s.as_str()).unwrap_or("data/models/dev-clean_phoneme_prototypes.bin");
+    let model_path = args
+        .get(1)
+        .map(|s| s.as_str())
+        .unwrap_or("data/models/dev-clean_phoneme_prototypes.bin");
 
     println!("Loading prototypes from: {}", model_path);
 
@@ -61,24 +64,40 @@ fn main() {
 
     println!("\n=== ORTHOGONALITY CHECK ===");
     if max_sim > 0.95 {
-        println!("WARNING: Max similarity {:.4} is dangerously high!", max_sim);
+        println!(
+            "WARNING: Max similarity {:.4} is dangerously high!",
+            max_sim
+        );
         println!("         This could indicate prototype collapse.");
     } else if max_sim > 0.8 {
         println!("CAUTION: Max similarity {:.4} is somewhat high.", max_sim);
     } else {
-        println!("GOOD: Max similarity {:.4} indicates healthy orthogonality.", max_sim);
+        println!(
+            "GOOD: Max similarity {:.4} indicates healthy orthogonality.",
+            max_sim
+        );
     }
 
-    println!("Pairs with sim > {}: {} / {} ({:.1}%)",
-             high_sim_threshold, high_sim_count, total_pairs,
-             100.0 * high_sim_count as f32 / total_pairs as f32);
+    println!(
+        "Pairs with sim > {}: {} / {} ({:.1}%)",
+        high_sim_threshold,
+        high_sim_count,
+        total_pairs,
+        100.0 * high_sim_count as f32 / total_pairs as f32
+    );
 
     // Most similar pairs (potential issues)
     similarities.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
     println!("\n=== MOST SIMILAR PHONEME PAIRS ===");
     println!("(Acoustically similar phonemes SHOULD be close)");
     for (p1, p2, sim) in similarities.iter().take(15) {
-        let status = if *sim > 0.8 { "HIGH" } else if *sim > 0.5 { "mid" } else { "ok" };
+        let status = if *sim > 0.8 {
+            "HIGH"
+        } else if *sim > 0.5 {
+            "mid"
+        } else {
+            "ok"
+        };
         println!("  {:>6} <-> {:<6}  {:.4}  [{}]", p1, p2, sim, status);
     }
 
@@ -93,9 +112,19 @@ fn main() {
     println!("\n=== PHONEME TYPE ANALYSIS ===");
 
     // Vowels (should cluster together somewhat)
-    let vowels = ["AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW"];
-    let vowels_with_stress: Vec<String> = vowels.iter()
-        .flat_map(|v| vec![format!("{}", v), format!("{}0", v), format!("{}1", v), format!("{}2", v)])
+    let vowels = [
+        "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
+    ];
+    let vowels_with_stress: Vec<String> = vowels
+        .iter()
+        .flat_map(|v| {
+            vec![
+                format!("{}", v),
+                format!("{}0", v),
+                format!("{}1", v),
+                format!("{}2", v),
+            ]
+        })
         .collect();
 
     // Stops
@@ -105,13 +134,24 @@ fn main() {
     let fricatives = ["F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH"];
 
     fn avg_within_group(pairs: &[(String, HV16)], group: &[&str]) -> Option<f32> {
-        let group_lower: Vec<String> = group.iter()
-            .flat_map(|g| vec![g.to_string(), format!("{}0", g), format!("{}1", g), format!("{}2", g)])
+        let group_lower: Vec<String> = group
+            .iter()
+            .flat_map(|g| {
+                vec![
+                    g.to_string(),
+                    format!("{}0", g),
+                    format!("{}1", g),
+                    format!("{}2", g),
+                ]
+            })
             .collect();
-        let members: Vec<_> = pairs.iter()
+        let members: Vec<_> = pairs
+            .iter()
             .filter(|(name, _)| {
                 let base = name.trim_end_matches(|c: char| c.is_ascii_digit());
-                group_lower.iter().any(|g| g.trim_end_matches(|c: char| c.is_ascii_digit()) == base)
+                group_lower
+                    .iter()
+                    .any(|g| g.trim_end_matches(|c: char| c.is_ascii_digit()) == base)
             })
             .collect();
 
@@ -147,14 +187,25 @@ fn main() {
 
     // Voiced vs voiceless pairs
     println!("\n=== VOICED/VOICELESS PAIRS ===");
-    let voiced_pairs = [("P", "B"), ("T", "D"), ("K", "G"), ("F", "V"), ("S", "Z"), ("SH", "ZH"), ("TH", "DH")];
+    let voiced_pairs = [
+        ("P", "B"),
+        ("T", "D"),
+        ("K", "G"),
+        ("F", "V"),
+        ("S", "Z"),
+        ("SH", "ZH"),
+        ("TH", "DH"),
+    ];
 
     for (voiceless, voiced) in &voiced_pairs {
         let v1 = pairs.iter().find(|(n, _)| n == *voiceless);
         let v2 = pairs.iter().find(|(n, _)| n == *voiced);
         if let (Some((_, hv1)), Some((_, hv2))) = (v1, v2) {
             let sim = hv1.similarity(hv2);
-            println!("  {} <-> {}  {:.4}  (should be similar)", voiceless, voiced, sim);
+            println!(
+                "  {} <-> {}  {:.4}  (should be similar)",
+                voiceless, voiced, sim
+            );
         }
     }
 
@@ -189,7 +240,10 @@ fn main() {
     };
 
     println!("{}", health_score);
-    println!("\nConclusion: {} phonemes trained with mean separation {:.4}", n, mean_sim);
+    println!(
+        "\nConclusion: {} phonemes trained with mean separation {:.4}",
+        n, mean_sim
+    );
 }
 
 use symthaea_stt::hdc::HV16;

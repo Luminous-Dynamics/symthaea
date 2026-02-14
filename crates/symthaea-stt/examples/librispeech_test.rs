@@ -12,13 +12,13 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use symthaea_stt::audio::{AudioFrontend, AudioProjector, AudioConfig};
-use symthaea_stt::phoneme::{PhonemeDecoder, TemporalDecoder, TemporalConfig};
-use symthaea_stt::unified_grammar::UnifiedGrammar;
-use symthaea_stt::temporal_grammar::TemporalEvent;
+use symthaea_stt::audio::{AudioConfig, AudioFrontend, AudioProjector};
+use symthaea_stt::eval::word_error_rate;
 use symthaea_stt::hdc::HV16;
 use symthaea_stt::ltc::LtcConfig;
-use symthaea_stt::eval::word_error_rate;
+use symthaea_stt::phoneme::{PhonemeDecoder, TemporalConfig, TemporalDecoder};
+use symthaea_stt::temporal_grammar::TemporalEvent;
+use symthaea_stt::unified_grammar::UnifiedGrammar;
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
@@ -146,9 +146,10 @@ impl WordDictionary {
             (vec!["N", "AA", "T"], "NOT"),
             (vec!["DH", "IH", "S"], "THIS"),
             (vec!["DH", "AE", "T"], "THAT"),
-        ].into_iter()
-            .map(|(p, w)| (p.into_iter().map(String::from).collect(), w.to_string()))
-            .collect();
+        ]
+        .into_iter()
+        .map(|(p, w)| (p.into_iter().map(String::from).collect(), w.to_string()))
+        .collect();
 
         Self { entries }
     }
@@ -188,21 +189,25 @@ impl WordDictionary {
 fn generate_prototypes() -> Vec<(String, HV16)> {
     let phonemes = vec![
         "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
-        "B", "D", "G", "K", "P", "T",
-        "CH", "DH", "F", "HH", "JH", "S", "SH", "TH", "V", "Z", "ZH",
-        "M", "N", "NG",
-        "L", "R", "W", "Y",
+        "B", "D", "G", "K", "P", "T", "CH", "DH", "F", "HH", "JH", "S", "SH", "TH", "V", "Z", "ZH",
+        "M", "N", "NG", "L", "R", "W", "Y",
     ];
 
-    phonemes.iter().enumerate().map(|(i, phoneme)| {
-        let mut hv = HV16::zero();
-        let hash_base = (i * 12345 + 67890) as u128;
-        for w in 0..16 {
-            let word_hash = hash_base.wrapping_mul(w as u128 + 1).wrapping_add(i as u128);
-            hv.words[w] = word_hash;
-        }
-        (phoneme.to_string(), hv)
-    }).collect()
+    phonemes
+        .iter()
+        .enumerate()
+        .map(|(i, phoneme)| {
+            let mut hv = HV16::zero();
+            let hash_base = (i * 12345 + 67890) as u128;
+            for w in 0..16 {
+                let word_hash = hash_base
+                    .wrapping_mul(w as u128 + 1)
+                    .wrapping_add(i as u128);
+                hv.words[w] = word_hash;
+            }
+            (phoneme.to_string(), hv)
+        })
+        .collect()
 }
 
 fn main() {
@@ -210,7 +215,7 @@ fn main() {
 
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
-    let mut limit = 50;  // Default: process 50 utterances
+    let mut limit = 50; // Default: process 50 utterances
     let mut subset = "dev-clean".to_string();
 
     let mut i = 1;
@@ -248,7 +253,10 @@ fn main() {
         .unwrap_or_else(|_| PathBuf::from("data/librispeech/LibriSpeech"));
 
     if !librispeech_path.exists() {
-        eprintln!("LibriSpeech data not found at: {}", librispeech_path.display());
+        eprintln!(
+            "LibriSpeech data not found at: {}",
+            librispeech_path.display()
+        );
         eprintln!("Set LIBRISPEECH_PATH environment variable or download data to:");
         eprintln!("  data/librispeech/LibriSpeech/");
         return;
@@ -268,7 +276,11 @@ fn main() {
     println!("  Found {} audio files", audio_files.len());
 
     if audio_files.is_empty() {
-        eprintln!("No audio files found in {}/{}", librispeech_path.display(), subset);
+        eprintln!(
+            "No audio files found in {}/{}",
+            librispeech_path.display(),
+            subset
+        );
         return;
     }
 
@@ -309,11 +321,13 @@ fn main() {
     ];
 
     for pattern in &training_patterns {
-        let events: Vec<TemporalEvent> = pattern.iter().enumerate()
+        let events: Vec<TemporalEvent> = pattern
+            .iter()
+            .enumerate()
             .filter_map(|(i, p)| {
-                grammar.category_id(*p).map(|cid| {
-                    TemporalEvent::new(*p, cid, i as f32 * 0.06, 0.06, 0.6)
-                })
+                grammar
+                    .category_id(*p)
+                    .map(|cid| TemporalEvent::new(*p, cid, i as f32 * 0.06, 0.06, 0.6))
             })
             .collect();
         for _ in 0..20 {
@@ -322,8 +336,11 @@ fn main() {
     }
 
     let stats = grammar.stats();
-    println!("  Trained grammar: {} clusters, {:.1}% density",
-             stats.num_clusters, stats.avg_cluster_density * 100.0);
+    println!(
+        "  Trained grammar: {} clusters, {:.1}% density",
+        stats.num_clusters,
+        stats.avg_cluster_density * 100.0
+    );
 
     let dictionary = WordDictionary::new();
     println!("  Initialized word dictionary");
@@ -343,7 +360,8 @@ fn main() {
             .unwrap_or("");
 
         // Get reference transcription
-        let reference = transcriptions.get(utterance_id)
+        let reference = transcriptions
+            .get(utterance_id)
             .map(|s| s.as_str())
             .unwrap_or("");
 
@@ -385,11 +403,13 @@ fn main() {
         total_hyp_words += hyp_words.len();
 
         // Score with grammar
-        let events: Vec<TemporalEvent> = phonemes.iter().enumerate()
+        let events: Vec<TemporalEvent> = phonemes
+            .iter()
+            .enumerate()
             .filter_map(|(i, p)| {
-                grammar.category_id(p).map(|cid| {
-                    TemporalEvent::new(p, cid, i as f32 * 0.06, 0.06, 0.6)
-                })
+                grammar
+                    .category_id(p)
+                    .map(|cid| TemporalEvent::new(p, cid, i as f32 * 0.06, 0.06, 0.6))
             })
             .collect();
 
@@ -399,16 +419,24 @@ fn main() {
             0.0
         };
 
-        results.push((utterance_id.to_string(), reference.to_string(), hypothesis.clone(), grammar_score));
+        results.push((
+            utterance_id.to_string(),
+            reference.to_string(),
+            hypothesis.clone(),
+            grammar_score,
+        ));
 
         // Print progress
         if (idx + 1) % 10 == 0 || idx == 0 {
-            println!("  [{}/{}] {} -> {} words, {} phonemes, grammar: {:+.3}",
-                     idx + 1, limit.min(audio_files.len()),
-                     utterance_id,
-                     hypothesis_words.len(),
-                     phonemes.len(),
-                     grammar_score);
+            println!(
+                "  [{}/{}] {} -> {} words, {} phonemes, grammar: {:+.3}",
+                idx + 1,
+                limit.min(audio_files.len()),
+                utterance_id,
+                hypothesis_words.len(),
+                phonemes.len(),
+                grammar_score
+            );
         }
     }
 
@@ -449,11 +477,18 @@ fn main() {
         println!("    Score distribution:");
         let bins = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
         for i in 0..bins.len() - 1 {
-            let count = scores.iter()
+            let count = scores
+                .iter()
                 .filter(|&&s| s >= bins[i] && s < bins[i + 1])
                 .count();
             let bar = "#".repeat(count.min(40));
-            println!("      [{:.1}-{:.1}): {:3} {}", bins[i], bins[i + 1], count, bar);
+            println!(
+                "      [{:.1}-{:.1}): {:3} {}",
+                bins[i],
+                bins[i + 1],
+                count,
+                bar
+            );
         }
     }
 

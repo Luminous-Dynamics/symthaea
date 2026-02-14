@@ -57,7 +57,7 @@ use std::io::Write;
 use std::path::Path;
 
 // Use shared HDC types from the hdc module
-use crate::hdc::{HV16, bundle};
+use crate::hdc::{bundle, HV16};
 
 // ============================================================================
 // DISCOVERED UNIT (The "Alien Phoneme")
@@ -138,7 +138,9 @@ impl DiscoveredUnit {
         if self.instances.len() > max_instances {
             // Keep a representative sample
             let step = self.instances.len() / max_instances;
-            self.instances = self.instances.iter()
+            self.instances = self
+                .instances
+                .iter()
                 .enumerate()
                 .filter(|(i, _)| i % step == 0)
                 .map(|(_, hv)| *hv)
@@ -181,7 +183,7 @@ impl Default for DiscoveryConfig {
             max_units: 100,
             salience_threshold: 0.5,
             min_segment_ms: 10.0,
-            max_segment_ms: 5000.0,  // 5 seconds (for whale songs)
+            max_segment_ms: 5000.0, // 5 seconds (for whale songs)
             track_transitions: true,
             max_instances_per_unit: 1000,
         }
@@ -196,8 +198,8 @@ impl DiscoveryConfig {
             min_instances: 5,
             max_units: 200,
             salience_threshold: 0.4,
-            min_segment_ms: 5.0,       // Very short clicks
-            max_segment_ms: 10000.0,   // Long whale songs
+            min_segment_ms: 5.0,     // Very short clicks
+            max_segment_ms: 10000.0, // Long whale songs
             track_transitions: true,
             max_instances_per_unit: 500,
         }
@@ -234,12 +236,12 @@ impl DiscoveryConfig {
     /// Configuration for unknown/alien signals
     pub fn xenolinguistic() -> Self {
         Self {
-            similarity_threshold: 0.55,  // More lenient (unknown structure)
+            similarity_threshold: 0.55, // More lenient (unknown structure)
             min_instances: 2,
-            max_units: 500,              // Allow many clusters
-            salience_threshold: 0.3,     // Detect subtle boundaries
-            min_segment_ms: 1.0,         // Could be very fast
-            max_segment_ms: 60000.0,     // Could be very slow (1 minute)
+            max_units: 500,          // Allow many clusters
+            salience_threshold: 0.3, // Detect subtle boundaries
+            min_segment_ms: 1.0,     // Could be very fast
+            max_segment_ms: 60000.0, // Could be very slow (1 minute)
             track_transitions: true,
             max_instances_per_unit: 200,
         }
@@ -333,9 +335,10 @@ impl OnlineClusterer {
         for (id, unit) in &self.units {
             let sim = unit.similarity(&segment.hv);
             if sim > self.config.similarity_threshold
-                && best_match.as_ref().map(|(_, s)| sim > *s).unwrap_or(true) {
-                    best_match = Some((id.clone(), sim));
-                }
+                && best_match.as_ref().map(|(_, s)| sim > *s).unwrap_or(true)
+            {
+                best_match = Some((id.clone(), sim));
+            }
         }
 
         let unit_id = if let Some((id, _)) = best_match {
@@ -349,7 +352,9 @@ impl OnlineClusterer {
             // Create new unit
             if self.units.len() >= self.config.max_units {
                 // At capacity - assign to closest (even if below threshold)
-                let closest = self.units.iter()
+                let closest = self
+                    .units
+                    .iter()
                     .map(|(id, u)| (id.clone(), u.similarity(&segment.hv)))
                     .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
@@ -400,7 +405,8 @@ impl OnlineClusterer {
 
     /// Get stable units (above minimum instance threshold)
     pub fn stable_units(&self) -> Vec<&DiscoveredUnit> {
-        self.units.values()
+        self.units
+            .values()
             .filter(|u| u.instance_count >= self.config.min_instances)
             .collect()
     }
@@ -421,7 +427,11 @@ impl OnlineClusterer {
                 let id1 = &unit_ids[i];
                 let id2 = &unit_ids[j];
 
-                let sim = self.units.get(id1).unwrap().centroid
+                let sim = self
+                    .units
+                    .get(id1)
+                    .unwrap()
+                    .centroid
                     .similarity(&self.units.get(id2).unwrap().centroid);
 
                 if sim > threshold {
@@ -435,7 +445,11 @@ impl OnlineClusterer {
             let count1 = self.units.get(&id1).map(|u| u.instance_count).unwrap_or(0);
             let count2 = self.units.get(&id2).map(|u| u.instance_count).unwrap_or(0);
 
-            let (keep, remove) = if count1 >= count2 { (id1, id2) } else { (id2, id1) };
+            let (keep, remove) = if count1 >= count2 {
+                (id1, id2)
+            } else {
+                (id2, id1)
+            };
 
             if let Some(removed) = self.units.remove(&remove) {
                 if let Some(keeper) = self.units.get_mut(&keep) {
@@ -559,7 +573,8 @@ impl GroundingEngine {
 
     /// Query: "What sound goes with this context?"
     pub fn query_context(&self, context_hv: &HV16) -> Vec<(&GroundedMeaning, f32)> {
-        self.groundings.iter()
+        self.groundings
+            .iter()
             .map(|g| (g, context_hv.similarity(&g.context_hv)))
             .filter(|(_, sim)| *sim > self.threshold)
             .collect()
@@ -581,7 +596,7 @@ pub struct DiscoveryResult {
     /// All discovered units
     pub units: Vec<DiscoveredUnit>,
     /// Segment assignments
-    pub segment_labels: Vec<(f32, f32, String)>,  // (start, end, unit_id)
+    pub segment_labels: Vec<(f32, f32, String)>, // (start, end, unit_id)
     /// Transition matrix (unit_i → unit_j count)
     pub transition_matrix: HashMap<(String, String), usize>,
     /// Statistics
@@ -595,7 +610,7 @@ pub struct DiscoveryStats {
     pub num_units: usize,
     pub num_stable_units: usize,
     pub mean_unit_duration_ms: f32,
-    pub unit_entropy: f32,  // Diversity measure
+    pub unit_entropy: f32, // Diversity measure
 }
 
 impl DiscoveryResult {
@@ -604,11 +619,23 @@ impl DiscoveryResult {
         let mut json = String::from("{\n");
 
         json.push_str("  \"stats\": {\n");
-        json.push_str(&format!("    \"total_duration_sec\": {:.2},\n", self.stats.total_duration_sec));
-        json.push_str(&format!("    \"num_segments\": {},\n", self.stats.num_segments));
+        json.push_str(&format!(
+            "    \"total_duration_sec\": {:.2},\n",
+            self.stats.total_duration_sec
+        ));
+        json.push_str(&format!(
+            "    \"num_segments\": {},\n",
+            self.stats.num_segments
+        ));
         json.push_str(&format!("    \"num_units\": {},\n", self.stats.num_units));
-        json.push_str(&format!("    \"num_stable_units\": {},\n", self.stats.num_stable_units));
-        json.push_str(&format!("    \"unit_entropy\": {:.3}\n", self.stats.unit_entropy));
+        json.push_str(&format!(
+            "    \"num_stable_units\": {},\n",
+            self.stats.num_stable_units
+        ));
+        json.push_str(&format!(
+            "    \"unit_entropy\": {:.3}\n",
+            self.stats.unit_entropy
+        ));
         json.push_str("  },\n");
 
         json.push_str("  \"units\": [\n");
@@ -624,7 +651,11 @@ impl DiscoveryResult {
 
         json.push_str("  \"segments\": [\n");
         for (i, (start, end, label)) in self.segment_labels.iter().enumerate() {
-            let comma = if i < self.segment_labels.len() - 1 { "," } else { "" };
+            let comma = if i < self.segment_labels.len() - 1 {
+                ","
+            } else {
+                ""
+            };
             json.push_str(&format!(
                 "    {{\n      \"start\": {:.3},\n      \"end\": {:.3},\n      \"unit\": \"{}\"\n    }}{}\n",
                 start, end, label, comma
@@ -638,7 +669,11 @@ impl DiscoveryResult {
         transitions.sort_by_key(|(_, count)| std::cmp::Reverse(**count));
 
         for (i, ((from, to), count)) in transitions.iter().take(20).enumerate() {
-            let comma = if i < 19 && i < transitions.len() - 1 { "," } else { "" };
+            let comma = if i < 19 && i < transitions.len() - 1 {
+                ","
+            } else {
+                ""
+            };
             json.push_str(&format!(
                 "    {{\n      \"from\": \"{}\",\n      \"to\": \"{}\",\n      \"count\": {}\n    }}{}\n",
                 from, to, count, comma
@@ -699,12 +734,7 @@ impl DiscoveryPipeline {
     }
 
     /// Process acoustic frames with salience
-    pub fn process(
-        &mut self,
-        frames: &[HV16],
-        salience: &[f32],
-        timestamps: &[f32],
-    ) {
+    pub fn process(&mut self, frames: &[HV16], salience: &[f32], timestamps: &[f32]) {
         // Detect boundaries
         let boundaries = self.detect_boundaries(salience, timestamps);
 
@@ -751,9 +781,8 @@ impl DiscoveryPipeline {
         }
 
         let mean: f32 = salience.iter().sum::<f32>() / salience.len() as f32;
-        let variance: f32 = salience.iter()
-            .map(|s| (s - mean).powi(2))
-            .sum::<f32>() / salience.len() as f32;
+        let variance: f32 =
+            salience.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / salience.len() as f32;
         let std = variance.sqrt();
         let threshold = mean + std * self.config.salience_threshold;
 
@@ -763,7 +792,7 @@ impl DiscoveryPipeline {
 
         // Method 1: Peak detection
         for i in 1..salience.len() - 1 {
-            let is_peak = salience[i] > salience[i-1] && salience[i] > salience[i+1];
+            let is_peak = salience[i] > salience[i - 1] && salience[i] > salience[i + 1];
             let above_threshold = salience[i] > threshold;
             let far_enough = timestamps[i] - last_time > min_gap;
 
@@ -777,8 +806,8 @@ impl DiscoveryPipeline {
         if boundaries.len() <= 1 {
             let window = 5;
             for i in window..salience.len() - window {
-                let prev_mean: f32 = salience[i-window..i].iter().sum::<f32>() / window as f32;
-                let next_mean: f32 = salience[i..i+window].iter().sum::<f32>() / window as f32;
+                let prev_mean: f32 = salience[i - window..i].iter().sum::<f32>() / window as f32;
+                let next_mean: f32 = salience[i..i + window].iter().sum::<f32>() / window as f32;
                 let gradient = (next_mean - prev_mean).abs();
 
                 let far_enough = timestamps[i] - last_time > min_gap;
@@ -794,7 +823,8 @@ impl DiscoveryPipeline {
             let interval = 0.5; // 500ms segments
             let mut t = interval;
             while t < *timestamps.last().unwrap_or(&0.0) {
-                let idx = timestamps.iter()
+                let idx = timestamps
+                    .iter()
                     .position(|&ts| ts >= t)
                     .unwrap_or(salience.len() - 1);
                 if idx > 0 && idx < salience.len() - 1 {
@@ -807,7 +837,11 @@ impl DiscoveryPipeline {
         // Add end boundary
         let last_t = *timestamps.last().unwrap_or(&0.0);
         let last_f = salience.len().saturating_sub(1);
-        if boundaries.last().map(|(t, _)| last_t - t > min_gap).unwrap_or(true) {
+        if boundaries
+            .last()
+            .map(|(t, _)| last_t - t > min_gap)
+            .unwrap_or(true)
+        {
             boundaries.push((last_t, last_f));
         }
 
@@ -822,15 +856,19 @@ impl DiscoveryPipeline {
         self.clusterer.merge_similar(0.75);
 
         // Collect stable units
-        let mut units: Vec<DiscoveredUnit> = self.clusterer.stable_units()
-            .into_iter()
-            .cloned()
-            .collect();
+        let mut units: Vec<DiscoveredUnit> =
+            self.clusterer.stable_units().into_iter().cloned().collect();
         units.sort_by_key(|u| std::cmp::Reverse(u.instance_count));
 
         // Collect segment labels
-        let segment_labels: Vec<(f32, f32, String)> = self.segments.iter()
-            .filter_map(|s| s.unit_id.as_ref().map(|id| (s.start_time, s.end_time, id.clone())))
+        let segment_labels: Vec<(f32, f32, String)> = self
+            .segments
+            .iter()
+            .filter_map(|s| {
+                s.unit_id
+                    .as_ref()
+                    .map(|id| (s.start_time, s.end_time, id.clone()))
+            })
             .collect();
 
         // Build transition matrix
@@ -842,21 +880,23 @@ impl DiscoveryPipeline {
         }
 
         // Compute statistics
-        let total_duration_sec = self.segments.last()
-            .map(|s| s.end_time)
-            .unwrap_or(0.0);
+        let total_duration_sec = self.segments.last().map(|s| s.end_time).unwrap_or(0.0);
 
-        let mean_duration: f32 = units.iter()
-            .map(|u| u.mean_duration_ms)
-            .sum::<f32>() / units.len().max(1) as f32;
+        let mean_duration: f32 =
+            units.iter().map(|u| u.mean_duration_ms).sum::<f32>() / units.len().max(1) as f32;
 
         // Shannon entropy of unit distribution
         let total_instances: usize = units.iter().map(|u| u.instance_count).sum();
         let entropy: f32 = if total_instances > 0 {
-            -units.iter()
+            -units
+                .iter()
                 .map(|u| {
                     let p = u.instance_count as f32 / total_instances as f32;
-                    if p > 0.0 { p * p.ln() } else { 0.0 }
+                    if p > 0.0 {
+                        p * p.ln()
+                    } else {
+                        0.0
+                    }
                 })
                 .sum::<f32>()
         } else {
@@ -987,12 +1027,8 @@ mod tests {
     #[test]
     fn test_discovery_result_json() {
         let result = DiscoveryResult {
-            units: vec![
-                DiscoveredUnit::new("UNIT_001", HV16::zero(), 100.0),
-            ],
-            segment_labels: vec![
-                (0.0, 0.1, "UNIT_001".to_string()),
-            ],
+            units: vec![DiscoveredUnit::new("UNIT_001", HV16::zero(), 100.0)],
+            segment_labels: vec![(0.0, 0.1, "UNIT_001".to_string())],
             transition_matrix: HashMap::new(),
             stats: DiscoveryStats::default(),
         };

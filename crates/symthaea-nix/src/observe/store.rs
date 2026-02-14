@@ -40,12 +40,10 @@ impl StoreObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::other(
-                format!(
-                    "nix path-info --all -S failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                ),
-            ));
+            return Err(std::io::Error::other(format!(
+                "nix path-info --all -S failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -59,13 +57,11 @@ impl StoreObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::other(
-                format!(
-                    "nix path-info -S failed for '{}': {}",
-                    path,
-                    String::from_utf8_lossy(&output.stderr)
-                ),
-            ));
+            return Err(std::io::Error::other(format!(
+                "nix path-info -S failed for '{}': {}",
+                path,
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -84,12 +80,10 @@ impl StoreObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::other(
-                format!(
-                    "nix-store --gc --print-roots failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                ),
-            ));
+            return Err(std::io::Error::other(format!(
+                "nix-store --gc --print-roots failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -207,7 +201,7 @@ mod tests {
     fn test_parse_store_info() {
         let info = StoreObserver::parse_store_info(MOCK_PATH_INFO).unwrap();
         assert_eq!(info.path_count, 4);
-        assert_eq!(info.total_size_bytes, 31457280 + 5242880 + 0 + 157286400);
+        assert_eq!(info.total_size_bytes, (31457280 + 5242880) + 157286400);
         assert_eq!(info.deriver_count, 1); // only the .drv path
         assert_eq!(info.store_path, "/nix/store");
     }

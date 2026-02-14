@@ -18,9 +18,8 @@
 //! ```
 
 use symthaea::consciousness::recursive_improvement::{
-    PrimitiveSemanticBridge, PrimitiveSemanticBridgeConfig,
-    SemanticBridge, SemanticBridgeConfig, SemanticInput, ActionContext,
-    DreamMode, DreamConfig, tier_name,
+    tier_name, ActionContext, DreamConfig, DreamMode, PrimitiveSemanticBridge,
+    PrimitiveSemanticBridgeConfig, SemanticBridge, SemanticBridgeConfig, SemanticInput,
 };
 use symthaea::hdc::primitive_system::PrimitiveSystem;
 
@@ -46,7 +45,7 @@ fn main() {
     println!("  Primitives available: {}", total_primitives);
 
     let mut primitive_bridge = PrimitiveSemanticBridge::new(PrimitiveSemanticBridgeConfig {
-        activation_threshold: 0.505,  // Low threshold to see what we get
+        activation_threshold: 0.505, // Low threshold to see what we get
         max_active_primitives: 15,
         use_primitive_hypervectors: true,
         ..Default::default()
@@ -71,20 +70,22 @@ fn main() {
     let test_inputs = vec![
         // Technical/Logical
         ("How does the compiler optimize code?", ActionContext::Query),
-        ("The algorithm uses dynamic programming", ActionContext::Response),
-
+        (
+            "The algorithm uses dynamic programming",
+            ActionContext::Response,
+        ),
         // Temporal/Planning
         ("When should I deploy the update?", ActionContext::Query),
         ("Deploy after testing completes", ActionContext::Response),
-
         // Emotional/Social
         ("Why do I feel frustrated?", ActionContext::Query),
-        ("Frustration comes from unmet expectations", ActionContext::Response),
-
+        (
+            "Frustration comes from unmet expectations",
+            ActionContext::Response,
+        ),
         // Meta-Cognitive
         ("Am I approaching this correctly?", ActionContext::Thought),
         ("Reflecting on my reasoning process", ActionContext::Thought),
-
         // Goal-Oriented
         ("Goal: Master NixOS configuration", ActionContext::Goal),
         ("Goal: Build reliable systems", ActionContext::Goal),
@@ -109,9 +110,18 @@ fn main() {
         };
 
         // Format top primitives
-        let top_prims: Vec<String> = result.decomposition.primitives.iter()
+        let top_prims: Vec<String> = result
+            .decomposition
+            .primitives
+            .iter()
             .take(3)
-            .map(|p| format!("{}({:.0}%)", &p.name[..p.name.len().min(8)], p.activation * 100.0))
+            .map(|p| {
+                format!(
+                    "{}({:.0}%)",
+                    &p.name[..p.name.len().min(8)],
+                    p.activation * 100.0
+                )
+            })
             .collect();
 
         let prims_str = if top_prims.is_empty() {
@@ -145,8 +155,14 @@ fn main() {
     let dream_results = dream_mode.batch_dream(semantic_bridge.world_model_mut());
 
     println!("  Dream cycles: {}", dream_results.stats.cycles_completed);
-    println!("  Peak consciousness: {:.2}%", dream_results.stats.peak_consciousness * 100.0);
-    println!("  Concepts discovered: {}", dream_results.concepts_discovered.len());
+    println!(
+        "  Peak consciousness: {:.2}%",
+        dream_results.stats.peak_consciousness * 100.0
+    );
+    println!(
+        "  Concepts discovered: {}",
+        dream_results.concepts_discovered.len()
+    );
     println!();
 
     // =========================================================================
@@ -165,7 +181,9 @@ fn main() {
 
     // Simulate enrichment by associating births with concepts
     // (In production, the WorldModel would do this automatically)
-    let enriched_concepts: Vec<_> = concepts.iter().enumerate()
+    let enriched_concepts: Vec<_> = concepts
+        .iter()
+        .enumerate()
         .map(|(i, concept)| {
             // Use the primitive births we collected, cycling if needed
             let birth = if i < all_births.len() {
@@ -223,12 +241,27 @@ fn main() {
 
     println!("  Metric                          | Value");
     println!("  ────────────────────────────────┼─────────────────────────────");
-    println!("  Inputs processed                | {}", prim_stats.inputs_processed);
-    println!("  Total primitive activations     | {}", prim_stats.primitive_activations);
-    println!("  Avg primitives per input        | {:.1}", prim_stats.avg_primitives_per_input);
-    println!("  Peak primitive activation       | {:.2}%", prim_stats.peak_primitive_activation * 100.0);
+    println!(
+        "  Inputs processed                | {}",
+        prim_stats.inputs_processed
+    );
+    println!(
+        "  Total primitive activations     | {}",
+        prim_stats.primitive_activations
+    );
+    println!(
+        "  Avg primitives per input        | {:.1}",
+        prim_stats.avg_primitives_per_input
+    );
+    println!(
+        "  Peak primitive activation       | {:.2}%",
+        prim_stats.peak_primitive_activation * 100.0
+    );
     println!("  Concepts crystallized           | {}", concepts.len());
-    println!("  Peak consciousness              | {:.2}%", sem_stats.peak_consciousness * 100.0);
+    println!(
+        "  Peak consciousness              | {:.2}%",
+        sem_stats.peak_consciousness * 100.0
+    );
     println!();
 
     // Validation
@@ -259,9 +292,18 @@ fn main() {
         println!("║                  PARTIAL SUCCESS                                   ║");
         println!("║                                                                    ║");
         println!("║  Some components working, but integration incomplete:             ║");
-        println!("║  - Has primitives: {}                                              ║", has_primitives);
-        println!("║  - Has concepts: {}                                                ║", has_concepts);
-        println!("║  - Has birth certs: {}                                             ║", has_births);
+        println!(
+            "║  - Has primitives: {}                                              ║",
+            has_primitives
+        );
+        println!(
+            "║  - Has concepts: {}                                                ║",
+            has_concepts
+        );
+        println!(
+            "║  - Has birth certs: {}                                             ║",
+            has_births
+        );
         println!("║                                                                    ║");
         println!("╚════════════════════════════════════════════════════════════════════╝");
     }

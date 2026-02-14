@@ -45,20 +45,22 @@
 //! cargo run --example magi_cli --features magi_loop -- interactive
 //! ```
 
+use std::collections::VecDeque;
 use std::io::{self, BufRead, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{Duration, Instant};
-use std::collections::VecDeque;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use symthaea::consciousness::recursive_improvement::{
     // Persistence
-    MagiPersistentModel, PersistenceConfig, StartupMode,
+    MagiPersistentModel,
+    PersistenceConfig,
     // World Prediction
     PredictionDomain,
+    StartupMode,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -128,7 +130,8 @@ impl MagiCli {
             .unwrap_or_default()
             .as_secs();
 
-        self.brier_history.push_back(BrierHistoryEntry { brier, timestamp });
+        self.brier_history
+            .push_back(BrierHistoryEntry { brier, timestamp });
 
         // Keep only last 100 entries
         while self.brier_history.len() > 100 {
@@ -142,9 +145,18 @@ impl MagiCli {
 
     fn cmd_status(&self) {
         println!();
-        println!("{}{}╔══════════════════════════════════════════════════════════════╗{}", BOLD, BLUE, RESET);
-        println!("{}{}║                    MAGI EPISTEMIC STATUS                      ║{}", BOLD, BLUE, RESET);
-        println!("{}{}╚══════════════════════════════════════════════════════════════╝{}", BOLD, BLUE, RESET);
+        println!(
+            "{}{}╔══════════════════════════════════════════════════════════════╗{}",
+            BOLD, BLUE, RESET
+        );
+        println!(
+            "{}{}║                    MAGI EPISTEMIC STATUS                      ║{}",
+            BOLD, BLUE, RESET
+        );
+        println!(
+            "{}{}╚══════════════════════════════════════════════════════════════╝{}",
+            BOLD, BLUE, RESET
+        );
         println!();
 
         // Session info
@@ -154,11 +166,19 @@ impl MagiCli {
         // Startup mode
         let startup_str = match self.model.startup_mode() {
             StartupMode::ColdStart => {
-                format!("{}{}COLD START{} (No prior knowledge)", BG_BLUE, BOLD, RESET)
+                format!(
+                    "{}{}COLD START{} (No prior knowledge)",
+                    BG_BLUE, BOLD, RESET
+                )
             }
-            StartupMode::WarmStart { lifetime_iterations, .. } => {
-                format!("{}{}WARM START{} (Restored {} iterations)",
-                    BG_GREEN, BOLD, RESET, lifetime_iterations)
+            StartupMode::WarmStart {
+                lifetime_iterations,
+                ..
+            } => {
+                format!(
+                    "{}{}WARM START{} (Restored {} iterations)",
+                    BG_GREEN, BOLD, RESET, lifetime_iterations
+                )
             }
             StartupMode::RecoveryStart { error } => {
                 format!("{}{}RECOVERY START{} ({})", BG_YELLOW, BOLD, RESET, error)
@@ -180,17 +200,34 @@ impl MagiCli {
         let brier_color = self.brier_color(brier);
         let brier_quality = self.brier_quality(brier);
 
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}CALIBRATION{}                                              {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Brier Score: {}{:.4}{} ({})                    {}│{}",
-            DIM, RESET, brier_color, brier, RESET, brier_quality, DIM, RESET);
-        println!("  {}│{}  ECE:         {:.4}                                    {}│{}",
-            DIM, RESET, ece, DIM, RESET);
-        println!("  {}│{}  Predictions: {}                                      {}│{}",
-            DIM, RESET, total_preds, DIM, RESET);
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}CALIBRATION{}                                              {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Brier Score: {}{:.4}{} ({})                    {}│{}",
+            DIM, RESET, brier_color, brier, RESET, brier_quality, DIM, RESET
+        );
+        println!(
+            "  {}│{}  ECE:         {:.4}                                    {}│{}",
+            DIM, RESET, ece, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Predictions: {}                                      {}│{}",
+            DIM, RESET, total_preds, DIM, RESET
+        );
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // Visual calibration bar
@@ -202,9 +239,15 @@ impl MagiCli {
         let gate_str = if well_calibrated {
             format!("{}{}AUTONOMOUS{} - Good calibration", GREEN, BOLD, RESET)
         } else if brier > 0.30 {
-            format!("{}{}SUPERVISED{} - Poor calibration requires oversight", RED, BOLD, RESET)
+            format!(
+                "{}{}SUPERVISED{} - Poor calibration requires oversight",
+                RED, BOLD, RESET
+            )
         } else {
-            format!("{}{}DRY RUN{} - Building calibration history", YELLOW, BOLD, RESET)
+            format!(
+                "{}{}DRY RUN{} - Building calibration history",
+                YELLOW, BOLD, RESET
+            )
         };
 
         println!("  {}Constraint Gate:{} {}", CYAN, RESET, gate_str);
@@ -212,32 +255,59 @@ impl MagiCli {
 
         // Lifetime stats
         let loop_state = &snapshot.loop_state;
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}LIFETIME STATISTICS{}                                     {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Loop Iterations:      {:>6}                          {}│{}",
-            DIM, RESET, loop_state.loop_iterations, DIM, RESET);
-        println!("  {}│{}  Predictions Made:     {:>6}                          {}│{}",
-            DIM, RESET, loop_state.predictions_made, DIM, RESET);
-        println!("  {}│{}  Predictions Resolved: {:>6}                          {}│{}",
-            DIM, RESET, loop_state.predictions_resolved, DIM, RESET);
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}LIFETIME STATISTICS{}                                     {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Loop Iterations:      {:>6}                          {}│{}",
+            DIM, RESET, loop_state.loop_iterations, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Predictions Made:     {:>6}                          {}│{}",
+            DIM, RESET, loop_state.predictions_made, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Predictions Resolved: {:>6}                          {}│{}",
+            DIM, RESET, loop_state.predictions_resolved, DIM, RESET
+        );
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
     }
 
     fn brier_color(&self, brier: f64) -> &'static str {
-        if brier < 0.15 { GREEN }
-        else if brier < 0.25 { YELLOW }
-        else { RED }
+        if brier < 0.15 {
+            GREEN
+        } else if brier < 0.25 {
+            YELLOW
+        } else {
+            RED
+        }
     }
 
     fn brier_quality(&self, brier: f64) -> &'static str {
-        if brier < 0.10 { "Excellent" }
-        else if brier < 0.15 { "Good" }
-        else if brier < 0.20 { "Fair" }
-        else if brier < 0.25 { "Poor" }
-        else { "Critical" }
+        if brier < 0.10 {
+            "Excellent"
+        } else if brier < 0.15 {
+            "Good"
+        } else if brier < 0.20 {
+            "Fair"
+        } else if brier < 0.25 {
+            "Poor"
+        } else {
+            "Critical"
+        }
     }
 
     fn print_calibration_bar(&self, brier: f64) {
@@ -266,9 +336,18 @@ impl MagiCli {
 
     fn cmd_predict(&mut self, statement: &str, confidence: f64, domain: PredictionDomain) {
         println!();
-        println!("{}{}╔══════════════════════════════════════════════════════════════╗{}", BOLD, MAGENTA, RESET);
-        println!("{}{}║                    REGISTERING PREDICTION                     ║{}", BOLD, MAGENTA, RESET);
-        println!("{}{}╚══════════════════════════════════════════════════════════════╝{}", BOLD, MAGENTA, RESET);
+        println!(
+            "{}{}╔══════════════════════════════════════════════════════════════╗{}",
+            BOLD, MAGENTA, RESET
+        );
+        println!(
+            "{}{}║                    REGISTERING PREDICTION                     ║{}",
+            BOLD, MAGENTA, RESET
+        );
+        println!(
+            "{}{}╚══════════════════════════════════════════════════════════════╝{}",
+            BOLD, MAGENTA, RESET
+        );
         println!();
 
         // Check gate status based on current calibration
@@ -277,19 +356,33 @@ impl MagiCli {
         let brier = snapshot.global_stats.lifetime_brier;
 
         println!("  {}Statement:{} \"{}\"", CYAN, RESET, statement);
-        println!("  {}Confidence:{} {}{:.1}%{}", CYAN, RESET,
+        println!(
+            "  {}Confidence:{} {}{:.1}%{}",
+            CYAN,
+            RESET,
             if confidence > 0.9 { YELLOW } else { GREEN },
-            confidence * 100.0, RESET);
+            confidence * 100.0,
+            RESET
+        );
         println!("  {}Domain:{} {:?}", CYAN, RESET, domain);
         println!();
 
         // Gate status
         let gate_str = if well_calibrated {
-            format!("{}{}✓ GATE OPEN{} - Prediction registered for autonomous execution", GREEN, BOLD, RESET)
+            format!(
+                "{}{}✓ GATE OPEN{} - Prediction registered for autonomous execution",
+                GREEN, BOLD, RESET
+            )
         } else if brier > 0.30 {
-            format!("{}{}⚡ SUPERVISED MODE{} - Poor calibration requires human approval", MAGENTA, BOLD, RESET)
+            format!(
+                "{}{}⚡ SUPERVISED MODE{} - Poor calibration requires human approval",
+                MAGENTA, BOLD, RESET
+            )
         } else {
-            format!("{}{}⚠ DRY RUN MODE{} - Building calibration history", YELLOW, BOLD, RESET)
+            format!(
+                "{}{}⚠ DRY RUN MODE{} - Building calibration history",
+                YELLOW, BOLD, RESET
+            )
         };
         println!("  {}", gate_str);
 
@@ -297,7 +390,10 @@ impl MagiCli {
         if confidence > 0.95 {
             println!();
             println!("  {}{}⚠ HIGH CONFIDENCE WARNING{}", YELLOW, BOLD, RESET);
-            println!("    Confidence >{:.0}% is bold. Failure will significantly hurt calibration.", confidence * 100.0);
+            println!(
+                "    Confidence >{:.0}% is bold. Failure will significantly hurt calibration.",
+                confidence * 100.0
+            );
         }
 
         // Store prediction
@@ -308,7 +404,10 @@ impl MagiCli {
         });
 
         println!();
-        println!("  {}{}→ Use 'resolve success' or 'resolve failure' to record outcome{}", DIM, YELLOW, RESET);
+        println!(
+            "  {}{}→ Use 'resolve success' or 'resolve failure' to record outcome{}",
+            DIM, YELLOW, RESET
+        );
         println!();
     }
 
@@ -318,36 +417,68 @@ impl MagiCli {
 
     fn cmd_resolve(&mut self, success: bool) -> io::Result<()> {
         println!();
-        println!("{}{}╔══════════════════════════════════════════════════════════════╗{}", BOLD,
-            if success { GREEN } else { RED }, RESET);
-        println!("{}{}║                    RESOLVING PREDICTION                       ║{}", BOLD,
-            if success { GREEN } else { RED }, RESET);
-        println!("{}{}╚══════════════════════════════════════════════════════════════╝{}", BOLD,
-            if success { GREEN } else { RED }, RESET);
+        println!(
+            "{}{}╔══════════════════════════════════════════════════════════════╗{}",
+            BOLD,
+            if success { GREEN } else { RED },
+            RESET
+        );
+        println!(
+            "{}{}║                    RESOLVING PREDICTION                       ║{}",
+            BOLD,
+            if success { GREEN } else { RED },
+            RESET
+        );
+        println!(
+            "{}{}╚══════════════════════════════════════════════════════════════╝{}",
+            BOLD,
+            if success { GREEN } else { RED },
+            RESET
+        );
         println!();
 
         let pending = match self.pending.take() {
             Some(p) => p,
             None => {
-                println!("  {}{}✗ No pending prediction to resolve{}", RED, BOLD, RESET);
-                println!("  {}Use 'predict' first to register a prediction{}", DIM, RESET);
+                println!(
+                    "  {}{}✗ No pending prediction to resolve{}",
+                    RED, BOLD, RESET
+                );
+                println!(
+                    "  {}Use 'predict' first to register a prediction{}",
+                    DIM, RESET
+                );
                 println!();
                 return Ok(());
             }
         };
 
         // Get before stats
-        let before_brier = self.model.persistence().current().global_stats.lifetime_brier;
+        let before_brier = self
+            .model
+            .persistence()
+            .current()
+            .global_stats
+            .lifetime_brier;
 
         println!("  {}Statement:{} \"{}\"", CYAN, RESET, pending.statement);
-        println!("  {}Confidence:{} {:.1}%", CYAN, RESET, pending.confidence * 100.0);
+        println!(
+            "  {}Confidence:{} {:.1}%",
+            CYAN,
+            RESET,
+            pending.confidence * 100.0
+        );
         println!("  {}Domain:{} {:?}", CYAN, RESET, pending.domain);
-        println!("  {}Outcome:{} {}", CYAN, RESET,
+        println!(
+            "  {}Outcome:{} {}",
+            CYAN,
+            RESET,
             if success {
                 format!("{}{}SUCCESS{}", GREEN, BOLD, RESET)
             } else {
                 format!("{}{}FAILURE{}", RED, BOLD, RESET)
-            });
+            }
+        );
         println!();
 
         // Calculate Brier component
@@ -358,27 +489,66 @@ impl MagiCli {
         let was_overconfident = !success && pending.confidence > 0.7;
         let was_underconfident = success && pending.confidence < 0.3;
 
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}FEEDBACK ANALYSIS{}                                       {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Brier Component: {}{:.4}{}                               {}│{}",
-            DIM, RESET,
-            if brier_component > 0.25 { RED } else if brier_component > 0.1 { YELLOW } else { GREEN },
-            brier_component, RESET, DIM, RESET);
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}FEEDBACK ANALYSIS{}                                       {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Brier Component: {}{:.4}{}                               {}│{}",
+            DIM,
+            RESET,
+            if brier_component > 0.25 {
+                RED
+            } else if brier_component > 0.1 {
+                YELLOW
+            } else {
+                GREEN
+            },
+            brier_component,
+            RESET,
+            DIM,
+            RESET
+        );
 
         if was_overconfident {
-            println!("  {}│{}  {}⚠ OVERCONFIDENCE DETECTED{}                            {}│{}",
-                DIM, RESET, YELLOW, RESET, DIM, RESET);
-            println!("  {}│{}    Claimed {:.0}% confidence but failed                {}│{}",
-                DIM, RESET, pending.confidence * 100.0, DIM, RESET);
+            println!(
+                "  {}│{}  {}⚠ OVERCONFIDENCE DETECTED{}                            {}│{}",
+                DIM, RESET, YELLOW, RESET, DIM, RESET
+            );
+            println!(
+                "  {}│{}    Claimed {:.0}% confidence but failed                {}│{}",
+                DIM,
+                RESET,
+                pending.confidence * 100.0,
+                DIM,
+                RESET
+            );
         } else if was_underconfident {
-            println!("  {}│{}  {}✓ UNDERCONFIDENCE DETECTED{}                          {}│{}",
-                DIM, RESET, GREEN, RESET, DIM, RESET);
-            println!("  {}│{}    Claimed {:.0}% confidence but succeeded              {}│{}",
-                DIM, RESET, pending.confidence * 100.0, DIM, RESET);
+            println!(
+                "  {}│{}  {}✓ UNDERCONFIDENCE DETECTED{}                          {}│{}",
+                DIM, RESET, GREEN, RESET, DIM, RESET
+            );
+            println!(
+                "  {}│{}    Claimed {:.0}% confidence but succeeded              {}│{}",
+                DIM,
+                RESET,
+                pending.confidence * 100.0,
+                DIM,
+                RESET
+            );
         }
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // Update persistence
@@ -413,24 +583,59 @@ impl MagiCli {
         // We manually updated the persistence snapshot, so just get the after stats
 
         // Get after stats
-        let after_brier = self.model.persistence().current().global_stats.lifetime_brier;
+        let after_brier = self
+            .model
+            .persistence()
+            .current()
+            .global_stats
+            .lifetime_brier;
         let brier_delta = after_brier - before_brier;
 
         // Show calibration change
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}CALIBRATION UPDATE{}                                      {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Before: {:.4}                                         {}│{}",
-            DIM, RESET, before_brier, DIM, RESET);
-        println!("  {}│{}  After:  {}{:.4}{}                                         {}│{}",
-            DIM, RESET, self.brier_color(after_brier), after_brier, RESET, DIM, RESET);
-        println!("  {}│{}  Delta:  {}{}{}                                      {}│{}",
-            DIM, RESET,
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}CALIBRATION UPDATE{}                                      {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Before: {:.4}                                         {}│{}",
+            DIM, RESET, before_brier, DIM, RESET
+        );
+        println!(
+            "  {}│{}  After:  {}{:.4}{}                                         {}│{}",
+            DIM,
+            RESET,
+            self.brier_color(after_brier),
+            after_brier,
+            RESET,
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}│{}  Delta:  {}{}{}                                      {}│{}",
+            DIM,
+            RESET,
             if brier_delta > 0.0 { RED } else { GREEN },
-            if brier_delta >= 0.0 { format!("+{:.4}", brier_delta) } else { format!("{:.4}", brier_delta) },
-            RESET, DIM, RESET);
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+            if brier_delta >= 0.0 {
+                format!("+{:.4}", brier_delta)
+            } else {
+                format!("{:.4}", brier_delta)
+            },
+            RESET,
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // Show new calibration bar
@@ -462,9 +667,18 @@ impl MagiCli {
 
     fn cmd_calibration(&self) {
         println!();
-        println!("{}{}╔══════════════════════════════════════════════════════════════╗{}", BOLD, CYAN, RESET);
-        println!("{}{}║                    CALIBRATION DETAILS                        ║{}", BOLD, CYAN, RESET);
-        println!("{}{}╚══════════════════════════════════════════════════════════════╝{}", BOLD, CYAN, RESET);
+        println!(
+            "{}{}╔══════════════════════════════════════════════════════════════╗{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}║                    CALIBRATION DETAILS                        ║{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}╚══════════════════════════════════════════════════════════════╝{}",
+            BOLD, CYAN, RESET
+        );
         println!();
 
         let snapshot = self.model.persistence().current();
@@ -473,24 +687,38 @@ impl MagiCli {
         let gs = &snapshot.global_stats;
         println!("  {}GLOBAL CALIBRATION{}", BOLD, RESET);
         println!("  ─────────────────────────────────────────");
-        println!("  Lifetime Brier:  {}{:.4}{} ({})",
-            self.brier_color(gs.lifetime_brier), gs.lifetime_brier, RESET,
-            self.brier_quality(gs.lifetime_brier));
-        println!("  Rolling Brier:   {}{:.4}{}",
-            self.brier_color(gs.rolling_brier), gs.rolling_brier, RESET);
+        println!(
+            "  Lifetime Brier:  {}{:.4}{} ({})",
+            self.brier_color(gs.lifetime_brier),
+            gs.lifetime_brier,
+            RESET,
+            self.brier_quality(gs.lifetime_brier)
+        );
+        println!(
+            "  Rolling Brier:   {}{:.4}{}",
+            self.brier_color(gs.rolling_brier),
+            gs.rolling_brier,
+            RESET
+        );
         println!("  ECE:             {:.4}", gs.ece);
         println!("  Total Predictions: {}", gs.total_predictions);
-        println!("  Correct:         {} ({:.1}%)",
+        println!(
+            "  Correct:         {} ({:.1}%)",
             gs.correct_predictions,
             if gs.total_predictions > 0 {
                 gs.correct_predictions as f64 / gs.total_predictions as f64 * 100.0
-            } else { 0.0 });
-        println!("  Well Calibrated: {}",
+            } else {
+                0.0
+            }
+        );
+        println!(
+            "  Well Calibrated: {}",
             if gs.is_well_calibrated {
                 format!("{}Yes{}", GREEN, RESET)
             } else {
                 format!("{}No{}", RED, RESET)
-            });
+            }
+        );
         println!();
 
         // Per-domain stats
@@ -501,7 +729,12 @@ impl MagiCli {
             for (domain, cal) in &snapshot.calibration {
                 println!();
                 println!("  {:?}", domain);
-                println!("    Brier: {}{:.4}{}", self.brier_color(cal.lifetime_brier), cal.lifetime_brier, RESET);
+                println!(
+                    "    Brier: {}{:.4}{}",
+                    self.brier_color(cal.lifetime_brier),
+                    cal.lifetime_brier,
+                    RESET
+                );
                 println!("    ECE:   {:.4}", cal.ece);
                 println!("    Count: {}", cal.prediction_count);
                 println!("    Conf Adj: {:.2}", cal.confidence_adjustment);
@@ -519,9 +752,18 @@ impl MagiCli {
 
     fn cmd_history(&self) {
         println!();
-        println!("{}{}╔══════════════════════════════════════════════════════════════╗{}", BOLD, YELLOW, RESET);
-        println!("{}{}║                    ATTRIBUTION HISTORY                        ║{}", BOLD, YELLOW, RESET);
-        println!("{}{}╚══════════════════════════════════════════════════════════════╝{}", BOLD, YELLOW, RESET);
+        println!(
+            "{}{}╔══════════════════════════════════════════════════════════════╗{}",
+            BOLD, YELLOW, RESET
+        );
+        println!(
+            "{}{}║                    ATTRIBUTION HISTORY                        ║{}",
+            BOLD, YELLOW, RESET
+        );
+        println!(
+            "{}{}╚══════════════════════════════════════════════════════════════╝{}",
+            BOLD, YELLOW, RESET
+        );
         println!();
 
         let snapshot = self.model.persistence().current();
@@ -533,7 +775,13 @@ impl MagiCli {
         }
 
         for (i, attr) in snapshot.attribution_history.iter().enumerate() {
-            println!("  {}#{}{} Prediction: {}", CYAN, i + 1, RESET, attr.prediction_id);
+            println!(
+                "  {}#{}{} Prediction: {}",
+                CYAN,
+                i + 1,
+                RESET,
+                attr.prediction_id
+            );
             println!("     Failure Mode: {}", attr.failure_mode);
             if !attr.missing_information.is_empty() {
                 println!("     Missing Info: {:?}", attr.missing_information);
@@ -552,16 +800,34 @@ impl MagiCli {
 
     fn cmd_drift(&mut self, count: usize, confidence: f64, success_rate: f64) -> io::Result<()> {
         println!();
-        println!("{}{}╔══════════════════════════════════════════════════════════════╗{}", BOLD, RED, RESET);
-        println!("{}{}║                    DRIFT INJECTION (RED TEAM)                 ║{}", BOLD, RED, RESET);
-        println!("{}{}╚══════════════════════════════════════════════════════════════╝{}", BOLD, RED, RESET);
+        println!(
+            "{}{}╔══════════════════════════════════════════════════════════════╗{}",
+            BOLD, RED, RESET
+        );
+        println!(
+            "{}{}║                    DRIFT INJECTION (RED TEAM)                 ║{}",
+            BOLD, RED, RESET
+        );
+        println!(
+            "{}{}╚══════════════════════════════════════════════════════════════╝{}",
+            BOLD, RED, RESET
+        );
         println!();
 
-        println!("  Injecting {} predictions at {:.0}% confidence with {:.0}% success rate...",
-            count, confidence * 100.0, success_rate * 100.0);
+        println!(
+            "  Injecting {} predictions at {:.0}% confidence with {:.0}% success rate...",
+            count,
+            confidence * 100.0,
+            success_rate * 100.0
+        );
         println!();
 
-        let before_brier = self.model.persistence().current().global_stats.lifetime_brier;
+        let before_brier = self
+            .model
+            .persistence()
+            .current()
+            .global_stats
+            .lifetime_brier;
 
         for i in 0..count {
             // Determine outcome based on success rate
@@ -579,8 +845,8 @@ impl MagiCli {
                     snapshot.global_stats.correct_predictions += 1;
                 }
                 snapshot.global_stats.brier_sum += brier_component;
-                snapshot.global_stats.lifetime_brier =
-                    snapshot.global_stats.brier_sum / snapshot.global_stats.total_predictions as f64;
+                snapshot.global_stats.lifetime_brier = snapshot.global_stats.brier_sum
+                    / snapshot.global_stats.total_predictions as f64;
 
                 let alpha = 0.2;
                 snapshot.global_stats.rolling_brier =
@@ -591,14 +857,25 @@ impl MagiCli {
                 snapshot.loop_state.loop_iterations += 1;
                 snapshot.lifetime_iterations += 1;
 
-                snapshot.global_stats.is_well_calibrated = snapshot.global_stats.lifetime_brier < 0.20;
+                snapshot.global_stats.is_well_calibrated =
+                    snapshot.global_stats.lifetime_brier < 0.20;
             }
 
             if (i + 1) % 10 == 0 || i == count - 1 {
-                let current = self.model.persistence().current().global_stats.lifetime_brier;
-                print!("  [{:>3}/{}] Brier: {}{:.4}{}\r",
-                    i + 1, count,
-                    self.brier_color(current), current, RESET);
+                let current = self
+                    .model
+                    .persistence()
+                    .current()
+                    .global_stats
+                    .lifetime_brier;
+                print!(
+                    "  [{:>3}/{}] Brier: {}{:.4}{}\r",
+                    i + 1,
+                    count,
+                    self.brier_color(current),
+                    current,
+                    RESET
+                );
                 io::stdout().flush()?;
             }
         }
@@ -606,14 +883,31 @@ impl MagiCli {
         println!();
         println!();
 
-        let after_brier = self.model.persistence().current().global_stats.lifetime_brier;
+        let after_brier = self
+            .model
+            .persistence()
+            .current()
+            .global_stats
+            .lifetime_brier;
 
         println!("  {}Results:{}", BOLD, RESET);
         println!("    Before: {:.4}", before_brier);
-        println!("    After:  {}{:.4}{}", self.brier_color(after_brier), after_brier, RESET);
-        println!("    Delta:  {}{:+.4}{}",
-            if after_brier > before_brier { RED } else { GREEN },
-            after_brier - before_brier, RESET);
+        println!(
+            "    After:  {}{:.4}{}",
+            self.brier_color(after_brier),
+            after_brier,
+            RESET
+        );
+        println!(
+            "    Delta:  {}{:+.4}{}",
+            if after_brier > before_brier {
+                RED
+            } else {
+                GREEN
+            },
+            after_brier - before_brier,
+            RESET
+        );
         println!();
 
         self.print_calibration_bar(after_brier);
@@ -642,7 +936,10 @@ impl MagiCli {
             println!("  Deleted: {:?}", path);
         }
 
-        println!("  {}State cleared. Next run will be a cold start.{}", DIM, RESET);
+        println!(
+            "  {}State cleared. Next run will be a cold start.{}",
+            DIM, RESET
+        );
         println!();
         Ok(())
     }
@@ -656,12 +953,26 @@ impl MagiCli {
     /// This is the key AGI criterion - falsifiable predictions about the external world
     fn cmd_verify(&mut self, check_type: &str, target: &str, confidence: f64) -> io::Result<()> {
         println!();
-        println!("{}{}╔══════════════════════════════════════════════════════════════╗{}", BOLD, MAGENTA, RESET);
-        println!("{}{}║             EXTERNALLY GROUNDED VERIFICATION                  ║{}", BOLD, MAGENTA, RESET);
-        println!("{}{}╚══════════════════════════════════════════════════════════════╝{}", BOLD, MAGENTA, RESET);
+        println!(
+            "{}{}╔══════════════════════════════════════════════════════════════╗{}",
+            BOLD, MAGENTA, RESET
+        );
+        println!(
+            "{}{}║             EXTERNALLY GROUNDED VERIFICATION                  ║{}",
+            BOLD, MAGENTA, RESET
+        );
+        println!(
+            "{}{}╚══════════════════════════════════════════════════════════════╝{}",
+            BOLD, MAGENTA, RESET
+        );
         println!();
 
-        let before_brier = self.model.persistence().current().global_stats.lifetime_brier;
+        let before_brier = self
+            .model
+            .persistence()
+            .current()
+            .global_stats
+            .lifetime_brier;
 
         // Determine prediction type and check reality
         let (prediction_statement, actual_outcome) = match check_type {
@@ -674,12 +985,16 @@ impl MagiCli {
                 println!("  {}Confidence:{} {:.1}%", CYAN, RESET, confidence * 100.0);
                 println!();
                 println!("  {}Checking reality...{}", DIM, RESET);
-                println!("  {}Result:{} {}", CYAN, RESET,
+                println!(
+                    "  {}Result:{} {}",
+                    CYAN,
+                    RESET,
                     if exists {
                         format!("{}{}EXISTS{}", GREEN, BOLD, RESET)
                     } else {
                         format!("{}{}NOT FOUND{}", RED, BOLD, RESET)
-                    });
+                    }
+                );
                 (statement, exists)
             }
             "cmd" | "command" => {
@@ -698,21 +1013,23 @@ impl MagiCli {
                 println!();
                 println!("  {}Executing...{}", DIM, RESET);
 
-                let result = Command::new(cmd)
-                    .args(&args)
-                    .output();
+                let result = Command::new(cmd).args(&args).output();
 
                 let success = match result {
                     Ok(output) => output.status.success(),
                     Err(_) => false,
                 };
 
-                println!("  {}Result:{} {}", CYAN, RESET,
+                println!(
+                    "  {}Result:{} {}",
+                    CYAN,
+                    RESET,
                     if success {
                         format!("{}{}SUCCESS{}", GREEN, BOLD, RESET)
                     } else {
                         format!("{}{}FAILED{}", RED, BOLD, RESET)
-                    });
+                    }
+                );
                 (statement, success)
             }
             "test" | "cargo-test" => {
@@ -732,12 +1049,16 @@ impl MagiCli {
                     Err(_) => false,
                 };
 
-                println!("  {}Result:{} {}", CYAN, RESET,
+                println!(
+                    "  {}Result:{} {}",
+                    CYAN,
+                    RESET,
                     if success {
                         format!("{}{}PASSED{}", GREEN, BOLD, RESET)
                     } else {
                         format!("{}{}FAILED{}", RED, BOLD, RESET)
-                    });
+                    }
+                );
                 (statement, success)
             }
             "pkg" | "package" | "nix-pkg" => {
@@ -750,9 +1071,7 @@ impl MagiCli {
                 println!("  {}Checking nix-env...{}", DIM, RESET);
 
                 // Use nix-env -q to check if package is installed
-                let result = Command::new("nix-env")
-                    .args(["-q", target])
-                    .output();
+                let result = Command::new("nix-env").args(["-q", target]).output();
 
                 let success = match result {
                     Ok(output) => {
@@ -763,12 +1082,16 @@ impl MagiCli {
                     Err(_) => false,
                 };
 
-                println!("  {}Result:{} {}", CYAN, RESET,
+                println!(
+                    "  {}Result:{} {}",
+                    CYAN,
+                    RESET,
                     if success {
                         format!("{}{}INSTALLED{}", GREEN, BOLD, RESET)
                     } else {
                         format!("{}{}NOT INSTALLED{}", RED, BOLD, RESET)
-                    });
+                    }
+                );
                 (statement, success)
             }
             "service" | "svc" | "systemd" => {
@@ -792,12 +1115,16 @@ impl MagiCli {
                     Err(_) => false,
                 };
 
-                println!("  {}Result:{} {}", CYAN, RESET,
+                println!(
+                    "  {}Result:{} {}",
+                    CYAN,
+                    RESET,
                     if success {
                         format!("{}{}ACTIVE{}", GREEN, BOLD, RESET)
                     } else {
                         format!("{}{}NOT ACTIVE{}", RED, BOLD, RESET)
-                    });
+                    }
+                );
                 (statement, success)
             }
             "url" | "http" | "https" => {
@@ -811,7 +1138,16 @@ impl MagiCli {
 
                 // Use curl as it's commonly available
                 let result = Command::new("curl")
-                    .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", "--connect-timeout", "5", target])
+                    .args([
+                        "-s",
+                        "-o",
+                        "/dev/null",
+                        "-w",
+                        "%{http_code}",
+                        "--connect-timeout",
+                        "5",
+                        target,
+                    ])
                     .output();
 
                 let success = match result {
@@ -825,7 +1161,16 @@ impl MagiCli {
                 };
 
                 let status_display = if let Ok(output) = Command::new("curl")
-                    .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", "--connect-timeout", "5", target])
+                    .args([
+                        "-s",
+                        "-o",
+                        "/dev/null",
+                        "-w",
+                        "%{http_code}",
+                        "--connect-timeout",
+                        "5",
+                        target,
+                    ])
                     .output()
                 {
                     String::from_utf8_lossy(&output.stdout).trim().to_string()
@@ -833,13 +1178,17 @@ impl MagiCli {
                     "ERR".to_string()
                 };
 
-                println!("  {}Result:{} {} (HTTP {})", CYAN, RESET,
+                println!(
+                    "  {}Result:{} {} (HTTP {})",
+                    CYAN,
+                    RESET,
                     if success {
                         format!("{}{}OK{}", GREEN, BOLD, RESET)
                     } else {
                         format!("{}{}FAILED{}", RED, BOLD, RESET)
                     },
-                    status_display);
+                    status_display
+                );
                 (statement, success)
             }
             "port" | "tcp" => {
@@ -852,16 +1201,23 @@ impl MagiCli {
                 println!("  {}Checking TCP connection (timeout: 3s)...{}", DIM, RESET);
 
                 let success = TcpStream::connect_timeout(
-                    &target.parse().unwrap_or_else(|_| "127.0.0.1:80".parse().unwrap()),
+                    &target
+                        .parse()
+                        .unwrap_or_else(|_| "127.0.0.1:80".parse().unwrap()),
                     Duration::from_secs(3),
-                ).is_ok();
+                )
+                .is_ok();
 
-                println!("  {}Result:{} {}", CYAN, RESET,
+                println!(
+                    "  {}Result:{} {}",
+                    CYAN,
+                    RESET,
                     if success {
                         format!("{}{}OPEN{}", GREEN, BOLD, RESET)
                     } else {
                         format!("{}{}CLOSED/UNREACHABLE{}", RED, BOLD, RESET)
-                    });
+                    }
+                );
                 (statement, success)
             }
             "dns" => {
@@ -874,9 +1230,7 @@ impl MagiCli {
                 println!("  {}Resolving DNS...{}", DIM, RESET);
 
                 // Use host command or dig
-                let result = Command::new("host")
-                    .arg(target)
-                    .output();
+                let result = Command::new("host").arg(target).output();
 
                 let success = match result {
                     Ok(output) => output.status.success(),
@@ -890,12 +1244,16 @@ impl MagiCli {
                     }
                 };
 
-                println!("  {}Result:{} {}", CYAN, RESET,
+                println!(
+                    "  {}Result:{} {}",
+                    CYAN,
+                    RESET,
                     if success {
                         format!("{}{}RESOLVES{}", GREEN, BOLD, RESET)
                     } else {
                         format!("{}{}FAILED{}", RED, BOLD, RESET)
-                    });
+                    }
+                );
                 (statement, success)
             }
             _ => {
@@ -915,34 +1273,83 @@ impl MagiCli {
         let was_overconfident = !actual_outcome && confidence > 0.7;
         let was_underconfident = actual_outcome && confidence < 0.3;
 
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}GROUNDING ANALYSIS{}                                      {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Statement: \"{}\"{}│{}",
-            DIM, RESET, &prediction_statement[..prediction_statement.len().min(40)], DIM, RESET);
-        println!("  {}│{}  Predicted: {:.0}% confident it's TRUE{}│{}",
-            DIM, RESET, confidence * 100.0, DIM, RESET);
-        println!("  {}│{}  Reality:   {}{}│{}",
-            DIM, RESET,
-            if actual_outcome { format!("{}TRUE{}", GREEN, RESET) } else { format!("{}FALSE{}", RED, RESET) },
-            DIM, RESET);
-        println!("  {}│{}  Brier:     {}{:.4}{}{}│{}",
-            DIM, RESET,
-            if brier_component > 0.25 { RED } else if brier_component > 0.1 { YELLOW } else { GREEN },
-            brier_component, RESET, DIM, RESET);
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}GROUNDING ANALYSIS{}                                      {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Statement: \"{}\"{}│{}",
+            DIM,
+            RESET,
+            &prediction_statement[..prediction_statement.len().min(40)],
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}│{}  Predicted: {:.0}% confident it's TRUE{}│{}",
+            DIM,
+            RESET,
+            confidence * 100.0,
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}│{}  Reality:   {}{}│{}",
+            DIM,
+            RESET,
+            if actual_outcome {
+                format!("{}TRUE{}", GREEN, RESET)
+            } else {
+                format!("{}FALSE{}", RED, RESET)
+            },
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}│{}  Brier:     {}{:.4}{}{}│{}",
+            DIM,
+            RESET,
+            if brier_component > 0.25 {
+                RED
+            } else if brier_component > 0.1 {
+                YELLOW
+            } else {
+                GREEN
+            },
+            brier_component,
+            RESET,
+            DIM,
+            RESET
+        );
 
         if was_overconfident {
-            println!("  {}│{}  {}⚠ OVERCONFIDENT{} - Reality disagrees!{}│{}",
-                DIM, RESET, YELLOW, RESET, DIM, RESET);
+            println!(
+                "  {}│{}  {}⚠ OVERCONFIDENT{} - Reality disagrees!{}│{}",
+                DIM, RESET, YELLOW, RESET, DIM, RESET
+            );
         } else if was_underconfident {
-            println!("  {}│{}  {}✓ UNDERCONFIDENT{} - You knew more than you thought!{}│{}",
-                DIM, RESET, GREEN, RESET, DIM, RESET);
+            println!(
+                "  {}│{}  {}✓ UNDERCONFIDENT{} - You knew more than you thought!{}│{}",
+                DIM, RESET, GREEN, RESET, DIM, RESET
+            );
         } else if brier_component < 0.1 {
-            println!("  {}│{}  {}✓ WELL CALIBRATED{} - Good prediction!{}│{}",
-                DIM, RESET, GREEN, RESET, DIM, RESET);
+            println!(
+                "  {}│{}  {}✓ WELL CALIBRATED{} - Good prediction!{}│{}",
+                DIM, RESET, GREEN, RESET, DIM, RESET
+            );
         }
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // Update persistence
@@ -968,23 +1375,58 @@ impl MagiCli {
         }
 
         // Show calibration change
-        let after_brier = self.model.persistence().current().global_stats.lifetime_brier;
+        let after_brier = self
+            .model
+            .persistence()
+            .current()
+            .global_stats
+            .lifetime_brier;
         let brier_delta = after_brier - before_brier;
 
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}CALIBRATION UPDATE{}                                      {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Before: {:.4}                                         {}│{}",
-            DIM, RESET, before_brier, DIM, RESET);
-        println!("  {}│{}  After:  {}{:.4}{}                                         {}│{}",
-            DIM, RESET, self.brier_color(after_brier), after_brier, RESET, DIM, RESET);
-        println!("  {}│{}  Delta:  {}{}{}                                      {}│{}",
-            DIM, RESET,
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}CALIBRATION UPDATE{}                                      {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Before: {:.4}                                         {}│{}",
+            DIM, RESET, before_brier, DIM, RESET
+        );
+        println!(
+            "  {}│{}  After:  {}{:.4}{}                                         {}│{}",
+            DIM,
+            RESET,
+            self.brier_color(after_brier),
+            after_brier,
+            RESET,
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}│{}  Delta:  {}{}{}                                      {}│{}",
+            DIM,
+            RESET,
             if brier_delta > 0.0 { RED } else { GREEN },
-            if brier_delta >= 0.0 { format!("+{:.4}", brier_delta) } else { format!("{:.4}", brier_delta) },
-            RESET, DIM, RESET);
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+            if brier_delta >= 0.0 {
+                format!("+{:.4}", brier_delta)
+            } else {
+                format!("{:.4}", brier_delta)
+            },
+            RESET,
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         self.print_calibration_bar(after_brier);
@@ -992,7 +1434,10 @@ impl MagiCli {
 
         // Save
         self.model.persistence_mut().force_save()?;
-        println!("  {}{}✓ Externally grounded prediction recorded{}", GREEN, DIM, RESET);
+        println!(
+            "  {}{}✓ Externally grounded prediction recorded{}",
+            GREEN, DIM, RESET
+        );
         println!();
 
         Ok(())
@@ -1004,9 +1449,18 @@ impl MagiCli {
 
     fn cmd_where(&self) {
         println!();
-        println!("{}{}╔══════════════════════════════════════════════════════════════╗{}", BOLD, CYAN, RESET);
-        println!("{}{}║                    EPISTEMIC STATE LOCATION                   ║{}", BOLD, CYAN, RESET);
-        println!("{}{}╚══════════════════════════════════════════════════════════════╝{}", BOLD, CYAN, RESET);
+        println!(
+            "{}{}╔══════════════════════════════════════════════════════════════╗{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}║                    EPISTEMIC STATE LOCATION                   ║{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}╚══════════════════════════════════════════════════════════════╝{}",
+            BOLD, CYAN, RESET
+        );
         println!();
 
         // Get the actual path
@@ -1020,7 +1474,10 @@ impl MagiCli {
             }
         };
 
-        println!("  {}Configured Path:{} .magi_state.json (relative)", CYAN, RESET);
+        println!(
+            "  {}Configured Path:{} .magi_state.json (relative)",
+            CYAN, RESET
+        );
         println!("  {}Resolved Path:{}  {}", CYAN, RESET, full_path.display());
         println!();
 
@@ -1048,11 +1505,17 @@ impl MagiCli {
                 }
             }
         } else {
-            println!("  {}File Status:{} {}NOT FOUND{} (will be created on first save)", CYAN, RESET, YELLOW, RESET);
+            println!(
+                "  {}File Status:{} {}NOT FOUND{} (will be created on first save)",
+                CYAN, RESET, YELLOW, RESET
+            );
         }
 
         println!();
-        println!("  {}Hint:{} Use 'reset' to clear state and start fresh", DIM, RESET);
+        println!(
+            "  {}Hint:{} Use 'reset' to clear state and start fresh",
+            DIM, RESET
+        );
         println!();
     }
 
@@ -1062,22 +1525,36 @@ impl MagiCli {
 
     fn cmd_domains(&self) {
         println!();
-        println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, CYAN, RESET);
-        println!("{}{}║              PER-DOMAIN CALIBRATION                            ║{}", BOLD, CYAN, RESET);
-        println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, CYAN, RESET);
+        println!(
+            "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}║              PER-DOMAIN CALIBRATION                            ║{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+            BOLD, CYAN, RESET
+        );
         println!();
 
         let snapshot = self.model.persistence().current();
 
         if snapshot.calibration.is_empty() {
             println!("  {}No domain-specific calibration data yet.{}", DIM, RESET);
-            println!("  {}Use 'verify' to make externally-grounded predictions.{}", DIM, RESET);
+            println!(
+                "  {}Use 'verify' to make externally-grounded predictions.{}",
+                DIM, RESET
+            );
             println!();
             return;
         }
 
-        println!("  {}{:<18} {:>8} {:>8} {:>8} {:>8}  {}{}",
-            BOLD, "Domain", "Brier", "ECE", "Count", "Adj", "Status", RESET);
+        println!(
+            "  {}{:<18} {:>8} {:>8} {:>8} {:>8}  {}{}",
+            BOLD, "Domain", "Brier", "ECE", "Count", "Adj", "Status", RESET
+        );
         println!("  ─────────────────────────────────────────────────────────────");
 
         for (domain, cal) in &snapshot.calibration {
@@ -1092,19 +1569,25 @@ impl MagiCli {
                 format!("{}○ Fair{}", DIM, RESET)
             };
 
-            println!("  {:<18} {}{:>8.4}{} {:>8.4} {:>8} {:>8.2}  {}",
+            println!(
+                "  {:<18} {}{:>8.4}{} {:>8.4} {:>8} {:>8.2}  {}",
                 format!("{:?}", domain),
-                brier_color, cal.lifetime_brier, RESET,
+                brier_color,
+                cal.lifetime_brier,
+                RESET,
                 cal.ece,
                 cal.prediction_count,
                 cal.confidence_adjustment,
-                status);
+                status
+            );
         }
 
         println!();
 
         // Show recommendations
-        let overconfident_domains: Vec<_> = snapshot.calibration.iter()
+        let overconfident_domains: Vec<_> = snapshot
+            .calibration
+            .iter()
             .filter(|(_, cal)| cal.is_overconfident)
             .map(|(d, _)| format!("{:?}", d))
             .collect();
@@ -1126,19 +1609,33 @@ impl MagiCli {
 
     fn cmd_trend(&self, window: usize) {
         println!();
-        println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, CYAN, RESET);
-        println!("{}{}║              CALIBRATION TREND                                 ║{}", BOLD, CYAN, RESET);
-        println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, CYAN, RESET);
+        println!(
+            "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}║              CALIBRATION TREND                                 ║{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+            BOLD, CYAN, RESET
+        );
         println!();
 
         if self.brier_history.is_empty() {
-            println!("  {}No trend data yet. Make some predictions to see trends.{}", DIM, RESET);
+            println!(
+                "  {}No trend data yet. Make some predictions to see trends.{}",
+                DIM, RESET
+            );
             println!();
             return;
         }
 
         // Get last N entries
-        let history: Vec<f64> = self.brier_history.iter()
+        let history: Vec<f64> = self
+            .brier_history
+            .iter()
             .rev()
             .take(window)
             .map(|e| e.brier)
@@ -1195,7 +1692,10 @@ impl MagiCli {
             print!("─");
         }
         println!("→");
-        println!("       Session start{}Now", " ".repeat(chart_width.saturating_sub(15)));
+        println!(
+            "       Session start{}Now",
+            " ".repeat(chart_width.saturating_sub(15))
+        );
         println!();
 
         // Summary statistics
@@ -1212,13 +1712,35 @@ impl MagiCli {
         };
 
         println!("  {}Summary:{}", BOLD, RESET);
-        println!("    Average Brier: {}{:.4}{}", self.brier_color(avg_brier), avg_brier, RESET);
-        println!("    Current Brier: {}{:.4}{}", self.brier_color(current_brier), current_brier, RESET);
-        println!("    Trend: {}{}",
-            if trend < 0.0 { GREEN } else if trend > 0.01 { RED } else { DIM },
-            if trend < -0.01 { format!("↓ Improving ({:+.4})", trend) }
-            else if trend > 0.01 { format!("↑ Degrading ({:+.4})", trend) }
-            else { "→ Stable".to_string() });
+        println!(
+            "    Average Brier: {}{:.4}{}",
+            self.brier_color(avg_brier),
+            avg_brier,
+            RESET
+        );
+        println!(
+            "    Current Brier: {}{:.4}{}",
+            self.brier_color(current_brier),
+            current_brier,
+            RESET
+        );
+        println!(
+            "    Trend: {}{}",
+            if trend < 0.0 {
+                GREEN
+            } else if trend > 0.01 {
+                RED
+            } else {
+                DIM
+            },
+            if trend < -0.01 {
+                format!("↓ Improving ({:+.4})", trend)
+            } else if trend > 0.01 {
+                format!("↑ Degrading ({:+.4})", trend)
+            } else {
+                "→ Stable".to_string()
+            }
+        );
         println!("{}", RESET);
         println!();
     }
@@ -1229,9 +1751,18 @@ impl MagiCli {
 
     fn cmd_batch(&mut self, file_path: &str) -> io::Result<()> {
         println!();
-        println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, MAGENTA, RESET);
-        println!("{}{}║              BATCH VERIFICATION                                ║{}", BOLD, MAGENTA, RESET);
-        println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, MAGENTA, RESET);
+        println!(
+            "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+            BOLD, MAGENTA, RESET
+        );
+        println!(
+            "{}{}║              BATCH VERIFICATION                                ║{}",
+            BOLD, MAGENTA, RESET
+        );
+        println!(
+            "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+            BOLD, MAGENTA, RESET
+        );
         println!();
 
         let file = std::fs::File::open(file_path)?;
@@ -1240,9 +1771,17 @@ impl MagiCli {
         let mut total = 0;
         let mut correct = 0;
         let mut total_brier = 0.0;
-        let before_brier = self.model.persistence().current().global_stats.lifetime_brier;
+        let before_brier = self
+            .model
+            .persistence()
+            .current()
+            .global_stats
+            .lifetime_brier;
 
-        println!("  {}Running predictions from {}...{}", DIM, file_path, RESET);
+        println!(
+            "  {}Running predictions from {}...{}",
+            DIM, file_path, RESET
+        );
         println!();
 
         for (line_num, line) in reader.lines().enumerate() {
@@ -1257,15 +1796,18 @@ impl MagiCli {
             // Parse: <check_type> <target> <confidence>
             let parts: Vec<&str> = line.splitn(3, char::is_whitespace).collect();
             if parts.len() < 2 {
-                println!("  {}Line {}: Invalid format (skipping){}", YELLOW, line_num + 1, RESET);
+                println!(
+                    "  {}Line {}: Invalid format (skipping){}",
+                    YELLOW,
+                    line_num + 1,
+                    RESET
+                );
                 continue;
             }
 
             let check_type = parts[0];
             let target = parts[1];
-            let confidence: f64 = parts.get(2)
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0.8);
+            let confidence: f64 = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.8);
 
             // Run verification silently and capture result
             let result = self.run_batch_verify(check_type, target, confidence);
@@ -1280,37 +1822,96 @@ impl MagiCli {
                         print!("  {}✗{} ", RED, RESET);
                     }
                     total_brier += brier_component;
-                    println!("{} {}: {} (Brier: {:.4}{})",
-                        check_type, target,
-                        if success { format!("{}OK{}", GREEN, RESET) } else { format!("{}FAIL{}", RED, RESET) },
+                    println!(
+                        "{} {}: {} (Brier: {:.4}{})",
+                        check_type,
+                        target,
+                        if success {
+                            format!("{}OK{}", GREEN, RESET)
+                        } else {
+                            format!("{}FAIL{}", RED, RESET)
+                        },
                         brier_component,
-                        if brier_component > 0.5 { format!(" {}⚠ OVERCONFIDENT{}", YELLOW, RESET) } else { "".to_string() });
+                        if brier_component > 0.5 {
+                            format!(" {}⚠ OVERCONFIDENT{}", YELLOW, RESET)
+                        } else {
+                            "".to_string()
+                        }
+                    );
                 }
                 Err(e) => {
-                    println!("  {}⚠ {} {}: Error - {}{}", YELLOW, check_type, target, e, RESET);
+                    println!(
+                        "  {}⚠ {} {}: Error - {}{}",
+                        YELLOW, check_type, target, e, RESET
+                    );
                 }
             }
         }
 
         println!();
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}BATCH SUMMARY{}                                          {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Total: {} | Correct: {} | Accuracy: {:.1}%{}│{}",
-            DIM, RESET, total, correct,
-            if total > 0 { correct as f64 / total as f64 * 100.0 } else { 0.0 },
-            DIM, RESET);
-        println!("  {}│{}  Batch Brier: {:.4}{}│{}",
-            DIM, RESET, if total > 0 { total_brier / total as f64 } else { 0.0 }, DIM, RESET);
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}BATCH SUMMARY{}                                          {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Total: {} | Correct: {} | Accuracy: {:.1}%{}│{}",
+            DIM,
+            RESET,
+            total,
+            correct,
+            if total > 0 {
+                correct as f64 / total as f64 * 100.0
+            } else {
+                0.0
+            },
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}│{}  Batch Brier: {:.4}{}│{}",
+            DIM,
+            RESET,
+            if total > 0 {
+                total_brier / total as f64
+            } else {
+                0.0
+            },
+            DIM,
+            RESET
+        );
 
-        let after_brier = self.model.persistence().current().global_stats.lifetime_brier;
+        let after_brier = self
+            .model
+            .persistence()
+            .current()
+            .global_stats
+            .lifetime_brier;
         let delta = after_brier - before_brier;
-        println!("  {}│{}  Global Brier: {:.4} → {:.4} ({}{:+.4}{}){} {}│{}",
-            DIM, RESET, before_brier, after_brier,
-            if delta > 0.0 { RED } else { GREEN }, delta, RESET,
-            DIM, DIM, RESET);
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}│{}  Global Brier: {:.4} → {:.4} ({}{:+.4}{}){} {}│{}",
+            DIM,
+            RESET,
+            before_brier,
+            after_brier,
+            if delta > 0.0 { RED } else { GREEN },
+            delta,
+            RESET,
+            DIM,
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // Save
@@ -1322,7 +1923,12 @@ impl MagiCli {
     }
 
     /// Run a single batch verification without printing (returns success and brier)
-    fn run_batch_verify(&mut self, check_type: &str, target: &str, confidence: f64) -> io::Result<(bool, f64)> {
+    fn run_batch_verify(
+        &mut self,
+        check_type: &str,
+        target: &str,
+        confidence: f64,
+    ) -> io::Result<(bool, f64)> {
         let actual_outcome = match check_type {
             "file" | "path" => Path::new(target).exists(),
             "cmd" | "command" => {
@@ -1337,42 +1943,54 @@ impl MagiCli {
                         .unwrap_or(false)
                 }
             }
-            "pkg" | "package" => {
-                Command::new("nix-env")
-                    .args(["-q", target])
-                    .output()
-                    .map(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).contains(target))
-                    .unwrap_or(false)
+            "pkg" | "package" => Command::new("nix-env")
+                .args(["-q", target])
+                .output()
+                .map(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).contains(target))
+                .unwrap_or(false),
+            "service" | "svc" => Command::new("systemctl")
+                .args(["is-active", target])
+                .output()
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim() == "active")
+                .unwrap_or(false),
+            "url" | "http" => Command::new("curl")
+                .args([
+                    "-s",
+                    "-o",
+                    "/dev/null",
+                    "-w",
+                    "%{http_code}",
+                    "--connect-timeout",
+                    "5",
+                    target,
+                ])
+                .output()
+                .map(|o| {
+                    let code: u32 = String::from_utf8_lossy(&o.stdout)
+                        .trim()
+                        .parse()
+                        .unwrap_or(0);
+                    code >= 200 && code < 400
+                })
+                .unwrap_or(false),
+            "port" | "tcp" => TcpStream::connect_timeout(
+                &target
+                    .parse()
+                    .unwrap_or_else(|_| "127.0.0.1:80".parse().unwrap()),
+                Duration::from_secs(3),
+            )
+            .is_ok(),
+            "dns" => Command::new("host")
+                .arg(target)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false),
+            _ => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Unknown check type",
+                ))
             }
-            "service" | "svc" => {
-                Command::new("systemctl")
-                    .args(["is-active", target])
-                    .output()
-                    .map(|o| String::from_utf8_lossy(&o.stdout).trim() == "active")
-                    .unwrap_or(false)
-            }
-            "url" | "http" => {
-                Command::new("curl")
-                    .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", "--connect-timeout", "5", target])
-                    .output()
-                    .map(|o| {
-                        let code: u32 = String::from_utf8_lossy(&o.stdout).trim().parse().unwrap_or(0);
-                        code >= 200 && code < 400
-                    })
-                    .unwrap_or(false)
-            }
-            "port" | "tcp" => {
-                TcpStream::connect_timeout(
-                    &target.parse().unwrap_or_else(|_| "127.0.0.1:80".parse().unwrap()),
-                    Duration::from_secs(3),
-                ).is_ok()
-            }
-            "dns" => {
-                Command::new("host").arg(target).output()
-                    .map(|o| o.status.success())
-                    .unwrap_or(false)
-            }
-            _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "Unknown check type")),
         };
 
         // Calculate Brier component
@@ -1402,7 +2020,12 @@ impl MagiCli {
         }
 
         // Record in history
-        let brier = self.model.persistence().current().global_stats.lifetime_brier;
+        let brier = self
+            .model
+            .persistence()
+            .current()
+            .global_stats
+            .lifetime_brier;
         self.record_brier_history(brier);
 
         Ok((actual_outcome, brier_component))
@@ -1432,7 +2055,11 @@ impl MagiCli {
                 let reason = if cal.is_overconfident {
                     format!("You've been overconfident on {:?} checks ({:.0}% accuracy vs higher confidence)", relevant_domain, accuracy * 100.0)
                 } else {
-                    format!("Based on your {:?} history ({:.0}% accuracy)", relevant_domain, accuracy * 100.0)
+                    format!(
+                        "Based on your {:?} history ({:.0}% accuracy)",
+                        relevant_domain,
+                        accuracy * 100.0
+                    )
                 };
                 return Some((suggested_low, suggested_high, reason));
             }
@@ -1447,9 +2074,20 @@ impl MagiCli {
                 println!();
                 println!("  {}{}⚠ Historical Warning:{}", YELLOW, BOLD, RESET);
                 println!("    {}", reason);
-                println!("    Suggested confidence range: {}{:.0}%-{:.0}%{}", GREEN, low * 100.0, high * 100.0, RESET);
+                println!(
+                    "    Suggested confidence range: {}{:.0}%-{:.0}%{}",
+                    GREEN,
+                    low * 100.0,
+                    high * 100.0,
+                    RESET
+                );
                 if proposed_confidence > high + 0.1 {
-                    println!("    {}You may be overconfident at {:.0}%.{}", YELLOW, proposed_confidence * 100.0, RESET);
+                    println!(
+                        "    {}You may be overconfident at {:.0}%.{}",
+                        YELLOW,
+                        proposed_confidence * 100.0,
+                        RESET
+                    );
                 }
                 println!();
             }
@@ -1462,9 +2100,18 @@ impl MagiCli {
 
     fn cmd_export(&self, output_path: &str, format: &str) -> io::Result<()> {
         println!();
-        println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, GREEN, RESET);
-        println!("{}{}║              EXPORTING EPISTEMIC STATE                         ║{}", BOLD, GREEN, RESET);
-        println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, GREEN, RESET);
+        println!(
+            "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+            BOLD, GREEN, RESET
+        );
+        println!(
+            "{}{}║              EXPORTING EPISTEMIC STATE                         ║{}",
+            BOLD, GREEN, RESET
+        );
+        println!(
+            "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+            BOLD, GREEN, RESET
+        );
         println!();
 
         let snapshot = self.model.persistence().current();
@@ -1481,11 +2128,18 @@ impl MagiCli {
                 for (domain, cal) in &snapshot.calibration {
                     let accuracy = if cal.prediction_count > 0 {
                         cal.correct_count as f64 / cal.prediction_count as f64
-                    } else { 0.0 };
+                    } else {
+                        0.0
+                    };
                     csv_content.push_str(&format!(
                         "{:?},{:.4},{:.4},{},{:.4},{:.2},{}\n",
-                        domain, cal.lifetime_brier, cal.ece, cal.prediction_count,
-                        accuracy, cal.confidence_adjustment, cal.is_overconfident
+                        domain,
+                        cal.lifetime_brier,
+                        cal.ece,
+                        cal.prediction_count,
+                        accuracy,
+                        cal.confidence_adjustment,
+                        cal.is_overconfident
                     ));
                 }
                 std::fs::write(output_path, csv_content)?;
@@ -1495,35 +2149,61 @@ impl MagiCli {
                 md.push_str("# MAGI Epistemic State Export\n\n");
                 md.push_str(&format!("**Exported**: {}\n", snapshot.saved_at_iso));
                 md.push_str(&format!("**Session**: #{}\n", snapshot.session_count));
-                md.push_str(&format!("**Lifetime Iterations**: {}\n\n", snapshot.lifetime_iterations));
+                md.push_str(&format!(
+                    "**Lifetime Iterations**: {}\n\n",
+                    snapshot.lifetime_iterations
+                ));
 
                 md.push_str("## Global Calibration\n\n");
-                md.push_str(&format!("- **Brier Score**: {:.4}\n", snapshot.global_stats.lifetime_brier));
+                md.push_str(&format!(
+                    "- **Brier Score**: {:.4}\n",
+                    snapshot.global_stats.lifetime_brier
+                ));
                 md.push_str(&format!("- **ECE**: {:.4}\n", snapshot.global_stats.ece));
-                md.push_str(&format!("- **Total Predictions**: {}\n", snapshot.global_stats.total_predictions));
-                md.push_str(&format!("- **Well Calibrated**: {}\n\n", snapshot.global_stats.is_well_calibrated));
+                md.push_str(&format!(
+                    "- **Total Predictions**: {}\n",
+                    snapshot.global_stats.total_predictions
+                ));
+                md.push_str(&format!(
+                    "- **Well Calibrated**: {}\n\n",
+                    snapshot.global_stats.is_well_calibrated
+                ));
 
                 md.push_str("## Per-Domain Calibration\n\n");
                 md.push_str("| Domain | Brier | ECE | Count | Adjustment |\n");
                 md.push_str("|--------|-------|-----|-------|------------|\n");
                 for (domain, cal) in &snapshot.calibration {
-                    md.push_str(&format!("| {:?} | {:.4} | {:.4} | {} | {:.2} |\n",
-                        domain, cal.lifetime_brier, cal.ece, cal.prediction_count, cal.confidence_adjustment));
+                    md.push_str(&format!(
+                        "| {:?} | {:.4} | {:.4} | {} | {:.2} |\n",
+                        domain,
+                        cal.lifetime_brier,
+                        cal.ece,
+                        cal.prediction_count,
+                        cal.confidence_adjustment
+                    ));
                 }
                 md.push_str("\n");
 
                 std::fs::write(output_path, md)?;
             }
             _ => {
-                return Err(io::Error::new(io::ErrorKind::InvalidInput,
-                    format!("Unknown format: {}. Use json, csv, or md", format)));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("Unknown format: {}. Use json, csv, or md", format),
+                ));
             }
         }
 
         println!("  {}Exported to {}:{}", CYAN, output_path, RESET);
         println!("    - {} domain calibrations", snapshot.calibration.len());
-        println!("    - {} lifetime predictions", snapshot.global_stats.total_predictions);
-        println!("    - {} causal attributions", snapshot.attribution_history.len());
+        println!(
+            "    - {} lifetime predictions",
+            snapshot.global_stats.total_predictions
+        );
+        println!(
+            "    - {} causal attributions",
+            snapshot.attribution_history.len()
+        );
         println!("    - Gate configuration");
         println!();
         println!("  {}{}✓ Export complete{}", GREEN, DIM, RESET);
@@ -1538,9 +2218,18 @@ impl MagiCli {
 
     fn cmd_import(&mut self, input_path: &str, merge: bool) -> io::Result<()> {
         println!();
-        println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, BLUE, RESET);
-        println!("{}{}║              IMPORTING EPISTEMIC STATE                         ║{}", BOLD, BLUE, RESET);
-        println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, BLUE, RESET);
+        println!(
+            "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+            BOLD, BLUE, RESET
+        );
+        println!(
+            "{}{}║              IMPORTING EPISTEMIC STATE                         ║{}",
+            BOLD, BLUE, RESET
+        );
+        println!(
+            "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+            BOLD, BLUE, RESET
+        );
         println!();
 
         let content = std::fs::read_to_string(input_path)?;
@@ -1550,7 +2239,10 @@ impl MagiCli {
 
         println!("  {}Loading from {}...{}", DIM, input_path, RESET);
         println!("    Sessions: {}", imported.session_count);
-        println!("    Predictions: {}", imported.global_stats.total_predictions);
+        println!(
+            "    Predictions: {}",
+            imported.global_stats.total_predictions
+        );
         println!("    Brier: {:.4}", imported.global_stats.lifetime_brier);
         println!();
 
@@ -1566,14 +2258,20 @@ impl MagiCli {
                     let current_weight = current_cal.prediction_count as f64;
 
                     if imported_weight > current_weight * 2.0 {
-                        println!("    {:?}: Using imported (more data: {} vs {})",
-                            domain, imported_cal.prediction_count, current_cal.prediction_count);
+                        println!(
+                            "    {:?}: Using imported (more data: {} vs {})",
+                            domain, imported_cal.prediction_count, current_cal.prediction_count
+                        );
                     } else if imported_cal.lifetime_brier < current_cal.lifetime_brier {
-                        println!("    {:?}: Using imported (better calibration: {:.4} vs {:.4})",
-                            domain, imported_cal.lifetime_brier, current_cal.lifetime_brier);
+                        println!(
+                            "    {:?}: Using imported (better calibration: {:.4} vs {:.4})",
+                            domain, imported_cal.lifetime_brier, current_cal.lifetime_brier
+                        );
                     } else {
-                        println!("    {:?}: Keeping local (better: {:.4} vs {:.4})",
-                            domain, current_cal.lifetime_brier, imported_cal.lifetime_brier);
+                        println!(
+                            "    {:?}: Keeping local (better: {:.4} vs {:.4})",
+                            domain, current_cal.lifetime_brier, imported_cal.lifetime_brier
+                        );
                     }
                 } else {
                     println!("    {:?}: Adding from import (new domain)", domain);
@@ -1584,7 +2282,8 @@ impl MagiCli {
             {
                 let snapshot = self.model.persistence_mut().current_mut();
                 for (domain, imported_cal) in imported.calibration {
-                    let should_import = if let Some(current_cal) = snapshot.calibration.get(&domain) {
+                    let should_import = if let Some(current_cal) = snapshot.calibration.get(&domain)
+                    {
                         imported_cal.prediction_count > current_cal.prediction_count * 2
                             || imported_cal.lifetime_brier < current_cal.lifetime_brier
                     } else {
@@ -1622,64 +2321,129 @@ impl MagiCli {
 
     fn cmd_analytics(&self) {
         println!();
-        println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, CYAN, RESET);
-        println!("{}{}║              SESSION ANALYTICS                                 ║{}", BOLD, CYAN, RESET);
-        println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, CYAN, RESET);
+        println!(
+            "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}║              SESSION ANALYTICS                                 ║{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+            BOLD, CYAN, RESET
+        );
         println!();
 
         let snapshot = self.model.persistence().current();
 
-        println!("  {}Sessions:{} {} (lifetime)", CYAN, RESET, snapshot.session_count);
-        println!("  {}Total Predictions:{} {}", CYAN, RESET, snapshot.global_stats.total_predictions);
+        println!(
+            "  {}Sessions:{} {} (lifetime)",
+            CYAN, RESET, snapshot.session_count
+        );
+        println!(
+            "  {}Total Predictions:{} {}",
+            CYAN, RESET, snapshot.global_stats.total_predictions
+        );
         println!();
 
         // Current session analysis
         let brier = snapshot.global_stats.lifetime_brier;
         let accuracy = if snapshot.global_stats.total_predictions > 0 {
-            snapshot.global_stats.correct_predictions as f64 / snapshot.global_stats.total_predictions as f64
-        } else { 0.0 };
+            snapshot.global_stats.correct_predictions as f64
+                / snapshot.global_stats.total_predictions as f64
+        } else {
+            0.0
+        };
 
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}CURRENT STATE{}                                          {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Lifetime Brier:  {}{:.4}{}{}│{}",
-            DIM, RESET, self.brier_color(brier), brier, RESET, DIM, RESET);
-        println!("  {}│{}  Rolling Brier:   {}{:.4}{}{}│{}",
-            DIM, RESET, self.brier_color(snapshot.global_stats.rolling_brier),
-            snapshot.global_stats.rolling_brier, RESET, DIM, RESET);
-        println!("  {}│{}  ECE:             {:.4}{}│{}",
-            DIM, RESET, snapshot.global_stats.ece, DIM, RESET);
-        println!("  {}│{}  Accuracy:        {:.1}%{}│{}",
-            DIM, RESET, accuracy * 100.0, DIM, RESET);
-        println!("  {}│{}  Well Calibrated: {}{}│{}",
-            DIM, RESET,
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}CURRENT STATE{}                                          {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Lifetime Brier:  {}{:.4}{}{}│{}",
+            DIM,
+            RESET,
+            self.brier_color(brier),
+            brier,
+            RESET,
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}│{}  Rolling Brier:   {}{:.4}{}{}│{}",
+            DIM,
+            RESET,
+            self.brier_color(snapshot.global_stats.rolling_brier),
+            snapshot.global_stats.rolling_brier,
+            RESET,
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}│{}  ECE:             {:.4}{}│{}",
+            DIM, RESET, snapshot.global_stats.ece, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Accuracy:        {:.1}%{}│{}",
+            DIM,
+            RESET,
+            accuracy * 100.0,
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}│{}  Well Calibrated: {}{}│{}",
+            DIM,
+            RESET,
             if snapshot.global_stats.is_well_calibrated {
                 format!("{}Yes{}", GREEN, RESET)
             } else {
                 format!("{}No{}", RED, RESET)
-            }, DIM, RESET);
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+            },
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // Domain breakdown
         if !snapshot.calibration.is_empty() {
-            let best_domain = snapshot.calibration.iter()
+            let best_domain = snapshot
+                .calibration
+                .iter()
                 .filter(|(_, cal)| cal.prediction_count >= 5)
                 .min_by(|a, b| a.1.lifetime_brier.partial_cmp(&b.1.lifetime_brier).unwrap());
 
-            let worst_domain = snapshot.calibration.iter()
+            let worst_domain = snapshot
+                .calibration
+                .iter()
                 .filter(|(_, cal)| cal.prediction_count >= 5)
                 .max_by(|a, b| a.1.lifetime_brier.partial_cmp(&b.1.lifetime_brier).unwrap());
 
             println!("  {}Domain Analysis:{}", BOLD, RESET);
             if let Some((domain, cal)) = best_domain {
-                println!("    {}Best:{} {:?} (Brier: {:.4}, {} predictions)",
-                    GREEN, RESET, domain, cal.lifetime_brier, cal.prediction_count);
+                println!(
+                    "    {}Best:{} {:?} (Brier: {:.4}, {} predictions)",
+                    GREEN, RESET, domain, cal.lifetime_brier, cal.prediction_count
+                );
             }
             if let Some((domain, cal)) = worst_domain {
-                println!("    {}Worst:{} {:?} (Brier: {:.4}, {} predictions)",
-                    RED, RESET, domain, cal.lifetime_brier, cal.prediction_count);
+                println!(
+                    "    {}Worst:{} {:?} (Brier: {:.4}, {} predictions)",
+                    RED, RESET, domain, cal.lifetime_brier, cal.prediction_count
+                );
             }
             println!();
         }
@@ -1688,23 +2452,34 @@ impl MagiCli {
         println!("  {}Recommendations:{}", BOLD, RESET);
 
         if snapshot.global_stats.total_predictions < 50 {
-            println!("    - Make more predictions to improve calibration (have {}/50)",
-                snapshot.global_stats.total_predictions);
+            println!(
+                "    - Make more predictions to improve calibration (have {}/50)",
+                snapshot.global_stats.total_predictions
+            );
         }
 
         if brier > 0.25 {
             println!("    - {}Calibration is poor (Brier > 0.25). Consider lowering confidence levels.{}", YELLOW, RESET);
         }
 
-        let overconfident_count = snapshot.calibration.values()
+        let overconfident_count = snapshot
+            .calibration
+            .values()
             .filter(|cal| cal.is_overconfident && cal.prediction_count >= 5)
             .count();
         if overconfident_count > 0 {
-            println!("    - {}You have {} overconfident domain(s). Use 'domains' to see details.{}", YELLOW, overconfident_count, RESET);
+            println!(
+                "    - {}You have {} overconfident domain(s). Use 'domains' to see details.{}",
+                YELLOW, overconfident_count, RESET
+            );
         }
 
-        if snapshot.global_stats.is_well_calibrated && snapshot.global_stats.total_predictions >= 50 {
-            println!("    - {}✓ Good calibration! You've earned autonomous execution rights.{}", GREEN, RESET);
+        if snapshot.global_stats.is_well_calibrated && snapshot.global_stats.total_predictions >= 50
+        {
+            println!(
+                "    - {}✓ Good calibration! You've earned autonomous execution rights.{}",
+                GREEN, RESET
+            );
         }
 
         println!();
@@ -1716,9 +2491,18 @@ impl MagiCli {
 
     fn cmd_gate(&self) {
         println!();
-        println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, YELLOW, RESET);
-        println!("{}{}║              CONSTRAINT GATE STATUS                            ║{}", BOLD, YELLOW, RESET);
-        println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, YELLOW, RESET);
+        println!(
+            "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+            BOLD, YELLOW, RESET
+        );
+        println!(
+            "{}{}║              CONSTRAINT GATE STATUS                            ║{}",
+            BOLD, YELLOW, RESET
+        );
+        println!(
+            "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+            BOLD, YELLOW, RESET
+        );
         println!();
 
         let snapshot = self.model.persistence().current();
@@ -1739,47 +2523,95 @@ impl MagiCli {
             "AUTONOMOUS"
         };
 
-        let mode_color = if current_mode.contains("AUTONOMOUS") { GREEN }
-            else if current_mode.contains("DRY") { YELLOW }
-            else { RED };
+        let mode_color = if current_mode.contains("AUTONOMOUS") {
+            GREEN
+        } else if current_mode.contains("DRY") {
+            YELLOW
+        } else {
+            RED
+        };
 
-        println!("  {}Current Mode:{} {}{}{}", CYAN, RESET, mode_color, current_mode, RESET);
+        println!(
+            "  {}Current Mode:{} {}{}{}",
+            CYAN, RESET, mode_color, current_mode, RESET
+        );
         println!();
 
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}GATE FACTORS{}                                           {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}GATE FACTORS{}                                           {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
 
         // Calibration quality
-        let cal_status = if brier < 0.15 { format!("{}Good{} (Brier < 0.15)", GREEN, RESET) }
-            else if brier < 0.20 { format!("{}Fair{} (Brier < 0.20)", YELLOW, RESET) }
-            else { format!("{}Poor{} (Brier >= 0.20)", RED, RESET) };
-        println!("  {}│{}  Calibration Quality: {}{}│{}",
-            DIM, RESET, cal_status, DIM, RESET);
+        let cal_status = if brier < 0.15 {
+            format!("{}Good{} (Brier < 0.15)", GREEN, RESET)
+        } else if brier < 0.20 {
+            format!("{}Fair{} (Brier < 0.20)", YELLOW, RESET)
+        } else {
+            format!("{}Poor{} (Brier >= 0.20)", RED, RESET)
+        };
+        println!(
+            "  {}│{}  Calibration Quality: {}{}│{}",
+            DIM, RESET, cal_status, DIM, RESET
+        );
 
         // Minimum predictions
         let pred_status = if total_preds >= gate_config.min_predictions_for_autonomy {
-            format!("{}✓{} ({} >= {})", GREEN, RESET, total_preds, gate_config.min_predictions_for_autonomy)
+            format!(
+                "{}✓{} ({} >= {})",
+                GREEN, RESET, total_preds, gate_config.min_predictions_for_autonomy
+            )
         } else {
-            format!("{}✗{} ({} < {})", RED, RESET, total_preds, gate_config.min_predictions_for_autonomy)
+            format!(
+                "{}✗{} ({} < {})",
+                RED, RESET, total_preds, gate_config.min_predictions_for_autonomy
+            )
         };
-        println!("  {}│{}  Min Predictions Met: {}{}│{}",
-            DIM, RESET, pred_status, DIM, RESET);
+        println!(
+            "  {}│{}  Min Predictions Met: {}{}│{}",
+            DIM, RESET, pred_status, DIM, RESET
+        );
 
         // Accuracy threshold
         let accuracy = if total_preds > 0 {
             snapshot.global_stats.correct_predictions as f64 / total_preds as f64
-        } else { 0.0 };
-        let acc_status = if accuracy >= gate_config.min_accuracy_for_autonomy {
-            format!("{}✓{} ({:.1}% >= {:.1}%)", GREEN, RESET, accuracy * 100.0, gate_config.min_accuracy_for_autonomy * 100.0)
         } else {
-            format!("{}✗{} ({:.1}% < {:.1}%)", RED, RESET, accuracy * 100.0, gate_config.min_accuracy_for_autonomy * 100.0)
+            0.0
         };
-        println!("  {}│{}  Accuracy Threshold:  {}{}│{}",
-            DIM, RESET, acc_status, DIM, RESET);
+        let acc_status = if accuracy >= gate_config.min_accuracy_for_autonomy {
+            format!(
+                "{}✓{} ({:.1}% >= {:.1}%)",
+                GREEN,
+                RESET,
+                accuracy * 100.0,
+                gate_config.min_accuracy_for_autonomy * 100.0
+            )
+        } else {
+            format!(
+                "{}✗{} ({:.1}% < {:.1}%)",
+                RED,
+                RESET,
+                accuracy * 100.0,
+                gate_config.min_accuracy_for_autonomy * 100.0
+            )
+        };
+        println!(
+            "  {}│{}  Accuracy Threshold:  {}{}│{}",
+            DIM, RESET, acc_status, DIM, RESET
+        );
 
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // What would require supervision
@@ -1787,10 +2619,15 @@ impl MagiCli {
         println!("    - Destructive operations (always)");
         println!("    - Critical/irreversible actions (always)");
         if !is_well_calibrated {
-            println!("    - {}All actions (until calibration improves){}", YELLOW, RESET);
+            println!(
+                "    - {}All actions (until calibration improves){}",
+                YELLOW, RESET
+            );
         }
 
-        let overconfident: Vec<_> = snapshot.calibration.iter()
+        let overconfident: Vec<_> = snapshot
+            .calibration
+            .iter()
             .filter(|(_, cal)| cal.is_overconfident && cal.prediction_count >= 5)
             .map(|(d, _)| format!("{:?}", d))
             .collect();
@@ -1807,64 +2644,175 @@ impl MagiCli {
 
     fn cmd_metrics(&self) {
         println!();
-        println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, MAGENTA, RESET);
-        println!("{}{}║              CONSCIOUSNESS METRICS AUDIT                        ║{}", BOLD, MAGENTA, RESET);
-        println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, MAGENTA, RESET);
+        println!(
+            "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+            BOLD, MAGENTA, RESET
+        );
+        println!(
+            "{}{}║              CONSCIOUSNESS METRICS AUDIT                        ║{}",
+            BOLD, MAGENTA, RESET
+        );
+        println!(
+            "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+            BOLD, MAGENTA, RESET
+        );
         println!();
 
         println!("  {}CRITICAL: λ₂ ≠ Φ{}", BOLD, RESET);
-        println!("  {}This system computes multiple metrics. Know what you're measuring!{}", DIM, RESET);
+        println!(
+            "  {}This system computes multiple metrics. Know what you're measuring!{}",
+            DIM, RESET
+        );
         println!();
 
-        println!("  {}╭─────────────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}TIERED Φ APPROXIMATION SYSTEM{}                                 {}│{}", DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────────────┤{}", DIM, RESET);
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}TIERED Φ APPROXIMATION SYSTEM{}                                 {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
 
         // Mock tier
-        println!("  {}│{} {}Mock{}      O(1)   Deterministic test values                    {}│{}", DIM, RESET, CYAN, RESET, DIM, RESET);
-        println!("  {}│{}           IIT-Aligned: {}N/A{} (testing only)                      {}│{}", DIM, RESET, DIM, RESET, DIM, RESET);
-        println!("  {}│{}                                                                   {}│{}", DIM, RESET, DIM, RESET);
+        println!(
+            "  {}│{} {}Mock{}      O(1)   Deterministic test values                    {}│{}",
+            DIM, RESET, CYAN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}           IIT-Aligned: {}N/A{} (testing only)                      {}│{}",
+            DIM, RESET, DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}                                                                   {}│{}",
+            DIM, RESET, DIM, RESET
+        );
 
         // Heuristic tier
-        println!("  {}│{} {}Heuristic{} O(n)   Fast approximation via similarity           {}│{}", DIM, RESET, CYAN, RESET, DIM, RESET);
-        println!("  {}│{}           IIT-Aligned: {}❓ Unvalidated{}                           {}│{}", DIM, RESET, YELLOW, RESET, DIM, RESET);
-        println!("  {}│{}                                                                   {}│{}", DIM, RESET, DIM, RESET);
+        println!(
+            "  {}│{} {}Heuristic{} O(n)   Fast approximation via similarity           {}│{}",
+            DIM, RESET, CYAN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}           IIT-Aligned: {}❓ Unvalidated{}                           {}│{}",
+            DIM, RESET, YELLOW, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}                                                                   {}│{}",
+            DIM, RESET, DIM, RESET
+        );
 
         // Spectral tier - THE CRITICAL ONE
-        println!("  {}│{} {}Spectral{}  O(n²)  {}⚠ MEASURES λ₂, NOT Φ!{}                       {}│{}", DIM, RESET, CYAN, RESET, RED, RESET, DIM, RESET);
-        println!("  {}│{}           IIT-Aligned: {}❌ NO{} (r = 0.097 correlation)           {}│{}", DIM, RESET, RED, RESET, DIM, RESET);
-        println!("  {}│{}           Measures: Graph mixing time (algebraic connectivity)   {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}           Favors: Uniform k-regular graphs (ring, torus)         {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}                                                                   {}│{}", DIM, RESET, DIM, RESET);
+        println!(
+            "  {}│{} {}Spectral{}  O(n²)  {}⚠ MEASURES λ₂, NOT Φ!{}                       {}│{}",
+            DIM, RESET, CYAN, RESET, RED, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}           IIT-Aligned: {}❌ NO{} (r = 0.097 correlation)           {}│{}",
+            DIM, RESET, RED, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}           Measures: Graph mixing time (algebraic connectivity)   {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}           Favors: Uniform k-regular graphs (ring, torus)         {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}                                                                   {}│{}",
+            DIM, RESET, DIM, RESET
+        );
 
         // Exact tier
-        println!("  {}│{} {}Exact{}     O(2ⁿ)  {}True IIT Φ (MIP calculation){}               {}│{}", DIM, RESET, CYAN, RESET, GREEN, RESET, DIM, RESET);
-        println!("  {}│{}           IIT-Aligned: {}✅ YES{} (validated against PyPhi)        {}│{}", DIM, RESET, GREEN, RESET, DIM, RESET);
-        println!("  {}│{}           Limit: n ≤ 12 only (exponential complexity)            {}│{}", DIM, RESET, DIM, RESET);
+        println!(
+            "  {}│{} {}Exact{}     O(2ⁿ)  {}True IIT Φ (MIP calculation){}               {}│{}",
+            DIM, RESET, CYAN, RESET, GREEN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}           IIT-Aligned: {}✅ YES{} (validated against PyPhi)        {}│{}",
+            DIM, RESET, GREEN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}           Limit: n ≤ 12 only (exponential complexity)            {}│{}",
+            DIM, RESET, DIM, RESET
+        );
 
-        println!("  {}╰─────────────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
-        println!("  {}╭─────────────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}CORRELATION EVIDENCE{}                                           {}│{}", DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Dual-metric comparison across 19 topologies:                    {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}                                                                   {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}  Pearson (r):    {}0.097{}  (near-zero linear correlation)         {}│{}", DIM, RESET, RED, RESET, DIM, RESET);
-        println!("  {}│{}  Spearman (ρ):   {}0.007{}  (near-zero rank correlation)           {}│{}", DIM, RESET, RED, RESET, DIM, RESET);
-        println!("  {}│{}  Avg Rank Diff:  {}6.42{}   (rankings completely divergent)        {}│{}", DIM, RESET, RED, RESET, DIM, RESET);
-        println!("  {}│{}                                                                   {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}  {}Conclusion:{} λ₂ and Φ measure different properties entirely    {}│{}", DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}╰─────────────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}CORRELATION EVIDENCE{}                                           {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Dual-metric comparison across 19 topologies:                    {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}                                                                   {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Pearson (r):    {}0.097{}  (near-zero linear correlation)         {}│{}",
+            DIM, RESET, RED, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Spearman (ρ):   {}0.007{}  (near-zero rank correlation)           {}│{}",
+            DIM, RESET, RED, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Avg Rank Diff:  {}6.42{}   (rankings completely divergent)        {}│{}",
+            DIM, RESET, RED, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}                                                                   {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  {}Conclusion:{} λ₂ and Φ measure different properties entirely    {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         println!("  {}GUIDANCE:{}", BOLD, RESET);
-        println!("    {}✓{} For consciousness research: Use {}Exact{} tier (n ≤ 12)", GREEN, RESET, GREEN, RESET);
-        println!("    {}✓{} For graph analysis: Spectral tier is valid (just not for Φ)", GREEN, RESET);
-        println!("    {}✗{} Never use λ₂ (Spectral) for IIT consciousness claims", RED, RESET);
+        println!(
+            "    {}✓{} For consciousness research: Use {}Exact{} tier (n ≤ 12)",
+            GREEN, RESET, GREEN, RESET
+        );
+        println!(
+            "    {}✓{} For graph analysis: Spectral tier is valid (just not for Φ)",
+            GREEN, RESET
+        );
+        println!(
+            "    {}✗{} Never use λ₂ (Spectral) for IIT consciousness claims",
+            RED, RESET
+        );
         println!();
 
-        println!("  {}See: docs/METRIC_CLARIFICATION.md for full analysis{}", DIM, RESET);
+        println!(
+            "  {}See: docs/METRIC_CLARIFICATION.md for full analysis{}",
+            DIM, RESET
+        );
         println!();
     }
 
@@ -1874,16 +2822,28 @@ impl MagiCli {
 
     fn cmd_attributions(&self) {
         println!();
-        println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, RED, RESET);
-        println!("{}{}║              FAILURE ATTRIBUTIONS                              ║{}", BOLD, RED, RESET);
-        println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, RED, RESET);
+        println!(
+            "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+            BOLD, RED, RESET
+        );
+        println!(
+            "{}{}║              FAILURE ATTRIBUTIONS                              ║{}",
+            BOLD, RED, RESET
+        );
+        println!(
+            "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+            BOLD, RED, RESET
+        );
         println!();
 
         let snapshot = self.model.persistence().current();
 
         if snapshot.attribution_history.is_empty() {
             println!("  {}No failure attributions recorded yet.{}", DIM, RESET);
-            println!("  {}Attributions are generated when predictions fail.{}", DIM, RESET);
+            println!(
+                "  {}Attributions are generated when predictions fail.{}",
+                DIM, RESET
+            );
             println!();
             return;
         }
@@ -1891,8 +2851,20 @@ impl MagiCli {
         println!("  {}Recent Failure Attributions:{}", BOLD, RESET);
         println!();
 
-        for (i, attr) in snapshot.attribution_history.iter().rev().take(10).enumerate() {
-            println!("  {}#{}{}  Prediction: {}", CYAN, i + 1, RESET, attr.prediction_id);
+        for (i, attr) in snapshot
+            .attribution_history
+            .iter()
+            .rev()
+            .take(10)
+            .enumerate()
+        {
+            println!(
+                "  {}#{}{}  Prediction: {}",
+                CYAN,
+                i + 1,
+                RESET,
+                attr.prediction_id
+            );
             println!("       Failure Mode: {}{}{}", RED, attr.failure_mode, RESET);
 
             if !attr.missing_information.is_empty() {
@@ -1912,7 +2884,9 @@ impl MagiCli {
         }
 
         // Patterns analysis
-        let failure_modes: std::collections::HashMap<&str, usize> = snapshot.attribution_history.iter()
+        let failure_modes: std::collections::HashMap<&str, usize> = snapshot
+            .attribution_history
+            .iter()
             .map(|a| a.failure_mode.as_str())
             .fold(std::collections::HashMap::new(), |mut acc, mode| {
                 *acc.entry(mode).or_insert(0) += 1;
@@ -1938,40 +2912,116 @@ impl MagiCli {
 
     fn cmd_bridge(&self) {
         println!();
-        println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, MAGENTA, RESET);
-        println!("{}{}║              ACTIVE INFERENCE BRIDGE                           ║{}", BOLD, MAGENTA, RESET);
-        println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, MAGENTA, RESET);
+        println!(
+            "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+            BOLD, MAGENTA, RESET
+        );
+        println!(
+            "{}{}║              ACTIVE INFERENCE BRIDGE                           ║{}",
+            BOLD, MAGENTA, RESET
+        );
+        println!(
+            "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+            BOLD, MAGENTA, RESET
+        );
         println!();
 
         let snapshot = self.model.persistence().current();
 
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}BRIDGE OVERVIEW{}                                        {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  The Active Inference Bridge converts MAGI Loop        {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}  calibration into control signals for consciousness:   {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}                                                         {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}  • {}Free Energy{}: Inverse of calibration (higher = worse) {}│{}", DIM, RESET, CYAN, RESET, DIM, RESET);
-        println!("  {}│{}  • {}Uncertainty{}: From ECE (calibration error)           {}│{}", DIM, RESET, CYAN, RESET, DIM, RESET);
-        println!("  {}│{}  • {}Confidence{}: From domain-adjusted calibration        {}│{}", DIM, RESET, CYAN, RESET, DIM, RESET);
-        println!("  {}│{}  • {}Surprise{}: Spike on prediction failures              {}│{}", DIM, RESET, CYAN, RESET, DIM, RESET);
-        println!("  {}│{}  • {}Coherence{}: Cross-domain consistency                 {}│{}", DIM, RESET, CYAN, RESET, DIM, RESET);
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}BRIDGE OVERVIEW{}                                        {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  The Active Inference Bridge converts MAGI Loop        {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  calibration into control signals for consciousness:   {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}                                                         {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  • {}Free Energy{}: Inverse of calibration (higher = worse) {}│{}",
+            DIM, RESET, CYAN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  • {}Uncertainty{}: From ECE (calibration error)           {}│{}",
+            DIM, RESET, CYAN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  • {}Confidence{}: From domain-adjusted calibration        {}│{}",
+            DIM, RESET, CYAN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  • {}Surprise{}: Spike on prediction failures              {}│{}",
+            DIM, RESET, CYAN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  • {}Coherence{}: Cross-domain consistency                 {}│{}",
+            DIM, RESET, CYAN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}PAC (PHASE-AMPLITUDE COUPLING){}                         {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Tracks prediction-outcome coupling quality.           {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}                                                         {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}  Coupling Levels:                                       {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}    • {}Strong{} (MI > 0.6): Predictions tightly coupled    {}│{}", DIM, RESET, GREEN, RESET, DIM, RESET);
-        println!("  {}│{}    • {}Moderate{} (0.3-0.6): Good tracking                 {}│{}", DIM, RESET, YELLOW, RESET, DIM, RESET);
-        println!("  {}│{}    • {}Weak{} (0.1-0.3): Loose coupling                    {}│{}", DIM, RESET, YELLOW, RESET, DIM, RESET);
-        println!("  {}│{}    • {}None{} (< 0.1): No meaningful coupling              {}│{}", DIM, RESET, RED, RESET, DIM, RESET);
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}PAC (PHASE-AMPLITUDE COUPLING){}                         {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Tracks prediction-outcome coupling quality.           {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}                                                         {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Coupling Levels:                                       {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}    • {}Strong{} (MI > 0.6): Predictions tightly coupled    {}│{}",
+            DIM, RESET, GREEN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}    • {}Moderate{} (0.3-0.6): Good tracking                 {}│{}",
+            DIM, RESET, YELLOW, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}    • {}Weak{} (0.1-0.3): Loose coupling                    {}│{}",
+            DIM, RESET, YELLOW, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}    • {}None{} (< 0.1): No meaningful coupling              {}│{}",
+            DIM, RESET, RED, RESET, DIM, RESET
+        );
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // Estimate coupling quality from calibration data
@@ -1979,7 +3029,10 @@ impl MagiCli {
         let ece = snapshot.global_stats.ece;
         let total_preds = snapshot.global_stats.total_predictions;
 
-        println!("  {}Estimated Bridge State (from calibration):{}", BOLD, RESET);
+        println!(
+            "  {}Estimated Bridge State (from calibration):{}",
+            BOLD, RESET
+        );
         println!();
 
         // Estimate modulation index from Brier score (inverse relationship)
@@ -1998,32 +3051,77 @@ impl MagiCli {
             Some(mi) => (format!("Poor (MI ≈ {:.2})", mi), RED),
         };
 
-        println!("    Coupling Quality: {}{}{}", coupling_color, coupling_str, RESET);
+        println!(
+            "    Coupling Quality: {}{}{}",
+            coupling_color, coupling_str, RESET
+        );
 
         // Signal estimates
         let free_energy = brier * 2.0; // Higher brier = higher free energy
         let uncertainty = ece.min(0.5) * 2.0; // Normalize ECE
-        let confidence = if snapshot.global_stats.is_well_calibrated { 0.8 } else { 0.4 };
+        let confidence = if snapshot.global_stats.is_well_calibrated {
+            0.8
+        } else {
+            0.4
+        };
 
         println!();
         println!("    {}Estimated Signal Levels:{}", DIM, RESET);
         println!("      Free Energy:  {}", Self::signal_bar(free_energy, RED));
-        println!("      Uncertainty:  {}", Self::signal_bar(uncertainty, YELLOW));
-        println!("      Confidence:   {}", Self::signal_bar(confidence, GREEN));
+        println!(
+            "      Uncertainty:  {}",
+            Self::signal_bar(uncertainty, YELLOW)
+        );
+        println!(
+            "      Confidence:   {}",
+            Self::signal_bar(confidence, GREEN)
+        );
         println!();
 
-        println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}LIVE BRIDGE STATS{}                                       {}│{}",
-            DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├─────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  For real-time bridge statistics with live PAC          {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}  tracking, use the {}monitor{} command:                      {}│{}", DIM, RESET, GREEN, RESET, DIM, RESET);
-        println!("  {}│{}                                                         {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}    {}magi> monitor{}                                        {}│{}", DIM, RESET, CYAN, RESET, DIM, RESET);
-        println!("  {}│{}                                                         {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}  The monitor runs the full MAGI Loop runtime with       {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}│{}  live signal generation and PAC tracking.               {}│{}", DIM, RESET, DIM, RESET);
-        println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╭─────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}LIVE BRIDGE STATS{}                                       {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├─────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  For real-time bridge statistics with live PAC          {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  tracking, use the {}monitor{} command:                      {}│{}",
+            DIM, RESET, GREEN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}                                                         {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}    {}magi> monitor{}                                        {}│{}",
+            DIM, RESET, CYAN, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}                                                         {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  The monitor runs the full MAGI Loop runtime with       {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  live signal generation and PAC tracking.               {}│{}",
+            DIM, RESET, DIM, RESET
+        );
+        println!(
+            "  {}╰─────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
     }
 
@@ -2032,12 +3130,14 @@ impl MagiCli {
         let clamped = value.clamp(0.0, 1.0);
         let filled = (clamped * 20.0).round() as usize;
         let empty = 20 - filled;
-        format!("{}{}{}{} {:.2}",
+        format!(
+            "{}{}{}{} {:.2}",
             color,
             "█".repeat(filled),
             RESET,
             "░".repeat(empty),
-            clamped)
+            clamped
+        )
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -2049,9 +3149,18 @@ impl MagiCli {
 
         if args.len() < 2 {
             // Show scheduled predictions
-            println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, CYAN, RESET);
-            println!("{}{}║              SCHEDULED PREDICTIONS                             ║{}", BOLD, CYAN, RESET);
-            println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, CYAN, RESET);
+            println!(
+                "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+                BOLD, CYAN, RESET
+            );
+            println!(
+                "{}{}║              SCHEDULED PREDICTIONS                             ║{}",
+                BOLD, CYAN, RESET
+            );
+            println!(
+                "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+                BOLD, CYAN, RESET
+            );
             println!();
 
             println!("  {}Usage:{}", BOLD, RESET);
@@ -2068,29 +3177,65 @@ impl MagiCli {
             println!("    30s, 5m, 1h, 2h30m");
             println!();
 
-            println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-            println!("  {}│{} {}NOTE:{} Scheduled predictions are experimental.          {}│{}", DIM, RESET, YELLOW, RESET, DIM, RESET);
-            println!("  {}│{}                                                         {}│{}", DIM, RESET, DIM, RESET);
-            println!("  {}│{}  Currently, scheduled predictions resolve on the next   {}│{}", DIM, RESET, DIM, RESET);
-            println!("  {}│{}  CLI startup. For continuous monitoring, use the        {}│{}", DIM, RESET, DIM, RESET);
-            println!("  {}│{}  {}monitor{} command with the MAGI Loop runtime.            {}│{}", DIM, RESET, GREEN, RESET, DIM, RESET);
-            println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+            println!(
+                "  {}╭─────────────────────────────────────────────────────────╮{}",
+                DIM, RESET
+            );
+            println!(
+                "  {}│{} {}NOTE:{} Scheduled predictions are experimental.          {}│{}",
+                DIM, RESET, YELLOW, RESET, DIM, RESET
+            );
+            println!(
+                "  {}│{}                                                         {}│{}",
+                DIM, RESET, DIM, RESET
+            );
+            println!(
+                "  {}│{}  Currently, scheduled predictions resolve on the next   {}│{}",
+                DIM, RESET, DIM, RESET
+            );
+            println!(
+                "  {}│{}  CLI startup. For continuous monitoring, use the        {}│{}",
+                DIM, RESET, DIM, RESET
+            );
+            println!(
+                "  {}│{}  {}monitor{} command with the MAGI Loop runtime.            {}│{}",
+                DIM, RESET, GREEN, RESET, DIM, RESET
+            );
+            println!(
+                "  {}╰─────────────────────────────────────────────────────────╯{}",
+                DIM, RESET
+            );
             println!();
             return;
         }
 
         match args[1] {
             "list" | "ls" => {
-                println!("{}{}╔═══════════════════════════════════════════════════════════════╗{}", BOLD, CYAN, RESET);
-                println!("{}{}║              SCHEDULED PREDICTIONS                             ║{}", BOLD, CYAN, RESET);
-                println!("{}{}╚═══════════════════════════════════════════════════════════════╝{}", BOLD, CYAN, RESET);
+                println!(
+                    "{}{}╔═══════════════════════════════════════════════════════════════╗{}",
+                    BOLD, CYAN, RESET
+                );
+                println!(
+                    "{}{}║              SCHEDULED PREDICTIONS                             ║{}",
+                    BOLD, CYAN, RESET
+                );
+                println!(
+                    "{}{}╚═══════════════════════════════════════════════════════════════╝{}",
+                    BOLD, CYAN, RESET
+                );
                 println!();
 
                 // For now, scheduling is not persisted - show informational message
                 println!("  {}No scheduled predictions in persistence.{}", DIM, RESET);
                 println!();
-                println!("  {}Scheduling requires the MAGI Loop Runtime to be active.{}", DIM, RESET);
-                println!("  {}Use the 'monitor' command for live prediction tracking.{}", DIM, RESET);
+                println!(
+                    "  {}Scheduling requires the MAGI Loop Runtime to be active.{}",
+                    DIM, RESET
+                );
+                println!(
+                    "  {}Use the 'monitor' command for live prediction tracking.{}",
+                    DIM, RESET
+                );
                 println!();
             }
             _ => {
@@ -2100,7 +3245,10 @@ impl MagiCli {
 
                 if in_pos.is_none() || in_pos.unwrap() < 3 {
                     println!("  {}Error:{} Invalid format. Use: schedule \"statement\" confidence in time", RED, RESET);
-                    println!("  {}Example:{} schedule \"build completes\" 0.85 in 5m", DIM, RESET);
+                    println!(
+                        "  {}Example:{} schedule \"build completes\" 0.85 in 5m",
+                        DIM, RESET
+                    );
                     return;
                 }
 
@@ -2122,13 +3270,17 @@ impl MagiCli {
                 let duration_secs = Self::parse_duration(&time_str);
 
                 if duration_secs.is_none() {
-                    println!("  {}Error:{} Could not parse duration: {}", RED, RESET, time_str);
+                    println!(
+                        "  {}Error:{} Could not parse duration: {}",
+                        RED, RESET, time_str
+                    );
                     println!("  {}Valid formats:{} 30s, 5m, 1h, 2h30m", DIM, RESET);
                     return;
                 }
 
                 let secs = duration_secs.unwrap();
-                let _resolve_time = std::time::SystemTime::now() + std::time::Duration::from_secs(secs);
+                let _resolve_time =
+                    std::time::SystemTime::now() + std::time::Duration::from_secs(secs);
 
                 println!("  {}Prediction Scheduled (experimental):{}", GREEN, RESET);
                 println!();
@@ -2137,18 +3289,54 @@ impl MagiCli {
                 println!("    Resolves:   in {} ({}s)", time_str, secs);
                 println!();
 
-                println!("  {}╭─────────────────────────────────────────────────────────╮{}", DIM, RESET);
-                println!("  {}│{} {}IMPLEMENTATION NOTE:{}                                   {}│{}", DIM, RESET, YELLOW, RESET, DIM, RESET);
-                println!("  {}│{}                                                         {}│{}", DIM, RESET, DIM, RESET);
-                println!("  {}│{}  Full scheduling requires background runtime.           {}│{}", DIM, RESET, DIM, RESET);
-                println!("  {}│{}  For now, use manual verification:                      {}│{}", DIM, RESET, DIM, RESET);
-                println!("  {}│{}                                                         {}│{}", DIM, RESET, DIM, RESET);
-                println!("  {}│{}    1. Run your operation                                {}│{}", DIM, RESET, DIM, RESET);
-                println!("  {}│{}    2. Wait for the expected time                        {}│{}", DIM, RESET, DIM, RESET);
-                println!("  {}│{}    3. Use 'verify' to check the result                  {}│{}", DIM, RESET, DIM, RESET);
-                println!("  {}│{}                                                         {}│{}", DIM, RESET, DIM, RESET);
-                println!("  {}│{}  Or use 'monitor' for real-time prediction tracking.    {}│{}", DIM, RESET, DIM, RESET);
-                println!("  {}╰─────────────────────────────────────────────────────────╯{}", DIM, RESET);
+                println!(
+                    "  {}╭─────────────────────────────────────────────────────────╮{}",
+                    DIM, RESET
+                );
+                println!(
+                    "  {}│{} {}IMPLEMENTATION NOTE:{}                                   {}│{}",
+                    DIM, RESET, YELLOW, RESET, DIM, RESET
+                );
+                println!(
+                    "  {}│{}                                                         {}│{}",
+                    DIM, RESET, DIM, RESET
+                );
+                println!(
+                    "  {}│{}  Full scheduling requires background runtime.           {}│{}",
+                    DIM, RESET, DIM, RESET
+                );
+                println!(
+                    "  {}│{}  For now, use manual verification:                      {}│{}",
+                    DIM, RESET, DIM, RESET
+                );
+                println!(
+                    "  {}│{}                                                         {}│{}",
+                    DIM, RESET, DIM, RESET
+                );
+                println!(
+                    "  {}│{}    1. Run your operation                                {}│{}",
+                    DIM, RESET, DIM, RESET
+                );
+                println!(
+                    "  {}│{}    2. Wait for the expected time                        {}│{}",
+                    DIM, RESET, DIM, RESET
+                );
+                println!(
+                    "  {}│{}    3. Use 'verify' to check the result                  {}│{}",
+                    DIM, RESET, DIM, RESET
+                );
+                println!(
+                    "  {}│{}                                                         {}│{}",
+                    DIM, RESET, DIM, RESET
+                );
+                println!(
+                    "  {}│{}  Or use 'monitor' for real-time prediction tracking.    {}│{}",
+                    DIM, RESET, DIM, RESET
+                );
+                println!(
+                    "  {}╰─────────────────────────────────────────────────────────╯{}",
+                    DIM, RESET
+                );
                 println!();
             }
         }
@@ -2190,9 +3378,18 @@ impl MagiCli {
 
     fn interactive(&mut self) -> io::Result<()> {
         println!();
-        println!("{}{}╔══════════════════════════════════════════════════════════════╗{}", BOLD, BLUE, RESET);
-        println!("{}{}║              MAGI EPISTEMIC SHELL - INTERACTIVE               ║{}", BOLD, BLUE, RESET);
-        println!("{}{}╚══════════════════════════════════════════════════════════════╝{}", BOLD, BLUE, RESET);
+        println!(
+            "{}{}╔══════════════════════════════════════════════════════════════╗{}",
+            BOLD, BLUE, RESET
+        );
+        println!(
+            "{}{}║              MAGI EPISTEMIC SHELL - INTERACTIVE               ║{}",
+            BOLD, BLUE, RESET
+        );
+        println!(
+            "{}{}╚══════════════════════════════════════════════════════════════╝{}",
+            BOLD, BLUE, RESET
+        );
         println!();
         println!("  Commands: status, predict, resolve, verify, calibration, domains, trend, batch, schedule,");
         println!("            export, import, analytics, gate, bridge, metrics, attributions, history, monitor,");
@@ -2206,10 +3403,20 @@ impl MagiCli {
 
         loop {
             // Prompt with mini-status
-            let brier = self.model.persistence().current().global_stats.lifetime_brier;
-            print!("{}[B:{:.2}]{} {}magi>{} ",
-                self.brier_color(brier), brier, RESET,
-                CYAN, RESET);
+            let brier = self
+                .model
+                .persistence()
+                .current()
+                .global_stats
+                .lifetime_brier;
+            print!(
+                "{}[B:{:.2}]{} {}magi>{} ",
+                self.brier_color(brier),
+                brier,
+                RESET,
+                CYAN,
+                RESET
+            );
             io::stdout().flush()?;
 
             input.clear();
@@ -2327,7 +3534,12 @@ impl MagiCli {
                     self.cmd_verify(check_type, target, confidence)?;
 
                     // Record in trend history
-                    let brier = self.model.persistence().current().global_stats.lifetime_brier;
+                    let brier = self
+                        .model
+                        .persistence()
+                        .current()
+                        .global_stats
+                        .lifetime_brier;
                     self.record_brier_history(brier);
                 }
                 "domains" | "dom" | "d" => {
@@ -2406,7 +3618,10 @@ impl MagiCli {
         println!();
         println!("  {}CORE COMMANDS{}", BOLD, RESET);
         println!("  ─────────────────────────────────────────");
-        println!("  {}status{}       Show system status, calibration, gate state", CYAN, RESET);
+        println!(
+            "  {}status{}       Show system status, calibration, gate state",
+            CYAN, RESET
+        );
         println!("  {}predict{}     Register a prediction", CYAN, RESET);
         println!("               predict <statement> [-c confidence] [-d domain]");
         println!("               Domains: code, tool, user, system, factual");
@@ -2415,7 +3630,10 @@ impl MagiCli {
         println!();
         println!("  {}VERIFICATION (External Grounding){}", BOLD, RESET);
         println!("  ─────────────────────────────────────────");
-        println!("  {}verify{}      Externally grounded prediction", CYAN, RESET);
+        println!(
+            "  {}verify{}      Externally grounded prediction",
+            CYAN, RESET
+        );
         println!("               verify <type> <target> [confidence]");
         println!("               Types:");
         println!("                 file    - file exists?");
@@ -2423,22 +3641,49 @@ impl MagiCli {
         println!("                 test    - cargo test passes?");
         println!("                 pkg     - NixOS package installed?");
         println!("                 service - systemd service active?");
-        println!("                 {}url{}     - HTTP endpoint accessible? (NEW)", GREEN, RESET);
-        println!("                 {}port{}    - TCP port open? (NEW)", GREEN, RESET);
-        println!("                 {}dns{}     - DNS resolves? (NEW)", GREEN, RESET);
-        println!("  {}batch{}       Run predictions from file (NEW)", CYAN, RESET);
+        println!(
+            "                 {}url{}     - HTTP endpoint accessible? (NEW)",
+            GREEN, RESET
+        );
+        println!(
+            "                 {}port{}    - TCP port open? (NEW)",
+            GREEN, RESET
+        );
+        println!(
+            "                 {}dns{}     - DNS resolves? (NEW)",
+            GREEN, RESET
+        );
+        println!(
+            "  {}batch{}       Run predictions from file (NEW)",
+            CYAN, RESET
+        );
         println!("               batch <file_path>");
-        println!("  {}schedule{}    Schedule prediction for future resolution (NEW)", CYAN, RESET);
+        println!(
+            "  {}schedule{}    Schedule prediction for future resolution (NEW)",
+            CYAN, RESET
+        );
         println!("               schedule <stmt> <conf> in <time>");
         println!("               schedule list");
         println!();
         println!("  {}CALIBRATION ANALYSIS (NEW){}", BOLD, RESET);
         println!("  ─────────────────────────────────────────");
-        println!("  {}domains{}     Per-domain calibration breakdown", CYAN, RESET);
-        println!("  {}trend{}       ASCII visualization of Brier score trend", CYAN, RESET);
+        println!(
+            "  {}domains{}     Per-domain calibration breakdown",
+            CYAN, RESET
+        );
+        println!(
+            "  {}trend{}       ASCII visualization of Brier score trend",
+            CYAN, RESET
+        );
         println!("               trend [window_size]  (default: 50)");
-        println!("  {}calibration{} Show detailed calibration stats", CYAN, RESET);
-        println!("  {}analytics{}   Session analytics and recommendations", CYAN, RESET);
+        println!(
+            "  {}calibration{} Show detailed calibration stats",
+            CYAN, RESET
+        );
+        println!(
+            "  {}analytics{}   Session analytics and recommendations",
+            CYAN, RESET
+        );
         println!();
         println!("  {}STATE MANAGEMENT (NEW){}", BOLD, RESET);
         println!("  ─────────────────────────────────────────");
@@ -2449,27 +3694,54 @@ impl MagiCli {
         println!();
         println!("  {}INTROSPECTION (NEW){}", BOLD, RESET);
         println!("  ─────────────────────────────────────────");
-        println!("  {}gate{}        Show constraint gate status & factors", CYAN, RESET);
-        println!("  {}bridge{}      Active Inference Bridge stats (NEW)", CYAN, RESET);
-        println!("  {}metrics{}     {}⚠ CRITICAL:{} λ₂ vs Φ metric audit", CYAN, RESET, RED, RESET);
-        println!("  {}attributions{} Show failure attribution analysis", CYAN, RESET);
-        println!("  {}history{}     Show attribution history (raw)", CYAN, RESET);
+        println!(
+            "  {}gate{}        Show constraint gate status & factors",
+            CYAN, RESET
+        );
+        println!(
+            "  {}bridge{}      Active Inference Bridge stats (NEW)",
+            CYAN, RESET
+        );
+        println!(
+            "  {}metrics{}     {}⚠ CRITICAL:{} λ₂ vs Φ metric audit",
+            CYAN, RESET, RED, RESET
+        );
+        println!(
+            "  {}attributions{} Show failure attribution analysis",
+            CYAN, RESET
+        );
+        println!(
+            "  {}history{}     Show attribution history (raw)",
+            CYAN, RESET
+        );
         println!();
         println!("  {}MONITORING (NEW){}", BOLD, RESET);
         println!("  ─────────────────────────────────────────");
-        println!("  {}monitor{}     Real-time epistemic dashboard (\"EEG\")", CYAN, RESET);
+        println!(
+            "  {}monitor{}     Real-time epistemic dashboard (\"EEG\")",
+            CYAN, RESET
+        );
         println!("               Shows: signals, calibration, gate status");
         println!("               Press 'q' + Enter to quit");
         println!();
         println!("  {}UTILITIES{}", BOLD, RESET);
         println!("  ─────────────────────────────────────────");
         println!("  {}where{}       Show state file location", CYAN, RESET);
-        println!("  {}drift{}       Red team: inject predictions", CYAN, RESET);
+        println!(
+            "  {}drift{}       Red team: inject predictions",
+            CYAN, RESET
+        );
         println!("               drift <count> <confidence> <success_rate>");
-        println!("  {}reset{}       Clear all state (cold start)", CYAN, RESET);
+        println!(
+            "  {}reset{}       Clear all state (cold start)",
+            CYAN, RESET
+        );
         println!("  {}quit{}        Exit the shell", CYAN, RESET);
         println!();
-        println!("  {}═══════════════════════════════════════════════════════════════════{}", DIM, RESET);
+        println!(
+            "  {}═══════════════════════════════════════════════════════════════════{}",
+            DIM, RESET
+        );
         println!();
         println!("  {}Verify Examples:{}", BOLD, RESET);
         println!("    verify file /etc/passwd 0.99      # File existence");
@@ -2499,9 +3771,18 @@ impl MagiCli {
 
     fn cmd_monitor_help() {
         println!();
-        println!("{}{}╔══════════════════════════════════════════════════════════════╗{}", BOLD, CYAN, RESET);
-        println!("{}{}║                    MAGI MONITOR                               ║{}", BOLD, CYAN, RESET);
-        println!("{}{}╚══════════════════════════════════════════════════════════════╝{}", BOLD, CYAN, RESET);
+        println!(
+            "{}{}╔══════════════════════════════════════════════════════════════╗{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}║                    MAGI MONITOR                               ║{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}╚══════════════════════════════════════════════════════════════╝{}",
+            BOLD, CYAN, RESET
+        );
         println!();
         println!("  Real-time MAGI Loop Runtime Dashboard");
         println!();
@@ -2571,13 +3852,27 @@ fn run_monitor(persistence_config: PersistenceConfig) -> io::Result<()> {
         let uptime = start_time.elapsed().as_secs();
 
         // Render header
-        println!("{}{}╔════════════════════════════════════════════════════════════════════════╗{}", BOLD, CYAN, RESET);
-        println!("{}{}║                    MAGI EPISTEMIC MONITOR                              ║{}", BOLD, CYAN, RESET);
-        println!("{}{}║      The \"EEG\" of Symthaea - Real-Time Cognitive Visualization         ║{}", BOLD, CYAN, RESET);
-        println!("{}{}╚════════════════════════════════════════════════════════════════════════╝{}", BOLD, CYAN, RESET);
+        println!(
+            "{}{}╔════════════════════════════════════════════════════════════════════════╗{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}║                    MAGI EPISTEMIC MONITOR                              ║{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}║      The \"EEG\" of Symthaea - Real-Time Cognitive Visualization         ║{}",
+            BOLD, CYAN, RESET
+        );
+        println!(
+            "{}{}╚════════════════════════════════════════════════════════════════════════╝{}",
+            BOLD, CYAN, RESET
+        );
         println!();
-        println!("  {}Uptime:{} {}s | {}Frame:{} #{} | {}Ctrl+C to quit{}",
-            DIM, RESET, uptime, DIM, RESET, frame_count, DIM, RESET);
+        println!(
+            "  {}Uptime:{} {}s | {}Frame:{} #{} | {}Ctrl+C to quit{}",
+            DIM, RESET, uptime, DIM, RESET, frame_count, DIM, RESET
+        );
         println!();
 
         // Session info
@@ -2590,12 +3885,30 @@ fn run_monitor(persistence_config: PersistenceConfig) -> io::Result<()> {
             format!("{}Initializing{}", BLUE, RESET)
         };
 
-        println!("  {}╭────────────────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}RUNTIME STATE{}                                                      {}│{}", DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├────────────────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  State: {}  │  Tick: {:>6}  │  Session: #{}               {}│{}", DIM, RESET, state_str, tick_count, session_number, DIM, RESET);
-        println!("  {}│{}  Lifetime iterations: {}                                     {}│{}", DIM, RESET, current.loop_state.loop_iterations, DIM, RESET);
-        println!("  {}╰────────────────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╭────────────────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}RUNTIME STATE{}                                                      {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├────────────────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  State: {}  │  Tick: {:>6}  │  Session: #{}               {}│{}",
+            DIM, RESET, state_str, tick_count, session_number, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Lifetime iterations: {}                                     {}│{}",
+            DIM, RESET, current.loop_state.loop_iterations, DIM, RESET
+        );
+        println!(
+            "  {}╰────────────────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // Generate simulated signals based on calibration state
@@ -2607,7 +3920,11 @@ fn run_monitor(persistence_config: PersistenceConfig) -> io::Result<()> {
         let base_uncertainty = ece.min(1.0);
         let base_confidence = 1.0 - brier.min(1.0);
         let base_surprise = (brier * 1.5).min(1.0);
-        let base_coherence = if current.global_stats.is_well_calibrated { 0.8 } else { 0.4 };
+        let base_coherence = if current.global_stats.is_well_calibrated {
+            0.8
+        } else {
+            0.4
+        };
 
         // Add oscillation for visual interest
         let osc1 = (signal_phase.sin() * 0.1) as f32;
@@ -2621,9 +3938,18 @@ fn run_monitor(persistence_config: PersistenceConfig) -> io::Result<()> {
         let coherence = (base_coherence as f32 + osc2 * 0.5).clamp(0.0, 1.0);
 
         // Signals (the "EEG")
-        println!("  {}╭────────────────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}COGNITIVE SIGNALS (\"EEG\"){}                                         {}│{}", DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├────────────────────────────────────────────────────────────────────┤{}", DIM, RESET);
+        println!(
+            "  {}╭────────────────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}COGNITIVE SIGNALS (\"EEG\"){}                                         {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├────────────────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
 
         print_signal_bar("Free Energy", free_energy, RED, YELLOW, GREEN);
         print_signal_bar("Uncertainty", uncertainty, GREEN, YELLOW, RED);
@@ -2631,13 +3957,20 @@ fn run_monitor(persistence_config: PersistenceConfig) -> io::Result<()> {
         print_signal_bar("Surprise   ", surprise, GREEN, YELLOW, RED);
         print_signal_bar("Coherence  ", coherence, RED, YELLOW, GREEN);
 
-        println!("  {}╰────────────────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╰────────────────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // Calibration metrics
-        let brier_color = if brier < 0.15 { GREEN }
-            else if brier < 0.25 { YELLOW }
-            else { RED };
+        let brier_color = if brier < 0.15 {
+            GREEN
+        } else if brier < 0.25 {
+            YELLOW
+        } else {
+            RED
+        };
         let calibration_quality = if brier < 0.05 {
             format!("{}Excellent{}", GREEN, RESET)
         } else if brier < 0.10 {
@@ -2650,15 +3983,39 @@ fn run_monitor(persistence_config: PersistenceConfig) -> io::Result<()> {
             format!("{}Poor{}", RED, RESET)
         };
 
-        println!("  {}╭────────────────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}CALIBRATION{}                                                        {}│{}", DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├────────────────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Brier: {}{:.4}{}  │  ECE: {:.4}  │  Quality: {}     {}│{}", DIM, RESET, brier_color, brier, RESET, ece, calibration_quality, DIM, RESET);
-        println!("  {}│{}  Predictions: {} total  │  Correct: {}                    {}│{}", DIM, RESET,
+        println!(
+            "  {}╭────────────────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}CALIBRATION{}                                                        {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├────────────────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Brier: {}{:.4}{}  │  ECE: {:.4}  │  Quality: {}     {}│{}",
+            DIM, RESET, brier_color, brier, RESET, ece, calibration_quality, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Predictions: {} total  │  Correct: {}                    {}│{}",
+            DIM,
+            RESET,
             current.global_stats.total_predictions,
-            current.global_stats.correct_predictions, DIM, RESET);
-        println!("  {}│{}  Lifetime Brier Sum: {:.4}                                  {}│{}", DIM, RESET, current.global_stats.brier_sum, DIM, RESET);
-        println!("  {}╰────────────────────────────────────────────────────────────────────╯{}", DIM, RESET);
+            current.global_stats.correct_predictions,
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}│{}  Lifetime Brier Sum: {:.4}                                  {}│{}",
+            DIM, RESET, current.global_stats.brier_sum, DIM, RESET
+        );
+        println!(
+            "  {}╰────────────────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // Gate status (derived from calibration state)
@@ -2672,43 +4029,114 @@ fn run_monitor(persistence_config: PersistenceConfig) -> io::Result<()> {
             (YELLOW, "DRY RUN (Building History)", false)
         };
 
-        println!("  {}╭────────────────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}CONSTRAINT GATE{}                                                    {}│{}", DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├────────────────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Mode: {}{}{}                                       {}│{}",
-            DIM, RESET, gate_color, gate_str, RESET, DIM, RESET);
-        println!("  {}│{}  Gate: {}  │  Min Preds: {}  │  Min Accuracy: {:.0}%  {}│{}",
-            DIM, RESET,
-            if gate_open { format!("{}OPEN{}", GREEN, RESET) } else { format!("{}RESTRICTED{}", RED, RESET) },
+        println!(
+            "  {}╭────────────────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}CONSTRAINT GATE{}                                                    {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├────────────────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Mode: {}{}{}                                       {}│{}",
+            DIM, RESET, gate_color, gate_str, RESET, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Gate: {}  │  Min Preds: {}  │  Min Accuracy: {:.0}%  {}│{}",
+            DIM,
+            RESET,
+            if gate_open {
+                format!("{}OPEN{}", GREEN, RESET)
+            } else {
+                format!("{}RESTRICTED{}", RED, RESET)
+            },
             current.gate_config.min_predictions_for_autonomy,
             current.gate_config.min_accuracy_for_autonomy * 100.0,
-            DIM, RESET);
-        println!("  {}╰────────────────────────────────────────────────────────────────────╯{}", DIM, RESET);
+            DIM,
+            RESET
+        );
+        println!(
+            "  {}╰────────────────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
         println!();
 
         // Per-domain calibration
         if !current.calibration.is_empty() {
-            println!("  {}╭────────────────────────────────────────────────────────────────────╮{}", DIM, RESET);
+            println!(
+                "  {}╭────────────────────────────────────────────────────────────────────╮{}",
+                DIM, RESET
+            );
             println!("  {}│{} {}DOMAIN CALIBRATION{}                                                {}│{}", DIM, RESET, BOLD, RESET, DIM, RESET);
-            println!("  {}├────────────────────────────────────────────────────────────────────┤{}", DIM, RESET);
+            println!(
+                "  {}├────────────────────────────────────────────────────────────────────┤{}",
+                DIM, RESET
+            );
             for (domain, cal) in &current.calibration {
-                let d_color = if cal.lifetime_brier < 0.15 { GREEN } else if cal.lifetime_brier < 0.25 { YELLOW } else { RED };
-                println!("  {}│{}  {:?}: {}{:.4}{}  (n={})                             {}│{}",
-                    DIM, RESET, domain, d_color, cal.lifetime_brier, RESET, cal.prediction_count, DIM, RESET);
+                let d_color = if cal.lifetime_brier < 0.15 {
+                    GREEN
+                } else if cal.lifetime_brier < 0.25 {
+                    YELLOW
+                } else {
+                    RED
+                };
+                println!(
+                    "  {}│{}  {:?}: {}{:.4}{}  (n={})                             {}│{}",
+                    DIM,
+                    RESET,
+                    domain,
+                    d_color,
+                    cal.lifetime_brier,
+                    RESET,
+                    cal.prediction_count,
+                    DIM,
+                    RESET
+                );
             }
-            println!("  {}╰────────────────────────────────────────────────────────────────────╯{}", DIM, RESET);
+            println!(
+                "  {}╰────────────────────────────────────────────────────────────────────╯{}",
+                DIM, RESET
+            );
             println!();
         }
 
         // Loop state
-        println!("  {}╭────────────────────────────────────────────────────────────────────╮{}", DIM, RESET);
-        println!("  {}│{} {}MAGI LOOP STATE{}                                                    {}│{}", DIM, RESET, BOLD, RESET, DIM, RESET);
-        println!("  {}├────────────────────────────────────────────────────────────────────┤{}", DIM, RESET);
-        println!("  {}│{}  Predictions Made:     {:>6}                                    {}│{}", DIM, RESET, current.loop_state.predictions_made, DIM, RESET);
-        println!("  {}│{}  Predictions Resolved: {:>6}                                    {}│{}", DIM, RESET, current.loop_state.predictions_resolved, DIM, RESET);
-        println!("  {}│{}  Attributions:         {:>6}                                    {}│{}", DIM, RESET, current.loop_state.attributions_generated, DIM, RESET);
-        println!("  {}│{}  Calibration Quality:  {:?}                               {}│{}", DIM, RESET, current.loop_state.calibration_quality, DIM, RESET);
-        println!("  {}╰────────────────────────────────────────────────────────────────────╯{}", DIM, RESET);
+        println!(
+            "  {}╭────────────────────────────────────────────────────────────────────╮{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{} {}MAGI LOOP STATE{}                                                    {}│{}",
+            DIM, RESET, BOLD, RESET, DIM, RESET
+        );
+        println!(
+            "  {}├────────────────────────────────────────────────────────────────────┤{}",
+            DIM, RESET
+        );
+        println!(
+            "  {}│{}  Predictions Made:     {:>6}                                    {}│{}",
+            DIM, RESET, current.loop_state.predictions_made, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Predictions Resolved: {:>6}                                    {}│{}",
+            DIM, RESET, current.loop_state.predictions_resolved, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Attributions:         {:>6}                                    {}│{}",
+            DIM, RESET, current.loop_state.attributions_generated, DIM, RESET
+        );
+        println!(
+            "  {}│{}  Calibration Quality:  {:?}                               {}│{}",
+            DIM, RESET, current.loop_state.calibration_quality, DIM, RESET
+        );
+        println!(
+            "  {}╰────────────────────────────────────────────────────────────────────╯{}",
+            DIM, RESET
+        );
 
         let _ = io::stdout().flush();
 
@@ -2732,7 +4160,13 @@ fn print_signal_bar(name: &str, value: f32, low_color: &str, mid_color: &str, hi
     const RESET: &str = "\x1b[0m";
 
     let normalized = (value.clamp(0.0, 1.0) * BAR_WIDTH as f32) as usize;
-    let color = if value < 0.3 { low_color } else if value < 0.7 { mid_color } else { high_color };
+    let color = if value < 0.3 {
+        low_color
+    } else if value < 0.7 {
+        mid_color
+    } else {
+        high_color
+    };
 
     print!("  {}│{}  {}: [", DIM, RESET, name);
     print!("{}", color);
@@ -2755,7 +4189,8 @@ fn main() -> io::Result<()> {
 
     // Parse global options
     let verbose = args.iter().any(|a| a == "-v" || a == "--verbose");
-    let state_path = args.iter()
+    let state_path = args
+        .iter()
         .position(|a| a == "--state")
         .and_then(|i| args.get(i + 1))
         .map(PathBuf::from);
@@ -2772,7 +4207,8 @@ fn main() -> io::Result<()> {
     let mut cli = MagiCli::new(config.clone(), verbose)?;
 
     // Find command (skip program name and options)
-    let cmd_args: Vec<&str> = args.iter()
+    let cmd_args: Vec<&str> = args
+        .iter()
         .skip(1)
         .filter(|a| !a.starts_with('-'))
         .map(|s| s.as_str())
@@ -2887,8 +4323,12 @@ fn main() -> io::Result<()> {
             "help" => cli.print_help(),
             _ => {
                 eprintln!("Unknown command: {}", cmd_args[0]);
-                eprintln!("Commands: status, predict, resolve, verify, calibration, domains, trend,");
-                eprintln!("          batch, export, import, analytics, gate, metrics, attributions,");
+                eprintln!(
+                    "Commands: status, predict, resolve, verify, calibration, domains, trend,"
+                );
+                eprintln!(
+                    "          batch, export, import, analytics, gate, metrics, attributions,"
+                );
                 eprintln!("          history, where, drift, reset, monitor, help");
                 std::process::exit(1);
             }

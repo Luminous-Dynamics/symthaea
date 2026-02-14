@@ -751,7 +751,7 @@ mod tests {
         let (lo, hi, alpha) = q.soft_quantize(0.26); // Just above boundary 0.25
         // Should be near the boundary between bins 0 and 1
         assert!(lo <= 1 && hi <= 1);
-        assert!(alpha >= 0.0 && alpha <= 1.0);
+        assert!((0.0..=1.0).contains(&alpha));
     }
 
     #[test]
@@ -855,8 +855,8 @@ mod tests {
 
         // Edge pixels (column 1-2 boundary) should have high gradient
         // Interior pixels should have low gradient
-        let edge_grad = grads[1 * 4 + 2]; // (2, 1) near edge
-        let interior_grad = grads[1 * 4 + 0]; // (0, 1) in bright region
+        let edge_grad = grads[4 + 2]; // (2, 1) near edge
+        let interior_grad = grads[4]; // (0, 1) in bright region
         assert!(
             edge_grad >= interior_grad,
             "edge should have higher gradient: {edge_grad} vs {interior_grad}"

@@ -195,7 +195,11 @@ impl ConfigWriter {
     ///
     /// This is a simple text-based approach — for complex modifications,
     /// use the parser layer to produce a proper AST edit.
-    pub fn set_option(&self, option_path: &str, value: &str) -> Result<ConfigPatch, std::io::Error> {
+    pub fn set_option(
+        &self,
+        option_path: &str,
+        value: &str,
+    ) -> Result<ConfigPatch, std::io::Error> {
         let config_path = self.config_root.join("configuration.nix");
         let original = std::fs::read_to_string(&config_path)?;
 
@@ -330,9 +334,7 @@ impl ConfigWriter {
         }
 
         // Stage the file
-        let rel_path = path
-            .strip_prefix(&self.config_root)
-            .unwrap_or(path);
+        let rel_path = path.strip_prefix(&self.config_root).unwrap_or(path);
 
         let _ = Command::new("git")
             .args(["add", &rel_path.display().to_string()])
@@ -357,9 +359,7 @@ impl ConfigWriter {
             .status()?;
 
         if !status.success() {
-            return Err(std::io::Error::other(
-                "git restore failed",
-            ));
+            return Err(std::io::Error::other("git restore failed"));
         }
 
         Ok(())
@@ -440,7 +440,9 @@ mod tests {
     #[test]
     fn test_set_option_existing() {
         let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
-        let patch = writer.set_option("services.openssh.enable", "false").unwrap();
+        let patch = writer
+            .set_option("services.openssh.enable", "false")
+            .unwrap();
         assert!(patch.modified.contains("services.openssh.enable = false;"));
         assert!(!patch.modified.contains("services.openssh.enable = true;"));
     }

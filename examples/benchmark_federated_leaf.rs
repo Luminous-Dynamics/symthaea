@@ -18,8 +18,8 @@
 use std::time::Instant;
 
 use ndarray::Array1;
-use symthaea::dynamics::cfc::{CfCNetwork, CfCNetworkConfig, CfCConfig, ActivationType};
-use symthaea::swarm::{FederatedAggregator, GradientMessage, DifferentialPrivacyConfig};
+use symthaea::dynamics::cfc::{ActivationType, CfCConfig, CfCNetwork, CfCNetworkConfig};
+use symthaea::swarm::{DifferentialPrivacyConfig, FederatedAggregator, GradientMessage};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -38,7 +38,10 @@ fn main() {
     // Test 1: Basic FedAvg Convergence
     // ═══════════════════════════════════════════════════════════════
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Test 1: FedAvg Convergence ({} clients, {} rounds)", n_clients, n_rounds);
+    println!(
+        "Test 1: FedAvg Convergence ({} clients, {} rounds)",
+        n_clients, n_rounds
+    );
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let t = Instant::now();
@@ -96,7 +99,8 @@ fn main() {
 
             // Compute gradient (weight difference)
             let local_weights = local_model.get_weights();
-            let gradient: Vec<f32> = local_weights.iter()
+            let gradient: Vec<f32> = local_weights
+                .iter()
                 .zip(aggregator.local_weights().iter())
                 .map(|(l, g)| l - g)
                 .collect();
@@ -126,9 +130,12 @@ fn main() {
                 for (inp, tgt) in inputs.iter().zip(targets.iter()) {
                     eval_model.reset();
                     let out = eval_model.forward(inp, 0.1);
-                    let loss: f32 = out.iter().zip(tgt.iter())
+                    let loss: f32 = out
+                        .iter()
+                        .zip(tgt.iter())
                         .map(|(o, t)| (o - t).powi(2))
-                        .sum::<f32>() / output_dim as f32;
+                        .sum::<f32>()
+                        / output_dim as f32;
                     total_loss += loss as f64;
                     count += 1;
                 }
@@ -144,8 +151,8 @@ fn main() {
     }
 
     let elapsed = t.elapsed().as_secs_f64();
-    let converged = round_losses.len() >= 2 &&
-        round_losses.last().unwrap() < round_losses.first().unwrap();
+    let converged =
+        round_losses.len() >= 2 && round_losses.last().unwrap() < round_losses.first().unwrap();
     println!("  FedAvg converged: {} ({:.1}s)", converged, elapsed);
 
     // ═══════════════════════════════════════════════════════════════
@@ -157,9 +164,18 @@ fn main() {
 
     let dp_configs = [
         ("No DP", None),
-        ("Low privacy (ε~10)", Some(DifferentialPrivacyConfig::low_privacy())),
-        ("Moderate (ε~1)", Some(DifferentialPrivacyConfig::moderate_privacy())),
-        ("High privacy (ε~0.1)", Some(DifferentialPrivacyConfig::high_privacy())),
+        (
+            "Low privacy (ε~10)",
+            Some(DifferentialPrivacyConfig::low_privacy()),
+        ),
+        (
+            "Moderate (ε~1)",
+            Some(DifferentialPrivacyConfig::moderate_privacy()),
+        ),
+        (
+            "High privacy (ε~0.1)",
+            Some(DifferentialPrivacyConfig::high_privacy()),
+        ),
     ];
 
     let mut dp_losses = Vec::new();
@@ -183,7 +199,8 @@ fn main() {
                 }
 
                 let local_weights = local_model.get_weights();
-                let gradient: Vec<f32> = local_weights.iter()
+                let gradient: Vec<f32> = local_weights
+                    .iter()
                     .zip(agg.local_weights().iter())
                     .map(|(l, g)| l - g)
                     .collect();
@@ -207,9 +224,12 @@ fn main() {
             for (inp, tgt) in inputs.iter().zip(targets.iter()) {
                 eval_model.reset();
                 let out = eval_model.forward(inp, 0.1);
-                let loss: f32 = out.iter().zip(tgt.iter())
+                let loss: f32 = out
+                    .iter()
+                    .zip(tgt.iter())
                     .map(|(o, t)| (o - t).powi(2))
-                    .sum::<f32>() / output_dim as f32;
+                    .sum::<f32>()
+                    / output_dim as f32;
                 total_loss += loss as f64;
                 count += 1;
             }
@@ -232,18 +252,20 @@ fn main() {
     let n_byzantine = 2; // 2 out of 10 clients
 
     let mut agg_no_bft = FederatedAggregator::new(global_weights.clone());
-    let mut agg_with_bft = FederatedAggregator::new(global_weights.clone())
-        .with_byzantine_tolerance(0.2);
+    let mut agg_with_bft =
+        FederatedAggregator::new(global_weights.clone()).with_byzantine_tolerance(0.2);
 
     for _ in 0..10 {
         for client_id in 0..n_clients {
             let gradient: Vec<f32> = if client_id < n_byzantine {
                 // Byzantine: random large gradients
                 let mut rng_seed = (client_id as u64 + 1) * 999;
-                (0..weight_dim).map(|_| {
-                    rng_seed = rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-                    ((rng_seed >> 33) as f32 / (1u64 << 31) as f32) * 10.0 - 5.0
-                }).collect()
+                (0..weight_dim)
+                    .map(|_| {
+                        rng_seed = rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                        ((rng_seed >> 33) as f32 / (1u64 << 31) as f32) * 10.0 - 5.0
+                    })
+                    .collect()
             } else {
                 // Honest: small realistic gradients
                 let mut local_model = CfCNetwork::new(config.clone());
@@ -252,7 +274,9 @@ fn main() {
                 for (inp, tgt) in inputs.iter().zip(targets.iter()) {
                     let _ = local_model.train_step(inp, tgt, 0.1, 0.01);
                 }
-                local_model.get_weights().iter()
+                local_model
+                    .get_weights()
+                    .iter()
                     .zip(agg_no_bft.local_weights().iter())
                     .map(|(l, g)| l - g)
                     .collect()
@@ -270,8 +294,18 @@ fn main() {
     }
 
     // Evaluate both
-    let loss_no_bft = evaluate_model(&config, agg_no_bft.local_weights(), &client_data, output_dim);
-    let loss_with_bft = evaluate_model(&config, agg_with_bft.local_weights(), &client_data, output_dim);
+    let loss_no_bft = evaluate_model(
+        &config,
+        agg_no_bft.local_weights(),
+        &client_data,
+        output_dim,
+    );
+    let loss_with_bft = evaluate_model(
+        &config,
+        agg_with_bft.local_weights(),
+        &client_data,
+        output_dim,
+    );
 
     println!("  Without BFT: loss = {:.4}", loss_no_bft);
     println!("  With BFT:    loss = {:.4}", loss_with_bft);
@@ -302,7 +336,9 @@ fn main() {
                 let _ = local_model.train_step(inp, tgt, 0.1, lr);
             }
 
-            let gradient: Vec<f32> = local_model.get_weights().iter()
+            let gradient: Vec<f32> = local_model
+                .get_weights()
+                .iter()
                 .zip(agg_trusted.local_weights().iter())
                 .map(|(l, g)| l - g)
                 .collect();
@@ -323,7 +359,12 @@ fn main() {
         agg_equal.aggregate_and_apply();
     }
 
-    let loss_trusted = evaluate_model(&config, agg_trusted.local_weights(), &client_data, output_dim);
+    let loss_trusted = evaluate_model(
+        &config,
+        agg_trusted.local_weights(),
+        &client_data,
+        output_dim,
+    );
     let loss_equal = evaluate_model(&config, agg_equal.local_weights(), &client_data, output_dim);
 
     println!("  Trust-weighted: loss = {:.4}", loss_trusted);
@@ -343,16 +384,25 @@ fn main() {
         ("DP preserves utility (low ε)", dp_utility_preserved),
         ("BFT improves Byzantine robustness", bft_helps),
         ("Trust-weighting is effective", trust_helps),
-        ("Aggregation completes all rounds", round_losses.len() == n_rounds),
+        (
+            "Aggregation completes all rounds",
+            round_losses.len() == n_rounds,
+        ),
     ];
 
     let mut passed = 0;
     for (name, pass) in &checks {
         println!("║  {} {:50}   ║", if *pass { "PASS" } else { "FAIL" }, name);
-        if *pass { passed += 1; }
+        if *pass {
+            passed += 1;
+        }
     }
     println!("╟──────────────────────────────────────────────────────────────╢");
-    println!("║  Result: {}/{} tests passed                                 ║", passed, checks.len());
+    println!(
+        "║  Result: {}/{} tests passed                                 ║",
+        passed,
+        checks.len()
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Save
@@ -390,9 +440,12 @@ fn evaluate_model(
         for (inp, tgt) in inputs.iter().zip(targets.iter()) {
             eval_model.reset();
             let out = eval_model.forward(inp, 0.1);
-            let loss: f32 = out.iter().zip(tgt.iter())
+            let loss: f32 = out
+                .iter()
+                .zip(tgt.iter())
                 .map(|(o, t)| (o - t).powi(2))
-                .sum::<f32>() / output_dim as f32;
+                .sum::<f32>()
+                / output_dim as f32;
             total_loss += loss as f64;
             count += 1;
         }
@@ -431,15 +484,17 @@ fn generate_non_iid_data(
             };
 
             // Generate input features correlated with class
-            let input: Vec<f32> = (0..input_dim).map(|d| {
-                let class_signal = ((class as f32 + d as f32) * 0.3).sin() * 0.5;
-                class_signal + (rand() - 0.5) * 0.3
-            }).collect();
+            let input: Vec<f32> = (0..input_dim)
+                .map(|d| {
+                    let class_signal = ((class as f32 + d as f32) * 0.3).sin() * 0.5;
+                    class_signal + (rand() - 0.5) * 0.3
+                })
+                .collect();
 
             // One-hot-ish target (soft labels)
-            let target: Vec<f32> = (0..output_dim).map(|c| {
-                if c == class { 0.8 } else { 0.1 }
-            }).collect();
+            let target: Vec<f32> = (0..output_dim)
+                .map(|c| if c == class { 0.8 } else { 0.1 })
+                .collect();
 
             inputs.push(Array1::from_vec(input));
             targets.push(Array1::from_vec(target));

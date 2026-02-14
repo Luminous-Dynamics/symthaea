@@ -8,9 +8,9 @@
 //! This ensures the system NEVER crashes due to missing model files.
 
 use anyhow::Result;
-use symthaea_core::hdc::real_hv::RealHV;
 #[cfg(feature = "embeddings")]
 use ort::{GraphOptimizationLevel, Session};
+use symthaea_core::hdc::real_hv::RealHV;
 #[cfg(feature = "embeddings")]
 use tokenizers::Tokenizer;
 
@@ -19,7 +19,7 @@ pub struct SemanticEncoder {
     tokenizer: Option<Tokenizer>,
     #[cfg(feature = "embeddings")]
     session: Option<Session>,
-    
+
     /// Deterministic random fallback
     use_dream: bool,
 }
@@ -48,7 +48,7 @@ impl SemanticEncoder {
     pub fn encode_text(&mut self, text: &str) -> Vec<i8> {
         // Real implementation would use ONNX here.
         // If models missing (use_dream = true), we "dream" the meaning.
-        
+
         if self.use_dream {
             self.dream_encode(text)
         } else {
@@ -56,7 +56,7 @@ impl SemanticEncoder {
             self.dream_encode(text)
         }
     }
-    
+
     /// Encode text into RealHV
     pub fn encode(&self, text: &str) -> Result<RealHV> {
         if self.use_dream {
@@ -75,32 +75,32 @@ impl SemanticEncoder {
     /// This allows the system to function coherently even without external models.
     /// "Dog" will always equal "Dog", even if the system doesn't know what a dog is.
     fn dream_encode(&self, text: &str) -> Vec<i8> {
+        use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        use rand::{Rng, SeedableRng};
-        use rand::rngs::StdRng;
 
         let mut hasher = DefaultHasher::new();
         text.hash(&mut hasher);
         let seed = hasher.finish();
 
         let mut rng = StdRng::seed_from_u64(seed);
-        
+
         let mut hv = vec![0i8; 10_000]; // Legacy bipolar size
         for i in 0..10_000 {
             hv[i] = if rng.gen_bool(0.5) { 1 } else { -1 };
         }
         hv
     }
-    
+
     fn dream_encode_real(&self, text: &str) -> RealHV {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        
+
         let mut hasher = DefaultHasher::new();
         text.hash(&mut hasher);
         let seed = hasher.finish();
-        
+
         // Generate 16,384D RealHV from seed
         RealHV::random(RealHV::DEFAULT_DIM, seed)
     }
@@ -108,9 +108,13 @@ impl SemanticEncoder {
     pub fn text_similarity(&mut self, text_a: &str, text_b: &str) -> f32 {
         let vec_a = self.encode_text(text_a);
         let vec_b = self.encode_text(text_b);
-        
+
         // Hamming similarity
-        let matches = vec_a.iter().zip(vec_b.iter()).filter(|(a, b)| a == b).count();
+        let matches = vec_a
+            .iter()
+            .zip(vec_b.iter())
+            .filter(|(a, b)| a == b)
+            .count();
         matches as f32 / vec_a.len() as f32
     }
 }

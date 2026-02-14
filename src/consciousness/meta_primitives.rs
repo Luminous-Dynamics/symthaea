@@ -577,7 +577,7 @@ mod tests {
         let mutated = composite.mutate();
         // Mutation should change the sequence
         // (though it might rarely be the same)
-        assert!(mutated.sequence.len() >= 1);
+        assert!(!mutated.sequence.is_empty());
         assert!(mutated.sequence.len() <= 8);
     }
 

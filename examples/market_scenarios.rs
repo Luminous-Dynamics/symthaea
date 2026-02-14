@@ -13,11 +13,10 @@
 //!
 //! Run with: cargo run --example market_scenarios
 
-use symthaea::markets::{
-    MarketSimulator, SimulatorConfig, PatternMemory, MarketRegime,
-    OHLCV, TechnicalIndicators,
-};
 use std::collections::HashMap;
+use symthaea::markets::{
+    MarketRegime, MarketSimulator, PatternMemory, SimulatorConfig, TechnicalIndicators, OHLCV,
+};
 
 fn main() {
     println!("=== Market Scenarios & HDC Parameter Tuning ===\n");
@@ -28,38 +27,50 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
 
     let scenarios = vec![
-        ("Bull Market", SimulatorConfig {
-            initial_price: 100.0,
-            base_volatility: 1.5,
-            mean_return: 0.08,  // Strong positive drift
-            regime_persistence: 0.95,
-            trend_strength: 2.0,
-            ..Default::default()
-        }),
-        ("Bear Market", SimulatorConfig {
-            initial_price: 100.0,
-            base_volatility: 2.0,
-            mean_return: -0.06,  // Negative drift
-            regime_persistence: 0.93,
-            trend_strength: 1.8,
-            ..Default::default()
-        }),
-        ("High Volatility", SimulatorConfig {
-            initial_price: 100.0,
-            base_volatility: 4.0,  // High vol
-            mean_return: 0.01,
-            regime_persistence: 0.85,  // Frequent regime changes
-            trend_strength: 1.0,
-            ..Default::default()
-        }),
-        ("Low Volatility", SimulatorConfig {
-            initial_price: 100.0,
-            base_volatility: 0.8,  // Low vol
-            mean_return: 0.02,
-            regime_persistence: 0.98,  // Stable regimes
-            trend_strength: 0.5,
-            ..Default::default()
-        }),
+        (
+            "Bull Market",
+            SimulatorConfig {
+                initial_price: 100.0,
+                base_volatility: 1.5,
+                mean_return: 0.08, // Strong positive drift
+                regime_persistence: 0.95,
+                trend_strength: 2.0,
+                ..Default::default()
+            },
+        ),
+        (
+            "Bear Market",
+            SimulatorConfig {
+                initial_price: 100.0,
+                base_volatility: 2.0,
+                mean_return: -0.06, // Negative drift
+                regime_persistence: 0.93,
+                trend_strength: 1.8,
+                ..Default::default()
+            },
+        ),
+        (
+            "High Volatility",
+            SimulatorConfig {
+                initial_price: 100.0,
+                base_volatility: 4.0, // High vol
+                mean_return: 0.01,
+                regime_persistence: 0.85, // Frequent regime changes
+                trend_strength: 1.0,
+                ..Default::default()
+            },
+        ),
+        (
+            "Low Volatility",
+            SimulatorConfig {
+                initial_price: 100.0,
+                base_volatility: 0.8, // Low vol
+                mean_return: 0.02,
+                regime_persistence: 0.98, // Stable regimes
+                trend_strength: 0.5,
+                ..Default::default()
+            },
+        ),
     ];
 
     let mut scenario_results: Vec<(&str, ScenarioResult)> = Vec::new();
@@ -77,18 +88,22 @@ fn main() {
     println!("║                  SCENARIO COMPARISON SUMMARY                     ║");
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
 
-    println!("{:<18} {:>10} {:>10} {:>10} {:>10} {:>10}",
-             "Scenario", "HDC Ret%", "Trend Ret%", "HDC Win%", "HDC Sharpe", "HDC DD%");
+    println!(
+        "{:<18} {:>10} {:>10} {:>10} {:>10} {:>10}",
+        "Scenario", "HDC Ret%", "Trend Ret%", "HDC Win%", "HDC Sharpe", "HDC DD%"
+    );
     println!("{:-<78}", "");
 
     for (name, result) in &scenario_results {
-        println!("{:<18} {:>9.2}% {:>9.2}% {:>9.1}% {:>10.2} {:>9.2}%",
-                 name,
-                 result.hdc_return,
-                 result.trend_return,
-                 result.hdc_win_rate * 100.0,
-                 result.hdc_sharpe,
-                 result.hdc_max_dd * 100.0);
+        println!(
+            "{:<18} {:>9.2}% {:>9.2}% {:>9.1}% {:>10.2} {:>9.2}%",
+            name,
+            result.hdc_return,
+            result.trend_return,
+            result.hdc_win_rate * 100.0,
+            result.hdc_sharpe,
+            result.hdc_max_dd * 100.0
+        );
     }
 
     // NOTE: Parameter tuning sweeps commented out for speed
@@ -111,7 +126,12 @@ struct ScenarioResult {
     regime_accuracy: f64,
 }
 
-fn run_scenario(config: &SimulatorConfig, train_days: usize, test_days: usize, lookback: usize) -> ScenarioResult {
+fn run_scenario(
+    config: &SimulatorConfig,
+    train_days: usize,
+    test_days: usize,
+    lookback: usize,
+) -> ScenarioResult {
     // Generate training data
     let mut train_sim = MarketSimulator::new(config.clone(), 42);
     let train_candles = train_sim.generate(train_days);
@@ -126,7 +146,13 @@ fn run_scenario(config: &SimulatorConfig, train_days: usize, test_days: usize, l
         let window_indicators = &train_indicators[i - lookback..i];
         let regime = classify_window(window_candles, &train_indicators[i]);
         let outcome = train_candles[i].change_pct() as f32;
-        memory.store_pattern(window_candles, window_indicators, regime, outcome, &format!("p{}", i));
+        memory.store_pattern(
+            window_candles,
+            window_indicators,
+            regime,
+            outcome,
+            &format!("p{}", i),
+        );
     }
 
     // Generate test data with different seed
@@ -202,7 +228,9 @@ fn run_hdc_benchmark(
 
         returns.push(ret);
         trades += 1;
-        if ret > 0.0 { wins += 1; }
+        if ret > 0.0 {
+            wins += 1;
+        }
 
         equity *= 1.0 + ret;
         peak = peak.max(equity);
@@ -210,7 +238,11 @@ fn run_hdc_benchmark(
     }
 
     let total_return = (equity - 1.0) * 100.0;
-    let win_rate = if trades > 0 { wins as f64 / trades as f64 } else { 0.0 };
+    let win_rate = if trades > 0 {
+        wins as f64 / trades as f64
+    } else {
+        0.0
+    };
     let sharpe = calculate_sharpe(&returns);
 
     (total_return, trades, win_rate, sharpe, max_dd)
@@ -244,7 +276,9 @@ fn run_trend_benchmark(
 
         returns.push(ret);
         trades += 1;
-        if ret > 0.0 { wins += 1; }
+        if ret > 0.0 {
+            wins += 1;
+        }
 
         equity *= 1.0 + ret;
         peak = peak.max(equity);
@@ -252,13 +286,21 @@ fn run_trend_benchmark(
     }
 
     let total_return = (equity - 1.0) * 100.0;
-    let win_rate = if trades > 0 { wins as f64 / trades as f64 } else { 0.0 };
+    let win_rate = if trades > 0 {
+        wins as f64 / trades as f64
+    } else {
+        0.0
+    };
     let sharpe = calculate_sharpe(&returns);
 
     (total_return, trades, win_rate, sharpe, max_dd)
 }
 
-fn run_random_benchmark(candles: &[OHLCV], lookback: usize, seed: u64) -> (f64, u32, f64, f64, f64) {
+fn run_random_benchmark(
+    candles: &[OHLCV],
+    lookback: usize,
+    seed: u64,
+) -> (f64, u32, f64, f64, f64) {
     let mut equity: f64 = 1.0;
     let mut rng = seed;
 
@@ -299,11 +341,20 @@ fn run_with_threshold(
         let window_indicators = &train_indicators[i - lookback..i];
         let regime = classify_window(window_candles, &train_indicators[i]);
         let outcome = train_candles[i].change_pct() as f32;
-        memory.store_pattern(window_candles, window_indicators, regime, outcome, &format!("p{}", i));
+        memory.store_pattern(
+            window_candles,
+            window_indicators,
+            regime,
+            outcome,
+            &format!("p{}", i),
+        );
     }
 
     let mut test_sim = MarketSimulator::new(
-        SimulatorConfig { initial_price: train_sim.price(), ..config.clone() },
+        SimulatorConfig {
+            initial_price: train_sim.price(),
+            ..config.clone()
+        },
         12345,
     );
     let test_candles = test_sim.generate(test_days);
@@ -340,13 +391,22 @@ fn run_with_train_size(
         let window_indicators = &train_indicators[i - lookback..i];
         let regime = classify_window(window_candles, &train_indicators[i]);
         let outcome = train_candles[i].change_pct() as f32;
-        memory.store_pattern(window_candles, window_indicators, regime, outcome, &format!("p{}", i));
+        memory.store_pattern(
+            window_candles,
+            window_indicators,
+            regime,
+            outcome,
+            &format!("p{}", i),
+        );
     }
 
     let pattern_count = memory.pattern_count();
 
     let mut test_sim = MarketSimulator::new(
-        SimulatorConfig { initial_price: train_sim.price(), ..config.clone() },
+        SimulatorConfig {
+            initial_price: train_sim.price(),
+            ..config.clone()
+        },
         12345,
     );
     let test_candles = test_sim.generate(test_days);
@@ -378,15 +438,25 @@ fn calculate_regime_accuracy(
         total += 1;
     }
 
-    if total > 0 { correct as f64 / total as f64 } else { 0.0 }
+    if total > 0 {
+        correct as f64 / total as f64
+    } else {
+        0.0
+    }
 }
 
 fn calculate_sharpe(returns: &[f64]) -> f64 {
-    if returns.is_empty() { return 0.0; }
+    if returns.is_empty() {
+        return 0.0;
+    }
     let avg: f64 = returns.iter().sum::<f64>() / returns.len() as f64;
     let var: f64 = returns.iter().map(|r| (r - avg).powi(2)).sum::<f64>() / returns.len() as f64;
     let std = var.sqrt();
-    if std > 0.0 { avg / std * (252.0_f64).sqrt() } else { 0.0 }
+    if std > 0.0 {
+        avg / std * (252.0_f64).sqrt()
+    } else {
+        0.0
+    }
 }
 
 fn classify_window(candles: &[OHLCV], indicators: &TechnicalIndicators) -> MarketRegime {
@@ -409,11 +479,19 @@ fn classify_window(candles: &[OHLCV], indicators: &TechnicalIndicators) -> Marke
 
 fn print_scenario_result(result: &ScenarioResult) {
     println!("  Final price: ${:.2}", result.final_price);
-    println!("  HDC: {:.2}% return, {:.1}% win rate, {:.2} Sharpe, {:.2}% max DD ({} trades)",
-             result.hdc_return, result.hdc_win_rate * 100.0, result.hdc_sharpe,
-             result.hdc_max_dd * 100.0, result.hdc_trades);
-    println!("  Trend: {:.2}% return, {:.1}% win rate",
-             result.trend_return, result.trend_win_rate * 100.0);
+    println!(
+        "  HDC: {:.2}% return, {:.1}% win rate, {:.2} Sharpe, {:.2}% max DD ({} trades)",
+        result.hdc_return,
+        result.hdc_win_rate * 100.0,
+        result.hdc_sharpe,
+        result.hdc_max_dd * 100.0,
+        result.hdc_trades
+    );
+    println!(
+        "  Trend: {:.2}% return, {:.1}% win rate",
+        result.trend_return,
+        result.trend_win_rate * 100.0
+    );
     println!("  Random: {:.2}% return", result.random_return);
     println!("  Regime accuracy: {:.1}%", result.regime_accuracy * 100.0);
 }

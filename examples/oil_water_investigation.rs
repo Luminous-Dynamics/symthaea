@@ -29,14 +29,14 @@
 //! cargo run --example oil_water_investigation --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -67,7 +67,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal: Vec<_> = phenomenal.into_iter().take(30).collect();
     let functional: Vec<_> = functional.into_iter().take(30).collect();
 
-    println!("Using {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Using {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     // Load model
     println!("Loading BGE-M3...");
@@ -152,7 +156,11 @@ fn run_experiment() -> Result<()> {
     println!("  Phen+Func: {:.4}", mean(&pf_distances));
 
     let p_pp_pf = permutation_test(&pp_distances, &pf_distances, 2000);
-    println!("\n  Phen+Phen vs Phen+Func: p = {:.4}{}", p_pp_pf, if p_pp_pf < 0.05 { " *" } else { "" });
+    println!(
+        "\n  Phen+Phen vs Phen+Func: p = {:.4}{}",
+        p_pp_pf,
+        if p_pp_pf < 0.05 { " *" } else { "" }
+    );
 
     if mean(&pf_distances) > mean(&pp_distances) {
         println!("\n  → Cross-class binding creates MORE orthogonal vectors");
@@ -234,9 +242,24 @@ fn run_experiment() -> Result<()> {
     println!("Betti numbers of bound vectors:");
     println!("Pair Type  │ Mean β₀ │ Mean β₁ │ Total");
     println!("───────────┼─────────┼─────────┼──────");
-    println!("Phen+Phen  │ {:7.2} │ {:7.2} │ {:5.2}", mean(&pp_betti0), mean(&pp_betti1), mean(&pp_betti0) + mean(&pp_betti1));
-    println!("Func+Func  │ {:7.2} │ {:7.2} │ {:5.2}", mean(&ff_betti0), mean(&ff_betti1), mean(&ff_betti0) + mean(&ff_betti1));
-    println!("Phen+Func  │ {:7.2} │ {:7.2} │ {:5.2}", mean(&pf_betti0), mean(&pf_betti1), mean(&pf_betti0) + mean(&pf_betti1));
+    println!(
+        "Phen+Phen  │ {:7.2} │ {:7.2} │ {:5.2}",
+        mean(&pp_betti0),
+        mean(&pp_betti1),
+        mean(&pp_betti0) + mean(&pp_betti1)
+    );
+    println!(
+        "Func+Func  │ {:7.2} │ {:7.2} │ {:5.2}",
+        mean(&ff_betti0),
+        mean(&ff_betti1),
+        mean(&ff_betti0) + mean(&ff_betti1)
+    );
+    println!(
+        "Phen+Func  │ {:7.2} │ {:7.2} │ {:5.2}",
+        mean(&pf_betti0),
+        mean(&pf_betti1),
+        mean(&pf_betti0) + mean(&pf_betti1)
+    );
 
     // ================================================================
     // TEST 4: Subspace Overlap Analysis
@@ -256,7 +279,10 @@ fn run_experiment() -> Result<()> {
 
     // Cosine similarity between class centroids
     let centroid_similarity = cosine_similarity_f64(&phen_mean, &func_mean);
-    println!("Cosine similarity between class centroids: {:.4}", centroid_similarity);
+    println!(
+        "Cosine similarity between class centroids: {:.4}",
+        centroid_similarity
+    );
 
     // Compute principal directions for each class (simplified: direction of max variance)
     let phen_var_per_dim: Vec<f64> = (0..phen_acts[0].len())
@@ -276,17 +302,31 @@ fn run_experiment() -> Result<()> {
         .collect();
 
     // Find top variance dimensions for each class
-    let mut phen_top_dims: Vec<(usize, f64)> = phen_var_per_dim.iter().enumerate().map(|(i, &v)| (i, v)).collect();
-    let mut func_top_dims: Vec<(usize, f64)> = func_var_per_dim.iter().enumerate().map(|(i, &v)| (i, v)).collect();
+    let mut phen_top_dims: Vec<(usize, f64)> = phen_var_per_dim
+        .iter()
+        .enumerate()
+        .map(|(i, &v)| (i, v))
+        .collect();
+    let mut func_top_dims: Vec<(usize, f64)> = func_var_per_dim
+        .iter()
+        .enumerate()
+        .map(|(i, &v)| (i, v))
+        .collect();
 
     phen_top_dims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
     func_top_dims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
-    let phen_top_50: std::collections::HashSet<usize> = phen_top_dims.iter().take(50).map(|(i, _)| *i).collect();
-    let func_top_50: std::collections::HashSet<usize> = func_top_dims.iter().take(50).map(|(i, _)| *i).collect();
+    let phen_top_50: std::collections::HashSet<usize> =
+        phen_top_dims.iter().take(50).map(|(i, _)| *i).collect();
+    let func_top_50: std::collections::HashSet<usize> =
+        func_top_dims.iter().take(50).map(|(i, _)| *i).collect();
 
     let overlap = phen_top_50.intersection(&func_top_50).count();
-    println!("Overlap in top 50 variance dimensions: {}/50 ({:.1}%)", overlap, (overlap as f64 / 50.0) * 100.0);
+    println!(
+        "Overlap in top 50 variance dimensions: {}/50 ({:.1}%)",
+        overlap,
+        (overlap as f64 / 50.0) * 100.0
+    );
 
     if overlap < 25 {
         println!("\n  ✓ Classes occupy DIFFERENT subspaces");
@@ -304,8 +344,11 @@ fn run_experiment() -> Result<()> {
 
     if mean(&pf_similarity) < mean(&pp_similarity) {
         println!("1. ORTHOGONALITY: Phenomenal and functional representations");
-        println!("   occupy different subspaces (cosine sim {:.3} vs {:.3})",
-                 mean(&pf_similarity), mean(&pp_similarity));
+        println!(
+            "   occupy different subspaces (cosine sim {:.3} vs {:.3})",
+            mean(&pf_similarity),
+            mean(&pp_similarity)
+        );
     }
 
     if mean(&pf_distances) > mean(&pp_distances) {
@@ -336,10 +379,18 @@ fn hamming_distance(a: &BinaryHV, b: &BinaryHV) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    let dot: f64 = a.iter().zip(b.iter()).map(|(&x, &y)| (x as f64) * (y as f64)).sum();
+    let dot: f64 = a
+        .iter()
+        .zip(b.iter())
+        .map(|(&x, &y)| (x as f64) * (y as f64))
+        .sum();
     let norm_a: f64 = a.iter().map(|&x| (x as f64).powi(2)).sum::<f64>().sqrt();
     let norm_b: f64 = b.iter().map(|&x| (x as f64).powi(2)).sum::<f64>().sqrt();
-    if norm_a > 0.0 && norm_b > 0.0 { dot / (norm_a * norm_b) } else { 0.0 }
+    if norm_a > 0.0 && norm_b > 0.0 {
+        dot / (norm_a * norm_b)
+    } else {
+        0.0
+    }
 }
 
 #[cfg(feature = "neural-bridge")]
@@ -347,7 +398,11 @@ fn cosine_similarity_f64(a: &[f64], b: &[f64]) -> f64 {
     let dot: f64 = a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum();
     let norm_a: f64 = a.iter().map(|&x| x.powi(2)).sum::<f64>().sqrt();
     let norm_b: f64 = b.iter().map(|&x| x.powi(2)).sum::<f64>().sqrt();
-    if norm_a > 0.0 && norm_b > 0.0 { dot / (norm_a * norm_b) } else { 0.0 }
+    if norm_a > 0.0 && norm_b > 0.0 {
+        dot / (norm_a * norm_b)
+    } else {
+        0.0
+    }
 }
 
 #[cfg(feature = "neural-bridge")]
@@ -386,7 +441,10 @@ fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn analyze_topology(hv: &BinaryHV, config: &TopologyConfig) -> symthaea_core::hdc::consciousness_topology::TopologicalAssessment {
+fn analyze_topology(
+    hv: &BinaryHV,
+    config: &TopologyConfig,
+) -> symthaea_core::hdc::consciousness_topology::TopologicalAssessment {
     let mut topology = ConsciousnessTopology::new(config.clone());
 
     topology.add_state(*hv);
@@ -399,7 +457,9 @@ fn analyze_topology(hv: &BinaryHV, config: &TopologyConfig) -> symthaea_core::hd
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 

@@ -7,17 +7,13 @@
 //! It is intended as the easiest way to get a feel for the
 //! consciousness pipeline without pulling in the full system.
 
-use symthaea::core::{
-    UnifiedConsciousnessPipeline,
-    ConsciousMoment,
-};
+use symthaea::core::{ConsciousMoment, UnifiedConsciousnessPipeline};
 
 fn main() {
     // Run a short, deterministic loop
     let steps = 20;
     let moments: Vec<ConsciousMoment> =
-        UnifiedConsciousnessPipeline::run_minimal_demo(steps)
-            .expect("pipeline should initialize");
+        UnifiedConsciousnessPipeline::run_minimal_demo(steps).expect("pipeline should initialize");
 
     println!("\nCore Minimal Consciousness Loop ({} steps)", steps);
     println!("================================================\n");
@@ -27,12 +23,7 @@ fn main() {
     for m in moments.iter().rev().take(5).rev() {
         println!(
             "  t={:>3}  C={:.3}  B={:.3}  W={:.3}  Φ={:.3}  limiting={:?}",
-            m.step,
-            m.consciousness,
-            m.binding,
-            m.workspace,
-            m.phi,
-            m.limiting_factor,
+            m.step, m.consciousness, m.binding, m.workspace, m.phi, m.limiting_factor,
         );
     }
 
@@ -49,4 +40,3 @@ fn main() {
     println!("  ⟨Φ⟩   = {:.3}", avg_phi);
     println!();
 }
-

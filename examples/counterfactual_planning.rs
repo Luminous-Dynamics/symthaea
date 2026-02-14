@@ -11,15 +11,12 @@
 
 #[cfg(feature = "reasoning_engine")]
 fn main() {
+    use symthaea::consciousness::counterfactual::semantic_roles::{RoleSubstitution, SemanticRole};
     use symthaea::consciousness::counterfactual::{
-        CausalDAG, CausalQuery, CounterfactualReasoner,
-        CausalReferenceHarness,
-        composer::CounterfactualComposer,
+        composer::CounterfactualComposer, CausalDAG, CausalQuery, CausalReferenceHarness,
+        CounterfactualReasoner,
     };
     use symthaea_core::hdc::binary_hv::BinaryHV;
-    use symthaea::consciousness::counterfactual::semantic_roles::{
-        SemanticRole, RoleSubstitution,
-    };
 
     println!("═══════════════════════════════════════════════════════════");
     println!("  Symthaea Counterfactual Planning Demo");
@@ -30,11 +27,12 @@ fn main() {
 
     // ── Example 1: Simple causal chain ───────────────────────────────
     println!("── Example 1: Simple causal chain (X → Y) ──");
-    let dag1 = CausalDAG::new(
-        vec!["Treatment".into(), "Outcome".into()],
-        vec![(0, 1)],
-    );
-    let query1 = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+    let dag1 = CausalDAG::new(vec!["Treatment".into(), "Outcome".into()], vec![(0, 1)]);
+    let query1 = CausalQuery {
+        treatment: 0,
+        outcome: 1,
+        conditioning: vec![],
+    };
     let outcome1 = reasoner.query(&dag1, &query1);
     print_outcome("Treatment → Outcome", &outcome1);
     println!();
@@ -46,7 +44,11 @@ fn main() {
         vec!["Treatment".into(), "Outcome".into(), "Confounder".into()],
         vec![(2, 0), (2, 1), (0, 1)],
     );
-    let query2 = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+    let query2 = CausalQuery {
+        treatment: 0,
+        outcome: 1,
+        conditioning: vec![],
+    };
     let outcome2 = reasoner.query(&dag2, &query2);
     print_outcome("Treatment → Outcome (adjusting for Confounder)", &outcome2);
     println!();
@@ -57,7 +59,11 @@ fn main() {
         vec!["A".into(), "B".into()],
         vec![], // no edges
     );
-    let query3 = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+    let query3 = CausalQuery {
+        treatment: 0,
+        outcome: 1,
+        conditioning: vec![],
+    };
     let outcome3 = reasoner.query(&dag3, &query3);
     print_outcome("A ⊥ B (no causal path)", &outcome3);
     println!();
@@ -98,7 +104,10 @@ fn main() {
     let test_count = harness.test_count();
     let result = harness.validate(&reasoner);
     println!("  Harness result: {:?}", result);
-    println!("  Test cases:     {} (DAGs ≤8 nodes, brute-force verified)", test_count);
+    println!(
+        "  Test cases:     {} (DAGs ≤8 nodes, brute-force verified)",
+        test_count
+    );
     println!();
 
     println!("═══════════════════════════════════════════════════════════");
@@ -108,21 +117,36 @@ fn main() {
 }
 
 #[cfg(feature = "reasoning_engine")]
-fn print_outcome(label: &str, outcome: &symthaea::consciousness::counterfactual::CausalQueryOutcome) {
+fn print_outcome(
+    label: &str,
+    outcome: &symthaea::consciousness::counterfactual::CausalQueryOutcome,
+) {
     use symthaea::consciousness::counterfactual::CausalQueryOutcome;
     match outcome {
-        CausalQueryOutcome::Identified { method, confidence, estimand } => {
+        CausalQueryOutcome::Identified {
+            method,
+            confidence,
+            estimand,
+        } => {
             println!("  Query:  {}", label);
             println!("  Result: IDENTIFIED via {:?}", method);
             println!("  Conf:   {:.2}", confidence);
             println!("  Est:    {}", estimand.description);
         }
-        CausalQueryOutcome::Unidentified { reason, suggestions, .. } => {
+        CausalQueryOutcome::Unidentified {
+            reason,
+            suggestions,
+            ..
+        } => {
             println!("  Query:  {}", label);
             println!("  Result: UNIDENTIFIED ({:?})", reason);
             println!("  Hints:  {}", suggestions.join("; "));
         }
-        CausalQueryOutcome::AssumptionRequired { assumption, plausibility, .. } => {
+        CausalQueryOutcome::AssumptionRequired {
+            assumption,
+            plausibility,
+            ..
+        } => {
             println!("  Query:  {}", label);
             println!("  Result: ASSUMPTION REQUIRED");
             println!("  Cond:   {}", assumption.condition);

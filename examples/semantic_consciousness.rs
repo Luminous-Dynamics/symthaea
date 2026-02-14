@@ -10,8 +10,7 @@
 //! ```
 
 use symthaea::consciousness::recursive_improvement::{
-    SemanticBridge, SemanticBridgeConfig, SemanticInput, ActionContext,
-    DreamMode, DreamConfig,
+    ActionContext, DreamConfig, DreamMode, SemanticBridge, SemanticBridgeConfig, SemanticInput,
 };
 
 fn main() {
@@ -55,27 +54,23 @@ fn main() {
         SemanticInput::query("How do I install nginx on NixOS?"),
         SemanticInput::thought("Searching for nginx configuration options..."),
         SemanticInput::response("Add nginx to environment.systemPackages in configuration.nix"),
-
         // Follow-up about configuration
         SemanticInput::query("How do I configure nginx virtual hosts?"),
         SemanticInput::thought("Looking up services.nginx configuration..."),
         SemanticInput::response("Use services.nginx.virtualHosts to define your hosts"),
-
         // Error handling
         SemanticInput::error("Error: nginx.conf syntax error at line 42").with_emotion(-0.5),
         SemanticInput::thought("Need to debug the configuration..."),
         SemanticInput::response("Fixed syntax error: missing semicolon after server_name"),
-
         // Different topic: Git
         SemanticInput::query("How do I configure git globally?"),
         SemanticInput::response("Use programs.git.enable = true in home-manager"),
-
         // Back to nginx
         SemanticInput::query("Enable nginx SSL with Let's Encrypt"),
         SemanticInput::response("Use security.acme and services.nginx.virtualHosts.*.enableACME"),
-
         // Goal setting
-        SemanticInput::new("Goal: Set up a secure web server", ActionContext::Goal).with_emotion(0.8),
+        SemanticInput::new("Goal: Set up a secure web server", ActionContext::Goal)
+            .with_emotion(0.8),
         SemanticInput::thought("Planning the implementation steps..."),
     ];
 
@@ -131,8 +126,14 @@ fn main() {
 
     println!("  Dream cycles: {}", dream_results.stats.cycles_completed);
     println!("  Steps simulated: {}", dream_results.stats.steps_simulated);
-    println!("  Concepts from dreams: {}", dream_results.concepts_discovered.len());
-    println!("  Peak consciousness: {:.2}%", dream_results.stats.peak_consciousness * 100.0);
+    println!(
+        "  Concepts from dreams: {}",
+        dream_results.concepts_discovered.len()
+    );
+    println!(
+        "  Peak consciousness: {:.2}%",
+        dream_results.stats.peak_consciousness * 100.0
+    );
     println!();
 
     // =========================================================================
@@ -182,10 +183,22 @@ fn main() {
     println!("  ────────────────────────────┼─────────────────────────────────");
     println!("  Texts Processed             | {}", stats.texts_processed);
     println!("  Concepts Crystallized       | {}", total_concepts);
-    println!("  Peak Consciousness          | {:.2}%", stats.peak_consciousness * 100.0);
-    println!("  Average Embedding Norm      | {:.4}", stats.avg_embedding_norm);
-    println!("  Final Consciousness         | {:.2}%", world_stats.consciousness_level * 100.0);
-    println!("  Accumulated Surprise        | {:.4}", world_stats.accumulated_surprise);
+    println!(
+        "  Peak Consciousness          | {:.2}%",
+        stats.peak_consciousness * 100.0
+    );
+    println!(
+        "  Average Embedding Norm      | {:.4}",
+        stats.avg_embedding_norm
+    );
+    println!(
+        "  Final Consciousness         | {:.2}%",
+        world_stats.consciousness_level * 100.0
+    );
+    println!(
+        "  Accumulated Surprise        | {:.4}",
+        world_stats.accumulated_surprise
+    );
 
     println!();
 

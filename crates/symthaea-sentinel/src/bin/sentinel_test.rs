@@ -22,12 +22,10 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use symthaea_sentinel::{
-    AudioSentinel, AudioFeatures, AudioCategory,
-    MEL_BANDS, LtcPreset, CONTROL_RATE,
-    compute_mfcc, compute_onset_strength, compute_spectral_centroid,
-    compute_spectral_flatness, compute_temporal_regularity, spectrum_to_mel_bands,
-    compute_ioi_variance,
-    FileAudioPump, FileAudioConfig, DatasetProcessor,
+    compute_ioi_variance, compute_mfcc, compute_onset_strength, compute_spectral_centroid,
+    compute_spectral_flatness, compute_temporal_regularity, spectrum_to_mel_bands, AudioCategory,
+    AudioFeatures, AudioSentinel, DatasetProcessor, FileAudioConfig, FileAudioPump, LtcPreset,
+    CONTROL_RATE, MEL_BANDS,
 };
 
 /// Process a file through the sentinel and get averaged features
@@ -62,9 +60,8 @@ fn process_file(
         // Compute features
         let mel_bands = spectrum_to_mel_bands(&spectrum, MEL_BANDS, pump.sample_rate());
 
-        let spectral_centroid = compute_spectral_centroid(
-            &spectrum, pump.sample_rate(), pump.window_size()
-        );
+        let spectral_centroid =
+            compute_spectral_centroid(&spectrum, pump.sample_rate(), pump.window_size());
 
         let onset_strength = if prev_spectrum.is_empty() {
             0.0
@@ -106,7 +103,8 @@ fn process_file(
 
         // Attack sharpness: max positive envelope derivative (how fast sound rises)
         let attack_sharpness = if envelope_delta_history.len() > 4 {
-            let max_positive: f32 = envelope_delta_history.iter()
+            let max_positive: f32 = envelope_delta_history
+                .iter()
                 .filter(|&&d| d > 0.0)
                 .copied()
                 .fold(0.0f32, |max, d| max.max(d));
@@ -117,15 +115,18 @@ fn process_file(
 
         // Decay roughness: variance of negative envelope derivatives (smooth vs jagged decay)
         let decay_roughness = if envelope_delta_history.len() > 8 {
-            let negative_deltas: Vec<f32> = envelope_delta_history.iter()
+            let negative_deltas: Vec<f32> = envelope_delta_history
+                .iter()
                 .filter(|&&d| d < 0.0)
                 .copied()
                 .collect();
             if negative_deltas.len() > 2 {
                 let mean: f32 = negative_deltas.iter().sum::<f32>() / negative_deltas.len() as f32;
-                let variance: f32 = negative_deltas.iter()
+                let variance: f32 = negative_deltas
+                    .iter()
                     .map(|&d| (d - mean).powi(2))
-                    .sum::<f32>() / negative_deltas.len() as f32;
+                    .sum::<f32>()
+                    / negative_deltas.len() as f32;
                 (variance * 100.0).sqrt().clamp(0.0, 1.0)
             } else {
                 0.5
@@ -145,7 +146,8 @@ fn process_file(
                 break;
             }
         }
-        let spectral_rolloff = rolloff_bin as f32 * (pump.sample_rate() / pump.window_size() as f32);
+        let spectral_rolloff =
+            rolloff_bin as f32 * (pump.sample_rate() / pump.window_size() as f32);
 
         let high_freq_energy: f32 = spectrum.iter().skip(spectrum.len() / 2).sum();
         let zero_crossing_rate = (high_freq_energy / total.max(1e-10)).min(0.5);
@@ -159,7 +161,8 @@ fn process_file(
         let spectral_flux = if prev_mel_bands.is_empty() {
             0.1
         } else {
-            let diff_sq: f32 = mel_bands.iter()
+            let diff_sq: f32 = mel_bands
+                .iter()
                 .zip(&prev_mel_bands)
                 .map(|(a, b)| (a - b).powi(2))
                 .sum();
@@ -171,10 +174,11 @@ fn process_file(
         // More peaks = more harmonic content
         let harmonic_ratio = {
             let mean_spec: f32 = spectrum.iter().sum::<f32>() / spectrum.len() as f32;
-            let peaks: usize = spectrum.windows(3)
+            let peaks: usize = spectrum
+                .windows(3)
                 .filter(|w| w[1] > w[0] && w[1] > w[2] && w[1] > mean_spec * 2.0)
                 .count();
-            (peaks as f32 / 20.0).min(1.0)  // Normalize: 20 peaks = max harmonic
+            (peaks as f32 / 20.0).min(1.0) // Normalize: 20 peaks = max harmonic
         };
 
         // Cross-frequency coupling (CFC): phase-amplitude coupling approximation
@@ -184,20 +188,39 @@ fn process_file(
 
         low_band_history.push(low_energy);
         high_band_history.push(high_energy);
-        if low_band_history.len() > 16 { low_band_history.remove(0); }
-        if high_band_history.len() > 16 { high_band_history.remove(0); }
+        if low_band_history.len() > 16 {
+            low_band_history.remove(0);
+        }
+        if high_band_history.len() > 16 {
+            high_band_history.remove(0);
+        }
 
         // CFC theta-gamma: correlation between low and high band envelopes
         let cfc_theta_gamma = if low_band_history.len() >= 4 {
-            let low_mean: f32 = low_band_history.iter().sum::<f32>() / low_band_history.len() as f32;
-            let high_mean: f32 = high_band_history.iter().sum::<f32>() / high_band_history.len() as f32;
-            let cov: f32 = low_band_history.iter().zip(&high_band_history)
+            let low_mean: f32 =
+                low_band_history.iter().sum::<f32>() / low_band_history.len() as f32;
+            let high_mean: f32 =
+                high_band_history.iter().sum::<f32>() / high_band_history.len() as f32;
+            let cov: f32 = low_band_history
+                .iter()
+                .zip(&high_band_history)
                 .map(|(l, h)| (l - low_mean) * (h - high_mean))
-                .sum::<f32>() / low_band_history.len() as f32;
-            let low_std = (low_band_history.iter().map(|x| (x - low_mean).powi(2)).sum::<f32>() / low_band_history.len() as f32).sqrt();
-            let high_std = (high_band_history.iter().map(|x| (x - high_mean).powi(2)).sum::<f32>() / high_band_history.len() as f32).sqrt();
+                .sum::<f32>()
+                / low_band_history.len() as f32;
+            let low_std = (low_band_history
+                .iter()
+                .map(|x| (x - low_mean).powi(2))
+                .sum::<f32>()
+                / low_band_history.len() as f32)
+                .sqrt();
+            let high_std = (high_band_history
+                .iter()
+                .map(|x| (x - high_mean).powi(2))
+                .sum::<f32>()
+                / high_band_history.len() as f32)
+                .sqrt();
             if low_std > 1e-6 && high_std > 1e-6 {
-                ((cov / (low_std * high_std)) * 0.5 + 0.5).clamp(0.0, 1.0)  // Map [-1,1] to [0,1]
+                ((cov / (low_std * high_std)) * 0.5 + 0.5).clamp(0.0, 1.0) // Map [-1,1] to [0,1]
             } else {
                 0.5
             }
@@ -276,8 +299,13 @@ fn get_similarity_detailed(
     let mut envelope_delta_history: Vec<f32> = Vec::new();
     let mut frame_counter: usize = 0;
     let mut totals = SimilarityBreakdown {
-        combined: 0.0, timbre_hdc: 0.0, rhythm_hdc: 0.0,
-        spectral: 0.0, timbre_freq: 0.0, rhythm_freq: 0.0, multi_scale: 0.0,
+        combined: 0.0,
+        timbre_hdc: 0.0,
+        rhythm_hdc: 0.0,
+        spectral: 0.0,
+        timbre_freq: 0.0,
+        rhythm_freq: 0.0,
+        multi_scale: 0.0,
     };
     let mut count = 0;
     // For new features
@@ -287,9 +315,8 @@ fn get_similarity_detailed(
 
     while let Some(spectrum) = pump.next_power_spectrum() {
         let mel_bands = spectrum_to_mel_bands(&spectrum, MEL_BANDS, pump.sample_rate());
-        let spectral_centroid = compute_spectral_centroid(
-            &spectrum, pump.sample_rate(), pump.window_size()
-        );
+        let spectral_centroid =
+            compute_spectral_centroid(&spectrum, pump.sample_rate(), pump.window_size());
 
         let onset_strength = if prev_spectrum.is_empty() {
             0.0
@@ -299,49 +326,76 @@ fn get_similarity_detailed(
         prev_spectrum = spectrum.clone();
 
         onset_history.push(onset_strength);
-        if onset_history.len() > 100 { onset_history.remove(0); }
+        if onset_history.len() > 100 {
+            onset_history.remove(0);
+        }
         let temporal_regularity = compute_temporal_regularity(&onset_history);
 
         let rms_energy = (spectrum.iter().sum::<f32>() / spectrum.len() as f32).sqrt();
         rms_history.push(rms_energy);
-        if rms_history.len() > 32 { rms_history.remove(0); }
+        if rms_history.len() > 32 {
+            rms_history.remove(0);
+        }
         let envelope_delta = (rms_energy - prev_rms).abs();
         let envelope_variance = if rms_history.len() > 2 {
             let mean: f32 = rms_history.iter().sum::<f32>() / rms_history.len() as f32;
             rms_history.iter().map(|&x| (x - mean).powi(2)).sum::<f32>() / rms_history.len() as f32
-        } else { 0.0 };
+        } else {
+            0.0
+        };
 
         // === TRANSIENT ANALYZER: Compute attack sharpness and decay roughness ===
         let signed_delta = rms_energy - prev_rms;
         prev_rms = rms_energy;
         envelope_delta_history.push(signed_delta);
-        if envelope_delta_history.len() > 64 { envelope_delta_history.remove(0); }
+        if envelope_delta_history.len() > 64 {
+            envelope_delta_history.remove(0);
+        }
 
         let attack_sharpness = if envelope_delta_history.len() > 4 {
-            let max_positive: f32 = envelope_delta_history.iter()
-                .filter(|&&d| d > 0.0).copied().fold(0.0f32, |max, d| max.max(d));
+            let max_positive: f32 = envelope_delta_history
+                .iter()
+                .filter(|&&d| d > 0.0)
+                .copied()
+                .fold(0.0f32, |max, d| max.max(d));
             (max_positive * 2.0).clamp(0.0, 1.0)
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         let decay_roughness = if envelope_delta_history.len() > 8 {
-            let negative_deltas: Vec<f32> = envelope_delta_history.iter()
-                .filter(|&&d| d < 0.0).copied().collect();
+            let negative_deltas: Vec<f32> = envelope_delta_history
+                .iter()
+                .filter(|&&d| d < 0.0)
+                .copied()
+                .collect();
             if negative_deltas.len() > 2 {
                 let mean: f32 = negative_deltas.iter().sum::<f32>() / negative_deltas.len() as f32;
-                let variance: f32 = negative_deltas.iter()
-                    .map(|&d| (d - mean).powi(2)).sum::<f32>() / negative_deltas.len() as f32;
+                let variance: f32 = negative_deltas
+                    .iter()
+                    .map(|&d| (d - mean).powi(2))
+                    .sum::<f32>()
+                    / negative_deltas.len() as f32;
                 (variance * 100.0).sqrt().clamp(0.0, 1.0)
-            } else { 0.5 }
-        } else { 0.5 };
+            } else {
+                0.5
+            }
+        } else {
+            0.5
+        };
 
         let total: f32 = spectrum.iter().sum();
         let mut cumsum = 0.0;
         let mut rolloff_bin = 0;
         for (i, &p) in spectrum.iter().enumerate() {
             cumsum += p;
-            if cumsum >= total * 0.85 { rolloff_bin = i; break; }
+            if cumsum >= total * 0.85 {
+                rolloff_bin = i;
+                break;
+            }
         }
-        let spectral_rolloff = rolloff_bin as f32 * (pump.sample_rate() / pump.window_size() as f32);
+        let spectral_rolloff =
+            rolloff_bin as f32 * (pump.sample_rate() / pump.window_size() as f32);
         let high_freq_energy: f32 = spectrum.iter().skip(spectrum.len() / 2).sum();
         let zero_crossing_rate = (high_freq_energy / total.max(1e-10)).min(0.5);
         let spectral_flatness = compute_spectral_flatness(&spectrum);
@@ -352,7 +406,8 @@ fn get_similarity_detailed(
         let spectral_flux = if prev_mel_bands.is_empty() {
             0.1
         } else {
-            let diff_sq: f32 = mel_bands.iter()
+            let diff_sq: f32 = mel_bands
+                .iter()
                 .zip(&prev_mel_bands)
                 .map(|(a, b)| (a - b).powi(2))
                 .sum();
@@ -363,7 +418,8 @@ fn get_similarity_detailed(
         // Harmonic ratio: approximated from spectral peakiness
         let harmonic_ratio = {
             let mean_spec: f32 = spectrum.iter().sum::<f32>() / spectrum.len() as f32;
-            let peaks: usize = spectrum.windows(3)
+            let peaks: usize = spectrum
+                .windows(3)
                 .filter(|w| w[1] > w[0] && w[1] > w[2] && w[1] > mean_spec * 2.0)
                 .count();
             (peaks as f32 / 20.0).min(1.0)
@@ -371,23 +427,47 @@ fn get_similarity_detailed(
 
         // CFC: track band envelopes for correlation
         let low_band: f32 = mel_bands.iter().take(5).sum::<f32>() / 5.0;
-        let high_band: f32 = mel_bands.iter().skip(20).sum::<f32>() / (mel_bands.len() - 20).max(1) as f32;
+        let high_band: f32 =
+            mel_bands.iter().skip(20).sum::<f32>() / (mel_bands.len() - 20).max(1) as f32;
         low_band_history.push(low_band);
         high_band_history.push(high_band);
-        if low_band_history.len() > 16 { low_band_history.remove(0); }
-        if high_band_history.len() > 16 { high_band_history.remove(0); }
+        if low_band_history.len() > 16 {
+            low_band_history.remove(0);
+        }
+        if high_band_history.len() > 16 {
+            high_band_history.remove(0);
+        }
 
         // CFC theta-gamma: correlation between low and high bands
         let cfc_theta_gamma = if low_band_history.len() >= 4 {
-            let low_mean: f32 = low_band_history.iter().sum::<f32>() / low_band_history.len() as f32;
-            let high_mean: f32 = high_band_history.iter().sum::<f32>() / high_band_history.len() as f32;
-            let cov: f32 = low_band_history.iter().zip(&high_band_history)
+            let low_mean: f32 =
+                low_band_history.iter().sum::<f32>() / low_band_history.len() as f32;
+            let high_mean: f32 =
+                high_band_history.iter().sum::<f32>() / high_band_history.len() as f32;
+            let cov: f32 = low_band_history
+                .iter()
+                .zip(&high_band_history)
                 .map(|(l, h)| (l - low_mean) * (h - high_mean))
-                .sum::<f32>() / low_band_history.len() as f32;
-            let low_std = (low_band_history.iter().map(|x| (x - low_mean).powi(2)).sum::<f32>() / low_band_history.len() as f32).sqrt().max(1e-6);
-            let high_std = (high_band_history.iter().map(|x| (x - high_mean).powi(2)).sum::<f32>() / high_band_history.len() as f32).sqrt().max(1e-6);
+                .sum::<f32>()
+                / low_band_history.len() as f32;
+            let low_std = (low_band_history
+                .iter()
+                .map(|x| (x - low_mean).powi(2))
+                .sum::<f32>()
+                / low_band_history.len() as f32)
+                .sqrt()
+                .max(1e-6);
+            let high_std = (high_band_history
+                .iter()
+                .map(|x| (x - high_mean).powi(2))
+                .sum::<f32>()
+                / high_band_history.len() as f32)
+                .sqrt()
+                .max(1e-6);
             ((cov / (low_std * high_std)) * 0.5 + 0.5).clamp(0.0, 1.0)
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         // CFC delta-beta: mid bands coupling
         let mid_low: f32 = mel_bands.iter().take(5).copied().sum::<f32>() / 5.0;
@@ -401,11 +481,26 @@ fn get_similarity_detailed(
         let burst_density = compute_ioi_variance(&onset_history, CONTROL_RATE);
 
         let features = AudioFeatures {
-            mel_bands, mfcc, spectral_centroid, spectral_rolloff,
-            onset_strength, rms_energy, zero_crossing_rate, spectral_flatness,
-            temporal_regularity, envelope_delta, envelope_variance, frame_index: frame_counter,
-            spectral_flux, harmonic_ratio, cfc_theta_gamma, cfc_delta_beta,
-            attack_sharpness, decay_roughness, silence_ratio, burst_density,
+            mel_bands,
+            mfcc,
+            spectral_centroid,
+            spectral_rolloff,
+            onset_strength,
+            rms_energy,
+            zero_crossing_rate,
+            spectral_flatness,
+            temporal_regularity,
+            envelope_delta,
+            envelope_variance,
+            frame_index: frame_counter,
+            spectral_flux,
+            harmonic_ratio,
+            cfc_theta_gamma,
+            cfc_delta_beta,
+            attack_sharpness,
+            decay_roughness,
+            silence_ratio,
+            burst_density,
         };
 
         let result = sentinel.process(&features);
@@ -460,9 +555,8 @@ fn get_similarity(
 
     while let Some(spectrum) = pump.next_power_spectrum() {
         let mel_bands = spectrum_to_mel_bands(&spectrum, MEL_BANDS, pump.sample_rate());
-        let spectral_centroid = compute_spectral_centroid(
-            &spectrum, pump.sample_rate(), pump.window_size()
-        );
+        let spectral_centroid =
+            compute_spectral_centroid(&spectrum, pump.sample_rate(), pump.window_size());
 
         let onset_strength = if prev_spectrum.is_empty() {
             0.0
@@ -497,24 +591,41 @@ fn get_similarity(
         let signed_delta = rms_energy - prev_rms;
         prev_rms = rms_energy;
         envelope_delta_history.push(signed_delta);
-        if envelope_delta_history.len() > 64 { envelope_delta_history.remove(0); }
+        if envelope_delta_history.len() > 64 {
+            envelope_delta_history.remove(0);
+        }
 
         let attack_sharpness = if envelope_delta_history.len() > 4 {
-            let max_positive: f32 = envelope_delta_history.iter()
-                .filter(|&&d| d > 0.0).copied().fold(0.0f32, |max, d| max.max(d));
+            let max_positive: f32 = envelope_delta_history
+                .iter()
+                .filter(|&&d| d > 0.0)
+                .copied()
+                .fold(0.0f32, |max, d| max.max(d));
             (max_positive * 2.0).clamp(0.0, 1.0)
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         let decay_roughness = if envelope_delta_history.len() > 8 {
-            let negative_deltas: Vec<f32> = envelope_delta_history.iter()
-                .filter(|&&d| d < 0.0).copied().collect();
+            let negative_deltas: Vec<f32> = envelope_delta_history
+                .iter()
+                .filter(|&&d| d < 0.0)
+                .copied()
+                .collect();
             if negative_deltas.len() > 2 {
                 let mean: f32 = negative_deltas.iter().sum::<f32>() / negative_deltas.len() as f32;
-                let variance: f32 = negative_deltas.iter()
-                    .map(|&d| (d - mean).powi(2)).sum::<f32>() / negative_deltas.len() as f32;
+                let variance: f32 = negative_deltas
+                    .iter()
+                    .map(|&d| (d - mean).powi(2))
+                    .sum::<f32>()
+                    / negative_deltas.len() as f32;
                 (variance * 100.0).sqrt().clamp(0.0, 1.0)
-            } else { 0.5 }
-        } else { 0.5 };
+            } else {
+                0.5
+            }
+        } else {
+            0.5
+        };
 
         let total: f32 = spectrum.iter().sum();
         let mut cumsum = 0.0;
@@ -526,7 +637,8 @@ fn get_similarity(
                 break;
             }
         }
-        let spectral_rolloff = rolloff_bin as f32 * (pump.sample_rate() / pump.window_size() as f32);
+        let spectral_rolloff =
+            rolloff_bin as f32 * (pump.sample_rate() / pump.window_size() as f32);
         let high_freq_energy: f32 = spectrum.iter().skip(spectrum.len() / 2).sum();
         let zero_crossing_rate = (high_freq_energy / total.max(1e-10)).min(0.5);
         let spectral_flatness = compute_spectral_flatness(&spectrum);
@@ -539,7 +651,8 @@ fn get_similarity(
         let spectral_flux = if prev_mel_bands.is_empty() {
             0.1
         } else {
-            let diff_sq: f32 = mel_bands.iter()
+            let diff_sq: f32 = mel_bands
+                .iter()
                 .zip(&prev_mel_bands)
                 .map(|(a, b)| (a - b).powi(2))
                 .sum();
@@ -550,7 +663,8 @@ fn get_similarity(
         // Harmonic ratio: approximated from spectral peakiness
         let harmonic_ratio = {
             let mean_spec: f32 = spectrum.iter().sum::<f32>() / spectrum.len() as f32;
-            let peaks: usize = spectrum.windows(3)
+            let peaks: usize = spectrum
+                .windows(3)
                 .filter(|w| w[1] > w[0] && w[1] > w[2] && w[1] > mean_spec * 2.0)
                 .count();
             (peaks as f32 / 20.0).min(1.0)
@@ -558,23 +672,47 @@ fn get_similarity(
 
         // CFC: track band envelopes for correlation
         let low_band: f32 = mel_bands.iter().take(5).sum::<f32>() / 5.0;
-        let high_band: f32 = mel_bands.iter().skip(20).sum::<f32>() / (mel_bands.len() - 20).max(1) as f32;
+        let high_band: f32 =
+            mel_bands.iter().skip(20).sum::<f32>() / (mel_bands.len() - 20).max(1) as f32;
         low_band_history.push(low_band);
         high_band_history.push(high_band);
-        if low_band_history.len() > 16 { low_band_history.remove(0); }
-        if high_band_history.len() > 16 { high_band_history.remove(0); }
+        if low_band_history.len() > 16 {
+            low_band_history.remove(0);
+        }
+        if high_band_history.len() > 16 {
+            high_band_history.remove(0);
+        }
 
         // CFC theta-gamma: correlation between low and high bands
         let cfc_theta_gamma = if low_band_history.len() >= 4 {
-            let low_mean: f32 = low_band_history.iter().sum::<f32>() / low_band_history.len() as f32;
-            let high_mean: f32 = high_band_history.iter().sum::<f32>() / high_band_history.len() as f32;
-            let cov: f32 = low_band_history.iter().zip(&high_band_history)
+            let low_mean: f32 =
+                low_band_history.iter().sum::<f32>() / low_band_history.len() as f32;
+            let high_mean: f32 =
+                high_band_history.iter().sum::<f32>() / high_band_history.len() as f32;
+            let cov: f32 = low_band_history
+                .iter()
+                .zip(&high_band_history)
                 .map(|(l, h)| (l - low_mean) * (h - high_mean))
-                .sum::<f32>() / low_band_history.len() as f32;
-            let low_std = (low_band_history.iter().map(|x| (x - low_mean).powi(2)).sum::<f32>() / low_band_history.len() as f32).sqrt().max(1e-6);
-            let high_std = (high_band_history.iter().map(|x| (x - high_mean).powi(2)).sum::<f32>() / high_band_history.len() as f32).sqrt().max(1e-6);
+                .sum::<f32>()
+                / low_band_history.len() as f32;
+            let low_std = (low_band_history
+                .iter()
+                .map(|x| (x - low_mean).powi(2))
+                .sum::<f32>()
+                / low_band_history.len() as f32)
+                .sqrt()
+                .max(1e-6);
+            let high_std = (high_band_history
+                .iter()
+                .map(|x| (x - high_mean).powi(2))
+                .sum::<f32>()
+                / high_band_history.len() as f32)
+                .sqrt()
+                .max(1e-6);
             ((cov / (low_std * high_std)) * 0.5 + 0.5).clamp(0.0, 1.0)
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         // CFC delta-beta: mid bands coupling
         let mid_low: f32 = mel_bands.iter().take(5).copied().sum::<f32>() / 5.0;
@@ -659,8 +797,13 @@ fn run_discrimination_test(
                     sentinel.continue_learning(pattern_name);
                     process_file(&mut pump, &mut sentinel, true, None, is_last)?;
                 }
-                println!("    ✓ Learned '{}' from {} ({}/{})",
-                    pattern_name, path, i + 1, learn_files.len());
+                println!(
+                    "    ✓ Learned '{}' from {} ({}/{})",
+                    pattern_name,
+                    path,
+                    i + 1,
+                    learn_files.len()
+                );
             }
             Err(e) => {
                 println!("    ✗ Failed to load {}: {}", path, e);
@@ -673,7 +816,10 @@ fn run_discrimination_test(
     let mut total = 0;
 
     // Phase 2: Rejection test (should be dissimilar)
-    println!("\n  Phase 2: REJECTION TEST (expect similarity < {:.2})", similarity_threshold);
+    println!(
+        "\n  Phase 2: REJECTION TEST (expect similarity < {:.2})",
+        similarity_threshold
+    );
     println!("  ─────────────────────────────────────────────────────");
 
     for &path in reject_files {
@@ -682,9 +828,15 @@ fn run_discrimination_test(
             Ok(mut pump) => {
                 let similarity = get_similarity(&mut pump, &mut sentinel, "Concept_0");
                 let pass = similarity < similarity_threshold;
-                if pass { passed += 1; }
+                if pass {
+                    passed += 1;
+                }
 
-                let status = if pass { "\x1b[32m✓ PASS\x1b[0m" } else { "\x1b[31m✗ FAIL\x1b[0m" };
+                let status = if pass {
+                    "\x1b[32m✓ PASS\x1b[0m"
+                } else {
+                    "\x1b[31m✗ FAIL\x1b[0m"
+                };
                 println!("    {} {} (similarity: {:.3})", status, path, similarity);
             }
             Err(e) => {
@@ -694,7 +846,10 @@ fn run_discrimination_test(
     }
 
     // Phase 3: Acceptance test (should be similar)
-    println!("\n  Phase 3: ACCEPTANCE TEST (expect similarity >= {:.2})", similarity_threshold);
+    println!(
+        "\n  Phase 3: ACCEPTANCE TEST (expect similarity >= {:.2})",
+        similarity_threshold
+    );
     println!("  ──────────────────────────────────────────────────────");
 
     for &path in accept_files {
@@ -703,9 +858,15 @@ fn run_discrimination_test(
             Ok(mut pump) => {
                 let similarity = get_similarity(&mut pump, &mut sentinel, "Concept_0");
                 let pass = similarity >= similarity_threshold;
-                if pass { passed += 1; }
+                if pass {
+                    passed += 1;
+                }
 
-                let status = if pass { "\x1b[32m✓ PASS\x1b[0m" } else { "\x1b[31m✗ FAIL\x1b[0m" };
+                let status = if pass {
+                    "\x1b[32m✓ PASS\x1b[0m"
+                } else {
+                    "\x1b[31m✗ FAIL\x1b[0m"
+                };
                 println!("    {} {} (similarity: {:.3})", status, path, similarity);
             }
             Err(e) => {
@@ -717,8 +878,17 @@ fn run_discrimination_test(
     // Summary
     println!("\n  ═══════════════════════════════════════════════════════════════════");
     let pass_rate = passed as f32 / total as f32 * 100.0;
-    let color = if pass_rate >= 80.0 { "\x1b[32m" } else if pass_rate >= 50.0 { "\x1b[33m" } else { "\x1b[31m" };
-    println!("  RESULT: {}{}/{} tests passed ({:.0}%)\x1b[0m", color, passed, total, pass_rate);
+    let color = if pass_rate >= 80.0 {
+        "\x1b[32m"
+    } else if pass_rate >= 50.0 {
+        "\x1b[33m"
+    } else {
+        "\x1b[31m"
+    };
+    println!(
+        "  RESULT: {}{}/{} tests passed ({:.0}%)\x1b[0m",
+        color, passed, total, pass_rate
+    );
     println!("  ═══════════════════════════════════════════════════════════════════\n");
 
     Ok((passed, total))
@@ -748,13 +918,20 @@ fn run_genre_test(data_dir: &str, use_premium: bool) -> Result<()> {
 
     if genre_dirs.is_empty() {
         println!("  No genre subdirectories found in {}", data_dir);
-        println!("  Expected structure: {}/blues/, {}/metal/, etc.", data_dir, data_dir);
+        println!(
+            "  Expected structure: {}/blues/, {}/metal/, etc.",
+            data_dir, data_dir
+        );
         return Ok(());
     }
 
-    println!("  Found {} genres: {:?}\n",
+    println!(
+        "  Found {} genres: {:?}\n",
         genre_dirs.len(),
-        genre_dirs.iter().map(|p| p.file_name().unwrap().to_string_lossy()).collect::<Vec<_>>()
+        genre_dirs
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy())
+            .collect::<Vec<_>>()
     );
 
     // Create sentinel with appropriate encoder mode
@@ -767,8 +944,11 @@ fn run_genre_test(data_dir: &str, use_premium: bool) -> Result<()> {
     // === FEW-SHOT LEARNING: Configure number of samples per class ===
     // 1-shot: baseline (original approach)
     // 2-shot: more stable prototypes, but fewer test samples for small datasets
-    const SHOTS_PER_CLASS: usize = 1;  // Number of samples to learn per class
-    println!("  Phase 1: Learning {} sample(s) per genre...", SHOTS_PER_CLASS);
+    const SHOTS_PER_CLASS: usize = 1; // Number of samples to learn per class
+    println!(
+        "  Phase 1: Learning {} sample(s) per genre...",
+        SHOTS_PER_CLASS
+    );
     for genre_dir in &genre_dirs {
         let genre_name = genre_dir.file_name().unwrap().to_string_lossy().to_string();
 
@@ -795,7 +975,7 @@ fn run_genre_test(data_dir: &str, use_premium: bool) -> Result<()> {
                     }
                     learned_count += 1;
                 } else {
-                    break;  // No more files available
+                    break; // No more files available
                 }
             }
 
@@ -839,8 +1019,9 @@ fn run_genre_test(data_dir: &str, use_premium: bool) -> Result<()> {
                     // Step 2: Compute mean and std of raw scores
                     let scores: Vec<f32> = raw_scores.iter().map(|(_, s)| *s).collect();
                     let mean: f32 = scores.iter().sum::<f32>() / scores.len() as f32;
-                    let variance: f32 = scores.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / scores.len() as f32;
-                    let std: f32 = variance.sqrt().max(0.001);  // Avoid division by zero
+                    let variance: f32 = scores.iter().map(|s| (s - mean).powi(2)).sum::<f32>()
+                        / scores.len() as f32;
+                    let std: f32 = variance.sqrt().max(0.001); // Avoid division by zero
 
                     // Step 3: Z-normalize and find best match
                     let mut best_genre = String::new();
@@ -857,7 +1038,8 @@ fn run_genre_test(data_dir: &str, use_premium: bool) -> Result<()> {
                     total += 1;
                     tested += 1;
 
-                    *confusion.entry(true_genre.clone())
+                    *confusion
+                        .entry(true_genre.clone())
                         .or_default()
                         .entry(best_genre.clone())
                         .or_insert(0) += 1;
@@ -884,7 +1066,8 @@ fn run_genre_test(data_dir: &str, use_premium: bool) -> Result<()> {
     for true_g in &genres {
         print!("  {:>8} ", &true_g[..true_g.len().min(7)]);
         for pred_g in &genres {
-            let count = confusion.get(true_g)
+            let count = confusion
+                .get(true_g)
                 .and_then(|m| m.get(pred_g))
                 .copied()
                 .unwrap_or(0);
@@ -927,7 +1110,9 @@ fn print_usage() {
     println!();
     println!("Examples:");
     println!("  # Test dog bark discrimination");
-    println!("  regression-test --learn dog_bark.wav --reject glass_break.wav --accept dog_bark_2.wav");
+    println!(
+        "  regression-test --learn dog_bark.wav --reject glass_break.wav --accept dog_bark_2.wav"
+    );
     println!();
     println!("  # Run on GTZAN dataset");
     println!("  regression-test --gtzan ./datasets/gtzan/genres/");
@@ -949,7 +1134,7 @@ fn main() -> Result<()> {
     let mut gtzan_dir: Option<&str> = None;
     let mut esc50_dir: Option<&str> = None;
     let mut ltc_preset = LtcPreset::Standard;
-    let mut use_premium = false;  // Premium encoder mode (CfC + RFF)
+    let mut use_premium = false; // Premium encoder mode (CfC + RFF)
 
     let mut i = 1;
     while i < args.len() {
@@ -1004,11 +1189,14 @@ fn main() -> Result<()> {
                         "whale" | "slow" => LtcPreset::SlowWhale,
                         _ => LtcPreset::Standard,
                     };
-                    println!("  Using LTC preset: {:?}", match ltc_preset {
-                        LtcPreset::Standard => "Standard (environmental)",
-                        LtcPreset::FastBird => "FastBird (rapid vocalizations)",
-                        LtcPreset::SlowWhale => "SlowWhale (low-frequency)",
-                    });
+                    println!(
+                        "  Using LTC preset: {:?}",
+                        match ltc_preset {
+                            LtcPreset::Standard => "Standard (environmental)",
+                            LtcPreset::FastBird => "FastBird (rapid vocalizations)",
+                            LtcPreset::SlowWhale => "SlowWhale (low-frequency)",
+                        }
+                    );
                 }
             }
             "--premium" => {
@@ -1030,7 +1218,7 @@ fn main() -> Result<()> {
     if let Some(dir) = gtzan_dir {
         run_genre_test(dir, use_premium)?;
     } else if let Some(dir) = esc50_dir {
-        run_genre_test(dir, use_premium)?;  // Same logic works for ESC-50
+        run_genre_test(dir, use_premium)?; // Same logic works for ESC-50
     } else if !learn_files.is_empty() {
         // First run discrimination test
         let (passed, total) = run_discrimination_test(
@@ -1055,8 +1243,8 @@ fn main() -> Result<()> {
                     hop_size: 512,
                     apply_window: true,
                 };
-                let mut pump = FileAudioPump::new(learn_file, config)
-                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                let mut pump =
+                    FileAudioPump::new(learn_file, config).map_err(|e| anyhow::anyhow!("{}", e))?;
                 println!("  Reference: {}", learn_file);
                 let is_last = i == learn_files.len() - 1;
                 if i == 0 {
@@ -1076,7 +1264,8 @@ fn main() -> Result<()> {
                 };
                 match FileAudioPump::new(diag_file, config) {
                     Ok(mut pump) => {
-                        let breakdown = get_similarity_detailed(&mut pump, &mut sentinel, "Concept_0");
+                        let breakdown =
+                            get_similarity_detailed(&mut pump, &mut sentinel, "Concept_0");
                         println!("\n  File: {}", diag_file);
                         println!("    Combined:    {:.3}", breakdown.combined);
                         println!("    ────────────────────────────");

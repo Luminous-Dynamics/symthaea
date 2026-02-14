@@ -111,7 +111,8 @@ impl WorkingMemory {
         // Evict lowest-activation if over capacity
         if self.items.len() > self.capacity {
             // Find index of minimum activation
-            let min_idx = self.items
+            let min_idx = self
+                .items
                 .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.activation.partial_cmp(&b.activation).unwrap())
@@ -122,7 +123,8 @@ impl WorkingMemory {
         }
 
         // Sort by activation (highest first)
-        self.items.sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
+        self.items
+            .sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
     }
 
     /// Take the last evicted item, if any.
@@ -148,7 +150,8 @@ impl WorkingMemory {
                 item.activation = (item.activation + sim * boost).min(1.0);
             }
         }
-        self.items.sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
+        self.items
+            .sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
     }
 
     /// Get the bundled context vector — weighted bundle of all items.
@@ -167,13 +170,11 @@ impl WorkingMemory {
 
     /// Retrieve the most similar item to a query.
     pub fn retrieve(&self, query: &ContinuousHV) -> Option<&MemoryItem> {
-        self.items
-            .iter()
-            .max_by(|a, b| {
-                let sim_a = a.content.similarity(query);
-                let sim_b = b.content.similarity(query);
-                sim_a.partial_cmp(&sim_b).unwrap()
-            })
+        self.items.iter().max_by(|a, b| {
+            let sim_a = a.content.similarity(query);
+            let sim_b = b.content.similarity(query);
+            sim_a.partial_cmp(&sim_b).unwrap()
+        })
     }
 
     /// Get all current items (highest activation first).
@@ -233,10 +234,7 @@ impl WorkingMemory {
 
     /// Restore working memory from saved state, reconstructing HDC vectors
     /// from the codebook.
-    pub fn load(
-        saved: &SavedWorkingMemory,
-        codebook: &mut crate::encoding::NixCodebook,
-    ) -> Self {
+    pub fn load(saved: &SavedWorkingMemory, codebook: &mut crate::encoding::NixCodebook) -> Self {
         let mut wm = Self::with_capacity(DEFAULT_CAPACITY);
         wm.step = saved.step;
 
@@ -323,12 +321,18 @@ mod tests {
         // Adding another item causes decay on the first
         wm.push(make_hv(2), MemorySource::UserInput, "second".into());
 
-        let first_activation = wm.items().iter()
+        let first_activation = wm
+            .items()
+            .iter()
             .find(|i| i.label == "first")
             .unwrap()
             .activation;
         assert!(first_activation < 1.0, "First item should have decayed");
-        assert!(first_activation > 0.8, "Should not have decayed too much: {}", first_activation);
+        assert!(
+            first_activation > 0.8,
+            "Should not have decayed too much: {}",
+            first_activation
+        );
     }
 
     #[test]
@@ -340,14 +344,18 @@ mod tests {
         wm.push(hv2, MemorySource::UserInput, "other".into());
 
         // Attend to something similar to hv1
-        let activation_before = wm.items().iter()
+        let activation_before = wm
+            .items()
+            .iter()
             .find(|i| i.label == "target")
             .unwrap()
             .activation;
 
         wm.attend(&hv1, 0.5);
 
-        let activation_after = wm.items().iter()
+        let activation_after = wm
+            .items()
+            .iter()
             .find(|i| i.label == "target")
             .unwrap()
             .activation;
@@ -378,7 +386,11 @@ mod tests {
 
         let mut wm = WorkingMemory::with_capacity(7);
         wm.push(make_hv(1), MemorySource::UserInput, "service-failed".into());
-        wm.push(make_hv(2), MemorySource::SystemObservation, "store-growth".into());
+        wm.push(
+            make_hv(2),
+            MemorySource::SystemObservation,
+            "store-growth".into(),
+        );
 
         let saved = wm.save();
         assert_eq!(saved.items.len(), 2);
@@ -397,10 +409,16 @@ mod tests {
         assert!(labels.contains(&"store-growth"));
 
         // Check activation preserved
-        let svc_activation = loaded.items().iter()
+        let svc_activation = loaded
+            .items()
+            .iter()
             .find(|i| i.label == "service-failed")
             .unwrap()
             .activation;
-        assert!(svc_activation < 1.0, "Should preserve decayed activation: {}", svc_activation);
+        assert!(
+            svc_activation < 1.0,
+            "Should preserve decayed activation: {}",
+            svc_activation
+        );
     }
 }

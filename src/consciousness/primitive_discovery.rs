@@ -890,7 +890,7 @@ mod tests {
 
         let _patterns = detector.get_significant_patterns();
         // Pattern should be detected but may not meet 2x threshold yet
-        assert!(detector.pattern_counts.len() >= 1);
+        assert!(!detector.pattern_counts.is_empty());
     }
 
     #[test]

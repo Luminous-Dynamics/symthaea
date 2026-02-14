@@ -74,7 +74,11 @@ impl JLProjector {
                 // Sparse: only ~1/3 of entries are non-zero
                 if hash % sparsity as u64 == 0 {
                     // Sign: ±1 with equal probability
-                    let sign = if (hash / sparsity as u64) % 2 == 0 { 1i8 } else { -1i8 };
+                    let sign = if (hash / sparsity as u64) % 2 == 0 {
+                        1i8
+                    } else {
+                        -1i8
+                    };
                     entries.push((row, col, sign));
                 }
             }
@@ -133,7 +137,10 @@ impl JLProjector {
 
     /// Project to binary HDC with L2 normalization applied first
     fn project_to_binary_normalized(&self, input: &[f32]) -> Vec<bool> {
-        self.project_normalized(input).into_iter().map(|v| v > 0.0).collect()
+        self.project_normalized(input)
+            .into_iter()
+            .map(|v| v > 0.0)
+            .collect()
     }
 }
 
@@ -235,8 +242,8 @@ impl HdcVector {
             let count: usize = vectors.iter().filter(|v| v.bits[i]).count();
             // Majority vote: count > n/2
             // For even n, use tiebreaker when count == n/2
-            result.bits[i] = count > threshold
-                || (has_ties && count == threshold && vectors[0].bits[i]);
+            result.bits[i] =
+                count > threshold || (has_ties && count == threshold && vectors[0].bits[i]);
         }
         result
     }
@@ -317,7 +324,9 @@ impl HdcVector {
     ///
     /// This is the fundamental similarity measure in binary HDC.
     pub fn similarity(&self, other: &HdcVector) -> f32 {
-        let matching: usize = self.bits.iter()
+        let matching: usize = self
+            .bits
+            .iter()
             .zip(other.bits.iter())
             .filter(|(&a, &b)| a == b)
             .count();
@@ -326,7 +335,8 @@ impl HdcVector {
 
     /// Calculate Hamming distance (number of differing bits)
     pub fn hamming_distance(&self, other: &HdcVector) -> usize {
-        self.bits.iter()
+        self.bits
+            .iter()
             .zip(other.bits.iter())
             .filter(|(&a, &b)| a != b)
             .count()
@@ -357,9 +367,7 @@ impl HdcVector {
         }
     }
 }
-use super::{
-    ImageEmbedding, OcrResult, VisualFeatures, RustCodeSemantics,
-};
+use super::{ImageEmbedding, OcrResult, RustCodeSemantics, VisualFeatures};
 
 /// Multi-modal perception result combining all sensory modalities
 #[derive(Debug, Clone)]
@@ -492,7 +500,11 @@ impl Default for MultiModalIntegrator {
             // 768D SigLIP embedding → 16,384D HDC
             image_projector: JLProjector::new(SIGLIP_DIM, HDC_DIM, IMAGE_PROJECTOR_SEED),
             // 1024D Qwen3 embedding → 16,384D HDC
-            text_embedding_projector: JLProjector::new(QWEN3_DIM, HDC_DIM, TEXT_EMBEDDING_PROJECTOR_SEED),
+            text_embedding_projector: JLProjector::new(
+                QWEN3_DIM,
+                HDC_DIM,
+                TEXT_EMBEDDING_PROJECTOR_SEED,
+            ),
             // 256D n-gram features → 16,384D HDC
             text_ngram_projector: JLProjector::new(256, HDC_DIM, TEXT_NGRAM_PROJECTOR_SEED),
             // 32D visual features → 16,384D HDC
@@ -582,7 +594,9 @@ impl MultiModalIntegrator {
 
         // Use the vision feature projector (32D -> HDC_DIM) with L2 normalization
         // L2 norm ensures images of different complexity produce comparable magnitude vectors
-        let projected_bits = self.vision_feature_projector.project_to_binary_normalized(&feature_vec);
+        let projected_bits = self
+            .vision_feature_projector
+            .project_to_binary_normalized(&feature_vec);
 
         Ok(HdcVector {
             bits: projected_bits,
@@ -625,7 +639,8 @@ impl MultiModalIntegrator {
 
         for window in chars.windows(3) {
             // Hash tri-gram to feature index
-            let hash = window.iter()
+            let hash = window
+                .iter()
                 .fold(0u64, |acc, &c| acc.wrapping_mul(31).wrapping_add(c as u64));
             let idx = (hash % 256) as usize;
             ngram_features[idx] += 1.0;
@@ -661,7 +676,8 @@ impl MultiModalIntegrator {
 
         for window in chars.windows(3) {
             // Hash tri-gram to feature index
-            let hash = window.iter()
+            let hash = window
+                .iter()
                 .fold(0u64, |acc, &c| acc.wrapping_mul(31).wrapping_add(c as u64));
             let idx = (hash % 256) as usize;
             ngram_features[idx] += 1.0;
@@ -705,19 +721,22 @@ impl MultiModalIntegrator {
         // Structural counts (normalized by typical max values)
         // Indices 0-5: Count features (log-scaled for better distribution)
         features[0] = ((semantics.function_count as f32 + 1.0).ln() / 7.0).clamp(0.0, 1.0); // ~1000 max
-        features[1] = ((semantics.struct_count as f32 + 1.0).ln() / 6.0).clamp(0.0, 1.0);   // ~400 max
-        features[2] = ((semantics.enum_count as f32 + 1.0).ln() / 5.0).clamp(0.0, 1.0);     // ~150 max
-        features[3] = ((semantics.trait_count as f32 + 1.0).ln() / 5.0).clamp(0.0, 1.0);    // ~150 max
-        features[4] = ((semantics.impl_count as f32 + 1.0).ln() / 6.0).clamp(0.0, 1.0);     // ~400 max
-        features[5] = ((semantics.module_count as f32 + 1.0).ln() / 5.0).clamp(0.0, 1.0);   // ~150 max
+        features[1] = ((semantics.struct_count as f32 + 1.0).ln() / 6.0).clamp(0.0, 1.0); // ~400 max
+        features[2] = ((semantics.enum_count as f32 + 1.0).ln() / 5.0).clamp(0.0, 1.0); // ~150 max
+        features[3] = ((semantics.trait_count as f32 + 1.0).ln() / 5.0).clamp(0.0, 1.0); // ~150 max
+        features[4] = ((semantics.impl_count as f32 + 1.0).ln() / 6.0).clamp(0.0, 1.0); // ~400 max
+        features[5] = ((semantics.module_count as f32 + 1.0).ln() / 5.0).clamp(0.0, 1.0); // ~150 max
 
         // Index 6: Public ratio (already normalized 0-1)
         features[6] = semantics.public_ratio;
 
         // Index 7: Total items (complexity indicator)
-        let total_items = semantics.function_count + semantics.struct_count
-            + semantics.enum_count + semantics.trait_count
-            + semantics.impl_count + semantics.module_count;
+        let total_items = semantics.function_count
+            + semantics.struct_count
+            + semantics.enum_count
+            + semantics.trait_count
+            + semantics.impl_count
+            + semantics.module_count;
         features[7] = ((total_items as f32 + 1.0).ln() / 8.0).clamp(0.0, 1.0);
 
         // Index 8: Struct-to-function ratio (architectural pattern)
@@ -734,7 +753,8 @@ impl MultiModalIntegrator {
             let name_lower = name.to_lowercase();
             let chars: Vec<char> = name_lower.chars().collect();
             for window in chars.windows(3) {
-                let hash = window.iter()
+                let hash = window
+                    .iter()
                     .fold(0u64, |acc, &c| acc.wrapping_mul(31).wrapping_add(c as u64));
                 let idx = (hash % NGRAM_BUCKETS as u64) as usize;
                 fn_name_ngrams[idx] += 1.0;
@@ -755,7 +775,8 @@ impl MultiModalIntegrator {
             let name_lower = name.to_lowercase();
             let chars: Vec<char> = name_lower.chars().collect();
             for window in chars.windows(3) {
-                let hash = window.iter()
+                let hash = window
+                    .iter()
                     .fold(0u64, |acc, &c| acc.wrapping_mul(31).wrapping_add(c as u64));
                 let idx = (hash % NGRAM_BUCKETS as u64) as usize;
                 struct_name_ngrams[idx] += 1.0;
@@ -783,7 +804,10 @@ impl MultiModalIntegrator {
     }
 
     /// Fuse multiple modality contributions into a unified perception
-    pub fn fuse_modalities(&self, contributions: Vec<ModalityContribution>) -> Result<MultiModalPerception> {
+    pub fn fuse_modalities(
+        &self,
+        contributions: Vec<ModalityContribution>,
+    ) -> Result<MultiModalPerception> {
         if contributions.is_empty() {
             anyhow::bail!("Cannot fuse zero modalities");
         }
@@ -1028,11 +1052,9 @@ mod tests {
         let embedding = create_test_embedding();
         let ocr = create_test_ocr();
 
-        let perception = integrator.perceive_image(
-            &features,
-            Some(&embedding),
-            Some(&ocr),
-        ).unwrap();
+        let perception = integrator
+            .perceive_image(&features, Some(&embedding), Some(&ocr))
+            .unwrap();
 
         // Should have 3 contributions: visual features, embedding, OCR
         assert_eq!(perception.modalities.len(), 3);
@@ -1063,11 +1085,15 @@ mod tests {
 
         // With adaptive weighting
         integrator.set_adaptive_weighting(true);
-        let adaptive_perception = integrator.fuse_modalities(vec![high_conf.clone(), low_conf.clone()]).unwrap();
+        let adaptive_perception = integrator
+            .fuse_modalities(vec![high_conf.clone(), low_conf.clone()])
+            .unwrap();
 
         // Without adaptive weighting
         integrator.set_adaptive_weighting(false);
-        let non_adaptive_perception = integrator.fuse_modalities(vec![high_conf, low_conf]).unwrap();
+        let non_adaptive_perception = integrator
+            .fuse_modalities(vec![high_conf, low_conf])
+            .unwrap();
 
         // Adaptive should give higher overall confidence
         assert!(adaptive_perception.confidence > non_adaptive_perception.confidence);
@@ -1118,8 +1144,11 @@ mod tests {
         let sim = a.similarity(&b);
 
         // Should be close to 0.5 (within statistical variance)
-        assert!(sim > 0.45 && sim < 0.55,
-            "Random vectors should be quasi-orthogonal, got similarity {}", sim);
+        assert!(
+            sim > 0.45 && sim < 0.55,
+            "Random vectors should be quasi-orthogonal, got similarity {}",
+            sim
+        );
     }
 
     #[test]
@@ -1128,8 +1157,11 @@ mod tests {
         let v = HdcVector::random(42);
         let sparsity = v.sparsity();
 
-        assert!(sparsity > 0.45 && sparsity < 0.55,
-            "Random vector should have ~50% sparsity, got {}", sparsity);
+        assert!(
+            sparsity > 0.45 && sparsity < 0.55,
+            "Random vector should have ~50% sparsity, got {}",
+            sparsity
+        );
     }
 
     #[test]
@@ -1142,8 +1174,11 @@ mod tests {
         let unbound = bound.unbind(&b);
 
         // Should recover original vector exactly
-        assert_eq!(a.similarity(&unbound), 1.0,
-            "Unbinding should recover original vector");
+        assert_eq!(
+            a.similarity(&unbound),
+            1.0,
+            "Unbinding should recover original vector"
+        );
     }
 
     #[test]
@@ -1157,10 +1192,16 @@ mod tests {
         let sim_b = bound.similarity(&b);
 
         // Should be quasi-orthogonal to both inputs
-        assert!(sim_a > 0.45 && sim_a < 0.55,
-            "Bound vector should be orthogonal to first input, got {}", sim_a);
-        assert!(sim_b > 0.45 && sim_b < 0.55,
-            "Bound vector should be orthogonal to second input, got {}", sim_b);
+        assert!(
+            sim_a > 0.45 && sim_a < 0.55,
+            "Bound vector should be orthogonal to first input, got {}",
+            sim_a
+        );
+        assert!(
+            sim_b > 0.45 && sim_b < 0.55,
+            "Bound vector should be orthogonal to second input, got {}",
+            sim_b
+        );
     }
 
     #[test]
@@ -1172,8 +1213,7 @@ mod tests {
         let ab = a.bind(&b);
         let ba = b.bind(&a);
 
-        assert_eq!(ab.similarity(&ba), 1.0,
-            "Binding should be commutative");
+        assert_eq!(ab.similarity(&ba), 1.0, "Binding should be commutative");
     }
 
     #[test]
@@ -1185,8 +1225,12 @@ mod tests {
             let permuted = v.permute(shift);
             let restored = permuted.inverse_permute(shift);
 
-            assert_eq!(v.similarity(&restored), 1.0,
-                "Inverse permute should restore original for shift {}", shift);
+            assert_eq!(
+                v.similarity(&restored),
+                1.0,
+                "Inverse permute should restore original for shift {}",
+                shift
+            );
         }
     }
 
@@ -1199,8 +1243,11 @@ mod tests {
         let permuted = v.permute(100);
         let sim = v.similarity(&permuted);
 
-        assert!(sim > 0.45 && sim < 0.55,
-            "Permuted vector should be quasi-orthogonal, got {}", sim);
+        assert!(
+            sim > 0.45 && sim < 0.55,
+            "Permuted vector should be quasi-orthogonal, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -1221,8 +1268,16 @@ mod tests {
         let sim_b = bundled.similarity(&b);
 
         // OR-bundle should be more similar to inputs than random
-        assert!(sim_a > 0.6, "Bundle should be similar to first input, got {}", sim_a);
-        assert!(sim_b > 0.6, "Bundle should be similar to second input, got {}", sim_b);
+        assert!(
+            sim_a > 0.6,
+            "Bundle should be similar to first input, got {}",
+            sim_a
+        );
+        assert!(
+            sim_b > 0.6,
+            "Bundle should be similar to second input, got {}",
+            sim_b
+        );
     }
 
     #[test]
@@ -1235,14 +1290,19 @@ mod tests {
         let bundled = HdcVector::majority_bundle(&[&a, &b, &c]);
 
         // Should be similar to all three (but not as high as with OR-bundle)
-        assert!(bundled.similarity(&a) > 0.55,
-            "Majority bundle should be similar to inputs");
+        assert!(
+            bundled.similarity(&a) > 0.55,
+            "Majority bundle should be similar to inputs"
+        );
         assert!(bundled.similarity(&b) > 0.55);
         assert!(bundled.similarity(&c) > 0.55);
 
         // Sparsity should be close to 50% (majority voting preserves this)
-        assert!(bundled.sparsity() > 0.4 && bundled.sparsity() < 0.6,
-            "Majority bundle should preserve ~50% sparsity, got {}", bundled.sparsity());
+        assert!(
+            bundled.sparsity() > 0.4 && bundled.sparsity() < 0.6,
+            "Majority bundle should preserve ~50% sparsity, got {}",
+            bundled.sparsity()
+        );
     }
 
     #[test]
@@ -1297,14 +1357,20 @@ mod tests {
 
         // Query: unbind context_A to get back code
         let recovered = code_in_a.unbind(&context_a);
-        assert_eq!(code.similarity(&recovered), 1.0,
-            "Should recover code by unbinding context_A");
+        assert_eq!(
+            code.similarity(&recovered),
+            1.0,
+            "Should recover code by unbinding context_A"
+        );
 
         // Wrong query: unbind context_B gives garbage
         let wrong_query = code_in_a.unbind(&context_b);
         let sim = code.similarity(&wrong_query);
-        assert!(sim > 0.45 && sim < 0.55,
-            "Wrong context should give quasi-orthogonal result, got {}", sim);
+        assert!(
+            sim > 0.45 && sim < 0.55,
+            "Wrong context should give quasi-orthogonal result, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -1315,11 +1381,7 @@ mod tests {
         let c = HdcVector::random(6666);
 
         // Position-encoded sequence
-        let sequence = HdcVector::majority_bundle(&[
-            &a.permute(0),
-            &b.permute(1),
-            &c.permute(2),
-        ]);
+        let sequence = HdcVector::majority_bundle(&[&a.permute(0), &b.permute(1), &c.permute(2)]);
 
         // Query: "what's at position 0?" - inverse permute and check similarity
         let query_pos0 = sequence.inverse_permute(0);
@@ -1347,20 +1409,21 @@ mod tests {
         let val2 = HdcVector::random(1234);
 
         // Memory is bundle of bound pairs
-        let memory = HdcVector::majority_bundle(&[
-            &key1.bind(&val1),
-            &key2.bind(&val2),
-        ]);
+        let memory = HdcVector::majority_bundle(&[&key1.bind(&val1), &key2.bind(&val2)]);
 
         // Query memory with key1 - should retrieve val1
         let retrieved1 = memory.unbind(&key1);
-        assert!(retrieved1.similarity(&val1) > retrieved1.similarity(&val2),
-            "Query with key1 should be more similar to val1");
+        assert!(
+            retrieved1.similarity(&val1) > retrieved1.similarity(&val2),
+            "Query with key1 should be more similar to val1"
+        );
 
         // Query memory with key2 - should retrieve val2
         let retrieved2 = memory.unbind(&key2);
-        assert!(retrieved2.similarity(&val2) > retrieved2.similarity(&val1),
-            "Query with key2 should be more similar to val2");
+        assert!(
+            retrieved2.similarity(&val2) > retrieved2.similarity(&val1),
+            "Query with key2 should be more similar to val2"
+        );
     }
 }
 

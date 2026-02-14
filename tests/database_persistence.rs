@@ -79,7 +79,7 @@ mod roundtrip_tests {
         let original_encoding = BinaryHV::random(seed);
         let record = MemoryRecord {
             id: "encoding-test".to_string(),
-            encoding: original_encoding.clone(),
+            encoding: original_encoding,
             timestamp_ms: 1700000000000,
             memory_type: MemoryType::Semantic,
             content: "Testing encoding integrity".to_string(),

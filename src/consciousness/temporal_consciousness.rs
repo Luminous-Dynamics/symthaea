@@ -1025,7 +1025,7 @@ mod tests {
 
         // Similar states should be continuous
         let state1 = BinaryHV::random(1);
-        let state2 = state1.clone(); // Very similar
+        let state2 = state1; // Very similar
 
         continuity.observe(&state1, 0.5, 0.5);
         continuity.observe(&state2, 0.5, 0.5);
@@ -1129,12 +1129,12 @@ mod tests {
         let base_state = BinaryHV::random(42);
         for i in 0..20 {
             // Slight variations
-            let state = if i % 2 == 0 { base_state.clone() } else { BinaryHV::random(i as u64) };
+            let state = if i % 2 == 0 { base_state } else { BinaryHV::random(i as u64) };
             analyzer.observe(&state, 0.5, None, None);
         }
 
         let coherence = analyzer.overall_temporal_coherence();
-        assert!(coherence >= 0.0 && coherence <= 1.0);
+        assert!((0.0..=1.0).contains(&coherence));
     }
 
     #[test]

@@ -3,13 +3,10 @@
 //! This forensic test verifies that training and inference produce
 //! consistent HDC vectors from the same audio input.
 
-use std::path::PathBuf;
 use clap::Parser;
+use std::path::PathBuf;
 
-use symthaea_stt::{
-    AudioFrontend, AudioProjector,
-    TrainedPrototypes, PhonemeDecoder,
-};
+use symthaea_stt::{AudioFrontend, AudioProjector, PhonemeDecoder, TrainedPrototypes};
 
 #[derive(Parser)]
 #[command(name = "symthaea-mirror")]
@@ -20,7 +17,11 @@ struct Cli {
     audio: PathBuf,
 
     /// Prototypes file (to compare against)
-    #[arg(short, long, default_value = "data/models/dev-clean_adaptive_prototypes.bin")]
+    #[arg(
+        short,
+        long,
+        default_value = "data/models/dev-clean_adaptive_prototypes.bin"
+    )]
     prototypes: PathBuf,
 
     /// Number of frames to compare
@@ -47,8 +48,12 @@ fn main() {
         }
     };
     let duration_sec = audio.len() as f32 / sample_rate as f32;
-    println!("  Duration: {:.2}s, Sample rate: {} Hz, {} samples",
-             duration_sec, sample_rate, audio.len());
+    println!(
+        "  Duration: {:.2}s, Sample rate: {} Hz, {} samples",
+        duration_sec,
+        sample_rate,
+        audio.len()
+    );
     println!();
 
     // Load prototypes to compare against
@@ -77,7 +82,10 @@ fn main() {
 
     // Analyze HV properties (using individual frames like training/inference)
     println!("═══════════════════════════════════════════════════════════════");
-    println!("FRAME HV ANALYSIS (first {} frames)", cli.num_frames.min(hvs.len()));
+    println!(
+        "FRAME HV ANALYSIS (first {} frames)",
+        cli.num_frames.min(hvs.len())
+    );
     println!("═══════════════════════════════════════════════════════════════");
     println!();
 
@@ -103,8 +111,10 @@ fn main() {
 
         // Show detailed view for first few
         if i < 5 {
-            println!("Frame {:3}: top={}({:.4}) min={:.4} range={:.4}",
-                     i, top_phoneme, top_score, min_score, range);
+            println!(
+                "Frame {:3}: top={}({:.4}) min={:.4} range={:.4}",
+                i, top_phoneme, top_score, min_score, range
+            );
 
             // Show top-5 candidates
             print!("           ");
@@ -145,15 +155,19 @@ fn main() {
     println!("Prototype-to-FramedHV cross-similarity (diagnostic):");
     for (label, proto_hv) in &sample_protos {
         // Compare prototype to first 5 BUNDLED inference HVs
-        let sims: Vec<f32> = hvs.iter()
+        let sims: Vec<f32> = hvs
+            .iter()
             .take(5)
             .map(|hv| proto_hv.similarity(hv))
             .collect();
         let avg_sim: f32 = sims.iter().sum::<f32>() / sims.len() as f32;
 
-        println!("  {} -> Frame[0..5]: avg={:.4}, vals={:?}",
-                 label, avg_sim,
-                 sims.iter().map(|s| format!("{:.3}", s)).collect::<Vec<_>>());
+        println!(
+            "  {} -> Frame[0..5]: avg={:.4}, vals={:?}",
+            label,
+            avg_sim,
+            sims.iter().map(|s| format!("{:.3}", s)).collect::<Vec<_>>()
+        );
     }
     println!();
 
@@ -165,36 +179,54 @@ fn main() {
 
     // Check prototype bit density
     let sample_proto_hv = proto_pairs[0].1;
-    let proto_ones = sample_proto_hv.words.iter()
+    let proto_ones = sample_proto_hv
+        .words
+        .iter()
         .map(|w| w.count_ones())
         .sum::<u32>();
     let proto_density = proto_ones as f32 / 2048.0;
 
     // Check bundled HV bit density (should be ~50% like prototypes)
     let sample_bundle = &hvs[0];
-    let bundle_ones = sample_bundle.words.iter()
+    let bundle_ones = sample_bundle
+        .words
+        .iter()
         .map(|w| w.count_ones())
         .sum::<u32>();
     let bundle_density = bundle_ones as f32 / 2048.0;
 
-    println!("Prototype bit density: {:.1}% ({}/2048 bits set)",
-             proto_density * 100.0, proto_ones);
-    println!("Framed HV bit density: {:.1}% ({}/2048 bits set)",
-             bundle_density * 100.0, bundle_ones);
+    println!(
+        "Prototype bit density: {:.1}% ({}/2048 bits set)",
+        proto_density * 100.0,
+        proto_ones
+    );
+    println!(
+        "Framed HV bit density: {:.1}% ({}/2048 bits set)",
+        bundle_density * 100.0,
+        bundle_ones
+    );
     println!();
 
     // Check if they're using the same hash space
-    let common_ones = sample_proto_hv.words.iter()
+    let common_ones = sample_proto_hv
+        .words
+        .iter()
         .zip(sample_bundle.words.iter())
         .map(|(a, b)| (a & b).count_ones())
         .sum::<u32>();
-    let common_zeros = sample_proto_hv.words.iter()
+    let common_zeros = sample_proto_hv
+        .words
+        .iter()
         .zip(sample_bundle.words.iter())
         .map(|(a, b)| (!a & !b).count_ones())
         .sum::<u32>();
 
-    println!("Bit agreement: {} common 1s + {} common 0s = {} matching bits",
-             common_ones, common_zeros, common_ones + common_zeros);
+    println!(
+        "Bit agreement: {} common 1s + {} common 0s = {} matching bits",
+        common_ones,
+        common_zeros,
+        common_ones + common_zeros
+    );
     println!("Expected for orthogonal vectors: ~1024 (50%)");
     println!("Expected for same-source vectors: >1200 (>60%)");
     println!();
@@ -217,7 +249,10 @@ fn main() {
         println!("   Next step: Check AudioFrontend.compute_mel_frame() normalization");
         println!("              and compare against how prototypes were trained.");
     } else if avg_max < 0.3 {
-        println!("⚠️  WARNING: Max similarity {:.4} is low (expect >0.3)", avg_max);
+        println!(
+            "⚠️  WARNING: Max similarity {:.4} is low (expect >0.3)",
+            avg_max
+        );
         println!("   Prototypes have weak discrimination.");
     } else {
         println!("✓  Max similarity {:.4} is reasonable (>0.3)", avg_max);

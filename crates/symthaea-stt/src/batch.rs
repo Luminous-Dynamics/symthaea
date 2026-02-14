@@ -7,16 +7,19 @@
 //!
 //! Uses work-stealing thread pool for efficient CPU utilization.
 
-use crate::audio::{AudioFrontend, AudioProjector, AudioConfig};
+use crate::audio::{AudioConfig, AudioFrontend, AudioProjector};
+use crate::bootstrap::{AdaptivePrototypeSet, AdaptiveStats, BootstrapConfig, TrainedPrototypes};
+use crate::discovery::{DiscoveryConfig, DiscoveryPipeline, DiscoveryResult};
 use crate::hdc::HV16;
-use crate::ltc::LtcConfig;
-use crate::bootstrap::{TrainedPrototypes, BootstrapConfig, AdaptivePrototypeSet, AdaptiveStats};
-use crate::discovery::{DiscoveryPipeline, DiscoveryConfig, DiscoveryResult};
 use crate::lexicon::{CmuDictionary, TextToPhonemes};
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}};
-use std::thread;
+use crate::ltc::LtcConfig;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
+use std::thread;
 
 /// Batch processing configuration
 #[derive(Debug, Clone)]
@@ -135,13 +138,14 @@ impl BatchProcessor {
         callback: Option<ProgressCallback>,
     ) -> (Vec<FileResult>, BatchStats) {
         let num_workers = self.config.workers();
-        let total_files = self.config.max_files.unwrap_or(files.len()).min(files.len());
+        let total_files = self
+            .config
+            .max_files
+            .unwrap_or(files.len())
+            .min(files.len());
 
         // Prepare file list
-        let mut work_files: Vec<PathBuf> = files.iter()
-            .take(total_files)
-            .cloned()
-            .collect();
+        let mut work_files: Vec<PathBuf> = files.iter().take(total_files).cloned().collect();
 
         if self.config.shuffle {
             // Simple shuffle using hash
@@ -153,7 +157,9 @@ impl BatchProcessor {
 
         // Shared state
         let results = Arc::new(Mutex::new(Vec::with_capacity(total_files)));
-        let work_queue = Arc::new(Mutex::new(work_files.into_iter().enumerate().collect::<Vec<_>>()));
+        let work_queue = Arc::new(Mutex::new(
+            work_files.into_iter().enumerate().collect::<Vec<_>>(),
+        ));
         let processed = Arc::new(AtomicUsize::new(0));
         let callback = callback.map(Arc::new);
 
@@ -269,8 +275,8 @@ impl BatchProcessor {
     /// Process a single file
     fn process_file(path: &Path, projector: &mut AudioProjector) -> Result<FileSuccess, String> {
         // Load audio
-        let (audio, sample_rate) = AudioFrontend::load_audio(path)
-            .map_err(|e| format!("Failed to load audio: {}", e))?;
+        let (audio, sample_rate) =
+            AudioFrontend::load_audio(path).map_err(|e| format!("Failed to load audio: {}", e))?;
 
         let audio_duration = audio.len() as f32 / sample_rate as f32;
 
@@ -375,10 +381,11 @@ impl BatchTrainer {
         let total = samples.len();
 
         let work_queue = Arc::new(Mutex::new(
-            samples.iter()
+            samples
+                .iter()
                 .enumerate()
                 .map(|(i, (path, transcript))| (i, (path.clone(), transcript.clone())))
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>(),
         ));
         let processed = Arc::new(AtomicUsize::new(0));
         let stats = Arc::new(Mutex::new(BatchStats::default()));
@@ -467,7 +474,9 @@ impl BatchTrainer {
 
         for (phoneme, acc) in accumulators.iter() {
             if acc.count >= self.bootstrap_config.min_instances {
-                prototypes.prototypes.insert(phoneme.clone(), acc.finalize());
+                prototypes
+                    .prototypes
+                    .insert(phoneme.clone(), acc.finalize());
                 prototypes.counts.insert(phoneme.clone(), acc.count);
             }
         }
@@ -483,8 +492,8 @@ impl BatchTrainer {
         text_to_phonemes: Option<&TextToPhonemes>,
     ) -> Result<f32, String> {
         // Load audio
-        let (audio, sample_rate) = AudioFrontend::load_audio(path)
-            .map_err(|e| format!("Load error: {}", e))?;
+        let (audio, sample_rate) =
+            AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {}", e))?;
 
         let duration = audio.len() as f32 / sample_rate as f32;
 
@@ -505,7 +514,8 @@ impl BatchTrainer {
                 .collect()
         } else {
             // Fall back to words
-            transcript.split_whitespace()
+            transcript
+                .split_whitespace()
                 .map(|w| w.to_lowercase())
                 .collect()
         };
@@ -546,7 +556,9 @@ impl BatchTrainer {
 
     /// Get current phoneme counts
     pub fn get_counts(&self) -> HashMap<String, usize> {
-        self.accumulators.lock().unwrap()
+        self.accumulators
+            .lock()
+            .unwrap()
             .iter()
             .map(|(k, v)| (k.clone(), v.count))
             .collect()
@@ -567,17 +579,21 @@ impl BatchTrainer {
         let total = samples.len();
 
         let work_queue = Arc::new(Mutex::new(
-            samples.iter()
+            samples
+                .iter()
                 .enumerate()
                 .map(|(i, (path, transcript))| (i, (path.clone(), transcript.clone())))
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>(),
         ));
         let processed = Arc::new(AtomicUsize::new(0));
         let stats = Arc::new(Mutex::new(BatchStats::default()));
         let callback = callback.map(Arc::new);
 
         // Use AdaptivePrototypeSet instead of naive accumulators
-        let adaptive_set = Arc::new(Mutex::new(AdaptivePrototypeSet::new(threshold, max_variants)));
+        let adaptive_set = Arc::new(Mutex::new(AdaptivePrototypeSet::new(
+            threshold,
+            max_variants,
+        )));
 
         let start_time = std::time::Instant::now();
 
@@ -673,8 +689,8 @@ impl BatchTrainer {
         text_to_phonemes: Option<&TextToPhonemes>,
     ) -> Result<f32, String> {
         // Load audio
-        let (audio, sample_rate) = AudioFrontend::load_audio(path)
-            .map_err(|e| format!("Load error: {}", e))?;
+        let (audio, sample_rate) =
+            AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {}", e))?;
 
         let duration = audio.len() as f32 / sample_rate as f32;
 
@@ -693,7 +709,8 @@ impl BatchTrainer {
                 .filter(|p| p != "_" && p != "SIL" && !p.starts_with('<'))
                 .collect()
         } else {
-            transcript.split_whitespace()
+            transcript
+                .split_whitespace()
                 .map(|w| w.to_lowercase())
                 .collect()
         };
@@ -704,7 +721,8 @@ impl BatchTrainer {
 
         // Duration-weighted alignment based on phoneme class
         // Relative durations: vowels=3, fricatives=2, stops=1, other=1.5
-        let durations: Vec<f32> = labels.iter()
+        let durations: Vec<f32> = labels
+            .iter()
             .map(|p| phoneme_relative_duration(p))
             .collect();
         let total_duration: f32 = durations.iter().sum();
@@ -807,12 +825,15 @@ impl BatchDiscovery {
         let total = files.len();
 
         // Shared discovery pipeline
-        let pipeline = Arc::new(Mutex::new(DiscoveryPipeline::new(self.discovery_config.clone())));
+        let pipeline = Arc::new(Mutex::new(DiscoveryPipeline::new(
+            self.discovery_config.clone(),
+        )));
         let work_queue = Arc::new(Mutex::new(
-            files.iter()
+            files
+                .iter()
                 .enumerate()
                 .map(|(i, path)| (i, path.clone()))
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>(),
         ));
         let processed = Arc::new(AtomicUsize::new(0));
         let stats = Arc::new(Mutex::new(BatchStats::default()));
@@ -897,8 +918,8 @@ impl BatchDiscovery {
         pipeline: &Arc<Mutex<DiscoveryPipeline>>,
     ) -> Result<f32, String> {
         // Load audio
-        let (audio, sample_rate) = AudioFrontend::load_audio(path)
-            .map_err(|e| format!("Load error: {}", e))?;
+        let (audio, sample_rate) =
+            AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {}", e))?;
 
         let duration = audio.len() as f32 / sample_rate as f32;
 
@@ -907,9 +928,7 @@ impl BatchDiscovery {
         let (hvs, saliences) = projector.project_with_salience(&audio);
 
         // Create timestamps
-        let timestamps: Vec<f32> = (0..hvs.len())
-            .map(|i| i as f32 * 0.010)
-            .collect();
+        let timestamps: Vec<f32> = (0..hvs.len()).map(|i| i as f32 * 0.010).collect();
 
         // Feed to pipeline
         {

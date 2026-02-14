@@ -9,7 +9,7 @@
 //! ```
 
 use symthaea::perception::multi_model_extractor::{
-    ModelPreset, all_validation_status, print_support_summary,
+    all_validation_status, print_support_summary, ModelPreset,
 };
 
 fn main() {
@@ -33,11 +33,17 @@ fn main() {
         let corridor = preset.phenomenal_corridor_layer();
         let depth = (corridor as f64 / config.num_layers as f64) * 100.0;
 
-        println!("{:16} │ {:6} │ Layer {:8} │ {:.1}%",
-                 config.model_id.split('/').last().unwrap_or(&config.model_id),
-                 config.num_layers,
-                 corridor,
-                 depth);
+        println!(
+            "{:16} │ {:6} │ Layer {:8} │ {:.1}%",
+            config
+                .model_id
+                .split('/')
+                .last()
+                .unwrap_or(&config.model_id),
+            config.num_layers,
+            corridor,
+            depth
+        );
     }
 
     println!("\n");

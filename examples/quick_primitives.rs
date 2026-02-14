@@ -1,10 +1,7 @@
 // Quick test of principled causal primitives (skips slow unified method)
 use symthaea::benchmarks::{
-    TuebingenAdapter,
-    discover_by_principled_hdc,
-    discover_by_phi,
-    discover_information_theoretic,
-    discover_majority_voting,
+    discover_by_phi, discover_by_principled_hdc, discover_information_theoretic,
+    discover_majority_voting, TuebingenAdapter,
 };
 
 fn main() {
@@ -25,28 +22,36 @@ fn main() {
     println!("Testing methods...\n");
 
     let results_phdc = adapter.run(discover_by_principled_hdc);
-    println!("  Principled HDC: {:.1}% ({}/{})",
-             results_phdc.accuracy() * 100.0,
-             results_phdc.correct,
-             results_phdc.total);
+    println!(
+        "  Principled HDC: {:.1}% ({}/{})",
+        results_phdc.accuracy() * 100.0,
+        results_phdc.correct,
+        results_phdc.total
+    );
 
     let results_phi = adapter.run(discover_by_phi);
-    println!("  Phi-based: {:.1}% ({}/{})",
-             results_phi.accuracy() * 100.0,
-             results_phi.correct,
-             results_phi.total);
+    println!(
+        "  Phi-based: {:.1}% ({}/{})",
+        results_phi.accuracy() * 100.0,
+        results_phi.correct,
+        results_phi.total
+    );
 
     let results_info = adapter.run(discover_information_theoretic);
-    println!("  Info-Theoretic: {:.1}% ({}/{})",
-             results_info.accuracy() * 100.0,
-             results_info.correct,
-             results_info.total);
+    println!(
+        "  Info-Theoretic: {:.1}% ({}/{})",
+        results_info.accuracy() * 100.0,
+        results_info.correct,
+        results_info.total
+    );
 
     let results_majority = adapter.run(discover_majority_voting);
-    println!("  Majority Voting: {:.1}% ({}/{})",
-             results_majority.accuracy() * 100.0,
-             results_majority.correct,
-             results_majority.total);
+    println!(
+        "  Majority Voting: {:.1}% ({}/{})",
+        results_majority.accuracy() * 100.0,
+        results_majority.correct,
+        results_majority.total
+    );
 
     // Summary
     println!("\n╔══════════════════════════════════════════════════════════════╗");
@@ -64,11 +69,28 @@ fn main() {
     println!("  ─────────────────────────────────────────────────");
     for (name, acc) in &methods {
         let delta = (acc - 0.5) * 100.0;
-        let marker = if *acc > 0.65 { "★" } else if *acc > 0.55 { "✓" } else if *acc > 0.5 { "~" } else { "✗" };
-        println!("  {:22} {:5.1}%      {:+5.1}%  {}", name, acc * 100.0, delta, marker);
+        let marker = if *acc > 0.65 {
+            "★"
+        } else if *acc > 0.55 {
+            "✓"
+        } else if *acc > 0.5 {
+            "~"
+        } else {
+            "✗"
+        };
+        println!(
+            "  {:22} {:5.1}%      {:+5.1}%  {}",
+            name,
+            acc * 100.0,
+            delta,
+            marker
+        );
     }
 
-    let best = methods.iter().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
+    let best = methods
+        .iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .unwrap();
     println!("\n  Best: {} ({:.1}%)", best.0, best.1 * 100.0);
     println!("\n  Done!");
 }

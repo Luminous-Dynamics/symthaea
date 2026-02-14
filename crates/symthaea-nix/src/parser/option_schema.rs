@@ -270,17 +270,26 @@ mod tests {
         let schemas = parse_nixos_options(sample_json()).unwrap();
         assert_eq!(schemas.len(), 3);
 
-        let nginx_enable = schemas.iter().find(|s| s.name == "services.nginx.enable").unwrap();
+        let nginx_enable = schemas
+            .iter()
+            .find(|s| s.name == "services.nginx.enable")
+            .unwrap();
         assert!(nginx_enable.is_enable_option());
         assert_eq!(nginx_enable.module_prefix(), "services");
         assert_eq!(nginx_enable.service_name(), Some("nginx"));
-        assert_eq!(nginx_enable.path_components(), vec!["services", "nginx", "enable"]);
+        assert_eq!(
+            nginx_enable.path_components(),
+            vec!["services", "nginx", "enable"]
+        );
     }
 
     #[test]
     fn test_package_list_detection() {
         let schemas = parse_nixos_options(sample_json()).unwrap();
-        let sys_pkgs = schemas.iter().find(|s| s.name == "environment.systemPackages").unwrap();
+        let sys_pkgs = schemas
+            .iter()
+            .find(|s| s.name == "environment.systemPackages")
+            .unwrap();
         assert!(sys_pkgs.is_package_list());
         assert!(!sys_pkgs.is_enable_option());
     }
@@ -289,17 +298,26 @@ mod tests {
     fn test_load_bundled_options() {
         let schemas = load_bundled_options().unwrap();
         // Should have a substantial number of bundled options
-        assert!(schemas.len() >= 100, "expected >= 100 bundled options, got {}", schemas.len());
+        assert!(
+            schemas.len() >= 100,
+            "expected >= 100 bundled options, got {}",
+            schemas.len()
+        );
         // Should include common options
         assert!(schemas.iter().any(|s| s.name == "services.nginx.enable"));
         assert!(schemas.iter().any(|s| s.name == "boot.loader.grub.enable"));
-        assert!(schemas.iter().any(|s| s.name == "networking.firewall.enable"));
+        assert!(schemas
+            .iter()
+            .any(|s| s.name == "networking.firewall.enable"));
     }
 
     #[test]
     fn test_related_packages_extraction() {
         let schemas = parse_nixos_options(sample_json()).unwrap();
-        let nginx_pkg = schemas.iter().find(|s| s.name == "services.nginx.package").unwrap();
+        let nginx_pkg = schemas
+            .iter()
+            .find(|s| s.name == "services.nginx.package")
+            .unwrap();
         assert!(nginx_pkg.related_packages.contains(&"nginx".to_string()));
     }
 }

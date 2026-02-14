@@ -7,8 +7,8 @@
 //! All destructive operations produce [`NixOSCommand`] values routed
 //! through the Φ-gated executor.
 
-use std::process::Command;
 use super::executor::NixOSCommand;
+use std::process::Command;
 
 /// Manages Nix store garbage collection with intelligent retention policies.
 pub struct GcManager;
@@ -94,9 +94,7 @@ impl GcManager {
             }
             _ => {
                 // Fallback: use du
-                let du = Command::new("du")
-                    .args(["-sb", "/nix/store"])
-                    .output()?;
+                let du = Command::new("du").args(["-sb", "/nix/store"]).output()?;
                 let stdout = String::from_utf8_lossy(&du.stdout);
                 let bytes = stdout
                     .split_whitespace()
@@ -239,17 +237,11 @@ impl GcManager {
         let value: Result<serde_json::Value, _> = serde_json::from_str(json);
         match value {
             Ok(serde_json::Value::Array(arr)) => {
-                let total: u64 = arr
-                    .iter()
-                    .filter_map(|v| v["narSize"].as_u64())
-                    .sum();
+                let total: u64 = arr.iter().filter_map(|v| v["narSize"].as_u64()).sum();
                 (total, arr.len())
             }
             Ok(serde_json::Value::Object(map)) => {
-                let total: u64 = map
-                    .values()
-                    .filter_map(|v| v["narSize"].as_u64())
-                    .sum();
+                let total: u64 = map.values().filter_map(|v| v["narSize"].as_u64()).sum();
                 (total, map.len())
             }
             _ => (0, 0),
@@ -322,7 +314,7 @@ mod tests {
     fn test_recommend_large_store() {
         let analysis = GcAnalysis {
             total_store_bytes: 50 * 1024 * 1024 * 1024, // 50 GiB
-            reclaimable_bytes: 20 * 1024 * 1024 * 1024,  // 20 GiB
+            reclaimable_bytes: 20 * 1024 * 1024 * 1024, // 20 GiB
             dead_path_count: 5000,
             live_root_count: 50,
             total_generations: 10,
@@ -336,7 +328,7 @@ mod tests {
     fn test_recommend_healthy_store() {
         let analysis = GcAnalysis {
             total_store_bytes: 10 * 1024 * 1024 * 1024, // 10 GiB
-            reclaimable_bytes: 500 * 1024 * 1024,         // 500 MiB
+            reclaimable_bytes: 500 * 1024 * 1024,       // 500 MiB
             dead_path_count: 50,
             live_root_count: 20,
             total_generations: 5,

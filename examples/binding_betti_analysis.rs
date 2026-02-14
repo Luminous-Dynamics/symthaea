@@ -12,17 +12,19 @@
 //! cargo run --example binding_betti_analysis --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig, TopologicalAssessment};
+use symthaea_core::hdc::consciousness_topology::{
+    ConsciousnessTopology, TopologicalAssessment, TopologyConfig,
+};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -48,22 +50,27 @@ fn run_experiment() -> Result<()> {
     let functional = load_corpus("data/consciousness_probe/functional_concepts_expanded.json")?;
 
     // Create pairs
-    let phen_pairs: Vec<(&str, &str)> = phenomenal.iter()
+    let phen_pairs: Vec<(&str, &str)> = phenomenal
+        .iter()
         .take(40)
         .collect::<Vec<_>>()
         .chunks(2)
         .map(|c| (c[0].as_str(), c[1].as_str()))
         .collect();
 
-    let func_pairs: Vec<(&str, &str)> = functional.iter()
+    let func_pairs: Vec<(&str, &str)> = functional
+        .iter()
         .take(40)
         .collect::<Vec<_>>()
         .chunks(2)
         .map(|c| (c[0].as_str(), c[1].as_str()))
         .collect();
 
-    println!("Created {} phenomenal pairs, {} functional pairs\n",
-             phen_pairs.len(), func_pairs.len());
+    println!(
+        "Created {} phenomenal pairs, {} functional pairs\n",
+        phen_pairs.len(),
+        func_pairs.len()
+    );
 
     // Load model
     println!("Loading BGE-M3...");
@@ -109,7 +116,9 @@ fn run_experiment() -> Result<()> {
     // Process phenomenal pairs
     println!("Processing phenomenal pairs...");
     for (i, (a, b)) in phen_pairs.iter().enumerate() {
-        if i % 5 == 0 { print!("  {}/{}\\r", i, phen_pairs.len()); }
+        if i % 5 == 0 {
+            print!("  {}/{}\\r", i, phen_pairs.len());
+        }
 
         let acts_a = extractor.extract_layers(a, &[layer])?;
         let acts_b = extractor.extract_layers(b, &[layer])?;
@@ -130,20 +139,26 @@ fn run_experiment() -> Result<()> {
         phen_bind.beta_1.push(bound_topo.betti.beta_1);
         phen_bind.beta_2.push(bound_topo.betti.beta_2);
         phen_bind.num_features.push(bound_topo.features.len());
-        phen_bind.total_persistence.push(total_persistence(&bound_topo));
+        phen_bind
+            .total_persistence
+            .push(total_persistence(&bound_topo));
 
         phen_bundle.beta_0.push(bundle_topo.betti.beta_0);
         phen_bundle.beta_1.push(bundle_topo.betti.beta_1);
         phen_bundle.beta_2.push(bundle_topo.betti.beta_2);
         phen_bundle.num_features.push(bundle_topo.features.len());
-        phen_bundle.total_persistence.push(total_persistence(&bundle_topo));
+        phen_bundle
+            .total_persistence
+            .push(total_persistence(&bundle_topo));
     }
     println!("  Done                    ");
 
     // Process functional pairs
     println!("Processing functional pairs...");
     for (i, (a, b)) in func_pairs.iter().enumerate() {
-        if i % 5 == 0 { print!("  {}/{}\\r", i, func_pairs.len()); }
+        if i % 5 == 0 {
+            print!("  {}/{}\\r", i, func_pairs.len());
+        }
 
         let acts_a = extractor.extract_layers(a, &[layer])?;
         let acts_b = extractor.extract_layers(b, &[layer])?;
@@ -161,13 +176,17 @@ fn run_experiment() -> Result<()> {
         func_bind.beta_1.push(bound_topo.betti.beta_1);
         func_bind.beta_2.push(bound_topo.betti.beta_2);
         func_bind.num_features.push(bound_topo.features.len());
-        func_bind.total_persistence.push(total_persistence(&bound_topo));
+        func_bind
+            .total_persistence
+            .push(total_persistence(&bound_topo));
 
         func_bundle.beta_0.push(bundle_topo.betti.beta_0);
         func_bundle.beta_1.push(bundle_topo.betti.beta_1);
         func_bundle.beta_2.push(bundle_topo.betti.beta_2);
         func_bundle.num_features.push(bundle_topo.features.len());
-        func_bundle.total_persistence.push(total_persistence(&bundle_topo));
+        func_bundle
+            .total_persistence
+            .push(total_persistence(&bundle_topo));
     }
     println!("  Done\n");
 
@@ -179,25 +198,45 @@ fn run_experiment() -> Result<()> {
     println!("Metric      │ Phen Bind │ Phen Bundle │ Func Bind │ Func Bundle");
     println!("────────────┼───────────┼─────────────┼───────────┼────────────");
 
-    println!("β₀ (comps)  │ {:9.2} │ {:11.2} │ {:9.2} │ {:10.2}",
-             mean_usize(&phen_bind.beta_0), mean_usize(&phen_bundle.beta_0),
-             mean_usize(&func_bind.beta_0), mean_usize(&func_bundle.beta_0));
+    println!(
+        "β₀ (comps)  │ {:9.2} │ {:11.2} │ {:9.2} │ {:10.2}",
+        mean_usize(&phen_bind.beta_0),
+        mean_usize(&phen_bundle.beta_0),
+        mean_usize(&func_bind.beta_0),
+        mean_usize(&func_bundle.beta_0)
+    );
 
-    println!("β₁ (cycles) │ {:9.2} │ {:11.2} │ {:9.2} │ {:10.2}",
-             mean_usize(&phen_bind.beta_1), mean_usize(&phen_bundle.beta_1),
-             mean_usize(&func_bind.beta_1), mean_usize(&func_bundle.beta_1));
+    println!(
+        "β₁ (cycles) │ {:9.2} │ {:11.2} │ {:9.2} │ {:10.2}",
+        mean_usize(&phen_bind.beta_1),
+        mean_usize(&phen_bundle.beta_1),
+        mean_usize(&func_bind.beta_1),
+        mean_usize(&func_bundle.beta_1)
+    );
 
-    println!("β₂ (voids)  │ {:9.2} │ {:11.2} │ {:9.2} │ {:10.2}",
-             mean_usize(&phen_bind.beta_2), mean_usize(&phen_bundle.beta_2),
-             mean_usize(&func_bind.beta_2), mean_usize(&func_bundle.beta_2));
+    println!(
+        "β₂ (voids)  │ {:9.2} │ {:11.2} │ {:9.2} │ {:10.2}",
+        mean_usize(&phen_bind.beta_2),
+        mean_usize(&phen_bundle.beta_2),
+        mean_usize(&func_bind.beta_2),
+        mean_usize(&func_bundle.beta_2)
+    );
 
-    println!("# Features  │ {:9.2} │ {:11.2} │ {:9.2} │ {:10.2}",
-             mean_usize(&phen_bind.num_features), mean_usize(&phen_bundle.num_features),
-             mean_usize(&func_bind.num_features), mean_usize(&func_bundle.num_features));
+    println!(
+        "# Features  │ {:9.2} │ {:11.2} │ {:9.2} │ {:10.2}",
+        mean_usize(&phen_bind.num_features),
+        mean_usize(&phen_bundle.num_features),
+        mean_usize(&func_bind.num_features),
+        mean_usize(&func_bundle.num_features)
+    );
 
-    println!("Tot Persist │ {:9.4} │ {:11.4} │ {:9.4} │ {:10.4}",
-             mean_f64(&phen_bind.total_persistence), mean_f64(&phen_bundle.total_persistence),
-             mean_f64(&func_bind.total_persistence), mean_f64(&func_bundle.total_persistence));
+    println!(
+        "Tot Persist │ {:9.4} │ {:11.4} │ {:9.4} │ {:10.4}",
+        mean_f64(&phen_bind.total_persistence),
+        mean_f64(&phen_bundle.total_persistence),
+        mean_f64(&func_bind.total_persistence),
+        mean_f64(&func_bundle.total_persistence)
+    );
 
     // Key comparisons
     println!("\n================================================================");
@@ -211,16 +250,30 @@ fn run_experiment() -> Result<()> {
     println!("β₀ (Components) - Lower = More Integrated:");
     println!("  Phenomenal: Bind-Bundle = {:+.3}", bind_vs_bundle_phen_b0);
     println!("  Functional: Bind-Bundle = {:+.3}", bind_vs_bundle_func_b0);
-    println!("  Interaction: {:+.3}", bind_vs_bundle_phen_b0 - bind_vs_bundle_func_b0);
+    println!(
+        "  Interaction: {:+.3}",
+        bind_vs_bundle_phen_b0 - bind_vs_bundle_func_b0
+    );
 
     // 2. Total persistence comparison
-    let bind_vs_bundle_phen_pers = mean_f64(&phen_bind.total_persistence) - mean_f64(&phen_bundle.total_persistence);
-    let bind_vs_bundle_func_pers = mean_f64(&func_bind.total_persistence) - mean_f64(&func_bundle.total_persistence);
+    let bind_vs_bundle_phen_pers =
+        mean_f64(&phen_bind.total_persistence) - mean_f64(&phen_bundle.total_persistence);
+    let bind_vs_bundle_func_pers =
+        mean_f64(&func_bind.total_persistence) - mean_f64(&func_bundle.total_persistence);
 
     println!("\nTotal Persistence - Higher = More Stable Features:");
-    println!("  Phenomenal: Bind-Bundle = {:+.4}", bind_vs_bundle_phen_pers);
-    println!("  Functional: Bind-Bundle = {:+.4}", bind_vs_bundle_func_pers);
-    println!("  Interaction: {:+.4}", bind_vs_bundle_phen_pers - bind_vs_bundle_func_pers);
+    println!(
+        "  Phenomenal: Bind-Bundle = {:+.4}",
+        bind_vs_bundle_phen_pers
+    );
+    println!(
+        "  Functional: Bind-Bundle = {:+.4}",
+        bind_vs_bundle_func_pers
+    );
+    println!(
+        "  Interaction: {:+.4}",
+        bind_vs_bundle_phen_pers - bind_vs_bundle_func_pers
+    );
 
     // 3. Statistical tests
     println!("\n================================================================");
@@ -237,26 +290,62 @@ fn run_experiment() -> Result<()> {
     let p_func_b0 = permutation_test(&func_bind_b0_f64, &func_bundle_b0_f64, 5000);
 
     println!("Bind vs Bundle (β₀):");
-    println!("  Phenomenal pairs: p = {:.4} {}", p_phen_b0, if p_phen_b0 < 0.05 { "*" } else { "" });
-    println!("  Functional pairs: p = {:.4} {}", p_func_b0, if p_func_b0 < 0.05 { "*" } else { "" });
+    println!(
+        "  Phenomenal pairs: p = {:.4} {}",
+        p_phen_b0,
+        if p_phen_b0 < 0.05 { "*" } else { "" }
+    );
+    println!(
+        "  Functional pairs: p = {:.4} {}",
+        p_func_b0,
+        if p_func_b0 < 0.05 { "*" } else { "" }
+    );
 
     // Test: Does phenomenal show different binding effect than functional?
-    let phen_bind_effect: Vec<f64> = phen_bind.beta_0.iter().zip(phen_bundle.beta_0.iter())
-        .map(|(&b, &bu)| b as f64 - bu as f64).collect();
-    let func_bind_effect: Vec<f64> = func_bind.beta_0.iter().zip(func_bundle.beta_0.iter())
-        .map(|(&b, &bu)| b as f64 - bu as f64).collect();
+    let phen_bind_effect: Vec<f64> = phen_bind
+        .beta_0
+        .iter()
+        .zip(phen_bundle.beta_0.iter())
+        .map(|(&b, &bu)| b as f64 - bu as f64)
+        .collect();
+    let func_bind_effect: Vec<f64> = func_bind
+        .beta_0
+        .iter()
+        .zip(func_bundle.beta_0.iter())
+        .map(|(&b, &bu)| b as f64 - bu as f64)
+        .collect();
 
     let p_interaction = permutation_test(&phen_bind_effect, &func_bind_effect, 5000);
     println!("\nInteraction (Phen binding effect vs Func binding effect):");
-    println!("  p = {:.4} {}", p_interaction, if p_interaction < 0.05 { "*" } else { "" });
+    println!(
+        "  p = {:.4} {}",
+        p_interaction,
+        if p_interaction < 0.05 { "*" } else { "" }
+    );
 
     // Total persistence tests
-    let p_phen_pers = permutation_test(&phen_bind.total_persistence, &phen_bundle.total_persistence, 5000);
-    let p_func_pers = permutation_test(&func_bind.total_persistence, &func_bundle.total_persistence, 5000);
+    let p_phen_pers = permutation_test(
+        &phen_bind.total_persistence,
+        &phen_bundle.total_persistence,
+        5000,
+    );
+    let p_func_pers = permutation_test(
+        &func_bind.total_persistence,
+        &func_bundle.total_persistence,
+        5000,
+    );
 
     println!("\nBind vs Bundle (Total Persistence):");
-    println!("  Phenomenal pairs: p = {:.4} {}", p_phen_pers, if p_phen_pers < 0.05 { "*" } else { "" });
-    println!("  Functional pairs: p = {:.4} {}", p_func_pers, if p_func_pers < 0.05 { "*" } else { "" });
+    println!(
+        "  Phenomenal pairs: p = {:.4} {}",
+        p_phen_pers,
+        if p_phen_pers < 0.05 { "*" } else { "" }
+    );
+    println!(
+        "  Functional pairs: p = {:.4} {}",
+        p_func_pers,
+        if p_func_pers < 0.05 { "*" } else { "" }
+    );
 
     // Summary
     println!("\n================================================================");
@@ -264,7 +353,8 @@ fn run_experiment() -> Result<()> {
     println!("================================================================\n");
 
     let binding_integrates = bind_vs_bundle_phen_b0 < 0.0 || bind_vs_bundle_func_b0 < 0.0;
-    let phen_specific = (bind_vs_bundle_phen_b0 - bind_vs_bundle_func_b0).abs() > 0.1 && p_interaction < 0.1;
+    let phen_specific =
+        (bind_vs_bundle_phen_b0 - bind_vs_bundle_func_b0).abs() > 0.1 && p_interaction < 0.1;
 
     if binding_integrates && phen_specific {
         println!("✓ BINDING CREATES INTEGRATION, ESPECIALLY FOR PHENOMENAL");
@@ -341,13 +431,17 @@ fn total_persistence(assessment: &TopologicalAssessment) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn mean_usize(values: &[usize]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<usize>() as f64 / values.len() as f64
 }
 
 #[cfg(feature = "neural-bridge")]
 fn mean_f64(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 

@@ -14,7 +14,7 @@ use std::time::Instant;
 use anyhow::Result;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::binary_hv::BinaryHV;
@@ -26,7 +26,9 @@ fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
     {
         println!("This example requires the 'neural-bridge' feature.");
-        println!("Run with: cargo run --example layer_topology_full_corpus --features neural-bridge");
+        println!(
+            "Run with: cargo run --example layer_topology_full_corpus --features neural-bridge"
+        );
         return Ok(());
     }
 
@@ -58,9 +60,15 @@ fn run_analysis() -> Result<()> {
         ..Default::default()
     };
     let extractor = LayerExtractor::load(config)?;
-    println!("  Model loaded in {:.2}s", load_start.elapsed().as_secs_f64());
+    println!(
+        "  Model loaded in {:.2}s",
+        load_start.elapsed().as_secs_f64()
+    );
     println!("  Layers: {}", extractor.num_layers());
-    println!("  Device: {}\n", if extractor.is_cuda() { "CUDA" } else { "CPU" });
+    println!(
+        "  Device: {}\n",
+        if extractor.is_cuda() { "CUDA" } else { "CPU" }
+    );
 
     // Analyze layers [0, 6, 12, 18, 23]
     let layers_to_analyze = vec![0, 6, 12, 18, 23];
@@ -83,7 +91,11 @@ fn run_analysis() -> Result<()> {
             phenomenal_by_layer[j].push(act.activation);
         }
     }
-    println!("  Completed {} concepts in {:.1}s", phenomenal_corpus.len(), phen_start.elapsed().as_secs_f64());
+    println!(
+        "  Completed {} concepts in {:.1}s",
+        phenomenal_corpus.len(),
+        phen_start.elapsed().as_secs_f64()
+    );
 
     // Extract activations for functional concepts
     println!("Processing functional concepts...");
@@ -99,11 +111,18 @@ fn run_analysis() -> Result<()> {
             functional_by_layer[j].push(act.activation);
         }
     }
-    println!("  Completed {} concepts in {:.1}s\n", functional_corpus.len(), func_start.elapsed().as_secs_f64());
+    println!(
+        "  Completed {} concepts in {:.1}s\n",
+        functional_corpus.len(),
+        func_start.elapsed().as_secs_f64()
+    );
 
     // Analyze topology at each layer with statistical testing
     println!("================================================================");
-    println!("   LAYER-WISE TOPOLOGY COMPARISON (n={} per class)", phenomenal_corpus.len());
+    println!(
+        "   LAYER-WISE TOPOLOGY COMPARISON (n={} per class)",
+        phenomenal_corpus.len()
+    );
     println!("================================================================\n");
 
     let topology_config = TopologyConfig {
@@ -139,7 +158,11 @@ fn run_analysis() -> Result<()> {
 
         let diff = phen_mean - func_mean;
         let pooled_std = ((phen_std.powi(2) + func_std.powi(2)) / 2.0).sqrt();
-        let cohens_d = if pooled_std > 0.0 { diff / pooled_std } else { 0.0 };
+        let cohens_d = if pooled_std > 0.0 {
+            diff / pooled_std
+        } else {
+            0.0
+        };
 
         // Permutation test
         let p_value = permutation_test(&phen_scores, &func_scores, 10000);
@@ -163,14 +186,21 @@ fn run_analysis() -> Result<()> {
     println!("   ANALYSIS SUMMARY");
     println!("================================================================\n");
 
-    println!("Layer with maximum phenomenal advantage: Layer {}", best_layer.0);
+    println!(
+        "Layer with maximum phenomenal advantage: Layer {}",
+        best_layer.0
+    );
     println!("  Difference: {:+.4}", best_layer.3);
     println!("  Cohen's d: {:+.4}", best_layer.4);
     println!("  p-value: {:.4}", best_layer.5);
 
     if best_layer.5 < 0.05 {
         println!("\n  ✓ STATISTICALLY SIGNIFICANT (p < 0.05)");
-        println!("  The Layer {} effect is validated with n={} concepts.", best_layer.0, phenomenal_corpus.len());
+        println!(
+            "  The Layer {} effect is validated with n={} concepts.",
+            best_layer.0,
+            phenomenal_corpus.len()
+        );
     } else {
         println!("\n  ✗ NOT STATISTICALLY SIGNIFICANT");
         println!("  The effect may require larger sample size or different methodology.");

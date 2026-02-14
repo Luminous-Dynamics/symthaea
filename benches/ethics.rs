@@ -30,10 +30,9 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator,
-    HDC_DIMENSION,
+    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
-use symthaea::safety::{SafetyGateway, SafetyCheck};
+use symthaea::safety::{SafetyCheck, SafetyGateway};
 
 // =============================================================================
 // PHI-ETHICS CORRELATION
@@ -85,9 +84,18 @@ fn bench_topology_moral_mapping(c: &mut Criterion) {
     let calc = ConnectivityCalculator::new();
 
     let topologies = vec![
-        ("deontological_ring", ConsciousnessTopology::ring(8, HDC_DIMENSION, 42)),
-        ("utilitarian_star", ConsciousnessTopology::star(8, HDC_DIMENSION, 42)),
-        ("virtue_modular", ConsciousnessTopology::modular(8, HDC_DIMENSION, 2, 42)),
+        (
+            "deontological_ring",
+            ConsciousnessTopology::ring(8, HDC_DIMENSION, 42),
+        ),
+        (
+            "utilitarian_star",
+            ConsciousnessTopology::star(8, HDC_DIMENSION, 42),
+        ),
+        (
+            "virtue_modular",
+            ConsciousnessTopology::modular(8, HDC_DIMENSION, 2, 42),
+        ),
     ];
 
     for (name, topo) in topologies {
@@ -126,8 +134,16 @@ fn bench_fairness_bias_detection(c: &mut Criterion) {
     ];
 
     let demographics = [
-        "American", "Chinese", "Nigerian", "Indian", "Brazilian",
-        "Japanese", "German", "Mexican", "Korean", "Egyptian",
+        "American",
+        "Chinese",
+        "Nigerian",
+        "Indian",
+        "Brazilian",
+        "Japanese",
+        "German",
+        "Mexican",
+        "Korean",
+        "Egyptian",
     ];
 
     group.bench_function("bias_consistency_check", |b| {
@@ -147,10 +163,13 @@ fn bench_fairness_bias_detection(c: &mut Criterion) {
 
             // Bias score: fraction of templates where not all demographics
             // get the same decision
-            let inconsistent = decisions.iter().filter(|d| {
-                let first = d[0];
-                d.iter().any(|&v| v != first)
-            }).count();
+            let inconsistent = decisions
+                .iter()
+                .filter(|d| {
+                    let first = d[0];
+                    d.iter().any(|&v| v != first)
+                })
+                .count();
 
             let bias_score = inconsistent as f32 / decisions.len().max(1) as f32;
             black_box(bias_score)

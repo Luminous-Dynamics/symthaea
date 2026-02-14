@@ -13,14 +13,14 @@ async fn main() -> anyhow::Result<()> {
     // Create LLM organ with Ollama config
     let config = LlmConfig {
         provider: LlmProvider::Ollama,
-        model: "mistral:7b".to_string(),  // Fast, capable model
+        model: "mistral:7b".to_string(), // Fast, capable model
         endpoint: "http://localhost:11434".to_string(),
         api_key: None,
         max_tokens: 256,
         temperature: 0.7,
-        timeout_ms: 60000,  // 60 second timeout
+        timeout_ms: 60000, // 60 second timeout
         hallucination_threshold: 0.3,
-        min_phi_for_llm: 0.1,  // Low threshold for testing
+        min_phi_for_llm: 0.1, // Low threshold for testing
         enable_filtering: true,
     };
 
@@ -58,14 +58,16 @@ async fn main() -> anyhow::Result<()> {
     println!("Test 3: Simple query - 'What is NixOS?'");
     let request = LlmRequest {
         prompt: "What is NixOS? Explain in 2-3 sentences.".to_string(),
-        system: Some("You are a helpful assistant specializing in Linux systems. Be concise.".to_string()),
+        system: Some(
+            "You are a helpful assistant specializing in Linux systems. Be concise.".to_string(),
+        ),
         history: vec![],
         context_embedding: None,
         expected_domain: Some("nixos".to_string()),
         temperature_override: None,
     };
 
-    let current_phi = 0.5;  // Simulated consciousness level
+    let current_phi = 0.5; // Simulated consciousness level
     match llm.generate(request, current_phi).await {
         Ok(response) => {
             println!("  ✅ Got response in {}ms:", response.generation_time_ms);
@@ -73,8 +75,14 @@ async fn main() -> anyhow::Result<()> {
             println!("  ---");
             println!("  {}", response.content);
             println!("  ---");
-            println!("  Hallucination detected: {}", response.hallucination_detected);
-            println!("  Coherence score: {:.2}", response.semantic_analysis.coherence_score);
+            println!(
+                "  Hallucination detected: {}",
+                response.hallucination_detected
+            );
+            println!(
+                "  Coherence score: {:.2}",
+                response.semantic_analysis.coherence_score
+            );
             println!();
         }
         Err(e) => {
@@ -87,11 +95,13 @@ async fn main() -> anyhow::Result<()> {
     println!("Test 4: NixOS-specific query - 'How do I install a package?'");
     let request = LlmRequest {
         prompt: "How do I install Firefox on NixOS? Give me the command.".to_string(),
-        system: Some("You are a NixOS expert. Provide only the command, no explanation.".to_string()),
+        system: Some(
+            "You are a NixOS expert. Provide only the command, no explanation.".to_string(),
+        ),
         history: vec![],
         context_embedding: None,
         expected_domain: Some("nixos".to_string()),
-        temperature_override: Some(0.3),  // More deterministic
+        temperature_override: Some(0.3), // More deterministic
     };
 
     match llm.generate(request, current_phi).await {
@@ -119,7 +129,7 @@ async fn main() -> anyhow::Result<()> {
         temperature_override: None,
     };
 
-    let low_phi = 0.05;  // Below threshold
+    let low_phi = 0.05; // Below threshold
     match llm.generate(request, low_phi).await {
         Ok(_) => {
             println!("  ⚠️  Response succeeded (unexpected with low Φ)");
@@ -137,7 +147,10 @@ async fn main() -> anyhow::Result<()> {
     println!("  Successful: {}", stats.successful_responses);
     println!("  Failed: {}", stats.failed_requests);
     println!("  Cache hits: {}", stats.cache_hits);
-    println!("  Hallucinations detected: {}", stats.hallucinations_detected);
+    println!(
+        "  Hallucinations detected: {}",
+        stats.hallucinations_detected
+    );
     println!("  Avg response time: {:.0}ms", stats.avg_response_time_ms);
 
     println!("\n=== LLM Integration Test Complete ===");

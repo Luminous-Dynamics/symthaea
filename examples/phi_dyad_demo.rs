@@ -5,7 +5,7 @@
 
 use symthaea::core::{ContinuousHV, HDC_DIMENSION};
 use symthaea::hdc::relational_consciousness::{
-    RelationalAssessment, RelationMode, RelationshipStage,
+    RelationMode, RelationalAssessment, RelationshipStage,
 };
 use symthaea::partnership::{
     DyadInput, DyadWeights, HumanPartnerModel, InteractionEvent, PhiDyadCalculator,
@@ -82,11 +82,7 @@ fn main() {
         let result = calc.compute(&input);
         println!("  {}", result.explanation);
 
-        trajectory.record(
-            event.timestamp,
-            human.stage,
-            result.phi_dyad,
-        );
+        trajectory.record(event.timestamp, human.stage, result.phi_dyad);
 
         println!();
     }
@@ -99,4 +95,3 @@ fn main() {
 
     println!("\nDone.\n");
 }
-

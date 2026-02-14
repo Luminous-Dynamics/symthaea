@@ -12,7 +12,7 @@
 //! Query = Voicing_HV ⊗ Manner_HV ⊗ Place_HV
 //! This query resonates in a Hopfield network to find the valid phoneme attractor.
 
-use crate::hdc::{HV16, BundleAccumulator};
+use crate::hdc::{BundleAccumulator, HV16};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -29,29 +29,29 @@ pub enum Voicing {
 /// Manner of articulation: How is air escaping?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Manner {
-    Stop,       // Complete closure then release (p, b, t, d, k, g)
-    Fricative,  // Turbulent airflow through narrow gap (f, v, s, z, sh, etc.)
-    Affricate,  // Stop + Fricative (ch, jh)
-    Nasal,      // Air through nose (m, n, ng)
-    Liquid,     // Partial obstruction (l, r)
-    Glide,      // Minimal obstruction, vowel-like (w, y)
-    Vowel,      // Open vocal tract
+    Stop,      // Complete closure then release (p, b, t, d, k, g)
+    Fricative, // Turbulent airflow through narrow gap (f, v, s, z, sh, etc.)
+    Affricate, // Stop + Fricative (ch, jh)
+    Nasal,     // Air through nose (m, n, ng)
+    Liquid,    // Partial obstruction (l, r)
+    Glide,     // Minimal obstruction, vowel-like (w, y)
+    Vowel,     // Open vocal tract
 }
 
 /// Place of articulation: Where is the constriction?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Place {
-    Bilabial,   // Both lips (p, b, m)
-    Labiodental,// Lower lip + upper teeth (f, v)
-    Dental,     // Tongue + teeth (th, dh)
-    Alveolar,   // Tongue + alveolar ridge (t, d, n, s, z, l, r)
-    Palatal,    // Tongue + hard palate (sh, zh, ch, jh, y)
-    Velar,      // Tongue back + soft palate (k, g, ng)
-    Glottal,    // Glottis (h)
+    Bilabial,    // Both lips (p, b, m)
+    Labiodental, // Lower lip + upper teeth (f, v)
+    Dental,      // Tongue + teeth (th, dh)
+    Alveolar,    // Tongue + alveolar ridge (t, d, n, s, z, l, r)
+    Palatal,     // Tongue + hard palate (sh, zh, ch, jh, y)
+    Velar,       // Tongue back + soft palate (k, g, ng)
+    Glottal,     // Glottis (h)
     // Vowel places (tongue position)
-    Front,      // Front vowels (iy, ih, ey, eh, ae)
-    Central,    // Central vowels (ah, er)
-    Back,       // Back vowels (uw, uh, ow, ao, aa)
+    Front,   // Front vowels (iy, ih, ey, eh, ae)
+    Central, // Central vowels (ah, er)
+    Back,    // Back vowels (uw, uh, ow, ao, aa)
 }
 
 /// Complete articulatory specification for a phoneme
@@ -68,9 +68,9 @@ pub struct ArticulatoryFeatures {
 /// Vowel height (tongue position)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VowelHeight {
-    High,   // iy, ih, uw, uh
-    Mid,    // ey, eh, ow, er, ah
-    Low,    // ae, aa, ao
+    High, // iy, ih, uw, uh
+    Mid,  // ey, eh, ow, er, ah
+    Low,  // ae, aa, ao
 }
 
 // ============================================================================
@@ -89,279 +89,435 @@ impl ArticulatoryMapper {
         // ========================
         // STOPS (Plosives)
         // ========================
-        features.insert("P".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiceless,
-            manner: Manner::Stop,
-            place: Place::Bilabial,
-            height: None, roundness: None,
-        });
-        features.insert("B".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Stop,
-            place: Place::Bilabial,
-            height: None, roundness: None,
-        });
-        features.insert("T".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiceless,
-            manner: Manner::Stop,
-            place: Place::Alveolar,
-            height: None, roundness: None,
-        });
-        features.insert("D".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Stop,
-            place: Place::Alveolar,
-            height: None, roundness: None,
-        });
-        features.insert("K".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiceless,
-            manner: Manner::Stop,
-            place: Place::Velar,
-            height: None, roundness: None,
-        });
-        features.insert("G".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Stop,
-            place: Place::Velar,
-            height: None, roundness: None,
-        });
+        features.insert(
+            "P".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiceless,
+                manner: Manner::Stop,
+                place: Place::Bilabial,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "B".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Stop,
+                place: Place::Bilabial,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "T".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiceless,
+                manner: Manner::Stop,
+                place: Place::Alveolar,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "D".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Stop,
+                place: Place::Alveolar,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "K".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiceless,
+                manner: Manner::Stop,
+                place: Place::Velar,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "G".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Stop,
+                place: Place::Velar,
+                height: None,
+                roundness: None,
+            },
+        );
 
         // ========================
         // FRICATIVES
         // ========================
-        features.insert("F".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiceless,
-            manner: Manner::Fricative,
-            place: Place::Labiodental,
-            height: None, roundness: None,
-        });
-        features.insert("V".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Fricative,
-            place: Place::Labiodental,
-            height: None, roundness: None,
-        });
-        features.insert("TH".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiceless,
-            manner: Manner::Fricative,
-            place: Place::Dental,
-            height: None, roundness: None,
-        });
-        features.insert("DH".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Fricative,
-            place: Place::Dental,
-            height: None, roundness: None,
-        });
-        features.insert("S".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiceless,
-            manner: Manner::Fricative,
-            place: Place::Alveolar,
-            height: None, roundness: None,
-        });
-        features.insert("Z".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Fricative,
-            place: Place::Alveolar,
-            height: None, roundness: None,
-        });
-        features.insert("SH".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiceless,
-            manner: Manner::Fricative,
-            place: Place::Palatal,
-            height: None, roundness: None,
-        });
-        features.insert("ZH".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Fricative,
-            place: Place::Palatal,
-            height: None, roundness: None,
-        });
-        features.insert("HH".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiceless,
-            manner: Manner::Fricative,
-            place: Place::Glottal,
-            height: None, roundness: None,
-        });
+        features.insert(
+            "F".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiceless,
+                manner: Manner::Fricative,
+                place: Place::Labiodental,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "V".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Fricative,
+                place: Place::Labiodental,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "TH".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiceless,
+                manner: Manner::Fricative,
+                place: Place::Dental,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "DH".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Fricative,
+                place: Place::Dental,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "S".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiceless,
+                manner: Manner::Fricative,
+                place: Place::Alveolar,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "Z".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Fricative,
+                place: Place::Alveolar,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "SH".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiceless,
+                manner: Manner::Fricative,
+                place: Place::Palatal,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "ZH".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Fricative,
+                place: Place::Palatal,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "HH".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiceless,
+                manner: Manner::Fricative,
+                place: Place::Glottal,
+                height: None,
+                roundness: None,
+            },
+        );
 
         // ========================
         // AFFRICATES
         // ========================
-        features.insert("CH".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiceless,
-            manner: Manner::Affricate,
-            place: Place::Palatal,
-            height: None, roundness: None,
-        });
-        features.insert("JH".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Affricate,
-            place: Place::Palatal,
-            height: None, roundness: None,
-        });
+        features.insert(
+            "CH".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiceless,
+                manner: Manner::Affricate,
+                place: Place::Palatal,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "JH".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Affricate,
+                place: Place::Palatal,
+                height: None,
+                roundness: None,
+            },
+        );
 
         // ========================
         // NASALS
         // ========================
-        features.insert("M".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Nasal,
-            place: Place::Bilabial,
-            height: None, roundness: None,
-        });
-        features.insert("N".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Nasal,
-            place: Place::Alveolar,
-            height: None, roundness: None,
-        });
-        features.insert("NG".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Nasal,
-            place: Place::Velar,
-            height: None, roundness: None,
-        });
+        features.insert(
+            "M".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Nasal,
+                place: Place::Bilabial,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "N".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Nasal,
+                place: Place::Alveolar,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "NG".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Nasal,
+                place: Place::Velar,
+                height: None,
+                roundness: None,
+            },
+        );
 
         // ========================
         // LIQUIDS
         // ========================
-        features.insert("L".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Liquid,
-            place: Place::Alveolar,
-            height: None, roundness: None,
-        });
-        features.insert("R".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Liquid,
-            place: Place::Alveolar,  // Approximant, but alveolar region
-            height: None, roundness: None,
-        });
+        features.insert(
+            "L".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Liquid,
+                place: Place::Alveolar,
+                height: None,
+                roundness: None,
+            },
+        );
+        features.insert(
+            "R".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Liquid,
+                place: Place::Alveolar, // Approximant, but alveolar region
+                height: None,
+                roundness: None,
+            },
+        );
 
         // ========================
         // GLIDES (Semivowels)
         // ========================
-        features.insert("W".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Glide,
-            place: Place::Bilabial,  // Lip rounding
-            height: Some(VowelHeight::High), roundness: Some(true),
-        });
-        features.insert("Y".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Glide,
-            place: Place::Palatal,
-            height: Some(VowelHeight::High), roundness: Some(false),
-        });
+        features.insert(
+            "W".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Glide,
+                place: Place::Bilabial, // Lip rounding
+                height: Some(VowelHeight::High),
+                roundness: Some(true),
+            },
+        );
+        features.insert(
+            "Y".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Glide,
+                place: Place::Palatal,
+                height: Some(VowelHeight::High),
+                roundness: Some(false),
+            },
+        );
 
         // ========================
         // VOWELS
         // ========================
         // High Front
-        features.insert("IY".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Front,
-            height: Some(VowelHeight::High), roundness: Some(false),
-        });
-        features.insert("IH".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Front,
-            height: Some(VowelHeight::High), roundness: Some(false),
-        });
+        features.insert(
+            "IY".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Front,
+                height: Some(VowelHeight::High),
+                roundness: Some(false),
+            },
+        );
+        features.insert(
+            "IH".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Front,
+                height: Some(VowelHeight::High),
+                roundness: Some(false),
+            },
+        );
 
         // Mid Front
-        features.insert("EY".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Front,
-            height: Some(VowelHeight::Mid), roundness: Some(false),
-        });
-        features.insert("EH".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Front,
-            height: Some(VowelHeight::Mid), roundness: Some(false),
-        });
+        features.insert(
+            "EY".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Front,
+                height: Some(VowelHeight::Mid),
+                roundness: Some(false),
+            },
+        );
+        features.insert(
+            "EH".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Front,
+                height: Some(VowelHeight::Mid),
+                roundness: Some(false),
+            },
+        );
 
         // Low Front
-        features.insert("AE".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Front,
-            height: Some(VowelHeight::Low), roundness: Some(false),
-        });
+        features.insert(
+            "AE".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Front,
+                height: Some(VowelHeight::Low),
+                roundness: Some(false),
+            },
+        );
 
         // Central
-        features.insert("AH".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Central,
-            height: Some(VowelHeight::Mid), roundness: Some(false),
-        });
-        features.insert("ER".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Central,
-            height: Some(VowelHeight::Mid), roundness: Some(false),
-        });
+        features.insert(
+            "AH".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Central,
+                height: Some(VowelHeight::Mid),
+                roundness: Some(false),
+            },
+        );
+        features.insert(
+            "ER".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Central,
+                height: Some(VowelHeight::Mid),
+                roundness: Some(false),
+            },
+        );
 
         // High Back
-        features.insert("UW".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Back,
-            height: Some(VowelHeight::High), roundness: Some(true),
-        });
-        features.insert("UH".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Back,
-            height: Some(VowelHeight::High), roundness: Some(true),
-        });
+        features.insert(
+            "UW".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Back,
+                height: Some(VowelHeight::High),
+                roundness: Some(true),
+            },
+        );
+        features.insert(
+            "UH".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Back,
+                height: Some(VowelHeight::High),
+                roundness: Some(true),
+            },
+        );
 
         // Mid Back
-        features.insert("OW".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Back,
-            height: Some(VowelHeight::Mid), roundness: Some(true),
-        });
+        features.insert(
+            "OW".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Back,
+                height: Some(VowelHeight::Mid),
+                roundness: Some(true),
+            },
+        );
 
         // Low Back
-        features.insert("AA".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Back,
-            height: Some(VowelHeight::Low), roundness: Some(false),
-        });
-        features.insert("AO".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Back,
-            height: Some(VowelHeight::Low), roundness: Some(true),
-        });
+        features.insert(
+            "AA".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Back,
+                height: Some(VowelHeight::Low),
+                roundness: Some(false),
+            },
+        );
+        features.insert(
+            "AO".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Back,
+                height: Some(VowelHeight::Low),
+                roundness: Some(true),
+            },
+        );
 
         // Diphthongs (use starting position)
-        features.insert("AY".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Central,  // Starts low-central
-            height: Some(VowelHeight::Low), roundness: Some(false),
-        });
-        features.insert("AW".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Central,
-            height: Some(VowelHeight::Low), roundness: Some(false),
-        });
-        features.insert("OY".into(), ArticulatoryFeatures {
-            voicing: Voicing::Voiced,
-            manner: Manner::Vowel,
-            place: Place::Back,
-            height: Some(VowelHeight::Mid), roundness: Some(true),
-        });
+        features.insert(
+            "AY".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Central, // Starts low-central
+                height: Some(VowelHeight::Low),
+                roundness: Some(false),
+            },
+        );
+        features.insert(
+            "AW".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Central,
+                height: Some(VowelHeight::Low),
+                roundness: Some(false),
+            },
+        );
+        features.insert(
+            "OY".into(),
+            ArticulatoryFeatures {
+                voicing: Voicing::Voiced,
+                manner: Manner::Vowel,
+                place: Place::Back,
+                height: Some(VowelHeight::Mid),
+                roundness: Some(true),
+            },
+        );
 
         Self { features }
     }
@@ -487,12 +643,32 @@ impl ArticulatoryHDC {
         let mapper = ArticulatoryMapper::new();
 
         let mut hdc = Self {
-            role_voicing, role_manner, role_place, role_height,
-            hv_voiced, hv_voiceless,
-            hv_stop, hv_fricative, hv_affricate, hv_nasal, hv_liquid, hv_glide, hv_vowel,
-            hv_bilabial, hv_labiodental, hv_dental, hv_alveolar, hv_palatal, hv_velar, hv_glottal,
-            hv_front, hv_central, hv_back,
-            hv_high, hv_mid, hv_low,
+            role_voicing,
+            role_manner,
+            role_place,
+            role_height,
+            hv_voiced,
+            hv_voiceless,
+            hv_stop,
+            hv_fricative,
+            hv_affricate,
+            hv_nasal,
+            hv_liquid,
+            hv_glide,
+            hv_vowel,
+            hv_bilabial,
+            hv_labiodental,
+            hv_dental,
+            hv_alveolar,
+            hv_palatal,
+            hv_velar,
+            hv_glottal,
+            hv_front,
+            hv_central,
+            hv_back,
+            hv_high,
+            hv_mid,
+            hv_low,
             phoneme_hvs: HashMap::new(),
             mapper,
         };
@@ -521,16 +697,16 @@ impl ArticulatoryHDC {
     /// Build phoneme HVs by binding articulatory features
     fn build_phoneme_hvs(&mut self) {
         let phonemes = [
-            "P", "B", "T", "D", "K", "G",  // Stops
-            "F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH",  // Fricatives
-            "CH", "JH",  // Affricates
-            "M", "N", "NG",  // Nasals
-            "L", "R",  // Liquids
-            "W", "Y",  // Glides
-            "IY", "IH", "EY", "EH", "AE",  // Front vowels
-            "AH", "ER",  // Central vowels
-            "UW", "UH", "OW", "AA", "AO",  // Back vowels
-            "AY", "AW", "OY",  // Diphthongs
+            "P", "B", "T", "D", "K", "G", // Stops
+            "F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH", // Fricatives
+            "CH", "JH", // Affricates
+            "M", "N", "NG", // Nasals
+            "L", "R", // Liquids
+            "W", "Y", // Glides
+            "IY", "IH", "EY", "EH", "AE", // Front vowels
+            "AH", "ER", // Central vowels
+            "UW", "UH", "OW", "AA", "AO", // Back vowels
+            "AY", "AW", "OY", // Diphthongs
         ];
 
         for phoneme in phonemes {
@@ -642,7 +818,8 @@ impl ArticulatoryHDC {
 
     /// Query: Find best matching phoneme for a query HV
     pub fn query(&self, query_hv: &HV16) -> Vec<(String, f32)> {
-        let mut results: Vec<_> = self.phoneme_hvs
+        let mut results: Vec<_> = self
+            .phoneme_hvs
             .iter()
             .map(|(name, hv)| (name.clone(), query_hv.similarity(hv)))
             .collect();
@@ -691,7 +868,8 @@ impl ArticulatoryResonator {
         let hdc = ArticulatoryHDC::new();
 
         // Build attractors from valid phonemes
-        let attractors: Vec<_> = hdc.phoneme_hvs
+        let attractors: Vec<_> = hdc
+            .phoneme_hvs
             .iter()
             .map(|(name, hv)| (name.clone(), *hv))
             .collect();
@@ -738,7 +916,7 @@ impl ArticulatoryResonator {
             if best_name == prev_best {
                 stable_count += 1;
                 if stable_count >= 2 {
-                    break;  // Converged to stable attractor
+                    break; // Converged to stable attractor
                 }
             } else {
                 stable_count = 0;
@@ -747,7 +925,8 @@ impl ArticulatoryResonator {
 
             // Move state toward the best attractor (cleanup step)
             // Blend: 70% current best attractor, 30% current state
-            if let Some((_, best_attractor)) = self.attractors.iter().find(|(n, _)| n == &best_name) {
+            if let Some((_, best_attractor)) = self.attractors.iter().find(|(n, _)| n == &best_name)
+            {
                 let mut acc = BundleAccumulator::new();
                 // Add attractor multiple times for weighting
                 for _ in 0..7 {
@@ -849,7 +1028,7 @@ impl AcousticArticulatoryDetector {
     /// Voiceless sounds have more high-frequency energy (noise)
     fn detect_voicing(&self, mel: &[f32]) -> Voicing {
         if mel.len() < 10 {
-            return Voicing::Voiced;  // Default
+            return Voicing::Voiced; // Default
         }
 
         // Low frequency energy (mel bins 0-10, roughly 0-1kHz)
@@ -863,7 +1042,7 @@ impl AcousticArticulatoryDetector {
         let total: f32 = mel.iter().sum();
 
         if total < 0.1 {
-            return Voicing::Voiceless;  // Silence
+            return Voicing::Voiceless; // Silence
         }
 
         // Voicing ratio: voiced sounds have dominant low-frequency
@@ -875,7 +1054,7 @@ impl AcousticArticulatoryDetector {
         } else if high_ratio > 0.35 {
             Voicing::Voiceless
         } else {
-            Voicing::Voiced  // Default to voiced (more common)
+            Voicing::Voiced // Default to voiced (more common)
         }
     }
 
@@ -949,7 +1128,7 @@ impl AcousticArticulatoryDetector {
     /// - Bilabial: Affects F1 more than F2/F3
     fn detect_place(&self, mel: &[f32]) -> Place {
         if mel.len() < 20 {
-            return Place::Alveolar;  // Default
+            return Place::Alveolar; // Default
         }
 
         // F1 region (roughly mel bins 2-8)
@@ -979,7 +1158,7 @@ impl AcousticArticulatoryDetector {
 
         let total: f32 = mel.iter().sum();
         if total < 0.1 {
-            return Place::Alveolar;  // Low energy - default
+            return Place::Alveolar; // Low energy - default
         }
 
         // Normalize
@@ -996,7 +1175,7 @@ impl AcousticArticulatoryDetector {
         // Palatal/Alveolar fricatives: High F3 and HF energy
         if f3_ratio > 0.2 || hf_ratio > 0.25 {
             if hf_ratio > 0.35 {
-                return Place::Palatal;  // Very high frequency = palatal
+                return Place::Palatal; // Very high frequency = palatal
             }
             return Place::Alveolar;
         }
@@ -1053,7 +1232,8 @@ fn strip_stress(phoneme: &str) -> String {
         phoneme
     };
 
-    base.trim_end_matches(|c: char| c.is_ascii_digit()).to_string()
+    base.trim_end_matches(|c: char| c.is_ascii_digit())
+        .to_string()
 }
 
 #[cfg(test)]
@@ -1084,7 +1264,7 @@ mod tests {
         let ng = mapper.get("NG").unwrap();
         assert_eq!(ng.voicing, Voicing::Voiced);
         assert_eq!(ng.manner, Manner::Nasal);
-        assert_eq!(ng.place, Place::Velar);  // Different place!
+        assert_eq!(ng.place, Place::Velar); // Different place!
     }
 
     #[test]

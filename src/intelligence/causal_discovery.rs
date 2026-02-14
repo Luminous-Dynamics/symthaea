@@ -1284,7 +1284,7 @@ mod tests {
 
         let (direction, confidence) = engine.predict_with_confidence(&x, &y);
 
-        assert!(confidence >= 0.0 && confidence <= 1.0);
+        assert!((0.0..=1.0).contains(&confidence));
         println!("Direction: {:?}, Confidence: {}", direction, confidence);
     }
 
@@ -1361,6 +1361,6 @@ mod tests {
         println!("Confidence: {:.4}", confidence);
 
         // Confidence should be in valid range
-        assert!(confidence >= 0.0 && confidence <= 1.0);
+        assert!((0.0..=1.0).contains(&confidence));
     }
 }

@@ -7,10 +7,10 @@
 //!
 //! Reference: https://www.edfplus.info/specs/edf.html
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
-use std::collections::HashMap;
 
 /// EDF file header information
 #[derive(Debug, Clone)]
@@ -86,8 +86,8 @@ pub struct EdfFile {
 impl EdfFile {
     /// Open and parse an EDF file
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let file = File::open(path.as_ref())
-            .map_err(|e| format!("Failed to open EDF file: {}", e))?;
+        let file =
+            File::open(path.as_ref()).map_err(|e| format!("Failed to open EDF file: {}", e))?;
         let mut reader = BufReader::new(file);
 
         // Parse main header (256 bytes)
@@ -100,12 +100,7 @@ impl EdfFile {
         let data_start = header.header_bytes;
 
         // Read all signal data
-        let signals = Self::read_signals(
-            &mut reader,
-            &header,
-            &signal_headers,
-            data_start,
-        )?;
+        let signals = Self::read_signals(&mut reader, &header, &signal_headers, data_start)?;
 
         Ok(Self {
             header,
@@ -131,7 +126,8 @@ impl EdfFile {
 
     fn parse_header(reader: &mut BufReader<File>) -> Result<EdfHeader, String> {
         let mut buf = [0u8; 256];
-        reader.read_exact(&mut buf)
+        reader
+            .read_exact(&mut buf)
             .map_err(|e| format!("Failed to read EDF header: {}", e))?;
 
         Ok(EdfHeader {
@@ -140,15 +136,23 @@ impl EdfFile {
             recording_id: String::from_utf8_lossy(&buf[88..168]).trim().to_string(),
             start_date: String::from_utf8_lossy(&buf[168..176]).trim().to_string(),
             start_time: String::from_utf8_lossy(&buf[176..184]).trim().to_string(),
-            header_bytes: String::from_utf8_lossy(&buf[184..192]).trim()
-                .parse().unwrap_or(256),
+            header_bytes: String::from_utf8_lossy(&buf[184..192])
+                .trim()
+                .parse()
+                .unwrap_or(256),
             reserved: String::from_utf8_lossy(&buf[192..236]).trim().to_string(),
-            num_records: String::from_utf8_lossy(&buf[236..244]).trim()
-                .parse().unwrap_or(0),
-            record_duration: String::from_utf8_lossy(&buf[244..252]).trim()
-                .parse().unwrap_or(1.0),
-            num_signals: String::from_utf8_lossy(&buf[252..256]).trim()
-                .parse().unwrap_or(0),
+            num_records: String::from_utf8_lossy(&buf[236..244])
+                .trim()
+                .parse()
+                .unwrap_or(0),
+            record_duration: String::from_utf8_lossy(&buf[244..252])
+                .trim()
+                .parse()
+                .unwrap_or(1.0),
+            num_signals: String::from_utf8_lossy(&buf[252..256])
+                .trim()
+                .parse()
+                .unwrap_or(0),
         })
     }
 
@@ -159,14 +163,20 @@ impl EdfFile {
         // Signal headers are stored as parallel arrays
         // Each field is num_signals * field_width bytes
 
-        let read_field = |reader: &mut BufReader<File>, width: usize, n: usize| -> Result<Vec<String>, String> {
-            let mut buf = vec![0u8; width * n];
-            reader.read_exact(&mut buf)
-                .map_err(|e| format!("Failed to read signal header field: {}", e))?;
-            Ok((0..n)
-                .map(|i| String::from_utf8_lossy(&buf[i*width..(i+1)*width]).trim().to_string())
-                .collect())
-        };
+        let read_field =
+            |reader: &mut BufReader<File>, width: usize, n: usize| -> Result<Vec<String>, String> {
+                let mut buf = vec![0u8; width * n];
+                reader
+                    .read_exact(&mut buf)
+                    .map_err(|e| format!("Failed to read signal header field: {}", e))?;
+                Ok((0..n)
+                    .map(|i| {
+                        String::from_utf8_lossy(&buf[i * width..(i + 1) * width])
+                            .trim()
+                            .to_string()
+                    })
+                    .collect())
+            };
 
         let labels = read_field(reader, 16, num_signals)?;
         let transducers = read_field(reader, 80, num_signals)?;
@@ -205,14 +215,16 @@ impl EdfFile {
         data_start: usize,
     ) -> Result<HashMap<String, EdfSignal>, String> {
         // Seek to data section
-        reader.seek(SeekFrom::Start(data_start as u64))
+        reader
+            .seek(SeekFrom::Start(data_start as u64))
             .map_err(|e| format!("Failed to seek to data: {}", e))?;
 
         let _num_signals = signal_headers.len();
         let num_records = header.num_records;
 
         // Initialize sample buffers
-        let mut all_samples: Vec<Vec<f32>> = signal_headers.iter()
+        let mut all_samples: Vec<Vec<f32>> = signal_headers
+            .iter()
             .map(|sh| Vec::with_capacity(sh.samples_per_record * num_records))
             .collect();
 
@@ -230,16 +242,15 @@ impl EdfFile {
 
                 // Convert to physical units
                 let gain = if sig_header.digital_max != sig_header.digital_min {
-                    (sig_header.physical_max - sig_header.physical_min) /
-                    (sig_header.digital_max - sig_header.digital_min) as f64
+                    (sig_header.physical_max - sig_header.physical_min)
+                        / (sig_header.digital_max - sig_header.digital_min) as f64
                 } else {
                     1.0
                 };
-                let offset = sig_header.physical_min -
-                    gain * sig_header.digital_min as f64;
+                let offset = sig_header.physical_min - gain * sig_header.digital_min as f64;
 
                 for i in 0..n_samples {
-                    let raw = i16::from_le_bytes([buf[i*2], buf[i*2+1]]) as f64;
+                    let raw = i16::from_le_bytes([buf[i * 2], buf[i * 2 + 1]]) as f64;
                     let physical = (raw * gain + offset) as f32;
                     all_samples[sig_idx].push(physical);
                 }
@@ -300,7 +311,10 @@ impl SleepStage {
 
     /// Is this a sleep stage (not wake or artifact)?
     pub fn is_sleep(&self) -> bool {
-        matches!(self, SleepStage::N1 | SleepStage::N2 | SleepStage::N3 | SleepStage::REM)
+        matches!(
+            self,
+            SleepStage::N1 | SleepStage::N2 | SleepStage::N3 | SleepStage::REM
+        )
     }
 
     /// Is this deep sleep (N3)?

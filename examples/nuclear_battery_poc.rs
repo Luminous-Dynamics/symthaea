@@ -27,9 +27,7 @@
 //! ```
 
 use symthaea_core::genesis::GenesisSeed;
-use symthaea_core::physics::{
-    StandardModel, Hadrons, PeriodicTable, NuclearPhysics, EnergyScale,
-};
+use symthaea_core::physics::{EnergyScale, Hadrons, NuclearPhysics, PeriodicTable, StandardModel};
 
 /// Battery specifications
 struct BatterySpec {
@@ -73,11 +71,18 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     println!("Physical Scales:");
-    for scale in [EnergyScale::Chemical, EnergyScale::Isomeric, EnergyScale::Nuclear, EnergyScale::Relativistic] {
-        println!("  {:12} {:12.0} eV ({:.0}× chemical)",
-                 format!("{:?}:", scale),
-                 scale.typical_ev(),
-                 scale.density_ratio());
+    for scale in [
+        EnergyScale::Chemical,
+        EnergyScale::Isomeric,
+        EnergyScale::Nuclear,
+        EnergyScale::Relativistic,
+    ] {
+        println!(
+            "  {:12} {:12.0} eV ({:.0}× chemical)",
+            format!("{:?}:", scale),
+            scale.typical_ev(),
+            scale.density_ratio()
+        );
     }
 
     // Vector representations
@@ -86,8 +91,14 @@ fn main() {
     let iso_vec = nuclear.encode_energy(EnergyScale::Isomeric, 100_000.0);
     let nuc_vec = nuclear.encode_energy(EnergyScale::Nuclear, 1_000_000.0);
 
-    println!("  Chemical ↔ Isomeric: {:.4}", chem_vec.similarity(&iso_vec));
-    println!("  Chemical ↔ Nuclear:  {:.4}", chem_vec.similarity(&nuc_vec));
+    println!(
+        "  Chemical ↔ Isomeric: {:.4}",
+        chem_vec.similarity(&iso_vec)
+    );
+    println!(
+        "  Chemical ↔ Nuclear:  {:.4}",
+        chem_vec.similarity(&nuc_vec)
+    );
     println!("  Isomeric ↔ Nuclear:  {:.4}", iso_vec.similarity(&nuc_vec));
     println!("  → Energy scales form distinct but related concepts\n");
 
@@ -102,7 +113,10 @@ fn main() {
         let half_life_years = hf.half_life_s.unwrap() / (365.25 * 24.0 * 3600.0);
         let energy_mev = hf.excitation_kev / 1000.0;
         println!("  Hf-178m2 (Hafnium-178 metastable state 2):");
-        println!("    Excitation energy: {:.2} MeV ({:.0} keV)", energy_mev, hf.excitation_kev);
+        println!(
+            "    Excitation energy: {:.2} MeV ({:.0} keV)",
+            energy_mev, hf.excitation_kev
+        );
         println!("    Half-life: {:.1} years", half_life_years);
         println!("    Status: Most studied isomer for energy storage");
         println!("    Challenge: Triggered release mechanism\n");
@@ -113,7 +127,10 @@ fn main() {
         let half_life_years = ta.half_life_s.unwrap() / (365.25 * 24.0 * 3600.0);
         println!("  Ta-180m (Tantalum-180 metastable):");
         println!("    Excitation energy: {:.0} keV", ta.excitation_kev);
-        println!("    Half-life: >10^{:.0} years (practically stable)", (half_life_years).log10());
+        println!(
+            "    Half-life: >10^{:.0} years (practically stable)",
+            (half_life_years).log10()
+        );
         println!("    Status: Only naturally-occurring nuclear isomer");
         println!("    Significance: Proof that nuclear batteries are stable\n");
     }
@@ -165,15 +182,20 @@ fn main() {
     ];
 
     println!("Energy Density Comparison (per kg):\n");
-    println!("{:<16} {:>15} {:>10} {}", "Battery", "Energy (Wh/kg)", "Relative", "Type");
+    println!(
+        "{:<16} {:>15} {:>10} {}",
+        "Battery", "Energy (Wh/kg)", "Relative", "Type"
+    );
     println!("{}", "-".repeat(70));
 
     let baseline = batteries[0].energy_density_wh_kg();
     for bat in &batteries {
         let density = bat.energy_density_wh_kg();
         let relative = density / baseline;
-        println!("{:<16} {:>15.2e} {:>10.0}× {}",
-                 bat.name, density, relative, bat.description);
+        println!(
+            "{:<16} {:>15.2e} {:>10.0}× {}",
+            bat.name, density, relative, bat.description
+        );
     }
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -187,14 +209,32 @@ fn main() {
     let tc_isomer = nuclear.get_isomer(43, 99).unwrap();
 
     println!("Isomer Vector Relationships:");
-    println!("  Hf-178m2 ↔ Ta-180m: {:.4}", hf_isomer.vector.similarity(&ta_isomer.vector));
-    println!("  Hf-178m2 ↔ Tc-99m:  {:.4}", hf_isomer.vector.similarity(&tc_isomer.vector));
-    println!("  Ta-180m ↔ Tc-99m:   {:.4}", ta_isomer.vector.similarity(&tc_isomer.vector));
+    println!(
+        "  Hf-178m2 ↔ Ta-180m: {:.4}",
+        hf_isomer.vector.similarity(&ta_isomer.vector)
+    );
+    println!(
+        "  Hf-178m2 ↔ Tc-99m:  {:.4}",
+        hf_isomer.vector.similarity(&tc_isomer.vector)
+    );
+    println!(
+        "  Ta-180m ↔ Tc-99m:   {:.4}",
+        ta_isomer.vector.similarity(&tc_isomer.vector)
+    );
 
     println!("\nStability Concept Correlation:");
-    println!("  Hf-178m2 ↔ Stable:     {:.4}", hf_isomer.vector.similarity(&nuclear.stable));
-    println!("  Hf-178m2 ↔ Metastable: {:.4}", hf_isomer.vector.similarity(&nuclear.metastable));
-    println!("  Hf-178m2 ↔ Radioactive:{:.4}", hf_isomer.vector.similarity(&nuclear.radioactive));
+    println!(
+        "  Hf-178m2 ↔ Stable:     {:.4}",
+        hf_isomer.vector.similarity(&nuclear.stable)
+    );
+    println!(
+        "  Hf-178m2 ↔ Metastable: {:.4}",
+        hf_isomer.vector.similarity(&nuclear.metastable)
+    );
+    println!(
+        "  Hf-178m2 ↔ Radioactive:{:.4}",
+        hf_isomer.vector.similarity(&nuclear.radioactive)
+    );
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("THEORETICAL NUCLEAR BATTERY DESIGN");
@@ -210,10 +250,19 @@ fn main() {
     let total_energy_wh = total_energy_j / 3600.0;
 
     println!("  Specifications (1 gram Hf-178m2):");
-    println!("    Stored energy:     {:.2e} MeV", hf_excitation_ev * hf_atoms_per_gram / 1e6);
+    println!(
+        "    Stored energy:     {:.2e} MeV",
+        hf_excitation_ev * hf_atoms_per_gram / 1e6
+    );
     println!("    Stored energy:     {:.2} kWh", total_energy_wh / 1000.0);
-    println!("    Energy density:    {:.2e} Wh/kg", total_energy_wh * 1000.0);
-    println!("    vs Li-ion:         {:.0}× improvement", total_energy_wh * 1000.0 / 250.0);
+    println!(
+        "    Energy density:    {:.2e} Wh/kg",
+        total_energy_wh * 1000.0
+    );
+    println!(
+        "    vs Li-ion:         {:.0}× improvement",
+        total_energy_wh * 1000.0 / 250.0
+    );
 
     println!("\n  Challenges:");
     println!("    1. Triggered release: Need controlled de-excitation mechanism");

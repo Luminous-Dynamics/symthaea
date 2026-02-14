@@ -1411,7 +1411,7 @@ mod tests {
 
         // Prediction accuracy should be calculable
         let accuracy = integration.prediction_accuracy();
-        assert!(accuracy >= 0.0 && accuracy <= 1.0);
+        assert!((0.0..=1.0).contains(&accuracy));
     }
 
     #[test]
@@ -1615,13 +1615,13 @@ mod tests {
 
             // Temporal coherence should be in valid range
             if let Some(coherence) = result.temporal_coherence {
-                assert!(coherence >= 0.0 && coherence <= 1.0,
+                assert!((0.0..=1.0).contains(&coherence),
                     "Temporal coherence out of range: {}", coherence);
             }
 
             // Continuity should also be in valid range
             if let Some(continuity) = result.consciousness_continuity {
-                assert!(continuity >= 0.0 && continuity <= 1.0,
+                assert!((0.0..=1.0).contains(&continuity),
                     "Consciousness continuity out of range: {}", continuity);
             }
         }
@@ -1800,7 +1800,7 @@ mod tests {
         // Tension check should be accessible
         let had_tensions = integration.last_value_had_tensions();
         // Tensions are detected based on harmony scores, may or may not have them
-        assert!(had_tensions == true || had_tensions == false);
+        assert!(had_tensions || !had_tensions);
 
         // Report should be available for detailed inspection
         if let Some(report) = integration.last_value_report() {

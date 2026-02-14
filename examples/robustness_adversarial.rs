@@ -16,11 +16,11 @@
 //! cargo run --example robustness_adversarial --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::phenomenal_detector::{PhenomenalDetector, ClassLabel};
+use symthaea::perception::phenomenal_detector::{ClassLabel, PhenomenalDetector};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -89,7 +89,10 @@ fn run_tests() -> Result<()> {
         ("The sensor perceives the light intensity", false),
         // These use functional words but are phenomenal
         ("The computation of meaning in conscious thought", true),
-        ("The processing that constitutes subjective experience", true),
+        (
+            "The processing that constitutes subjective experience",
+            true,
+        ),
         ("The algorithm of awareness itself", true),
     ];
 
@@ -129,8 +132,8 @@ fn run_tests() -> Result<()> {
         ("I feel pain in my arm", true),
         ("The redness of the apple is vivid", true),
         // Metaphorical (not actually phenomenal)
-        ("The code feels elegant", false), // Metaphor
-        ("The algorithm is beautiful", false), // Metaphor
+        ("The code feels elegant", false),            // Metaphor
+        ("The algorithm is beautiful", false),        // Metaphor
         ("The program has a mind of its own", false), // Metaphor
         // Literal functional
         ("The function returns an integer", false),
@@ -158,7 +161,7 @@ fn run_tests() -> Result<()> {
         ("The Turing test measures behavioral equivalence", false),
         // Mixed/ambiguous
         ("Consciousness is an illusion", true), // Still about consciousness
-        ("Qualia might not exist", true), // Still about qualia
+        ("Qualia might not exist", true),       // Still about qualia
     ];
 
     let (passed, total) = run_test_suite(&detector, &philosophy_cases, "Philosophy")?;
@@ -259,13 +262,23 @@ fn run_test_suite(
             passed += 1;
         }
 
-        println!("{} [{}→{}] ({:.2}) \"{}\"",
-                 icon, expected_str, detected_str, result.score,
-                 truncate(text, 45));
+        println!(
+            "{} [{}→{}] ({:.2}) \"{}\"",
+            icon,
+            expected_str,
+            detected_str,
+            result.score,
+            truncate(text, 45)
+        );
     }
 
-    println!("\n{} Results: {}/{} ({:.1}%)",
-             suite_name, passed, total, passed as f64 / total as f64 * 100.0);
+    println!(
+        "\n{} Results: {}/{} ({:.1}%)",
+        suite_name,
+        passed,
+        total,
+        passed as f64 / total as f64 * 100.0
+    );
 
     Ok((passed, total))
 }

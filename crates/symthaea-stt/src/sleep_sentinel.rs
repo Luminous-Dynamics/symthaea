@@ -8,10 +8,10 @@
 //! Uses the same LTC temporal dynamics + HDC projection architecture
 //! that powers Symthaea's acoustic processing, adapted for biosignals.
 
-use crate::hdc::{HV16, bundle};
-use crate::ltc::{LtcCell, LtcConfig};
 use crate::edf_loader::SleepStage;
-use rustfft::{FftPlanner, num_complex::Complex};
+use crate::hdc::{bundle, HV16};
+use crate::ltc::{LtcCell, LtcConfig};
+use rustfft::{num_complex::Complex, FftPlanner};
 use std::f32::consts::PI;
 
 /// Consciousness state as determined by the Sentinel
@@ -46,7 +46,10 @@ impl ConsciousnessState {
 
     /// Is this a consolidation-favorable state?
     pub fn is_consolidation_state(&self) -> bool {
-        matches!(self, ConsciousnessState::DeepSleep | ConsciousnessState::Dreaming)
+        matches!(
+            self,
+            ConsciousnessState::DeepSleep | ConsciousnessState::Dreaming
+        )
     }
 }
 
@@ -138,9 +141,9 @@ impl ConsciousnessSentinel {
         // Longer time constants than audio (100ms vs 20ms) for slower dynamics
         let physio_config = LtcConfig {
             hidden_size: 32,
-            tau_min: 0.050,    // 50ms - fast response
-            tau_max: 0.500,    // 500ms - slow integration
-            tau_init: 0.100,   // 100ms - typical EEG rhythm
+            tau_min: 0.050,  // 50ms - fast response
+            tau_max: 0.500,  // 500ms - slow integration
+            tau_init: 0.100, // 100ms - typical EEG rhythm
             tau_lr: 0.005,
             adaptive_tau: true,
         };
@@ -154,7 +157,7 @@ impl ConsciousnessSentinel {
             ..physio_config
         };
         let eog_ltc = LtcCell::new(2, simple_config.clone()); // REM activity, saccades
-        let emg_ltc = LtcCell::new(2, simple_config);         // tonic, phasic
+        let emg_ltc = LtcCell::new(2, simple_config); // tonic, phasic
 
         let buffer_size = (sample_rate * frame_duration) as usize;
 
@@ -263,16 +266,10 @@ impl ConsciousnessSentinel {
         ];
         let eeg_state = self.eeg_ltc.forward(&eeg_features, self.frame_duration);
 
-        let eog_features = vec![
-            self.current_eog_activity,
-            rem_bursts,
-        ];
+        let eog_features = vec![self.current_eog_activity, rem_bursts];
         let eog_state = self.eog_ltc.forward(&eog_features, self.frame_duration);
 
-        let emg_features = vec![
-            self.current_emg_activity,
-            emg_atonia,
-        ];
+        let emg_features = vec![self.current_emg_activity, emg_atonia];
         let emg_state = self.emg_ltc.forward(&emg_features, self.frame_duration);
 
         // 6. Project to HDC space (using sign-based LSH like acoustic)
@@ -311,7 +308,7 @@ impl ConsciousnessSentinel {
         }
         let mut crossings = 0;
         for i in 1..eog.len() {
-            if (eog[i-1] > 0.0) != (eog[i] > 0.0) {
+            if (eog[i - 1] > 0.0) != (eog[i] > 0.0) {
                 crossings += 1;
             }
         }
@@ -371,7 +368,8 @@ impl ConsciousnessSentinel {
 
         // Prepare FFT input (power of 2 size)
         let fft_size = eeg.len().next_power_of_two().min(512);
-        let mut buffer: Vec<Complex<f32>> = eeg.iter()
+        let mut buffer: Vec<Complex<f32>> = eeg
+            .iter()
             .take(fft_size)
             .map(|&x| Complex::new(x, 0.0))
             .collect();
@@ -444,7 +442,7 @@ impl ConsciousnessSentinel {
         // Count zero-crossings (rapid movements)
         let mut crossings = 0;
         for i in 1..eog.len() {
-            if (eog[i-1] > 0.0) != (eog[i] > 0.0) {
+            if (eog[i - 1] > 0.0) != (eog[i] > 0.0) {
                 crossings += 1;
             }
         }
@@ -616,7 +614,7 @@ impl ConsciousnessSentinel {
         let mut count = 0;
 
         for i in 0..n {
-            for j in (i+1)..n {
+            for j in (i + 1)..n {
                 total_sim += self.recent_hvs[i].similarity(&self.recent_hvs[j]);
                 count += 1;
             }

@@ -6,11 +6,11 @@
 //! - Cepstral analysis for harmonicity
 //! - Multi-band energy analysis
 
-use symthaea_stt::temporal_grammar::{TemporalGrammar, TemporalEvent, DomainConfig, Sparsity};
-use symthaea_stt::audio::AudioFrontend;
-use std::path::Path;
 use std::collections::HashMap;
 use std::f32::consts::PI;
+use std::path::Path;
+use symthaea_stt::audio::AudioFrontend;
+use symthaea_stt::temporal_grammar::{DomainConfig, Sparsity, TemporalEvent, TemporalGrammar};
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
@@ -87,10 +87,12 @@ fn compute_signal_stats(audio: &[f32], sample_rate: f32, frame_size: usize) -> S
         let freq_res = sample_rate / n_fft as f32;
         let total_e: f32 = spectrum.iter().sum();
         if total_e > 1e-10 {
-            let centroid = spectrum.iter()
+            let centroid = spectrum
+                .iter()
                 .enumerate()
                 .map(|(k, &mag)| k as f32 * freq_res * mag)
-                .sum::<f32>() / total_e;
+                .sum::<f32>()
+                / total_e;
             centroids.push(centroid);
         }
 
@@ -99,20 +101,32 @@ fn compute_signal_stats(audio: &[f32], sample_rate: f32, frame_size: usize) -> S
 
     // Compute statistics
     let energy_mean = energies.iter().sum::<f32>() / energies.len().max(1) as f32;
-    let energy_std = (energies.iter().map(|e| (e - energy_mean).powi(2)).sum::<f32>()
-                      / energies.len().max(1) as f32).sqrt();
+    let energy_std = (energies
+        .iter()
+        .map(|e| (e - energy_mean).powi(2))
+        .sum::<f32>()
+        / energies.len().max(1) as f32)
+        .sqrt();
 
     let mut sorted_e = energies.clone();
     sorted_e.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let energy_median = sorted_e.get(sorted_e.len() / 2).copied().unwrap_or(0.0);
 
     let tk_mean = tk_energies.iter().sum::<f32>() / tk_energies.len().max(1) as f32;
-    let tk_std = (tk_energies.iter().map(|e| (e - tk_mean).powi(2)).sum::<f32>()
-                  / tk_energies.len().max(1) as f32).sqrt();
+    let tk_std = (tk_energies
+        .iter()
+        .map(|e| (e - tk_mean).powi(2))
+        .sum::<f32>()
+        / tk_energies.len().max(1) as f32)
+        .sqrt();
 
     let centroid_mean = centroids.iter().sum::<f32>() / centroids.len().max(1) as f32;
-    let centroid_std = (centroids.iter().map(|c| (c - centroid_mean).powi(2)).sum::<f32>()
-                        / centroids.len().max(1) as f32).sqrt();
+    let centroid_std = (centroids
+        .iter()
+        .map(|c| (c - centroid_mean).powi(2))
+        .sum::<f32>()
+        / centroids.len().max(1) as f32)
+        .sqrt();
 
     SignalStats {
         energy_mean,
@@ -134,9 +148,9 @@ struct SpectralFeatures {
     bandwidth: f32,
     spectral_flux: f32,
     peak_freq: f32,
-    low_band_ratio: f32,   // 0-500 Hz
-    mid_band_ratio: f32,   // 500-2000 Hz
-    high_band_ratio: f32,  // 2000+ Hz
+    low_band_ratio: f32,  // 0-500 Hz
+    mid_band_ratio: f32,  // 500-2000 Hz
+    high_band_ratio: f32, // 2000+ Hz
     harmonic_ratio: f32,
     crest_factor: f32,
 }
@@ -144,7 +158,7 @@ struct SpectralFeatures {
 fn extract_spectral_features(
     samples: &[f32],
     sample_rate: f32,
-    prev_spectrum: &[f32]
+    prev_spectrum: &[f32],
 ) -> (SpectralFeatures, Vec<f32>) {
     let n = samples.len();
     let n_fft = n.min(512);
@@ -153,7 +167,10 @@ fn extract_spectral_features(
     let energy = (samples.iter().map(|s| s * s).sum::<f32>() / n as f32).sqrt();
 
     // Peak value for crest factor
-    let peak = samples.iter().map(|s| s.abs()).fold(0.0f32, |a, b| a.max(b));
+    let peak = samples
+        .iter()
+        .map(|s| s.abs())
+        .fold(0.0f32, |a, b| a.max(b));
     let crest_factor = if energy > 1e-10 { peak / energy } else { 0.0 };
 
     // Teager-Kaiser energy
@@ -186,28 +203,35 @@ fn extract_spectral_features(
 
     // Spectral centroid
     let centroid = if total_energy > 1e-10 {
-        spectrum.iter()
+        spectrum
+            .iter()
             .enumerate()
             .map(|(k, &mag)| k as f32 * freq_res * mag)
-            .sum::<f32>() / total_energy
+            .sum::<f32>()
+            / total_energy
     } else {
         0.0
     };
 
     // Spectral bandwidth
     let bandwidth = if total_energy > 1e-10 {
-        (spectrum.iter()
+        (spectrum
+            .iter()
             .enumerate()
             .map(|(k, &mag)| (k as f32 * freq_res - centroid).powi(2) * mag)
-            .sum::<f32>() / total_energy).sqrt()
+            .sum::<f32>()
+            / total_energy)
+            .sqrt()
     } else {
         0.0
     };
 
     // Peak frequency
-    let (peak_bin, _) = spectrum.iter()
-        .enumerate()
-        .fold((0, 0.0f32), |(bi, bm), (i, &m)| if m > bm { (i, m) } else { (bi, bm) });
+    let (peak_bin, _) =
+        spectrum.iter().enumerate().fold(
+            (0, 0.0f32),
+            |(bi, bm), (i, &m)| if m > bm { (i, m) } else { (bi, bm) },
+        );
     let peak_freq = peak_bin as f32 * freq_res;
 
     // Band ratios
@@ -215,21 +239,27 @@ fn extract_spectral_features(
     let mid_cutoff = (2000.0 / freq_res) as usize;
 
     let low_energy: f32 = spectrum.iter().take(low_cutoff.min(spectrum.len())).sum();
-    let mid_energy: f32 = spectrum.iter()
+    let mid_energy: f32 = spectrum
+        .iter()
         .skip(low_cutoff.min(spectrum.len()))
         .take((mid_cutoff - low_cutoff).max(0))
         .sum();
     let high_energy: f32 = spectrum.iter().skip(mid_cutoff.min(spectrum.len())).sum();
 
     let (low_band_ratio, mid_band_ratio, high_band_ratio) = if total_energy > 1e-10 {
-        (low_energy / total_energy, mid_energy / total_energy, high_energy / total_energy)
+        (
+            low_energy / total_energy,
+            mid_energy / total_energy,
+            high_energy / total_energy,
+        )
     } else {
         (0.0, 0.0, 0.0)
     };
 
     // Spectral flux (change from previous frame)
     let spectral_flux = if prev_spectrum.len() == spectrum.len() {
-        spectrum.iter()
+        spectrum
+            .iter()
             .zip(prev_spectrum.iter())
             .map(|(a, b)| (a - b).powi(2))
             .sum::<f32>()
@@ -281,7 +311,8 @@ fn classify_frame_adaptive(
     } else {
         0.0
     };
-    let click_thresh = stats.tk_mean / stats.energy_mean.max(1e-10) + 0.5 * stats.tk_std / stats.energy_mean.max(1e-10);
+    let click_thresh = stats.tk_mean / stats.energy_mean.max(1e-10)
+        + 0.5 * stats.tk_std / stats.energy_mean.max(1e-10);
 
     // FM slope for whistle direction
     let fm_slope = if frame_duration > 0.0 {
@@ -337,7 +368,9 @@ fn classify_frame_adaptive(
     }
 
     // Default based on dominant band
-    if features.high_band_ratio > features.low_band_ratio && features.high_band_ratio > features.mid_band_ratio {
+    if features.high_band_ratio > features.low_band_ratio
+        && features.high_band_ratio > features.mid_band_ratio
+    {
         return ("burst_rapid", 5);
     } else if features.mid_band_ratio > features.low_band_ratio {
         return ("whistle_flat", 4);
@@ -366,7 +399,8 @@ fn extract_events_v3(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<
         let frame = &audio[i..i + frame_size];
         let (features, spectrum) = extract_spectral_features(frame, sample_rate, &prev_spectrum);
 
-        let (event_type, class_id) = classify_frame_adaptive(&features, &stats, prev_centroid, frame_duration);
+        let (event_type, class_id) =
+            classify_frame_adaptive(&features, &stats, prev_centroid, frame_duration);
 
         prev_centroid = features.centroid;
         prev_spectrum = spectrum;
@@ -392,7 +426,8 @@ fn extract_events_v3(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<
                     }
 
                     if event_type != "silence" {
-                        current_event = Some((event_type.to_string(), class_id, time, features.energy));
+                        current_event =
+                            Some((event_type.to_string(), class_id, time, features.energy));
                     } else {
                         current_event = None;
                     }
@@ -427,11 +462,19 @@ fn extract_events_v3(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<
 /// Enhanced cetacean domain config
 fn enhanced_cetacean_config() -> DomainConfig {
     let calls = vec![
-        "click_loud", "click_soft",
-        "whistle_up", "whistle_down", "whistle_flat",
-        "burst_rapid", "burst_slow",
-        "moan", "silence",
-    ].into_iter().map(String::from).collect();
+        "click_loud",
+        "click_soft",
+        "whistle_up",
+        "whistle_down",
+        "whistle_flat",
+        "burst_rapid",
+        "burst_slow",
+        "moan",
+        "silence",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
 
     DomainConfig {
         name: "cetacean_v3".to_string(),
@@ -462,7 +505,12 @@ fn main() -> std::io::Result<()> {
 
     let whale_files: Vec<_> = std::fs::read_dir(whale_dir)?
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map(|ext| ext == "wav").unwrap_or(false))
+        .filter(|e| {
+            e.path()
+                .extension()
+                .map(|ext| ext == "wav")
+                .unwrap_or(false)
+        })
         .collect();
 
     if whale_files.is_empty() {
@@ -501,9 +549,15 @@ fn main() -> std::io::Result<()> {
 
         // Compute and display signal stats
         let sig_stats = compute_signal_stats(&audio, sample_rate as f32, 2048);
-        println!("    {} ({:.1}s)", filename, audio.len() as f32 / sample_rate as f32);
-        println!("      Signal: E_mean={:.4} E_std={:.4} TK_mean={:.4}",
-                 sig_stats.energy_mean, sig_stats.energy_std, sig_stats.tk_mean);
+        println!(
+            "    {} ({:.1}s)",
+            filename,
+            audio.len() as f32 / sample_rate as f32
+        );
+        println!(
+            "      Signal: E_mean={:.4} E_std={:.4} TK_mean={:.4}",
+            sig_stats.energy_mean, sig_stats.energy_std, sig_stats.tk_mean
+        );
 
         let events = extract_events_v3(&audio, sample_rate as f32, 2048);
 
@@ -537,7 +591,11 @@ fn main() -> std::io::Result<()> {
 
     // Check diversity
     let diversity = type_totals.len() as f32 / 9.0 * 100.0;
-    println!("\n    Event diversity: {:.0}% ({}/9 types used)", diversity, type_totals.len());
+    println!(
+        "\n    Event diversity: {:.0}% ({}/9 types used)",
+        diversity,
+        type_totals.len()
+    );
 
     // Phase 2: Train
     subheader("Phase 2: Training");
@@ -555,7 +613,10 @@ fn main() -> std::io::Result<()> {
     }
 
     let stats = grammar.stats();
-    println!("\n    Grammar density: {:.3} (target <0.5)", stats.grammar_density);
+    println!(
+        "\n    Grammar density: {:.3} (target <0.5)",
+        stats.grammar_density
+    );
 
     // Phase 3: Score
     subheader("Phase 3: Scoring");
@@ -590,7 +651,12 @@ fn main() -> std::io::Result<()> {
 
         let test_files: Vec<_> = std::fs::read_dir(test_dir)?
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map(|ext| ext == "wav").unwrap_or(false))
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .map(|ext| ext == "wav")
+                    .unwrap_or(false)
+            })
             .collect();
 
         for entry in &test_files {
@@ -601,10 +667,20 @@ fn main() -> std::io::Result<()> {
                 let events = extract_events_v3(&audio, sample_rate as f32, 2048);
                 if events.len() >= 2 {
                     let score = grammar.score_sequence(&events);
-                    let label = if filename.contains("whale") { "WHALE" }
-                               else if filename.contains("dolphin") { "DOLPHIN" }
-                               else { "OTHER" };
-                    println!("    [{}] {}: {:.4} ({} events)", label, filename, score, events.len());
+                    let label = if filename.contains("whale") {
+                        "WHALE"
+                    } else if filename.contains("dolphin") {
+                        "DOLPHIN"
+                    } else {
+                        "OTHER"
+                    };
+                    println!(
+                        "    [{}] {}: {:.4} ({} events)",
+                        label,
+                        filename,
+                        score,
+                        events.len()
+                    );
                 }
             }
         }

@@ -56,7 +56,6 @@ pub struct CfCNetwork {
     // === Backbone Layers (The "Approximator") ===
     // These weights learn to predict A (steady state) and τ (time constant)
     // based on input and current state.
-
     /// Input -> Hidden weights
     pub w_input: Array2<f32>,
     /// Hidden -> Hidden weights
@@ -150,9 +149,9 @@ impl CfCNetwork {
 
         // 4. Closed-form Solution:
         // h(t) = (h_prev - A) * exp(-delta_t * (1/tau_gate)) + A
-        
+
         // Ensure tau isn't zero to avoid div/0. Map 0..1 to 0.1..10.0 seconds timescale
-        let timescale = 1.0; 
+        let timescale = 1.0;
         let decay_factor = (-delta_t / (timescale * (&tau_gate + 0.01))).mapv(|v| v.exp());
 
         // The Master Equation: Mixing old state and new target
@@ -176,7 +175,7 @@ impl CfCNetwork {
         };
 
         let next_state = self.predict_forward(&effective_input, delta_t)?;
-        
+
         // Update state
         self.state = next_state;
         self.elapsed_time += delta_t;
@@ -265,37 +264,43 @@ impl CfCNetwork {
     /// Unlike BPTT which truncates history, this uses the closed-form derivative
     /// to update weights based on the error at time `t`.
     #[allow(non_snake_case)] // Mathematical notation: A = target state, dL/dA = gradient
-    pub fn train_step(&mut self, input: &Array1<f32>, target: &Array1<f32>, delta_t: f32, learning_rate: f32) -> Result<f32> {
+    pub fn train_step(
+        &mut self,
+        input: &Array1<f32>,
+        target: &Array1<f32>,
+        delta_t: f32,
+        learning_rate: f32,
+    ) -> Result<f32> {
         // Forward pass (recompute to get intermediates)
         let input_part = self.w_input.dot(input);
         let hidden_part = self.w_hidden.dot(&self.state);
         let backbone = (input_part + hidden_part + &self.bias).mapv(|v| v.tanh());
-        
+
         // Using fast sigmoid for 2-3x speedup
         let tau_gate = (self.w_tau.dot(&backbone) + &self.b_tau).mapv(fast_sigmoid);
         let target_state = self.w_head.dot(&backbone) + &self.b_head;
-        
-        let timescale = 1.0; 
+
+        let timescale = 1.0;
         let decay_factor = (-delta_t / (timescale * (&tau_gate + 0.01))).mapv(|v| v.exp());
-        
+
         let prediction = (&self.state - &target_state) * &decay_factor + &target_state;
-        
+
         // Loss: MSE
         let error = &prediction - target;
         let mse = error.mapv(|x| x.powi(2)).sum() / self.num_neurons as f32;
-        
+
         // Backward Pass (Simplified Analytical Gradient)
         // dL/dx = 2 * error / N
         let d_loss = error.mapv(|x| 2.0 * x / self.num_neurons as f32);
-        
+
         // dH/dA (Sensitivity to target state A)
         // H = (h0 - A) * decay + A = h0*decay + A(1 - decay)
         // dH/dA = 1 - decay
         let d_output_d_A = 1.0 - &decay_factor;
-        
+
         // dL/dA = dL/dH * dH/dA
         let d_loss_d_A = &d_loss * &d_output_d_A;
-        
+
         // Update Head Weights (A = W_head * z + b)
         // dL/dW_head = dL/dA * z^T
         // Naive update: W_head -= lr * outer(dL/dA, backbone)
@@ -306,7 +311,7 @@ impl CfCNetwork {
             }
             self.b_head[i] -= learning_rate * grad_Ai;
         }
-        
+
         Ok(mse)
     }
 }

@@ -13,13 +13,12 @@
 //! cargo run --example detector_robustness_improved --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
 use symthaea::perception::{
-    PhenomenalDetector, DetectorConfig, DetectionMethod,
-    ContrastiveExamples, ContrastiveExample,
+    ContrastiveExample, ContrastiveExamples, DetectionMethod, DetectorConfig, PhenomenalDetector,
 };
 
 fn main() -> Result<()> {
@@ -95,12 +94,13 @@ fn run_experiment() -> Result<()> {
     improved_config.negative_weight = 1.5; // Weight negative examples higher
     improved_config.context_window = 3;
 
-    let improved_detector = PhenomenalDetector::with_contrastive_examples(
-        improved_config,
-        contrastive_path
-    )?;
+    let improved_detector =
+        PhenomenalDetector::with_contrastive_examples(improved_config, contrastive_path)?;
 
-    println!("  Loaded and calibrated in {:.2}s\n", load_start.elapsed().as_secs_f64());
+    println!(
+        "  Loaded and calibrated in {:.2}s\n",
+        load_start.elapsed().as_secs_f64()
+    );
 
     println!("Evaluating improved detector on contrastive examples...\n");
     let improved_eval = improved_detector.evaluate_contrastive()?;
@@ -115,39 +115,69 @@ fn run_experiment() -> Result<()> {
     let overall_delta = improved_eval.accuracy - baseline_eval.accuracy;
 
     println!("Overall Accuracy Comparison:");
-    println!("  Baseline: {:.1}% ({}/{})",
-             baseline_eval.accuracy * 100.0, baseline_eval.correct, baseline_eval.total);
-    println!("  Improved: {:.1}% ({}/{})",
-             improved_eval.accuracy * 100.0, improved_eval.correct, improved_eval.total);
+    println!(
+        "  Baseline: {:.1}% ({}/{})",
+        baseline_eval.accuracy * 100.0,
+        baseline_eval.correct,
+        baseline_eval.total
+    );
+    println!(
+        "  Improved: {:.1}% ({}/{})",
+        improved_eval.accuracy * 100.0,
+        improved_eval.correct,
+        improved_eval.total
+    );
     println!("  Delta:    {:+.1}%\n", overall_delta * 100.0);
 
     println!("Category-wise Improvement:");
-    println!("{:<25} {:>12} {:>12} {:>10}", "Category", "Baseline", "Improved", "Delta");
+    println!(
+        "{:<25} {:>12} {:>12} {:>10}",
+        "Category", "Baseline", "Improved", "Delta"
+    );
     println!("{}", "-".repeat(60));
 
     for (cat, (total, _, imp_acc)) in &improved_eval.by_category {
-        let base_acc = baseline_eval.by_category.get(cat)
+        let base_acc = baseline_eval
+            .by_category
+            .get(cat)
             .map(|(_, _, a)| *a)
             .unwrap_or(0.0);
         let delta = imp_acc - base_acc;
-        println!("{:<25} {:>11.1}% {:>11.1}% {:>+9.1}%",
-                 cat, base_acc * 100.0, imp_acc * 100.0, delta * 100.0);
+        println!(
+            "{:<25} {:>11.1}% {:>11.1}% {:>+9.1}%",
+            cat,
+            base_acc * 100.0,
+            imp_acc * 100.0,
+            delta * 100.0
+        );
     }
 
     println!("\nDifficulty-wise Improvement:");
-    println!("{:<15} {:>12} {:>12} {:>10}", "Difficulty", "Baseline", "Improved", "Delta");
+    println!(
+        "{:<15} {:>12} {:>12} {:>10}",
+        "Difficulty", "Baseline", "Improved", "Delta"
+    );
     println!("{}", "-".repeat(50));
 
     for diff_level in &["easy", "medium", "hard"] {
-        let base_acc = baseline_eval.by_difficulty.get(*diff_level)
+        let base_acc = baseline_eval
+            .by_difficulty
+            .get(*diff_level)
             .map(|(_, _, a)| *a)
             .unwrap_or(0.0);
-        let imp_acc = improved_eval.by_difficulty.get(*diff_level)
+        let imp_acc = improved_eval
+            .by_difficulty
+            .get(*diff_level)
             .map(|(_, _, a)| *a)
             .unwrap_or(0.0);
         let delta = imp_acc - base_acc;
-        println!("{:<15} {:>11.1}% {:>11.1}% {:>+9.1}%",
-                 diff_level, base_acc * 100.0, imp_acc * 100.0, delta * 100.0);
+        println!(
+            "{:<15} {:>11.1}% {:>11.1}% {:>+9.1}%",
+            diff_level,
+            base_acc * 100.0,
+            imp_acc * 100.0,
+            delta * 100.0
+        );
     }
 
     // Phase 4: Detailed error analysis
@@ -160,7 +190,11 @@ fn run_experiment() -> Result<()> {
     let mut regressed_examples: Vec<(&ExampleEvaluation, &ExampleEvaluation)> = Vec::new();
     let mut still_wrong: Vec<&ExampleEvaluation> = Vec::new();
 
-    for (base, imp) in baseline_eval.evaluations.iter().zip(improved_eval.evaluations.iter()) {
+    for (base, imp) in baseline_eval
+        .evaluations
+        .iter()
+        .zip(improved_eval.evaluations.iter())
+    {
         if !base.correct && imp.correct {
             improved_examples.push((base, imp));
         } else if base.correct && !imp.correct {
@@ -173,8 +207,10 @@ fn run_experiment() -> Result<()> {
     println!("Examples that IMPROVED ({}):", improved_examples.len());
     for (base, imp) in improved_examples.iter().take(5) {
         println!("  [{}] \"{}\"", imp.id, truncate(&imp.text, 50));
-        println!("       Expected: {} | Baseline: {:.2} -> Improved: {:.2}",
-                 imp.expected, base.score, imp.score);
+        println!(
+            "       Expected: {} | Baseline: {:.2} -> Improved: {:.2}",
+            imp.expected, base.score, imp.score
+        );
     }
     if improved_examples.len() > 5 {
         println!("  ... and {} more", improved_examples.len() - 5);
@@ -184,16 +220,20 @@ fn run_experiment() -> Result<()> {
         println!("\nExamples that REGRESSED ({}):", regressed_examples.len());
         for (base, imp) in regressed_examples.iter().take(5) {
             println!("  [{}] \"{}\"", imp.id, truncate(&imp.text, 50));
-            println!("       Expected: {} | Baseline: {:.2} -> Improved: {:.2}",
-                     imp.expected, base.score, imp.score);
+            println!(
+                "       Expected: {} | Baseline: {:.2} -> Improved: {:.2}",
+                imp.expected, base.score, imp.score
+            );
         }
     }
 
     println!("\nExamples still INCORRECT ({}):", still_wrong.len());
     for eval in still_wrong.iter().take(5) {
         println!("  [{}] \"{}\"", eval.id, truncate(&eval.text, 50));
-        println!("       Expected: {} | Score: {:.2} | Cat: {} | Diff: {}",
-                 eval.expected, eval.score, eval.category, eval.difficulty);
+        println!(
+            "       Expected: {} | Score: {:.2} | Cat: {} | Diff: {}",
+            eval.expected, eval.score, eval.category, eval.difficulty
+        );
     }
     if still_wrong.len() > 5 {
         println!("  ... and {} more", still_wrong.len() - 5);
@@ -204,20 +244,28 @@ fn run_experiment() -> Result<()> {
     println!("   SUMMARY");
     println!("================================================================\n");
 
-    let semantic_confusion_improved = improved_eval.by_category.get("semantic_confusion")
+    let semantic_confusion_improved = improved_eval
+        .by_category
+        .get("semantic_confusion")
         .map(|(_, _, a)| *a >= 0.60)
         .unwrap_or(false);
 
-    let semantic_acc = improved_eval.by_category.get("semantic_confusion")
+    let semantic_acc = improved_eval
+        .by_category
+        .get("semantic_confusion")
         .map(|(_, _, a)| *a)
         .unwrap_or(0.0);
 
     if semantic_confusion_improved {
-        println!("SUCCESS: Semantic confusion accuracy improved to {:.1}% (target: 60%+)",
-                 semantic_acc * 100.0);
+        println!(
+            "SUCCESS: Semantic confusion accuracy improved to {:.1}% (target: 60%+)",
+            semantic_acc * 100.0
+        );
     } else {
-        println!("PARTIAL: Semantic confusion accuracy at {:.1}% (target: 60%+)",
-                 semantic_acc * 100.0);
+        println!(
+            "PARTIAL: Semantic confusion accuracy at {:.1}% (target: 60%+)",
+            semantic_acc * 100.0
+        );
     }
 
     println!("\nKey improvements from contrastive training:");
@@ -226,7 +274,10 @@ fn run_experiment() -> Result<()> {
     println!("  3. Negation handling preserves topic classification");
 
     if overall_delta > 0.0 {
-        println!("\nOverall improvement: {:+.1}% accuracy gain", overall_delta * 100.0);
+        println!(
+            "\nOverall improvement: {:+.1}% accuracy gain",
+            overall_delta * 100.0
+        );
     }
 
     println!("\n================================================================");
@@ -239,18 +290,34 @@ fn run_experiment() -> Result<()> {
 #[cfg(feature = "neural-bridge")]
 fn print_evaluation_results(label: &str, eval: &symthaea::perception::ContrastiveEvaluation) {
     println!("{} Results:", label);
-    println!("  Overall: {:.1}% ({}/{})",
-             eval.accuracy * 100.0, eval.correct, eval.total);
+    println!(
+        "  Overall: {:.1}% ({}/{})",
+        eval.accuracy * 100.0,
+        eval.correct,
+        eval.total
+    );
 
     println!("\n  By Category:");
     for (cat, (total, correct, acc)) in &eval.by_category {
-        println!("    {:<25}: {:.1}% ({}/{})", cat, acc * 100.0, correct, total);
+        println!(
+            "    {:<25}: {:.1}% ({}/{})",
+            cat,
+            acc * 100.0,
+            correct,
+            total
+        );
     }
 
     println!("\n  By Difficulty:");
     for diff_level in &["easy", "medium", "hard"] {
         if let Some((total, correct, acc)) = eval.by_difficulty.get(*diff_level) {
-            println!("    {:<15}: {:.1}% ({}/{})", diff_level, acc * 100.0, correct, total);
+            println!(
+                "    {:<15}: {:.1}% ({}/{})",
+                diff_level,
+                acc * 100.0,
+                correct,
+                total
+            );
         }
     }
     println!();
@@ -261,7 +328,7 @@ fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_len-3])
+        format!("{}...", &s[..max_len - 3])
     }
 }
 

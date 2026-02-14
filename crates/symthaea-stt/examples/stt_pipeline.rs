@@ -6,12 +6,12 @@
 //! speech recognition pipeline with unified grammar rescoring.
 
 use std::path::Path;
-use symthaea_stt::audio::{AudioFrontend, AudioProjector, AudioConfig};
-use symthaea_stt::phoneme::{PhonemeDecoder, PhonemeResonator, TemporalDecoder, TemporalConfig};
-use symthaea_stt::unified_grammar::UnifiedGrammar;
-use symthaea_stt::temporal_grammar::TemporalEvent;
+use symthaea_stt::audio::{AudioConfig, AudioFrontend, AudioProjector};
 use symthaea_stt::hdc::HV16;
 use symthaea_stt::ltc::LtcConfig;
+use symthaea_stt::phoneme::{PhonemeDecoder, PhonemeResonator, TemporalConfig, TemporalDecoder};
+use symthaea_stt::temporal_grammar::TemporalEvent;
+use symthaea_stt::unified_grammar::UnifiedGrammar;
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
@@ -68,9 +68,10 @@ impl WordDictionary {
             (vec!["IH", "T"], "it"),
             (vec!["AO", "N"], "on"),
             (vec!["AE", "T"], "at"),
-        ].into_iter()
-            .map(|(p, w)| (p.into_iter().map(String::from).collect(), w.to_string()))
-            .collect();
+        ]
+        .into_iter()
+        .map(|(p, w)| (p.into_iter().map(String::from).collect(), w.to_string()))
+        .collect();
 
         Self { entries }
     }
@@ -270,8 +271,14 @@ impl TranscriptionResult {
 
 fn estimate_duration(phoneme: &str) -> f32 {
     match phoneme {
-        p if p.starts_with('A') || p.starts_with('E') || p.starts_with('I') ||
-             p.starts_with('O') || p.starts_with('U') => 0.10,
+        p if p.starts_with('A')
+            || p.starts_with('E')
+            || p.starts_with('I')
+            || p.starts_with('O')
+            || p.starts_with('U') =>
+        {
+            0.10
+        }
         "S" | "Z" | "SH" | "ZH" | "F" | "V" | "TH" | "DH" => 0.08,
         "P" | "B" | "T" | "D" | "K" | "G" => 0.05,
         "M" | "N" | "NG" => 0.06,
@@ -281,8 +288,14 @@ fn estimate_duration(phoneme: &str) -> f32 {
 
 fn estimate_intensity(phoneme: &str) -> f32 {
     match phoneme {
-        p if p.starts_with('A') || p.starts_with('E') || p.starts_with('I') ||
-             p.starts_with('O') || p.starts_with('U') => 0.8,
+        p if p.starts_with('A')
+            || p.starts_with('E')
+            || p.starts_with('I')
+            || p.starts_with('O')
+            || p.starts_with('U') =>
+        {
+            0.8
+        }
         "B" | "D" | "G" | "V" | "Z" | "DH" | "ZH" | "M" | "N" | "NG" => 0.6,
         "P" | "T" | "K" | "F" | "S" | "TH" | "SH" | "HH" => 0.5,
         _ => 0.55,
@@ -295,10 +308,8 @@ fn generate_synthetic_prototypes() -> Vec<(String, HV16)> {
 
     let phonemes = vec![
         "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
-        "B", "D", "G", "K", "P", "T",
-        "CH", "DH", "F", "HH", "JH", "S", "SH", "TH", "V", "Z", "ZH",
-        "M", "N", "NG",
-        "L", "R", "W", "Y",
+        "B", "D", "G", "K", "P", "T", "CH", "DH", "F", "HH", "JH", "S", "SH", "TH", "V", "Z", "ZH",
+        "M", "N", "NG", "L", "R", "W", "Y",
     ];
 
     let mut prototypes = Vec::new();
@@ -310,7 +321,9 @@ fn generate_synthetic_prototypes() -> Vec<(String, HV16)> {
         // Set ~50% of bits based on hash of phoneme
         let hash_base = (i * 12345 + 67890) as u128;
         for w in 0..16 {
-            let word_hash = hash_base.wrapping_mul(w as u128 + 1).wrapping_add(i as u128);
+            let word_hash = hash_base
+                .wrapping_mul(w as u128 + 1)
+                .wrapping_add(i as u128);
             hv.words[w] = word_hash;
         }
 
@@ -376,14 +389,18 @@ fn main() {
         vec!["B", "IH", "G", "P", "IH", "G", "D", "IH", "G"],
         vec!["F", "IH", "SH", "D", "IH", "SH", "W", "IH", "SH"],
         vec!["S", "T", "R", "AO", "NG", "S", "T", "R", "IH", "NG"],
-    ].into_iter()
-        .map(|seq| seq.into_iter().map(String::from).collect())
-        .collect();
+    ]
+    .into_iter()
+    .map(|seq| seq.into_iter().map(String::from).collect())
+    .collect();
 
     pipeline.train_grammar(&training_sequences, 30);
     let stats = pipeline.grammar_stats();
-    println!("    Trained grammar: {} clusters, {:.1}% density",
-             stats.num_clusters, stats.avg_cluster_density * 100.0);
+    println!(
+        "    Trained grammar: {} clusters, {:.1}% density",
+        stats.num_clusters,
+        stats.avg_cluster_density * 100.0
+    );
 
     // Simulate transcription
     subheader("Phase 2: Simulated Transcription");
@@ -403,7 +420,11 @@ fn main() {
 
         println!("    Expected: \"{}\"", expected);
         println!("    Phonemes: {}", phonemes.join(" "));
-        println!("    Decoded:  {} (confidence: {:.2})", result.phonemes.join(" "), result.confidence);
+        println!(
+            "    Decoded:  {} (confidence: {:.2})",
+            result.phonemes.join(" "),
+            result.confidence
+        );
         println!("    Grammar:  {:+.4}", result.grammar_score);
         println!();
     }
@@ -421,11 +442,14 @@ fn main() {
 
     println!("    Phonotactic scoring:");
     for (phonemes, label) in score_tests {
-        let events: Vec<TemporalEvent> = phonemes.iter().enumerate()
+        let events: Vec<TemporalEvent> = phonemes
+            .iter()
+            .enumerate()
             .filter_map(|(i, p)| {
-                pipeline.grammar.category_id(*p).map(|cid| {
-                    TemporalEvent::new(*p, cid, i as f32 * 0.06, 0.06, 0.6)
-                })
+                pipeline
+                    .grammar
+                    .category_id(*p)
+                    .map(|cid| TemporalEvent::new(*p, cid, i as f32 * 0.06, 0.06, 0.6))
             })
             .collect();
 
@@ -446,8 +470,11 @@ fn main() {
         match AudioFrontend::load_wav(test_audio_path) {
             Ok((audio, sample_rate)) => {
                 println!("    Loaded: {}", test_audio_path);
-                println!("    Duration: {:.2}s, Sample rate: {}Hz",
-                         audio.len() as f32 / sample_rate as f32, sample_rate);
+                println!(
+                    "    Duration: {:.2}s, Sample rate: {}Hz",
+                    audio.len() as f32 / sample_rate as f32,
+                    sample_rate
+                );
 
                 let result = pipeline.transcribe(&audio);
                 println!("    Transcription: \"{}\"", result.text());
@@ -479,8 +506,11 @@ fn main() {
     println!("      HDC Encoder:       Hyperdimensional vectors");
     println!("      Phoneme Decoder:   {} prototypes", prototypes.len());
     println!("      Temporal Decoder:  Schmitt trigger + run-length");
-    println!("      Unified Grammar:   {} clusters, {:.1}% density",
-             stats.num_clusters, stats.avg_cluster_density * 100.0);
+    println!(
+        "      Unified Grammar:   {} clusters, {:.1}% density",
+        stats.num_clusters,
+        stats.avg_cluster_density * 100.0
+    );
     println!("      Word Dictionary:   Simple greedy matching");
     println!();
     println!("    Key Features:");

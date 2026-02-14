@@ -13,13 +13,13 @@
 
 use std::sync::Arc;
 
-use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, TemporalBackend, TrainingMethod};
-use symthaea::hdc_ltc_bridge::{AdaptiveDimConfig, HdcLtcBridgeConfig};
-use symthaea::consciousness::{
-    CompositionalityEngine, CompositionalityConfig,
+use symthaea::cognitive_loop::{
+    CognitiveLoopConfig, CognitiveLoopService, TemporalBackend, TrainingMethod,
 };
-use symthaea::hdc::primitive_system::PrimitiveSystem;
+use symthaea::consciousness::{CompositionalityConfig, CompositionalityEngine};
 use symthaea::hdc::binary_hv::BinaryHV;
+use symthaea::hdc::primitive_system::PrimitiveSystem;
+use symthaea::hdc_ltc_bridge::{AdaptiveDimConfig, HdcLtcBridgeConfig};
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -50,8 +50,8 @@ fn main() {
     };
 
     let training_method = format!("{:?}", config.training_method);
-    let mut service = CognitiveLoopService::new(config)
-        .expect("Failed to create CognitiveLoopService");
+    let mut service =
+        CognitiveLoopService::new(config).expect("Failed to create CognitiveLoopService");
 
     println!("Backend:          {:?}", service.temporal_backend());
     println!("Training method:  {}", training_method);
@@ -62,7 +62,10 @@ fn main() {
     // Phase 1: Learning  (50 cycles of patterned input)
     // ══════════════════════════════════════════════════════════════════════
     println!("── Phase 1: Learning (50 cycles, patterned input) ─────────────");
-    println!("{:<8} {:>10} {:>12} {:>10}", "Cycle", "Phi", "Coherence", "Loss");
+    println!(
+        "{:<8} {:>10} {:>12} {:>10}",
+        "Cycle", "Phi", "Coherence", "Loss"
+    );
 
     let patterns = [
         "cause leads to effect",
@@ -98,7 +101,8 @@ fn main() {
     let mut comp = CompositionalityEngine::new(ps, CompositionalityConfig::default());
 
     // Sequential: (cause ∘ similarity)
-    let seq = comp.compose_sequential("cause", "similarity")
+    let seq = comp
+        .compose_sequential("cause", "similarity")
         .expect("sequential composition failed");
     println!(
         "  Sequential:  {} | depth={} | est. Phi={:.3}",
@@ -106,7 +110,8 @@ fn main() {
     );
 
     // Parallel: (time_arrow || negation)
-    let par = comp.compose_parallel("time_arrow", "negation")
+    let par = comp
+        .compose_parallel("time_arrow", "negation")
         .expect("parallel composition failed");
     println!(
         "  Parallel:    {} | depth={} | est. Phi={:.3}",
@@ -114,7 +119,8 @@ fn main() {
     );
 
     // Nested: sequential of (seq result) and parallel result
-    let nested = comp.compose_sequential(&seq.id, &par.id)
+    let nested = comp
+        .compose_sequential(&seq.id, &par.id)
         .expect("nested composition failed");
     println!(
         "  Nested:      {} | depth={} | est. Phi={:.3}",
@@ -123,7 +129,8 @@ fn main() {
 
     // Execute the nested composition
     let test_input = BinaryHV::random(12345);
-    let exec_result = comp.execute(&nested.id, &test_input)
+    let exec_result = comp
+        .execute(&nested.id, &test_input)
         .expect("execution failed");
     println!(
         "  Execution:   confidence={:.3} | steps={} | path={:?}",
@@ -135,7 +142,10 @@ fn main() {
     // Phase 3: Adaptation  (30 cycles of harder / novel input)
     // ══════════════════════════════════════════════════════════════════════
     println!("── Phase 3: Adaptation (30 cycles, harder input) ──────────────");
-    println!("{:<8} {:>10} {:>12} {:>10}", "Cycle", "Phi", "Coherence", "Loss");
+    println!(
+        "{:<8} {:>10} {:>12} {:>10}",
+        "Cycle", "Phi", "Coherence", "Loss"
+    );
 
     let hard_patterns = [
         "quantum entanglement violates local realism through nonlocal correlations",
@@ -167,7 +177,10 @@ fn main() {
     // Phase 4: Consolidation  (30 cycles of easy input)
     // ══════════════════════════════════════════════════════════════════════
     println!("── Phase 4: Consolidation (30 cycles, easy input) ─────────────");
-    println!("{:<8} {:>10} {:>12} {:>10}", "Cycle", "Phi", "Coherence", "Loss");
+    println!(
+        "{:<8} {:>10} {:>12} {:>10}",
+        "Cycle", "Phi", "Coherence", "Loss"
+    );
 
     let easy_patterns = ["hello world", "yes or no", "one two three"];
 

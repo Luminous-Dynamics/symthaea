@@ -827,7 +827,7 @@ mod tests {
         let nx = 3;
         let ny = 4;
         let px = vec![0.2, 0.5, 0.3];
-        let py = vec![0.1, 0.2, 0.3, 0.4];
+        let py = [0.1, 0.2, 0.3, 0.4];
         let mut joint = vec![0.0_f64; nx * ny];
         for x in 0..nx {
             for y in 0..ny {

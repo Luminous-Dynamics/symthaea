@@ -60,7 +60,8 @@ fn main() {
     for speaker in 0..n_speakers {
         for utt in 0..train_per_speaker {
             let mfccs = generate_speaker_mfccs(speaker, frames_per_utterance, n_mfcc, utt as u64);
-            let encoded = encode_utterance(&mfccs, &level_hvs, &coeff_hvs, &frame_hvs, n_levels, dim);
+            let encoded =
+                encode_utterance(&mfccs, &level_hvs, &coeff_hvs, &frame_hvs, n_levels, dim);
 
             for (acc, &val) in prototypes[speaker].iter_mut().zip(encoded.values.iter()) {
                 *acc += val;
@@ -84,7 +85,11 @@ fn main() {
         .collect();
 
     let train_time = t.elapsed().as_secs_f64();
-    println!("  Training: {} utterances in {:.1}s", n_speakers * train_per_speaker, train_time);
+    println!(
+        "  Training: {} utterances in {:.1}s",
+        n_speakers * train_per_speaker,
+        train_time
+    );
 
     // Test
     let t = Instant::now();
@@ -95,13 +100,17 @@ fn main() {
         for utt in 0..test_per_speaker {
             let seed = 1000 + utt as u64;
             let mfccs = generate_speaker_mfccs(speaker, frames_per_utterance, n_mfcc, seed);
-            let encoded = encode_utterance(&mfccs, &level_hvs, &coeff_hvs, &frame_hvs, n_levels, dim);
+            let encoded =
+                encode_utterance(&mfccs, &level_hvs, &coeff_hvs, &frame_hvs, n_levels, dim);
 
             let predicted = speaker_prototypes
                 .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| {
-                    encoded.similarity(a).partial_cmp(&encoded.similarity(b)).unwrap()
+                    encoded
+                        .similarity(a)
+                        .partial_cmp(&encoded.similarity(b))
+                        .unwrap()
                 })
                 .map(|(i, _)| i)
                 .unwrap_or(0);
@@ -114,7 +123,13 @@ fn main() {
 
     let test_time = t.elapsed().as_secs_f64();
     let accuracy = correct as f64 / total as f64;
-    println!("  Testing: {:.2}% ({}/{}) in {:.1}s", accuracy * 100.0, correct, total, test_time);
+    println!(
+        "  Testing: {:.2}% ({}/{}) in {:.1}s",
+        accuracy * 100.0,
+        correct,
+        total,
+        test_time
+    );
 
     // ═══════════════════════════════════════════════════════════════
     // Test 2: Encoding Quality - Temporal vs Non-temporal
@@ -126,7 +141,14 @@ fn main() {
     // Encode same utterance with and without temporal position
     let test_mfccs = generate_speaker_mfccs(0, frames_per_utterance, n_mfcc, 42);
 
-    let temporal_enc = encode_utterance(&test_mfccs, &level_hvs, &coeff_hvs, &frame_hvs, n_levels, dim);
+    let temporal_enc = encode_utterance(
+        &test_mfccs,
+        &level_hvs,
+        &coeff_hvs,
+        &frame_hvs,
+        n_levels,
+        dim,
+    );
 
     // Bag-of-frames: same but without position binding
     let bag_enc = encode_utterance_bag(&test_mfccs, &level_hvs, &coeff_hvs, n_levels, dim);
@@ -134,15 +156,35 @@ fn main() {
     // Reversed utterance
     let mut reversed_mfccs = test_mfccs.clone();
     reversed_mfccs.reverse();
-    let reversed_enc = encode_utterance(&reversed_mfccs, &level_hvs, &coeff_hvs, &frame_hvs, n_levels, dim);
+    let reversed_enc = encode_utterance(
+        &reversed_mfccs,
+        &level_hvs,
+        &coeff_hvs,
+        &frame_hvs,
+        n_levels,
+        dim,
+    );
     let reversed_bag = encode_utterance_bag(&reversed_mfccs, &level_hvs, &coeff_hvs, n_levels, dim);
 
     let temporal_rev_sim = temporal_enc.similarity(&reversed_enc);
     let bag_rev_sim = bag_enc.similarity(&reversed_bag);
 
-    println!("  Temporal: forward↔reversed similarity = {:.4}", temporal_rev_sim);
-    println!("  Bag-of-frames: forward↔reversed similarity = {:.4}", bag_rev_sim);
-    println!("  Temporal encodes order: {}", if temporal_rev_sim < bag_rev_sim { "YES" } else { "NO" });
+    println!(
+        "  Temporal: forward↔reversed similarity = {:.4}",
+        temporal_rev_sim
+    );
+    println!(
+        "  Bag-of-frames: forward↔reversed similarity = {:.4}",
+        bag_rev_sim
+    );
+    println!(
+        "  Temporal encodes order: {}",
+        if temporal_rev_sim < bag_rev_sim {
+            "YES"
+        } else {
+            "NO"
+        }
+    );
 
     // ═══════════════════════════════════════════════════════════════
     // Summary
@@ -154,16 +196,25 @@ fn main() {
     let checks = vec![
         ("Speaker ID accuracy > 50%", accuracy > 0.50),
         ("Speaker ID accuracy > 70%", accuracy > 0.70),
-        ("Temporal encoding preserves order", temporal_rev_sim < bag_rev_sim),
+        (
+            "Temporal encoding preserves order",
+            temporal_rev_sim < bag_rev_sim,
+        ),
     ];
 
     let mut passed = 0;
     for (name, pass) in &checks {
         println!("║  {} {:50}   ║", if *pass { "PASS" } else { "FAIL" }, name);
-        if *pass { passed += 1; }
+        if *pass {
+            passed += 1;
+        }
     }
     println!("╟──────────────────────────────────────────────────────────────╢");
-    println!("║  Result: {}/{} tests passed                                 ║", passed, checks.len());
+    println!(
+        "║  Result: {}/{} tests passed                                 ║",
+        passed,
+        checks.len()
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Save
@@ -185,8 +236,15 @@ fn main() {
 }
 
 /// Generate synthetic MFCC-like features for a speaker
-fn generate_speaker_mfccs(speaker: usize, n_frames: usize, n_mfcc: usize, seed: u64) -> Vec<Vec<f32>> {
-    let mut rng = seed.wrapping_mul(6364136223846793005).wrapping_add(speaker as u64 * 12345 + 1);
+fn generate_speaker_mfccs(
+    speaker: usize,
+    n_frames: usize,
+    n_mfcc: usize,
+    seed: u64,
+) -> Vec<Vec<f32>> {
+    let mut rng = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(speaker as u64 * 12345 + 1);
     let mut rand = || -> f32 {
         rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1);
         (rng >> 33) as f32 / (1u64 << 31) as f32 * 2.0 - 1.0
@@ -201,11 +259,7 @@ fn generate_speaker_mfccs(speaker: usize, n_frames: usize, n_mfcc: usize, seed: 
         .collect();
 
     (0..n_frames)
-        .map(|_| {
-            (0..n_mfcc)
-                .map(|c| base[c] + rand() * 0.2)
-                .collect()
-        })
+        .map(|_| (0..n_mfcc).map(|c| base[c] + rand() * 0.2).collect())
         .collect()
 }
 

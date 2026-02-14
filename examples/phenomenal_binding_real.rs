@@ -15,8 +15,8 @@
 //! - 2x2 ANOVA: Operation (Bind/Bundle) x Pair Type (Unified/Separate)
 //! - Key test: Interaction effect (binding specifically helps unified pairs)
 
-use std::time::Instant;
 use std::path::Path;
+use std::time::Instant;
 
 use anyhow::Result;
 
@@ -24,7 +24,10 @@ use anyhow::Result;
 use symthaea::perception::ConsciousnessProbeV2;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{BinaryHV, consciousness_topology::{ConsciousnessTopology, TopologyConfig}};
+use symthaea_core::hdc::{
+    consciousness_topology::{ConsciousnessTopology, TopologyConfig},
+    BinaryHV,
+};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -114,8 +117,11 @@ fn run_h2_experiment() -> Result<()> {
         ("bland", "dish"),
     ];
 
-    println!("Testing {} unified pairs and {} separate pairs\n",
-             unified_pairs.len(), separate_pairs.len());
+    println!(
+        "Testing {} unified pairs and {} separate pairs\n",
+        unified_pairs.len(),
+        separate_pairs.len()
+    );
 
     // Topology configuration
     let topo_config = TopologyConfig {
@@ -160,7 +166,10 @@ fn run_h2_experiment() -> Result<()> {
         let bundled = BinaryHV::bundle(&[hv_a.clone(), hv_b.clone()]);
         unified_bundle_unity.push(analyze_hv(&bundled));
     }
-    println!("  Completed in {:.2}s\n", unified_start.elapsed().as_secs_f64());
+    println!(
+        "  Completed in {:.2}s\n",
+        unified_start.elapsed().as_secs_f64()
+    );
 
     // Process separate pairs
     println!("Processing separate pairs...");
@@ -175,7 +184,10 @@ fn run_h2_experiment() -> Result<()> {
         let bundled = BinaryHV::bundle(&[hv_a.clone(), hv_b.clone()]);
         separate_bundle_unity.push(analyze_hv(&bundled));
     }
-    println!("  Completed in {:.2}s\n", separate_start.elapsed().as_secs_f64());
+    println!(
+        "  Completed in {:.2}s\n",
+        separate_start.elapsed().as_secs_f64()
+    );
 
     // Calculate statistics
     let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
@@ -195,12 +207,20 @@ fn run_h2_experiment() -> Result<()> {
 
     println!("                      BIND (XOR)       BUNDLE (MAJ)");
     println!("                    -------------     -------------");
-    println!("UNIFIED PAIRS        {:.4} (+/-{:.4})   {:.4} (+/-{:.4})",
-             unified_bind_mean, std(&unified_bind_unity),
-             unified_bundle_mean, std(&unified_bundle_unity));
-    println!("SEPARATE PAIRS       {:.4} (+/-{:.4})   {:.4} (+/-{:.4})\n",
-             separate_bind_mean, std(&separate_bind_unity),
-             separate_bundle_mean, std(&separate_bundle_unity));
+    println!(
+        "UNIFIED PAIRS        {:.4} (+/-{:.4})   {:.4} (+/-{:.4})",
+        unified_bind_mean,
+        std(&unified_bind_unity),
+        unified_bundle_mean,
+        std(&unified_bundle_unity)
+    );
+    println!(
+        "SEPARATE PAIRS       {:.4} (+/-{:.4})   {:.4} (+/-{:.4})\n",
+        separate_bind_mean,
+        std(&separate_bind_unity),
+        separate_bundle_mean,
+        std(&separate_bundle_unity)
+    );
 
     // Key metrics
     let bind_advantage_unified = unified_bind_mean - unified_bundle_mean;
@@ -209,7 +229,10 @@ fn run_h2_experiment() -> Result<()> {
 
     println!("KEY METRICS:");
     println!("  Bind advantage (unified):  {:.4}", bind_advantage_unified);
-    println!("  Bind advantage (separate): {:.4}", bind_advantage_separate);
+    println!(
+        "  Bind advantage (separate): {:.4}",
+        bind_advantage_separate
+    );
     println!("  INTERACTION EFFECT:        {:.4}\n", interaction_effect);
 
     // Permutation test for interaction effect
@@ -218,11 +241,13 @@ fn run_h2_experiment() -> Result<()> {
     let observed_interaction = interaction_effect;
 
     // Combine all data for permutation
-    let all_bind: Vec<f64> = unified_bind_unity.iter()
+    let all_bind: Vec<f64> = unified_bind_unity
+        .iter()
         .chain(separate_bind_unity.iter())
         .copied()
         .collect();
-    let all_bundle: Vec<f64> = unified_bundle_unity.iter()
+    let all_bundle: Vec<f64> = unified_bundle_unity
+        .iter()
         .chain(separate_bundle_unity.iter())
         .copied()
         .collect();
@@ -238,16 +263,16 @@ fn run_h2_experiment() -> Result<()> {
         indices.shuffle(&mut rng);
 
         // Split into permuted unified/separate
-        let perm_unified_bind: Vec<f64> = indices[..n_unified].iter()
-            .map(|&i| all_bind[i])
-            .collect();
-        let perm_unified_bundle: Vec<f64> = indices[..n_unified].iter()
+        let perm_unified_bind: Vec<f64> =
+            indices[..n_unified].iter().map(|&i| all_bind[i]).collect();
+        let perm_unified_bundle: Vec<f64> = indices[..n_unified]
+            .iter()
             .map(|&i| all_bundle[i])
             .collect();
-        let perm_separate_bind: Vec<f64> = indices[n_unified..].iter()
-            .map(|&i| all_bind[i])
-            .collect();
-        let perm_separate_bundle: Vec<f64> = indices[n_unified..].iter()
+        let perm_separate_bind: Vec<f64> =
+            indices[n_unified..].iter().map(|&i| all_bind[i]).collect();
+        let perm_separate_bundle: Vec<f64> = indices[n_unified..]
+            .iter()
             .map(|&i| all_bundle[i])
             .collect();
 
@@ -291,11 +316,17 @@ fn run_h2_experiment() -> Result<()> {
     }
 
     // Effect size (Cohen's d for interaction)
-    let pooled_std = ((std(&unified_bind_unity).powi(2) +
-                       std(&unified_bundle_unity).powi(2) +
-                       std(&separate_bind_unity).powi(2) +
-                       std(&separate_bundle_unity).powi(2)) / 4.0).sqrt();
-    let cohens_d = if pooled_std > 0.0 { interaction_effect / pooled_std } else { 0.0 };
+    let pooled_std = ((std(&unified_bind_unity).powi(2)
+        + std(&unified_bundle_unity).powi(2)
+        + std(&separate_bind_unity).powi(2)
+        + std(&separate_bundle_unity).powi(2))
+        / 4.0)
+        .sqrt();
+    let cohens_d = if pooled_std > 0.0 {
+        interaction_effect / pooled_std
+    } else {
+        0.0
+    };
 
     let effect_size = if cohens_d.abs() < 0.2 {
         "negligible"
@@ -317,21 +348,27 @@ fn run_h2_experiment() -> Result<()> {
     println!("Unified Pairs (first 5):");
     for i in 0..5.min(unified_pairs.len()) {
         let (a, b) = unified_pairs[i];
-        println!("  ({}, {}) - Bind: {:.4}, Bundle: {:.4}, Delta: {:.4}",
-                 a, b,
-                 unified_bind_unity[i],
-                 unified_bundle_unity[i],
-                 unified_bind_unity[i] - unified_bundle_unity[i]);
+        println!(
+            "  ({}, {}) - Bind: {:.4}, Bundle: {:.4}, Delta: {:.4}",
+            a,
+            b,
+            unified_bind_unity[i],
+            unified_bundle_unity[i],
+            unified_bind_unity[i] - unified_bundle_unity[i]
+        );
     }
 
     println!("\nSeparate Pairs (first 5):");
     for i in 0..5.min(separate_pairs.len()) {
         let (a, b) = separate_pairs[i];
-        println!("  ({}, {}) - Bind: {:.4}, Bundle: {:.4}, Delta: {:.4}",
-                 a, b,
-                 separate_bind_unity[i],
-                 separate_bundle_unity[i],
-                 separate_bind_unity[i] - separate_bundle_unity[i]);
+        println!(
+            "  ({}, {}) - Bind: {:.4}, Bundle: {:.4}, Delta: {:.4}",
+            a,
+            b,
+            separate_bind_unity[i],
+            separate_bundle_unity[i],
+            separate_bind_unity[i] - separate_bundle_unity[i]
+        );
     }
 
     println!("\n================================================================");

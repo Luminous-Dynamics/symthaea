@@ -798,8 +798,8 @@ mod tests {
         // Frequencies should be in the requested range
         let f_min = cwt.frequencies.iter().cloned().fold(f64::INFINITY, f64::min);
         let f_max = cwt.frequencies.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        assert!(f_min >= 4.0 && f_min <= 6.0, "Min freq should be ~5 Hz, got {}", f_min);
-        assert!(f_max >= 45.0 && f_max <= 55.0, "Max freq should be ~50 Hz, got {}", f_max);
+        assert!((4.0..=6.0).contains(&f_min), "Min freq should be ~5 Hz, got {}", f_min);
+        assert!((45.0..=55.0).contains(&f_max), "Max freq should be ~50 Hz, got {}", f_max);
 
         // The scale at 10 Hz should have non-zero power (signal is 10 Hz sine)
         let closest_10hz = cwt.frequencies

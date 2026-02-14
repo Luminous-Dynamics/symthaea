@@ -195,11 +195,8 @@ fn perturbation_complexity(hvs: &[ContinuousHV], perturb_idx: usize) -> f64 {
     // High PCI = diverse, non-trivial spread pattern
     // Low PCI = uniform (all similar) or no spread (all dissimilar)
     let mean: f32 = similarities.iter().sum::<f32>() / similarities.len() as f32;
-    let _variance: f32 = similarities
-        .iter()
-        .map(|s| (s - mean).powi(2))
-        .sum::<f32>()
-        / similarities.len() as f32;
+    let _variance: f32 =
+        similarities.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / similarities.len() as f32;
 
     // Entropy of binned similarity distribution (proxy for Lempel-Ziv)
     let n_bins = 10;
@@ -237,7 +234,10 @@ fn main() {
     let n_nodes = 16;
     let n_trials = 5;
 
-    println!("Configuration: {} nodes, {} trials per state, dim={}\n", n_nodes, n_trials, DIM);
+    println!(
+        "Configuration: {} nodes, {} trials per state, dim={}\n",
+        n_nodes, n_trials, DIM
+    );
 
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!(
@@ -269,18 +269,12 @@ fn main() {
         }
 
         let phi_mean = phis.iter().sum::<f64>() / phis.len() as f64;
-        let phi_std = (phis
-            .iter()
-            .map(|x| (x - phi_mean).powi(2))
-            .sum::<f64>()
+        let phi_std = (phis.iter().map(|x| (x - phi_mean).powi(2)).sum::<f64>()
             / (phis.len() - 1).max(1) as f64)
             .sqrt();
 
         let pci_mean = pcis.iter().sum::<f64>() / pcis.len() as f64;
-        let pci_std = (pcis
-            .iter()
-            .map(|x| (x - pci_mean).powi(2))
-            .sum::<f64>()
+        let pci_std = (pcis.iter().map(|x| (x - pci_mean).powi(2)).sum::<f64>()
             / (pcis.len() - 1).max(1) as f64)
             .sqrt();
 
@@ -396,15 +390,20 @@ fn main() {
         (
             "Φ-PCI weak correlation (expected: |r| < 0.8)",
             correlation.abs() < 0.8,
-            format!("r = {:.4} (Φ=intrinsic integration, PCI=perturbational complexity)", correlation),
+            format!(
+                "r = {:.4} (Φ=intrinsic integration, PCI=perturbational complexity)",
+                correlation
+            ),
         ),
         // Both measures should independently order conscious states correctly:
         // awake > vegetative for both Φ and PCI
         (
             "Both Φ and PCI order: awake > vegetative",
             (awake_phi > vegetative_phi) && (awake_pci > vegetative_pci),
-            format!("Φ: {:.4} > {:.4}, PCI: {:.4} > {:.4}",
-                awake_phi, vegetative_phi, awake_pci, vegetative_pci),
+            format!(
+                "Φ: {:.4} > {:.4}, PCI: {:.4} > {:.4}",
+                awake_phi, vegetative_phi, awake_pci, vegetative_pci
+            ),
         ),
     ];
 

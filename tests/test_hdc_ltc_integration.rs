@@ -60,7 +60,7 @@ fn test_bridge_forward() {
     // Output should be different from zero (network processed input)
     let norm: f32 = output.iter().map(|x| x * x).sum::<f32>().sqrt();
     // After processing, norm should be non-trivial
-    assert!(norm > 0.0 || norm == 0.0); // May be zero initially
+    assert!(norm >= 0.0); // May be zero initially
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn test_bridge_state_diversity() {
     let _ = bridge.step(&input, 0.02);
 
     let diversity = bridge.state_diversity();
-    assert!(diversity >= 0.0 && diversity <= 1.0);
+    assert!((0.0..=1.0).contains(&diversity));
 }
 
 #[test]
@@ -410,8 +410,8 @@ fn test_backend_parity_coherence() {
     let coh_cfc = service_cfc.temporal_coherence();
     let coh_hdc = service_hdc.temporal_coherence();
 
-    assert!(coh_cfc >= 0.0 && coh_cfc <= 1.0);
-    assert!(coh_hdc >= 0.0 && coh_hdc <= 1.0);
+    assert!((0.0..=1.0).contains(&coh_cfc));
+    assert!((0.0..=1.0).contains(&coh_hdc));
 }
 
 #[test]
@@ -430,8 +430,8 @@ fn test_backend_parity_state_diversity() {
     let div_cfc = service_cfc.cfc_state_diversity();
     let div_hdc = service_hdc.cfc_state_diversity();
 
-    assert!(div_cfc >= 0.0 && div_cfc <= 1.0);
-    assert!(div_hdc >= 0.0 && div_hdc <= 1.0);
+    assert!((0.0..=1.0).contains(&div_cfc));
+    assert!((0.0..=1.0).contains(&div_hdc));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

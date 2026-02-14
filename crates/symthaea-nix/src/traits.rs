@@ -427,8 +427,7 @@ impl CausalDiscoveryEngine {
         } else {
             CausalDirection::Backward
         };
-        let confidence =
-            (cov.abs() / (mean_x.abs().max(1.0) * mean_y.abs().max(1.0))).min(1.0);
+        let confidence = (cov.abs() / (mean_x.abs().max(1.0) * mean_y.abs().max(1.0))).min(1.0);
         (direction, confidence)
     }
 }

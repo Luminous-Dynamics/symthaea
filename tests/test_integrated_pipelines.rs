@@ -271,7 +271,7 @@ mod repl_cognitive_fep_motor_integration {
             assert!(validation.is_ok(), "Valid actions should pass policy: {:?}", validation);
 
             // In simulated mode, execution returns simulated outcome
-            let result = executor.execute(&action, &policy, &sandbox);
+            let result = executor.execute(action, &policy, &sandbox);
             assert!(result.is_ok(), "Simulated execution should succeed");
         }
 
@@ -439,7 +439,7 @@ mod swarm_consciousness_broadcasting {
                     peer_states.insert(info.node_id.clone(), TrustLevel::Unknown);
                 }
                 PeerEvent::TrustChanged { peer_id, new, .. } => {
-                    peer_states.insert(peer_id.clone(), new.clone());
+                    peer_states.insert(peer_id.clone(), *new);
                 }
                 PeerEvent::ConsciousnessUpdate { .. } => {
                     consciousness_updates += 1;
@@ -568,7 +568,7 @@ mod swarm_consciousness_broadcasting {
             let payload = TensorPayload {
                 data: vec![0.1, 0.2, 0.3, 0.4],
                 shape: vec![2, 2],
-                tensor_type: tensor_type.clone(),
+                tensor_type: *tensor_type,
                 source: "test-layer".to_string(),
                 timestamp_ms: 12345,
             };
@@ -857,7 +857,7 @@ mod phi_guided_architecture_search {
         let calculator = ConnectivityCalculator::new();
         let phi = calculator.algebraic_connectivity(&representations);
 
-        assert!(phi >= 0.0 && phi <= 1.0, "Phi should be in [0, 1]");
+        assert!((0.0..=1.0).contains(&phi), "Phi should be in [0, 1]");
 
         println!("Node Representations Test: PASSED");
         println!("  Computed Phi: {:.6}", phi);

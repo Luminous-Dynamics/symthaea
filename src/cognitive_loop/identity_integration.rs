@@ -4,6 +4,12 @@
 //! cryptographic signing for cognitive loop outputs when the `identity`
 //! feature is enabled.
 
+#[cfg(feature = "identity")]
+#[allow(unused_imports)]
+use super::CognitiveLoopService;
+#[cfg(feature = "identity")]
+#[allow(unused_imports)]
+use anyhow::Result;
 
 #[cfg(feature = "identity")]
 impl CognitiveLoopService {

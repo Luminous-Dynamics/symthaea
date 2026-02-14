@@ -25,20 +25,23 @@
 
 // Import MAGI Loop components
 use symthaea::consciousness::recursive_improvement::{
-    // World Prediction (Phase 1)
-    OutcomeCategory, RiskTier, WorldActionContext,
+    // EFE Integration (Phase 3)
+    EfeWeights,
 
     // Constraint Gate (Phase 3.5)
     ExecutionMode,
 
-    // MAGI Integration
-    WorldGroundedSelfModel, WorldGroundedConfig,
-
-    // EFE Integration (Phase 3)
-    EfeWeights,
-
+    // World Prediction (Phase 1)
+    OutcomeCategory,
+    RiskTier,
     // Safe Update (Phase 6)
     SafeUpdateManager,
+    WorldActionContext,
+
+    WorldGroundedConfig,
+
+    // MAGI Integration
+    WorldGroundedSelfModel,
 };
 
 /// The "Toy World" - a simple deterministic environment
@@ -85,7 +88,10 @@ fn main() {
 
     println!("  ✓ WorldGroundedSelfModel initialized");
     println!("  ✓ Initial state: {:?}", magi.loop_state());
-    println!("  ✓ Calibration quality: {:?}", magi.loop_state().calibration_quality);
+    println!(
+        "  ✓ Calibration quality: {:?}",
+        magi.loop_state().calibration_quality
+    );
     println!();
 
     // =========================================================================
@@ -96,16 +102,14 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // Create an action context for predicting f(3)
-    let action_3 = WorldActionContext::new(
-        "predict_parity",
-        "Predict whether f(3) returns even",
-    ).with_risk_tier(RiskTier::Observation);
+    let action_3 = WorldActionContext::new("predict_parity", "Predict whether f(3) returns even")
+        .with_risk_tier(RiskTier::Observation);
 
     // System predicts f(3) is EVEN with 90% confidence (WRONG - 3 is odd!)
     let prediction_3 = magi.predict(
         "f(3) is even",
-        OutcomeCategory::Success,  // Predicting "is_even" = true
-        0.9,                        // 90% confidence (overconfident!)
+        OutcomeCategory::Success, // Predicting "is_even" = true
+        0.9,                      // 90% confidence (overconfident!)
         action_3.clone(),
     );
 
@@ -120,7 +124,10 @@ fn main() {
     println!("    Mode: {:?}", gate_decision_before.mode);
     println!("    Confidence: {:.2}", gate_decision_before.confidence);
     if let Some(factor) = gate_decision_before.factors.first() {
-        println!("    Primary factor: {} ({})", factor.name, factor.description);
+        println!(
+            "    Primary factor: {} ({})",
+            factor.name, factor.description
+        );
     }
     println!();
 
@@ -142,13 +149,16 @@ fn main() {
     magi.resolve_prediction(
         &prediction_3.id,
         OutcomeCategory::SafeFailure, // Actually odd, not even
-        0.99, // High confidence in the resolution
+        0.99,                         // High confidence in the resolution
     );
 
     // Check calibration after failure
     let summary_after_fail = magi.calibration_summary();
     println!("  Calibration After Failure:");
-    println!("    Total predictions: {}", summary_after_fail.total_predictions);
+    println!(
+        "    Total predictions: {}",
+        summary_after_fail.total_predictions
+    );
     println!("    Overall Brier: {:.4}", summary_after_fail.global_brier);
     println!("    Mean ECE: {:.4}", summary_after_fail.global_ece);
     println!("    Quality: {:?}", magi.loop_state().calibration_quality);
@@ -167,7 +177,10 @@ fn main() {
     println!("    Mode: {:?}", gate_decision_after.mode);
     println!("    Confidence: {:.2}", gate_decision_after.confidence);
     if let Some(factor) = gate_decision_after.factors.first() {
-        println!("    Primary factor: {} ({})", factor.name, factor.description);
+        println!(
+            "    Primary factor: {} ({})",
+            factor.name, factor.description
+        );
     }
     let is_autonomous = gate_decision_after.mode.is_autonomous();
     println!("    Autonomous: {}", is_autonomous);
@@ -181,7 +194,10 @@ fn main() {
     let efe_contrib = magi.compute_efe_contribution(&action_3);
     println!("  EFE Contribution (learning potential):");
     println!("    Pragmatic: {:.3}", efe_contrib.pragmatic);
-    println!("    Epistemic: {:.3} (higher = more to learn)", efe_contrib.epistemic);
+    println!(
+        "    Epistemic: {:.3} (higher = more to learn)",
+        efe_contrib.epistemic
+    );
     println!("    Novelty: {:.3}", efe_contrib.novelty);
     println!();
 
@@ -193,16 +209,14 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // Now predict f(4) with LOWER confidence (system has learned humility)
-    let action_4 = WorldActionContext::new(
-        "predict_parity",
-        "Predict whether f(4) returns even",
-    ).with_risk_tier(RiskTier::Observation);
+    let action_4 = WorldActionContext::new("predict_parity", "Predict whether f(4) returns even")
+        .with_risk_tier(RiskTier::Observation);
 
     // System predicts f(4) is EVEN with only 60% confidence (humble!)
     let prediction_4 = magi.predict(
         "f(4) is even",
-        OutcomeCategory::Success,  // Predicting "is_even" = true
-        0.6,                        // 60% confidence (humble)
+        OutcomeCategory::Success, // Predicting "is_even" = true
+        0.6,                      // 60% confidence (humble)
         action_4.clone(),
     );
 
@@ -231,8 +245,14 @@ fn main() {
 
     let summary_after_success = magi.calibration_summary();
     println!("  Calibration After Success:");
-    println!("    Total predictions: {}", summary_after_success.total_predictions);
-    println!("    Overall Brier: {:.4} (lower is better)", summary_after_success.global_brier);
+    println!(
+        "    Total predictions: {}",
+        summary_after_success.total_predictions
+    );
+    println!(
+        "    Overall Brier: {:.4} (lower is better)",
+        summary_after_success.global_brier
+    );
     println!("    Mean ECE: {:.4}", summary_after_success.global_ece);
     println!("    Quality: {:?}", magi.loop_state().calibration_quality);
     println!();
@@ -258,7 +278,8 @@ fn main() {
         let action = WorldActionContext::new(
             "predict_parity",
             format!("Predict whether f({}) returns even", x),
-        ).with_risk_tier(RiskTier::Observation);
+        )
+        .with_risk_tier(RiskTier::Observation);
 
         // If we predict even, we predict Success
         // If we predict odd, we predict SafeFailure (not even)
@@ -287,10 +308,14 @@ fn main() {
         magi.resolve_prediction(&prediction.id, actual_outcome, 0.99);
 
         let symbol = if was_correct { "✅" } else { "❌" };
-        println!("  {} f({}) = {} | predicted {} | conf: {:.0}%",
-            symbol, x, ToyWorld::evaluate(x),
+        println!(
+            "  {} f({}) = {} | predicted {} | conf: {:.0}%",
+            symbol,
+            x,
+            ToyWorld::evaluate(x),
             if predict_even { "even" } else { "odd" },
-            confidence * 100.0);
+            confidence * 100.0
+        );
     }
 
     println!();
@@ -314,7 +339,10 @@ fn main() {
     println!("    Mode: {:?}", final_gate.mode);
     println!("    Confidence: {:.2}", final_gate.confidence);
     if let Some(factor) = final_gate.factors.first() {
-        println!("    Primary factor: {} ({})", factor.name, factor.description);
+        println!(
+            "    Primary factor: {} ({})",
+            factor.name, factor.description
+        );
     }
     println!("    Autonomous: {}", final_gate.mode.is_autonomous());
 
@@ -339,12 +367,11 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // Compute calibrated EFE for a new action
-    let new_action = WorldActionContext::new(
-        "predict_parity",
-        "Predict whether f(100) returns even",
-    ).with_risk_tier(RiskTier::Observation);
+    let new_action =
+        WorldActionContext::new("predict_parity", "Predict whether f(100) returns even")
+            .with_risk_tier(RiskTier::Observation);
 
-    let base_efe = -0.5;  // Hypothetical base EFE from Active Inference
+    let base_efe = -0.5; // Hypothetical base EFE from Active Inference
     let calibrated = magi.compute_calibrated_efe(&new_action, base_efe, &efe_weights);
 
     println!("  Evaluating action: predict f(100)");
@@ -355,10 +382,22 @@ fn main() {
     println!();
 
     println!("  EFE Contribution from Calibration:");
-    println!("    Pragmatic: {:.3}", calibrated.calibration_contribution.pragmatic);
-    println!("    Epistemic: {:.3}", calibrated.calibration_contribution.epistemic);
-    println!("    Novelty: {:.3}", calibrated.calibration_contribution.novelty);
-    println!("    Domain: {:?}", calibrated.calibration_contribution.domain);
+    println!(
+        "    Pragmatic: {:.3}",
+        calibrated.calibration_contribution.pragmatic
+    );
+    println!(
+        "    Epistemic: {:.3}",
+        calibrated.calibration_contribution.epistemic
+    );
+    println!(
+        "    Novelty: {:.3}",
+        calibrated.calibration_contribution.novelty
+    );
+    println!(
+        "    Domain: {:?}",
+        calibrated.calibration_contribution.domain
+    );
     println!();
 
     // =========================================================================
@@ -387,9 +426,15 @@ fn main() {
     println!();
     println!("  Final State:");
     println!("    Loop State: {:?}", magi.loop_state());
-    println!("    Calibration: {:?}", magi.loop_state().calibration_quality);
+    println!(
+        "    Calibration: {:?}",
+        magi.loop_state().calibration_quality
+    );
     println!("    Predictions Made: {}", final_summary.total_predictions);
-    println!("    Brier Score: {:.4} (0 = perfect)", final_summary.global_brier);
+    println!(
+        "    Brier Score: {:.4} (0 = perfect)",
+        final_summary.global_brier
+    );
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║                    THE LOOP IS CLOSED                            ║");

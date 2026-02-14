@@ -17,32 +17,27 @@
 //! cargo run --release --example prefrontal_integration
 //! ```
 
+use symthaea::brain::{AttentionBid, BridgeConfig, ConsciousnessBridge, PrefrontalCortexActor};
 use symthaea::consciousness::recursive_improvement::{
-    ConsciousnessWorldModel, WorldModelConfig,
-    ConsciousnessTransition, ConsciousnessAction, LatentConsciousnessState,
-    DreamMode, DreamConfig,
-};
-use symthaea::brain::{
-    PrefrontalCortexActor, AttentionBid, ConsciousnessBridge, BridgeConfig,
+    ConsciousnessAction, ConsciousnessTransition, ConsciousnessWorldModel, DreamConfig, DreamMode,
+    LatentConsciousnessState, WorldModelConfig,
 };
 
 /// Generate varied experience states
-fn generate_experience(phase: usize, i: usize) -> (LatentConsciousnessState, LatentConsciousnessState) {
+fn generate_experience(
+    phase: usize,
+    i: usize,
+) -> (LatentConsciousnessState, LatentConsciousnessState) {
     let base = (phase as f64 * 0.2 + i as f64 * 0.01).min(0.9);
     let noise = (i as f64 * 0.1).sin() * 0.05;
 
-    let from = LatentConsciousnessState::from_observables(
-        base + noise,
-        0.5 + noise,
-        0.5,
-        0.8
-    );
+    let from = LatentConsciousnessState::from_observables(base + noise, 0.5 + noise, 0.5, 0.8);
 
     let to = LatentConsciousnessState::from_observables(
         base + 0.1 + noise,
         0.5 + 0.05 + noise,
         0.55,
-        0.85
+        0.85,
     );
 
     (from, to)
@@ -165,8 +160,14 @@ fn main() {
 
     println!("  Dream cycles: {}", dream_results.stats.cycles_completed);
     println!("  Steps simulated: {}", dream_results.stats.steps_simulated);
-    println!("  Concepts from dreams: {}", dream_results.concepts_discovered.len());
-    println!("  Peak consciousness: {:.2}%", dream_results.stats.peak_consciousness * 100.0);
+    println!(
+        "  Concepts from dreams: {}",
+        dream_results.concepts_discovered.len()
+    );
+    println!(
+        "  Peak consciousness: {:.2}%",
+        dream_results.stats.peak_consciousness * 100.0
+    );
     println!();
 
     // Sync bridge after dreams
@@ -219,12 +220,7 @@ fn main() {
                 bid.content.clone()
             };
 
-            println!(
-                "  {:>5} | {:24} | {}",
-                cycle + 1,
-                bid.source,
-                content
-            );
+            println!("  {:>5} | {:24} | {}", cycle + 1, bid.source, content);
         }
     }
 
@@ -256,7 +252,12 @@ fn main() {
         } else {
             item.content.clone()
         };
-        println!("    [{}] {} (activation: {:.2})", i + 1, content, item.activation);
+        println!(
+            "    [{}] {} (activation: {:.2})",
+            i + 1,
+            content,
+            item.activation
+        );
     }
 
     println!();
@@ -287,14 +288,32 @@ fn main() {
 
     println!("  Metric                      | Value");
     println!("  ────────────────────────────┼─────────────────────────────────");
-    println!("  Total Experiences           | {}", PHASES * EXPERIENCES_PER_PHASE);
+    println!(
+        "  Total Experiences           | {}",
+        PHASES * EXPERIENCES_PER_PHASE
+    );
     println!("  Concepts Crystallized       | {}", total_concepts);
-    println!("  Concepts -> Bids Converted  | {}", bridge_stats.concepts_converted);
-    println!("  Bids Submitted to Prefrontal| {}", bridge_stats.bids_submitted);
-    println!("  Concept Bids Won Spotlight  | {}", bridge_stats.bids_won_spotlight);
+    println!(
+        "  Concepts -> Bids Converted  | {}",
+        bridge_stats.concepts_converted
+    );
+    println!(
+        "  Bids Submitted to Prefrontal| {}",
+        bridge_stats.bids_submitted
+    );
+    println!(
+        "  Concept Bids Won Spotlight  | {}",
+        bridge_stats.bids_won_spotlight
+    );
     println!("  Other Bids Won Spotlight    | {}", other_wins);
-    println!("  Average Bid Salience        | {:.3}", bridge_stats.avg_salience);
-    println!("  Peak Consciousness          | {:.2}%", bridge_stats.peak_consciousness * 100.0);
+    println!(
+        "  Average Bid Salience        | {:.3}",
+        bridge_stats.avg_salience
+    );
+    println!(
+        "  Peak Consciousness          | {:.2}%",
+        bridge_stats.peak_consciousness * 100.0
+    );
 
     println!();
 

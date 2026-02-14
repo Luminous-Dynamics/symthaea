@@ -311,6 +311,6 @@ mod tests {
     fn test_normalized_range() {
         let signal: Vec<f64> = (0..50).map(|x| (x as f64).sin()).collect();
         let pe = permutation_entropy_order3(&signal, 1);
-        assert!(pe >= 0.0 && pe <= 1.0, "PE should be in [0,1], got {}", pe);
+        assert!((0.0..=1.0).contains(&pe), "PE should be in [0,1], got {}", pe);
     }
 }

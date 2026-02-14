@@ -14,11 +14,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator,
-    unified_hv::ContinuousHV,
-    binary_hv::BinaryHV,
-    HDC_DIMENSION,
+    binary_hv::BinaryHV, consciousness_topology_generators::ConsciousnessTopology,
+    spectral_connectivity::ConnectivityCalculator, unified_hv::ContinuousHV, HDC_DIMENSION,
 };
 
 // =============================================================================
@@ -110,9 +107,7 @@ fn bench_hdc_vector_stress(c: &mut Criterion) {
             BenchmarkId::new("bind_chain", n_vectors),
             n_vectors,
             |b, &n| {
-                let vectors: Vec<_> = (0..n)
-                    .map(|i| BinaryHV::random(i as u64))
-                    .collect();
+                let vectors: Vec<_> = (0..n).map(|i| BinaryHV::random(i as u64)).collect();
 
                 b.iter(|| {
                     let mut result = vectors[0].clone();
@@ -181,17 +176,13 @@ fn bench_dimension_scaling(c: &mut Criterion) {
 
         if n_nodes <= 128 {
             // Limit for reasonable benchmark time
-            group.bench_with_input(
-                BenchmarkId::new("hypercube_dim", dim),
-                &dim,
-                |b, &d| {
-                    b.iter(|| {
-                        let topo = ConsciousnessTopology::hypercube(d, HDC_DIMENSION, 42);
-                        let result = calc.compute(&topo.node_representations);
-                        black_box(result)
-                    })
-                },
-            );
+            group.bench_with_input(BenchmarkId::new("hypercube_dim", dim), &dim, |b, &d| {
+                b.iter(|| {
+                    let topo = ConsciousnessTopology::hypercube(d, HDC_DIMENSION, 42);
+                    let result = calc.compute(&topo.node_representations);
+                    black_box(result)
+                })
+            });
         }
     }
 
@@ -211,14 +202,38 @@ fn bench_all_topologies(c: &mut Criterion) {
 
     // Test multiple topology types
     let topologies = vec![
-        ("random", ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, 42)),
-        ("star", ConsciousnessTopology::star(n_nodes, HDC_DIMENSION, 42)),
-        ("ring", ConsciousnessTopology::ring(n_nodes, HDC_DIMENSION, 42)),
-        ("line", ConsciousnessTopology::line(n_nodes, HDC_DIMENSION, 42)),
-        ("dense_network", ConsciousnessTopology::dense_network(n_nodes, HDC_DIMENSION, None, 42)),
-        ("torus", ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, 42)),
-        ("hypercube_3d", ConsciousnessTopology::hypercube(3, HDC_DIMENSION, 42)),
-        ("hypercube_4d", ConsciousnessTopology::hypercube(4, HDC_DIMENSION, 42)),
+        (
+            "random",
+            ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, 42),
+        ),
+        (
+            "star",
+            ConsciousnessTopology::star(n_nodes, HDC_DIMENSION, 42),
+        ),
+        (
+            "ring",
+            ConsciousnessTopology::ring(n_nodes, HDC_DIMENSION, 42),
+        ),
+        (
+            "line",
+            ConsciousnessTopology::line(n_nodes, HDC_DIMENSION, 42),
+        ),
+        (
+            "dense_network",
+            ConsciousnessTopology::dense_network(n_nodes, HDC_DIMENSION, None, 42),
+        ),
+        (
+            "torus",
+            ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, 42),
+        ),
+        (
+            "hypercube_3d",
+            ConsciousnessTopology::hypercube(3, HDC_DIMENSION, 42),
+        ),
+        (
+            "hypercube_4d",
+            ConsciousnessTopology::hypercube(4, HDC_DIMENSION, 42),
+        ),
     ];
 
     for (name, topo) in topologies {

@@ -24,9 +24,9 @@ use std::path::Path;
 
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
+    semantic_encoder::{CharNgramEncoder, MoralSemanticEncoder, SemanticEncoder},
     spectral_connectivity::ConnectivityCalculator,
     unified_hv::ContinuousHV,
-    semantic_encoder::{SemanticEncoder, MoralSemanticEncoder, CharNgramEncoder},
     HDC_DIMENSION,
 };
 
@@ -76,8 +76,8 @@ impl EthicsCategory {
 #[derive(Debug, Clone)]
 struct EthicsScenario {
     text: String,
-    label: i32,  // 1 = ethical, 0 = unethical (or vice versa depending on category)
-    #[allow(dead_code)]  // Category is stored for potential future analysis
+    label: i32, // 1 = ethical, 0 = unethical (or vice versa depending on category)
+    #[allow(dead_code)] // Category is stored for potential future analysis
     category: EthicsCategory,
 }
 
@@ -194,7 +194,9 @@ fn parse_csv_line(line: &str, category: EthicsCategory) -> Result<(i32, String),
             if fields.len() < 2 {
                 return Err(format!("Invalid line format (need 2+ fields): {}", line));
             }
-            let label: i32 = fields[0].parse().map_err(|_| format!("Invalid label: '{}'", fields[0]))?;
+            let label: i32 = fields[0]
+                .parse()
+                .map_err(|_| format!("Invalid label: '{}'", fields[0]))?;
             let text = fields[1].trim_matches('"').to_string();
             Ok((label, text))
         }
@@ -212,9 +214,14 @@ fn parse_csv_line(line: &str, category: EthicsCategory) -> Result<(i32, String),
             // Format: label,input,is_short,edited
             // Text may contain commas, so use proper CSV parsing
             if fields.len() < 2 {
-                return Err(format!("Invalid commonsense format (need 2+ fields): {}", line));
+                return Err(format!(
+                    "Invalid commonsense format (need 2+ fields): {}",
+                    line
+                ));
             }
-            let label: i32 = fields[0].parse().map_err(|_| format!("Invalid label: '{}'", fields[0]))?;
+            let label: i32 = fields[0]
+                .parse()
+                .map_err(|_| format!("Invalid label: '{}'", fields[0]))?;
             let text = fields[1].trim_matches('"').to_string();
             Ok((label, text))
         }
@@ -334,14 +341,38 @@ fn main() {
 
     // Define topologies to test (subset of 19 for speed)
     let topologies: Vec<(&str, Box<dyn Fn() -> ConsciousnessTopology>)> = vec![
-        ("Hypercube 4D", Box::new(|| ConsciousnessTopology::hypercube(4, HDC_DIMENSION, seed))),
-        ("Hypercube 3D", Box::new(|| ConsciousnessTopology::hypercube(3, HDC_DIMENSION, seed))),
-        ("Ring", Box::new(|| ConsciousnessTopology::ring(n_nodes, HDC_DIMENSION, seed))),
-        ("Torus", Box::new(|| ConsciousnessTopology::torus_square(3, HDC_DIMENSION, seed))),
-        ("Star", Box::new(|| ConsciousnessTopology::star(n_nodes, HDC_DIMENSION, seed))),
-        ("Random", Box::new(|| ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, seed))),
-        ("Dense", Box::new(|| ConsciousnessTopology::dense_network(n_nodes, HDC_DIMENSION, None, seed))),
-        ("Modular", Box::new(|| ConsciousnessTopology::modular(n_nodes, HDC_DIMENSION, 3, seed))),
+        (
+            "Hypercube 4D",
+            Box::new(|| ConsciousnessTopology::hypercube(4, HDC_DIMENSION, seed)),
+        ),
+        (
+            "Hypercube 3D",
+            Box::new(|| ConsciousnessTopology::hypercube(3, HDC_DIMENSION, seed)),
+        ),
+        (
+            "Ring",
+            Box::new(|| ConsciousnessTopology::ring(n_nodes, HDC_DIMENSION, seed)),
+        ),
+        (
+            "Torus",
+            Box::new(|| ConsciousnessTopology::torus_square(3, HDC_DIMENSION, seed)),
+        ),
+        (
+            "Star",
+            Box::new(|| ConsciousnessTopology::star(n_nodes, HDC_DIMENSION, seed)),
+        ),
+        (
+            "Random",
+            Box::new(|| ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, seed)),
+        ),
+        (
+            "Dense",
+            Box::new(|| ConsciousnessTopology::dense_network(n_nodes, HDC_DIMENSION, None, seed)),
+        ),
+        (
+            "Modular",
+            Box::new(|| ConsciousnessTopology::modular(n_nodes, HDC_DIMENSION, 3, seed)),
+        ),
     ];
 
     // Measure Φ for each topology
@@ -381,7 +412,11 @@ fn main() {
     for category in EthicsCategory::all() {
         match load_ethics_csv(category, "test") {
             Ok(scenarios) => {
-                println!("  ✅ {} - {} scenarios loaded", category.name(), scenarios.len());
+                println!(
+                    "  ✅ {} - {} scenarios loaded",
+                    category.name(),
+                    scenarios.len()
+                );
                 all_scenarios.insert(category, scenarios);
             }
             Err(e) => {
@@ -400,12 +435,21 @@ fn main() {
     let encoding_methods = [EncoderMethod::CharNgram, EncoderMethod::MoralSemantic];
 
     for method in &encoding_methods {
-        println!("\n🧠 Evaluating topology-ethics correlation with {} encoder...\n", method.name());
+        println!(
+            "\n🧠 Evaluating topology-ethics correlation with {} encoder...\n",
+            method.name()
+        );
 
         // Results table header
-        println!("╔════════════════╦════════╦══════════════════════════════════════════════════════╗");
-        println!("║ Topology       ║   Φ    ║  Justice   Deont.   Virtue   Util.   Common  │ Mean ║");
-        println!("╠════════════════╬════════╬══════════════════════════════════════════════════════╣");
+        println!(
+            "╔════════════════╦════════╦══════════════════════════════════════════════════════╗"
+        );
+        println!(
+            "║ Topology       ║   Φ    ║  Justice   Deont.   Virtue   Util.   Common  │ Mean ║"
+        );
+        println!(
+            "╠════════════════╬════════╬══════════════════════════════════════════════════════╣"
+        );
 
         let mut results: Vec<(String, f64, Vec<f32>, f32)> = Vec::new();
 
@@ -439,7 +483,8 @@ fn main() {
 
             println!(
                 "║ {:14} ║ {:.4} ║ {} {} {} {} {} │{:5.1}%║",
-                name, phi,
+                name,
+                phi,
                 acc_strs.get(0).unwrap_or(&"  N/A  ".to_string()),
                 acc_strs.get(1).unwrap_or(&"  N/A  ".to_string()),
                 acc_strs.get(2).unwrap_or(&"  N/A  ".to_string()),
@@ -451,7 +496,9 @@ fn main() {
             results.push((name.clone(), *phi, accuracies, mean_acc));
         }
 
-        println!("╚════════════════╩════════╩══════════════════════════════════════════════════════╝\n");
+        println!(
+            "╚════════════════╩════════╩══════════════════════════════════════════════════════╝\n"
+        );
 
         // Compute correlation
         if results.len() >= 3 {
@@ -462,7 +509,10 @@ fn main() {
 
             println!("📈 CORRELATION ANALYSIS ({})", method.name());
             println!("═══════════════════════════════════════════════════════════════════");
-            println!("  Pearson correlation (Φ vs Ethics Accuracy): r = {:.4}", correlation);
+            println!(
+                "  Pearson correlation (Φ vs Ethics Accuracy): r = {:.4}",
+                correlation
+            );
             println!();
 
             if correlation > 0.5 {
@@ -477,7 +527,9 @@ fn main() {
                 if matches!(method, EncoderMethod::CharNgram) {
                     println!("     The character n-gram method may be too simple to reveal the relationship.");
                 } else {
-                    println!("     The correlation may be inherently weak, or require more samples.");
+                    println!(
+                        "     The correlation may be inherently weak, or require more samples."
+                    );
                 }
             }
 

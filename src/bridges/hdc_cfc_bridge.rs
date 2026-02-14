@@ -1161,7 +1161,7 @@ mod tests {
 
         // Check values are bounded (tanh output)
         for &v in &encoded {
-            assert!(v >= -1.0 && v <= 1.0, "Encoded value {} out of bounds", v);
+            assert!((-1.0..=1.0).contains(&v), "Encoded value {} out of bounds", v);
         }
     }
 

@@ -11,10 +11,8 @@
 //!
 //! Run with: cargo run --example gwt_cincinnati_demo
 
-use symthaea::hdc::gwt_cincinnati_integration::{
-    CincinnatiGwtIntegrator, CincinnatiGwtConfig
-};
 use symthaea::hdc::global_workspace::WorkspaceConfig;
+use symthaea::hdc::gwt_cincinnati_integration::{CincinnatiGwtConfig, CincinnatiGwtIntegrator};
 
 // =============================================================================
 // PATTERN GENERATORS
@@ -42,9 +40,9 @@ fn surprise_sequence(length: usize, surprise_at: usize) -> Vec<bool> {
     (0..length)
         .map(|i| {
             if i < surprise_at {
-                i % 2 == 0  // Regular alternating
+                i % 2 == 0 // Regular alternating
             } else {
-                true  // Sudden all-true (surprise!)
+                true // Sudden all-true (surprise!)
             }
         })
         .collect()
@@ -65,13 +63,17 @@ fn analyze_sequence(name: &str, sequence: &[bool], config: CincinnatiGwtConfig) 
 
     println!("\nResults:");
     println!("  Prediction Accuracy: {:.1}%", result.accuracy * 100.0);
-    println!("  Conscious Access:    {:.1}% of steps", result.conscious_ratio * 100.0);
+    println!(
+        "  Conscious Access:    {:.1}% of steps",
+        result.conscious_ratio * 100.0
+    );
     println!("  Average Salience:    {:.3}", result.avg_salience);
     println!("  Total Budding:       {} events", result.total_budding);
     println!("  Final Node Count:    {}", result.final_node_count);
 
     // Find moments of conscious access
-    let conscious_moments: Vec<usize> = result.results
+    let conscious_moments: Vec<usize> = result
+        .results
         .iter()
         .enumerate()
         .filter(|(_, r)| r.is_conscious)
@@ -104,25 +106,32 @@ fn compare_salience_profiles() {
     let patterns = vec![
         ("Periodic (p=4)", periodic_sequence(4, 100)),
         ("Periodic (p=8)", periodic_sequence(8, 100)),
-        ("Logistic (r=3.2)", logistic_sequence(3.2, 100)),  // Periodic-ish
-        ("Logistic (r=3.8)", logistic_sequence(3.8, 100)),  // Chaotic
+        ("Logistic (r=3.2)", logistic_sequence(3.2, 100)), // Periodic-ish
+        ("Logistic (r=3.8)", logistic_sequence(3.8, 100)), // Chaotic
         ("Surprise (at 50)", surprise_sequence(100, 50)),
     ];
 
-    println!("\n{:<20} | {:>10} | {:>10} | {:>10} | {:>8}",
-             "Pattern", "Accuracy", "Conscious", "Salience", "Budding");
-    println!("{:-<20}-+-{:-^10}-+-{:-^10}-+-{:-^10}-+-{:-^8}", "", "", "", "", "");
+    println!(
+        "\n{:<20} | {:>10} | {:>10} | {:>10} | {:>8}",
+        "Pattern", "Accuracy", "Conscious", "Salience", "Budding"
+    );
+    println!(
+        "{:-<20}-+-{:-^10}-+-{:-^10}-+-{:-^10}-+-{:-^8}",
+        "", "", "", "", ""
+    );
 
     for (name, sequence) in patterns {
         let mut integrator = CincinnatiGwtIntegrator::new(config.clone());
         let result = integrator.process_sequence(&sequence);
 
-        println!("{:<20} | {:>9.1}% | {:>9.1}% | {:>10.3} | {:>8}",
-                 name,
-                 result.accuracy * 100.0,
-                 result.conscious_ratio * 100.0,
-                 result.avg_salience,
-                 result.total_budding);
+        println!(
+            "{:<20} | {:>9.1}% | {:>9.1}% | {:>10.3} | {:>8}",
+            name,
+            result.accuracy * 100.0,
+            result.conscious_ratio * 100.0,
+            result.avg_salience,
+            result.total_budding
+        );
     }
 
     println!("\nKey Insight: Chaotic sequences have higher salience due to prediction errors!");
@@ -134,14 +143,14 @@ fn multi_stream_consciousness() {
     println!("Simulating multiple temporal streams competing for conscious access...\n");
 
     // Three different pattern streams
-    let stream_a = periodic_sequence(4, 50);    // Very predictable
-    let stream_b = logistic_sequence(3.8, 50);  // Chaotic (interesting)
-    let stream_c = surprise_sequence(50, 25);   // Has surprise
+    let stream_a = periodic_sequence(4, 50); // Very predictable
+    let stream_b = logistic_sequence(3.8, 50); // Chaotic (interesting)
+    let stream_c = surprise_sequence(50, 25); // Has surprise
 
     let config = CincinnatiGwtConfig {
         workspace_config: WorkspaceConfig {
             entry_threshold: 0.45,
-            max_capacity: 2,  // Limited capacity!
+            max_capacity: 2, // Limited capacity!
             ..Default::default()
         },
         ..Default::default()
@@ -159,26 +168,46 @@ fn multi_stream_consciousness() {
     for i in 0..50 {
         // Process one from each stream
         let result_a = integrator.process_observation(stream_a[i]);
-        if result_a.is_conscious { stream_a_conscious += 1; }
+        if result_a.is_conscious {
+            stream_a_conscious += 1;
+        }
 
         let result_b = integrator.process_observation(stream_b[i]);
-        if result_b.is_conscious { stream_b_conscious += 1; }
+        if result_b.is_conscious {
+            stream_b_conscious += 1;
+        }
 
         let result_c = integrator.process_observation(stream_c[i]);
-        if result_c.is_conscious { stream_c_conscious += 1; }
+        if result_c.is_conscious {
+            stream_c_conscious += 1;
+        }
 
         // Report interesting moments
         if i == 25 {
             println!("  At step 25 (surprise moment in C):");
-            println!("    A salience: {:.3}, B salience: {:.3}, C salience: {:.3}",
-                     result_a.salience, result_b.salience, result_c.salience);
+            println!(
+                "    A salience: {:.3}, B salience: {:.3}, C salience: {:.3}",
+                result_a.salience, result_b.salience, result_c.salience
+            );
         }
     }
 
     println!("\nConscious access frequency:");
-    println!("  Stream A (periodic):  {} times ({:.1}%)", stream_a_conscious, stream_a_conscious as f64 / 50.0 * 100.0);
-    println!("  Stream B (chaotic):   {} times ({:.1}%)", stream_b_conscious, stream_b_conscious as f64 / 50.0 * 100.0);
-    println!("  Stream C (surprise):  {} times ({:.1}%)", stream_c_conscious, stream_c_conscious as f64 / 50.0 * 100.0);
+    println!(
+        "  Stream A (periodic):  {} times ({:.1}%)",
+        stream_a_conscious,
+        stream_a_conscious as f64 / 50.0 * 100.0
+    );
+    println!(
+        "  Stream B (chaotic):   {} times ({:.1}%)",
+        stream_b_conscious,
+        stream_b_conscious as f64 / 50.0 * 100.0
+    );
+    println!(
+        "  Stream C (surprise):  {} times ({:.1}%)",
+        stream_c_conscious,
+        stream_c_conscious as f64 / 50.0 * 100.0
+    );
 
     let stats = integrator.stats();
     println!("\nWorkspace Statistics:");
@@ -195,8 +224,8 @@ fn budding_attention_analysis() {
 
     // Config with HIGH budding attention boost
     let high_boost_config = CincinnatiGwtConfig {
-        budding_attention_boost: 0.5,  // Budding strongly boosts attention
-        budding_threshold: 0.3,         // Lower threshold → more budding
+        budding_attention_boost: 0.5, // Budding strongly boosts attention
+        budding_threshold: 0.3,       // Lower threshold → more budding
         workspace_config: WorkspaceConfig {
             entry_threshold: 0.5,
             ..Default::default()
@@ -206,7 +235,7 @@ fn budding_attention_analysis() {
 
     // Config with LOW budding attention boost
     let low_boost_config = CincinnatiGwtConfig {
-        budding_attention_boost: 0.05,  // Budding barely affects attention
+        budding_attention_boost: 0.05, // Budding barely affects attention
         budding_threshold: 0.3,
         workspace_config: WorkspaceConfig {
             entry_threshold: 0.5,
@@ -228,10 +257,24 @@ fn budding_attention_analysis() {
 
     println!("{:<25} | {:>15} | {:>15}", "", "High Boost", "Low Boost");
     println!("{:-<25}-+-{:-^15}-+-{:-^15}", "", "", "");
-    println!("{:<25} | {:>14.1}% | {:>14.1}%", "Conscious Access", high_result.conscious_ratio * 100.0, low_result.conscious_ratio * 100.0);
-    println!("{:<25} | {:>15.3} | {:>15.3}", "Average Salience", high_result.avg_salience, low_result.avg_salience);
-    println!("{:<25} | {:>15} | {:>15}", "Total Budding", high_result.total_budding, low_result.total_budding);
-    println!("{:<25} | {:>15} | {:>15}", "Final Nodes", high_result.final_node_count, low_result.final_node_count);
+    println!(
+        "{:<25} | {:>14.1}% | {:>14.1}%",
+        "Conscious Access",
+        high_result.conscious_ratio * 100.0,
+        low_result.conscious_ratio * 100.0
+    );
+    println!(
+        "{:<25} | {:>15.3} | {:>15.3}",
+        "Average Salience", high_result.avg_salience, low_result.avg_salience
+    );
+    println!(
+        "{:<25} | {:>15} | {:>15}",
+        "Total Budding", high_result.total_budding, low_result.total_budding
+    );
+    println!(
+        "{:<25} | {:>15} | {:>15}",
+        "Final Nodes", high_result.final_node_count, low_result.final_node_count
+    );
 
     println!("\nConclusion: Higher budding-attention coupling → more conscious access");
 }
@@ -241,15 +284,17 @@ fn budding_attention_analysis() {
 // =============================================================================
 
 fn main() {
-    println!("{}",
-r#"
+    println!(
+        "{}",
+        r#"
 ╔══════════════════════════════════════════════════════════════════════╗
 ║      GLOBAL WORKSPACE + CINCINNATI-LTC INTEGRATION DEMO              ║
 ║                                                                      ║
 ║  Demonstrating how temporal pattern recognition integrates with      ║
 ║  the Global Workspace consciousness pipeline (Baars, 1988)           ║
 ╚══════════════════════════════════════════════════════════════════════╝
-"#);
+"#
+    );
 
     // 1. Basic sequence analysis
     let config = CincinnatiGwtConfig {
@@ -261,9 +306,21 @@ r#"
         ..Default::default()
     };
 
-    analyze_sequence("Periodic Pattern (period=4)", &periodic_sequence(4, 100), config.clone());
-    analyze_sequence("Chaotic Pattern (r=3.8)", &logistic_sequence(3.8, 100), config.clone());
-    analyze_sequence("Surprise Pattern", &surprise_sequence(100, 50), config.clone());
+    analyze_sequence(
+        "Periodic Pattern (period=4)",
+        &periodic_sequence(4, 100),
+        config.clone(),
+    );
+    analyze_sequence(
+        "Chaotic Pattern (r=3.8)",
+        &logistic_sequence(3.8, 100),
+        config.clone(),
+    );
+    analyze_sequence(
+        "Surprise Pattern",
+        &surprise_sequence(100, 50),
+        config.clone(),
+    );
 
     // 2. Salience comparison
     compare_salience_profiles();
@@ -276,7 +333,8 @@ r#"
 
     // Summary
     println!("\n{:=^70}", " Summary ");
-    println!(r#"
+    println!(
+        r#"
 Key Findings:
 
 1. SURPRISING EVENTS GAIN CONSCIOUS ACCESS
@@ -297,7 +355,8 @@ Key Findings:
 
 This demonstrates how Cincinnati-LTC's temporal pattern recognition
 integrates with Global Workspace Theory's model of conscious access.
-"#);
+"#
+    );
 
     println!("╔══════════════════════════════════════════════════════════════════════╗");
     println!("║                     INTEGRATION DEMO COMPLETE                        ║");

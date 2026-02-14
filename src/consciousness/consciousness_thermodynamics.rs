@@ -2000,7 +2000,7 @@ mod tests {
         let mut dims = [0.8, 0.7, 0.6, 0.5, 0.6, 0.5, 0.5]; // High initial state
 
         // Need initial state for free energy calculation
-        analyzer.analyze(dims.clone());
+        analyzer.analyze(dims);
 
         let extracted = analyzer.extract_work(&mut dims, 0.2);
 

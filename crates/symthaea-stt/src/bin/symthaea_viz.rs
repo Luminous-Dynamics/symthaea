@@ -18,10 +18,7 @@ use console::style;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use symthaea_stt::{
-    AudioFrontend, AudioConfig,
-    TrainedPrototypes, HV16,
-};
+use symthaea_stt::{AudioConfig, AudioFrontend, TrainedPrototypes, HV16};
 
 #[derive(Parser)]
 #[command(name = "symthaea-viz")]
@@ -113,7 +110,12 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Spectrogram { input, output, width, height } => {
+        Commands::Spectrogram {
+            input,
+            output,
+            width,
+            height,
+        } => {
             if let Err(e) = visualize_spectrogram(&input, &output, width, height) {
                 eprintln!("Error: {}", e);
                 std::process::exit(1);
@@ -125,13 +127,22 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Commands::Similarity { input, output, max_items } => {
+        Commands::Similarity {
+            input,
+            output,
+            max_items,
+        } => {
             if let Err(e) = visualize_similarity(&input, &output, max_items) {
                 eprintln!("Error: {}", e);
                 std::process::exit(1);
             }
         }
-        Commands::Waveform { input, output, width, height } => {
+        Commands::Waveform {
+            input,
+            output,
+            width,
+            height,
+        } => {
             if let Err(e) = visualize_waveform(&input, &output, width, height) {
                 eprintln!("Error: {}", e);
                 std::process::exit(1);
@@ -159,8 +170,8 @@ fn visualize_spectrogram(
     println!("{}Generating spectrogram...", style("").bold());
 
     // Load audio
-    let (audio, _sample_rate) = AudioFrontend::load_audio(input)
-        .map_err(|e| format!("Failed to load audio: {}", e))?;
+    let (audio, _sample_rate) =
+        AudioFrontend::load_audio(input).map_err(|e| format!("Failed to load audio: {}", e))?;
 
     // Extract features
     let mut frontend = AudioFrontend::new(AudioConfig::default());
@@ -170,9 +181,7 @@ fn visualize_spectrogram(
         return Err("No features extracted".to_string());
     }
 
-    let ext = output.extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("svg");
+    let ext = output.extension().and_then(|e| e.to_str()).unwrap_or("svg");
 
     match ext {
         "svg" => write_spectrogram_svg(&features, output, width, height),
@@ -192,7 +201,9 @@ fn write_spectrogram_svg(
     let num_mels = features.first().map(|f| f.len()).unwrap_or(0);
 
     // Normalize features
-    let (min_val, max_val) = features.iter().flat_map(|f| f.iter())
+    let (min_val, max_val) = features
+        .iter()
+        .flat_map(|f| f.iter())
         .fold((f32::INFINITY, f32::NEG_INFINITY), |(min, max), &v| {
             (min.min(v), max.max(v))
         });
@@ -215,11 +226,15 @@ fn write_spectrogram_svg(
             let color = viridis_color(normalized);
 
             let x = t as f32 * cell_w;
-            let y = (num_mels - 1 - f) as f32 * cell_h;  // Flip vertically
+            let y = (num_mels - 1 - f) as f32 * cell_h; // Flip vertically
 
             svg.push_str(&format!(
                 r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}"/>"#,
-                x, y, cell_w + 0.5, cell_h + 0.5, color
+                x,
+                y,
+                cell_w + 0.5,
+                cell_h + 0.5,
+                color
             ));
         }
     }
@@ -231,13 +246,13 @@ fn write_spectrogram_svg(
     ));
     svg.push_str(&format!(
         r#"<text x="{}" y="{}" fill="white" font-size="12">Time</text>"#,
-        width / 2, height - 5
+        width / 2,
+        height - 5
     ));
 
     svg.push_str("</svg>");
 
-    let mut file = File::create(output)
-        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file = File::create(output).map_err(|e| format!("Failed to create file: {}", e))?;
     file.write_all(svg.as_bytes())
         .map_err(|e| format!("Failed to write: {}", e))?;
 
@@ -259,7 +274,9 @@ fn write_spectrogram_ascii(
     let step_f = (num_mels as f32 / height as f32).max(1.0);
 
     // Normalize
-    let (min_val, max_val) = features.iter().flat_map(|f| f.iter())
+    let (min_val, max_val) = features
+        .iter()
+        .flat_map(|f| f.iter())
         .fold((f32::INFINITY, f32::NEG_INFINITY), |(min, max), &v| {
             (min.min(v), max.max(v))
         });
@@ -286,8 +303,7 @@ fn write_spectrogram_ascii(
         output_str.push('\n');
     }
 
-    let mut file = File::create(output)
-        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file = File::create(output).map_err(|e| format!("Failed to create file: {}", e))?;
     file.write_all(output_str.as_bytes())
         .map_err(|e| format!("Failed to write: {}", e))?;
 
@@ -307,7 +323,9 @@ fn write_spectrogram_html(
     let num_frames = features.len();
     let num_mels = features.first().map(|f| f.len()).unwrap_or(0);
 
-    let (min_val, max_val) = features.iter().flat_map(|f| f.iter())
+    let (min_val, max_val) = features
+        .iter()
+        .flat_map(|f| f.iter())
         .fold((f32::INFINITY, f32::NEG_INFINITY), |(min, max), &v| {
             (min.min(v), max.max(v))
         });
@@ -330,13 +348,18 @@ fn write_spectrogram_html(
             let y = (num_mels - 1 - f) as f32 * cell_h;
             svg.push_str(&format!(
                 r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" fill="{}"/>"#,
-                x, y, cell_w + 0.5, cell_h + 0.5, color
+                x,
+                y,
+                cell_w + 0.5,
+                cell_h + 0.5,
+                color
             ));
         }
     }
     svg.push_str("</svg>");
 
-    let html = format!(r#"<!DOCTYPE html>
+    let html = format!(
+        r#"<!DOCTYPE html>
 <html>
 <head>
     <title>Spectrogram - Symthaea</title>
@@ -356,10 +379,14 @@ fn write_spectrogram_html(
         <p>Frames: {} | Mel bins: {} | Duration: {:.2}s</p>
     </div>
 </body>
-</html>"#, svg, num_frames, num_mels, num_frames as f32 * 0.01);
+</html>"#,
+        svg,
+        num_frames,
+        num_mels,
+        num_frames as f32 * 0.01
+    );
 
-    let mut file = File::create(output)
-        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file = File::create(output).map_err(|e| format!("Failed to create file: {}", e))?;
     file.write_all(html.as_bytes())
         .map_err(|e| format!("Failed to write: {}", e))?;
 
@@ -374,34 +401,39 @@ fn write_spectrogram_html(
 fn visualize_timeline(input: &Path, output: &Path) -> Result<(), String> {
     println!("{}Generating timeline...", style("").bold());
 
-    let content = std::fs::read_to_string(input)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+    let content =
+        std::fs::read_to_string(input).map_err(|e| format!("Failed to read file: {}", e))?;
 
-    let json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let json: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
-    let segments = json.get("segments")
+    let segments = json
+        .get("segments")
         .and_then(|s| s.as_array())
         .ok_or("No segments found")?;
 
-    let units = json.get("units")
+    let units = json
+        .get("units")
         .and_then(|u| u.as_array())
         .ok_or("No units found")?;
 
     // Generate colors for units
-    let unit_ids: Vec<String> = units.iter()
+    let unit_ids: Vec<String> = units
+        .iter()
         .filter_map(|u| u.get("id").and_then(|v| v.as_str()))
         .map(|s| s.to_string())
         .collect();
 
-    let mut unit_colors: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut unit_colors: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
     for (i, id) in unit_ids.iter().enumerate() {
-        let hue = (i * 137) % 360;  // Golden angle for distinct colors
+        let hue = (i * 137) % 360; // Golden angle for distinct colors
         unit_colors.insert(id.clone(), format!("hsl({}, 70%, 50%)", hue));
     }
 
     // Find time range
-    let max_time = segments.iter()
+    let max_time = segments
+        .iter()
         .filter_map(|s| s.get("end").and_then(|v| v.as_f64()))
         .fold(0.0f64, |a, b| a.max(b));
 
@@ -443,7 +475,9 @@ fn visualize_timeline(input: &Path, output: &Path) -> Result<(), String> {
     // Time axis
     svg.push_str(&format!(
         r##"<line x1="50" y1="{}" x2="{}" y2="{}" stroke="#666"/>"##,
-        timeline_y + timeline_h + 10, width - 50, timeline_y + timeline_h + 10
+        timeline_y + timeline_h + 10,
+        width - 50,
+        timeline_y + timeline_h + 10
     ));
 
     // Time labels
@@ -499,8 +533,7 @@ fn visualize_timeline(input: &Path, output: &Path) -> Result<(), String> {
         unit_ids.len()
     );
 
-    let mut file = File::create(output)
-        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file = File::create(output).map_err(|e| format!("Failed to create file: {}", e))?;
     file.write_all(html.as_bytes())
         .map_err(|e| format!("Failed to write: {}", e))?;
 
@@ -512,20 +545,13 @@ fn visualize_timeline(input: &Path, output: &Path) -> Result<(), String> {
 // SIMILARITY MATRIX
 // ============================================================================
 
-fn visualize_similarity(
-    input: &Path,
-    output: &Path,
-    max_items: usize,
-) -> Result<(), String> {
+fn visualize_similarity(input: &Path, output: &Path, max_items: usize) -> Result<(), String> {
     println!("{}Generating similarity matrix...", style("").bold());
 
-    let prototypes = TrainedPrototypes::load(input)
-        .map_err(|e| format!("Failed to load prototypes: {}", e))?;
+    let prototypes =
+        TrainedPrototypes::load(input).map_err(|e| format!("Failed to load prototypes: {}", e))?;
 
-    let items: Vec<(String, HV16)> = prototypes.as_pairs()
-        .into_iter()
-        .take(max_items)
-        .collect();
+    let items: Vec<(String, HV16)> = prototypes.as_pairs().into_iter().take(max_items).collect();
 
     if items.is_empty() {
         return Err("No prototypes found".to_string());
@@ -548,7 +574,9 @@ fn visualize_similarity(
         // Row label
         svg.push_str(&format!(
             r#"<text x="{}" y="{}" fill="white" font-size="10" text-anchor="end">{}</text>"#,
-            margin - 5, margin + i * cell_size + cell_size / 2 + 3, name_i
+            margin - 5,
+            margin + i * cell_size + cell_size / 2 + 3,
+            name_i
         ));
 
         // Column label
@@ -568,7 +596,11 @@ fn visualize_similarity(
 
             svg.push_str(&format!(
                 r##"<rect x="{}" y="{}" width="{}" height="{}" fill="{}" stroke="#333"/>"##,
-                x, y, cell_size - 1, cell_size - 1, color
+                x,
+                y,
+                cell_size - 1,
+                cell_size - 1,
+                color
             ));
 
             // Show value on diagonal
@@ -586,7 +618,8 @@ fn visualize_similarity(
     let ext = output.extension().and_then(|e| e.to_str()).unwrap_or("svg");
 
     if ext == "html" {
-        let html = format!(r#"<!DOCTYPE html>
+        let html = format!(
+            r#"<!DOCTYPE html>
 <html>
 <head>
     <title>Similarity Matrix - Symthaea</title>
@@ -600,15 +633,15 @@ fn visualize_similarity(
     {}
     <p>Showing {} prototypes</p>
 </body>
-</html>"#, svg, n);
+</html>"#,
+            svg, n
+        );
 
-        let mut file = File::create(output)
-            .map_err(|e| format!("Failed to create file: {}", e))?;
+        let mut file = File::create(output).map_err(|e| format!("Failed to create file: {}", e))?;
         file.write_all(html.as_bytes())
             .map_err(|e| format!("Failed to write: {}", e))?;
     } else {
-        let mut file = File::create(output)
-            .map_err(|e| format!("Failed to create file: {}", e))?;
+        let mut file = File::create(output).map_err(|e| format!("Failed to create file: {}", e))?;
         file.write_all(svg.as_bytes())
             .map_err(|e| format!("Failed to write: {}", e))?;
     }
@@ -629,8 +662,8 @@ fn visualize_waveform(
 ) -> Result<(), String> {
     println!("{}Generating waveform...", style("").bold());
 
-    let (audio, sample_rate) = AudioFrontend::load_audio(input)
-        .map_err(|e| format!("Failed to load audio: {}", e))?;
+    let (audio, sample_rate) =
+        AudioFrontend::load_audio(input).map_err(|e| format!("Failed to load audio: {}", e))?;
 
     let duration = audio.len() as f32 / sample_rate as f32;
 
@@ -675,7 +708,8 @@ fn visualize_waveform(
 
     svg.push_str("</svg>");
 
-    let html = format!(r#"<!DOCTYPE html>
+    let html = format!(
+        r#"<!DOCTYPE html>
 <html>
 <head>
     <title>Waveform - Symthaea</title>
@@ -689,10 +723,14 @@ fn visualize_waveform(
     {}
     <p>Duration: {:.2}s | Sample rate: {} Hz | Samples: {}</p>
 </body>
-</html>"#, svg, duration, sample_rate, audio.len());
+</html>"#,
+        svg,
+        duration,
+        sample_rate,
+        audio.len()
+    );
 
-    let mut file = File::create(output)
-        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file = File::create(output).map_err(|e| format!("Failed to create file: {}", e))?;
     file.write_all(html.as_bytes())
         .map_err(|e| format!("Failed to write: {}", e))?;
 
@@ -707,13 +745,14 @@ fn visualize_waveform(
 fn generate_report(input: &Path, output: &Path) -> Result<(), String> {
     println!("{}Generating evaluation report...", style("").bold());
 
-    let content = std::fs::read_to_string(input)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+    let content =
+        std::fs::read_to_string(input).map_err(|e| format!("Failed to read file: {}", e))?;
 
-    let json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let json: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
-    let html = format!(r#"<!DOCTYPE html>
+    let html = format!(
+        r#"<!DOCTYPE html>
 <html>
 <head>
     <title>Evaluation Report - Symthaea</title>
@@ -739,10 +778,11 @@ fn generate_report(input: &Path, output: &Path) -> Result<(), String> {
         </div>
     </div>
 </body>
-</html>"#, serde_json::to_string_pretty(&json).unwrap_or_default());
+</html>"#,
+        serde_json::to_string_pretty(&json).unwrap_or_default()
+    );
 
-    let mut file = File::create(output)
-        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file = File::create(output).map_err(|e| format!("Failed to create file: {}", e))?;
     file.write_all(html.as_bytes())
         .map_err(|e| format!("Failed to write: {}", e))?;
 
@@ -762,10 +802,12 @@ fn viridis_color(t: f32) -> String {
     let g = (0.004 + t * (0.906 - 0.004 + t * (-0.349))).clamp(0.0, 1.0);
     let b = (0.329 + t * (0.143 - 0.329 + t * (0.658))).clamp(0.0, 1.0);
 
-    format!("#{:02x}{:02x}{:02x}",
+    format!(
+        "#{:02x}{:02x}{:02x}",
         (r * 255.0) as u8,
         (g * 255.0) as u8,
-        (b * 255.0) as u8)
+        (b * 255.0) as u8
+    )
 }
 
 fn similarity_color(sim: f32) -> String {
@@ -773,7 +815,7 @@ fn similarity_color(sim: f32) -> String {
     let t = sim.clamp(0.0, 1.0);
 
     let r = ((1.0 - t) * 0.2) as u8 * 255;
-    let g = ((t * 0.8 + 0.2)) * 255.0;
+    let g = (t * 0.8 + 0.2) * 255.0;
     let b = ((1.0 - t) * 0.8) * 255.0;
 
     format!("#{:02x}{:02x}{:02x}", { r }, g as u8, b as u8)

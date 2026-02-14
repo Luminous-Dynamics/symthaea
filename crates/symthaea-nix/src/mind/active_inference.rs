@@ -10,11 +10,11 @@
 //! The engine does NOT classify intents — it understands user input as a desired
 //! state and generates the action sequence that bridges current → desired.
 
-use symthaea_core::hdc::ContinuousHV;
-use crate::encoding::NixCodebook;
-use super::world_model::{NixWorldModel, ActionCategory};
+use super::episodic_memory::{EpisodeOutcome, NixEpisodicMemory};
 use super::goal_inference::{GoalInference, InferredGoal};
-use super::episodic_memory::{NixEpisodicMemory, EpisodeOutcome};
+use super::world_model::{ActionCategory, NixWorldModel};
+use crate::encoding::NixCodebook;
+use symthaea_core::hdc::ContinuousHV;
 
 /// A scored candidate action with rationale.
 #[derive(Debug, Clone)]
@@ -173,15 +173,14 @@ impl NixActiveInference {
         };
 
         // Episodic valence: past outcomes for similar states
-        let episodic = self.episodic_memory.predict_valence(
-            self.world_model.system_state(),
-        );
+        let episodic = self
+            .episodic_memory
+            .predict_valence(self.world_model.system_state());
 
         // Expected free energy (lower = better)
         // EFE = -(pragmatic + curiosity * epistemic + episodic_weight * episodic)
-        let efe = -(pragmatic
-            + self.curiosity_weight * epistemic
-            + self.episodic_weight * episodic);
+        let efe =
+            -(pragmatic + self.curiosity_weight * epistemic + self.episodic_weight * episodic);
 
         let rationale = format!(
             "{:?}: pragmatic={:.3}, epistemic={:.3}, episodic={:.3} → EFE={:.3}",
@@ -213,7 +212,8 @@ impl NixActiveInference {
         phi: f64,
     ) {
         // Update the world model's transition model
-        self.world_model.learn_transition(state_before, action.clone(), state_after);
+        self.world_model
+            .learn_transition(state_before, action.clone(), state_after);
 
         // Compute prediction error
         let predicted = self.world_model.predict_state(&action);
@@ -222,13 +222,29 @@ impl NixActiveInference {
         // Record in episodic memory (Φ-gated)
         use crate::action::executor::NixOSCommand;
         let cmd = match &action {
-            ActionCategory::Install => NixOSCommand::EnvInstall { packages: vec!["unknown".into()] },
-            ActionCategory::Remove => NixOSCommand::EnvRemove { packages: vec!["unknown".into()] },
-            ActionCategory::Rebuild => NixOSCommand::RebuildSwitch { flake: None, extra_args: vec![] },
+            ActionCategory::Install => NixOSCommand::EnvInstall {
+                packages: vec!["unknown".into()],
+            },
+            ActionCategory::Remove => NixOSCommand::EnvRemove {
+                packages: vec!["unknown".into()],
+            },
+            ActionCategory::Rebuild => NixOSCommand::RebuildSwitch {
+                flake: None,
+                extra_args: vec![],
+            },
             ActionCategory::Rollback => NixOSCommand::EnvRollback,
-            ActionCategory::GarbageCollect => NixOSCommand::CollectGarbage { older_than_days: None, delete_all: false },
-            ActionCategory::Update => NixOSCommand::Channel { operation: crate::action::executor::ChannelOperation::Update { channel: None } },
-            _ => NixOSCommand::Custom { command: format!("{:?}", action), args: vec![], safety_level: crate::action::executor::SafetyLevel::ReadOnly},
+            ActionCategory::GarbageCollect => NixOSCommand::CollectGarbage {
+                older_than_days: None,
+                delete_all: false,
+            },
+            ActionCategory::Update => NixOSCommand::Channel {
+                operation: crate::action::executor::ChannelOperation::Update { channel: None },
+            },
+            _ => NixOSCommand::Custom {
+                command: format!("{:?}", action),
+                args: vec![],
+                safety_level: crate::action::executor::SafetyLevel::ReadOnly,
+            },
         };
 
         self.episodic_memory.record_transition(

@@ -30,7 +30,11 @@ pub struct CausalExplorer<'a> {
 
 impl<'a> CausalExplorer<'a> {
     pub fn new(links: Vec<CausalLink>) -> Self {
-        Self { links, scroll_offset: 0, block: None }
+        Self {
+            links,
+            scroll_offset: 0,
+            block: None,
+        }
     }
 
     pub fn scroll(mut self, offset: usize) -> Self {
@@ -57,7 +61,9 @@ impl<'a> CausalExplorer<'a> {
 impl Widget for CausalExplorer<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let block = self.block.unwrap_or_else(|| {
-            Block::default().title(" Causal Graph ").borders(Borders::ALL)
+            Block::default()
+                .title(" Causal Graph ")
+                .borders(Borders::ALL)
         });
         let inner = block.inner(area);
         block.render(area, buf);
@@ -65,7 +71,8 @@ impl Widget for CausalExplorer<'_> {
         if inner.height < 2 || inner.width < 20 || self.links.is_empty() {
             if inner.height >= 1 && inner.width >= 15 {
                 buf.set_string(
-                    inner.x + 1, inner.y,
+                    inner.x + 1,
+                    inner.y,
                     "No causal links",
                     Style::default().fg(Color::DarkGray),
                 );
@@ -84,7 +91,9 @@ impl Widget for CausalExplorer<'_> {
 
         // Visible links
         let visible_count = (inner.height.saturating_sub(1)) as usize;
-        let visible = self.links.iter()
+        let visible = self
+            .links
+            .iter()
             .skip(self.scroll_offset)
             .take(visible_count);
 
@@ -159,12 +168,14 @@ mod tests {
 
     #[test]
     fn test_scroll() {
-        let links: Vec<CausalLink> = (0..20).map(|i| CausalLink {
-            from: format!("from.{}", i),
-            to: format!("to.{}", i),
-            confidence: 0.5 + (i as f64) * 0.02,
-            relationship: "affects".into(),
-        }).collect();
+        let links: Vec<CausalLink> = (0..20)
+            .map(|i| CausalLink {
+                from: format!("from.{}", i),
+                to: format!("to.{}", i),
+                confidence: 0.5 + (i as f64) * 0.02,
+                relationship: "affects".into(),
+            })
+            .collect();
         let widget = CausalExplorer::new(links).scroll(5);
         let area = Rect::new(0, 0, 50, 8);
         let mut buf = Buffer::empty(area);

@@ -36,12 +36,10 @@ impl JournalObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::other(
-                format!(
-                    "journalctl failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                ),
-            ));
+            return Err(std::io::Error::other(format!(
+                "journalctl failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -63,13 +61,11 @@ impl JournalObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::other(
-                format!(
-                    "journalctl -u {} failed: {}",
-                    unit,
-                    String::from_utf8_lossy(&output.stderr)
-                ),
-            ));
+            return Err(std::io::Error::other(format!(
+                "journalctl -u {} failed: {}",
+                unit,
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -82,25 +78,15 @@ impl JournalObserver {
     pub fn errors_since(duration: &str) -> Result<Vec<JournalEntry>, std::io::Error> {
         let since = format!("-{}", duration);
         let output = Command::new("journalctl")
-            .args([
-                "--since",
-                &since,
-                "-p",
-                "err",
-                "--no-pager",
-                "-o",
-                "short",
-            ])
+            .args(["--since", &since, "-p", "err", "--no-pager", "-o", "short"])
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::other(
-                format!(
-                    "journalctl --since {} -p err failed: {}",
-                    since,
-                    String::from_utf8_lossy(&output.stderr)
-                ),
-            ));
+            return Err(std::io::Error::other(format!(
+                "journalctl --since {} -p err failed: {}",
+                since,
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);

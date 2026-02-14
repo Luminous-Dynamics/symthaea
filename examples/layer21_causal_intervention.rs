@@ -20,14 +20,14 @@
 //! cargo run --example layer21_causal_intervention --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -59,7 +59,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal: Vec<_> = phenomenal.into_iter().take(50).collect();
     let functional: Vec<_> = functional.into_iter().take(50).collect();
 
-    println!("Using {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Using {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     // Load model
     println!("Loading BGE-M3...");
@@ -88,7 +92,12 @@ fn run_experiment() -> Result<()> {
 
     // First, get baseline at Layer 21
     let (baseline_phen, baseline_func) = extract_unity_scores(
-        &extractor, &phenomenal, &functional, 21, &topology_config, None
+        &extractor,
+        &phenomenal,
+        &functional,
+        21,
+        &topology_config,
+        None,
     )?;
 
     let baseline_diff = mean(&baseline_phen) - mean(&baseline_func);
@@ -98,7 +107,11 @@ fn run_experiment() -> Result<()> {
     println!("  Phenomenal unity: {:.4}", mean(&baseline_phen));
     println!("  Functional unity: {:.4}", mean(&baseline_func));
     println!("  Difference: {:+.4}", baseline_diff);
-    println!("  p-value: {:.4} {}\n", baseline_p, if baseline_p < 0.05 { "*" } else { "" });
+    println!(
+        "  p-value: {:.4} {}\n",
+        baseline_p,
+        if baseline_p < 0.05 { "*" } else { "" }
+    );
 
     // Intervention types
     let interventions = vec![
@@ -122,8 +135,12 @@ fn run_experiment() -> Result<()> {
 
         for (name, intervention) in &interventions {
             let (phen_unity, func_unity) = extract_unity_scores(
-                &extractor, &phenomenal, &functional, layer, &topology_config,
-                Some(intervention.clone())
+                &extractor,
+                &phenomenal,
+                &functional,
+                layer,
+                &topology_config,
+                Some(intervention.clone()),
             )?;
 
             let diff = mean(&phen_unity) - mean(&func_unity);
@@ -136,10 +153,14 @@ fn run_experiment() -> Result<()> {
                 0.0
             };
 
-            println!("  {}: diff={:+.4}, p={:.4}{}, reduction={:.1}%",
-                     name, diff, p,
-                     if p < 0.05 { "*" } else { " " },
-                     effect_reduction);
+            println!(
+                "  {}: diff={:+.4}, p={:.4}{}, reduction={:.1}%",
+                name,
+                diff,
+                p,
+                if p < 0.05 { "*" } else { " " },
+                effect_reduction
+            );
 
             results.push((layer, name, diff, p, effect_reduction));
         }
@@ -156,7 +177,8 @@ fn run_experiment() -> Result<()> {
     println!("──────┼──────────┼───────────┼───────────┼────────");
 
     for &layer in &intervention_layers {
-        let layer_results: Vec<_> = results.iter()
+        let layer_results: Vec<_> = results
+            .iter()
             .filter(|(l, _, _, _, _)| *l == layer)
             .collect();
 
@@ -170,17 +192,20 @@ fn run_experiment() -> Result<()> {
     // Determine if Layer 21 is special
     println!("\n----------------------------------------------------------------");
 
-    let layer21_reductions: Vec<f64> = results.iter()
+    let layer21_reductions: Vec<f64> = results
+        .iter()
         .filter(|(l, _, _, _, _)| *l == 21)
         .map(|(_, _, _, _, r)| *r)
         .collect();
 
-    let layer18_reductions: Vec<f64> = results.iter()
+    let layer18_reductions: Vec<f64> = results
+        .iter()
         .filter(|(l, _, _, _, _)| *l == 18)
         .map(|(_, _, _, _, r)| *r)
         .collect();
 
-    let layer23_reductions: Vec<f64> = results.iter()
+    let layer23_reductions: Vec<f64> = results
+        .iter()
         .filter(|(l, _, _, _, _)| *l == 23)
         .map(|(_, _, _, _, r)| *r)
         .collect();
@@ -202,7 +227,10 @@ fn run_experiment() -> Result<()> {
     if mean_21 > mean_18 && mean_21 > mean_23 && mean_21 > 30.0 {
         println!("✓ LAYER 21 IS CAUSALLY IMPORTANT");
         println!("  Interventions at Layer 21 cause the largest reduction in phenomenal effect");
-        println!("  Mean reduction: {:.1}% (vs {:.1}% at L18, {:.1}% at L23)", mean_21, mean_18, mean_23);
+        println!(
+            "  Mean reduction: {:.1}% (vs {:.1}% at L18, {:.1}% at L23)",
+            mean_21, mean_18, mean_23
+        );
         println!("\n  This supports the hypothesis that Layer 21 is where phenomenal");
         println!("  structure is encoded, not just correlated with.");
     } else if mean_21 > 20.0 {
@@ -216,12 +244,15 @@ fn run_experiment() -> Result<()> {
     }
 
     // Strongest intervention
-    let strongest = results.iter()
+    let strongest = results
+        .iter()
         .max_by(|a, b| a.4.partial_cmp(&b.4).unwrap())
         .unwrap();
 
-    println!("\nStrongest intervention: {} at Layer {} ({:.1}% reduction)",
-             strongest.1, strongest.0, strongest.4);
+    println!(
+        "\nStrongest intervention: {} at Layer {} ({:.1}% reduction)",
+        strongest.1, strongest.0, strongest.4
+    );
 
     println!("\n================================================================");
     println!("   EXPERIMENT COMPLETE");
@@ -362,7 +393,9 @@ fn compute_unity(hv: &BinaryHV, config: &TopologyConfig) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 

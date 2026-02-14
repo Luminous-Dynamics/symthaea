@@ -403,10 +403,8 @@ impl SqliteMemory {
                 row.get::<_, String>(0)
             }).map_err(|e| DatabaseError::QueryFailed(format!("LSH query failed: {}", e)))?;
 
-            for row in rows {
-                if let Ok(id) = row {
-                    candidates.insert(id);
-                }
+            for id in rows.flatten() {
+                candidates.insert(id);
             }
         }
 
@@ -981,7 +979,7 @@ mod tests {
             let record = MemoryRecord {
                 id: format!("lsh-search-{}", i),
                 encoding: BinaryHV::random(i + 100),
-                timestamp_ms: 1000000 + i as u64,
+                timestamp_ms: 1000000 + i,
                 memory_type: MemoryType::Episodic,
                 content: format!("Record {}", i),
                 valence: 0.5,

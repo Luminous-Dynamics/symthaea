@@ -10,8 +10,11 @@ use std::f32::consts::PI;
 #[cfg(feature = "live-audio")]
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 #[cfg(feature = "live-audio")]
-use ringbuf::{HeapRb, traits::{Consumer, Producer, Split}};
-use rustfft::{FftPlanner, num_complex::Complex};
+use ringbuf::{
+    traits::{Consumer, Producer, Split},
+    HeapRb,
+};
+use rustfft::{num_complex::Complex, FftPlanner};
 use std::fs::File;
 use std::path::Path;
 use symphonia::core::audio::{AudioBufferRef, Signal};
@@ -81,17 +84,22 @@ pub struct AudioPump {
 impl AudioPump {
     pub fn new(config: AudioConfig) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let host = cpal::default_host();
-        let device = host.default_input_device()
+        let device = host
+            .default_input_device()
             .ok_or("No audio input device found")?;
 
         let supported_config = device.default_input_config()?;
         let sample_rate = u32::from(supported_config.sample_rate()) as f32;
         let channels = supported_config.channels() as usize;
 
-        let device_name = device.description()
+        let device_name = device
+            .description()
             .map(|d| d.name().to_string())
             .unwrap_or_else(|_| "Unknown".to_string());
-        println!("Audio Device: {} ({} Hz, {} ch)", device_name, sample_rate, channels);
+        println!(
+            "Audio Device: {} ({} Hz, {} ch)",
+            device_name, sample_rate, channels
+        );
 
         let rb = HeapRb::<f32>::new(config.window_size * 4);
         let (mut producer, consumer) = rb.split();
@@ -162,7 +170,8 @@ impl AudioPump {
         self.sample_buffer.drain(..self.config.hop_size);
 
         let windowed: Vec<f32> = if self.config.apply_window {
-            window.iter()
+            window
+                .iter()
                 .zip(&self.window_coeffs)
                 .map(|(s, w)| s * w)
                 .collect()
@@ -171,14 +180,16 @@ impl AudioPump {
         };
 
         let fft = self.fft_planner.plan_fft_forward(self.config.window_size);
-        let mut complex_buffer: Vec<Complex<f32>> = windowed.iter()
+        let mut complex_buffer: Vec<Complex<f32>> = windowed
+            .iter()
             .map(|&x| Complex { re: x, im: 0.0 })
             .collect();
 
         fft.process(&mut complex_buffer);
 
         let n_bins = self.config.window_size / 2 + 1;
-        let magnitude: Vec<f32> = complex_buffer.iter()
+        let magnitude: Vec<f32> = complex_buffer
+            .iter()
             .take(n_bins)
             .map(|c| c.norm())
             .collect();
@@ -187,9 +198,8 @@ impl AudioPump {
     }
 
     pub fn next_power_spectrum(&mut self) -> Option<Vec<f32>> {
-        self.next_spectrum().map(|mag| {
-            mag.iter().map(|m| m * m).collect()
-        })
+        self.next_spectrum()
+            .map(|mag| mag.iter().map(|m| m * m).collect())
     }
 
     #[allow(dead_code)]
@@ -221,8 +231,7 @@ impl FileAudioPump {
     pub fn new<P: AsRef<Path>>(path: P, config: FileAudioConfig) -> Result<Self, String> {
         let path_str = path.as_ref().to_string_lossy().to_string();
 
-        let file = File::open(&path)
-            .map_err(|e| format!("Failed to open {}: {}", path_str, e))?;
+        let file = File::open(&path).map_err(|e| format!("Failed to open {}: {}", path_str, e))?;
 
         let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
@@ -248,12 +257,12 @@ impl FileAudioPump {
 
         let track_id = track.id;
 
-        let sample_rate = track.codec_params.sample_rate
+        let sample_rate = track
+            .codec_params
+            .sample_rate
             .ok_or_else(|| "Unknown sample rate".to_string())? as f32;
 
-        let channels = track.codec_params.channels
-            .map(|c| c.count())
-            .unwrap_or(1);
+        let channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(1);
 
         let dec_opts = DecoderOptions::default();
         let mut decoder = symphonia::default::get_codecs()
@@ -266,7 +275,10 @@ impl FileAudioPump {
             let packet = match format.next_packet() {
                 Ok(p) => p,
                 Err(symphonia::core::errors::Error::IoError(ref e))
-                    if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
+                    if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+                {
+                    break
+                }
                 Err(e) => {
                     eprintln!("    Warning: decode error: {}", e);
                     continue;
@@ -295,8 +307,13 @@ impl FileAudioPump {
 
         let duration_secs = all_samples.len() as f32 / sample_rate;
 
-        println!("  Loaded: {} ({:.1}s, {:.0} Hz, {} samples)",
-            path_str, duration_secs, sample_rate, all_samples.len());
+        println!(
+            "  Loaded: {} ({:.1}s, {:.0} Hz, {} samples)",
+            path_str,
+            duration_secs,
+            sample_rate,
+            all_samples.len()
+        );
 
         let window_coeffs: Vec<f32> = (0..config.window_size)
             .map(|i| 0.5 * (1.0 - (2.0 * PI * i as f32 / (config.window_size - 1) as f32).cos()))
@@ -416,12 +433,14 @@ impl FileAudioPump {
         let window_slice = &self.samples[self.position..self.position + self.config.window_size];
 
         let mut complex_buffer: Vec<Complex<f32>> = if self.config.apply_window {
-            window_slice.iter()
+            window_slice
+                .iter()
                 .zip(&self.window_coeffs)
                 .map(|(&s, &w)| Complex { re: s * w, im: 0.0 })
                 .collect()
         } else {
-            window_slice.iter()
+            window_slice
+                .iter()
                 .map(|&s| Complex { re: s, im: 0.0 })
                 .collect()
         };
@@ -432,7 +451,8 @@ impl FileAudioPump {
         self.position += self.config.hop_size;
 
         let n_bins = self.config.window_size / 2 + 1;
-        let magnitude: Vec<f32> = complex_buffer.iter()
+        let magnitude: Vec<f32> = complex_buffer
+            .iter()
             .take(n_bins)
             .map(|c| c.norm())
             .collect();
@@ -441,9 +461,8 @@ impl FileAudioPump {
     }
 
     pub fn next_power_spectrum(&mut self) -> Option<Vec<f32>> {
-        self.next_spectrum().map(|mag| {
-            mag.iter().map(|m| m * m).collect()
-        })
+        self.next_spectrum()
+            .map(|mag| mag.iter().map(|m| m * m).collect())
     }
 
     #[allow(dead_code)]
@@ -512,7 +531,11 @@ impl DatasetProcessor {
         }
 
         files.sort();
-        println!("  Found {} audio files in {}", files.len(), dir.as_ref().display());
+        println!(
+            "  Found {} audio files in {}",
+            files.len(),
+            dir.as_ref().display()
+        );
 
         Ok(Self {
             files,
@@ -554,7 +577,8 @@ pub fn compute_onset_strength(prev_spectrum: &[f32], curr_spectrum: &[f32]) -> f
         return 0.0;
     }
 
-    let flux: f32 = curr_spectrum.iter()
+    let flux: f32 = curr_spectrum
+        .iter()
         .zip(prev_spectrum)
         .map(|(curr, prev)| (curr - prev).max(0.0))
         .sum();
@@ -571,7 +595,8 @@ pub fn compute_spectral_centroid(spectrum: &[f32], sample_rate: f32, fft_size: u
 
     let freq_per_bin = sample_rate / fft_size as f32;
 
-    let weighted_sum: f32 = spectrum.iter()
+    let weighted_sum: f32 = spectrum
+        .iter()
         .enumerate()
         .map(|(i, &mag)| i as f32 * freq_per_bin * mag)
         .sum();
@@ -597,14 +622,14 @@ pub fn compute_spectral_flatness(spectrum: &[f32]) -> f32 {
     let n = spectrum.len() as f32;
     let epsilon = 1e-10;
 
-    let log_sum: f32 = spectrum.iter()
-        .map(|&x| (x + epsilon).ln())
-        .sum();
+    let log_sum: f32 = spectrum.iter().map(|&x| (x + epsilon).ln()).sum();
     let geometric_mean = (log_sum / n).exp();
 
     let arithmetic_mean = spectrum.iter().sum::<f32>() / n;
 
-    (geometric_mean / (arithmetic_mean + epsilon)).min(1.0).max(0.0)
+    (geometric_mean / (arithmetic_mean + epsilon))
+        .min(1.0)
+        .max(0.0)
 }
 
 /// Compute burst density from onset history (DEPRECATED - use compute_ioi_variance)
@@ -618,9 +643,11 @@ pub fn compute_burst_density(onset_history: &[f32], control_rate: f32) -> f32 {
     }
 
     let mean: f32 = onset_history.iter().sum::<f32>() / onset_history.len() as f32;
-    let variance: f32 = onset_history.iter()
+    let variance: f32 = onset_history
+        .iter()
         .map(|x| (x - mean).powi(2))
-        .sum::<f32>() / onset_history.len() as f32;
+        .sum::<f32>()
+        / onset_history.len() as f32;
     let std_dev = variance.sqrt();
     let threshold = mean + 0.5 * std_dev;
 
@@ -661,9 +688,11 @@ pub fn compute_ioi_variance(onset_history: &[f32], _control_rate: f32) -> f32 {
 
     // Calculate threshold for peak detection
     let mean: f32 = onset_history.iter().sum::<f32>() / onset_history.len() as f32;
-    let variance: f32 = onset_history.iter()
+    let variance: f32 = onset_history
+        .iter()
         .map(|x| (x - mean).powi(2))
-        .sum::<f32>() / onset_history.len() as f32;
+        .sum::<f32>()
+        / onset_history.len() as f32;
     let std_dev = variance.sqrt();
 
     // Threshold: mean + 0.75 * std_dev (detect clear peaks)
@@ -687,7 +716,8 @@ pub fn compute_ioi_variance(onset_history: &[f32], _control_rate: f32) -> f32 {
     }
 
     // Compute inter-onset intervals
-    let intervals: Vec<f32> = peak_positions.windows(2)
+    let intervals: Vec<f32> = peak_positions
+        .windows(2)
         .map(|w| (w[1] - w[0]) as f32)
         .collect();
 
@@ -701,9 +731,11 @@ pub fn compute_ioi_variance(onset_history: &[f32], _control_rate: f32) -> f32 {
         return 0.5;
     }
 
-    let ioi_variance: f32 = intervals.iter()
+    let ioi_variance: f32 = intervals
+        .iter()
         .map(|x| (x - ioi_mean).powi(2))
-        .sum::<f32>() / intervals.len() as f32;
+        .sum::<f32>()
+        / intervals.len() as f32;
     let ioi_std = ioi_variance.sqrt();
 
     // Coefficient of variation: 0 = perfectly regular, higher = more irregular
@@ -722,9 +754,11 @@ pub fn compute_temporal_regularity(onset_history: &[f32]) -> f32 {
 
     let n = onset_history.len();
     let mean: f32 = onset_history.iter().sum::<f32>() / n as f32;
-    let variance: f32 = onset_history.iter()
+    let variance: f32 = onset_history
+        .iter()
         .map(|&x| (x - mean).powi(2))
-        .sum::<f32>() / n as f32;
+        .sum::<f32>()
+        / n as f32;
 
     if variance < 1e-10 {
         return 0.0;
@@ -768,11 +802,10 @@ pub fn spectrum_to_mel_bands(spectrum: &[f32], n_mels: usize, sample_rate: f32) 
         .map(|i| mel_min + (mel_max - mel_min) * i as f32 / (n_mels + 1) as f32)
         .collect();
 
-    let hz_edges: Vec<f32> = mel_edges.iter()
-        .map(|&m| mel_to_hz(m))
-        .collect();
+    let hz_edges: Vec<f32> = mel_edges.iter().map(|&m| mel_to_hz(m)).collect();
 
-    let bin_edges: Vec<usize> = hz_edges.iter()
+    let bin_edges: Vec<usize> = hz_edges
+        .iter()
         .map(|&hz| (hz / hz_per_bin).round() as usize)
         .collect();
 
@@ -786,16 +819,22 @@ pub fn spectrum_to_mel_bands(spectrum: &[f32], n_mels: usize, sample_rate: f32) 
         if start < end {
             for j in start..end {
                 let weight = if j <= center {
-                    if center > start { (j - start) as f32 / (center - start) as f32 } else { 1.0 }
-                } else if end > center { (end - j) as f32 / (end - center) as f32 } else { 1.0 };
+                    if center > start {
+                        (j - start) as f32 / (center - start) as f32
+                    } else {
+                        1.0
+                    }
+                } else if end > center {
+                    (end - j) as f32 / (end - center) as f32
+                } else {
+                    1.0
+                };
                 *band += spectrum[j] * weight;
             }
         }
     }
 
-    mel_bands.iter()
-        .map(|&e| (e.max(1e-10)).log10())
-        .collect()
+    mel_bands.iter().map(|&e| (e.max(1e-10)).log10()).collect()
 }
 
 /// Result of processing a single file through the sentinel
@@ -814,13 +853,21 @@ pub struct FileProcessingResult {
 impl FileProcessingResult {
     pub fn print_summary(&self) {
         println!("  File: {}", self.file_path);
-        println!("    Duration: {:.1}s, {} frames", self.duration_secs, self.num_frames);
+        println!(
+            "    Duration: {:.1}s, {} frames",
+            self.duration_secs, self.num_frames
+        );
         println!("    Estimated BPM: {:.0}", self.estimated_bpm);
         print!("    Rhythm Sig: [");
         for (i, &v) in self.mean_rhythm_signature.iter().enumerate() {
-            if i > 0 { print!(", "); }
-            if v > 0.05 { print!("\x1b[33m{:.3}\x1b[0m", v); }
-            else { print!("{:.3}", v); }
+            if i > 0 {
+                print!(", ");
+            }
+            if v > 0.05 {
+                print!("\x1b[33m{:.3}\x1b[0m", v);
+            } else {
+                print!("{:.3}", v);
+            }
         }
         println!("]");
     }

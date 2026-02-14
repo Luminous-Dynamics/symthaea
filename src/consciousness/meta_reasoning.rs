@@ -746,7 +746,7 @@ mod tests {
         let query = "This could be about safety or creative problem solving";
         let alternatives = reasoner.find_alternative_contexts(query);
 
-        assert!(alternatives.len() > 0, "Should find alternative contexts");
+        assert!(!alternatives.is_empty(), "Should find alternative contexts");
         assert!(alternatives.len() <= 3, "Should return at most 3 alternatives");
 
         // Alternatives should be sorted by confidence

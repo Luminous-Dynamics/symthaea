@@ -50,9 +50,20 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("     WISDOM ENGINE: CONTRASTIVE PROTOTYPE REFINEMENT       ").bold().cyan());
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("     WISDOM ENGINE: CONTRASTIVE PROTOTYPE REFINEMENT       ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
     println!();
     println!("  Priority 3: Push similar prototypes apart to prevent mode collapse");
     println!();
@@ -62,7 +73,11 @@ fn main() {
     let mut prototypes = match TrainedPrototypes::load(&cli.input) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("{} Failed to load prototypes: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to load prototypes: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -76,7 +91,10 @@ fn main() {
     println!("  Min similarity: {:.4}", initial_stats.min_sim);
     println!("  Max similarity: {:.4}", initial_stats.max_sim);
     println!("  Mean similarity: {:.4}", initial_stats.mean_sim);
-    println!("  Pairs above {}: {}", cli.min_separation, initial_stats.pairs_above_threshold);
+    println!(
+        "  Pairs above {}: {}",
+        cli.min_separation, initial_stats.pairs_above_threshold
+    );
     println!();
 
     if cli.verbose && !confusion_pairs.is_empty() {
@@ -88,7 +106,10 @@ fn main() {
     }
 
     // Apply contrastive refinement
-    println!("🔧 Applying contrastive separation (target: <{})...", cli.min_separation);
+    println!(
+        "🔧 Applying contrastive separation (target: <{})...",
+        cli.min_separation
+    );
     apply_aggressive_separation(&mut prototypes, cli.min_separation, cli.max_iterations);
     println!();
 
@@ -98,29 +119,54 @@ fn main() {
     println!("  Min similarity: {:.4}", final_stats.min_sim);
     println!("  Max similarity: {:.4}", final_stats.max_sim);
     println!("  Mean similarity: {:.4}", final_stats.mean_sim);
-    println!("  Pairs above {}: {}", cli.min_separation, final_stats.pairs_above_threshold);
+    println!(
+        "  Pairs above {}: {}",
+        cli.min_separation, final_stats.pairs_above_threshold
+    );
     println!();
 
     // Report improvement
     let improvement = initial_stats.max_sim - final_stats.max_sim;
     if improvement > 0.0 {
-        println!("  {} Max similarity reduced by {:.4}", style("✓").green(), improvement);
+        println!(
+            "  {} Max similarity reduced by {:.4}",
+            style("✓").green(),
+            improvement
+        );
     }
 
     // Save refined prototypes
     println!("💾 Saving refined prototypes to {:?}...", cli.output);
     if let Err(e) = prototypes.save(&cli.output) {
-        eprintln!("{} Failed to save prototypes: {}", style("ERROR:").red().bold(), e);
+        eprintln!(
+            "{} Failed to save prototypes: {}",
+            style("ERROR:").red().bold(),
+            e
+        );
         std::process::exit(1);
     }
     println!("  ✓ Saved {} phonemes", prototypes.len());
     println!();
 
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("                   REFINEMENT COMPLETE                      ").bold().green());
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("                   REFINEMENT COMPLETE                      ")
+            .bold()
+            .green()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
     println!();
-    println!("  Next step: Evaluate with stt-eval --prototypes {:?}", cli.output);
+    println!(
+        "  Next step: Evaluate with stt-eval --prototypes {:?}",
+        cli.output
+    );
 }
 
 struct SeparationStats {
@@ -130,7 +176,9 @@ struct SeparationStats {
     pairs_above_threshold: usize,
 }
 
-fn analyze_separation(prototypes: &TrainedPrototypes) -> (SeparationStats, Vec<(String, String, f32)>) {
+fn analyze_separation(
+    prototypes: &TrainedPrototypes,
+) -> (SeparationStats, Vec<(String, String, f32)>) {
     let pairs = prototypes.as_pairs();
     let mut min_sim = f32::INFINITY;
     let mut max_sim = f32::NEG_INFINITY;
@@ -156,7 +204,11 @@ fn analyze_separation(prototypes: &TrainedPrototypes) -> (SeparationStats, Vec<(
     let stats = SeparationStats {
         min_sim,
         max_sim,
-        mean_sim: if count > 0 { sum_sim / count as f32 } else { 0.0 },
+        mean_sim: if count > 0 {
+            sum_sim / count as f32
+        } else {
+            0.0
+        },
         pairs_above_threshold: confusion_pairs.iter().filter(|(_, _, s)| *s > 0.3).count(),
     };
 
@@ -164,7 +216,11 @@ fn analyze_separation(prototypes: &TrainedPrototypes) -> (SeparationStats, Vec<(
 }
 
 /// Apply aggressive contrastive separation until all pairs are below threshold
-fn apply_aggressive_separation(prototypes: &mut TrainedPrototypes, min_separation: f32, max_iterations: usize) {
+fn apply_aggressive_separation(
+    prototypes: &mut TrainedPrototypes,
+    min_separation: f32,
+    max_iterations: usize,
+) {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
@@ -195,7 +251,8 @@ fn apply_aggressive_separation(prototypes: &mut TrainedPrototypes, min_separatio
                     pairs_fixed += 1;
 
                     // Adaptive repulsion strength - push harder when closer
-                    let repulsion_strength = ((similarity - min_separation) / (1.0 - min_separation)).powf(0.5) * 0.5;
+                    let repulsion_strength =
+                        ((similarity - min_separation) / (1.0 - min_separation)).powf(0.5) * 0.5;
 
                     // Generate different seeds for each prototype
                     let mut hasher_i = DefaultHasher::new();
@@ -210,8 +267,10 @@ fn apply_aggressive_separation(prototypes: &mut TrainedPrototypes, min_separatio
                     let seed_j = hasher_j.finish();
 
                     // Apply repulsion
-                    let new_i = contrastive_repel_seeded(&proto_i, &proto_j, repulsion_strength, seed_i);
-                    let new_j = contrastive_repel_seeded(&proto_j, &proto_i, repulsion_strength, seed_j);
+                    let new_i =
+                        contrastive_repel_seeded(&proto_i, &proto_j, repulsion_strength, seed_i);
+                    let new_j =
+                        contrastive_repel_seeded(&proto_j, &proto_i, repulsion_strength, seed_j);
 
                     prototypes.prototypes.insert(label_i.clone(), new_i);
                     prototypes.prototypes.insert(label_j.clone(), new_j);
@@ -221,8 +280,10 @@ fn apply_aggressive_separation(prototypes: &mut TrainedPrototypes, min_separatio
 
         // Progress reporting
         if iteration == 0 || iteration % 20 == 0 || pairs_fixed == 0 {
-            println!("    Iter {:3}: {} pairs above {:.2}, max_sim={:.4}",
-                     iteration, pairs_fixed, min_separation, max_sim_seen);
+            println!(
+                "    Iter {:3}: {} pairs above {:.2}, max_sim={:.4}",
+                iteration, pairs_fixed, min_separation, max_sim_seen
+            );
         }
 
         // Stop if converged
@@ -272,5 +333,7 @@ fn contrastive_repel_seeded(proto: &HV16, negative: &HV16, strength: f32, seed: 
         }
     }
 
-    HV16 { words: result_words }
+    HV16 {
+        words: result_words,
+    }
 }

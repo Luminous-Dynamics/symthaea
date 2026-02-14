@@ -1006,7 +1006,7 @@ mod tests {
         let mut channel = ModalityChannel::new(Modality::Auditory);
         let features = BinaryHV::random(42);
 
-        channel.update(features.clone());
+        channel.update(features);
 
         assert_eq!(channel.temporal_buffer.len(), 1);
         assert_eq!(channel.features, features);
@@ -1026,7 +1026,7 @@ mod tests {
 
         // Should have valid coherence
         let coherence = channel.temporal_coherence();
-        assert!(coherence >= 0.0 && coherence <= 1.0);
+        assert!((0.0..=1.0).contains(&coherence));
     }
 
     #[test]

@@ -4,11 +4,11 @@
 //! This is the "Whale Bridge" - proving the architecture works on real data
 //! before scaling to speech.
 
-use symthaea_stt::temporal_grammar::{TemporalGrammar, TemporalEvent, DomainConfig};
-use symthaea_stt::liquid::{LiquidBank, LiquidFeatures};
-use symthaea_stt::audio::AudioFrontend;
-use std::path::Path;
 use std::collections::HashMap;
+use std::path::Path;
+use symthaea_stt::audio::AudioFrontend;
+use symthaea_stt::liquid::{LiquidBank, LiquidFeatures};
+use symthaea_stt::temporal_grammar::{DomainConfig, TemporalEvent, TemporalGrammar};
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
@@ -56,7 +56,10 @@ fn extract_events(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<Tem
         // Classify frame
         let (event_type, class_id) = if features.energy < silence_thresh {
             ("silence", 8)
-        } else if features.click > click_thresh && features.click > features.whistle && features.click > features.burst {
+        } else if features.click > click_thresh
+            && features.click > features.whistle
+            && features.click > features.burst
+        {
             ("click", 0)
         } else if features.whistle > whistle_thresh && features.whistle > features.burst {
             // Determine whistle direction based on spectral tilt change
@@ -93,7 +96,8 @@ fn extract_events(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<Tem
                     }
 
                     if event_type != "silence" {
-                        current_event = Some((event_type.to_string(), class_id, time, features.energy));
+                        current_event =
+                            Some((event_type.to_string(), class_id, time, features.energy));
                     } else {
                         current_event = None;
                     }
@@ -126,7 +130,10 @@ fn extract_events(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<Tem
 }
 
 /// Analyze a whale recording
-fn analyze_recording(path: &Path, grammar: &mut TemporalGrammar) -> Option<(String, Vec<TemporalEvent>, f32)> {
+fn analyze_recording(
+    path: &Path,
+    grammar: &mut TemporalGrammar,
+) -> Option<(String, Vec<TemporalEvent>, f32)> {
     let filename = path.file_name()?.to_string_lossy().to_string();
 
     // Load audio
@@ -138,7 +145,12 @@ fn analyze_recording(path: &Path, grammar: &mut TemporalGrammar) -> Option<(Stri
         }
     };
 
-    println!("    {} ({:.1}s @ {}Hz)", filename, audio.len() as f32 / sample_rate as f32, sample_rate);
+    println!(
+        "    {} ({:.1}s @ {}Hz)",
+        filename,
+        audio.len() as f32 / sample_rate as f32,
+        sample_rate
+    );
 
     // Extract events
     let frame_size = 2048;
@@ -178,7 +190,12 @@ fn main() -> std::io::Result<()> {
 
     let mut whale_files: Vec<_> = std::fs::read_dir(whale_dir)?
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map(|ext| ext == "wav").unwrap_or(false))
+        .filter(|e| {
+            e.path()
+                .extension()
+                .map(|ext| ext == "wav")
+                .unwrap_or(false)
+        })
         .collect();
 
     if whale_files.is_empty() {
@@ -198,7 +215,14 @@ fn main() -> std::io::Result<()> {
     println!("    Categories:  {}", stats.num_categories);
     println!("    Sparsity:    {:.0}%", stats.sparsity * 100.0);
     println!("    Hierarchy:   {} levels", stats.hierarchy_depth);
-    println!("    Prediction:  {}", if stats.predictive_feedback { "ON" } else { "OFF" });
+    println!(
+        "    Prediction:  {}",
+        if stats.predictive_feedback {
+            "ON"
+        } else {
+            "OFF"
+        }
+    );
 
     // Phase 1: Analyze all recordings
     subheader("Phase 1: Analyzing Recordings");
@@ -232,7 +256,10 @@ fn main() -> std::io::Result<()> {
     }
 
     let stats = grammar.stats();
-    println!("\n    Grammar density after training: {:.3}", stats.grammar_density);
+    println!(
+        "\n    Grammar density after training: {:.3}",
+        stats.grammar_density
+    );
 
     // Test on second half
     subheader("Phase 3: Discrimination Testing");
@@ -265,11 +292,15 @@ fn main() -> std::io::Result<()> {
     // Calculate statistics
     let train_avg = if !train_scores.is_empty() {
         train_scores.iter().sum::<f32>() / train_scores.len() as f32
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     let test_avg = if !test_scores.is_empty() {
         test_scores.iter().sum::<f32>() / test_scores.len() as f32
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     subheader("Results");
 
@@ -285,17 +316,27 @@ fn main() -> std::io::Result<()> {
 
         let test_files: Vec<_> = std::fs::read_dir(test_dir)?
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map(|ext| ext == "wav").unwrap_or(false))
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .map(|ext| ext == "wav")
+                    .unwrap_or(false)
+            })
             .collect();
 
         for entry in &test_files {
             if let Some((filename, events, _)) = analyze_recording(&entry.path(), &mut grammar) {
                 if !events.is_empty() {
                     let score = grammar.score_sequence(&events);
-                    let species = if filename.contains("whale") { "[WHALE]" }
-                                 else if filename.contains("dolphin") { "[DOLPHIN]" }
-                                 else if filename.contains("bird") { "[BIRD]" }
-                                 else { "[OTHER]" };
+                    let species = if filename.contains("whale") {
+                        "[WHALE]"
+                    } else if filename.contains("dolphin") {
+                        "[DOLPHIN]"
+                    } else if filename.contains("bird") {
+                        "[BIRD]"
+                    } else {
+                        "[OTHER]"
+                    };
                     println!("      {} {}: {:.4}", species, filename, score);
                 }
             }
@@ -310,7 +351,10 @@ fn main() -> std::io::Result<()> {
     println!("  Universal Temporal Grammar on Real Whale Audio:");
     println!();
     println!("    Recordings processed:  {}", all_results.len());
-    println!("    Total events detected: {}", all_results.iter().map(|(_, e, _)| e.len()).sum::<usize>());
+    println!(
+        "    Total events detected: {}",
+        all_results.iter().map(|(_, e, _)| e.len()).sum::<usize>()
+    );
     println!("    Training patterns:     {}", stats.training_count);
     println!("    Grammar density:       {:.3}", stats.grammar_density);
     println!();

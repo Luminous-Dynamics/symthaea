@@ -758,7 +758,7 @@ mod tests {
 
         // Field should still be coherent
         let coherence = field.coherence();
-        assert!(coherence >= 0.0 && coherence <= 1.0);
+        assert!((0.0..=1.0).contains(&coherence));
     }
 
     #[test]
@@ -791,7 +791,7 @@ mod tests {
 
         let binding_strength = binder.bind(&features);
 
-        assert!(binding_strength >= 0.0 && binding_strength <= 1.0);
+        assert!((0.0..=1.0).contains(&binding_strength));
         assert!(binder.are_bound("red", "circle"));
     }
 
@@ -858,7 +858,7 @@ mod tests {
 
         // Empty field should have some coherence
         let coherence = field.coherence();
-        assert!(coherence >= 0.0 && coherence <= 1.0);
+        assert!((0.0..=1.0).contains(&coherence));
     }
 
     #[test]

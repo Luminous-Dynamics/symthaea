@@ -11,14 +11,14 @@
 //! cargo run --example binding_layer21_integration --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -47,22 +47,27 @@ fn run_experiment() -> Result<()> {
     let functional = load_corpus("data/consciousness_probe/functional_concepts_expanded.json")?;
 
     // Create pairs (first 25 pairs from each class)
-    let phen_pairs: Vec<(&str, &str)> = phenomenal.iter()
+    let phen_pairs: Vec<(&str, &str)> = phenomenal
+        .iter()
         .take(50)
         .collect::<Vec<_>>()
         .chunks(2)
         .map(|c| (c[0].as_str(), c[1].as_str()))
         .collect();
 
-    let func_pairs: Vec<(&str, &str)> = functional.iter()
+    let func_pairs: Vec<(&str, &str)> = functional
+        .iter()
         .take(50)
         .collect::<Vec<_>>()
         .chunks(2)
         .map(|c| (c[0].as_str(), c[1].as_str()))
         .collect();
 
-    println!("Created {} phenomenal pairs, {} functional pairs\n",
-             phen_pairs.len(), func_pairs.len());
+    println!(
+        "Created {} phenomenal pairs, {} functional pairs\n",
+        phen_pairs.len(),
+        func_pairs.len()
+    );
 
     // Load model
     println!("Loading BGE-M3 with layer access...");
@@ -105,7 +110,9 @@ fn run_experiment() -> Result<()> {
 
         // Process phenomenal pairs
         for (i, (a, b)) in phen_pairs.iter().enumerate() {
-            if i % 10 == 0 { print!("  Phen {}/{}\r", i, phen_pairs.len()); }
+            if i % 10 == 0 {
+                print!("  Phen {}/{}\r", i, phen_pairs.len());
+            }
 
             let acts_a = extractor.extract_layers(a, &[layer])?;
             let acts_b = extractor.extract_layers(b, &[layer])?;
@@ -116,13 +123,19 @@ fn run_experiment() -> Result<()> {
             let bound = hv_a.bind(&hv_b);
             let bundled = BinaryHV::bundle(&[hv_a, hv_b]);
 
-            results.phen_bind_unity.push(compute_unity(&bound, &topology_config));
-            results.phen_bundle_unity.push(compute_unity(&bundled, &topology_config));
+            results
+                .phen_bind_unity
+                .push(compute_unity(&bound, &topology_config));
+            results
+                .phen_bundle_unity
+                .push(compute_unity(&bundled, &topology_config));
         }
 
         // Process functional pairs
         for (i, (a, b)) in func_pairs.iter().enumerate() {
-            if i % 10 == 0 { print!("  Func {}/{}\r", i, func_pairs.len()); }
+            if i % 10 == 0 {
+                print!("  Func {}/{}\r", i, func_pairs.len());
+            }
 
             let acts_a = extractor.extract_layers(a, &[layer])?;
             let acts_b = extractor.extract_layers(b, &[layer])?;
@@ -133,8 +146,12 @@ fn run_experiment() -> Result<()> {
             let bound = hv_a.bind(&hv_b);
             let bundled = BinaryHV::bundle(&[hv_a, hv_b]);
 
-            results.func_bind_unity.push(compute_unity(&bound, &topology_config));
-            results.func_bundle_unity.push(compute_unity(&bundled, &topology_config));
+            results
+                .func_bind_unity
+                .push(compute_unity(&bound, &topology_config));
+            results
+                .func_bundle_unity
+                .push(compute_unity(&bundled, &topology_config));
         }
 
         println!("  Done                    ");
@@ -155,8 +172,10 @@ fn run_experiment() -> Result<()> {
         let func_bind = mean(&results.func_bind_unity);
         let func_bundle = mean(&results.func_bundle_unity);
 
-        println!("{:5} │ {:9.4} │ {:11.4} │ {:9.4} │ {:10.4}",
-                 layer, phen_bind, phen_bundle, func_bind, func_bundle);
+        println!(
+            "{:5} │ {:9.4} │ {:11.4} │ {:9.4} │ {:10.4}",
+            layer, phen_bind, phen_bundle, func_bind, func_bundle
+        );
     }
 
     // Key comparisons
@@ -190,12 +209,17 @@ fn run_experiment() -> Result<()> {
 
         // Statistical test for interaction
         let p_interaction = permutation_test_interaction(
-            &results.phen_bind_unity, &results.phen_bundle_unity,
-            &results.func_bind_unity, &results.func_bundle_unity,
-            5000
+            &results.phen_bind_unity,
+            &results.phen_bundle_unity,
+            &results.func_bind_unity,
+            &results.func_bundle_unity,
+            5000,
         );
-        println!("  Interaction p-value: {:.4} {}\n",
-                 p_interaction, if p_interaction < 0.05 { "*" } else { "" });
+        println!(
+            "  Interaction p-value: {:.4} {}\n",
+            p_interaction,
+            if p_interaction < 0.05 { "*" } else { "" }
+        );
     }
 
     // Summary
@@ -213,9 +237,11 @@ fn run_experiment() -> Result<()> {
 
         let interaction = (phen_bind - phen_bundle) - (func_bind - func_bundle);
         let p = permutation_test_interaction(
-            &results.phen_bind_unity, &results.phen_bundle_unity,
-            &results.func_bind_unity, &results.func_bundle_unity,
-            5000
+            &results.phen_bind_unity,
+            &results.phen_bundle_unity,
+            &results.func_bind_unity,
+            &results.func_bundle_unity,
+            5000,
         );
 
         if interaction > best_interaction.1 {
@@ -285,23 +311,35 @@ fn compute_unity(hv: &BinaryHV, config: &TopologyConfig) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 
 #[cfg(feature = "neural-bridge")]
 fn permutation_test_interaction(
-    phen_bind: &[f64], phen_bundle: &[f64],
-    func_bind: &[f64], func_bundle: &[f64],
-    n_perm: usize
+    phen_bind: &[f64],
+    phen_bundle: &[f64],
+    func_bind: &[f64],
+    func_bundle: &[f64],
+    n_perm: usize,
 ) -> f64 {
     let observed = (mean(phen_bind) - mean(phen_bundle)) - (mean(func_bind) - mean(func_bundle));
 
     let mut data: Vec<(f64, usize, usize)> = Vec::new();
-    for &v in phen_bind { data.push((v, 0, 0)); }
-    for &v in phen_bundle { data.push((v, 0, 1)); }
-    for &v in func_bind { data.push((v, 1, 0)); }
-    for &v in func_bundle { data.push((v, 1, 1)); }
+    for &v in phen_bind {
+        data.push((v, 0, 0));
+    }
+    for &v in phen_bundle {
+        data.push((v, 0, 1));
+    }
+    for &v in func_bind {
+        data.push((v, 1, 0));
+    }
+    for &v in func_bundle {
+        data.push((v, 1, 1));
+    }
 
     let mut more_extreme = 0;
     let mut rng: u64 = 42;
@@ -316,13 +354,29 @@ fn permutation_test_interaction(
             data[j].0 = tmp;
         }
 
-        let pb: f64 = data.iter().filter(|d| d.1 == 0 && d.2 == 0).map(|d| d.0).sum::<f64>()
+        let pb: f64 = data
+            .iter()
+            .filter(|d| d.1 == 0 && d.2 == 0)
+            .map(|d| d.0)
+            .sum::<f64>()
             / data.iter().filter(|d| d.1 == 0 && d.2 == 0).count() as f64;
-        let pbu: f64 = data.iter().filter(|d| d.1 == 0 && d.2 == 1).map(|d| d.0).sum::<f64>()
+        let pbu: f64 = data
+            .iter()
+            .filter(|d| d.1 == 0 && d.2 == 1)
+            .map(|d| d.0)
+            .sum::<f64>()
             / data.iter().filter(|d| d.1 == 0 && d.2 == 1).count() as f64;
-        let fb: f64 = data.iter().filter(|d| d.1 == 1 && d.2 == 0).map(|d| d.0).sum::<f64>()
+        let fb: f64 = data
+            .iter()
+            .filter(|d| d.1 == 1 && d.2 == 0)
+            .map(|d| d.0)
+            .sum::<f64>()
             / data.iter().filter(|d| d.1 == 1 && d.2 == 0).count() as f64;
-        let fbu: f64 = data.iter().filter(|d| d.1 == 1 && d.2 == 1).map(|d| d.0).sum::<f64>()
+        let fbu: f64 = data
+            .iter()
+            .filter(|d| d.1 == 1 && d.2 == 1)
+            .map(|d| d.0)
+            .sum::<f64>()
             / data.iter().filter(|d| d.1 == 1 && d.2 == 1).count() as f64;
 
         let perm_int = (pb - pbu) - (fb - fbu);

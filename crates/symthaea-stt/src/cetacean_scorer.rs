@@ -24,7 +24,7 @@
 //! This is fundamentally different from the WhaleSentinel's click-timing approach.
 //! Here we abstract whale sounds into discrete "articulatory" categories.
 
-use crate::hdc::{HV16, BundleAccumulator};
+use crate::hdc::{BundleAccumulator, HV16};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
@@ -118,15 +118,42 @@ impl std::fmt::Display for CetaceanUnit {
 
 /// All possible CAUs (3 manner × 3 place = 9 units)
 pub const ALL_CAUS: [CetaceanUnit; 9] = [
-    CetaceanUnit { manner: CetaceanManner::Click, place: CetaceanPlace::Upsweep },
-    CetaceanUnit { manner: CetaceanManner::Click, place: CetaceanPlace::Downsweep },
-    CetaceanUnit { manner: CetaceanManner::Click, place: CetaceanPlace::Flat },
-    CetaceanUnit { manner: CetaceanManner::Whistle, place: CetaceanPlace::Upsweep },
-    CetaceanUnit { manner: CetaceanManner::Whistle, place: CetaceanPlace::Downsweep },
-    CetaceanUnit { manner: CetaceanManner::Whistle, place: CetaceanPlace::Flat },
-    CetaceanUnit { manner: CetaceanManner::Burst, place: CetaceanPlace::Upsweep },
-    CetaceanUnit { manner: CetaceanManner::Burst, place: CetaceanPlace::Downsweep },
-    CetaceanUnit { manner: CetaceanManner::Burst, place: CetaceanPlace::Flat },
+    CetaceanUnit {
+        manner: CetaceanManner::Click,
+        place: CetaceanPlace::Upsweep,
+    },
+    CetaceanUnit {
+        manner: CetaceanManner::Click,
+        place: CetaceanPlace::Downsweep,
+    },
+    CetaceanUnit {
+        manner: CetaceanManner::Click,
+        place: CetaceanPlace::Flat,
+    },
+    CetaceanUnit {
+        manner: CetaceanManner::Whistle,
+        place: CetaceanPlace::Upsweep,
+    },
+    CetaceanUnit {
+        manner: CetaceanManner::Whistle,
+        place: CetaceanPlace::Downsweep,
+    },
+    CetaceanUnit {
+        manner: CetaceanManner::Whistle,
+        place: CetaceanPlace::Flat,
+    },
+    CetaceanUnit {
+        manner: CetaceanManner::Burst,
+        place: CetaceanPlace::Upsweep,
+    },
+    CetaceanUnit {
+        manner: CetaceanManner::Burst,
+        place: CetaceanPlace::Downsweep,
+    },
+    CetaceanUnit {
+        manner: CetaceanManner::Burst,
+        place: CetaceanPlace::Flat,
+    },
 ];
 
 /// Manner class names for display
@@ -516,7 +543,10 @@ mod tests {
         // Discrimination should favor sperm whale pattern
         let disc = scorer.discriminate(&sperm_coda, &humpback_song);
         println!("Discrimination (sperm vs humpback): {}", disc);
-        assert!(disc > 0.0, "Sperm whale pattern should score higher after training");
+        assert!(
+            disc > 0.0,
+            "Sperm whale pattern should score higher after training"
+        );
     }
 
     #[test]

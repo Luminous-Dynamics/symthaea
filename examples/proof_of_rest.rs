@@ -312,7 +312,11 @@ impl RestValidator {
     fn validate_and_reward(&mut self, proof: &SleepStateProof) -> Result<RestReward, String> {
         // Verify the ZK proof
         match proof.verify() {
-            ProofVerificationResult::Valid { stage, epoch_count, confidence } => {
+            ProofVerificationResult::Valid {
+                stage,
+                epoch_count,
+                confidence,
+            } => {
                 // Calculate reward
                 let base_rate = self.reward_rates.get(&stage).copied().unwrap_or(0.0);
                 let rest_minutes = epoch_count * 30 / 60; // 30 seconds per epoch
@@ -335,12 +339,11 @@ impl RestValidator {
                     timestamp: proof.timestamp,
                 })
             }
-            ProofVerificationResult::Invalid(reason) => {
-                Err(format!("Proof invalid: {}", reason))
-            }
-            ProofVerificationResult::InsufficientEvidence(epochs) => {
-                Err(format!("Insufficient evidence: only {} epochs (need 5+)", epochs))
-            }
+            ProofVerificationResult::Invalid(reason) => Err(format!("Proof invalid: {}", reason)),
+            ProofVerificationResult::InsufficientEvidence(epochs) => Err(format!(
+                "Insufficient evidence: only {} epochs (need 5+)",
+                epochs
+            )),
         }
     }
 }
@@ -374,11 +377,11 @@ impl SleepStage {
     /// Higher consciousness = higher Φ
     fn to_phi(&self) -> f64 {
         match self {
-            SleepStage::Wake => 0.8,  // Highest - awake
-            SleepStage::REM => 0.6,   // High - dreaming (conscious)
-            SleepStage::N1 => 0.4,    // Transitional
-            SleepStage::N2 => 0.3,    // Light sleep
-            SleepStage::N3 => 0.1,    // Lowest - deep sleep
+            SleepStage::Wake => 0.8, // Highest - awake
+            SleepStage::REM => 0.6,  // High - dreaming (conscious)
+            SleepStage::N1 => 0.4,   // Transitional
+            SleepStage::N2 => 0.3,   // Light sleep
+            SleepStage::N3 => 0.1,   // Lowest - deep sleep
         }
     }
 }
@@ -520,7 +523,11 @@ impl SleepSession {
 
             let snapshot = ConsciousnessSnapshot {
                 phi: stage.to_phi(),
-                meta_awareness: if stage == SleepStage::Wake || stage == SleepStage::REM { 0.7 } else { 0.2 },
+                meta_awareness: if stage == SleepStage::Wake || stage == SleepStage::REM {
+                    0.7
+                } else {
+                    0.2
+                },
                 coherence: avg_sync,
                 affective_valence: 1.0 - avg_emg.clamp(0.0, 2.0) / 2.0, // Lower EMG = more relaxed
                 sleep_stage: stage,
@@ -570,8 +577,14 @@ fn main() {
     println!();
 
     let session = SleepSession::from_sc4001_simulation();
-    println!("   Loaded {} epochs from simulated SC4001 session", session.epochs.len());
-    println!("   Total duration: {} minutes", session.epochs.len() * 30 / 60);
+    println!(
+        "   Loaded {} epochs from simulated SC4001 session",
+        session.epochs.len()
+    );
+    println!(
+        "   Total duration: {} minutes",
+        session.epochs.len() * 30 / 60
+    );
     println!();
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -590,12 +603,23 @@ fn main() {
     println!("   │ Stage   │ Epochs │ Synchrony │ Complex   │ EOG       │ EMG Tone  │");
     println!("   ├─────────┼────────┼───────────┼───────────┼───────────┼───────────┤");
 
-    for stage in [SleepStage::Wake, SleepStage::N1, SleepStage::N2, SleepStage::N3, SleepStage::REM] {
+    for stage in [
+        SleepStage::Wake,
+        SleepStage::N1,
+        SleepStage::N2,
+        SleepStage::N3,
+        SleepStage::REM,
+    ] {
         if let Some((snapshot, count)) = analysis.get(&stage) {
-            println!("   │ {:7} │ {:6} │ {:9.3} │ {:9.3} │ {:9.3} │ {:9.3} │",
-                stage.name(), count,
-                snapshot.eeg_synchrony, snapshot.eeg_complexity,
-                snapshot.eog_activity, snapshot.emg_tone);
+            println!(
+                "   │ {:7} │ {:6} │ {:9.3} │ {:9.3} │ {:9.3} │ {:9.3} │",
+                stage.name(),
+                count,
+                snapshot.eeg_synchrony,
+                snapshot.eeg_complexity,
+                snapshot.eog_activity,
+                snapshot.emg_tone
+            );
         }
     }
     println!("   └─────────┴────────┴───────────┴───────────┴───────────┴───────────┘");
@@ -616,10 +640,12 @@ fn main() {
         let proof = SleepStateProof::create(snapshot, *count);
 
         println!("   {} Proof Generated:", stage.name());
-        println!("      Commitments: EEG={:016x}, EOG={:016x}, EMG={:016x}",
+        println!(
+            "      Commitments: EEG={:016x}, EOG={:016x}, EMG={:016x}",
             proof.eeg_commitment.commitment.0 & 0xFFFFFFFFFFFFFFFF,
             proof.eog_commitment.commitment.0 & 0xFFFFFFFFFFFFFFFF,
-            proof.emg_commitment.commitment.0 & 0xFFFFFFFFFFFFFFFF);
+            proof.emg_commitment.commitment.0 & 0xFFFFFFFFFFFFFFFF
+        );
         println!("      Challenge:   {:032x}", proof.challenge.0);
         println!("      Response:    {:032x}", proof.response.0);
         println!("      Epochs:      {}", proof.epoch_count);
@@ -646,7 +672,10 @@ fn main() {
         match validator.validate_and_reward(proof) {
             Ok(reward) => {
                 println!("✅ VALID");
-                println!("      Reward: {:.4} REST tokens ({:?})", reward.amount, reward.reward_type);
+                println!(
+                    "      Reward: {:.4} REST tokens ({:?})",
+                    reward.amount, reward.reward_type
+                );
                 println!("      Minutes: {} verified", reward.rest_minutes);
                 total_reward += reward.amount;
             }
@@ -669,11 +698,26 @@ fn main() {
     println!("   ┌─────────────────────────────────────────────────────────────────┐");
     println!("   │                    PROOF OF REST SUMMARY                        │");
     println!("   ├─────────────────────────────────────────────────────────────────┤");
-    println!("   │ Total Epochs Analyzed:     {:5}                                │", session.epochs.len());
-    println!("   │ Total Session Duration:    {:5} minutes                        │", session.epochs.len() * 30 / 60);
-    println!("   │ Proofs Generated:          {:5}                                │", proofs.len());
-    println!("   │ Proofs Validated:          {:5}                                │", validator.proofs_validated);
-    println!("   │ Total Rewards Issued:      {:8.4} REST                        │", total_reward);
+    println!(
+        "   │ Total Epochs Analyzed:     {:5}                                │",
+        session.epochs.len()
+    );
+    println!(
+        "   │ Total Session Duration:    {:5} minutes                        │",
+        session.epochs.len() * 30 / 60
+    );
+    println!(
+        "   │ Proofs Generated:          {:5}                                │",
+        proofs.len()
+    );
+    println!(
+        "   │ Proofs Validated:          {:5}                                │",
+        validator.proofs_validated
+    );
+    println!(
+        "   │ Total Rewards Issued:      {:8.4} REST                        │",
+        total_reward
+    );
     println!("   └─────────────────────────────────────────────────────────────────┘");
     println!();
 
@@ -681,13 +725,28 @@ fn main() {
     if let Some((n3_snapshot, n3_count)) = analysis.get(&SleepStage::N3) {
         println!("   🎯 KEY FINDING: N3 Deep Sleep Verified!");
         println!();
-        println!("      The Trinity Architecture detected {} epochs of N3 Deep Sleep", n3_count);
+        println!(
+            "      The Trinity Architecture detected {} epochs of N3 Deep Sleep",
+            n3_count
+        );
         println!("      with the following physiological signatures:");
         println!();
-        println!("      • EEG Synchrony:  {:.3} (HIGH - slow wave activity)", n3_snapshot.eeg_synchrony);
-        println!("      • EEG Complexity: {:.3} (LOW - monotonic delta waves)", n3_snapshot.eeg_complexity);
-        println!("      • EOG Activity:   {:.3} (LOW - eyes still)", n3_snapshot.eog_activity);
-        println!("      • EMG Tone:       {:.3} (LOW - relaxed muscles)", n3_snapshot.emg_tone);
+        println!(
+            "      • EEG Synchrony:  {:.3} (HIGH - slow wave activity)",
+            n3_snapshot.eeg_synchrony
+        );
+        println!(
+            "      • EEG Complexity: {:.3} (LOW - monotonic delta waves)",
+            n3_snapshot.eeg_complexity
+        );
+        println!(
+            "      • EOG Activity:   {:.3} (LOW - eyes still)",
+            n3_snapshot.eog_activity
+        );
+        println!(
+            "      • EMG Tone:       {:.3} (LOW - relaxed muscles)",
+            n3_snapshot.emg_tone
+        );
         println!();
         println!("      This data was committed using Pedersen commitments,");
         println!("      proven valid using Schnorr proofs,");

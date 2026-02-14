@@ -15,16 +15,13 @@
 use clap::{Parser, Subcommand};
 use console::{style, Emoji};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 use symthaea_stt::{
-    BatchTrainer, BatchConfig,
-    BootstrapConfig, TrainedPrototypes,
-    AudioFrontend, AudioProjector, PhonemeResonator,
-    phoneme_error_rate,
-    CmuDictionary, TextToPhonemes,
+    phoneme_error_rate, AudioFrontend, AudioProjector, BatchConfig, BatchTrainer, BootstrapConfig,
+    CmuDictionary, PhonemeResonator, TextToPhonemes, TrainedPrototypes,
 };
 
 static DOWNLOAD: Emoji<'_, '_> = Emoji("📥 ", "");
@@ -154,24 +151,59 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Download { subset, output, no_extract } => {
+        Commands::Download {
+            subset,
+            output,
+            no_extract,
+        } => {
             if let Err(e) = download_subset(&subset, &output, !no_extract) {
                 eprintln!("{}Download failed: {}", WARN, e);
                 std::process::exit(1);
             }
         }
-        Commands::Train { data, output, max_files, workers, min_instances, dict, adaptive, threshold, max_variants } => {
+        Commands::Train {
+            data,
+            output,
+            max_files,
+            workers,
+            min_instances,
+            dict,
+            adaptive,
+            threshold,
+            max_variants,
+        } => {
             if adaptive {
-                if let Err(e) = train_adaptive(&data, &output, max_files, workers, min_instances, dict.as_deref(), threshold, max_variants) {
+                if let Err(e) = train_adaptive(
+                    &data,
+                    &output,
+                    max_files,
+                    workers,
+                    min_instances,
+                    dict.as_deref(),
+                    threshold,
+                    max_variants,
+                ) {
                     eprintln!("{}Training failed: {}", WARN, e);
                     std::process::exit(1);
                 }
-            } else if let Err(e) = train_on_data(&data, &output, max_files, workers, min_instances, dict.as_deref()) {
+            } else if let Err(e) = train_on_data(
+                &data,
+                &output,
+                max_files,
+                workers,
+                min_instances,
+                dict.as_deref(),
+            ) {
                 eprintln!("{}Training failed: {}", WARN, e);
                 std::process::exit(1);
             }
         }
-        Commands::Auto { subset, base_dir, workers, dict } => {
+        Commands::Auto {
+            subset,
+            base_dir,
+            workers,
+            dict,
+        } => {
             if let Err(e) = auto_pipeline(&subset, &base_dir, workers, dict.as_deref()) {
                 eprintln!("{}Pipeline failed: {}", WARN, e);
                 std::process::exit(1);
@@ -186,8 +218,16 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Commands::Eval { model, data, max_files, output, dict } => {
-            if let Err(e) = evaluate_model(&model, &data, max_files, output.as_deref(), dict.as_deref()) {
+        Commands::Eval {
+            model,
+            data,
+            max_files,
+            output,
+            dict,
+        } => {
+            if let Err(e) =
+                evaluate_model(&model, &data, max_files, output.as_deref(), dict.as_deref())
+            {
                 eprintln!("{}Evaluation failed: {}", WARN, e);
                 std::process::exit(1);
             }
@@ -251,31 +291,41 @@ const SUBSETS: &[SubsetInfo] = &[
 fn list_subsets() {
     println!("\n{}Available LibriSpeech subsets:\n", style("").bold());
 
-    println!("{:<20} {:<35} {:>10} {:>10}",
+    println!(
+        "{:<20} {:<35} {:>10} {:>10}",
         style("Subset").bold(),
         style("Description").bold(),
         style("Size").bold(),
-        style("Hours").bold());
+        style("Hours").bold()
+    );
     println!("{}", "-".repeat(75));
 
     for subset in SUBSETS {
-        println!("{:<20} {:<35} {:>7} MB {:>7.1} h",
-            subset.name,
-            subset.description,
-            subset.size_mb,
-            subset.hours);
+        println!(
+            "{:<20} {:<35} {:>7} MB {:>7.1} h",
+            subset.name, subset.description, subset.size_mb, subset.hours
+        );
     }
 
-    println!("\n{}Recommended for testing: {}", style("Tip: ").cyan(),
-        style("test-clean").green());
-    println!("{}Full training: {}\n", style("Tip: ").cyan(),
-        style("train-clean-100").green());
+    println!(
+        "\n{}Recommended for testing: {}",
+        style("Tip: ").cyan(),
+        style("test-clean").green()
+    );
+    println!(
+        "{}Full training: {}\n",
+        style("Tip: ").cyan(),
+        style("train-clean-100").green()
+    );
 }
 
 fn download_subset(subset: &str, output: &Path, extract: bool) -> Result<(), String> {
     // Validate subset
     if !SUBSETS.iter().any(|s| s.name == subset) {
-        return Err(format!("Unknown subset '{}'. Run 'list' to see available subsets.", subset));
+        return Err(format!(
+            "Unknown subset '{}'. Run 'list' to see available subsets.",
+            subset
+        ));
     }
 
     let url = format!(
@@ -291,17 +341,22 @@ fn download_subset(subset: &str, output: &Path, extract: bool) -> Result<(), Str
     println!();
 
     // Create output directory
-    fs::create_dir_all(output)
-        .map_err(|e| format!("Failed to create output directory: {}", e))?;
+    fs::create_dir_all(output).map_err(|e| format!("Failed to create output directory: {}", e))?;
 
     let tar_path = output.join(format!("{}.tar.gz", subset));
 
     // Check if already downloaded
     if tar_path.exists() {
-        println!("{}Archive already exists, skipping download", style("Note: ").yellow());
+        println!(
+            "{}Archive already exists, skipping download",
+            style("Note: ").yellow()
+        );
     } else {
         println!("{}Downloading {} ...", DOWNLOAD, subset);
-        println!("{}This may take a while for larger subsets", style("Note: ").dim());
+        println!(
+            "{}This may take a while for larger subsets",
+            style("Note: ").dim()
+        );
 
         // Use curl or wget for download
         download_file(&url, &tar_path)?;
@@ -319,7 +374,10 @@ fn download_subset(subset: &str, output: &Path, extract: bool) -> Result<(), Str
     }
 
     println!("\n{}Download complete!", SUCCESS);
-    println!("Data location: {}", output.join("LibriSpeech").join(subset).display());
+    println!(
+        "Data location: {}",
+        output.join("LibriSpeech").join(subset).display()
+    );
 
     Ok(())
 }
@@ -348,7 +406,12 @@ fn download_file(url: &str, output: &Path) -> Result<(), String> {
 
 fn extract_tar_gz(archive: &Path, output: &Path) -> Result<(), String> {
     let result = std::process::Command::new("tar")
-        .args(["-xzf", &archive.to_string_lossy(), "-C", &output.to_string_lossy()])
+        .args([
+            "-xzf",
+            &archive.to_string_lossy(),
+            "-C",
+            &output.to_string_lossy(),
+        ])
         .status();
 
     match result {
@@ -369,7 +432,14 @@ fn train_on_data(
     println!("{}", "=".repeat(50));
     println!("Data:    {}", data_dir.display());
     println!("Output:  {}", output.display());
-    println!("Workers: {}", if workers == 0 { "auto".to_string() } else { workers.to_string() });
+    println!(
+        "Workers: {}",
+        if workers == 0 {
+            "auto".to_string()
+        } else {
+            workers.to_string()
+        }
+    );
     if let Some(dict) = dict_path {
         println!("Dict:    {} (phoneme-level training)", dict.display());
     } else {
@@ -385,8 +455,13 @@ fn train_on_data(
         return Err("No audio/transcript pairs found".to_string());
     }
 
-    let total_samples = max_files.map(|m| m.min(samples.len())).unwrap_or(samples.len());
-    println!("Found {} audio files with transcripts", style(total_samples).green());
+    let total_samples = max_files
+        .map(|m| m.min(samples.len()))
+        .unwrap_or(samples.len());
+    println!(
+        "Found {} audio files with transcripts",
+        style(total_samples).green()
+    );
     println!();
 
     // Configure training
@@ -408,7 +483,8 @@ fn train_on_data(
 
     if let Some(dict) = dict_path {
         println!("{}Loading pronunciation dictionary...", style("").dim());
-        trainer.load_dictionary(dict)
+        trainer
+            .load_dictionary(dict)
             .map_err(|e| format!("Failed to load dictionary: {}", e))?;
         println!("Dictionary loaded - training phoneme prototypes");
     }
@@ -424,7 +500,10 @@ fn train_on_data(
     let progress_clone = progress.clone();
     let callback = Box::new(move |current: usize, _total: usize, path: &str| {
         progress_clone.set_position(current as u64);
-        progress_clone.set_message(format!("Processing {}", path.split('/').next_back().unwrap_or(path)));
+        progress_clone.set_message(format!(
+            "Processing {}",
+            path.split('/').next_back().unwrap_or(path)
+        ));
     });
 
     // Train
@@ -440,7 +519,8 @@ fn train_on_data(
             .map_err(|e| format!("Failed to create output directory: {}", e))?;
     }
 
-    prototypes.save(output)
+    prototypes
+        .save(output)
         .map_err(|e| format!("Failed to save prototypes: {}", e))?;
 
     // Print stats
@@ -448,12 +528,18 @@ fn train_on_data(
     println!("{}", "-".repeat(40));
     println!("Files processed:    {}", stats.files_processed);
     println!("Files succeeded:    {}", style(stats.files_success).green());
-    println!("Files failed:       {}", if stats.files_failed > 0 {
-        style(stats.files_failed).red().to_string()
-    } else {
-        stats.files_failed.to_string()
-    });
-    println!("Audio processed:    {:.1} hours", stats.total_audio_sec / 3600.0);
+    println!(
+        "Files failed:       {}",
+        if stats.files_failed > 0 {
+            style(stats.files_failed).red().to_string()
+        } else {
+            stats.files_failed.to_string()
+        }
+    );
+    println!(
+        "Audio processed:    {:.1} hours",
+        stats.total_audio_sec / 3600.0
+    );
     println!("Processing time:    {:.1} seconds", stats.total_time_sec);
     println!("Realtime factor:    {:.1}x", stats.realtime_factor);
     println!();
@@ -485,11 +571,21 @@ fn train_adaptive(
     threshold: f32,
     max_variants: usize,
 ) -> Result<(), String> {
-    println!("\n{}LibriSpeech Adaptive Training Pipeline", style("").bold().cyan());
+    println!(
+        "\n{}LibriSpeech Adaptive Training Pipeline",
+        style("").bold().cyan()
+    );
     println!("{}", "=".repeat(50));
     println!("Data:       {}", data_dir.display());
     println!("Output:     {}", output.display());
-    println!("Workers:    {}", if workers == 0 { "auto".to_string() } else { workers.to_string() });
+    println!(
+        "Workers:    {}",
+        if workers == 0 {
+            "auto".to_string()
+        } else {
+            workers.to_string()
+        }
+    );
     println!("Mode:       {}", style("ADAPTIVE").green().bold());
     println!("Threshold:  {:.2}", threshold);
     println!("Max Variants: {}", max_variants);
@@ -508,8 +604,13 @@ fn train_adaptive(
         return Err("No audio/transcript pairs found".to_string());
     }
 
-    let total_samples = max_files.map(|m| m.min(samples.len())).unwrap_or(samples.len());
-    println!("Found {} audio files with transcripts", style(total_samples).green());
+    let total_samples = max_files
+        .map(|m| m.min(samples.len()))
+        .unwrap_or(samples.len());
+    println!(
+        "Found {} audio files with transcripts",
+        style(total_samples).green()
+    );
     println!();
 
     // Configure training
@@ -531,7 +632,8 @@ fn train_adaptive(
 
     if let Some(dict) = dict_path {
         println!("{}Loading pronunciation dictionary...", style("").dim());
-        trainer.load_dictionary(dict)
+        trainer
+            .load_dictionary(dict)
             .map_err(|e| format!("Failed to load dictionary: {}", e))?;
         println!("Dictionary loaded - training phoneme prototypes with allophone discovery");
     }
@@ -547,18 +649,17 @@ fn train_adaptive(
     let progress_clone = progress.clone();
     let callback = Box::new(move |current: usize, _total: usize, path: &str| {
         progress_clone.set_position(current as u64);
-        progress_clone.set_message(format!("Processing {}", path.split('/').next_back().unwrap_or(path)));
+        progress_clone.set_message(format!(
+            "Processing {}",
+            path.split('/').next_back().unwrap_or(path)
+        ));
     });
 
     // Train with adaptive clustering
     println!("{}Training with adaptive allophone clustering...", TRAIN);
     let samples_to_train: Vec<_> = samples.into_iter().take(total_samples).collect();
-    let (adaptive_set, stats, adaptive_stats) = trainer.train_adaptive(
-        &samples_to_train,
-        threshold,
-        max_variants,
-        Some(callback),
-    );
+    let (adaptive_set, stats, adaptive_stats) =
+        trainer.train_adaptive(&samples_to_train, threshold, max_variants, Some(callback));
 
     progress.finish_with_message("Training complete!");
 
@@ -569,7 +670,10 @@ fn train_adaptive(
 
     // CONTRASTIVE SEPARATION: Push similar prototypes apart to prevent collapse
     // Must run AFTER expansion to separate all variant pairs
-    println!("{}Enforcing prototype separation (post-expansion)...", TRAIN);
+    println!(
+        "{}Enforcing prototype separation (post-expansion)...",
+        TRAIN
+    );
     prototypes.enforce_separation(0.55); // Push apart pairs with >0.55 similarity (below mirror's max 0.67)
     println!("  Separation enforcement complete");
 
@@ -579,7 +683,8 @@ fn train_adaptive(
             .map_err(|e| format!("Failed to create output directory: {}", e))?;
     }
 
-    prototypes.save(output)
+    prototypes
+        .save(output)
         .map_err(|e| format!("Failed to save prototypes: {}", e))?;
 
     // Print stats
@@ -587,21 +692,28 @@ fn train_adaptive(
     println!("{}", "-".repeat(40));
     println!("Files processed:    {}", stats.files_processed);
     println!("Files succeeded:    {}", style(stats.files_success).green());
-    println!("Files failed:       {}", if stats.files_failed > 0 {
-        style(stats.files_failed).red().to_string()
-    } else {
-        stats.files_failed.to_string()
-    });
-    println!("Audio processed:    {:.1} hours", stats.total_audio_sec / 3600.0);
+    println!(
+        "Files failed:       {}",
+        if stats.files_failed > 0 {
+            style(stats.files_failed).red().to_string()
+        } else {
+            stats.files_failed.to_string()
+        }
+    );
+    println!(
+        "Audio processed:    {:.1} hours",
+        stats.total_audio_sec / 3600.0
+    );
     println!("Processing time:    {:.1} seconds", stats.total_time_sec);
     println!("Realtime factor:    {:.1}x", stats.realtime_factor);
 
     println!("\n{}Adaptive Training Statistics", style("").bold());
     println!("{}", "-".repeat(40));
     println!("Phonemes discovered: {}", adaptive_stats.total_phonemes);
-    println!("Allophone variants:  {} (avg {:.1} per phoneme)",
-             adaptive_stats.total_variants,
-             adaptive_stats.avg_variants_per_phoneme);
+    println!(
+        "Allophone variants:  {} (avg {:.1} per phoneme)",
+        adaptive_stats.total_variants, adaptive_stats.avg_variants_per_phoneme
+    );
     println!("Max variants seen:   {}", adaptive_stats.max_variants_seen);
     println!("Total instances:     {}", adaptive_stats.total_instances);
 
@@ -623,14 +735,18 @@ fn train_adaptive(
     println!("{}", "-".repeat(40));
     for phoneme in ["T", "N", "AH0", "S", "D"].iter() {
         if let Some(proto) = adaptive_set.prototypes.get(*phoneme) {
-            let variant_info: Vec<_> = proto.variant_counts.iter()
+            let variant_info: Vec<_> = proto
+                .variant_counts
+                .iter()
                 .enumerate()
                 .map(|(i, c)| format!("v{}: {}", i, c))
                 .collect();
-            println!("  {:>6}: {} variants [{}]",
-                     phoneme,
-                     proto.num_variants(),
-                     variant_info.join(", "));
+            println!(
+                "  {:>6}: {} variants [{}]",
+                phoneme,
+                proto.num_variants(),
+                variant_info.join(", ")
+            );
         }
     }
 
@@ -646,8 +762,7 @@ fn scan_librispeech_data(data_dir: &Path) -> Result<Vec<(PathBuf, String)>, Stri
     // Transcripts: speaker_id/chapter_id/speaker_id-chapter_id.trans.txt
 
     fn scan_recursive(dir: &Path, samples: &mut Vec<(PathBuf, String)>) -> Result<(), String> {
-        let entries = fs::read_dir(dir)
-            .map_err(|e| format!("Failed to read directory: {}", e))?;
+        let entries = fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {}", e))?;
 
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
@@ -662,12 +777,16 @@ fn scan_librispeech_data(data_dir: &Path) -> Result<Vec<(PathBuf, String)>, Stri
                     if let Ok(transcripts) = parse_transcript_file(&path) {
                         for (utterance_id, text) in transcripts {
                             // Find corresponding audio file
-                            let audio_path = path.parent().unwrap().join(format!("{}.flac", utterance_id));
+                            let audio_path = path
+                                .parent()
+                                .unwrap()
+                                .join(format!("{}.flac", utterance_id));
                             if audio_path.exists() {
                                 samples.push((audio_path, text));
                             } else {
                                 // Try .wav
-                                let wav_path = path.parent().unwrap().join(format!("{}.wav", utterance_id));
+                                let wav_path =
+                                    path.parent().unwrap().join(format!("{}.wav", utterance_id));
                                 if wav_path.exists() {
                                     samples.push((wav_path, text));
                                 }
@@ -695,7 +814,7 @@ fn parse_transcript_file(path: &Path) -> Result<Vec<(String, String)>, std::io::
         let line = line?;
         if let Some(idx) = line.find(' ') {
             let utterance_id = line[..idx].to_string();
-            let text = line[idx+1..].to_string();
+            let text = line[idx + 1..].to_string();
             transcripts.push((utterance_id, text));
         }
     }
@@ -703,8 +822,16 @@ fn parse_transcript_file(path: &Path) -> Result<Vec<(String, String)>, std::io::
     Ok(transcripts)
 }
 
-fn auto_pipeline(subset: &str, base_dir: &Path, workers: usize, dict_path: Option<&Path>) -> Result<(), String> {
-    println!("\n{}Symthaea LibriSpeech Auto Pipeline", style("").bold().cyan());
+fn auto_pipeline(
+    subset: &str,
+    base_dir: &Path,
+    workers: usize,
+    dict_path: Option<&Path>,
+) -> Result<(), String> {
+    println!(
+        "\n{}Symthaea LibriSpeech Auto Pipeline",
+        style("").bold().cyan()
+    );
     println!("{}", "=".repeat(50));
     println!("Subset:  {}", style(subset).green());
     println!("Base:    {}", base_dir.display());
@@ -716,7 +843,9 @@ fn auto_pipeline(subset: &str, base_dir: &Path, workers: usize, dict_path: Optio
 
     // Step 2: Train
     let data_dir = librispeech_dir.join("LibriSpeech").join(subset);
-    let output = base_dir.join("models").join(format!("{}_prototypes.bin", subset));
+    let output = base_dir
+        .join("models")
+        .join(format!("{}_prototypes.bin", subset));
 
     train_on_data(&data_dir, &output, None, workers, 10, dict_path)?;
 
@@ -754,7 +883,9 @@ fn show_info(data_dir: &Path) -> Result<(), String> {
             let components: Vec<_> = filename.split('-').collect();
             if components.len() >= 2 {
                 *speakers.entry(components[0].to_string()).or_insert(0) += 1;
-                *chapters.entry(format!("{}-{}", components[0], components[1])).or_insert(0) += 1;
+                *chapters
+                    .entry(format!("{}-{}", components[0], components[1]))
+                    .or_insert(0) += 1;
             }
         }
 
@@ -769,7 +900,10 @@ fn show_info(data_dir: &Path) -> Result<(), String> {
     println!("Chapters:        {}", chapters.len());
     println!("Total words:     {}", total_words);
     println!("Total chars:     {}", total_chars);
-    println!("Avg words/file:  {:.1}", total_words as f32 / samples.len() as f32);
+    println!(
+        "Avg words/file:  {:.1}",
+        total_words as f32 / samples.len() as f32
+    );
 
     // Show speaker distribution
     println!("\n{}Speakers (top 10):", style("").bold());
@@ -783,11 +917,14 @@ fn show_info(data_dir: &Path) -> Result<(), String> {
     println!("\n{}Sample transcripts:", style("").bold());
     for (path, transcript) in samples.iter().take(3) {
         println!("  {}", path.file_name().unwrap().to_string_lossy());
-        println!("    \"{}\"", if transcript.len() > 60 {
-            format!("{}...", &transcript[..60])
-        } else {
-            transcript.clone()
-        });
+        println!(
+            "    \"{}\"",
+            if transcript.len() > 60 {
+                format!("{}...", &transcript[..60])
+            } else {
+                transcript.clone()
+            }
+        );
     }
 
     Ok(())
@@ -802,7 +939,10 @@ fn evaluate_model(
     output: Option<&Path>,
     dict_path: Option<&Path>,
 ) -> Result<(), String> {
-    println!("\n{}LibriSpeech Evaluation Pipeline", style("").bold().cyan());
+    println!(
+        "\n{}LibriSpeech Evaluation Pipeline",
+        style("").bold().cyan()
+    );
     println!("{}", "=".repeat(50));
     println!("Model:   {}", model_path.display());
     println!("Data:    {}", data_dir.display());
@@ -813,10 +953,13 @@ fn evaluate_model(
 
     // Load prototypes
     println!("{}Loading model...", style("").dim());
-    let prototypes = TrainedPrototypes::load(model_path)
-        .map_err(|e| format!("Failed to load model: {}", e))?;
+    let prototypes =
+        TrainedPrototypes::load(model_path).map_err(|e| format!("Failed to load model: {}", e))?;
 
-    println!("Loaded {} phoneme prototypes", style(prototypes.len()).green());
+    println!(
+        "Loaded {} phoneme prototypes",
+        style(prototypes.len()).green()
+    );
 
     // Create resonator and load prototypes
     let mut resonator = PhonemeResonator::new();
@@ -837,8 +980,8 @@ fn evaluate_model(
     // Load dictionary if provided
     let text_to_phonemes = if let Some(dict) = dict_path {
         println!("{}Loading dictionary...", style("").dim());
-        let dict = CmuDictionary::load(dict)
-            .map_err(|e| format!("Failed to load dictionary: {}", e))?;
+        let dict =
+            CmuDictionary::load(dict).map_err(|e| format!("Failed to load dictionary: {}", e))?;
         Some(TextToPhonemes::new(dict))
     } else {
         None
@@ -852,7 +995,9 @@ fn evaluate_model(
         return Err("No test samples found".to_string());
     }
 
-    let total_samples = max_files.map(|m| m.min(samples.len())).unwrap_or(samples.len());
+    let total_samples = max_files
+        .map(|m| m.min(samples.len()))
+        .unwrap_or(samples.len());
     println!("Evaluating on {} samples", style(total_samples).green());
 
     // Progress bar
@@ -867,7 +1012,7 @@ fn evaluate_model(
     let mut projector = AudioProjector::default_config();
 
     let mut total_per = 0.0;
-    let mut total_per_nostress = 0.0;  // Stress-agnostic PER
+    let mut total_per_nostress = 0.0; // Stress-agnostic PER
     let mut per_count = 0;
     let mut total_ref_phonemes = 0;
     let mut total_hyp_phonemes = 0;
@@ -902,11 +1047,14 @@ fn evaluate_model(
             let mut above_threshold = 0;
             let mut below_threshold = 0;
             let mut max_score: f32 = -2.0;
-            let mut phoneme_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+            let mut phoneme_counts: std::collections::HashMap<String, usize> =
+                std::collections::HashMap::new();
             for (fi, hv) in hvs.iter().take(100).enumerate() {
                 let results = resonator.query(hv, 1);
                 if let Some((phoneme, score)) = results.first() {
-                    if fi < 10 { println!("  DEBUG Frame {}: {} score={:.4}", fi, phoneme, score); }
+                    if fi < 10 {
+                        println!("  DEBUG Frame {}: {} score={:.4}", fi, phoneme, score);
+                    }
                     max_score = max_score.max(*score);
                     if *score > 0.1 {
                         above_threshold += 1;
@@ -916,11 +1064,17 @@ fn evaluate_model(
                     }
                 }
             }
-            println!("  DEBUG: {} above 0.1, {} below 0.1, max={:.4}", above_threshold, below_threshold, max_score);
+            println!(
+                "  DEBUG: {} above 0.1, {} below 0.1, max={:.4}",
+                above_threshold, below_threshold, max_score
+            );
             // Show which phonemes are being predicted
             let mut counts: Vec<_> = phoneme_counts.into_iter().collect();
             counts.sort_by_key(|(_, c)| std::cmp::Reverse(*c));
-            println!("  DEBUG Phonemes above 0.1: {:?}", counts.iter().take(10).collect::<Vec<_>>());
+            println!(
+                "  DEBUG Phonemes above 0.1: {:?}",
+                counts.iter().take(10).collect::<Vec<_>>()
+            );
         }
 
         // Decode phonemes with LINGUISTIC CONSTRAINTS
@@ -945,7 +1099,7 @@ fn evaluate_model(
             for (phoneme, acoustic_score) in &candidates {
                 // Strip variant suffix
                 let base_phoneme = if let Some(idx) = phoneme.rfind('_') {
-                    if phoneme[idx+1..].chars().all(|c| c.is_ascii_digit()) {
+                    if phoneme[idx + 1..].chars().all(|c| c.is_ascii_digit()) {
                         phoneme[..idx].to_string()
                     } else {
                         phoneme.clone()
@@ -978,7 +1132,7 @@ fn evaluate_model(
             // CTC-style greedy decoding:
             // 1. Threshold gate: Ignore low-confidence frames
             // 2. Collapse repeats: Only emit on phoneme change
-            const CONFIDENCE_THRESHOLD: f32 = 0.12;  // Acoustic must be strong enough
+            const CONFIDENCE_THRESHOLD: f32 = 0.12; // Acoustic must be strong enough
 
             if best_score < CONFIDENCE_THRESHOLD {
                 continue;
@@ -994,7 +1148,7 @@ fn evaluate_model(
         let reference_phonemes: Vec<String> = if let Some(ref ttp) = text_to_phonemes {
             ttp.convert(reference_text)
                 .into_iter()
-                .filter(|p| p != "_" && p != "SIL")  // Remove silence markers
+                .filter(|p| p != "_" && p != "SIL") // Remove silence markers
                 .collect()
         } else {
             // Without dictionary, use placeholder
@@ -1009,16 +1163,26 @@ fn evaluate_model(
 
             // DEBUG: Print first file's reference vs predicted
             if i == 0 {
-                println!("  DEBUG REF ({} phonemes): {:?}", reference_phonemes.len(), &reference_phonemes[..reference_phonemes.len().min(30)]);
-                println!("  DEBUG HYP ({} phonemes): {:?}", predicted_phonemes.len(), &predicted_phonemes[..predicted_phonemes.len().min(30)]);
+                println!(
+                    "  DEBUG REF ({} phonemes): {:?}",
+                    reference_phonemes.len(),
+                    &reference_phonemes[..reference_phonemes.len().min(30)]
+                );
+                println!(
+                    "  DEBUG HYP ({} phonemes): {:?}",
+                    predicted_phonemes.len(),
+                    &predicted_phonemes[..predicted_phonemes.len().min(30)]
+                );
             }
 
             let per = phoneme_error_rate(&ref_strs, &hyp_strs);
             total_per += per;
 
             // Also compute stress-agnostic PER
-            let ref_nostress: Vec<String> = reference_phonemes.iter().map(|p| strip_stress(p)).collect();
-            let hyp_nostress: Vec<String> = predicted_phonemes.iter().map(|p| strip_stress(p)).collect();
+            let ref_nostress: Vec<String> =
+                reference_phonemes.iter().map(|p| strip_stress(p)).collect();
+            let hyp_nostress: Vec<String> =
+                predicted_phonemes.iter().map(|p| strip_stress(p)).collect();
             let ref_ns: Vec<&str> = ref_nostress.iter().map(String::as_str).collect();
             let hyp_ns: Vec<&str> = hyp_nostress.iter().map(String::as_str).collect();
             let per_nostress = phoneme_error_rate(&ref_ns, &hyp_ns);
@@ -1041,8 +1205,16 @@ fn evaluate_model(
     progress.finish_with_message("Evaluation complete!");
 
     // Compute averages
-    let avg_per = if per_count > 0 { total_per / per_count as f32 } else { 1.0 };
-    let avg_per_nostress = if per_count > 0 { total_per_nostress / per_count as f32 } else { 1.0 };
+    let avg_per = if per_count > 0 {
+        total_per / per_count as f32
+    } else {
+        1.0
+    };
+    let avg_per_nostress = if per_count > 0 {
+        total_per_nostress / per_count as f32
+    } else {
+        1.0
+    };
 
     // Print results
     println!("\n{}Evaluation Results", style("").bold().cyan());
@@ -1055,11 +1227,17 @@ fn evaluate_model(
     println!("{}", "-".repeat(40));
     println!("Average PER:           {:.1}%", avg_per * 100.0);
     println!("PER (no stress):       {:.1}%", avg_per_nostress * 100.0);
-    println!("Accuracy (no stress):  {:.1}%", (1.0 - avg_per_nostress) * 100.0);
+    println!(
+        "Accuracy (no stress):  {:.1}%",
+        (1.0 - avg_per_nostress) * 100.0
+    );
     println!();
 
     if text_to_phonemes.is_none() {
-        println!("{}Note: Provide --dict for phoneme-level evaluation", style("Tip: ").yellow());
+        println!(
+            "{}Note: Provide --dict for phoneme-level evaluation",
+            style("Tip: ").yellow()
+        );
     }
 
     // Print per-phoneme statistics
@@ -1075,12 +1253,22 @@ fn evaluate_model(
         for (phoneme, ref_count) in ref_sorted.iter().take(15) {
             let hyp_count = hyp_phoneme_counts.get(*phoneme).unwrap_or(&0);
             let ratio = *hyp_count as f32 / **ref_count as f32;
-            let status = if ratio < 0.5 { "UNDER" } else if ratio > 2.0 { "OVER" } else { "~OK" };
-            println!("  {:4}: ref={:4} hyp={:4} ({:.2}x) {}", phoneme, ref_count, hyp_count, ratio, status);
+            let status = if ratio < 0.5 {
+                "UNDER"
+            } else if ratio > 2.0 {
+                "OVER"
+            } else {
+                "~OK"
+            };
+            println!(
+                "  {:4}: ref={:4} hyp={:4} ({:.2}x) {}",
+                phoneme, ref_count, hyp_count, ratio, status
+            );
         }
 
         // Show phonemes that are over-predicted (not in top reference)
-        let mut hyp_only: Vec<_> = hyp_phoneme_counts.iter()
+        let mut hyp_only: Vec<_> = hyp_phoneme_counts
+            .iter()
             .filter(|(p, c)| **c > 50 && ref_phoneme_counts.get(*p).unwrap_or(&0) < &(**c / 3))
             .collect();
         hyp_only.sort_by_key(|(_, c)| std::cmp::Reverse(*c));
@@ -1106,8 +1294,12 @@ fn evaluate_model(
 
         let mut file = File::create(output_path)
             .map_err(|e| format!("Failed to create output file: {}", e))?;
-        file.write_all(serde_json::to_string_pretty(&report_json).unwrap().as_bytes())
-            .map_err(|e| format!("Failed to write report: {}", e))?;
+        file.write_all(
+            serde_json::to_string_pretty(&report_json)
+                .unwrap()
+                .as_bytes(),
+        )
+        .map_err(|e| format!("Failed to write report: {}", e))?;
 
         println!("\n{}Report saved to: {}", SUCCESS, output_path.display());
     }

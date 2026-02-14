@@ -92,14 +92,10 @@ fn bench_bind_operation(c: &mut Criterion) {
     let hv2 = BinaryHV::random(43);
 
     // Single bind operation (SIMD)
-    group.bench_function("simd", |b| {
-        b.iter(|| black_box(hv1.bind(&hv2)))
-    });
+    group.bench_function("simd", |b| b.iter(|| black_box(hv1.bind(&hv2))));
 
     // Scalar bind for comparison
-    group.bench_function("scalar", |b| {
-        b.iter(|| black_box(hv1.bind_scalar(&hv2)))
-    });
+    group.bench_function("scalar", |b| b.iter(|| black_box(hv1.bind_scalar(&hv2))));
 
     // Chained binding (A bind B bind C bind D)
     let hv3 = BinaryHV::random(44);
@@ -109,15 +105,11 @@ fn bench_bind_operation(c: &mut Criterion) {
     });
 
     // Self-inverse property verification (A bind A = 0)
-    group.bench_function("self_inverse", |b| {
-        b.iter(|| black_box(hv1.bind(&hv1)))
-    });
+    group.bench_function("self_inverse", |b| b.iter(|| black_box(hv1.bind(&hv1))));
 
     // Unbinding (recover B from A_bind_B using A)
     let bound = hv1.bind(&hv2);
-    group.bench_function("unbind", |b| {
-        b.iter(|| black_box(bound.bind(&hv1)))
-    });
+    group.bench_function("unbind", |b| b.iter(|| black_box(bound.bind(&hv1))));
 
     group.finish();
 }
@@ -134,9 +126,7 @@ fn bench_similarity_calculation(c: &mut Criterion) {
     let hv2 = BinaryHV::random(43);
 
     // Single similarity calculation (SIMD)
-    group.bench_function("simd", |b| {
-        b.iter(|| black_box(hv1.similarity(&hv2)))
-    });
+    group.bench_function("simd", |b| b.iter(|| black_box(hv1.similarity(&hv2))));
 
     // Scalar similarity for comparison
     group.bench_function("scalar", |b| {
@@ -144,15 +134,11 @@ fn bench_similarity_calculation(c: &mut Criterion) {
     });
 
     // Self-similarity (should be 1.0)
-    group.bench_function("self", |b| {
-        b.iter(|| black_box(hv1.similarity(&hv1)))
-    });
+    group.bench_function("self", |b| b.iter(|| black_box(hv1.similarity(&hv1))));
 
     // Similarity with inverted (should be 0.0)
     let inv = hv1.invert();
-    group.bench_function("inverse", |b| {
-        b.iter(|| black_box(hv1.similarity(&inv)))
-    });
+    group.bench_function("inverse", |b| b.iter(|| black_box(hv1.similarity(&inv))));
 
     // Batch similarity (query against codebook)
     let codebook: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
@@ -191,9 +177,7 @@ fn bench_hamming_distance(c: &mut Criterion) {
     let hv2 = BinaryHV::random(43);
 
     // Single hamming distance (SIMD)
-    group.bench_function("simd", |b| {
-        b.iter(|| black_box(hv1.hamming_distance(&hv2)))
-    });
+    group.bench_function("simd", |b| b.iter(|| black_box(hv1.hamming_distance(&hv2))));
 
     // Scalar hamming distance for comparison
     group.bench_function("scalar", |b| {
@@ -201,9 +185,7 @@ fn bench_hamming_distance(c: &mut Criterion) {
     });
 
     // Self distance (should be 0)
-    group.bench_function("self", |b| {
-        b.iter(|| black_box(hv1.hamming_distance(&hv1)))
-    });
+    group.bench_function("self", |b| b.iter(|| black_box(hv1.hamming_distance(&hv1))));
 
     // Distance to inverted (should be 16384)
     let inv = hv1.invert();
@@ -249,15 +231,15 @@ fn bench_bundle_operation(c: &mut Criterion) {
             b.iter(|| black_box(BinaryHV::bundle_safe(vecs)))
         });
 
-        group.bench_with_input(BenchmarkId::new("normalized", count), &vectors, |b, vecs| {
-            b.iter(|| black_box(BinaryHV::bundle_normalized(vecs)))
-        });
+        group.bench_with_input(
+            BenchmarkId::new("normalized", count),
+            &vectors,
+            |b, vecs| b.iter(|| black_box(BinaryHV::bundle_normalized(vecs))),
+        );
     }
 
     // Empty bundle (edge case)
-    group.bench_function("empty", |b| {
-        b.iter(|| black_box(BinaryHV::bundle(&[])))
-    });
+    group.bench_function("empty", |b| b.iter(|| black_box(BinaryHV::bundle(&[]))));
 
     // Single vector bundle (should return same vector)
     let single = BinaryHV::random(42);
@@ -290,9 +272,7 @@ fn bench_permute_operation(c: &mut Criterion) {
     }
 
     // Zero shift (identity, should be fast)
-    group.bench_function("identity", |b| {
-        b.iter(|| black_box(hv.permute(0)))
-    });
+    group.bench_function("identity", |b| b.iter(|| black_box(hv.permute(0))));
 
     // Full cycle (shift by DIM)
     group.bench_function("full_cycle", |b| {
@@ -324,19 +304,13 @@ fn bench_invert_operation(c: &mut Criterion) {
     let hv = BinaryHV::random(42);
 
     // Single invert (SIMD)
-    group.bench_function("simd", |b| {
-        b.iter(|| black_box(hv.invert()))
-    });
+    group.bench_function("simd", |b| b.iter(|| black_box(hv.invert())));
 
     // Scalar invert for comparison
-    group.bench_function("scalar", |b| {
-        b.iter(|| black_box(hv.invert_scalar()))
-    });
+    group.bench_function("scalar", |b| b.iter(|| black_box(hv.invert_scalar())));
 
     // Double invert (should equal original)
-    group.bench_function("double", |b| {
-        b.iter(|| black_box(hv.invert().invert()))
-    });
+    group.bench_function("double", |b| b.iter(|| black_box(hv.invert().invert())));
 
     group.finish();
 }
@@ -351,14 +325,10 @@ fn bench_auxiliary_operations(c: &mut Criterion) {
     let hv = BinaryHV::random(42);
 
     // Popcount
-    group.bench_function("popcount", |b| {
-        b.iter(|| black_box(hv.popcount()))
-    });
+    group.bench_function("popcount", |b| b.iter(|| black_box(hv.popcount())));
 
     // Density calculation
-    group.bench_function("density", |b| {
-        b.iter(|| black_box(hv.density()))
-    });
+    group.bench_function("density", |b| b.iter(|| black_box(hv.density())));
 
     // Get single bit
     group.bench_function("get_bit", |b| {
@@ -370,9 +340,7 @@ fn bench_auxiliary_operations(c: &mut Criterion) {
     });
 
     // Bipolar conversion (to f32 array)
-    group.bench_function("to_bipolar", |b| {
-        b.iter(|| black_box(hv.to_bipolar()))
-    });
+    group.bench_function("to_bipolar", |b| b.iter(|| black_box(hv.to_bipolar())));
 
     // From bipolar conversion
     let bipolar = hv.to_bipolar();
@@ -403,24 +371,16 @@ fn bench_memory_operations(c: &mut Criterion) {
 
     // Clone operation
     let hv = BinaryHV::random(42);
-    group.bench_function("clone", |b| {
-        b.iter(|| black_box(hv.clone()))
-    });
+    group.bench_function("clone", |b| b.iter(|| black_box(hv.clone())));
 
     // Default (zero) creation
-    group.bench_function("default", |b| {
-        b.iter(|| black_box(BinaryHV::default()))
-    });
+    group.bench_function("default", |b| b.iter(|| black_box(BinaryHV::default())));
 
     // Zero creation (const)
-    group.bench_function("zero", |b| {
-        b.iter(|| black_box(BinaryHV::zero()))
-    });
+    group.bench_function("zero", |b| b.iter(|| black_box(BinaryHV::zero())));
 
     // Ones creation (const)
-    group.bench_function("ones", |b| {
-        b.iter(|| black_box(BinaryHV::ones()))
-    });
+    group.bench_function("ones", |b| b.iter(|| black_box(BinaryHV::ones())));
 
     // From bits
     let bits = vec![0xFFFFFFFFFFFFFFFFu64; 256];
@@ -430,9 +390,7 @@ fn bench_memory_operations(c: &mut Criterion) {
 
     // Equality check
     let hv2 = BinaryHV::random(42);
-    group.bench_function("equality", |b| {
-        b.iter(|| black_box(hv == hv2))
-    });
+    group.bench_function("equality", |b| b.iter(|| black_box(hv == hv2)));
 
     // Hash (for HashMap usage)
     use std::collections::hash_map::DefaultHasher;
@@ -465,19 +423,13 @@ fn bench_set_operations(c: &mut Criterion) {
     });
 
     // Union (SIMD OR)
-    group.bench_function("union", |b| {
-        b.iter(|| black_box(hv1.union(&hv2)))
-    });
+    group.bench_function("union", |b| b.iter(|| black_box(hv1.union(&hv2))));
 
     // BitAnd trait operator
-    group.bench_function("bitand_trait", |b| {
-        b.iter(|| black_box(hv1 & hv2))
-    });
+    group.bench_function("bitand_trait", |b| b.iter(|| black_box(hv1 & hv2)));
 
     // BitOr trait operator
-    group.bench_function("bitor_trait", |b| {
-        b.iter(|| black_box(hv1 | hv2))
-    });
+    group.bench_function("bitor_trait", |b| b.iter(|| black_box(hv1 | hv2)));
 
     // Cosine similarity
     group.bench_function("cosine_similarity", |b| {
@@ -500,13 +452,17 @@ fn bench_weighted_bundle(c: &mut Criterion) {
 
         group.throughput(Throughput::Elements(count as u64));
 
-        group.bench_with_input(BenchmarkId::new("stack", count), &(vectors.clone(), weights.clone()), |b, (vecs, ws)| {
-            b.iter(|| black_box(BinaryHV::weighted_bundle(vecs, ws)))
-        });
+        group.bench_with_input(
+            BenchmarkId::new("stack", count),
+            &(vectors.clone(), weights.clone()),
+            |b, (vecs, ws)| b.iter(|| black_box(BinaryHV::weighted_bundle(vecs, ws))),
+        );
 
-        group.bench_with_input(BenchmarkId::new("safe", count), &(vectors, weights), |b, (vecs, ws)| {
-            b.iter(|| black_box(BinaryHV::weighted_bundle_safe(vecs, ws)))
-        });
+        group.bench_with_input(
+            BenchmarkId::new("safe", count),
+            &(vectors, weights),
+            |b, (vecs, ws)| b.iter(|| black_box(BinaryHV::weighted_bundle_safe(vecs, ws))),
+        );
     }
 
     group.finish();
@@ -555,9 +511,11 @@ fn bench_new_primitives(c: &mut Criterion) {
         .map(|(i, v)| (i, hv.similarity(v)))
         .collect();
     for k in [1, 5, 10] {
-        group.bench_with_input(BenchmarkId::new("k_winners", k), &(sims.clone(), k), |b, (s, k_val)| {
-            b.iter(|| black_box(BinaryHV::k_winners(s, *k_val)))
-        });
+        group.bench_with_input(
+            BenchmarkId::new("k_winners", k),
+            &(sims.clone(), k),
+            |b, (s, k_val)| b.iter(|| black_box(BinaryHV::k_winners(s, *k_val))),
+        );
     }
 
     group.finish();
