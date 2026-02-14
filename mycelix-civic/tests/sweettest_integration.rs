@@ -9,8 +9,12 @@
 //! nix develop
 //! hc dna pack dna/
 //! hc app pack .
-//! cargo test -p civic-tests --test sweettest_integration -- --ignored
+//! cd tests
+//! cargo test --release --test sweettest_integration -- --ignored --test-threads=2
 //! ```
+//!
+//! Note: `--test-threads=2` prevents conductor database timeouts from too many
+//! concurrent Holochain conductors competing for SQLite locks.
 
 use holochain::prelude::*;
 use holochain::sweettest::*;
@@ -1238,6 +1242,398 @@ async fn test_justice_case_with_media_evidence() {
         .await;
 
     assert!(event.action().author() == alice.agent_pubkey());
+}
+
+// ============================================================================
+// Cross-Cluster Dispatch Scenarios — Civic -> Commons
+// ============================================================================
+//
+// These scenarios exercise the `dispatch_commons_call` extern on the
+// civic_bridge zome, which calls `dispatch_call_cross_cluster()` against
+// the ALLOWED_COMMONS_ZOMES allowlist. Each test constructs a
+// CrossClusterDispatchInput targeting a zome in the Commons DNA. In a
+// real conductor with the unified hApp, the call would be routed via
+// `CallTargetCell::OtherRole("commons")`.
+
+// Mirror type for CrossClusterDispatchInput (from mycelix_bridge_common)
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CrossClusterDispatchInput {
+    pub role: String,
+    pub zome: String,
+    pub fn_name: String,
+    pub payload: Vec<u8>,
+}
+
+// Mirror type for DispatchResult (from mycelix_bridge_common)
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DispatchResult {
+    pub success: bool,
+    pub response: Option<Vec<u8>>,
+    pub error: Option<String>,
+}
+
+/// Cross-cluster: Emergency -> Food (Civic -> Commons)
+///
+/// Scenario: During a disaster response, the emergency_incidents zome
+/// needs to query food stock levels from the commons food_distribution
+/// zome to plan rationing and supply logistics. The dispatch crosses
+/// from the Civic DNA to the Commons DNA via OtherRole("commons").
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_cross_cluster_emergency_queries_food_stock() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+
+    // 1. Declare a disaster first (the triggering incident)
+    let disaster = DeclareDisasterInput {
+        id: "disaster-food-query".to_string(),
+        disaster_type: DisasterType::Hurricane,
+        title: "Hurricane Maria Response".to_string(),
+        description: "Category 4 hurricane requiring food supply assessment".to_string(),
+        severity: SeverityLevel::Level4,
+        affected_area: AffectedArea {
+            center_lat: 29.7604,
+            center_lon: -95.3698,
+            radius_km: 80.0,
+            boundary: None,
+            zones: vec![],
+        },
+        estimated_affected: 75000,
+        coordination_lead: Some(agent.clone()),
+    };
+
+    let disaster_record: Record = conductor
+        .call(
+            &alice.zome("emergency_incidents"),
+            "declare_disaster",
+            disaster,
+        )
+        .await;
+
+    // 2. Cross-cluster dispatch: emergency -> commons food_distribution
+    //    to query available food stocks during the disaster
+    let food_query_payload = serde_json::to_vec(&serde_json::json!({
+        "disaster_id": disaster_record.action_address().to_string(),
+        "area_lat": 29.7604,
+        "area_lon": -95.3698,
+        "radius_km": 80.0,
+        "food_types": ["non_perishable", "water", "ready_to_eat"],
+    }))
+    .unwrap();
+
+    let dispatch = CrossClusterDispatchInput {
+        role: "commons".to_string(),
+        zome: "food_distribution".to_string(),
+        fn_name: "query_available_stock".to_string(),
+        payload: food_query_payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&alice.zome("civic_bridge"), "dispatch_commons_call", dispatch)
+        .await;
+
+    // In a real unified hApp with both DNAs, this would reach the commons
+    // food_distribution zome. Here, the dispatch validates the zome name
+    // against ALLOWED_COMMONS_ZOMES. Without the commons DNA installed,
+    // we expect a network/routing error rather than an allowlist rejection.
+    assert!(
+        result.success || result.error.is_some(),
+        "Cross-cluster dispatch should either succeed or return a routing error"
+    );
+    // Verify it was NOT rejected by the allowlist (food_distribution is allowed)
+    if let Some(ref err) = result.error {
+        assert!(
+            !err.contains("not in the allowed cross-cluster dispatch list"),
+            "food_distribution should be in the allowed commons zomes"
+        );
+    }
+
+    // 3. Bridge event recording the cross-cluster food stock query
+    let query_event = CivicEventEntry {
+        domain: "emergency".to_string(),
+        event_type: "cross_cluster_food_stock_queried".to_string(),
+        source_agent: agent.clone(),
+        payload: serde_json::to_string(&serde_json::json!({
+            "disaster_hash": disaster_record.action_address().to_string(),
+            "target_cluster": "commons",
+            "target_zome": "food_distribution",
+            "query": "available food stocks for disaster response",
+        }))
+        .unwrap(),
+        created_at: Timestamp::now(),
+        related_hashes: vec![disaster_record.action_address().to_string()],
+    };
+
+    let event_record: Record = conductor
+        .call(&alice.zome("civic_bridge"), "broadcast_event", query_event)
+        .await;
+
+    assert!(event_record.action().author() == alice.agent_pubkey());
+}
+
+/// Cross-cluster: Justice -> Transport (Civic -> Commons)
+///
+/// Scenario: A justice case involves suspected carbon credit fraud. The
+/// justice_cases zome dispatches to the commons transport_impact zome to
+/// query the suspect's carbon credit history for forensic analysis.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_cross_cluster_justice_queries_transport_carbon_credits() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+    let now = Timestamp::now();
+
+    // 1. File a justice case for suspected carbon credit fraud
+    let case = CaseInput {
+        id: "case-carbon-fraud".to_string(),
+        title: "Suspected carbon credit fraud".to_string(),
+        description: "Agent reported inflated trip distances to earn excess carbon credits".to_string(),
+        case_type: CaseType::FinancialDispute,
+        complainant: format!("did:key:{}", agent),
+        respondent: "did:key:suspect-agent-did".to_string(),
+        parties: vec![],
+        phase: CasePhase::Filed,
+        status: CaseStatus::Active,
+        severity: CaseSeverity::Serious,
+        context: CaseContext {
+            happ: Some("mycelix-commons".to_string()),
+            reference_id: Some("transport-credits-audit".to_string()),
+            community: Some("Richardson".to_string()),
+            jurisdiction: None,
+        },
+        created_at: now,
+        updated_at: now,
+        phase_deadline: None,
+    };
+
+    let case_record: Record = conductor
+        .call(&alice.zome("justice_cases"), "file_case", case)
+        .await;
+
+    // 2. Cross-cluster dispatch: justice -> commons transport_impact
+    //    to query carbon credit history for the suspect
+    let credit_query_payload = serde_json::to_vec(&serde_json::json!({
+        "agent_did": "did:key:suspect-agent-did",
+        "from_timestamp": 1700000000,
+        "to_timestamp": 1710000000,
+    }))
+    .unwrap();
+
+    let dispatch = CrossClusterDispatchInput {
+        role: "commons".to_string(),
+        zome: "transport_impact".to_string(),
+        fn_name: "get_agent_carbon_credits".to_string(),
+        payload: credit_query_payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&alice.zome("civic_bridge"), "dispatch_commons_call", dispatch)
+        .await;
+
+    assert!(
+        result.success || result.error.is_some(),
+        "Cross-cluster dispatch should either succeed or return a routing error"
+    );
+    // Verify it was NOT rejected by the allowlist
+    if let Some(ref err) = result.error {
+        assert!(
+            !err.contains("not in the allowed cross-cluster dispatch list"),
+            "transport_impact should be in the allowed commons zomes"
+        );
+    }
+
+    // 3. Bridge event linking the case to the cross-cluster evidence query
+    let evidence_event = CivicEventEntry {
+        domain: "justice".to_string(),
+        event_type: "cross_cluster_evidence_queried".to_string(),
+        source_agent: agent.clone(),
+        payload: serde_json::to_string(&serde_json::json!({
+            "case_hash": case_record.action_address().to_string(),
+            "target_cluster": "commons",
+            "target_zome": "transport_impact",
+            "evidence_type": "carbon_credit_history",
+            "suspect_did": "did:key:suspect-agent-did",
+        }))
+        .unwrap(),
+        created_at: Timestamp::now(),
+        related_hashes: vec![case_record.action_address().to_string()],
+    };
+
+    let event_record: Record = conductor
+        .call(&alice.zome("civic_bridge"), "broadcast_event", evidence_event)
+        .await;
+
+    assert!(event_record.action().author() == alice.agent_pubkey());
+
+    // 4. Verify justice events include the cross-cluster query
+    let justice_events: Vec<Record> = conductor
+        .call(
+            &alice.zome("civic_bridge"),
+            "get_domain_events",
+            "justice".to_string(),
+        )
+        .await;
+
+    assert!(
+        !justice_events.is_empty(),
+        "Justice domain should have the cross-cluster evidence query event"
+    );
+}
+
+/// Cross-cluster: Emergency -> Housing (Civic -> Commons)
+///
+/// Scenario: During a disaster, the emergency_coordination zome needs to
+/// check available housing capacity in the commons cluster to supplement
+/// dedicated shelters. This dispatches to commons housing_units.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_cross_cluster_emergency_checks_housing_capacity() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&civic_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+
+    // 1. Declare a large-scale disaster exceeding shelter capacity
+    let disaster = DeclareDisasterInput {
+        id: "disaster-shelter-overflow".to_string(),
+        disaster_type: DisasterType::Tornado,
+        title: "North Texas Tornado Complex".to_string(),
+        description: "Multiple tornadoes requiring overflow housing capacity assessment".to_string(),
+        severity: SeverityLevel::Level5,
+        affected_area: AffectedArea {
+            center_lat: 32.9483,
+            center_lon: -96.7299,
+            radius_km: 40.0,
+            boundary: None,
+            zones: vec![OperationalZone {
+                id: "zone-overflow".to_string(),
+                name: "Richardson Central".to_string(),
+                boundary: vec![(32.94, -96.73), (32.96, -96.73), (32.96, -96.71)],
+                priority: ZonePriority::Critical,
+                status: ZoneStatus::Active,
+            }],
+        },
+        estimated_affected: 25000,
+        coordination_lead: Some(agent.clone()),
+    };
+
+    let disaster_record: Record = conductor
+        .call(
+            &alice.zome("emergency_incidents"),
+            "declare_disaster",
+            disaster,
+        )
+        .await;
+
+    // 2. Register a shelter (at capacity)
+    let shelter = RegisterShelterInput {
+        id: "shelter-full-001".to_string(),
+        name: "Richardson Community Center".to_string(),
+        location_lat: 32.9483,
+        location_lon: -96.7299,
+        address: "100 Civic Center Dr, Richardson, TX".to_string(),
+        capacity: 300,
+        shelter_type: ShelterType::Emergency,
+        amenities: vec![Amenity::Food, Amenity::Medical, Amenity::Power, Amenity::Cots],
+        contact: "emergency-ops@richardson.gov".to_string(),
+    };
+
+    let _shelter_record: Record = conductor
+        .call(
+            &alice.zome("emergency_shelters"),
+            "register_shelter",
+            shelter,
+        )
+        .await;
+
+    // 3. Cross-cluster dispatch: emergency -> commons housing_units
+    //    to check available overflow housing capacity
+    let housing_query_payload = serde_json::to_vec(&serde_json::json!({
+        "area": "Richardson, TX",
+        "disaster_id": disaster_record.action_address().to_string(),
+        "min_capacity": 10,
+        "unit_status": "available",
+    }))
+    .unwrap();
+
+    let dispatch = CrossClusterDispatchInput {
+        role: "commons".to_string(),
+        zome: "housing_units".to_string(),
+        fn_name: "get_available_units_for_area".to_string(),
+        payload: housing_query_payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&alice.zome("civic_bridge"), "dispatch_commons_call", dispatch)
+        .await;
+
+    assert!(
+        result.success || result.error.is_some(),
+        "Cross-cluster dispatch should either succeed or return a routing error"
+    );
+    // Verify it was NOT rejected by the allowlist
+    if let Some(ref err) = result.error {
+        assert!(
+            !err.contains("not in the allowed cross-cluster dispatch list"),
+            "housing_units should be in the allowed commons zomes"
+        );
+    }
+
+    // 4. Bridge event recording the cross-cluster shelter capacity check
+    let capacity_event = CivicEventEntry {
+        domain: "emergency".to_string(),
+        event_type: "cross_cluster_housing_capacity_checked".to_string(),
+        source_agent: agent.clone(),
+        payload: serde_json::to_string(&serde_json::json!({
+            "disaster_hash": disaster_record.action_address().to_string(),
+            "target_cluster": "commons",
+            "target_zome": "housing_units",
+            "reason": "shelter capacity exceeded, checking overflow housing",
+            "area": "Richardson, TX",
+        }))
+        .unwrap(),
+        created_at: Timestamp::now(),
+        related_hashes: vec![disaster_record.action_address().to_string()],
+    };
+
+    let event_record: Record = conductor
+        .call(&alice.zome("civic_bridge"), "broadcast_event", capacity_event)
+        .await;
+
+    assert!(event_record.action().author() == alice.agent_pubkey());
+
+    // 5. Verify emergency events include the housing capacity check
+    let emergency_events: Vec<Record> = conductor
+        .call(
+            &alice.zome("civic_bridge"),
+            "get_domain_events",
+            "emergency".to_string(),
+        )
+        .await;
+
+    assert!(
+        emergency_events.len() >= 1,
+        "Emergency domain should have the cross-cluster housing capacity event"
+    );
 }
 
 // ============================================================================

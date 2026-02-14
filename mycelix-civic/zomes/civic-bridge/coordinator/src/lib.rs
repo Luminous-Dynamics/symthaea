@@ -377,6 +377,15 @@ const ALLOWED_COMMONS_ZOMES: &[&str] = &[
     "water_capture",
     "water_steward",
     "water_wisdom",
+    // Food domain
+    "food_production",
+    "food_distribution",
+    "food_preservation",
+    "food_knowledge",
+    // Transport domain
+    "transport_routes",
+    "transport_sharing",
+    "transport_impact",
     // Commons bridge
     "commons_bridge",
 ];
@@ -787,19 +796,23 @@ mod tests {
         let has_care = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("care_"));
         let has_mutualaid = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("mutualaid_"));
         let has_water = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("water_"));
+        let has_food = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("food_"));
+        let has_transport = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("transport_"));
         let has_bridge = ALLOWED_COMMONS_ZOMES.contains(&"commons_bridge");
         assert!(has_property, "ALLOWED_COMMONS_ZOMES missing property domain");
         assert!(has_housing, "ALLOWED_COMMONS_ZOMES missing housing domain");
         assert!(has_care, "ALLOWED_COMMONS_ZOMES missing care domain");
         assert!(has_mutualaid, "ALLOWED_COMMONS_ZOMES missing mutualaid domain");
         assert!(has_water, "ALLOWED_COMMONS_ZOMES missing water domain");
+        assert!(has_food, "ALLOWED_COMMONS_ZOMES missing food domain");
+        assert!(has_transport, "ALLOWED_COMMONS_ZOMES missing transport domain");
         assert!(has_bridge, "ALLOWED_COMMONS_ZOMES missing commons_bridge");
     }
 
     #[test]
     fn commons_allowlist_has_expected_count() {
-        // 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 1 commons_bridge = 28
-        assert_eq!(ALLOWED_COMMONS_ZOMES.len(), 28);
+        // 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food + 3 transport + 1 commons_bridge = 35
+        assert_eq!(ALLOWED_COMMONS_ZOMES.len(), 35);
     }
 
     #[test]

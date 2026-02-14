@@ -76,11 +76,11 @@ function createMockCase(overrides: Partial<Case> = {}): Case {
     id: 'case-123',
     title: 'Contract Breach Dispute',
     description: 'Vendor failed to deliver goods as specified',
-    category: 'ContractBreach' as CaseCategory,
+    category: 'ContractDispute' as CaseCategory,
     complainant: 'did:mycelix:complainant123',
     respondent: 'did:mycelix:respondent456',
-    phase: 'Filing' as CasePhase,
-    status: 'Open' as CaseStatus,
+    phase: 'Filed' as CasePhase,
+    status: 'Active' as CaseStatus,
     arbitrators: [],
     evidence_count: 0,
     filed_at: Date.now() * 1000,
@@ -110,7 +110,7 @@ function createMockMediatorProfile(overrides: Partial<MediatorProfile> = {}): Me
     reputation_score: 0.85,
     cases_mediated: 25,
     success_rate: 0.78,
-    specializations: ['ContractBreach', 'PropertyDispute'] as CaseCategory[],
+    specializations: ['ContractDispute', 'PropertyDispute'] as CaseCategory[],
     available: true,
     certified_at: Date.now() * 1000 - 86400000000,
     ...overrides,
@@ -123,7 +123,7 @@ function createMockArbitratorProfile(overrides: Partial<ArbitratorProfile> = {})
     reputation_score: 0.92,
     cases_arbitrated: 50,
     appeals_overturned: 3,
-    specializations: ['ContractBreach', 'Fraud'] as CaseCategory[],
+    specializations: ['ContractDispute', 'ConductViolation'] as CaseCategory[],
     tier: 'Lead' as ArbitratorTier,
     available: true,
     certified_at: Date.now() * 1000 - 172800000000,
@@ -135,7 +135,7 @@ function createMockDecision(overrides: Partial<Decision> = {}): Decision {
   return {
     id: 'decision-123',
     case_id: 'case-123',
-    outcome: 'ComplainantFavor' as DecisionOutcome,
+    outcome: 'ForComplainant' as DecisionOutcome,
     reasoning: 'Evidence clearly shows breach of contract terms',
     remedies: [
       {
@@ -213,7 +213,7 @@ describe('CasesClient', () => {
       const result = await client.fileCase({
         title: 'Contract Breach Dispute',
         description: 'Vendor failed to deliver goods',
-        category: 'ContractBreach',
+        category: 'ContractDispute',
         respondent: 'did:mycelix:respondent456',
       });
 
@@ -230,13 +230,13 @@ describe('CasesClient', () => {
 
     it('should file case with all categories', async () => {
       const categories: CaseCategory[] = [
-        'ContractBreach',
+        'ContractDispute',
         'PropertyDispute',
-        'Fraud',
-        'Defamation',
-        'CopyrightViolation',
-        'GovernanceViolation',
-        'Interpersonal',
+        'ConductViolation',
+        'ConductViolation',
+        'IPDispute',
+        'GovernanceDispute',
+        'ConductViolation',
         'Other',
       ];
 
@@ -460,7 +460,7 @@ describe('ArbitrationClient', () => {
   describe('registerAsMediator', () => {
     it('should register as mediator', async () => {
       const result = await client.registerAsMediator({
-        specializations: ['ContractBreach', 'PropertyDispute'],
+        specializations: ['ContractDispute', 'PropertyDispute'],
       });
 
       expect(result.entry.Present.did).toBe('did:mycelix:mediator123');
@@ -471,7 +471,7 @@ describe('ArbitrationClient', () => {
   describe('registerAsArbitrator', () => {
     it('should register as arbitrator with tier', async () => {
       const result = await client.registerAsArbitrator({
-        specializations: ['ContractBreach', 'Fraud'],
+        specializations: ['ContractDispute', 'ConductViolation'],
         tier: 'Lead',
       });
 
@@ -484,7 +484,7 @@ describe('ArbitrationClient', () => {
 
       for (const tier of tiers) {
         const result = await client.registerAsArbitrator({
-          specializations: ['ContractBreach'],
+          specializations: ['ContractDispute'],
           tier,
         });
 
@@ -495,17 +495,17 @@ describe('ArbitrationClient', () => {
 
   describe('getAvailableMediators', () => {
     it('should get available mediators for category', async () => {
-      const results = await client.getAvailableMediators('ContractBreach');
+      const results = await client.getAvailableMediators('ContractDispute');
 
       expect(results).toHaveLength(1);
       expect(results[0].entry.Present.available).toBe(true);
-      expect(results[0].entry.Present.specializations).toContain('ContractBreach');
+      expect(results[0].entry.Present.specializations).toContain('ContractDispute');
     });
   });
 
   describe('getAvailableArbitrators', () => {
     it('should get available arbitrators for category', async () => {
-      const results = await client.getAvailableArbitrators('ContractBreach');
+      const results = await client.getAvailableArbitrators('ContractDispute');
 
       expect(results).toHaveLength(1);
       expect(results[0].entry.Present.available).toBe(true);
@@ -546,20 +546,20 @@ describe('ArbitrationClient', () => {
 
       const result = await client.renderDecision(
         'case-123',
-        'ComplainantFavor',
+        'ForComplainant',
         'Clear breach of contract',
         remedies
       );
 
-      expect(result.entry.Present.outcome).toBe('ComplainantFavor');
+      expect(result.entry.Present.outcome).toBe('ForComplainant');
       expect(result.entry.Present.remedies).toHaveLength(1);
     });
 
     it('should render with all outcomes', async () => {
       const outcomes: DecisionOutcome[] = [
-        'ComplainantFavor',
-        'RespondentFavor',
-        'Split',
+        'ForComplainant',
+        'ForRespondent',
+        'SplitDecision',
         'Dismissed',
         'Settled',
       ];
@@ -763,13 +763,13 @@ describe('createJusticeClients', () => {
 describe('Type Safety', () => {
   it('should enforce case category types', () => {
     const validCategories: CaseCategory[] = [
-      'ContractBreach',
+      'ContractDispute',
       'PropertyDispute',
-      'Fraud',
-      'Defamation',
-      'CopyrightViolation',
-      'GovernanceViolation',
-      'Interpersonal',
+      'ConductViolation',
+      'ConductViolation',
+      'IPDispute',
+      'GovernanceDispute',
+      'ConductViolation',
       'Other',
     ];
 
@@ -781,7 +781,7 @@ describe('Type Safety', () => {
 
   it('should enforce case phase progression', () => {
     const phases: CasePhase[] = [
-      'Filing',
+      'Filed',
       'Mediation',
       'Arbitration',
       'Appeal',
@@ -889,7 +889,7 @@ describe('Integration Patterns', () => {
     const clients = createJusticeClients(mockZome);
 
     // Render decision
-    const decision = await clients.arbitration.renderDecision('case-123', 'ComplainantFavor', 'Reasoning', []);
+    const decision = await clients.arbitration.renderDecision('case-123', 'ForComplainant', 'Reasoning', []);
 
     // Request cross-hApp enforcement
     const enforcement = await clients.enforcement.requestEnforcement({
@@ -942,7 +942,7 @@ describe('ValidatedCasesClient', () => {
       const result = await validatedClient.fileCase({
         title: 'Contract Breach',
         description: 'Vendor failed to deliver goods as contracted',
-        category: 'ContractBreach',
+        category: 'ContractDispute',
         respondent: 'did:mycelix:respondent456',
       });
       expect(result.entry.Present?.id).toBe('case-123');
@@ -953,7 +953,7 @@ describe('ValidatedCasesClient', () => {
         validatedClient.fileCase({
           title: '',
           description: 'Vendor failed to deliver goods as contracted',
-          category: 'ContractBreach',
+          category: 'ContractDispute',
           respondent: 'did:mycelix:respondent456',
         })
       ).rejects.toThrow('Validation failed');
@@ -964,7 +964,7 @@ describe('ValidatedCasesClient', () => {
         validatedClient.fileCase({
           title: 'x'.repeat(201),
           description: 'Vendor failed to deliver goods as contracted',
-          category: 'ContractBreach',
+          category: 'ContractDispute',
           respondent: 'did:mycelix:respondent456',
         })
       ).rejects.toThrow('Validation failed');
@@ -975,7 +975,7 @@ describe('ValidatedCasesClient', () => {
         validatedClient.fileCase({
           title: 'Contract Breach',
           description: 'Too short',
-          category: 'ContractBreach',
+          category: 'ContractDispute',
           respondent: 'did:mycelix:respondent456',
         })
       ).rejects.toThrow('Validation failed');
@@ -986,7 +986,7 @@ describe('ValidatedCasesClient', () => {
         validatedClient.fileCase({
           title: 'Contract Breach',
           description: 'Vendor failed to deliver goods as contracted',
-          category: 'Invalid' as 'ContractBreach',
+          category: 'Invalid' as 'ContractDispute',
           respondent: 'did:mycelix:respondent456',
         })
       ).rejects.toThrow('Validation failed');
@@ -997,7 +997,7 @@ describe('ValidatedCasesClient', () => {
         validatedClient.fileCase({
           title: 'Contract Breach',
           description: 'Vendor failed to deliver goods as contracted',
-          category: 'ContractBreach',
+          category: 'ContractDispute',
           respondent: 'not-a-did',
         })
       ).rejects.toThrow('Validation failed');
@@ -1212,7 +1212,7 @@ describe('ValidatedArbitrationClient', () => {
   describe('registerAsMediator', () => {
     it('accepts valid mediator input', async () => {
       const result = await validatedClient.registerAsMediator({
-        specializations: ['ContractBreach', 'PropertyDispute'],
+        specializations: ['ContractDispute', 'PropertyDispute'],
       });
       expect(result.entry.Present?.did).toBe('did:mycelix:mediator123');
     });
@@ -1225,7 +1225,7 @@ describe('ValidatedArbitrationClient', () => {
 
     it('rejects invalid specialization', async () => {
       await expect(
-        validatedClient.registerAsMediator({ specializations: ['Invalid' as 'ContractBreach'] })
+        validatedClient.registerAsMediator({ specializations: ['Invalid' as 'ContractDispute'] })
       ).rejects.toThrow('Validation failed');
     });
   });
@@ -1233,7 +1233,7 @@ describe('ValidatedArbitrationClient', () => {
   describe('registerAsArbitrator', () => {
     it('accepts valid arbitrator input', async () => {
       const result = await validatedClient.registerAsArbitrator({
-        specializations: ['ContractBreach', 'Fraud'],
+        specializations: ['ContractDispute', 'ConductViolation'],
         tier: 'Lead',
       });
       expect(result.entry.Present?.did).toBe('did:mycelix:arbitrator123');
@@ -1247,20 +1247,20 @@ describe('ValidatedArbitrationClient', () => {
 
     it('rejects invalid tier', async () => {
       await expect(
-        validatedClient.registerAsArbitrator({ specializations: ['ContractBreach'], tier: 'Invalid' as 'Lead' })
+        validatedClient.registerAsArbitrator({ specializations: ['ContractDispute'], tier: 'Invalid' as 'Lead' })
       ).rejects.toThrow('Validation failed');
     });
   });
 
   describe('getAvailableMediators', () => {
     it('accepts valid category', async () => {
-      const result = await validatedClient.getAvailableMediators('ContractBreach');
+      const result = await validatedClient.getAvailableMediators('ContractDispute');
       expect(result.length).toBeGreaterThan(0);
     });
 
     it('rejects invalid category', async () => {
       await expect(
-        validatedClient.getAvailableMediators('Invalid' as 'ContractBreach')
+        validatedClient.getAvailableMediators('Invalid' as 'ContractDispute')
       ).rejects.toThrow('Validation failed');
     });
   });
@@ -1309,7 +1309,7 @@ describe('ValidatedArbitrationClient', () => {
     it('accepts valid inputs', async () => {
       const result = await validatedClient.renderDecision(
         'case-123',
-        'ComplainantFavor',
+        'ForComplainant',
         'The evidence clearly supports the complainant position and remedy is warranted',
         []
       );
@@ -1318,19 +1318,19 @@ describe('ValidatedArbitrationClient', () => {
 
     it('rejects empty case ID', async () => {
       await expect(
-        validatedClient.renderDecision('', 'ComplainantFavor', 'Long enough reasoning text for decision', [])
+        validatedClient.renderDecision('', 'ForComplainant', 'Long enough reasoning text for decision', [])
       ).rejects.toThrow('Validation failed');
     });
 
     it('rejects invalid outcome', async () => {
       await expect(
-        validatedClient.renderDecision('case-123', 'Invalid' as 'ComplainantFavor', 'Long enough reasoning text for decision', [])
+        validatedClient.renderDecision('case-123', 'Invalid' as 'ForComplainant', 'Long enough reasoning text for decision', [])
       ).rejects.toThrow('Validation failed');
     });
 
     it('rejects short reasoning', async () => {
       await expect(
-        validatedClient.renderDecision('case-123', 'ComplainantFavor', 'Too short', [])
+        validatedClient.renderDecision('case-123', 'ForComplainant', 'Too short', [])
       ).rejects.toThrow('Validation failed');
     });
   });
@@ -1547,13 +1547,13 @@ describe('Justice Validation Schema Boundary Tests', () => {
     const validClient = () => new ValidatedCasesClient(mockClient);
 
     const validCategories: CaseCategory[] = [
-      'ContractBreach',
+      'ContractDispute',
       'PropertyDispute',
-      'Fraud',
-      'Defamation',
-      'CopyrightViolation',
-      'GovernanceViolation',
-      'Interpersonal',
+      'ConductViolation',
+      'ConductViolation',
+      'IPDispute',
+      'GovernanceDispute',
+      'ConductViolation',
       'Other',
     ];
 
@@ -1575,7 +1575,7 @@ describe('Justice Validation Schema Boundary Tests', () => {
       const result = await client.fileCase({
         title: 'x'.repeat(200),
         description: 'A detailed description of the case for validation',
-        category: 'ContractBreach',
+        category: 'ContractDispute',
         respondent: 'did:mycelix:test123',
       });
       expect(result.entry.Present?.id).toBeDefined();
@@ -1586,7 +1586,7 @@ describe('Justice Validation Schema Boundary Tests', () => {
       const result = await client.fileCase({
         title: 'x',
         description: 'A detailed description of the case for validation',
-        category: 'ContractBreach',
+        category: 'ContractDispute',
         respondent: 'did:mycelix:test123',
       });
       expect(result.entry.Present?.id).toBeDefined();
@@ -1599,7 +1599,7 @@ describe('Justice Validation Schema Boundary Tests', () => {
       const result = await client.fileCase({
         title: 'Test Case',
         description: 'abcdefghij', // exactly 10 chars
-        category: 'ContractBreach',
+        category: 'ContractDispute',
         respondent: 'did:mycelix:test123',
       });
       expect(result.entry.Present?.id).toBeDefined();
@@ -1611,7 +1611,7 @@ describe('Justice Validation Schema Boundary Tests', () => {
         client.fileCase({
           title: 'Test Case',
           description: 'abcdefghi', // 9 chars
-          category: 'ContractBreach',
+          category: 'ContractDispute',
           respondent: 'did:mycelix:test123',
         })
       ).rejects.toThrow('at least 10 characters');
@@ -1714,7 +1714,7 @@ describe('Justice Validation Schema Boundary Tests', () => {
   describe('DecisionOutcome Enum Validation', () => {
     const validClient = () => new ValidatedArbitrationClient(mockClient);
 
-    const validOutcomes: DecisionOutcome[] = ['ComplainantFavor', 'RespondentFavor', 'Split', 'Dismissed', 'Settled'];
+    const validOutcomes: DecisionOutcome[] = ['ForComplainant', 'ForRespondent', 'SplitDecision', 'Dismissed', 'Settled'];
 
     it.each(validOutcomes)('accepts valid outcome: %s', async (outcome) => {
       const client = validClient();
@@ -1731,14 +1731,14 @@ describe('Justice Validation Schema Boundary Tests', () => {
   describe('Reasoning Length Validation', () => {
     it('accepts reasoning at exactly 20 characters', async () => {
       const client = new ValidatedArbitrationClient(mockClient);
-      const result = await client.renderDecision('case-123', 'ComplainantFavor', 'a'.repeat(20), []);
+      const result = await client.renderDecision('case-123', 'ForComplainant', 'a'.repeat(20), []);
       expect(result.entry.Present?.id).toBeDefined();
     });
 
     it('rejects reasoning at 19 characters', async () => {
       const client = new ValidatedArbitrationClient(mockClient);
       await expect(
-        client.renderDecision('case-123', 'ComplainantFavor', 'a'.repeat(19), [])
+        client.renderDecision('case-123', 'ForComplainant', 'a'.repeat(19), [])
       ).rejects.toThrow('at least 20 characters');
     });
   });
@@ -1764,7 +1764,7 @@ describe('Justice Validation Schema Boundary Tests', () => {
     it.each(validTiers)('accepts valid tier: %s', async (tier) => {
       const client = validClient();
       const result = await client.registerAsArbitrator({
-        specializations: ['ContractBreach'],
+        specializations: ['ContractDispute'],
         tier,
       });
       expect(result.entry.Present?.did).toBeDefined();
@@ -1922,7 +1922,7 @@ describe('Justice Validation Schema Boundary Tests', () => {
     it('accepts single specialization', async () => {
       const client = new ValidatedArbitrationClient(mockClient);
       const result = await client.registerAsMediator({
-        specializations: ['ContractBreach'],
+        specializations: ['ContractDispute'],
       });
       expect(result.entry.Present?.did).toBeDefined();
     });
@@ -1931,13 +1931,13 @@ describe('Justice Validation Schema Boundary Tests', () => {
       const client = new ValidatedArbitrationClient(mockClient);
       const result = await client.registerAsMediator({
         specializations: [
-          'ContractBreach',
+          'ContractDispute',
           'PropertyDispute',
-          'Fraud',
-          'Defamation',
-          'CopyrightViolation',
-          'GovernanceViolation',
-          'Interpersonal',
+          'ConductViolation',
+          'ConductViolation',
+          'IPDispute',
+          'GovernanceDispute',
+          'ConductViolation',
           'Other',
         ],
       });
@@ -1948,7 +1948,7 @@ describe('Justice Validation Schema Boundary Tests', () => {
       const client = new ValidatedArbitrationClient(mockClient);
       await expect(
         client.registerAsMediator({
-          specializations: ['ContractBreach', 'InvalidSpecialization' as CaseCategory],
+          specializations: ['ContractDispute', 'InvalidSpecialization' as CaseCategory],
         })
       ).rejects.toThrow('Validation failed');
     });
@@ -1957,7 +1957,7 @@ describe('Justice Validation Schema Boundary Tests', () => {
   describe('GetAvailableArbitrators Validation', () => {
     it('accepts valid category', async () => {
       const client = new ValidatedArbitrationClient(mockClient);
-      const result = await client.getAvailableArbitrators('ContractBreach');
+      const result = await client.getAvailableArbitrators('ContractDispute');
       expect(result).toBeDefined();
     });
 
@@ -2073,7 +2073,7 @@ describe('Justice Validation Schema Boundary Tests', () => {
         await client.fileCase({
           title: '',
           description: 'Valid description here',
-          category: 'ContractBreach',
+          category: 'ContractDispute',
           respondent: 'did:mycelix:test',
         });
         expect.fail('Should have thrown');
@@ -2088,7 +2088,7 @@ describe('Justice Validation Schema Boundary Tests', () => {
         await client.fileCase({
           title: 'Test',
           description: 'short',
-          category: 'ContractBreach',
+          category: 'ContractDispute',
           respondent: 'did:mycelix:test',
         });
         expect.fail('Should have thrown');

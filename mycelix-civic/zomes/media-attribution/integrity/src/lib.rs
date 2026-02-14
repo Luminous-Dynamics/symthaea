@@ -195,8 +195,24 @@ fn validate_update_royalty_rule(
 
 fn validate_create_usage_record(
     _action: EntryCreationAction,
-    _record: UsageRecord,
+    record: UsageRecord,
 ) -> ExternResult<ValidateCallbackResult> {
+    if record.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Usage record ID cannot be empty".into()));
+    }
+    if record.publication_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Usage record publication_id cannot be empty".into()));
+    }
+    if let Some(ref did) = record.user_did {
+        if !did.is_empty() && !did.starts_with("did:") {
+            return Ok(ValidateCallbackResult::Invalid("User DID must be a valid DID".into()));
+        }
+    }
+    if let Some(paid) = record.royalty_paid {
+        if paid < 0.0 {
+            return Ok(ValidateCallbackResult::Invalid("Royalty paid cannot be negative".into()));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -783,10 +799,41 @@ mod tests {
     }
 
     #[test]
-    fn usage_record_with_empty_id_passes() {
-        // validate_create_usage_record does not check id
+    fn usage_record_with_empty_id_rejected() {
         let mut record = valid_usage_record();
         record.id = "".into();
+        let result = validate_create_usage_record(create_action(), record);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn usage_record_with_empty_publication_id_rejected() {
+        let mut record = valid_usage_record();
+        record.publication_id = "".into();
+        let result = validate_create_usage_record(create_action(), record);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn usage_record_with_invalid_user_did_rejected() {
+        let mut record = valid_usage_record();
+        record.user_did = Some("not-a-did".into());
+        let result = validate_create_usage_record(create_action(), record);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn usage_record_with_negative_royalty_rejected() {
+        let mut record = valid_usage_record();
+        record.royalty_paid = Some(-0.01);
+        let result = validate_create_usage_record(create_action(), record);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn usage_record_with_valid_did_passes() {
+        let mut record = valid_usage_record();
+        record.user_did = Some("did:key:z6Mk123".into());
         let result = validate_create_usage_record(create_action(), record);
         assert!(is_valid(&result));
     }

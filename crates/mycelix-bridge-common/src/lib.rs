@@ -307,6 +307,55 @@ pub struct FactcheckStatusResult {
     pub error: Option<String>,
 }
 
+/// Input for querying food availability (commons: emergency → food, mutualaid → food)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FoodAvailabilityQuery {
+    pub product_name: Option<String>,
+    pub market_type: Option<String>,
+    pub max_distance_km: Option<f64>,
+}
+
+/// Result of a food availability query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FoodAvailabilityResult {
+    pub available_listings: u32,
+    pub nearest_market: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Input for querying transport routes (commons: mutualaid → transport, care → transport)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TransportRouteQuery {
+    pub origin_lat: f64,
+    pub origin_lon: f64,
+    pub destination_lat: f64,
+    pub destination_lon: f64,
+    pub mode: Option<String>,
+}
+
+/// Result of a transport route query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TransportRouteResult {
+    pub route_count: u32,
+    pub estimated_minutes: Option<u32>,
+    pub estimated_emissions_kg_co2: Option<f64>,
+    pub error: Option<String>,
+}
+
+/// Input for querying carbon credits (commons: property → transport)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CarbonCreditQuery {
+    pub agent_did: String,
+}
+
+/// Result of a carbon credit query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CarbonCreditResult {
+    pub total_credits_kg_co2: f64,
+    pub trips_logged: u32,
+    pub error: Option<String>,
+}
+
 // ============================================================================
 // Audit trail query types
 // ============================================================================
@@ -737,5 +786,101 @@ mod tests {
         let r2: AuditTrailResult = serde_json::from_str(&json).unwrap();
         assert!(r2.entries.is_empty());
         assert_eq!(r2.total_matched, 0);
+    }
+
+    // Food/Transport/Carbon typed helper serde tests
+
+    #[test]
+    fn food_availability_query_serde_roundtrip() {
+        let q = FoodAvailabilityQuery {
+            product_name: Some("tomatoes".into()),
+            market_type: Some("FarmersMarket".into()),
+            max_distance_km: Some(15.0),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: FoodAvailabilityQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.product_name.as_deref(), Some("tomatoes"));
+        assert_eq!(q2.market_type.as_deref(), Some("FarmersMarket"));
+        assert_eq!(q2.max_distance_km, Some(15.0));
+    }
+
+    #[test]
+    fn food_availability_query_no_filters() {
+        let q = FoodAvailabilityQuery {
+            product_name: None,
+            market_type: None,
+            max_distance_km: None,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: FoodAvailabilityQuery = serde_json::from_str(&json).unwrap();
+        assert!(q2.product_name.is_none());
+    }
+
+    #[test]
+    fn food_availability_result_serde_roundtrip() {
+        let r = FoodAvailabilityResult {
+            available_listings: 12,
+            nearest_market: Some("Southside Farmers Market".into()),
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: FoodAvailabilityResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.available_listings, 12);
+        assert_eq!(r2.nearest_market.as_deref(), Some("Southside Farmers Market"));
+        assert!(r2.error.is_none());
+    }
+
+    #[test]
+    fn transport_route_query_serde_roundtrip() {
+        let q = TransportRouteQuery {
+            origin_lat: 32.9483,
+            origin_lon: -96.7299,
+            destination_lat: 32.7767,
+            destination_lon: -96.7970,
+            mode: Some("Cycling".into()),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: TransportRouteQuery = serde_json::from_str(&json).unwrap();
+        assert!((q2.origin_lat - 32.9483).abs() < 1e-4);
+        assert_eq!(q2.mode.as_deref(), Some("Cycling"));
+    }
+
+    #[test]
+    fn transport_route_result_serde_roundtrip() {
+        let r = TransportRouteResult {
+            route_count: 3,
+            estimated_minutes: Some(45),
+            estimated_emissions_kg_co2: Some(0.0),
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: TransportRouteResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.route_count, 3);
+        assert_eq!(r2.estimated_minutes, Some(45));
+        assert_eq!(r2.estimated_emissions_kg_co2, Some(0.0));
+    }
+
+    #[test]
+    fn carbon_credit_query_serde_roundtrip() {
+        let q = CarbonCreditQuery {
+            agent_did: "did:mycelix:agent123".into(),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: CarbonCreditQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.agent_did, "did:mycelix:agent123");
+    }
+
+    #[test]
+    fn carbon_credit_result_serde_roundtrip() {
+        let r = CarbonCreditResult {
+            total_credits_kg_co2: 127.5,
+            trips_logged: 34,
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: CarbonCreditResult = serde_json::from_str(&json).unwrap();
+        assert!((r2.total_credits_kg_co2 - 127.5).abs() < 1e-6);
+        assert_eq!(r2.trips_logged, 34);
+        assert!(r2.error.is_none());
     }
 }

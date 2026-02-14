@@ -183,15 +183,30 @@ fn validate_update_publication(
 
 fn validate_create_content_block(
     _action: EntryCreationAction,
-    _block: ContentBlock,
+    block: ContentBlock,
 ) -> ExternResult<ValidateCallbackResult> {
+    if block.publication_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Content block publication_id cannot be empty".into()));
+    }
+    if block.content.is_empty() && block.encrypted_content.is_none() {
+        return Ok(ValidateCallbackResult::Invalid("Content block must have content or encrypted_content".into()));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_create_publication_version(
     _action: EntryCreationAction,
-    _version: PublicationVersion,
+    version: PublicationVersion,
 ) -> ExternResult<ValidateCallbackResult> {
+    if version.publication_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Publication version publication_id cannot be empty".into()));
+    }
+    if version.content_hash.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Publication version content_hash cannot be empty".into()));
+    }
+    if version.version == 0 {
+        return Ok(ValidateCallbackResult::Invalid("Publication version number must be at least 1".into()));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -485,9 +500,25 @@ mod tests {
     }
 
     #[test]
-    fn content_block_with_empty_content() {
+    fn content_block_with_empty_content_no_encrypted_rejected() {
         let mut block = valid_content_block();
         block.content = "".into();
+        block.encrypted_content = None;
+        let result = validate_create_content_block(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            block,
+        );
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn content_block_with_empty_content_but_encrypted_passes() {
+        let mut block = valid_content_block();
+        block.content = "".into();
+        block.encrypted_content = Some("encrypted_data_here".into());
         let result = validate_create_content_block(
             EntryCreationAction::Create(fake_create(
                 EntryHash::from_raw_36(vec![0; 36]),
@@ -496,6 +527,20 @@ mod tests {
             block,
         );
         assert!(is_valid(result));
+    }
+
+    #[test]
+    fn content_block_empty_publication_id_rejected() {
+        let mut block = valid_content_block();
+        block.publication_id = "".into();
+        let result = validate_create_content_block(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            block,
+        );
+        assert!(is_invalid(result));
     }
 
     // PublicationVersion validation tests
@@ -513,7 +558,8 @@ mod tests {
     }
 
     #[test]
-    fn publication_version_with_empty_summary() {
+    fn publication_version_with_empty_summary_passes() {
+        // change_summary is not validated (can be empty)
         let mut version = valid_publication_version();
         version.change_summary = "".into();
         let result = validate_create_publication_version(
@@ -524,6 +570,48 @@ mod tests {
             version,
         );
         assert!(is_valid(result));
+    }
+
+    #[test]
+    fn publication_version_empty_publication_id_rejected() {
+        let mut version = valid_publication_version();
+        version.publication_id = "".into();
+        let result = validate_create_publication_version(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            version,
+        );
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn publication_version_empty_content_hash_rejected() {
+        let mut version = valid_publication_version();
+        version.content_hash = "".into();
+        let result = validate_create_publication_version(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            version,
+        );
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn publication_version_zero_rejected() {
+        let mut version = valid_publication_version();
+        version.version = 0;
+        let result = validate_create_publication_version(
+            EntryCreationAction::Create(fake_create(
+                EntryHash::from_raw_36(vec![0; 36]),
+                AgentPubKey::from_raw_36(vec![1; 36]),
+            )),
+            version,
+        );
+        assert!(is_invalid(result));
     }
 
     // Anchor validation tests
@@ -664,7 +752,8 @@ mod tests {
     }
 
     #[test]
-    fn publication_with_version_zero() {
+    fn publication_with_version_zero_passes() {
+        // Publication's own version field is not validated (only PublicationVersion is)
         let mut pub_data = valid_publication();
         pub_data.version = 0;
         let result = validate_create_publication(

@@ -34,27 +34,37 @@ export interface ZomeCallable {
 // Case Types
 // ============================================================================
 
-/** Case phase */
+/** Case phase (matches Rust CasePhase in justice-cases integrity) */
 export type CasePhase =
-  | 'Filing'
+  | 'Filed'
+  | 'Negotiation'
   | 'Mediation'
   | 'Arbitration'
   | 'Appeal'
   | 'Enforcement'
   | 'Closed';
 
-/** Case status */
-export type CaseStatus = 'Open' | 'InProgress' | 'Resolved' | 'Dismissed' | 'Withdrawn';
+/** Case status (matches Rust CaseStatus in justice-cases integrity) */
+export type CaseStatus =
+  | 'Active'
+  | 'OnHold'
+  | 'AwaitingResponse'
+  | 'InDeliberation'
+  | 'DecisionRendered'
+  | 'Enforcing'
+  | 'Resolved'
+  | 'Dismissed'
+  | 'Withdrawn';
 
-/** Case category */
+/** Case category (matches Rust CaseType in justice-cases integrity) */
 export type CaseCategory =
-  | 'ContractBreach'
+  | 'ContractDispute'
+  | 'ConductViolation'
   | 'PropertyDispute'
-  | 'Fraud'
-  | 'Defamation'
-  | 'CopyrightViolation'
-  | 'GovernanceViolation'
-  | 'Interpersonal'
+  | 'FinancialDispute'
+  | 'GovernanceDispute'
+  | 'IdentityDispute'
+  | 'IPDispute'
   | 'Other';
 
 /** Evidence type */
@@ -66,11 +76,11 @@ export type EvidenceType =
   | 'Witness'
   | 'Other';
 
-/** Decision outcome */
+/** Decision outcome (matches Rust DecisionOutcome in justice-cases integrity) */
 export type DecisionOutcome =
-  | 'ComplainantFavor'
-  | 'RespondentFavor'
-  | 'Split'
+  | 'ForComplainant'
+  | 'ForRespondent'
+  | 'SplitDecision'
   | 'Dismissed'
   | 'Settled';
 

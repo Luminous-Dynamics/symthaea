@@ -113,8 +113,8 @@ hc dna pack .
 | SDK cluster integration | 49 | CommonsBridgeClient + CivicBridgeClient + typed convenience + cross-cluster + signal type guards + audit trail |
 | SDK conductor cluster | 22 | Typed convenience, rate limiting, allowlist, audit trail mock tests |
 | Sweettest cross-cluster | 12 | OtherRole dispatch, allowlist enforcement, typed helpers, bidirectional health |
-| Commons sweettest | 14 | Property, housing, care, mutualaid, water, food, transport, bridge, cross-domain (compiles against .dna bundle) |
-| Civic sweettest | 14 | Justice, emergency, media, bridge, cross-domain (compiles against .dna bundle) |
+| Commons sweettest | 14/14 pass | Property, housing, care, mutualaid, water, food, transport, bridge, cross-domain. Run with `--test-threads=2` |
+| Civic sweettest | 14/14 pass | Justice, emergency, media, bridge, cross-domain. Run with `--test-threads=2` |
 | DNA/hApp bundles | 2 | commons (24M, 35 zomes) + civic (12M, 16 zomes) packed and verified |
 | WASM zomes | 66 | Compile to wasm32-unknown-unknown |
 | Sweettest | 15/15 pass | `just test-sweettest` (--release required) |
@@ -125,7 +125,7 @@ See [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md) for full details.
 
 ## Development Priorities
 
-1. **P0**: Sweettests passing (15/15). Fix CI `continue-on-error` flags, expand CI sweettest coverage
+1. **P0**: Sweettests passing (28/28 commons+civic). Fix CI `continue-on-error` flags, expand CI sweettest coverage
 2. **P1**: Add `cargo doc` + `cargo test --doc` to CI pipeline
 3. **P2**: Tryorama ecosystem test execution, E2E coverage
 

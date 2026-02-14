@@ -162,6 +162,12 @@ fn validate_create_endorsement(
     _action: EntryCreationAction,
     endorsement: Endorsement,
 ) -> ExternResult<ValidateCallbackResult> {
+    if endorsement.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Endorsement ID cannot be empty".into()));
+    }
+    if endorsement.publication_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Endorsement publication_id cannot be empty".into()));
+    }
     if !endorsement.endorser_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Endorser must be a valid DID".into()));
     }
@@ -195,8 +201,17 @@ fn validate_create_quality_score(
     _action: EntryCreationAction,
     score: QualityScore,
 ) -> ExternResult<ValidateCallbackResult> {
+    if score.publication_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("QualityScore publication_id cannot be empty".into()));
+    }
     if score.score < 0.0 || score.score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid("Score must be 0-1".into()));
+    }
+    if score.fact_check_score < 0.0 || score.fact_check_score > 1.0 {
+        return Ok(ValidateCallbackResult::Invalid("Fact check score must be 0-1".into()));
+    }
+    if score.author_reputation < 0.0 || score.author_reputation > 1.0 {
+        return Ok(ValidateCallbackResult::Invalid("Author reputation must be 0-1".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -215,8 +230,17 @@ fn validate_create_featured_content(
     _action: EntryCreationAction,
     featured: FeaturedContent,
 ) -> ExternResult<ValidateCallbackResult> {
+    if featured.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("FeaturedContent ID cannot be empty".into()));
+    }
+    if featured.publication_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("FeaturedContent publication_id cannot be empty".into()));
+    }
     if !featured.featured_by.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Featured by must be a valid DID".into()));
+    }
+    if featured.reason.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Featured reason cannot be empty".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -427,21 +451,39 @@ mod tests {
     }
 
     #[test]
-    fn endorsement_with_empty_id_passes() {
-        // id is not validated
+    fn endorsement_with_empty_id_rejected() {
         let mut e = make_endorsement();
         e.id = "".into();
         let result = validate_create_endorsement(fake_entry_creation_action(), e);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Endorsement ID cannot be empty");
     }
 
     #[test]
-    fn endorsement_with_empty_publication_id_passes() {
-        // publication_id is not validated
+    fn endorsement_with_whitespace_id_rejected() {
+        let mut e = make_endorsement();
+        e.id = "   ".into();
+        let result = validate_create_endorsement(fake_entry_creation_action(), e);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Endorsement ID cannot be empty");
+    }
+
+    #[test]
+    fn endorsement_with_empty_publication_id_rejected() {
         let mut e = make_endorsement();
         e.publication_id = "".into();
         let result = validate_create_endorsement(fake_entry_creation_action(), e);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Endorsement publication_id cannot be empty");
+    }
+
+    #[test]
+    fn endorsement_with_whitespace_publication_id_rejected() {
+        let mut e = make_endorsement();
+        e.publication_id = "  \t ".into();
+        let result = validate_create_endorsement(fake_entry_creation_action(), e);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Endorsement publication_id cannot be empty");
     }
 
     // ========================================================================
@@ -681,30 +723,77 @@ mod tests {
     }
 
     #[test]
-    fn quality_score_fact_check_score_not_validated() {
-        // fact_check_score has no range check
+    fn quality_score_fact_check_score_above_one_rejected() {
         let mut qs = make_quality_score();
-        qs.fact_check_score = 99.0;
+        qs.fact_check_score = 1.01;
         let result = validate_create_quality_score(fake_entry_creation_action(), qs);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Fact check score must be 0-1");
     }
 
     #[test]
-    fn quality_score_author_reputation_not_validated() {
-        // author_reputation has no range check
+    fn quality_score_fact_check_score_below_zero_rejected() {
+        let mut qs = make_quality_score();
+        qs.fact_check_score = -0.01;
+        let result = validate_create_quality_score(fake_entry_creation_action(), qs);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Fact check score must be 0-1");
+    }
+
+    #[test]
+    fn quality_score_fact_check_score_boundary_passes() {
+        for val in [0.0, 0.5, 1.0] {
+            let mut qs = make_quality_score();
+            qs.fact_check_score = val;
+            let result = validate_create_quality_score(fake_entry_creation_action(), qs);
+            assert!(is_valid(&result), "fact_check_score={} should be valid", val);
+        }
+    }
+
+    #[test]
+    fn quality_score_author_reputation_above_one_rejected() {
+        let mut qs = make_quality_score();
+        qs.author_reputation = 1.01;
+        let result = validate_create_quality_score(fake_entry_creation_action(), qs);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Author reputation must be 0-1");
+    }
+
+    #[test]
+    fn quality_score_author_reputation_below_zero_rejected() {
         let mut qs = make_quality_score();
         qs.author_reputation = -5.0;
         let result = validate_create_quality_score(fake_entry_creation_action(), qs);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Author reputation must be 0-1");
     }
 
     #[test]
-    fn quality_score_empty_publication_id_passes() {
-        // publication_id is not validated
+    fn quality_score_author_reputation_boundary_passes() {
+        for val in [0.0, 0.5, 1.0] {
+            let mut qs = make_quality_score();
+            qs.author_reputation = val;
+            let result = validate_create_quality_score(fake_entry_creation_action(), qs);
+            assert!(is_valid(&result), "author_reputation={} should be valid", val);
+        }
+    }
+
+    #[test]
+    fn quality_score_empty_publication_id_rejected() {
         let mut qs = make_quality_score();
         qs.publication_id = "".into();
         let result = validate_create_quality_score(fake_entry_creation_action(), qs);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "QualityScore publication_id cannot be empty");
+    }
+
+    #[test]
+    fn quality_score_whitespace_publication_id_rejected() {
+        let mut qs = make_quality_score();
+        qs.publication_id = "   ".into();
+        let result = validate_create_quality_score(fake_entry_creation_action(), qs);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "QualityScore publication_id cannot be empty");
     }
 
     // ========================================================================
@@ -817,30 +906,57 @@ mod tests {
     }
 
     #[test]
-    fn featured_content_empty_reason_passes() {
-        // reason is not validated
+    fn featured_content_empty_reason_rejected() {
         let mut f = make_featured_content();
         f.reason = "".into();
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Featured reason cannot be empty");
     }
 
     #[test]
-    fn featured_content_empty_id_passes() {
-        // id is not validated
+    fn featured_content_whitespace_reason_rejected() {
+        let mut f = make_featured_content();
+        f.reason = "   ".into();
+        let result = validate_create_featured_content(fake_entry_creation_action(), f);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Featured reason cannot be empty");
+    }
+
+    #[test]
+    fn featured_content_empty_id_rejected() {
         let mut f = make_featured_content();
         f.id = "".into();
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "FeaturedContent ID cannot be empty");
     }
 
     #[test]
-    fn featured_content_empty_publication_id_passes() {
-        // publication_id is not validated
+    fn featured_content_whitespace_id_rejected() {
+        let mut f = make_featured_content();
+        f.id = "  \t ".into();
+        let result = validate_create_featured_content(fake_entry_creation_action(), f);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "FeaturedContent ID cannot be empty");
+    }
+
+    #[test]
+    fn featured_content_empty_publication_id_rejected() {
         let mut f = make_featured_content();
         f.publication_id = "".into();
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "FeaturedContent publication_id cannot be empty");
+    }
+
+    #[test]
+    fn featured_content_whitespace_publication_id_rejected() {
+        let mut f = make_featured_content();
+        f.publication_id = "   ".into();
+        let result = validate_create_featured_content(fake_entry_creation_action(), f);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "FeaturedContent publication_id cannot be empty");
     }
 
     // ========================================================================

@@ -27,7 +27,71 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 }
 
 #[hdk_extern]
-pub fn validate(_op: Op) -> ExternResult<ValidateCallbackResult> {
+pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    match op.flattened::<EntryTypes, LinkTypes>()? {
+        FlatOp::StoreEntry(store_entry) => match store_entry {
+            OpEntry::CreateEntry { app_entry, .. } => match app_entry {
+                EntryTypes::Proposal(proposal) => validate_proposal(proposal),
+                EntryTypes::Vote(_vote) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::Rule(rule) => validate_rule(rule),
+                EntryTypes::Member(member) => validate_member(member),
+            },
+            OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
+                EntryTypes::Proposal(proposal) => validate_proposal(proposal),
+                EntryTypes::Rule(rule) => validate_rule(rule),
+                EntryTypes::Member(member) => validate_member(member),
+                _ => Ok(ValidateCallbackResult::Valid),
+            },
+            _ => Ok(ValidateCallbackResult::Valid),
+        },
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+fn validate_proposal(proposal: Proposal) -> ExternResult<ValidateCallbackResult> {
+    if proposal.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Proposal ID cannot be empty".into()));
+    }
+    if proposal.title.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Proposal title cannot be empty".into()));
+    }
+    if proposal.description.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Proposal description cannot be empty".into()));
+    }
+    if proposal.quorum_percent > 100 {
+        return Ok(ValidateCallbackResult::Invalid("Quorum percent must be 0-100".into()));
+    }
+    if proposal.threshold_percent > 100 {
+        return Ok(ValidateCallbackResult::Invalid("Threshold percent must be 0-100".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_rule(rule: Rule) -> ExternResult<ValidateCallbackResult> {
+    if rule.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Rule ID cannot be empty".into()));
+    }
+    if rule.title.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Rule title cannot be empty".into()));
+    }
+    if rule.text.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Rule text cannot be empty".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_member(member: Member) -> ExternResult<ValidateCallbackResult> {
+    if member.display_name.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Member display name cannot be empty".into()));
+    }
+    if member.roles.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Member must have at least one role".into()));
+    }
+    if let Some(score) = member.matl_score {
+        if score < 0.0 || score > 1.0 {
+            return Ok(ValidateCallbackResult::Invalid("MATL score must be between 0.0 and 1.0".into()));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -799,5 +863,233 @@ mod tests {
             EntryTypes::Member(m) => assert_eq!(m.display_name, "Test Member"),
             _ => panic!("Expected Member entry type"),
         }
+    }
+
+    // ========================================================================
+    // PROPOSAL VALIDATION TESTS
+    // ========================================================================
+
+    fn make_valid_proposal() -> Proposal {
+        Proposal {
+            id: "proposal-001".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0xdb; 36]),
+            title: "Test proposal".to_string(),
+            description: "A meaningful description".to_string(),
+            proposal_type: ProposalType::GeneralDecision,
+            modifies_rule: None,
+            voting_method: VotingMethod::Majority,
+            quorum_percent: 50,
+            threshold_percent: 51,
+            voting_starts: Timestamp::from_micros(1000000),
+            voting_ends: Timestamp::from_micros(2000000),
+            status: ProposalStatus::Draft,
+            created_at: Timestamp::from_micros(1000000),
+        }
+    }
+
+    #[test]
+    fn valid_proposal_passes_validation() {
+        let result = validate_proposal(make_valid_proposal());
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn proposal_empty_id_rejected() {
+        let mut p = make_valid_proposal();
+        p.id = "".to_string();
+        let result = validate_proposal(p);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn proposal_whitespace_id_rejected() {
+        let mut p = make_valid_proposal();
+        p.id = "   ".to_string();
+        let result = validate_proposal(p);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn proposal_empty_title_rejected() {
+        let mut p = make_valid_proposal();
+        p.title = "".to_string();
+        let result = validate_proposal(p);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn proposal_empty_description_rejected() {
+        let mut p = make_valid_proposal();
+        p.description = "".to_string();
+        let result = validate_proposal(p);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn proposal_quorum_over_100_rejected() {
+        let mut p = make_valid_proposal();
+        p.quorum_percent = 101;
+        let result = validate_proposal(p);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn proposal_threshold_over_100_rejected() {
+        let mut p = make_valid_proposal();
+        p.threshold_percent = 200;
+        let result = validate_proposal(p);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn proposal_quorum_100_passes() {
+        let mut p = make_valid_proposal();
+        p.quorum_percent = 100;
+        let result = validate_proposal(p);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn proposal_quorum_0_passes() {
+        let mut p = make_valid_proposal();
+        p.quorum_percent = 0;
+        let result = validate_proposal(p);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // ========================================================================
+    // RULE VALIDATION TESTS
+    // ========================================================================
+
+    fn make_valid_rule() -> Rule {
+        Rule {
+            id: "rule-001".to_string(),
+            title: "Test Rule".to_string(),
+            text: "Members must contribute monthly".to_string(),
+            category: RuleCategory::Governance,
+            priority: 5,
+            created_by_proposal: ActionHash::from_raw_36(vec![0xab; 36]),
+            active_since: Timestamp::from_micros(1000000),
+            active: true,
+            superseded_by: None,
+        }
+    }
+
+    #[test]
+    fn valid_rule_passes_validation() {
+        let result = validate_rule(make_valid_rule());
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn rule_empty_id_rejected() {
+        let mut r = make_valid_rule();
+        r.id = "".to_string();
+        let result = validate_rule(r);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn rule_whitespace_id_rejected() {
+        let mut r = make_valid_rule();
+        r.id = "  \t ".to_string();
+        let result = validate_rule(r);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn rule_empty_title_rejected() {
+        let mut r = make_valid_rule();
+        r.title = "".to_string();
+        let result = validate_rule(r);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn rule_empty_text_rejected() {
+        let mut r = make_valid_rule();
+        r.text = "".to_string();
+        let result = validate_rule(r);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ========================================================================
+    // MEMBER VALIDATION TESTS
+    // ========================================================================
+
+    fn make_valid_member() -> Member {
+        Member {
+            agent: AgentPubKey::from_raw_36(vec![0xdb; 36]),
+            display_name: "Alice".to_string(),
+            identity_hash: None,
+            roles: vec![MemberRole::Member],
+            joined_at: Timestamp::from_micros(1000000),
+            status: MemberStatus::Active,
+            endorsement_count: 0,
+            matl_score: Some(0.5),
+        }
+    }
+
+    #[test]
+    fn valid_member_passes_validation() {
+        let result = validate_member(make_valid_member());
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn member_empty_display_name_rejected() {
+        let mut m = make_valid_member();
+        m.display_name = "".to_string();
+        let result = validate_member(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn member_whitespace_display_name_rejected() {
+        let mut m = make_valid_member();
+        m.display_name = "   ".to_string();
+        let result = validate_member(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn member_empty_roles_rejected() {
+        let mut m = make_valid_member();
+        m.roles = vec![];
+        let result = validate_member(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn member_matl_score_negative_rejected() {
+        let mut m = make_valid_member();
+        m.matl_score = Some(-0.1);
+        let result = validate_member(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn member_matl_score_over_1_rejected() {
+        let mut m = make_valid_member();
+        m.matl_score = Some(1.1);
+        let result = validate_member(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn member_matl_score_none_passes() {
+        let mut m = make_valid_member();
+        m.matl_score = None;
+        let result = validate_member(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn member_matl_score_boundary_passes() {
+        let mut m = make_valid_member();
+        m.matl_score = Some(0.0);
+        assert!(matches!(validate_member(m.clone()), Ok(ValidateCallbackResult::Valid)));
+        m.matl_score = Some(1.0);
+        assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Valid)));
     }
 }

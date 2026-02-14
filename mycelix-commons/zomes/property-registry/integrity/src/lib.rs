@@ -178,8 +178,32 @@ fn validate_create_property(
     _action: EntryCreationAction,
     property: Property,
 ) -> ExternResult<ValidateCallbackResult> {
+    if property.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Property ID cannot be empty".into()));
+    }
+    if property.title.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Property title cannot be empty".into()));
+    }
     if !property.owner_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Owner must be a valid DID".into()));
+    }
+    if let Some(ref geo) = property.geolocation {
+        if geo.latitude < -90.0 || geo.latitude > 90.0 {
+            return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+        }
+        if geo.longitude < -180.0 || geo.longitude > 180.0 {
+            return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+        }
+        if let Some(area) = geo.area_sqm {
+            if area <= 0.0 {
+                return Ok(ValidateCallbackResult::Invalid("Area must be positive".into()));
+            }
+        }
+    }
+    if let Some(ref meta) = property.metadata.appraised_value {
+        if *meta < 0.0 {
+            return Ok(ValidateCallbackResult::Invalid("Appraised value cannot be negative".into()));
+        }
     }
     let mut total_share = 100.0;
     for co_owner in &property.co_owners {
@@ -208,8 +232,24 @@ fn validate_create_title_deed(
     _action: EntryCreationAction,
     deed: TitleDeed,
 ) -> ExternResult<ValidateCallbackResult> {
+    if deed.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Deed ID cannot be empty".into()));
+    }
+    if deed.property_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Deed property_id cannot be empty".into()));
+    }
     if !deed.owner_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Owner must be a valid DID".into()));
+    }
+    for enc in &deed.encumbrances {
+        if !enc.holder_did.starts_with("did:") {
+            return Ok(ValidateCallbackResult::Invalid("Encumbrance holder must be a valid DID".into()));
+        }
+        if let Some(amount) = enc.amount {
+            if amount < 0.0 {
+                return Ok(ValidateCallbackResult::Invalid("Encumbrance amount cannot be negative".into()));
+            }
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -663,6 +703,164 @@ mod tests {
         let mut deed = make_title_deed();
         deed.deed_type = DeedType::Transfer;
         deed.previous_deed_id = Some("deed-000".into());
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // NEW PROPERTY VALIDATION TESTS (field-level)
+    // ========================================================================
+
+    #[test]
+    fn property_empty_id_rejected() {
+        let mut p = make_property();
+        p.id = "".into();
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_whitespace_id_rejected() {
+        let mut p = make_property();
+        p.id = "   ".into();
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_empty_title_rejected() {
+        let mut p = make_property();
+        p.title = "".into();
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_geolocation_invalid_lat_rejected() {
+        let mut p = make_property();
+        p.geolocation = Some(GeoLocation {
+            latitude: 91.0,
+            longitude: -96.7,
+            boundaries: None,
+            area_sqm: Some(500.0),
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_geolocation_invalid_lon_rejected() {
+        let mut p = make_property();
+        p.geolocation = Some(GeoLocation {
+            latitude: 32.9,
+            longitude: -181.0,
+            boundaries: None,
+            area_sqm: Some(500.0),
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_geolocation_zero_area_rejected() {
+        let mut p = make_property();
+        p.geolocation = Some(GeoLocation {
+            latitude: 32.9,
+            longitude: -96.7,
+            boundaries: None,
+            area_sqm: Some(0.0),
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_geolocation_negative_area_rejected() {
+        let mut p = make_property();
+        p.geolocation = Some(GeoLocation {
+            latitude: 32.9,
+            longitude: -96.7,
+            boundaries: None,
+            area_sqm: Some(-100.0),
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_negative_appraised_value_rejected() {
+        let mut p = make_property();
+        p.metadata.appraised_value = Some(-1.0);
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_no_geolocation_passes() {
+        let mut p = make_property();
+        p.geolocation = None;
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // NEW TITLE DEED VALIDATION TESTS (field-level)
+    // ========================================================================
+
+    #[test]
+    fn deed_empty_id_rejected() {
+        let mut deed = make_title_deed();
+        deed.id = "".into();
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn deed_empty_property_id_rejected() {
+        let mut deed = make_title_deed();
+        deed.property_id = "".into();
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn deed_encumbrance_invalid_did_rejected() {
+        let mut deed = make_title_deed();
+        deed.encumbrances = vec![Encumbrance {
+            encumbrance_type: EncumbranceType::Mortgage,
+            holder_did: "not-a-did".into(),
+            amount: Some(100_000.0),
+            registered: Timestamp::from_micros(1_000_000),
+            expires: None,
+        }];
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn deed_encumbrance_negative_amount_rejected() {
+        let mut deed = make_title_deed();
+        deed.encumbrances = vec![Encumbrance {
+            encumbrance_type: EncumbranceType::Lien,
+            holder_did: "did:key:z6MkBank".into(),
+            amount: Some(-500.0),
+            registered: Timestamp::from_micros(1_000_000),
+            expires: None,
+        }];
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn deed_encumbrance_valid_passes() {
+        let mut deed = make_title_deed();
+        deed.encumbrances = vec![Encumbrance {
+            encumbrance_type: EncumbranceType::Easement,
+            holder_did: "did:key:z6MkNeighbor".into(),
+            amount: None,
+            registered: Timestamp::from_micros(1_000_000),
+            expires: None,
+        }];
         let result = validate_create_title_deed(fake_entry_creation_action(), deed);
         assert!(is_valid(&result));
     }
