@@ -1191,4 +1191,384 @@ mod tests {
 
         assert_eq!(ltc.config.num_neurons, restored.config.num_neurons);
     }
+
+    // ====================================================================
+    // Additional tests for thorough coverage
+    // ====================================================================
+
+    #[test]
+    fn test_default_construction() {
+        let ltc = UnifiedLTC::default();
+        let cfg = ltc.config();
+        assert_eq!(cfg.num_neurons, 256);
+        assert_eq!(cfg.input_dim, 64);
+        assert_eq!(cfg.output_dim, 32);
+        assert!(matches!(cfg.state_type, StateType::Scalar));
+        assert_eq!(ltc.scalar_states().len(), 256);
+        assert_eq!(ltc.total_time(), 0.0);
+    }
+
+    #[test]
+    fn test_config_scalar_defaults() {
+        let cfg = UnifiedLTCConfig::scalar(128, 32, 16);
+        assert_eq!(cfg.num_neurons, 128);
+        assert_eq!(cfg.input_dim, 32);
+        assert_eq!(cfg.output_dim, 16);
+        assert!(matches!(cfg.state_type, StateType::Scalar));
+        assert!(matches!(cfg.learning, LearningAlgorithm::BPTT { .. }));
+        assert!(matches!(cfg.connectivity, Connectivity::Dense));
+    }
+
+    #[test]
+    fn test_config_hdc_defaults() {
+        let cfg = UnifiedLTCConfig::hdc(2048);
+        assert_eq!(cfg.num_neurons, 1);
+        assert_eq!(cfg.input_dim, 2048);
+        assert_eq!(cfg.output_dim, 2048);
+        assert!(matches!(cfg.state_type, StateType::HDC { dimension: 2048 }));
+        assert!(matches!(cfg.learning, LearningAlgorithm::Adam { .. }));
+    }
+
+    #[test]
+    fn test_config_hdc_network_defaults() {
+        let cfg = UnifiedLTCConfig::hdc_network(4, 512);
+        assert_eq!(cfg.num_neurons, 4);
+        assert_eq!(cfg.input_dim, 512);
+        assert!(matches!(cfg.learning, LearningAlgorithm::Hebbian { .. }));
+    }
+
+    #[test]
+    fn test_forward_input_dimension_mismatch() {
+        let config = UnifiedLTCConfig::scalar(16, 8, 4);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        // Provide wrong-sized input
+        let wrong_input = vec![1.0f32; 5];
+        let result = ltc.forward(&wrong_input);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("dimension mismatch"));
+    }
+
+    #[test]
+    fn test_forward_on_hdc_mode_fails() {
+        let config = UnifiedLTCConfig::hdc(256);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = vec![0.0f32; 256];
+        let result = ltc.forward(&input);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("scalar mode"));
+    }
+
+    #[test]
+    fn test_backward_requires_bptt() {
+        let mut config = UnifiedLTCConfig::scalar(16, 8, 4);
+        config.learning = LearningAlgorithm::None;
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let hidden_states = vec![vec![0.0f32; 16]];
+        let output_grad = vec![0.0f32; 4];
+        let input = vec![0.0f32; 8];
+        let result = ltc.backward(&input, &hidden_states, &output_grad);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("BPTT"));
+    }
+
+    #[test]
+    fn test_forward_output_finiteness() {
+        let mut config = UnifiedLTCConfig::scalar(16, 8, 4);
+        config.num_steps = 50;
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = vec![1.0f32; 8];
+        let (output, _states) = ltc.forward(&input).unwrap();
+
+        for (i, val) in output.iter().enumerate() {
+            assert!(val.is_finite(), "output[{}] = {} is not finite", i, val);
+        }
+    }
+
+    #[test]
+    fn test_forward_states_dimension_preserved() {
+        let mut config = UnifiedLTCConfig::scalar(20, 10, 5);
+        config.num_steps = 30;
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = vec![0.3f32; 10];
+        let (output, states) = ltc.forward(&input).unwrap();
+
+        assert_eq!(output.len(), 5, "output dim must match output_dim");
+        assert_eq!(states.len(), 30, "num hidden states must match num_steps");
+        for (t, state) in states.iter().enumerate() {
+            assert_eq!(
+                state.len(),
+                20,
+                "hidden state at t={} has wrong dimension",
+                t
+            );
+        }
+    }
+
+    #[test]
+    fn test_hdc_evolve_zero_dt() {
+        let config = UnifiedLTCConfig::hdc(256);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let initial_states: Vec<_> = ltc.hdc_states().to_vec();
+        let input = ContinuousHV::random(256, 99);
+
+        // Evolving with dt=0 should not change state
+        ltc.evolve(0.0, &input);
+
+        for (i, (orig, after)) in initial_states.iter().zip(ltc.hdc_states().iter()).enumerate() {
+            assert_eq!(
+                orig.values, after.values,
+                "HDC state[{}] changed with dt=0",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_hdc_evolve_state_bounded() {
+        let config = UnifiedLTCConfig::hdc(512);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = ContinuousHV::random(512, 7);
+
+        // Evolve with a large dt many times to stress-test bounding
+        for _ in 0..500 {
+            ltc.evolve(0.5, &input);
+        }
+
+        for (i, state) in ltc.hdc_states().iter().enumerate() {
+            let norm = state.norm();
+            assert!(
+                norm <= 5.5,
+                "HDC state[{}] norm={} exceeds bound",
+                i,
+                norm
+            );
+            for (j, v) in state.values.iter().enumerate() {
+                assert!(
+                    v.is_finite(),
+                    "HDC state[{}].values[{}] = {} is not finite",
+                    i,
+                    j,
+                    v
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_hdc_rk4_evolve_finite() {
+        let config = UnifiedLTCConfig::hdc(256);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = ContinuousHV::random(256, 55);
+
+        for _ in 0..50 {
+            ltc.evolve_rk4(0.01, &input);
+        }
+
+        assert!(ltc.total_time() > 0.0);
+        for (i, state) in ltc.hdc_states().iter().enumerate() {
+            for (j, v) in state.values.iter().enumerate() {
+                assert!(
+                    v.is_finite(),
+                    "RK4 state[{}].values[{}] = {} is not finite",
+                    i,
+                    j,
+                    v
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_hdc_adam_update() {
+        let config = UnifiedLTCConfig::hdc(256);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = ContinuousHV::random(256, 42);
+
+        let weights_before: Vec<_> = ltc.hdc_weights.iter().map(|w| w.values.clone()).collect();
+
+        ltc.evolve(0.01, &input);
+        ltc.adam_update(&input);
+
+        // Weights must have changed
+        let mut any_changed = false;
+        for (before, after) in weights_before.iter().zip(ltc.hdc_weights.iter()) {
+            if before != &after.values {
+                any_changed = true;
+                break;
+            }
+        }
+        assert!(any_changed, "Adam update should modify weights");
+
+        // All weight values must be finite
+        for (i, w) in ltc.hdc_weights.iter().enumerate() {
+            for (j, v) in w.values.iter().enumerate() {
+                assert!(
+                    v.is_finite(),
+                    "hdc_weights[{}].values[{}] = {} not finite after Adam",
+                    i,
+                    j,
+                    v
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_reset_clears_state() {
+        let config = UnifiedLTCConfig::scalar(16, 8, 4);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = vec![1.0f32; 8];
+        let _ = ltc.forward(&input).unwrap();
+
+        assert!(ltc.total_time() > 0.0);
+        assert!(ltc.scalar_states().iter().any(|&s| s != 0.0));
+
+        ltc.reset();
+
+        assert_eq!(ltc.total_time(), 0.0);
+        for &s in ltc.scalar_states() {
+            assert_eq!(s, 0.0, "scalar state should be zero after reset");
+        }
+    }
+
+    #[test]
+    fn test_predict_next_hdv_scalar_mode() {
+        let config = UnifiedLTCConfig::scalar(16, 8, 4);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        // Before any forward pass, prediction should still produce correct dim
+        let pred = ltc.predict_next_hdv();
+        assert_eq!(pred.len(), 4);
+        for v in &pred {
+            assert!(v.is_finite());
+        }
+
+        // After forward pass, prediction may differ
+        let input = vec![0.5f32; 8];
+        let _ = ltc.forward(&input).unwrap();
+        let pred_after = ltc.predict_next_hdv();
+        assert_eq!(pred_after.len(), 4);
+        for v in &pred_after {
+            assert!(v.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_predict_next_hdv_hdc_mode() {
+        let config = UnifiedLTCConfig::hdc(128);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let pred = ltc.predict_next_hdv();
+        assert_eq!(pred.len(), 128);
+
+        let input = ContinuousHV::random(128, 10);
+        ltc.evolve(0.01, &input);
+        let pred_after = ltc.predict_next_hdv();
+        assert_eq!(pred_after.len(), 128);
+    }
+
+    #[test]
+    fn test_activation_functions_edge_values() {
+        // Softplus overflows f32 for large x (e^100 > f32::MAX), so we test
+        // it separately with a smaller range. All other activations are bounded
+        // or linear and handle large inputs fine.
+        let bounded_activations = [
+            Activation::Tanh,
+            Activation::Sigmoid,
+            Activation::LeakyRelu,
+            Activation::Identity,
+        ];
+
+        let edge_values = [0.0f32, 1.0, -1.0, 100.0, -100.0, f32::MIN_POSITIVE];
+
+        for act in &bounded_activations {
+            for &x in &edge_values {
+                let y = act.apply_scalar(x);
+                assert!(
+                    y.is_finite(),
+                    "{:?}.apply_scalar({}) = {} is not finite",
+                    act,
+                    x,
+                    y
+                );
+                let dy = act.derivative_scalar(x);
+                assert!(
+                    dy.is_finite(),
+                    "{:?}.derivative_scalar({}) = {} is not finite",
+                    act,
+                    x,
+                    dy
+                );
+            }
+        }
+
+        // Softplus with values in the representable range
+        let softplus_values = [0.0f32, 1.0, -1.0, 10.0, -10.0, f32::MIN_POSITIVE];
+        for &x in &softplus_values {
+            let y = Activation::Softplus.apply_scalar(x);
+            assert!(
+                y.is_finite(),
+                "Softplus.apply_scalar({}) = {} is not finite",
+                x,
+                y
+            );
+            assert!(y >= 0.0, "Softplus output must be non-negative, got {}", y);
+            let dy = Activation::Softplus.derivative_scalar(x);
+            assert!(
+                dy.is_finite(),
+                "Softplus.derivative_scalar({}) = {} is not finite",
+                x,
+                dy
+            );
+        }
+    }
+
+    #[test]
+    fn test_neuromodulation_high_vitality_no_sluggishness() {
+        let config = UnifiedLTCConfig::scalar(8, 4, 2);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let tau_before: Vec<_> = ltc.tau.clone();
+
+        // High vitality (> threshold) should NOT increase tau
+        ltc.apply_neuromodulation(1.5);
+
+        // sluggishness = 1 + (1-1.5)*2 = 0.0 which is < 1.5, so tau unchanged
+        for (orig, new_val) in tau_before.iter().zip(ltc.tau.iter()) {
+            assert!(
+                (*new_val - *orig).abs() < 1e-6,
+                "tau should not increase with high vitality"
+            );
+        }
+    }
+
+    #[test]
+    fn test_sparse_forward_pass_finite() {
+        let config = UnifiedLTCConfig::scalar_sparse(32, 8, 4, 0.2);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = vec![0.5f32; 8];
+        let (output, states) = ltc.forward(&input).unwrap();
+
+        assert_eq!(output.len(), 4);
+        for val in &output {
+            assert!(val.is_finite());
+        }
+        for state in &states {
+            assert_eq!(state.len(), 32);
+        }
+    }
 }

@@ -22,8 +22,7 @@ use anyhow::Result;
 use ndarray::Array1;
 use std::time::Instant;
 
-use crate::cfc::CfCNetwork;
-use crate::dynamics::cfc::CfCNetworkConfig;
+use crate::dynamics::cfc::{CfCNetwork, CfCNetworkConfig};
 use crate::phi_engine::{PhiEngine, PhiMethod};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 

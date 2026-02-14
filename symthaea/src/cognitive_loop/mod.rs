@@ -133,7 +133,7 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 use ndarray::Array1;
 use symthaea_core::hdc::predictive_encoder::PredictiveHdcEncoder;
-use crate::cfc::CfCNetwork;
+use crate::dynamics::cfc::CfCNetwork;
 use crate::dynamics::cfc_coherence::{CfCCoherenceBridge, CoherenceConfig, CoherenceSummary};
 use crate::dynamics::temporal_signatures::{
     TemporalSignatureEncoder, SignatureConfig, ConsciousnessPattern, TemporalStateSummary

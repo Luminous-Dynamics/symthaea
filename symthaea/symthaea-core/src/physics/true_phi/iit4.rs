@@ -1,0 +1,216 @@
+//! IIT 4.0 Measures
+//!
+//! Reference: Albantakis et al. (2023) "Integrated Information Theory (IIT) 4.0"
+
+use crate::hdc::unified_hv::ContinuousHV;
+use serde::{Deserialize, Serialize};
+
+use super::{ContinuousEntropyEstimator, TruePhiCalculator};
+
+/// IIT 4.0 result containing intrinsic difference measures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IIT4Result {
+    /// Intrinsic difference (id) - fundamental measure
+    pub intrinsic_difference: f64,
+    /// Small phi (φ) - irreducibility of a mechanism
+    pub small_phi: f64,
+    /// Big Phi (Φ) - integrated information of the system
+    pub big_phi: f64,
+    /// Intrinsic information (ii) - how much the state specifies itself
+    pub intrinsic_information: f64,
+    /// Number of concepts (mechanisms with φ > 0)
+    pub concept_count: usize,
+}
+
+/// IIT 4.0 Calculator
+///
+/// Implements the updated IIT 4.0 formalism with:
+/// - Intrinsic difference as the fundamental measure
+/// - Improved irreducibility computation
+/// - Intrinsic information quantification
+#[derive(Debug, Clone)]
+pub struct IIT4Calculator {
+    /// Base entropy estimator
+    estimator: ContinuousEntropyEstimator,
+    /// Threshold for considering φ > 0
+    phi_threshold: f64,
+}
+
+impl Default for IIT4Calculator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IIT4Calculator {
+    /// Create a new IIT 4.0 calculator
+    pub fn new() -> Self {
+        Self {
+            estimator: ContinuousEntropyEstimator::fast(),
+            phi_threshold: 0.001,
+        }
+    }
+
+    /// Compute intrinsic difference between two distributions
+    ///
+    /// id(p, q) = D_KL(p || m) + D_KL(q || m)
+    /// where m = (p + q) / 2 (Jensen-Shannon style)
+    pub fn intrinsic_difference(&self, p: &ContinuousHV, q: &ContinuousHV) -> f64 {
+        let n = p.values.len().min(q.values.len());
+        if n == 0 {
+            return 0.0;
+        }
+
+        // Compute histogram distributions
+        let num_bins = 16;
+        let mut p_counts = vec![0usize; num_bins];
+        let mut q_counts = vec![0usize; num_bins];
+
+        for i in 0..n {
+            let p_bin = (((p.values[i] + 1.0) / 2.0).clamp(0.0, 0.9999) * num_bins as f32) as usize;
+            let q_bin = (((q.values[i] + 1.0) / 2.0).clamp(0.0, 0.9999) * num_bins as f32) as usize;
+            p_counts[p_bin] += 1;
+            q_counts[q_bin] += 1;
+        }
+
+        let total = n as f64;
+        let mut id = 0.0;
+
+        for i in 0..num_bins {
+            let p_prob = p_counts[i] as f64 / total;
+            let q_prob = q_counts[i] as f64 / total;
+            let m_prob = (p_prob + q_prob) / 2.0;
+
+            if m_prob > 1e-10 {
+                if p_prob > 1e-10 {
+                    id += p_prob * (p_prob / m_prob).log2();
+                }
+                if q_prob > 1e-10 {
+                    id += q_prob * (q_prob / m_prob).log2();
+                }
+            }
+        }
+
+        id / 2.0 // Normalize to [0, 1] range for identical distributions
+    }
+
+    /// Compute small phi (φ) - irreducibility of a mechanism
+    ///
+    /// φ measures how much a mechanism's cause-effect is reduced
+    /// when the system is partitioned.
+    pub fn small_phi(&self, mechanism: &ContinuousHV, context: &[ContinuousHV]) -> f64 {
+        if context.is_empty() {
+            return 0.0;
+        }
+
+        // Compute unpartitioned cause-effect
+        let refs: Vec<&ContinuousHV> = context.iter().collect();
+        let whole = ContinuousHV::bundle(&refs);
+        let whole_mi = self.estimator.mutual_information_fast(mechanism, &whole);
+
+        // Find minimum over all partitions
+        let mut min_mi = f64::INFINITY;
+
+        // For each possible partition of context
+        let n = context.len();
+        for mask in 1..(1 << n) - 1 {
+            let mut part_a = Vec::new();
+            let mut part_b = Vec::new();
+
+            for i in 0..n {
+                if (mask & (1 << i)) != 0 {
+                    part_a.push(&context[i]);
+                } else {
+                    part_b.push(&context[i]);
+                }
+            }
+
+            if part_a.is_empty() || part_b.is_empty() {
+                continue;
+            }
+
+            // Compute MI for partitioned system
+            let bundle_a = ContinuousHV::bundle(&part_a);
+            let bundle_b = ContinuousHV::bundle(&part_b);
+            let mi_a = self.estimator.mutual_information_fast(mechanism, &bundle_a);
+            let mi_b = self.estimator.mutual_information_fast(mechanism, &bundle_b);
+
+            let partition_mi = mi_a + mi_b;
+            min_mi = min_mi.min(partition_mi);
+        }
+
+        // φ = whole - min(partitioned)
+        (whole_mi - min_mi).max(0.0)
+    }
+
+    /// Compute intrinsic information
+    ///
+    /// How much the current state specifies about itself
+    /// (self-information under the mechanism)
+    pub fn intrinsic_information(&self, state: &ContinuousHV) -> f64 {
+        // Use entropy as a proxy for self-information
+        // Lower entropy = more specific state = higher intrinsic info
+        let h = self.estimator.entropy(state);
+        let max_h = (16.0_f64).log2(); // Max entropy for 16 bins
+        (max_h - h).max(0.0)
+    }
+
+    /// Compute full IIT 4.0 analysis
+    pub fn analyze(&self, components: &[ContinuousHV]) -> IIT4Result {
+        let n = components.len();
+        if n < 2 {
+            return IIT4Result {
+                intrinsic_difference: 0.0,
+                small_phi: 0.0,
+                big_phi: 0.0,
+                intrinsic_information: 0.0,
+                concept_count: 0,
+            };
+        }
+
+        // Compute pairwise intrinsic differences
+        let mut total_id = 0.0;
+        let mut pair_count = 0;
+        for i in 0..n {
+            for j in (i + 1)..n {
+                total_id += self.intrinsic_difference(&components[i], &components[j]);
+                pair_count += 1;
+            }
+        }
+        let avg_id = if pair_count > 0 { total_id / pair_count as f64 } else { 0.0 };
+
+        // Compute small phi for each component
+        let mut total_phi = 0.0;
+        let mut concept_count = 0;
+        for i in 0..n {
+            let context: Vec<ContinuousHV> = components.iter()
+                .enumerate()
+                .filter(|(j, _)| *j != i)
+                .map(|(_, c)| c.clone())
+                .collect();
+
+            let phi_i = self.small_phi(&components[i], &context);
+            total_phi += phi_i;
+            if phi_i > self.phi_threshold {
+                concept_count += 1;
+            }
+        }
+
+        // Compute big Phi using TruePhiCalculator
+        let calc = TruePhiCalculator::new();
+        let phi_result = calc.compute_true_phi(components);
+
+        // Compute total intrinsic information
+        let total_ii: f64 = components.iter()
+            .map(|c| self.intrinsic_information(c))
+            .sum();
+
+        IIT4Result {
+            intrinsic_difference: avg_id,
+            small_phi: total_phi / n as f64,
+            big_phi: phi_result.phi,
+            intrinsic_information: total_ii / n as f64,
+            concept_count,
+        }
+    }
+}

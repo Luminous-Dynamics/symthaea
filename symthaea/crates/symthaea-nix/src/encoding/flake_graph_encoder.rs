@@ -120,15 +120,22 @@ impl<'a> FlakeGraphEncoder<'a> {
 
     /// Predict which inputs would be affected by updating a specific input.
     ///
-    /// Uses the encoded graph to find inputs whose vectors are similar to
-    /// the updated input (indicating dependency relationships).
+    /// Uses the encoded graph to find inputs whose edge vectors reference
+    /// the updated input, indicating dependency relationships. Inputs
+    /// connected via "follows" or "depends" edges are considered affected.
     pub fn predict_cascade(
         &mut self,
         updated_input: &str,
         graph: &EncodedFlakeGraph,
         threshold: f32,
     ) -> Vec<(String, f32)> {
-        let updated_hv = self.codebook.get_or_create(updated_input).clone();
+        // Use the encoded graph vector for the updated input (if available)
+        // rather than the raw basis vector, since graph vectors live in the
+        // encoded space that includes binding with roles.
+        let updated_hv = graph.input_vectors.iter()
+            .find(|(name, _)| name == updated_input)
+            .map(|(_, hv)| hv.clone())
+            .unwrap_or_else(|| self.codebook.get_or_create(updated_input).clone());
 
         let mut affected: Vec<(String, f32)> = graph.input_vectors.iter()
             .filter(|(name, _)| name != updated_input)
@@ -136,12 +143,23 @@ impl<'a> FlakeGraphEncoder<'a> {
             .filter(|(_, sim)| *sim > threshold)
             .collect();
 
-        // Also check edges that originate from the updated input
+        // Check edges that reference the updated input (either direction).
+        // An edge from X to updated_input means X depends on it (cascade target).
+        // An edge from updated_input to Y means Y is a dependency (also affected).
         for (from, to, edge_hv) in &graph.edge_vectors {
-            if from == updated_input {
-                let sim = updated_hv.similarity(edge_hv).abs();
-                if sim > threshold && !affected.iter().any(|(name, _)| name == to) {
-                    affected.push((to.clone(), sim));
+            let target = if to == updated_input {
+                Some(from.as_str())
+            } else if from == updated_input {
+                Some(to.as_str())
+            } else {
+                None
+            };
+
+            if let Some(target_name) = target {
+                if target_name != updated_input && !affected.iter().any(|(name, _)| name == target_name) {
+                    let sim = updated_hv.similarity(edge_hv).abs();
+                    let effective_sim = sim.max(threshold + 0.01); // Ensure structurally-connected inputs appear
+                    affected.push((target_name.to_string(), effective_sim));
                 }
             }
         }

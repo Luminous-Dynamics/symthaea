@@ -6,7 +6,7 @@
 
 use std::sync::mpsc;
 use ndarray::Array1;
-use crate::cfc::CfCNetwork;
+use crate::dynamics::cfc::CfCNetwork;
 use super::TrainingMethod;
 
 /// A single training sample sent from the inference thread to the trainer.

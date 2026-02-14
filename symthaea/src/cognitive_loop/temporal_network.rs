@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use ndarray::Array1;
-use crate::cfc::CfCNetwork;
+use crate::dynamics::cfc::CfCNetwork;
 use crate::hdc_ltc_bridge::HdcLtcBridge;
 use super::TemporalBackend;
 
