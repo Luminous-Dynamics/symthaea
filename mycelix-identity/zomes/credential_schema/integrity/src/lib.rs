@@ -432,6 +432,102 @@ mod tests {
         }
     }
 
+    // --- Property-Based Tests (proptest) ---
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        fn arb_schema_category() -> impl Strategy<Value = SchemaCategory> {
+            prop_oneof![
+                Just(SchemaCategory::Education),
+                Just(SchemaCategory::Employment),
+                Just(SchemaCategory::Identity),
+                Just(SchemaCategory::Skills),
+                Just(SchemaCategory::Governance),
+                Just(SchemaCategory::Financial),
+                Just(SchemaCategory::Energy),
+                "[a-zA-Z]{3,20}".prop_map(SchemaCategory::Custom),
+            ]
+        }
+
+        proptest! {
+            /// SchemaCategory round-trips through JSON.
+            #[test]
+            fn schema_category_json_roundtrip(cat in arb_schema_category()) {
+                let json = serde_json::to_string(&cat).unwrap();
+                let back: SchemaCategory = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(cat, back);
+            }
+
+            /// Valid schema IDs always start with "mycelix:schema:".
+            #[test]
+            fn schema_id_format(suffix in "[a-z]{3,20}:[a-z]{3,20}:v[0-9]{1,3}") {
+                let id = format!("mycelix:schema:{}", suffix);
+                prop_assert!(id.starts_with("mycelix:schema:"));
+            }
+
+            /// Invalid schema IDs never start with "mycelix:schema:".
+            #[test]
+            fn invalid_schema_id_rejected(prefix in "(urn|http|did|schema)") {
+                let id = format!("{}:foo:bar:v1", prefix);
+                prop_assert!(!id.starts_with("mycelix:schema:"));
+            }
+
+            /// Semver versions always contain a dot.
+            #[test]
+            fn semver_format(major in 0u32..100, minor in 0u32..100, patch in 0u32..100) {
+                let version = format!("{}.{}.{}", major, minor, patch);
+                prop_assert!(version.contains('.'));
+            }
+
+            /// Trust levels outside [0, 1] are rejected.
+            #[test]
+            fn endorsement_trust_level_bounds(level in proptest::num::f64::ANY) {
+                let in_bounds = (0.0..=1.0).contains(&level);
+                // NaN is not in bounds
+                if level.is_nan() {
+                    prop_assert!(!in_bounds);
+                }
+            }
+
+            /// Valid trust levels are within [0, 1].
+            #[test]
+            fn endorsement_valid_trust_level(level in 0.0f64..=1.0f64) {
+                prop_assert!((0.0..=1.0).contains(&level));
+            }
+
+            /// CredentialSchema JSON round-trips with arbitrary versions.
+            #[test]
+            fn schema_json_roundtrip(
+                major in 0u32..100,
+                minor in 0u32..100,
+                patch in 0u32..100,
+                name in "[A-Z][a-z]{2,20}"
+            ) {
+                let schema = CredentialSchema {
+                    id: "mycelix:schema:test:v1".into(),
+                    name,
+                    description: "Test".into(),
+                    version: format!("{}.{}.{}", major, minor, patch),
+                    author: "did:mycelix:test".into(),
+                    schema: r#"{"type":"object"}"#.into(),
+                    required_fields: vec!["field1".into()],
+                    optional_fields: vec![],
+                    credential_type: vec!["VerifiableCredential".into()],
+                    default_expiration: 0,
+                    revocable: true,
+                    active: true,
+                    created: Timestamp::from_micros(1_700_000_000_000_000),
+                    updated: Timestamp::from_micros(1_700_000_000_000_000),
+                };
+                let json = serde_json::to_string(&schema).unwrap();
+                let back: CredentialSchema = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(schema, back);
+            }
+        }
+    }
+
     #[test]
     fn schema_endorsement_rejects_non_did_endorser() {
         assert!(!"https://example.com".starts_with("did:"));

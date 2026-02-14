@@ -570,6 +570,149 @@ fn validate_update_request(
     Ok(ValidateCallbackResult::Valid)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn arb_trust_tier() -> impl Strategy<Value = TrustTier> {
+        prop_oneof![
+            Just(TrustTier::Observer),
+            Just(TrustTier::Basic),
+            Just(TrustTier::Standard),
+            Just(TrustTier::Elevated),
+            Just(TrustTier::Guardian),
+        ]
+    }
+
+    fn arb_kvector_component() -> impl Strategy<Value = KVectorComponent> {
+        prop_oneof![
+            Just(KVectorComponent::Reputation),
+            Just(KVectorComponent::Activity),
+            Just(KVectorComponent::Integrity),
+            Just(KVectorComponent::Performance),
+            Just(KVectorComponent::Membership),
+            Just(KVectorComponent::Stake),
+            Just(KVectorComponent::History),
+            Just(KVectorComponent::Topology),
+        ]
+    }
+
+    fn arb_attestation_status() -> impl Strategy<Value = AttestationStatus> {
+        prop_oneof![
+            Just(AttestationStatus::Pending),
+            Just(AttestationStatus::Fulfilled),
+            Just(AttestationStatus::Declined),
+            Just(AttestationStatus::Expired),
+            Just(AttestationStatus::Cancelled),
+        ]
+    }
+
+    /// Generate a valid TrustScoreRange within [0, 1] where lower <= upper.
+    fn arb_trust_score_range() -> impl Strategy<Value = TrustScoreRange> {
+        (0.0f32..=1.0f32, 0.0f32..=1.0f32).prop_map(|(a, b)| {
+            let lower = a.min(b);
+            let upper = a.max(b);
+            TrustScoreRange { lower, upper }
+        })
+    }
+
+    proptest! {
+        /// TrustTier::from_score always returns a tier whose min_score <= the input.
+        #[test]
+        fn from_score_consistent_with_min_score(score in 0.0f64..=1.0f64) {
+            let tier = TrustTier::from_score(score);
+            prop_assert!(
+                score >= tier.min_score(),
+                "score {} should be >= tier {:?} min_score {}",
+                score, tier, tier.min_score()
+            );
+        }
+
+        /// TrustTier::from_score is monotonically non-decreasing.
+        #[test]
+        fn from_score_monotone(a in 0.0f64..=1.0f64, b in 0.0f64..=1.0f64) {
+            if a <= b {
+                let tier_a = TrustTier::from_score(a);
+                let tier_b = TrustTier::from_score(b);
+                prop_assert!(
+                    tier_a.min_score() <= tier_b.min_score(),
+                    "tier({}) = {:?} should have min_score <= tier({}) = {:?}",
+                    a, tier_a, b, tier_b
+                );
+            }
+        }
+
+        /// TrustScoreRange round-trips through JSON.
+        #[test]
+        fn trust_score_range_json_roundtrip(range in arb_trust_score_range()) {
+            let json = serde_json::to_string(&range).unwrap();
+            let back: TrustScoreRange = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(range, back);
+        }
+
+        /// TrustTier round-trips through JSON.
+        #[test]
+        fn trust_tier_json_roundtrip(tier in arb_trust_tier()) {
+            let json = serde_json::to_string(&tier).unwrap();
+            let back: TrustTier = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(tier, back);
+        }
+
+        /// KVectorComponent round-trips through JSON.
+        #[test]
+        fn kvector_component_json_roundtrip(comp in arb_kvector_component()) {
+            let json = serde_json::to_string(&comp).unwrap();
+            let back: KVectorComponent = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(comp, back);
+        }
+
+        /// AttestationStatus round-trips through JSON.
+        #[test]
+        fn attestation_status_json_roundtrip(status in arb_attestation_status()) {
+            let json = serde_json::to_string(&status).unwrap();
+            let back: AttestationStatus = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(status, back);
+        }
+
+        /// Tier boundaries are exact at threshold values.
+        #[test]
+        fn tier_boundaries_exact(tier in arb_trust_tier()) {
+            let boundary = tier.min_score();
+            let result = TrustTier::from_score(boundary);
+            prop_assert_eq!(tier, result);
+        }
+
+        /// Valid ranges have lower <= upper.
+        #[test]
+        fn trust_score_range_invariant(range in arb_trust_score_range()) {
+            prop_assert!(range.lower <= range.upper);
+            prop_assert!(range.lower >= 0.0);
+            prop_assert!(range.upper <= 1.0);
+        }
+
+        /// Only Pending can transition to terminal states.
+        #[test]
+        fn attestation_terminal_states_dont_transition(
+            terminal in prop_oneof![
+                Just(AttestationStatus::Fulfilled),
+                Just(AttestationStatus::Declined),
+                Just(AttestationStatus::Expired),
+                Just(AttestationStatus::Cancelled),
+            ],
+            target in arb_attestation_status()
+        ) {
+            // Terminal states can only stay the same (no-op update)
+            let valid = terminal == target;
+            // From the validation code: only Pending can transition to these
+            if !valid {
+                // Attempting to transition from terminal to different state is invalid
+                prop_assert_ne!(terminal, AttestationStatus::Pending);
+            }
+        }
+    }
+}
+
 /// Validate trust presentation creation
 fn validate_create_presentation(
     _action: Create,

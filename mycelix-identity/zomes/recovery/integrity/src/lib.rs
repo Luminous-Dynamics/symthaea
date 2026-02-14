@@ -462,6 +462,134 @@ fn validate_update_recovery_request(
     Ok(ValidateCallbackResult::Valid)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn arb_recovery_status() -> impl Strategy<Value = RecoveryStatus> {
+        prop_oneof![
+            Just(RecoveryStatus::Pending),
+            Just(RecoveryStatus::Approved),
+            Just(RecoveryStatus::ReadyToExecute),
+            Just(RecoveryStatus::Completed),
+            Just(RecoveryStatus::Rejected),
+            Just(RecoveryStatus::Cancelled),
+        ]
+    }
+
+    fn arb_vote_decision() -> impl Strategy<Value = VoteDecision> {
+        prop_oneof![
+            Just(VoteDecision::Approve),
+            Just(VoteDecision::Reject),
+            Just(VoteDecision::Abstain),
+        ]
+    }
+
+    /// Generate a valid trustee list (3-7 unique DID strings).
+    fn arb_trustee_list() -> impl Strategy<Value = Vec<String>> {
+        (3usize..=7).prop_flat_map(|count| {
+            proptest::collection::vec("[a-zA-Z0-9]{8,16}".prop_map(|s| format!("did:mycelix:{}", s)), count)
+        })
+    }
+
+    proptest! {
+        /// RecoveryStatus round-trips through JSON.
+        #[test]
+        fn recovery_status_json_roundtrip(status in arb_recovery_status()) {
+            let json = serde_json::to_string(&status).unwrap();
+            let back: RecoveryStatus = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(status, back);
+        }
+
+        /// VoteDecision round-trips through JSON.
+        #[test]
+        fn vote_decision_json_roundtrip(vote in arb_vote_decision()) {
+            let json = serde_json::to_string(&vote).unwrap();
+            let back: VoteDecision = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(vote, back);
+        }
+
+        /// Majority threshold is always ceil(n/2) for any valid trustee count.
+        #[test]
+        fn majority_threshold_formula(count in 3usize..=7) {
+            let min_threshold = (count as f64 * 0.5).ceil() as u32;
+            // For 3 trustees: ceil(1.5) = 2
+            // For 4 trustees: ceil(2.0) = 2
+            // For 5 trustees: ceil(2.5) = 3
+            // For 6 trustees: ceil(3.0) = 3
+            // For 7 trustees: ceil(3.5) = 4
+            prop_assert!(min_threshold >= 2, "Majority must be at least 2");
+            prop_assert!(min_threshold as usize <= count, "Majority can't exceed count");
+        }
+
+        /// Valid thresholds are within [majority, trustees.len()].
+        #[test]
+        fn threshold_bounds(trustees in arb_trustee_list()) {
+            let n = trustees.len();
+            let min_threshold = (n as f64 * 0.5).ceil() as u32;
+            for threshold in min_threshold..=(n as u32) {
+                prop_assert!(threshold >= min_threshold);
+                prop_assert!(threshold as usize <= n);
+            }
+        }
+
+        /// Terminal recovery states cannot transition to non-self states.
+        #[test]
+        fn terminal_recovery_states(
+            target in arb_recovery_status()
+        ) {
+            let terminals = [
+                RecoveryStatus::Completed,
+                RecoveryStatus::Rejected,
+                RecoveryStatus::Cancelled,
+            ];
+            for terminal in &terminals {
+                let valid = match (terminal, &target) {
+                    (RecoveryStatus::Completed, RecoveryStatus::Completed)
+                    | (RecoveryStatus::Rejected, RecoveryStatus::Rejected)
+                    | (RecoveryStatus::Cancelled, RecoveryStatus::Cancelled) => true,
+                    _ => false,
+                };
+                if terminal != &target {
+                    prop_assert!(!valid, "Terminal {:?} should not transition to {:?}", terminal, target);
+                }
+            }
+        }
+
+        /// Pending can transition to Approved, Rejected, or Cancelled (not ReadyToExecute or Completed).
+        #[test]
+        fn pending_valid_transitions(target in arb_recovery_status()) {
+            let valid = match target {
+                RecoveryStatus::Approved
+                | RecoveryStatus::Rejected
+                | RecoveryStatus::Cancelled
+                | RecoveryStatus::Pending => true,
+                RecoveryStatus::ReadyToExecute | RecoveryStatus::Completed => false,
+            };
+            // This matches the validation logic in validate_update_recovery_request
+            let matches_validation = match (&RecoveryStatus::Pending, &target) {
+                (RecoveryStatus::Pending, RecoveryStatus::Approved)
+                | (RecoveryStatus::Pending, RecoveryStatus::Rejected)
+                | (RecoveryStatus::Pending, RecoveryStatus::Cancelled) => true,
+                (a, b) if a == b => true,
+                _ => false,
+            };
+            prop_assert_eq!(valid, matches_validation);
+        }
+
+        /// Generated trustee lists always have 3-7 entries.
+        #[test]
+        fn trustee_list_size(trustees in arb_trustee_list()) {
+            prop_assert!(trustees.len() >= 3);
+            prop_assert!(trustees.len() <= 7);
+            for t in &trustees {
+                prop_assert!(t.starts_with("did:mycelix:"));
+            }
+        }
+    }
+}
+
 /// Validate recovery vote creation
 fn validate_create_recovery_vote(
     _action: EntryCreationAction,

@@ -5109,3 +5109,412 @@ mod multi_agent_tests {
         );
     }
 }
+
+// ============================================================================
+// Cross-hApp Identity Integration Tests
+// ============================================================================
+
+/// Mirror types for selective disclosure and enhanced trust queries.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SelectiveQueryInput {
+    pub did: String,
+    pub source_happ: String,
+    pub requested_fields: Vec<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SelectiveIdentityResult {
+    pub did: String,
+    pub queried_at: Timestamp,
+    pub disclosed_fields: Vec<String>,
+    pub is_valid: Option<bool>,
+    pub is_deactivated: Option<bool>,
+    pub matl_score: Option<f64>,
+    pub reputation_score: Option<f64>,
+    pub credential_count: Option<u32>,
+    pub mfa_enrolled: Option<bool>,
+    pub mfa_assurance_level: Option<String>,
+    pub mfa_assurance_score: Option<f64>,
+    pub mfa_factor_count: Option<u32>,
+    pub fl_eligible: Option<bool>,
+    pub did_created: Option<Timestamp>,
+    pub services: Option<Vec<ServiceInfo>>,
+    pub verification_methods: Option<Vec<VerificationMethodInfo>>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ServiceInfo {
+    pub id: String,
+    pub type_: String,
+    pub endpoint: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct VerificationMethodInfo {
+    pub id: String,
+    pub type_: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TrustCheckInput {
+    pub did: String,
+    pub threshold: f64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct EnhancedTrustCheckInput {
+    pub did: String,
+    pub threshold: f64,
+    pub require_mfa: bool,
+    pub min_mfa_score: Option<f64>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct EnhancedTrustResult {
+    pub did: String,
+    pub is_trusted: bool,
+    pub matl_score: f64,
+    pub reputation_score: f64,
+    pub mfa_score: f64,
+    pub mfa_enrolled: bool,
+    pub fl_eligible: bool,
+    pub meets_threshold: bool,
+    pub meets_mfa_requirement: bool,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DidVerificationStatus {
+    pub did: String,
+    pub exists: bool,
+    pub active: bool,
+    pub mfa_enrolled: bool,
+    pub mfa_assurance_level: Option<String>,
+    pub mfa_assurance_score: f64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct MfaAssuranceLevelResult {
+    pub did: String,
+    pub enrolled: bool,
+    pub assurance_level: Option<String>,
+    pub assurance_score: f64,
+    pub factor_count: u32,
+    pub fl_eligible: bool,
+}
+
+#[cfg(test)]
+mod cross_happ_integration_tests {
+    use super::*;
+
+    /// Test selective disclosure — only requested fields should be populated.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_selective_query_only_returns_requested_fields() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did = format!("did:mycelix:{}", agent);
+
+        // Query with only "is_valid" — other fields should be None
+        let query = SelectiveQueryInput {
+            did: did.clone(),
+            source_happ: "test-governance".to_string(),
+            requested_fields: vec!["is_valid".to_string()],
+        };
+
+        let result: SelectiveIdentityResult = conductor
+            .call(&cell.zome("identity_bridge"), "query_identity_selective", query)
+            .await;
+
+        assert_eq!(result.did, did);
+        assert!(result.is_valid.is_some(), "Requested field should be populated");
+        assert!(result.is_valid.unwrap(), "DID should be valid");
+
+        // Non-requested fields should be None
+        assert!(result.reputation_score.is_none(), "reputation_score not requested");
+        assert!(result.matl_score.is_none(), "matl_score not requested");
+        assert!(result.mfa_enrolled.is_none(), "mfa_enrolled not requested");
+        assert!(result.credential_count.is_none(), "credential_count not requested");
+        assert!(result.services.is_none(), "services not requested");
+    }
+
+    /// Test selective disclosure with multiple fields including reputation.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_selective_query_multiple_fields() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did = format!("did:mycelix:{}", agent);
+
+        // Report reputation
+        let rep = ReportReputationInput {
+            did: did.clone(),
+            source_happ: "test-finance".to_string(),
+            score: 0.85,
+            interactions: 50,
+        };
+        let _: Record = conductor
+            .call(&cell.zome("identity_bridge"), "report_reputation", rep)
+            .await;
+
+        // Query multiple fields
+        let query = SelectiveQueryInput {
+            did: did.clone(),
+            source_happ: "test-energy".to_string(),
+            requested_fields: vec![
+                "is_valid".to_string(),
+                "reputation_score".to_string(),
+                "mfa_enrolled".to_string(),
+            ],
+        };
+
+        let result: SelectiveIdentityResult = conductor
+            .call(&cell.zome("identity_bridge"), "query_identity_selective", query)
+            .await;
+
+        assert!(result.is_valid.is_some());
+        assert!(result.reputation_score.is_some());
+        assert!(result.mfa_enrolled.is_some());
+
+        // Non-requested should still be None
+        assert!(result.services.is_none());
+        assert!(result.did_created.is_none());
+    }
+
+    /// Test is_trustworthy check with threshold.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_trustworthiness_threshold() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did = format!("did:mycelix:{}", agent);
+
+        // Report high reputation
+        let rep = ReportReputationInput {
+            did: did.clone(),
+            source_happ: "verified-happ".to_string(),
+            score: 0.92,
+            interactions: 100,
+        };
+        let _: Record = conductor
+            .call(&cell.zome("identity_bridge"), "report_reputation", rep)
+            .await;
+
+        // Check with low threshold — should pass
+        let low_check = TrustCheckInput {
+            did: did.clone(),
+            threshold: 0.5,
+        };
+        let trusted: bool = conductor
+            .call(&cell.zome("identity_bridge"), "is_trustworthy", low_check)
+            .await;
+        assert!(trusted, "High-reputation DID should pass low threshold");
+
+        // Check with very high threshold — may fail depending on MATL formula
+        let high_check = TrustCheckInput {
+            did: did.clone(),
+            threshold: 0.99,
+        };
+        let trusted_high: bool = conductor
+            .call(&cell.zome("identity_bridge"), "is_trustworthy", high_check)
+            .await;
+        // A single reputation source at 0.92 won't meet 0.99 threshold
+        assert!(!trusted_high, "Should not meet 0.99 threshold with single 0.92 source");
+    }
+
+    /// Test enhanced trust check with MFA requirements.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_enhanced_trust_without_mfa() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID (no MFA)
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did = format!("did:mycelix:{}", agent);
+
+        // Report reputation
+        let rep = ReportReputationInput {
+            did: did.clone(),
+            source_happ: "test-happ".to_string(),
+            score: 0.8,
+            interactions: 50,
+        };
+        let _: Record = conductor
+            .call(&cell.zome("identity_bridge"), "report_reputation", rep)
+            .await;
+
+        // Check without MFA requirement — should pass
+        let check_no_mfa = EnhancedTrustCheckInput {
+            did: did.clone(),
+            threshold: 0.5,
+            require_mfa: false,
+            min_mfa_score: None,
+        };
+        let result: EnhancedTrustResult = conductor
+            .call(&cell.zome("identity_bridge"), "check_enhanced_trust", check_no_mfa)
+            .await;
+
+        assert!(result.is_trusted, "Should be trusted without MFA requirement");
+        assert!(result.meets_threshold, "Should meet threshold");
+        assert!(result.meets_mfa_requirement, "MFA not required, should pass");
+        assert!(!result.mfa_enrolled, "No MFA enrolled");
+
+        // Check WITH MFA requirement — should fail (no MFA enrolled)
+        let check_with_mfa = EnhancedTrustCheckInput {
+            did: did.clone(),
+            threshold: 0.5,
+            require_mfa: true,
+            min_mfa_score: Some(0.25),
+        };
+        let result_mfa: EnhancedTrustResult = conductor
+            .call(&cell.zome("identity_bridge"), "check_enhanced_trust", check_with_mfa)
+            .await;
+
+        assert!(!result_mfa.is_trusted, "Should NOT be trusted when MFA required but not enrolled");
+        assert!(!result_mfa.meets_mfa_requirement, "MFA requirement not met");
+    }
+
+    /// Test DID verification status (lightweight, no audit trail).
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_did_verification_status() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did = format!("did:mycelix:{}", agent);
+
+        // Check existing DID
+        let status: DidVerificationStatus = conductor
+            .call(&cell.zome("identity_bridge"), "get_did_verification_status", did.clone())
+            .await;
+
+        assert!(status.exists, "DID should exist");
+        assert!(status.active, "DID should be active");
+        assert!(!status.mfa_enrolled, "No MFA enrolled initially");
+
+        // Check non-existent DID
+        let fake_did = "did:mycelix:nonexistent123456".to_string();
+        let fake_status: DidVerificationStatus = conductor
+            .call(&cell.zome("identity_bridge"), "get_did_verification_status", fake_did)
+            .await;
+
+        assert!(!fake_status.exists, "Non-existent DID should not exist");
+        assert!(!fake_status.active, "Non-existent DID should not be active");
+    }
+
+    /// Test MFA assurance level query (lightweight, no audit trail).
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_mfa_assurance_level_query() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did = format!("did:mycelix:{}", agent);
+
+        // Query MFA level for DID without MFA
+        let mfa_result: MfaAssuranceLevelResult = conductor
+            .call(&cell.zome("identity_bridge"), "get_mfa_assurance_level", did.clone())
+            .await;
+
+        assert_eq!(mfa_result.did, did);
+        assert!(!mfa_result.enrolled, "No MFA enrolled");
+        assert_eq!(mfa_result.factor_count, 0);
+        assert!(!mfa_result.fl_eligible, "Not FL eligible without MFA");
+    }
+
+    /// Test FL eligibility requires MFA enrollment.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_fl_eligibility_requires_mfa() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID (no MFA)
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did = format!("did:mycelix:{}", agent);
+
+        // Check FL eligibility — should be false without MFA
+        let eligible: bool = conductor
+            .call(&cell.zome("identity_bridge"), "is_fl_eligible", did.clone())
+            .await;
+
+        assert!(!eligible, "DID without MFA should not be FL eligible");
+    }
+
+    /// Test verify_did for existing and non-existing DIDs.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_verify_did_existence() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did = format!("did:mycelix:{}", agent);
+
+        // Existing DID
+        let exists: bool = conductor
+            .call(&cell.zome("identity_bridge"), "verify_did", did)
+            .await;
+        assert!(exists, "Created DID should be verifiable");
+
+        // Non-existing DID
+        let fake_exists: bool = conductor
+            .call(&cell.zome("identity_bridge"), "verify_did", "did:mycelix:doesnotexist123".to_string())
+            .await;
+        assert!(!fake_exists, "Non-existent DID should not verify");
+    }
+}
