@@ -231,6 +231,13 @@ fn validate_create_meeting(
             "Meeting must have at least one agenda item".into(),
         ));
     }
+    for item in &meeting.agenda {
+        if item.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Agenda items cannot be empty".into(),
+            ));
+        }
+    }
     if meeting.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Meeting location cannot be empty".into(),
@@ -294,6 +301,13 @@ fn validate_create_election(
             "Election must have at least one position".into(),
         ));
     }
+    for pos in &election.positions {
+        if pos.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Position name cannot be empty".into(),
+            ));
+        }
+    }
     if election.voting_closes <= election.voting_opens {
         return Ok(ValidateCallbackResult::Invalid(
             "Voting close must be after voting open".into(),
@@ -327,9 +341,14 @@ fn validate_create_ballot(_action: Create, ballot: Ballot) -> ExternResult<Valid
             "Ballot must contain at least one vote".into(),
         ));
     }
-    // Check for duplicate position votes
+    // Check for empty and duplicate position votes
     let mut seen_positions = std::collections::HashSet::new();
     for vote in &ballot.votes {
+        if vote.position.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Vote position cannot be empty".into(),
+            ));
+        }
         if !seen_positions.insert(vote.position.clone()) {
             return Ok(ValidateCallbackResult::Invalid(format!(
                 "Duplicate vote for position '{}'",
@@ -1102,8 +1121,10 @@ mod tests {
     fn create_meeting_agenda_with_empty_strings() {
         let mut m = valid_meeting();
         m.agenda = vec!["".to_string(), "Item 2".to_string()];
-        // Validator only checks that agenda is not empty, not individual items
-        assert_valid(validate_create_meeting(fake_create(), m));
+        assert_invalid(
+            validate_create_meeting(fake_create(), m),
+            "Agenda items cannot be empty",
+        );
     }
 
     #[test]
@@ -1120,8 +1141,10 @@ mod tests {
             position: String::new(),
             candidate: agent_a(),
         }];
-        // Validator doesn't check for empty position strings
-        assert_valid(validate_create_ballot(fake_create(), b));
+        assert_invalid(
+            validate_create_ballot(fake_create(), b),
+            "Vote position cannot be empty",
+        );
     }
 
     #[test]
@@ -1129,5 +1152,179 @@ mod tests {
         let mut b = valid_bylaw();
         b.id = "BL-2024-§1-α".to_string();
         assert_valid(validate_create_bylaw(fake_create(), b));
+    }
+
+    // ── Whitespace-only string validation tests ────────────────────────
+
+    #[test]
+    fn create_meeting_whitespace_title_rejected() {
+        let mut m = valid_meeting();
+        m.title = "   \t  ".to_string();
+        assert_invalid(
+            validate_create_meeting(fake_create(), m),
+            "Meeting title cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_meeting_whitespace_location_rejected() {
+        let mut m = valid_meeting();
+        m.location = "  \n  ".to_string();
+        assert_invalid(
+            validate_create_meeting(fake_create(), m),
+            "Meeting location cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_meeting_agenda_whitespace_item_rejected() {
+        let mut m = valid_meeting();
+        m.agenda = vec!["   ".to_string()];
+        assert_invalid(
+            validate_create_meeting(fake_create(), m),
+            "Agenda items cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_meeting_agenda_mixed_valid_and_whitespace_rejected() {
+        let mut m = valid_meeting();
+        m.agenda = vec!["Valid item".to_string(), " \t ".to_string()];
+        assert_invalid(
+            validate_create_meeting(fake_create(), m),
+            "Agenda items cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_resolution_whitespace_title_rejected() {
+        let mut r = valid_resolution();
+        r.title = "   ".to_string();
+        assert_invalid(
+            validate_create_resolution(fake_create(), r),
+            "Resolution title cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_resolution_whitespace_description_rejected() {
+        let mut r = valid_resolution();
+        r.description = " \t\n ".to_string();
+        assert_invalid(
+            validate_create_resolution(fake_create(), r),
+            "Resolution description cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_bylaw_whitespace_id_rejected() {
+        let mut b = valid_bylaw();
+        b.id = "   ".to_string();
+        assert_invalid(
+            validate_create_bylaw(fake_create(), b),
+            "ByLaw ID cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_bylaw_whitespace_title_rejected() {
+        let mut b = valid_bylaw();
+        b.title = " \t ".to_string();
+        assert_invalid(
+            validate_create_bylaw(fake_create(), b),
+            "ByLaw title cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_bylaw_whitespace_content_rejected() {
+        let mut b = valid_bylaw();
+        b.content = "  \n\n  ".to_string();
+        assert_invalid(
+            validate_create_bylaw(fake_create(), b),
+            "ByLaw content cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_election_whitespace_title_rejected() {
+        let mut e = valid_election();
+        e.title = "   ".to_string();
+        assert_invalid(
+            validate_create_election(fake_create(), e),
+            "Election title cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_election_whitespace_position_rejected() {
+        let mut e = valid_election();
+        e.positions = vec!["  ".to_string()];
+        e.candidates = vec![];
+        assert_invalid(
+            validate_create_election(fake_create(), e),
+            "Position name cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_election_mixed_valid_and_whitespace_position_rejected() {
+        let mut e = valid_election();
+        e.positions = vec!["President".to_string(), " \t ".to_string()];
+        e.candidates = vec![CandidateEntry {
+            agent: agent_a(),
+            position: "President".to_string(),
+            statement: "I will serve.".to_string(),
+        }];
+        assert_invalid(
+            validate_create_election(fake_create(), e),
+            "Position name cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_election_candidate_whitespace_statement_rejected() {
+        let mut e = valid_election();
+        e.candidates = vec![CandidateEntry {
+            agent: agent_a(),
+            position: "President".to_string(),
+            statement: "   ".to_string(),
+        }];
+        assert_invalid(
+            validate_create_election(fake_create(), e),
+            "Candidate statement cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_ballot_whitespace_position_rejected() {
+        let mut b = valid_ballot();
+        b.votes = vec![BallotVote {
+            position: "  \t  ".to_string(),
+            candidate: agent_a(),
+        }];
+        assert_invalid(
+            validate_create_ballot(fake_create(), b),
+            "Vote position cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_ballot_mixed_valid_and_whitespace_position_rejected() {
+        let mut b = valid_ballot();
+        b.votes = vec![
+            BallotVote {
+                position: "President".to_string(),
+                candidate: agent_a(),
+            },
+            BallotVote {
+                position: "   ".to_string(),
+                candidate: agent_b(),
+            },
+        ];
+        assert_invalid(
+            validate_create_ballot(fake_create(), b),
+            "Vote position cannot be empty",
+        );
     }
 }

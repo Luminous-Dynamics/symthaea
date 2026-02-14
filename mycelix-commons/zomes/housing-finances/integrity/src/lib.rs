@@ -129,11 +129,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 original_entry_hash: _,
             } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::MonthlyCharge(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::MonthlyCharge(charge) => validate_update_charge(charge),
                 EntryTypes::Payment(_) => Ok(ValidateCallbackResult::Invalid(
                     "Payments cannot be modified after creation".into(),
                 )),
-                EntryTypes::ReserveFund(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::ReserveFund(fund) => validate_update_fund(fund),
                 EntryTypes::Budget(_) => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -255,6 +255,44 @@ fn validate_create_budget(_action: Create, budget: Budget) -> ExternResult<Valid
             "Category allocations ({}) must equal projected expenses ({})",
             total_allocated, budget.expenses_projected_cents
         )));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_charge(charge: MonthlyCharge) -> ExternResult<ValidateCallbackResult> {
+    if charge.period_month < 1 || charge.period_month > 12 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Month must be between 1 and 12".into(),
+        ));
+    }
+    if charge.period_year < 2020 || charge.period_year > 2100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Year must be between 2020 and 2100".into(),
+        ));
+    }
+    let computed_total = charge.base_rent_cents
+        + charge.maintenance_fee_cents
+        + charge.utilities_cents
+        + charge.reserve_contribution_cents;
+    if charge.total_cents != computed_total {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Total ({}) must equal sum of components ({})",
+            charge.total_cents, computed_total
+        )));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_fund(fund: ReserveFund) -> ExternResult<ValidateCallbackResult> {
+    if fund.name.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fund name cannot be empty".into(),
+        ));
+    }
+    if fund.target_cents == 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fund target must be greater than 0".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -1536,5 +1574,131 @@ mod tests {
         };
         let cloned = cat.clone();
         assert_eq!(cat, cloned);
+    }
+
+    // ========================================================================
+    // UPDATE CHARGE VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn update_charge_valid() {
+        let result = validate_update_charge(make_charge());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn update_charge_month_zero_rejected() {
+        let mut charge = make_charge();
+        charge.period_month = 0;
+        let result = validate_update_charge(charge);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn update_charge_month_13_rejected() {
+        let mut charge = make_charge();
+        charge.period_month = 13;
+        let result = validate_update_charge(charge);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn update_charge_year_2019_rejected() {
+        let mut charge = make_charge();
+        charge.period_year = 2019;
+        let result = validate_update_charge(charge);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn update_charge_year_2101_rejected() {
+        let mut charge = make_charge();
+        charge.period_year = 2101;
+        let result = validate_update_charge(charge);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn update_charge_total_mismatch_rejected() {
+        let mut charge = make_charge();
+        charge.total_cents = 999_999;
+        let result = validate_update_charge(charge);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn update_charge_all_zeros_valid() {
+        let mut charge = make_charge();
+        charge.base_rent_cents = 0;
+        charge.maintenance_fee_cents = 0;
+        charge.utilities_cents = 0;
+        charge.reserve_contribution_cents = 0;
+        charge.total_cents = 0;
+        let result = validate_update_charge(charge);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn update_charge_month_checked_before_total() {
+        let mut charge = make_charge();
+        charge.period_month = 0;
+        charge.total_cents = 999;
+        let result = validate_update_charge(charge);
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                assert!(msg.contains("Month"));
+            }
+            other => panic!("Expected Invalid, got {:?}", other),
+        }
+    }
+
+    // ========================================================================
+    // UPDATE FUND VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn update_fund_valid() {
+        let result = validate_update_fund(make_fund());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn update_fund_empty_name_rejected() {
+        let mut fund = make_fund();
+        fund.name = "".into();
+        let result = validate_update_fund(fund);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn update_fund_whitespace_name_rejected() {
+        let mut fund = make_fund();
+        fund.name = "   ".into();
+        let result = validate_update_fund(fund);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn update_fund_zero_target_rejected() {
+        let mut fund = make_fund();
+        fund.target_cents = 0;
+        let result = validate_update_fund(fund);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn update_fund_one_cent_target_accepted() {
+        let mut fund = make_fund();
+        fund.target_cents = 1;
+        let result = validate_update_fund(fund);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn update_fund_zero_balance_accepted() {
+        let mut fund = make_fund();
+        fund.balance_cents = 0;
+        let result = validate_update_fund(fund);
+        assert!(is_valid(&result));
     }
 }

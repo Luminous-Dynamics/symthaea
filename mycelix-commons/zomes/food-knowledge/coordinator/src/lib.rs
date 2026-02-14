@@ -117,6 +117,47 @@ pub fn get_recipes_by_tag(tag: String) -> ExternResult<Vec<Record>> {
     records_from_links(links)
 }
 
+// ============================================================================
+// UPDATE FUNCTIONS
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateSeedVarietyInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: SeedVariety,
+}
+
+#[hdk_extern]
+pub fn update_seed_variety(input: UpdateSeedVarietyInput) -> ExternResult<ActionHash> {
+    update_entry(input.original_action_hash, &EntryTypes::SeedVariety(input.updated_entry))
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateTraditionalPracticeInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: TraditionalPractice,
+}
+
+#[hdk_extern]
+pub fn update_traditional_practice(input: UpdateTraditionalPracticeInput) -> ExternResult<ActionHash> {
+    update_entry(input.original_action_hash, &EntryTypes::TraditionalPractice(input.updated_entry))
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateRecipeInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: Recipe,
+}
+
+#[hdk_extern]
+pub fn update_recipe(input: UpdateRecipeInput) -> ExternResult<ActionHash> {
+    update_entry(input.original_action_hash, &EntryTypes::Recipe(input.updated_entry))
+}
+
+// ============================================================================
+// SEARCH
+// ============================================================================
+
 #[hdk_extern]
 pub fn search_knowledge(query: String) -> ExternResult<Vec<Record>> {
     // Simple search: try as species, category, or tag
@@ -533,6 +574,193 @@ mod tests {
         let decoded: SeedVariety = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.days_to_maturity, 1);
     }
+
+    // ========================================================================
+    // UpdateSeedVarietyInput tests
+    // ========================================================================
+
+    #[test]
+    fn update_seed_variety_input_struct_construction() {
+        let input = UpdateSeedVarietyInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: SeedVariety {
+                name: "Updated Cherokee Purple".to_string(),
+                species: "Solanum lycopersicum".to_string(),
+                origin: Some("Tennessee".to_string()),
+                days_to_maturity: 85,
+                companion_plants: vec!["Basil".to_string()],
+                avoid_plants: vec![],
+                seed_saving_notes: Some("Updated notes".to_string()),
+            },
+        };
+        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(input.updated_entry.name, "Updated Cherokee Purple");
+        assert_eq!(input.updated_entry.days_to_maturity, 85);
+    }
+
+    #[test]
+    fn update_seed_variety_input_serde_roundtrip() {
+        let input = UpdateSeedVarietyInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            updated_entry: SeedVariety {
+                name: "Roma".to_string(),
+                species: "Solanum lycopersicum".to_string(),
+                origin: None,
+                days_to_maturity: 75,
+                companion_plants: vec![],
+                avoid_plants: vec![],
+                seed_saving_notes: None,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateSeedVarietyInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, input.original_action_hash);
+        assert_eq!(decoded.updated_entry.name, "Roma");
+        assert_eq!(decoded.updated_entry.origin, None);
+    }
+
+    #[test]
+    fn update_seed_variety_input_clone_is_equal() {
+        let input = UpdateSeedVarietyInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xcd; 36]),
+            updated_entry: SeedVariety {
+                name: "Brandywine".to_string(),
+                species: "Solanum lycopersicum".to_string(),
+                origin: Some("PA".to_string()),
+                days_to_maturity: 90,
+                companion_plants: vec!["Basil".to_string()],
+                avoid_plants: vec!["Fennel".to_string()],
+                seed_saving_notes: None,
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry, input.updated_entry);
+    }
+
+    // ========================================================================
+    // UpdateTraditionalPracticeInput tests
+    // ========================================================================
+
+    #[test]
+    fn update_traditional_practice_input_struct_construction() {
+        let input = UpdateTraditionalPracticeInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: TraditionalPractice {
+                name: "Updated Three Sisters".to_string(),
+                description: "Corn, beans, squash, and sunflowers".to_string(),
+                region: Some("North America".to_string()),
+                season: Some("Late Spring".to_string()),
+                category: PracticeCategory::Planting,
+            },
+        };
+        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(input.updated_entry.name, "Updated Three Sisters");
+    }
+
+    #[test]
+    fn update_traditional_practice_input_serde_roundtrip() {
+        let input = UpdateTraditionalPracticeInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xef; 36]),
+            updated_entry: TraditionalPractice {
+                name: "Companion Planting".to_string(),
+                description: "Growing compatible plants near each other".to_string(),
+                region: None,
+                season: None,
+                category: PracticeCategory::Pest,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTraditionalPracticeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, input.original_action_hash);
+        assert_eq!(decoded.updated_entry.category, PracticeCategory::Pest);
+        assert!(decoded.updated_entry.region.is_none());
+    }
+
+    #[test]
+    fn update_traditional_practice_input_clone_is_equal() {
+        let input = UpdateTraditionalPracticeInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0x11; 36]),
+            updated_entry: TraditionalPractice {
+                name: "Milpa".to_string(),
+                description: "Mesoamerican system".to_string(),
+                region: Some("Central America".to_string()),
+                season: Some("Spring".to_string()),
+                category: PracticeCategory::Soil,
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry, input.updated_entry);
+    }
+
+    // ========================================================================
+    // UpdateRecipeInput tests
+    // ========================================================================
+
+    #[test]
+    fn update_recipe_input_struct_construction() {
+        let input = UpdateRecipeInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: Recipe {
+                name: "Updated Tomato Sauce".to_string(),
+                ingredients: vec!["Tomatoes".to_string(), "Garlic".to_string(), "Onion".to_string()],
+                instructions: "Blend, season, and simmer".to_string(),
+                servings: 6,
+                prep_time_min: 60,
+                tags: vec!["sauce".to_string(), "Italian".to_string()],
+                source_attribution: Some("Updated cookbook".to_string()),
+            },
+        };
+        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(input.updated_entry.servings, 6);
+        assert_eq!(input.updated_entry.ingredients.len(), 3);
+    }
+
+    #[test]
+    fn update_recipe_input_serde_roundtrip() {
+        let input = UpdateRecipeInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xaa; 36]),
+            updated_entry: Recipe {
+                name: "Simple Bread".to_string(),
+                ingredients: vec!["Flour".to_string(), "Water".to_string()],
+                instructions: "Mix and bake".to_string(),
+                servings: 1,
+                prep_time_min: 90,
+                tags: vec![],
+                source_attribution: None,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateRecipeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, input.original_action_hash);
+        assert_eq!(decoded.updated_entry.name, "Simple Bread");
+        assert!(decoded.updated_entry.tags.is_empty());
+        assert!(decoded.updated_entry.source_attribution.is_none());
+    }
+
+    #[test]
+    fn update_recipe_input_clone_is_equal() {
+        let input = UpdateRecipeInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xbb; 36]),
+            updated_entry: Recipe {
+                name: "Pozole".to_string(),
+                ingredients: vec!["Hominy".to_string(), "Pork".to_string()],
+                instructions: "Simmer for hours".to_string(),
+                servings: 8,
+                prep_time_min: 240,
+                tags: vec!["Mexican".to_string()],
+                source_attribution: Some("Family recipe".to_string()),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry, input.updated_entry);
+    }
+
+    // ========================================================================
+    // Existing tests continue below
+    // ========================================================================
 
     #[test]
     fn recipe_single_ingredient_no_tags_roundtrip() {

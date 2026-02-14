@@ -51,6 +51,34 @@ pub fn create_land_trust(trust: LandTrust) -> ExternResult<Record> {
 }
 
 // ============================================================================
+// UPDATE FUNCTIONS
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateLandTrustInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: LandTrust,
+}
+
+/// Update a land trust entry (general-purpose update replacing the whole entry)
+#[hdk_extern]
+pub fn update_land_trust(input: UpdateLandTrustInput) -> ExternResult<ActionHash> {
+    update_entry(input.original_action_hash, &EntryTypes::LandTrust(input.updated_entry))
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateGroundLeaseInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: GroundLease,
+}
+
+/// Update a ground lease entry (general-purpose update replacing the whole entry)
+#[hdk_extern]
+pub fn update_ground_lease(input: UpdateGroundLeaseInput) -> ExternResult<ActionHash> {
+    update_entry(input.original_action_hash, &EntryTypes::GroundLease(input.updated_entry))
+}
+
+// ============================================================================
 // Cross-domain: Property ownership verification via bridge dispatch
 // ============================================================================
 
@@ -1012,5 +1040,148 @@ mod tests {
         assert_eq!(decoded, calc);
         assert!(decoded.ami_at_purchase.is_none());
         assert!(decoded.current_ami.is_none());
+    }
+
+    // ── UpdateLandTrustInput tests ──────────────────────────────────
+
+    #[test]
+    fn update_land_trust_input_struct_construction() {
+        let input = UpdateLandTrustInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: LandTrust {
+                id: "trust-updated".to_string(),
+                name: "Updated Trust".to_string(),
+                mission: "Updated mission".to_string(),
+                boundary: vec![(45.0, -122.0), (45.1, -122.0)],
+                charter_hash: None,
+                stewardship_board: vec![fake_agent()],
+                affordability_target_ami_percent: 60,
+                created_at: Timestamp::from_micros(1000),
+            },
+        };
+        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(input.updated_entry.name, "Updated Trust");
+        assert_eq!(input.updated_entry.affordability_target_ami_percent, 60);
+    }
+
+    #[test]
+    fn update_land_trust_input_serde_roundtrip() {
+        let input = UpdateLandTrustInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            updated_entry: LandTrust {
+                id: "trust-001".to_string(),
+                name: "Community Trust".to_string(),
+                mission: "Affordable housing for all".to_string(),
+                boundary: vec![(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)],
+                charter_hash: Some(fake_action_hash()),
+                stewardship_board: vec![fake_agent()],
+                affordability_target_ami_percent: 80,
+                created_at: Timestamp::from_micros(500),
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateLandTrustInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, input.original_action_hash);
+        assert_eq!(decoded.updated_entry.id, "trust-001");
+        assert_eq!(decoded.updated_entry.boundary.len(), 3);
+    }
+
+    #[test]
+    fn update_land_trust_input_clone_is_equal() {
+        let input = UpdateLandTrustInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xef; 36]),
+            updated_entry: LandTrust {
+                id: "trust-clone".to_string(),
+                name: "Cloneable Trust".to_string(),
+                mission: "Test cloning".to_string(),
+                boundary: vec![],
+                charter_hash: None,
+                stewardship_board: vec![fake_agent()],
+                affordability_target_ami_percent: 100,
+                created_at: Timestamp::from_micros(0),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry, input.updated_entry);
+    }
+
+    // ── UpdateGroundLeaseInput tests ────────────────────────────────
+
+    #[test]
+    fn update_ground_lease_input_struct_construction() {
+        let input = UpdateGroundLeaseInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: GroundLease {
+                trust_hash: fake_action_hash(),
+                unit_hash: fake_action_hash(),
+                leaseholder: fake_agent(),
+                lease_term_years: 99,
+                ground_rent_monthly_cents: 60000,
+                resale_formula: ResaleFormula {
+                    formula_type: FormulaType::AppreciationCap,
+                    max_appreciation_percent_annual: Some(3),
+                    ami_cap_percent: None,
+                    improvement_credit_percent: Some(80),
+                },
+                started_at: Timestamp::from_micros(1000),
+                expires_at: Timestamp::from_micros(3000000),
+            },
+        };
+        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(input.updated_entry.ground_rent_monthly_cents, 60000);
+        assert_eq!(input.updated_entry.lease_term_years, 99);
+    }
+
+    #[test]
+    fn update_ground_lease_input_serde_roundtrip() {
+        let input = UpdateGroundLeaseInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xcc; 36]),
+            updated_entry: GroundLease {
+                trust_hash: fake_action_hash(),
+                unit_hash: fake_action_hash(),
+                leaseholder: fake_agent(),
+                lease_term_years: 50,
+                ground_rent_monthly_cents: 0,
+                resale_formula: ResaleFormula {
+                    formula_type: FormulaType::Hybrid,
+                    max_appreciation_percent_annual: Some(2),
+                    ami_cap_percent: Some(80),
+                    improvement_credit_percent: Some(100),
+                },
+                started_at: Timestamp::from_micros(500),
+                expires_at: Timestamp::from_micros(2000000),
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateGroundLeaseInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, input.original_action_hash);
+        assert_eq!(decoded.updated_entry.lease_term_years, 50);
+        assert_eq!(decoded.updated_entry.resale_formula.formula_type, FormulaType::Hybrid);
+    }
+
+    #[test]
+    fn update_ground_lease_input_clone_is_equal() {
+        let input = UpdateGroundLeaseInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0x11; 36]),
+            updated_entry: GroundLease {
+                trust_hash: fake_action_hash(),
+                unit_hash: fake_action_hash(),
+                leaseholder: fake_agent(),
+                lease_term_years: 25,
+                ground_rent_monthly_cents: 30000,
+                resale_formula: ResaleFormula {
+                    formula_type: FormulaType::ConsumerPriceIndex,
+                    max_appreciation_percent_annual: None,
+                    ami_cap_percent: None,
+                    improvement_credit_percent: None,
+                },
+                started_at: Timestamp::from_micros(100),
+                expires_at: Timestamp::from_micros(1000000),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry, input.updated_entry);
     }
 }

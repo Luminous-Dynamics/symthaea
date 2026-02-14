@@ -251,6 +251,50 @@ pub fn get_regional_patterns(region: String) -> ExternResult<Vec<Record>> {
     Ok(records)
 }
 
+// ============================================================================
+// UPDATE FUNCTIONS
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateTraditionalPracticeInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: TraditionalPractice,
+}
+
+/// Update a traditional water management practice
+#[hdk_extern]
+pub fn update_practice(input: UpdateTraditionalPracticeInput) -> ExternResult<ActionHash> {
+    update_entry(input.original_action_hash, &EntryTypes::TraditionalPractice(input.updated_entry))
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateConservationMethodInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: ConservationMethod,
+}
+
+/// Update a conservation method
+#[hdk_extern]
+pub fn update_conservation_method(input: UpdateConservationMethodInput) -> ExternResult<ActionHash> {
+    update_entry(input.original_action_hash, &EntryTypes::ConservationMethod(input.updated_entry))
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateClimateWaterPatternInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: ClimateWaterPattern,
+}
+
+/// Update an observed climate-water pattern
+#[hdk_extern]
+pub fn update_climate_pattern(input: UpdateClimateWaterPatternInput) -> ExternResult<ActionHash> {
+    update_entry(input.original_action_hash, &EntryTypes::ClimateWaterPattern(input.updated_entry))
+}
+
+// ============================================================================
+// QUERIES (continued)
+// ============================================================================
+
 /// Get all climate patterns
 #[hdk_extern]
 pub fn get_all_climate_patterns(_: ()) -> ExternResult<Vec<Record>> {
@@ -692,5 +736,203 @@ mod tests {
         let back: ConservationMethod = serde_json::from_str(&json).unwrap();
         assert_eq!(back.water_saved_percent, Some(u8::MAX));
         assert_eq!(back.difficulty, DifficultyLevel::Expert);
+    }
+
+    // ========================================================================
+    // UpdateTraditionalPracticeInput tests
+    // ========================================================================
+
+    #[test]
+    fn update_traditional_practice_input_struct_construction() {
+        let input = UpdateTraditionalPracticeInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: TraditionalPractice {
+                id: "tp-updated".to_string(),
+                title: "Updated Qanat System".to_string(),
+                description: "Improved underground water channel system".to_string(),
+                practice_type: PracticeType::Irrigation,
+                region: "Middle East".to_string(),
+                culture_or_community: "Persian".to_string(),
+                recorded_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                access_level: AccessLevel::Public,
+                effectiveness_rating: Some(9),
+            },
+        };
+        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(input.updated_entry.title, "Updated Qanat System");
+        assert_eq!(input.updated_entry.effectiveness_rating, Some(9));
+    }
+
+    #[test]
+    fn update_traditional_practice_input_serde_roundtrip() {
+        let input = UpdateTraditionalPracticeInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xef; 36]),
+            updated_entry: TraditionalPractice {
+                id: "tp-serde".to_string(),
+                title: "Rain Ceremony".to_string(),
+                description: "Traditional ceremony to invite rain".to_string(),
+                practice_type: PracticeType::Ceremony,
+                region: "Southern Africa".to_string(),
+                culture_or_community: "Zulu".to_string(),
+                recorded_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                access_level: AccessLevel::Sacred,
+                effectiveness_rating: None,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTraditionalPracticeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, input.original_action_hash);
+        assert_eq!(decoded.updated_entry.title, "Rain Ceremony");
+        assert_eq!(decoded.updated_entry.access_level, AccessLevel::Sacred);
+        assert!(decoded.updated_entry.effectiveness_rating.is_none());
+    }
+
+    #[test]
+    fn update_traditional_practice_input_clone_is_equal() {
+        let input = UpdateTraditionalPracticeInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0x11; 36]),
+            updated_entry: TraditionalPractice {
+                id: "tp-clone".to_string(),
+                title: "Fog Collection".to_string(),
+                description: "Using nets to collect fog".to_string(),
+                practice_type: PracticeType::Harvesting,
+                region: "Chile".to_string(),
+                culture_or_community: "Coastal".to_string(),
+                recorded_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                access_level: AccessLevel::CommunityOnly,
+                effectiveness_rating: Some(7),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry, input.updated_entry);
+    }
+
+    // ========================================================================
+    // UpdateConservationMethodInput tests
+    // ========================================================================
+
+    #[test]
+    fn update_conservation_method_input_struct_construction() {
+        let input = UpdateConservationMethodInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: ConservationMethod {
+                id: "cm-updated".to_string(),
+                title: "Updated Drip Irrigation".to_string(),
+                description: "Improved low-volume water delivery".to_string(),
+                water_saved_percent: Some(70),
+                applicable_to: vec![WaterClassification::Irrigation],
+                cost_level: CostLevel::Medium,
+                difficulty: DifficultyLevel::Intermediate,
+            },
+        };
+        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(input.updated_entry.title, "Updated Drip Irrigation");
+        assert_eq!(input.updated_entry.water_saved_percent, Some(70));
+    }
+
+    #[test]
+    fn update_conservation_method_input_serde_roundtrip() {
+        let input = UpdateConservationMethodInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xaa; 36]),
+            updated_entry: ConservationMethod {
+                id: "cm-serde".to_string(),
+                title: "Water Quality Monitoring".to_string(),
+                description: "Regular testing of water sources".to_string(),
+                water_saved_percent: None,
+                applicable_to: vec![WaterClassification::Potable, WaterClassification::Cooking],
+                cost_level: CostLevel::Low,
+                difficulty: DifficultyLevel::Beginner,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateConservationMethodInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, input.original_action_hash);
+        assert_eq!(decoded.updated_entry.title, "Water Quality Monitoring");
+        assert!(decoded.updated_entry.water_saved_percent.is_none());
+        assert_eq!(decoded.updated_entry.applicable_to.len(), 2);
+    }
+
+    #[test]
+    fn update_conservation_method_input_clone_is_equal() {
+        let input = UpdateConservationMethodInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xbb; 36]),
+            updated_entry: ConservationMethod {
+                id: "cm-clone".to_string(),
+                title: "Rainwater Harvesting".to_string(),
+                description: "Collecting rainwater".to_string(),
+                water_saved_percent: Some(40),
+                applicable_to: vec![WaterClassification::Greywater],
+                cost_level: CostLevel::Free,
+                difficulty: DifficultyLevel::Beginner,
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry, input.updated_entry);
+    }
+
+    // ========================================================================
+    // UpdateClimateWaterPatternInput tests
+    // ========================================================================
+
+    #[test]
+    fn update_climate_water_pattern_input_struct_construction() {
+        let input = UpdateClimateWaterPatternInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: ClimateWaterPattern {
+                region: "Southwest US".to_string(),
+                season: "Summer".to_string(),
+                pattern_type: PatternType::Drought,
+                description: "Updated drought assessment".to_string(),
+                observed_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                observed_at: Timestamp::from_micros(1_700_000_000),
+                indicators: vec!["Reduced streamflow".to_string(), "Low aquifer".to_string()],
+            },
+        };
+        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(input.updated_entry.region, "Southwest US");
+        assert_eq!(input.updated_entry.indicators.len(), 2);
+    }
+
+    #[test]
+    fn update_climate_water_pattern_input_serde_roundtrip() {
+        let input = UpdateClimateWaterPatternInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xcc; 36]),
+            updated_entry: ClimateWaterPattern {
+                region: "Mekong Delta".to_string(),
+                season: "Monsoon".to_string(),
+                pattern_type: PatternType::Flood,
+                description: "Severe monsoon flooding".to_string(),
+                observed_by: AgentPubKey::from_raw_36(vec![0xcd; 36]),
+                observed_at: Timestamp::from_micros(1_500_000_000),
+                indicators: vec![],
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateClimateWaterPatternInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, input.original_action_hash);
+        assert_eq!(decoded.updated_entry.region, "Mekong Delta");
+        assert_eq!(decoded.updated_entry.pattern_type, PatternType::Flood);
+        assert!(decoded.updated_entry.indicators.is_empty());
+    }
+
+    #[test]
+    fn update_climate_water_pattern_input_clone_is_equal() {
+        let input = UpdateClimateWaterPatternInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0x33; 36]),
+            updated_entry: ClimateWaterPattern {
+                region: "Great Lakes".to_string(),
+                season: "Spring".to_string(),
+                pattern_type: PatternType::QualityChange,
+                description: "Algal bloom".to_string(),
+                observed_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                observed_at: Timestamp::from_micros(1_750_000_000),
+                indicators: vec!["Elevated phosphorus".to_string()],
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry, input.updated_entry);
     }
 }

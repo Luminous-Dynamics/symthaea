@@ -442,10 +442,20 @@ fn validate_update_request(request: ServiceRequest) -> ExternResult<ValidateCall
             "Request title cannot be empty".into(),
         ));
     }
+    if request.hours_needed < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours needed cannot be negative".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_update_exchange(exchange: TimeExchange) -> ExternResult<ValidateCallbackResult> {
+    if exchange.hours <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Exchange hours must be positive".into(),
+        ));
+    }
     if let Some(rating) = exchange.rating_provider {
         if !(1..=5).contains(&rating) {
             return Ok(ValidateCallbackResult::Invalid(
@@ -1380,6 +1390,73 @@ mod tests {
         assert_invalid(
             validate_update_exchange(e),
             "Provider rating must be 1-5",
+        );
+    }
+
+    // ── validate_update_request numeric bounds ──────────────────────────
+
+    #[test]
+    fn update_request_negative_hours_rejected() {
+        let mut r = valid_request();
+        r.hours_needed = -1.0;
+        assert_invalid(
+            validate_update_request(r),
+            "Hours needed cannot be negative",
+        );
+    }
+
+    #[test]
+    fn update_request_zero_hours_ok() {
+        // update allows zero (closing a request), unlike create which requires positive
+        let mut r = valid_request();
+        r.hours_needed = 0.0;
+        assert_valid(validate_update_request(r));
+    }
+
+    #[test]
+    fn update_request_positive_hours_ok() {
+        let mut r = valid_request();
+        r.hours_needed = 5.0;
+        assert_valid(validate_update_request(r));
+    }
+
+    // ── validate_update_exchange numeric bounds ─────────────────────────
+
+    #[test]
+    fn update_exchange_zero_hours_rejected() {
+        let mut e = valid_exchange();
+        e.hours = 0.0;
+        assert_invalid(
+            validate_update_exchange(e),
+            "Exchange hours must be positive",
+        );
+    }
+
+    #[test]
+    fn update_exchange_negative_hours_rejected() {
+        let mut e = valid_exchange();
+        e.hours = -2.0;
+        assert_invalid(
+            validate_update_exchange(e),
+            "Exchange hours must be positive",
+        );
+    }
+
+    #[test]
+    fn update_exchange_positive_hours_ok() {
+        let mut e = valid_exchange();
+        e.hours = 3.5;
+        assert_valid(validate_update_exchange(e));
+    }
+
+    #[test]
+    fn update_exchange_hours_checked_before_ratings() {
+        let mut e = valid_exchange();
+        e.hours = -1.0;
+        e.rating_provider = Some(0); // Also invalid
+        assert_invalid(
+            validate_update_exchange(e),
+            "Exchange hours must be positive",
         );
     }
 }

@@ -175,6 +175,12 @@ fn validate_cargo_offer(c: CargoOffer) -> ExternResult<ValidateCallbackResult> {
     if c.price_per_kg < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Price cannot be negative".into()));
     }
+    if c.origin_lat < -90.0 || c.origin_lat > 90.0 || c.destination_lat < -90.0 || c.destination_lat > 90.0 {
+        return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+    }
+    if c.origin_lon < -180.0 || c.origin_lon > 180.0 || c.destination_lon < -180.0 || c.destination_lon > 180.0 {
+        return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -656,6 +662,140 @@ mod tests {
         c.capacity_kg = 0.0;
         c.price_per_kg = -1.0;
         assert_invalid(validate_cargo_offer(c), "Cargo capacity must be positive");
+    }
+
+    // ── validate_cargo_offer: latitude boundaries ─────────────────────
+
+    #[test]
+    fn cargo_origin_lat_too_low_rejected() {
+        let mut c = valid_cargo_offer();
+        c.origin_lat = -91.0;
+        assert_invalid(validate_cargo_offer(c), "Latitude must be between -90 and 90");
+    }
+
+    #[test]
+    fn cargo_origin_lat_too_high_rejected() {
+        let mut c = valid_cargo_offer();
+        c.origin_lat = 91.0;
+        assert_invalid(validate_cargo_offer(c), "Latitude must be between -90 and 90");
+    }
+
+    #[test]
+    fn cargo_dest_lat_too_low_rejected() {
+        let mut c = valid_cargo_offer();
+        c.destination_lat = -91.0;
+        assert_invalid(validate_cargo_offer(c), "Latitude must be between -90 and 90");
+    }
+
+    #[test]
+    fn cargo_dest_lat_too_high_rejected() {
+        let mut c = valid_cargo_offer();
+        c.destination_lat = 91.0;
+        assert_invalid(validate_cargo_offer(c), "Latitude must be between -90 and 90");
+    }
+
+    #[test]
+    fn cargo_origin_lat_at_boundary_neg90_valid() {
+        let mut c = valid_cargo_offer();
+        c.origin_lat = -90.0;
+        assert_valid(validate_cargo_offer(c));
+    }
+
+    #[test]
+    fn cargo_origin_lat_at_boundary_pos90_valid() {
+        let mut c = valid_cargo_offer();
+        c.origin_lat = 90.0;
+        assert_valid(validate_cargo_offer(c));
+    }
+
+    #[test]
+    fn cargo_dest_lat_at_boundary_neg90_valid() {
+        let mut c = valid_cargo_offer();
+        c.destination_lat = -90.0;
+        assert_valid(validate_cargo_offer(c));
+    }
+
+    #[test]
+    fn cargo_dest_lat_at_boundary_pos90_valid() {
+        let mut c = valid_cargo_offer();
+        c.destination_lat = 90.0;
+        assert_valid(validate_cargo_offer(c));
+    }
+
+    // ── validate_cargo_offer: longitude boundaries ──────────────────────
+
+    #[test]
+    fn cargo_origin_lon_too_low_rejected() {
+        let mut c = valid_cargo_offer();
+        c.origin_lon = -181.0;
+        assert_invalid(validate_cargo_offer(c), "Longitude must be between -180 and 180");
+    }
+
+    #[test]
+    fn cargo_origin_lon_too_high_rejected() {
+        let mut c = valid_cargo_offer();
+        c.origin_lon = 181.0;
+        assert_invalid(validate_cargo_offer(c), "Longitude must be between -180 and 180");
+    }
+
+    #[test]
+    fn cargo_dest_lon_too_low_rejected() {
+        let mut c = valid_cargo_offer();
+        c.destination_lon = -181.0;
+        assert_invalid(validate_cargo_offer(c), "Longitude must be between -180 and 180");
+    }
+
+    #[test]
+    fn cargo_dest_lon_too_high_rejected() {
+        let mut c = valid_cargo_offer();
+        c.destination_lon = 181.0;
+        assert_invalid(validate_cargo_offer(c), "Longitude must be between -180 and 180");
+    }
+
+    #[test]
+    fn cargo_origin_lon_at_boundary_neg180_valid() {
+        let mut c = valid_cargo_offer();
+        c.origin_lon = -180.0;
+        assert_valid(validate_cargo_offer(c));
+    }
+
+    #[test]
+    fn cargo_origin_lon_at_boundary_pos180_valid() {
+        let mut c = valid_cargo_offer();
+        c.origin_lon = 180.0;
+        assert_valid(validate_cargo_offer(c));
+    }
+
+    #[test]
+    fn cargo_dest_lon_at_boundary_neg180_valid() {
+        let mut c = valid_cargo_offer();
+        c.destination_lon = -180.0;
+        assert_valid(validate_cargo_offer(c));
+    }
+
+    #[test]
+    fn cargo_dest_lon_at_boundary_pos180_valid() {
+        let mut c = valid_cargo_offer();
+        c.destination_lon = 180.0;
+        assert_valid(validate_cargo_offer(c));
+    }
+
+    // ── validate_cargo_offer: combined lat/lon check order ──────────────
+
+    #[test]
+    fn cargo_invalid_capacity_with_invalid_lat_rejects_capacity_first() {
+        let mut c = valid_cargo_offer();
+        c.capacity_kg = 0.0;
+        c.origin_lat = -91.0;
+        assert_invalid(validate_cargo_offer(c), "Cargo capacity must be positive");
+    }
+
+    #[test]
+    fn cargo_invalid_price_with_invalid_lon_rejects_price_first() {
+        let mut c = valid_cargo_offer();
+        c.price_per_kg = -1.0;
+        c.origin_lon = 181.0;
+        assert_invalid(validate_cargo_offer(c), "Price cannot be negative");
     }
 
     // ── Anchor test ─────────────────────────────────────────────────────

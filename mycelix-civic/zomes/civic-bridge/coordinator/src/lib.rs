@@ -17,6 +17,10 @@ use mycelix_bridge_common::{
     JusticeAreaQuery, JusticeAreaResult,
     FactcheckStatusQuery, FactcheckStatusResult,
     AuditTrailQuery, AuditTrailEntry, AuditTrailResult,
+    WaterSafetyQuery, WaterSafetyResult,
+    EmergencyFoodQuery, EmergencyFoodResult,
+    ShelterCapacityQuery, ShelterCapacityResult,
+    EmergencyCareQuery, EmergencyCareResult,
     RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
 };
 
@@ -592,6 +596,174 @@ pub fn verify_care_credentials_for_evidence(input: VerifyCareCredentialsInput) -
     }
 }
 
+// ---- Emergency → Commons cross-cluster resource queries ----
+
+/// Query water safety in a disaster zone.
+///
+/// Cross-cluster call: civic-bridge → commons water_purity via
+/// `CallTargetCell::OtherRole("commons")`.  Used by emergency-coordination
+/// to determine which water sources in an affected area are safe for
+/// consumption during disaster response.
+#[hdk_extern]
+pub fn query_water_safety_for_emergency(input: WaterSafetyQuery) -> ExternResult<WaterSafetyResult> {
+    let dispatch = CrossClusterDispatchInput {
+        role: COMMONS_ROLE.to_string(),
+        zome: "water_purity".to_string(),
+        fn_name: "check_area_safety".to_string(),
+        payload: ExternIO::encode(&input)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0,
+    };
+
+    match bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_COMMONS_ZOMES) {
+        Ok(result) if result.success => {
+            if let Some(response) = result.response {
+                let decoded: WaterSafetyResult = ExternIO(response).decode()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+                Ok(decoded)
+            } else {
+                Ok(WaterSafetyResult {
+                    safe_sources: 0,
+                    contaminated_sources: 0,
+                    total_sources: 0,
+                })
+            }
+        }
+        Ok(_result) => Ok(WaterSafetyResult {
+            safe_sources: 0,
+            contaminated_sources: 0,
+            total_sources: 0,
+        }),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Cross-cluster water safety query failed: {:?}", e)
+        ))),
+    }
+}
+
+/// Query food availability for emergency distribution.
+///
+/// Cross-cluster call: civic-bridge → commons food_distribution via
+/// `CallTargetCell::OtherRole("commons")`.  Used by emergency-resources
+/// to identify food stocks and distribution points that can serve
+/// displaced populations.
+#[hdk_extern]
+pub fn query_food_for_emergency(input: EmergencyFoodQuery) -> ExternResult<EmergencyFoodResult> {
+    let dispatch = CrossClusterDispatchInput {
+        role: COMMONS_ROLE.to_string(),
+        zome: "food_distribution".to_string(),
+        fn_name: "check_emergency_availability".to_string(),
+        payload: ExternIO::encode(&input)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0,
+    };
+
+    match bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_COMMONS_ZOMES) {
+        Ok(result) if result.success => {
+            if let Some(response) = result.response {
+                let decoded: EmergencyFoodResult = ExternIO(response).decode()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+                Ok(decoded)
+            } else {
+                Ok(EmergencyFoodResult {
+                    available_kg: 0.0,
+                    distribution_points: 0,
+                    estimated_days_supply: 0.0,
+                })
+            }
+        }
+        Ok(_result) => Ok(EmergencyFoodResult {
+            available_kg: 0.0,
+            distribution_points: 0,
+            estimated_days_supply: 0.0,
+        }),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Cross-cluster food availability query failed: {:?}", e)
+        ))),
+    }
+}
+
+/// Query shelter capacity for emergency housing.
+///
+/// Cross-cluster call: civic-bridge → commons housing_units via
+/// `CallTargetCell::OtherRole("commons")`.  Used by emergency-shelters
+/// to find available beds and shelters near a disaster zone, supplementing
+/// dedicated emergency shelters with community housing capacity.
+#[hdk_extern]
+pub fn query_shelter_capacity_for_emergency(input: ShelterCapacityQuery) -> ExternResult<ShelterCapacityResult> {
+    let dispatch = CrossClusterDispatchInput {
+        role: COMMONS_ROLE.to_string(),
+        zome: "housing_units".to_string(),
+        fn_name: "check_shelter_capacity".to_string(),
+        payload: ExternIO::encode(&input)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0,
+    };
+
+    match bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_COMMONS_ZOMES) {
+        Ok(result) if result.success => {
+            if let Some(response) = result.response {
+                let decoded: ShelterCapacityResult = ExternIO(response).decode()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+                Ok(decoded)
+            } else {
+                Ok(ShelterCapacityResult {
+                    available_beds: 0,
+                    total_shelters: 0,
+                    nearest_shelter_km: 0.0,
+                })
+            }
+        }
+        Ok(_result) => Ok(ShelterCapacityResult {
+            available_beds: 0,
+            total_shelters: 0,
+            nearest_shelter_km: 0.0,
+        }),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Cross-cluster shelter capacity query failed: {:?}", e)
+        ))),
+    }
+}
+
+/// Query available care providers for emergency response.
+///
+/// Cross-cluster call: civic-bridge → commons care_matching via
+/// `CallTargetCell::OtherRole("commons")`.  Used by emergency-triage
+/// to find care providers with the needed skills near a disaster area,
+/// prioritized by urgency level.
+#[hdk_extern]
+pub fn query_care_for_emergency(input: EmergencyCareQuery) -> ExternResult<EmergencyCareResult> {
+    let dispatch = CrossClusterDispatchInput {
+        role: COMMONS_ROLE.to_string(),
+        zome: "care_matching".to_string(),
+        fn_name: "find_emergency_providers".to_string(),
+        payload: ExternIO::encode(&input)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0,
+    };
+
+    match bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_COMMONS_ZOMES) {
+        Ok(result) if result.success => {
+            if let Some(response) = result.response {
+                let decoded: EmergencyCareResult = ExternIO(response).decode()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+                Ok(decoded)
+            } else {
+                Ok(EmergencyCareResult {
+                    available_providers: 0,
+                    nearest_provider_km: 0.0,
+                })
+            }
+        }
+        Ok(_result) => Ok(EmergencyCareResult {
+            available_providers: 0,
+            nearest_provider_km: 0.0,
+        }),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Cross-cluster care provider query failed: {:?}", e)
+        ))),
+    }
+}
+
 // ============================================================================
 // Audit Trail Queries
 // ============================================================================
@@ -930,6 +1102,153 @@ mod tests {
         assert!(!r2.commons_reachable);
         assert!(r2.recommendation.is_none());
         assert_eq!(r2.error.as_deref(), Some("Connection refused"));
+    }
+
+    // ---- Emergency → Commons cross-cluster type serde ----
+
+    #[test]
+    fn water_safety_query_serde_roundtrip() {
+        let q = WaterSafetyQuery {
+            area_lat: 32.9483,
+            area_lon: -96.7299,
+            radius_km: 10.0,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: WaterSafetyQuery = serde_json::from_str(&json).unwrap();
+        assert!((q2.area_lat - 32.9483).abs() < 1e-4);
+        assert!((q2.area_lon - (-96.7299)).abs() < 1e-4);
+        assert!((q2.radius_km - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn water_safety_result_serde_roundtrip() {
+        let r = WaterSafetyResult {
+            safe_sources: 12,
+            contaminated_sources: 3,
+            total_sources: 15,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: WaterSafetyResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.safe_sources, 12);
+        assert_eq!(r2.contaminated_sources, 3);
+        assert_eq!(r2.total_sources, 15);
+    }
+
+    #[test]
+    fn emergency_food_query_serde_roundtrip() {
+        let q = EmergencyFoodQuery {
+            area_lat: 29.7604,
+            area_lon: -95.3698,
+            radius_km: 25.0,
+            people_count: 500,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: EmergencyFoodQuery = serde_json::from_str(&json).unwrap();
+        assert!((q2.area_lat - 29.7604).abs() < 1e-4);
+        assert_eq!(q2.people_count, 500);
+    }
+
+    #[test]
+    fn emergency_food_result_serde_roundtrip() {
+        let r = EmergencyFoodResult {
+            available_kg: 2500.5,
+            distribution_points: 4,
+            estimated_days_supply: 3.5,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: EmergencyFoodResult = serde_json::from_str(&json).unwrap();
+        assert!((r2.available_kg - 2500.5).abs() < 1e-6);
+        assert_eq!(r2.distribution_points, 4);
+        assert!((r2.estimated_days_supply - 3.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn shelter_capacity_query_serde_roundtrip() {
+        let q = ShelterCapacityQuery {
+            area_lat: 30.2672,
+            area_lon: -97.7431,
+            radius_km: 15.0,
+            beds_needed: 200,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: ShelterCapacityQuery = serde_json::from_str(&json).unwrap();
+        assert!((q2.area_lat - 30.2672).abs() < 1e-4);
+        assert_eq!(q2.beds_needed, 200);
+    }
+
+    #[test]
+    fn shelter_capacity_result_serde_roundtrip() {
+        let r = ShelterCapacityResult {
+            available_beds: 150,
+            total_shelters: 3,
+            nearest_shelter_km: 2.4,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: ShelterCapacityResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.available_beds, 150);
+        assert_eq!(r2.total_shelters, 3);
+        assert!((r2.nearest_shelter_km - 2.4).abs() < 1e-6);
+    }
+
+    #[test]
+    fn emergency_care_query_serde_roundtrip() {
+        let q = EmergencyCareQuery {
+            area_lat: 32.7767,
+            area_lon: -96.7970,
+            skill_needed: "trauma_surgeon".into(),
+            urgency_level: 5,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: EmergencyCareQuery = serde_json::from_str(&json).unwrap();
+        assert!((q2.area_lat - 32.7767).abs() < 1e-4);
+        assert_eq!(q2.skill_needed, "trauma_surgeon");
+        assert_eq!(q2.urgency_level, 5);
+    }
+
+    #[test]
+    fn emergency_care_result_serde_roundtrip() {
+        let r = EmergencyCareResult {
+            available_providers: 7,
+            nearest_provider_km: 1.2,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: EmergencyCareResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.available_providers, 7);
+        assert!((r2.nearest_provider_km - 1.2).abs() < 1e-6);
+    }
+
+    // ---- Emergency cross-cluster target zomes are in commons allowlist ----
+
+    #[test]
+    fn emergency_water_safety_target_in_commons_allowlist() {
+        assert!(
+            ALLOWED_COMMONS_ZOMES.contains(&"water_purity"),
+            "water_purity must be in ALLOWED_COMMONS_ZOMES for water safety queries"
+        );
+    }
+
+    #[test]
+    fn emergency_food_target_in_commons_allowlist() {
+        assert!(
+            ALLOWED_COMMONS_ZOMES.contains(&"food_distribution"),
+            "food_distribution must be in ALLOWED_COMMONS_ZOMES for food availability queries"
+        );
+    }
+
+    #[test]
+    fn emergency_shelter_target_in_commons_allowlist() {
+        assert!(
+            ALLOWED_COMMONS_ZOMES.contains(&"housing_units"),
+            "housing_units must be in ALLOWED_COMMONS_ZOMES for shelter capacity queries"
+        );
+    }
+
+    #[test]
+    fn emergency_care_target_in_commons_allowlist() {
+        assert!(
+            ALLOWED_COMMONS_ZOMES.contains(&"care_matching"),
+            "care_matching must be in ALLOWED_COMMONS_ZOMES for care provider queries"
+        );
     }
 
     // ---- Rate limit validation ----

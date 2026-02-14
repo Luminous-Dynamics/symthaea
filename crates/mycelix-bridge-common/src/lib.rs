@@ -357,6 +357,76 @@ pub struct CarbonCreditResult {
 }
 
 // ============================================================================
+// Cross-cluster emergency↔commons query types
+// ============================================================================
+
+/// Input for querying water safety in a disaster zone (emergency → water)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WaterSafetyQuery {
+    pub area_lat: f64,
+    pub area_lon: f64,
+    pub radius_km: f64,
+}
+
+/// Result of a water safety query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WaterSafetyResult {
+    pub safe_sources: u32,
+    pub contaminated_sources: u32,
+    pub total_sources: u32,
+}
+
+/// Input for querying food availability during an emergency (emergency → food)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EmergencyFoodQuery {
+    pub area_lat: f64,
+    pub area_lon: f64,
+    pub radius_km: f64,
+    pub people_count: u32,
+}
+
+/// Result of an emergency food availability query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EmergencyFoodResult {
+    pub available_kg: f64,
+    pub distribution_points: u32,
+    pub estimated_days_supply: f64,
+}
+
+/// Input for querying shelter capacity during an emergency (emergency → housing)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ShelterCapacityQuery {
+    pub area_lat: f64,
+    pub area_lon: f64,
+    pub radius_km: f64,
+    pub beds_needed: u32,
+}
+
+/// Result of a shelter capacity query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ShelterCapacityResult {
+    pub available_beds: u32,
+    pub total_shelters: u32,
+    pub nearest_shelter_km: f64,
+}
+
+/// Input for querying available care providers during an emergency (emergency → care)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EmergencyCareQuery {
+    pub area_lat: f64,
+    pub area_lon: f64,
+    pub skill_needed: String,
+    pub urgency_level: u8,
+}
+
+/// Result of an emergency care provider query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EmergencyCareResult {
+    pub available_providers: u32,
+    pub nearest_provider_km: f64,
+}
+
+// ============================================================================
 // Audit trail query types
 // ============================================================================
 
@@ -882,5 +952,268 @@ mod tests {
         assert!((r2.total_credits_kg_co2 - 127.5).abs() < 1e-6);
         assert_eq!(r2.trips_logged, 34);
         assert!(r2.error.is_none());
+    }
+
+    // Emergency↔Commons cross-cluster type serde tests
+
+    #[test]
+    fn water_safety_query_serde_roundtrip() {
+        let q = WaterSafetyQuery {
+            area_lat: 32.9483,
+            area_lon: -96.7299,
+            radius_km: 10.0,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: WaterSafetyQuery = serde_json::from_str(&json).unwrap();
+        assert!((q2.area_lat - 32.9483).abs() < 1e-4);
+        assert!((q2.area_lon - (-96.7299)).abs() < 1e-4);
+        assert!((q2.radius_km - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn water_safety_result_serde_roundtrip() {
+        let r = WaterSafetyResult {
+            safe_sources: 8,
+            contaminated_sources: 2,
+            total_sources: 10,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: WaterSafetyResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.safe_sources, 8);
+        assert_eq!(r2.contaminated_sources, 2);
+        assert_eq!(r2.total_sources, 10);
+    }
+
+    #[test]
+    fn water_safety_result_all_contaminated() {
+        let r = WaterSafetyResult {
+            safe_sources: 0,
+            contaminated_sources: 5,
+            total_sources: 5,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: WaterSafetyResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.safe_sources, 0);
+        assert_eq!(r2.contaminated_sources, 5);
+    }
+
+    #[test]
+    fn emergency_food_query_serde_roundtrip() {
+        let q = EmergencyFoodQuery {
+            area_lat: 29.7604,
+            area_lon: -95.3698,
+            radius_km: 25.0,
+            people_count: 500,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: EmergencyFoodQuery = serde_json::from_str(&json).unwrap();
+        assert!((q2.area_lat - 29.7604).abs() < 1e-4);
+        assert!((q2.area_lon - (-95.3698)).abs() < 1e-4);
+        assert!((q2.radius_km - 25.0).abs() < 1e-6);
+        assert_eq!(q2.people_count, 500);
+    }
+
+    #[test]
+    fn emergency_food_result_serde_roundtrip() {
+        let r = EmergencyFoodResult {
+            available_kg: 2500.5,
+            distribution_points: 4,
+            estimated_days_supply: 3.5,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: EmergencyFoodResult = serde_json::from_str(&json).unwrap();
+        assert!((r2.available_kg - 2500.5).abs() < 1e-6);
+        assert_eq!(r2.distribution_points, 4);
+        assert!((r2.estimated_days_supply - 3.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn emergency_food_result_zero_supply() {
+        let r = EmergencyFoodResult {
+            available_kg: 0.0,
+            distribution_points: 0,
+            estimated_days_supply: 0.0,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: EmergencyFoodResult = serde_json::from_str(&json).unwrap();
+        assert!((r2.available_kg).abs() < 1e-6);
+        assert_eq!(r2.distribution_points, 0);
+        assert!((r2.estimated_days_supply).abs() < 1e-6);
+    }
+
+    #[test]
+    fn shelter_capacity_query_serde_roundtrip() {
+        let q = ShelterCapacityQuery {
+            area_lat: 30.2672,
+            area_lon: -97.7431,
+            radius_km: 15.0,
+            beds_needed: 200,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: ShelterCapacityQuery = serde_json::from_str(&json).unwrap();
+        assert!((q2.area_lat - 30.2672).abs() < 1e-4);
+        assert!((q2.area_lon - (-97.7431)).abs() < 1e-4);
+        assert!((q2.radius_km - 15.0).abs() < 1e-6);
+        assert_eq!(q2.beds_needed, 200);
+    }
+
+    #[test]
+    fn shelter_capacity_result_serde_roundtrip() {
+        let r = ShelterCapacityResult {
+            available_beds: 150,
+            total_shelters: 3,
+            nearest_shelter_km: 2.4,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: ShelterCapacityResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.available_beds, 150);
+        assert_eq!(r2.total_shelters, 3);
+        assert!((r2.nearest_shelter_km - 2.4).abs() < 1e-6);
+    }
+
+    #[test]
+    fn shelter_capacity_result_no_shelters() {
+        let r = ShelterCapacityResult {
+            available_beds: 0,
+            total_shelters: 0,
+            nearest_shelter_km: 0.0,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: ShelterCapacityResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.available_beds, 0);
+        assert_eq!(r2.total_shelters, 0);
+    }
+
+    #[test]
+    fn emergency_care_query_serde_roundtrip() {
+        let q = EmergencyCareQuery {
+            area_lat: 32.7767,
+            area_lon: -96.7970,
+            skill_needed: "trauma_surgeon".into(),
+            urgency_level: 5,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: EmergencyCareQuery = serde_json::from_str(&json).unwrap();
+        assert!((q2.area_lat - 32.7767).abs() < 1e-4);
+        assert!((q2.area_lon - (-96.7970)).abs() < 1e-4);
+        assert_eq!(q2.skill_needed, "trauma_surgeon");
+        assert_eq!(q2.urgency_level, 5);
+    }
+
+    #[test]
+    fn emergency_care_query_low_urgency() {
+        let q = EmergencyCareQuery {
+            area_lat: 0.0,
+            area_lon: 0.0,
+            skill_needed: "first_aid".into(),
+            urgency_level: 1,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: EmergencyCareQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.urgency_level, 1);
+        assert_eq!(q2.skill_needed, "first_aid");
+    }
+
+    #[test]
+    fn emergency_care_result_serde_roundtrip() {
+        let r = EmergencyCareResult {
+            available_providers: 7,
+            nearest_provider_km: 1.2,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: EmergencyCareResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.available_providers, 7);
+        assert!((r2.nearest_provider_km - 1.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn emergency_care_result_no_providers() {
+        let r = EmergencyCareResult {
+            available_providers: 0,
+            nearest_provider_km: 0.0,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: EmergencyCareResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.available_providers, 0);
+    }
+
+    // Boundary validation tests for emergency↔commons types
+
+    #[test]
+    fn water_safety_query_extreme_coordinates() {
+        let q = WaterSafetyQuery {
+            area_lat: 90.0,
+            area_lon: 180.0,
+            radius_km: 0.001,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: WaterSafetyQuery = serde_json::from_str(&json).unwrap();
+        assert!((q2.area_lat - 90.0).abs() < 1e-6);
+        assert!((q2.area_lon - 180.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn water_safety_query_negative_coordinates() {
+        let q = WaterSafetyQuery {
+            area_lat: -90.0,
+            area_lon: -180.0,
+            radius_km: 100.0,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: WaterSafetyQuery = serde_json::from_str(&json).unwrap();
+        assert!((q2.area_lat - (-90.0)).abs() < 1e-6);
+        assert!((q2.area_lon - (-180.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn shelter_capacity_query_zero_beds_needed() {
+        let q = ShelterCapacityQuery {
+            area_lat: 0.0,
+            area_lon: 0.0,
+            radius_km: 1.0,
+            beds_needed: 0,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: ShelterCapacityQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.beds_needed, 0);
+    }
+
+    #[test]
+    fn emergency_food_query_zero_people() {
+        let q = EmergencyFoodQuery {
+            area_lat: 0.0,
+            area_lon: 0.0,
+            radius_km: 1.0,
+            people_count: 0,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: EmergencyFoodQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.people_count, 0);
+    }
+
+    #[test]
+    fn emergency_care_query_max_urgency_level() {
+        let q = EmergencyCareQuery {
+            area_lat: 0.0,
+            area_lon: 0.0,
+            skill_needed: "any".into(),
+            urgency_level: 255,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: EmergencyCareQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.urgency_level, 255);
+    }
+
+    #[test]
+    fn emergency_care_query_empty_skill() {
+        let q = EmergencyCareQuery {
+            area_lat: 0.0,
+            area_lon: 0.0,
+            skill_needed: "".into(),
+            urgency_level: 3,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: EmergencyCareQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q2.skill_needed, "");
     }
 }

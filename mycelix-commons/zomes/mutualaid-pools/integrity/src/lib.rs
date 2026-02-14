@@ -292,12 +292,31 @@ fn validate_mutual_aid_pool(pool: &MutualAidPool) -> ExternResult<ValidateCallba
         validate_did(member)?;
     }
 
-    // Validate disbursement approval threshold
+    // Validate contribution rules
+    if pool.contribution_rules.max_withdrawal == 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Max withdrawal must be greater than 0".into()
+        ));
+    }
+
+    // Validate disbursement rules
+    if pool.disbursement_rules.min_approvals == 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Minimum approvals must be greater than 0".into()
+        ));
+    }
+
     if pool.disbursement_rules.approval_threshold_percent > 100 {
         return Ok(ValidateCallbackResult::Invalid(
             PoolsError::InvalidApprovalThreshold(
                 pool.disbursement_rules.approval_threshold_percent
             ).to_string()
+        ));
+    }
+
+    if pool.disbursement_rules.max_disbursement == 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Max disbursement must be greater than 0".into()
         ));
     }
 
@@ -1125,6 +1144,96 @@ mod tests {
         mem.last_contribution = Some(fake_timestamp(2000));
         mem.last_disbursement = Some(fake_timestamp(3000));
         assert_valid(validate_pool_membership(&mem));
+    }
+
+    // ── validate_mutual_aid_pool: contribution rule numeric bounds ─────
+
+    #[test]
+    fn validate_pool_max_withdrawal_zero_rejected() {
+        let mut pool = valid_pool();
+        pool.contribution_rules.max_withdrawal = 0;
+        assert_invalid(
+            validate_mutual_aid_pool(&pool),
+            "Max withdrawal must be greater than 0",
+        );
+    }
+
+    #[test]
+    fn validate_pool_max_withdrawal_one_ok() {
+        let mut pool = valid_pool();
+        pool.contribution_rules.max_withdrawal = 1;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_max_withdrawal_max_ok() {
+        let mut pool = valid_pool();
+        pool.contribution_rules.max_withdrawal = u64::MAX;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    // ── validate_mutual_aid_pool: disbursement rule numeric bounds ─────
+
+    #[test]
+    fn validate_pool_min_approvals_zero_rejected() {
+        let mut pool = valid_pool();
+        pool.disbursement_rules.min_approvals = 0;
+        assert_invalid(
+            validate_mutual_aid_pool(&pool),
+            "Minimum approvals must be greater than 0",
+        );
+    }
+
+    #[test]
+    fn validate_pool_min_approvals_one_ok() {
+        let mut pool = valid_pool();
+        pool.disbursement_rules.min_approvals = 1;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_min_approvals_large_ok() {
+        let mut pool = valid_pool();
+        pool.disbursement_rules.min_approvals = 100;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_max_disbursement_zero_rejected() {
+        let mut pool = valid_pool();
+        pool.disbursement_rules.max_disbursement = 0;
+        assert_invalid(
+            validate_mutual_aid_pool(&pool),
+            "Max disbursement must be greater than 0",
+        );
+    }
+
+    #[test]
+    fn validate_pool_max_disbursement_one_ok() {
+        let mut pool = valid_pool();
+        pool.disbursement_rules.max_disbursement = 1;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_max_disbursement_max_ok() {
+        let mut pool = valid_pool();
+        pool.disbursement_rules.max_disbursement = u64::MAX;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_min_monthly_zero_ok() {
+        let mut pool = valid_pool();
+        pool.contribution_rules.min_monthly = 0;
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_min_monthly_nonzero_ok() {
+        let mut pool = valid_pool();
+        pool.contribution_rules.min_monthly = 500;
+        assert_valid(validate_mutual_aid_pool(&pool));
     }
 
     // ── Default trait tests ─────────────────────────────────────────────

@@ -309,6 +309,38 @@ pub struct UpdateCollectionInput {
     pub visibility: Option<Visibility>,
 }
 
+/// Update a featured content entry
+#[hdk_extern]
+pub fn update_featured_content(input: UpdateFeaturedContentInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::FeaturedContent(input.updated_entry),
+    )
+}
+
+/// Input for updating featured content
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateFeaturedContentInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: FeaturedContent,
+}
+
+/// Update a quality score entry
+#[hdk_extern]
+pub fn update_quality_score(input: UpdateQualityScoreInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::QualityScore(input.updated_entry),
+    )
+}
+
+/// Input for updating a quality score
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateQualityScoreInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: QualityScore,
+}
+
 /// Remove endorsement
 #[hdk_extern]
 pub fn remove_endorsement(input: RemoveEndorsementInput) -> ExternResult<()> {
@@ -586,6 +618,128 @@ mod tests {
         let json = serde_json::to_string(&input).expect("serialize");
         let parsed: UnfeatureInput = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(parsed.featured_id, "feat-1");
+    }
+
+    // ========================================================================
+    // Update input struct tests
+    // ========================================================================
+
+    #[test]
+    fn update_featured_content_input_serde_roundtrip() {
+        let input = UpdateFeaturedContentInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: FeaturedContent {
+                id: "featured:pub-1:999".into(),
+                publication_id: "pub-1".into(),
+                featured_by: "did:example:editor".into(),
+                reason: "Updated reason - exceptional depth".into(),
+                featured_from: Timestamp::from_micros(1_000_000),
+                featured_until: Some(Timestamp::from_micros(9_999_999)),
+            },
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateFeaturedContentInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(parsed.updated_entry.reason, "Updated reason - exceptional depth");
+        assert_eq!(parsed.updated_entry.featured_until, Some(Timestamp::from_micros(9_999_999)));
+    }
+
+    #[test]
+    fn update_featured_content_input_clone() {
+        let input = UpdateFeaturedContentInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            updated_entry: FeaturedContent {
+                id: "feat-clone".into(),
+                publication_id: "pub-c".into(),
+                featured_by: "did:example:ed".into(),
+                reason: "Clone test".into(),
+                featured_from: Timestamp::from_micros(0),
+                featured_until: None,
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry.reason, "Clone test");
+    }
+
+    #[test]
+    fn update_featured_content_input_no_until_serde() {
+        let input = UpdateFeaturedContentInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            updated_entry: FeaturedContent {
+                id: "feat-no-until".into(),
+                publication_id: "pub-x".into(),
+                featured_by: "did:example:x".into(),
+                reason: "Indefinite feature".into(),
+                featured_from: Timestamp::from_micros(0),
+                featured_until: None,
+            },
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateFeaturedContentInput = serde_json::from_str(&json).expect("deserialize");
+        assert!(parsed.updated_entry.featured_until.is_none());
+    }
+
+    #[test]
+    fn update_quality_score_input_serde_roundtrip() {
+        let input = UpdateQualityScoreInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xcd; 36]),
+            updated_entry: QualityScore {
+                publication_id: "pub-1".into(),
+                score: 0.95,
+                endorsement_count: 95,
+                share_count: 50,
+                fact_check_score: 0.99,
+                author_reputation: 0.88,
+                last_calculated: Timestamp::from_micros(5_000_000),
+            },
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateQualityScoreInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.original_action_hash, ActionHash::from_raw_36(vec![0xcd; 36]));
+        assert!((parsed.updated_entry.score - 0.95).abs() < 1e-10);
+        assert_eq!(parsed.updated_entry.endorsement_count, 95);
+        assert_eq!(parsed.updated_entry.share_count, 50);
+    }
+
+    #[test]
+    fn update_quality_score_input_clone() {
+        let input = UpdateQualityScoreInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            updated_entry: QualityScore {
+                publication_id: "pub-clone".into(),
+                score: 0.5,
+                endorsement_count: 10,
+                share_count: 5,
+                fact_check_score: 0.5,
+                author_reputation: 0.5,
+                last_calculated: Timestamp::from_micros(0),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.updated_entry.publication_id, "pub-clone");
+        assert!((cloned.updated_entry.score - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn update_quality_score_input_zero_counts_serde() {
+        let input = UpdateQualityScoreInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xef; 36]),
+            updated_entry: QualityScore {
+                publication_id: "pub-zero".into(),
+                score: 0.0,
+                endorsement_count: 0,
+                share_count: 0,
+                fact_check_score: 0.0,
+                author_reputation: 0.0,
+                last_calculated: Timestamp::from_micros(0),
+            },
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateQualityScoreInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.updated_entry.endorsement_count, 0);
+        assert_eq!(parsed.updated_entry.share_count, 0);
+        assert!((parsed.updated_entry.score - 0.0).abs() < 1e-10);
     }
 
     // ========================================================================

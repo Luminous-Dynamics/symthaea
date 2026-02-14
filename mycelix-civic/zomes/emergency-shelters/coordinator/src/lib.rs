@@ -153,6 +153,22 @@ pub struct UpdateShelterStatusInput {
     pub new_status: ShelterStatus,
 }
 
+/// Update a shelter entry (general update)
+#[hdk_extern]
+pub fn update_shelter(input: UpdateShelterInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::Shelter(input.updated_entry),
+    )
+}
+
+/// Input for updating a shelter
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateShelterInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: Shelter,
+}
+
 /// Check in a person or party to a shelter
 #[hdk_extern]
 pub fn check_in_person(input: CheckInPersonInput) -> ExternResult<Record> {
@@ -881,6 +897,83 @@ mod tests {
         let json = serde_json::to_string(&input).expect("serialize");
         let parsed: RegisterShelterInput = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(parsed.amenities.len(), 12);
+    }
+
+    // ========================================================================
+    // UPDATE SHELTER INPUT TESTS
+    // ========================================================================
+
+    #[test]
+    fn update_shelter_input_serde_roundtrip() {
+        let input = UpdateShelterInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: Shelter {
+                id: "shelter-1".into(),
+                name: "Updated Community Center".into(),
+                location_lat: 32.9483,
+                location_lon: -96.7299,
+                address: "123 Main St".into(),
+                capacity: 300,
+                current_occupancy: 50,
+                shelter_type: ShelterType::Community,
+                amenities: vec![Amenity::Power, Amenity::Water, Amenity::Medical],
+                status: ShelterStatus::Open,
+                contact: "555-0200".into(),
+            },
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateShelterInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(parsed.updated_entry.name, "Updated Community Center");
+        assert_eq!(parsed.updated_entry.capacity, 300);
+        assert_eq!(parsed.updated_entry.amenities.len(), 3);
+    }
+
+    #[test]
+    fn update_shelter_input_clone() {
+        let input = UpdateShelterInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            updated_entry: Shelter {
+                id: "s-clone".into(),
+                name: "Clone Test".into(),
+                location_lat: 0.0,
+                location_lon: 0.0,
+                address: "1 St".into(),
+                capacity: 10,
+                current_occupancy: 0,
+                shelter_type: ShelterType::Emergency,
+                amenities: vec![],
+                status: ShelterStatus::Open,
+                contact: "555-0000".into(),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry.name, "Clone Test");
+    }
+
+    #[test]
+    fn update_shelter_input_full_status_serde() {
+        let input = UpdateShelterInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            updated_entry: Shelter {
+                id: "s-full".into(),
+                name: "Full Shelter".into(),
+                location_lat: 33.0,
+                location_lon: -97.0,
+                address: "789 Elm St".into(),
+                capacity: 50,
+                current_occupancy: 50,
+                shelter_type: ShelterType::PetFriendly,
+                amenities: vec![Amenity::PetArea],
+                status: ShelterStatus::Full,
+                contact: "555-1111".into(),
+            },
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateShelterInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.updated_entry.status, ShelterStatus::Full);
+        assert_eq!(parsed.updated_entry.current_occupancy, parsed.updated_entry.capacity);
     }
 
     #[test]

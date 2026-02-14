@@ -190,6 +190,38 @@ pub struct UpdateShareInput {
     pub new_share_percentage: f64,
 }
 
+/// Update an attribution entry
+#[hdk_extern]
+pub fn update_attribution(input: UpdateAttributionInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::Attribution(input.updated_entry),
+    )
+}
+
+/// Input for updating an attribution
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateAttributionInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: Attribution,
+}
+
+/// Update a royalty rule entry
+#[hdk_extern]
+pub fn update_royalty_rule(input: UpdateRoyaltyRuleInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::RoyaltyRule(input.updated_entry),
+    )
+}
+
+/// Input for updating a royalty rule
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateRoyaltyRuleInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: RoyaltyRule,
+}
+
 /// Get publication royalty rules
 #[hdk_extern]
 pub fn get_publication_royalties(publication_id: String) -> ExternResult<Vec<Record>> {
@@ -796,6 +828,130 @@ mod tests {
         assert_eq!(result2.dispute_count, 3);
         assert_eq!(result2.unresolved_count, 1);
         assert!(result2.warning.is_some());
+    }
+
+    // ========================================================================
+    // Update input struct tests
+    // ========================================================================
+
+    #[test]
+    fn update_attribution_input_serde_roundtrip() {
+        let input = UpdateAttributionInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: Attribution {
+                id: "attr:pub-1:did:mycelix:alice:999".into(),
+                publication_id: "pub-1".into(),
+                contributor_did: "did:mycelix:alice".into(),
+                role: ContributorRole::Author,
+                share_percentage: 60.0,
+                verified: true,
+                created: Timestamp::from_micros(1_000_000),
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateAttributionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(decoded.updated_entry.share_percentage, 60.0);
+        assert!(decoded.updated_entry.verified);
+    }
+
+    #[test]
+    fn update_attribution_input_clone() {
+        let input = UpdateAttributionInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            updated_entry: Attribution {
+                id: "attr-clone".into(),
+                publication_id: "pub-c".into(),
+                contributor_did: "did:mycelix:bob".into(),
+                role: ContributorRole::Editor,
+                share_percentage: 20.0,
+                verified: false,
+                created: Timestamp::from_micros(0),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry.role, ContributorRole::Editor);
+    }
+
+    #[test]
+    fn update_attribution_input_other_role_serde() {
+        let input = UpdateAttributionInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            updated_entry: Attribution {
+                id: "attr-other".into(),
+                publication_id: "pub-x".into(),
+                contributor_did: "did:mycelix:custom".into(),
+                role: ContributorRole::Other("sound-designer".into()),
+                share_percentage: 5.0,
+                verified: false,
+                created: Timestamp::from_micros(0),
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateAttributionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.updated_entry.role, ContributorRole::Other("sound-designer".into()));
+    }
+
+    #[test]
+    fn update_royalty_rule_input_serde_roundtrip() {
+        let input = UpdateRoyaltyRuleInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xcd; 36]),
+            updated_entry: RoyaltyRule {
+                id: "royalty:pub-1:PerView:999".into(),
+                publication_id: "pub-1".into(),
+                rule_type: RoyaltyType::PerDownload,
+                percentage: 15.0,
+                minimum_amount: Some(0.05),
+                currency: "EUR".into(),
+                active: true,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateRoyaltyRuleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xcd; 36]));
+        assert_eq!(decoded.updated_entry.rule_type, RoyaltyType::PerDownload);
+        assert_eq!(decoded.updated_entry.percentage, 15.0);
+        assert_eq!(decoded.updated_entry.minimum_amount, Some(0.05));
+    }
+
+    #[test]
+    fn update_royalty_rule_input_clone() {
+        let input = UpdateRoyaltyRuleInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            updated_entry: RoyaltyRule {
+                id: "r-clone".into(),
+                publication_id: "pub-c".into(),
+                rule_type: RoyaltyType::Subscription,
+                percentage: 10.0,
+                minimum_amount: None,
+                currency: "USD".into(),
+                active: false,
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.updated_entry.rule_type, RoyaltyType::Subscription);
+        assert!(!cloned.updated_entry.active);
+    }
+
+    #[test]
+    fn update_royalty_rule_input_deactivated_serde() {
+        let input = UpdateRoyaltyRuleInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xef; 36]),
+            updated_entry: RoyaltyRule {
+                id: "r-deactivated".into(),
+                publication_id: "pub-2".into(),
+                rule_type: RoyaltyType::PerView,
+                percentage: 0.0,
+                minimum_amount: None,
+                currency: "USD".into(),
+                active: false,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateRoyaltyRuleInput = serde_json::from_str(&json).unwrap();
+        assert!(!decoded.updated_entry.active);
+        assert_eq!(decoded.updated_entry.percentage, 0.0);
     }
 
     #[test]

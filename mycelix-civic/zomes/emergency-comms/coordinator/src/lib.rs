@@ -185,6 +185,54 @@ pub struct BroadcastInput {
     pub expires_at: Timestamp,
 }
 
+/// Update an emergency message
+#[hdk_extern]
+pub fn update_message(input: UpdateMessageInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::EmergencyMessage(input.updated_entry),
+    )
+}
+
+/// Input for updating a message
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateMessageInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: EmergencyMessage,
+}
+
+/// Update an emergency channel
+#[hdk_extern]
+pub fn update_channel(input: UpdateChannelInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::EmergencyChannel(input.updated_entry),
+    )
+}
+
+/// Input for updating a channel
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateChannelInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: EmergencyChannel,
+}
+
+/// Update a broadcast
+#[hdk_extern]
+pub fn update_broadcast(input: UpdateBroadcastInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::Broadcast(input.updated_entry),
+    )
+}
+
+/// Input for updating a broadcast
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateBroadcastInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: Broadcast,
+}
+
 /// Get messages for a channel
 #[hdk_extern]
 pub fn get_channel_messages(channel_hash: ActionHash) -> ExternResult<Vec<Record>> {
@@ -672,6 +720,130 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let decoded: CreateChannelInput = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.name, "");
+    }
+
+    // ========================================================================
+    // Update input struct tests
+    // ========================================================================
+
+    #[test]
+    fn update_message_input_serde_roundtrip() {
+        let input = UpdateMessageInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: EmergencyMessage {
+                sender: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                channel_hash: None,
+                priority: MessagePriority::Flash,
+                content: "Updated evacuation notice".to_string(),
+                location: Some((29.76, -95.37)),
+                created_at: Timestamp::from_micros(1_000_000),
+                ttl_hours: 48,
+                hop_count: 1,
+                synced: false,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateMessageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(decoded.updated_entry.priority, MessagePriority::Flash);
+        assert_eq!(decoded.updated_entry.content, "Updated evacuation notice");
+    }
+
+    #[test]
+    fn update_message_input_clone() {
+        let input = UpdateMessageInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            updated_entry: EmergencyMessage {
+                sender: AgentPubKey::from_raw_36(vec![0u8; 36]),
+                channel_hash: None,
+                priority: MessagePriority::Routine,
+                content: "Clone test".to_string(),
+                location: None,
+                created_at: Timestamp::from_micros(0),
+                ttl_hours: 1,
+                hop_count: 0,
+                synced: false,
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry.content, "Clone test");
+    }
+
+    #[test]
+    fn update_channel_input_serde_roundtrip() {
+        let input = UpdateChannelInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xcd; 36]),
+            updated_entry: EmergencyChannel {
+                name: "Renamed Channel".to_string(),
+                disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                channel_type: ChannelType::Command,
+                participants: vec![
+                    AgentPubKey::from_raw_36(vec![1u8; 36]),
+                    AgentPubKey::from_raw_36(vec![2u8; 36]),
+                    AgentPubKey::from_raw_36(vec![3u8; 36]),
+                ],
+                created_by: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateChannelInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xcd; 36]));
+        assert_eq!(decoded.updated_entry.name, "Renamed Channel");
+        assert_eq!(decoded.updated_entry.participants.len(), 3);
+    }
+
+    #[test]
+    fn update_channel_input_clone() {
+        let input = UpdateChannelInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            updated_entry: EmergencyChannel {
+                name: "Test".to_string(),
+                disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                channel_type: ChannelType::Public,
+                participants: vec![AgentPubKey::from_raw_36(vec![0u8; 36])],
+                created_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.updated_entry.name, "Test");
+    }
+
+    #[test]
+    fn update_broadcast_input_serde_roundtrip() {
+        let input = UpdateBroadcastInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xef; 36]),
+            updated_entry: Broadcast {
+                disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                broadcast_type: BroadcastType::AllClear,
+                content: "All clear - danger has passed".to_string(),
+                target_area: (29.76, -95.37, 15.0),
+                issued_by: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                expires_at: Timestamp::from_micros(9_999_999),
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateBroadcastInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xef; 36]));
+        assert_eq!(decoded.updated_entry.broadcast_type, BroadcastType::AllClear);
+        assert_eq!(decoded.updated_entry.content, "All clear - danger has passed");
+    }
+
+    #[test]
+    fn update_broadcast_input_clone() {
+        let input = UpdateBroadcastInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            updated_entry: Broadcast {
+                disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                broadcast_type: BroadcastType::Evacuation,
+                content: "Evacuate".to_string(),
+                target_area: (0.0, 0.0, 1.0),
+                issued_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+                expires_at: Timestamp::from_micros(0),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.updated_entry.content, "Evacuate");
     }
 
     #[test]
