@@ -227,97 +227,92 @@ wait-timeout = "0.2"
 
 [features]
 default = []
-service = ["clap"]  # Enable symthaea-service binary
-shell = ["crossterm", "ratatui"]  # Enable symthaea-shell TUI binary
-gui = ["eframe", "egui"]  # Enable symthaea-gui binary
-demo = ["clap", "ctrlc"]  # Demo binaries with CLI argument parsing and signal handling
+
+# ── Binary build gates ──────────────────────────────────────────────
+# These enable optional dependencies for specific binaries.
+service = ["clap"]                          # symthaea-service binary
+shell = ["crossterm", "ratatui"]            # symthaea-shell TUI binary
+gui = ["eframe", "egui"]                    # symthaea-gui binary
+demo = ["clap", "ctrlc"]                    # Demo binaries (CLI args + signal handling)
 full = ["service", "shell", "gui", "demo"]  # All binaries
-# Voice features
+api_module = ["axum", "tower-http"]         # HTTP API binary + module
+
+# ── Voice & Audio ───────────────────────────────────────────────────
 voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
-voice-tts-cuda = ["voice-tts", "ort/cuda"]  # TTS with CUDA acceleration (requires CUDA toolkit)
-voice-tts-async = ["voice-tts"]  # Async/streaming TTS (futures dep deferred)
-voice-stt = ["symthaea-stt", "hound"]  # STT with symthaea-stt crate (HDC + LTC + CfC)
-# audio-sentinel removed: symthaea-sentinel is never imported in main crate (use sentinel sub-crate directly)
-nix-mind = ["symthaea-nix"]  # Conscious NixOS mind with HDC world model + active inference
-audio = ["voice-tts", "rodio"]  # Full audio including playback
-# audio-cuda removed: aggregated dead voice-tts-cuda + rodio with no cfg gate or required-features
-# pyphi removed: pyo3 never used in source code (feature was planned but never implemented)
-# Semantic encoding with Burn ML framework
-semantic-burn = ["burn", "burn-ndarray"]  # Pure Rust semantic encoder
-# Perception & Embeddings (Phase 1 Activation)
-embeddings = ["tokenizers", "ort", "hf-hub"]  # Qwen3/BGE text embeddings via ONNX
-vision = ["ort", "hf-hub"]  # SigLIP image embeddings via ONNX
-perception = ["embeddings", "vision"]  # Full multimodal perception stack
-webcam = []  # deferred (live webcam capture for video perception - gates cfg blocks in source)
+voice-tts-cuda = ["voice-tts", "ort/cuda"]            # TTS with CUDA acceleration
+voice-tts-async = ["voice-tts"]                       # Async/streaming TTS (planned, not yet implemented)
+voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt crate (HDC + LTC + CfC)
+audio = ["voice-tts", "rodio"]                        # Full audio including playback
+
+# ── Perception & Embeddings ─────────────────────────────────────────
+embeddings = ["tokenizers", "ort", "hf-hub"]          # Qwen3/BGE text embeddings via ONNX
+vision = ["ort", "hf-hub"]                            # SigLIP image embeddings via ONNX
+perception = ["embeddings", "vision"]                 # Full multimodal perception stack
+webcam = []                                           # Live webcam capture (gates cfg blocks in source)
+semantic-burn = ["burn", "burn-ndarray"]              # Pure Rust semantic encoder via Burn
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
-# Database backends: DuckDB is active (unconditional dep). Others deferred:
-# - qdrant: blocked (lzma link conflict with burn-ndarray)
-# - cozo: blocked (graph_builder 0.4.1 rayon compat)
-# - lancedb: blocked (xz2 link conflict with burn-ndarray)
-hdf5 = []     # deferred (requires system HDF5 library - gates cfg blocks in cmod_adapter.rs)
-# Swarm Intelligence - Hybrid Iroh + Holochain
-swarm = ["iroh"]  # Real-time P2P tensor streaming via Iroh 0.95+
-holochain = []    # gate only (real integration in symthaea-mycelix-bridge; rmp-serde conflict prevents in-tree dep)
-# Desktop integration features
-notifications = ["zbus"]  # E1: D-Bus desktop notifications
-# systemd removed: libsystemd never used in source code (feature was planned but never implemented)
-# desktop removed: aggregated notifications + dead systemd (use "notifications" directly)
-# Mycelix integration
-# mycelix = ["mycelix-sdk", "sha3"]  # Full Mycelix SDK integration for governance
-# Disabled until mycelix-sdk is available as a proper crate
-mycelix = ["mycelix-fl-core", "sha3"]  # Mycelix FL algorithms + hashing
 
-# Identity: MFDI (Multi-Factor Delegated Identity) for cognitive agents
-identity = []  # Ed25519 signatures, capability gating, signed request/output
+# ── Distributed / Network ──────────────────────────────────────────
+swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
+holochain = []                              # Gate only (real integration in symthaea-mycelix-bridge)
+mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
+network = []                                # Mycelix network client (real HTTP fetching)
 
-# GPU acceleration for CfC networks
-gpu = ["burn", "burn-ndarray"]  # GPU acceleration via Burn/WGPU for CfC networks
-cuda = ["gpu"]  # CUDA backend (requires CUDA toolkit)
+# ── GPU ─────────────────────────────────────────────────────────────
+gpu = ["burn", "burn-ndarray"]              # GPU acceleration via Burn/WGPU for CfC networks
+cuda = ["gpu"]                              # CUDA backend (requires CUDA toolkit)
 
-# Module compilation gates (integration_module and observability_module are cfg-gated in lib.rs;
-# the rest are example build gates used in required-features on [[example]] entries)
-integration_module = []        # Integration module in lib.rs
-observability_module = []      # Observability module in lib.rs
-api_module = ["axum", "tower-http"]  # HTTP API binary + module
-full_consciousness = []        # Extended consciousness submodules
-full_perception = []           # Extended perception submodules
-full_language = []             # Advanced language features (grammar, parsers)
-school_lookahead = []          # CfC-based lookahead in school module
-physiology_module = []         # Physiology integration in school
-mycelix_module = []            # Mycelix governance hooks
-databases_module = []          # Database backends in experience module
-magi_loop = []                 # MAGI Loop world-grounded prediction (recursive_improvement)
-recursive_improvement_advanced = ["full_consciousness"]  # benchmark_suite, routing_hub, primitive_semantic_bridge (need SemanticPrimitiveEncoder)
-epistemic_conflict = []        # Epistemic conflict detection + reliability + Φ_eff
-conscious_tool_gate = ["epistemic_conflict"]  # Consciousness-gated tool use (requires epistemic_conflict)
-temporal_planning = ["epistemic_conflict", "magi_loop"]  # ForkedState + MCTS + EVS
-counterfactual = ["epistemic_conflict"]  # Causal queries v0 with reference harness
-reasoning_engine = ["epistemic_conflict", "conscious_tool_gate", "temporal_planning", "counterfactual"]  # Full ConsciousReasoningEngine
+# ── Desktop & System Integration ────────────────────────────────────
+notifications = ["zbus"]                    # D-Bus desktop notifications
+nix-mind = ["symthaea-nix"]                 # Conscious NixOS mind with HDC world model + active inference
+nix-cli = ["symthaea-nix", "symthaea-nix/cli"]
+nix-tui = ["symthaea-nix", "symthaea-nix/tui"]
+nix-daemon = ["symthaea-nix", "symthaea-nix/daemon"]
+identity = []                               # Ed25519 signatures, capability gating
 
-# Consciousness-Aware Code Understanding & Generation
-code_understanding = ["tree-sitter-rust", "tree-sitter-python"]  # Multi-language code parsing via tree-sitter
-code_generation = ["code_understanding"]  # HDC-based code generation (requires parsers)
-consciousness_code = ["code_generation", "reasoning_engine", "epistemic_conflict"]  # Full consciousness-aware code pipeline
+# ── Database backends ───────────────────────────────────────────────
+# DuckDB is an unconditional dep. Others deferred due to link conflicts:
+# - qdrant/lancedb: lzma/xz2 conflict with burn-ndarray
+# - cozo: graph_builder 0.4.1 rayon compat
+hdf5 = []                                  # Requires system HDF5 library (gates cmod_adapter.rs)
+databases_module = []                       # Database backends in experience module
 
-# Sub-crate feature forwarding
-nix-cli = ["symthaea-nix", "symthaea-nix/cli"]        # CLI for Nix Mind
-nix-tui = ["symthaea-nix", "symthaea-nix/tui"]        # TUI for Nix Mind
-nix-daemon = ["symthaea-nix", "symthaea-nix/daemon"]   # Daemon mode for Nix Mind
-# sentinel-live-audio removed: symthaea-sentinel never imported in main crate (use sentinel sub-crate directly)
+# ── Consciousness & Reasoning (code-level cfg gates) ────────────────
+full_consciousness = []                     # Extended consciousness submodules
+full_perception = []                        # Extended perception submodules
+full_language = []                          # Advanced language features (grammar, parsers)
+magi_loop = []                              # MAGI Loop world-grounded prediction
+epistemic_conflict = []                     # Epistemic conflict detection + reliability + Φ_eff
+conscious_tool_gate = ["epistemic_conflict"]
+temporal_planning = ["epistemic_conflict", "magi_loop"]
+counterfactual = ["epistemic_conflict"]
+reasoning_engine = ["epistemic_conflict", "conscious_tool_gate", "temporal_planning", "counterfactual"]
+recursive_improvement_advanced = ["full_consciousness"]
 
-nvml = []                      # NVIDIA Management Library for GPU monitoring
-network = []                   # Mycelix network client (real HTTP fetching)
-partnership_module = []        # Partnership module for Φ_dyad computation
-web_research_module = []       # Web research epistemic verification (scaffolded)
-benchmarks_module = []         # Benchmarks module compilation gate
-consciousness_module = []      # Consciousness examples compilation gate
-embeddings_module = []         # Embeddings examples compilation gate
-language_module = []           # Language examples compilation gate
-brain_module = []              # Brain subsystem examples compilation gate
-soul_module = []               # Soul/identity examples compilation gate
-school_module = []             # School/learning examples compilation gate
+# ── Code Understanding & Generation ─────────────────────────────────
+code_understanding = ["tree-sitter-rust", "tree-sitter-python"]
+code_generation = ["code_understanding"]
+consciousness_code = ["code_generation", "reasoning_engine", "epistemic_conflict"]
+
+# ── Example build gates ─────────────────────────────────────────────
+# These exist solely as required-features for [[example]] entries.
+# They prevent examples from building unless explicitly opted-in.
+integration_module = []         # Integration examples
+observability_module = []       # Observability examples
+school_lookahead = []           # CfC-based lookahead in school
+physiology_module = []          # Physiology integration
+mycelix_module = []             # Mycelix governance hooks
+partnership_module = []         # Φ_dyad computation
+web_research_module = []        # Web research epistemic verification
+benchmarks_module = []          # Benchmark examples
+consciousness_module = []       # Consciousness examples
+embeddings_module = []          # Embeddings examples
+language_module = []            # Language examples
+brain_module = []               # Brain subsystem examples
+soul_module = []                # Soul/identity examples
+school_module = []              # School/learning examples
 
 [dev-dependencies]
 criterion = "0.5"
