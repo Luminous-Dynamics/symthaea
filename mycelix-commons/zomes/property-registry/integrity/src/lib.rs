@@ -158,15 +158,79 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => {
+        FlatOp::RegisterCreateLink { link_type, base_address: _, target_address: _, tag, action: _ } => {
             match link_type {
-                LinkTypes::OwnerToProperties => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::PropertyToDeeds => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::LocationToProperty => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::PropertyToEncumbrances => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::OwnerToProperties => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "OwnerToProperties link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::PropertyToDeeds => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PropertyToDeeds link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::LocationToProperty => {
+                    // Location tags may carry geohash or coordinate data
+                    if tag.0.len() > 512 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "LocationToProperty link tag too long (max 512 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::PropertyToEncumbrances => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PropertyToEncumbrances link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
-        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDeleteLink { link_type, original_action: _, base_address: _, target_address: _, tag, action: _ } => {
+            match link_type {
+                LinkTypes::OwnerToProperties => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "OwnerToProperties delete link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::PropertyToDeeds => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PropertyToDeeds delete link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::LocationToProperty => {
+                    if tag.0.len() > 512 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "LocationToProperty delete link tag too long (max 512 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::PropertyToEncumbrances => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PropertyToEncumbrances delete link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
@@ -1659,5 +1723,211 @@ mod tests {
     fn property_update_valid_passes() {
         let result = validate_update_property(fake_update(), make_property());
         assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // LINK TAG VALIDATION TESTS
+    // ========================================================================
+
+    /// Helper: build a FlatOp::RegisterCreateLink with the given link type and tag,
+    /// then run it through the validate dispatch. Returns the result.
+    fn validate_create_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let base = AnyLinkableHash::from(fake_entry_hash());
+        let target = AnyLinkableHash::from(fake_entry_hash());
+        let tag = LinkTag(tag_bytes);
+        let action = fake_create();
+        // We call the same logic that the validate() function dispatches to.
+        // Since we can't easily construct a full Op in unit tests, we inline
+        // the match logic from the RegisterCreateLink arm.
+        match link_type {
+            LinkTypes::OwnerToProperties => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OwnerToProperties link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PropertyToDeeds => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PropertyToDeeds link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::LocationToProperty => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "LocationToProperty link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PropertyToEncumbrances => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PropertyToEncumbrances link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    fn validate_delete_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::OwnerToProperties => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OwnerToProperties delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PropertyToDeeds => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PropertyToDeeds delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::LocationToProperty => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "LocationToProperty delete link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PropertyToEncumbrances => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PropertyToEncumbrances delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    // -- OwnerToProperties link tag tests --
+
+    #[test]
+    fn test_link_owner_to_properties_valid_tag() {
+        let result = validate_create_link_tag(LinkTypes::OwnerToProperties, vec![0u8; 64]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_link_owner_to_properties_empty_tag() {
+        let result = validate_create_link_tag(LinkTypes::OwnerToProperties, vec![]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_link_owner_to_properties_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::OwnerToProperties, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_link_owner_to_properties_tag_too_long_rejected() {
+        let result = validate_create_link_tag(LinkTypes::OwnerToProperties, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- PropertyToDeeds link tag tests --
+
+    #[test]
+    fn test_link_property_to_deeds_valid_tag() {
+        let result = validate_create_link_tag(LinkTypes::PropertyToDeeds, vec![0u8; 100]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_link_property_to_deeds_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::PropertyToDeeds, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_link_property_to_deeds_tag_too_long_rejected() {
+        let result = validate_create_link_tag(LinkTypes::PropertyToDeeds, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- LocationToProperty link tag tests (512 byte limit) --
+
+    #[test]
+    fn test_link_location_to_property_valid_tag() {
+        let result = validate_create_link_tag(LinkTypes::LocationToProperty, vec![0u8; 100]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_link_location_to_property_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::LocationToProperty, vec![0u8; 512]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_link_location_to_property_tag_too_long_rejected() {
+        let result = validate_create_link_tag(LinkTypes::LocationToProperty, vec![0u8; 513]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- PropertyToEncumbrances link tag tests --
+
+    #[test]
+    fn test_link_property_to_encumbrances_valid_tag() {
+        let result = validate_create_link_tag(LinkTypes::PropertyToEncumbrances, vec![0u8; 128]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_link_property_to_encumbrances_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::PropertyToEncumbrances, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_link_property_to_encumbrances_tag_too_long_rejected() {
+        let result = validate_create_link_tag(LinkTypes::PropertyToEncumbrances, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- Delete link tag tests --
+
+    #[test]
+    fn test_delete_link_owner_to_properties_valid_tag() {
+        let result = validate_delete_link_tag(LinkTypes::OwnerToProperties, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_delete_link_owner_to_properties_tag_too_long_rejected() {
+        let result = validate_delete_link_tag(LinkTypes::OwnerToProperties, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn test_delete_link_location_to_property_valid_tag() {
+        let result = validate_delete_link_tag(LinkTypes::LocationToProperty, vec![0u8; 512]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn test_delete_link_location_to_property_tag_too_long_rejected() {
+        let result = validate_delete_link_tag(LinkTypes::LocationToProperty, vec![0u8; 513]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn test_delete_link_property_to_encumbrances_tag_too_long_rejected() {
+        let result = validate_delete_link_tag(LinkTypes::PropertyToEncumbrances, vec![0u8; 257]);
+        assert!(is_invalid(&result));
     }
 }

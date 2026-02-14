@@ -171,10 +171,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 original_entry_hash: _,
             } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::BoardMeeting(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::Resolution(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::ByLaw(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::Election(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::BoardMeeting(meeting) => validate_update_meeting(meeting),
+                EntryTypes::Resolution(resolution) => validate_update_resolution(resolution),
+                EntryTypes::ByLaw(bylaw) => validate_update_bylaw(bylaw),
+                EntryTypes::Election(election) => validate_update_election(election),
                 EntryTypes::Ballot(_) => Ok(ValidateCallbackResult::Invalid(
                     "Ballots cannot be modified after casting".into(),
                 )),
@@ -185,26 +185,148 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
         } => match link_type {
-            LinkTypes::AllMeetings => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::MeetingToResolution => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AllByLaws => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::ByLawSupersedes => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AllElections => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::ElectionToBallot => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::VoterToBallot => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::ProposerToResolution => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AllMeetings => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllMeetings link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::MeetingToResolution => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MeetingToResolution link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllByLaws => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllByLaws link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ByLawSupersedes => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ByLawSupersedes link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllElections => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllElections link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ElectionToBallot => {
+                // Ballot links may carry voter metadata
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ElectionToBallot link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::VoterToBallot => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "VoterToBallot link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ProposerToResolution => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ProposerToResolution link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         },
         FlatOp::RegisterDeleteLink {
-            link_type: _,
+            link_type,
             original_action: _,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => Ok(ValidateCallbackResult::Valid),
+        } => match link_type {
+            LinkTypes::AllMeetings => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllMeetings delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::MeetingToResolution => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MeetingToResolution delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllByLaws => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllByLaws delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ByLawSupersedes => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ByLawSupersedes delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllElections => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllElections delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ElectionToBallot => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ElectionToBallot delete link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::VoterToBallot => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "VoterToBallot delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ProposerToResolution => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ProposerToResolution delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
@@ -221,14 +343,19 @@ fn validate_create_meeting(
             "Meeting title cannot be empty".into(),
         ));
     }
-    if meeting.title.len() > 256 {
+    if meeting.title.len() > 512 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Meeting title must be at most 256 characters".into(),
+            "Meeting title must be at most 512 characters".into(),
         ));
     }
     if meeting.agenda.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Meeting must have at least one agenda item".into(),
+        ));
+    }
+    if meeting.agenda.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 agenda items".into(),
         ));
     }
     for item in &meeting.agenda {
@@ -237,11 +364,76 @@ fn validate_create_meeting(
                 "Agenda items cannot be empty".into(),
             ));
         }
+        if item.len() > 512 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each agenda item must be 512 characters or fewer".into(),
+            ));
+        }
     }
     if meeting.location.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Meeting location cannot be empty".into(),
         ));
+    }
+    if meeting.location.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Meeting location must be 256 characters or fewer".into(),
+        ));
+    }
+    if meeting.attendees.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 100 attendees".into(),
+        ));
+    }
+    if let Some(ref minutes) = meeting.minutes {
+        if minutes.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Meeting minutes must be 4096 characters or fewer".into(),
+            ));
+        }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_meeting(meeting: BoardMeeting) -> ExternResult<ValidateCallbackResult> {
+    if meeting.title.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Meeting title cannot be empty".into(),
+        ));
+    }
+    if meeting.title.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Meeting title must be at most 512 characters".into(),
+        ));
+    }
+    if meeting.agenda.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 agenda items".into(),
+        ));
+    }
+    for item in &meeting.agenda {
+        if item.len() > 512 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each agenda item must be 512 characters or fewer".into(),
+            ));
+        }
+    }
+    if meeting.location.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Meeting location must be 256 characters or fewer".into(),
+        ));
+    }
+    if meeting.attendees.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 100 attendees".into(),
+        ));
+    }
+    if let Some(ref minutes) = meeting.minutes {
+        if minutes.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Meeting minutes must be 4096 characters or fewer".into(),
+            ));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -255,9 +447,38 @@ fn validate_create_resolution(
             "Resolution title cannot be empty".into(),
         ));
     }
+    if resolution.title.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resolution title must be 512 characters or fewer".into(),
+        ));
+    }
     if resolution.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Resolution description cannot be empty".into(),
+        ));
+    }
+    if resolution.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resolution description must be 4096 characters or fewer".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_resolution(resolution: Resolution) -> ExternResult<ValidateCallbackResult> {
+    if resolution.title.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resolution title cannot be empty".into(),
+        ));
+    }
+    if resolution.title.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resolution title must be 512 characters or fewer".into(),
+        ));
+    }
+    if resolution.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resolution description must be 4096 characters or fewer".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -269,9 +490,19 @@ fn validate_create_bylaw(_action: Create, bylaw: ByLaw) -> ExternResult<Validate
             "ByLaw ID cannot be empty".into(),
         ));
     }
+    if bylaw.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ByLaw ID must be 64 characters or fewer".into(),
+        ));
+    }
     if bylaw.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "ByLaw title cannot be empty".into(),
+        ));
+    }
+    if bylaw.title.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ByLaw title must be 512 characters or fewer".into(),
         ));
     }
     if bylaw.content.trim().is_empty() {
@@ -279,9 +510,38 @@ fn validate_create_bylaw(_action: Create, bylaw: ByLaw) -> ExternResult<Validate
             "ByLaw content cannot be empty".into(),
         ));
     }
+    if bylaw.content.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ByLaw content must be 4096 characters or fewer".into(),
+        ));
+    }
     if bylaw.version == 0 {
         return Ok(ValidateCallbackResult::Invalid(
             "ByLaw version must be at least 1".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_bylaw(bylaw: ByLaw) -> ExternResult<ValidateCallbackResult> {
+    if bylaw.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ByLaw ID cannot be empty".into(),
+        ));
+    }
+    if bylaw.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ByLaw ID must be 64 characters or fewer".into(),
+        ));
+    }
+    if bylaw.title.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ByLaw title must be 512 characters or fewer".into(),
+        ));
+    }
+    if bylaw.content.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ByLaw content must be 4096 characters or fewer".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -296,9 +556,19 @@ fn validate_create_election(
             "Election title cannot be empty".into(),
         ));
     }
+    if election.title.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Election title must be 512 characters or fewer".into(),
+        ));
+    }
     if election.positions.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Election must have at least one position".into(),
+        ));
+    }
+    if election.positions.len() > 20 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 20 positions".into(),
         ));
     }
     for pos in &election.positions {
@@ -307,6 +577,16 @@ fn validate_create_election(
                 "Position name cannot be empty".into(),
             ));
         }
+        if pos.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each position name must be 256 characters or fewer".into(),
+            ));
+        }
+    }
+    if election.candidates.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 candidates".into(),
+        ));
     }
     if election.voting_closes <= election.voting_opens {
         return Ok(ValidateCallbackResult::Invalid(
@@ -331,6 +611,63 @@ fn validate_create_election(
                 "Candidate statement cannot be empty".into(),
             ));
         }
+        if candidate.statement.len() > 2048 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Candidate statement must be 2048 characters or fewer".into(),
+            ));
+        }
+    }
+    if let Some(ref results) = election.results {
+        if results.len() > 20 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Cannot have more than 20 results".into(),
+            ));
+        }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_election(election: Election) -> ExternResult<ValidateCallbackResult> {
+    if election.title.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Election title cannot be empty".into(),
+        ));
+    }
+    if election.title.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Election title must be 512 characters or fewer".into(),
+        ));
+    }
+    if election.positions.len() > 20 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 20 positions".into(),
+        ));
+    }
+    for pos in &election.positions {
+        if pos.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each position name must be 256 characters or fewer".into(),
+            ));
+        }
+    }
+    if election.candidates.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 candidates".into(),
+        ));
+    }
+    for candidate in &election.candidates {
+        if candidate.statement.len() > 2048 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Candidate statement must be 2048 characters or fewer".into(),
+            ));
+        }
+    }
+    if let Some(ref results) = election.results {
+        if results.len() > 20 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Cannot have more than 20 results".into(),
+            ));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -341,12 +678,22 @@ fn validate_create_ballot(_action: Create, ballot: Ballot) -> ExternResult<Valid
             "Ballot must contain at least one vote".into(),
         ));
     }
+    if ballot.votes.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 votes in a ballot".into(),
+        ));
+    }
     // Check for empty and duplicate position votes
     let mut seen_positions = std::collections::HashSet::new();
     for vote in &ballot.votes {
         if vote.position.trim().is_empty() {
             return Ok(ValidateCallbackResult::Invalid(
                 "Vote position cannot be empty".into(),
+            ));
+        }
+        if vote.position.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Vote position must be 256 characters or fewer".into(),
             ));
         }
         if !seen_positions.insert(vote.position.clone()) {
@@ -630,17 +977,17 @@ mod tests {
     #[test]
     fn create_meeting_title_too_long() {
         let mut m = valid_meeting();
-        m.title = "a".repeat(257);
+        m.title = "a".repeat(513);
         assert_invalid(
             validate_create_meeting(fake_create(), m),
-            "Meeting title must be at most 256 characters",
+            "Meeting title must be at most 512 characters",
         );
     }
 
     #[test]
     fn create_meeting_title_at_boundary() {
         let mut m = valid_meeting();
-        m.title = "a".repeat(256);
+        m.title = "a".repeat(512);
         assert_valid(validate_create_meeting(fake_create(), m));
     }
 
@@ -1099,9 +1446,19 @@ mod tests {
     }
 
     #[test]
-    fn create_bylaw_very_long_content() {
+    fn create_bylaw_content_too_long() {
         let mut b = valid_bylaw();
-        b.content = "a".repeat(10000);
+        b.content = "a".repeat(4097);
+        assert_invalid(
+            validate_create_bylaw(fake_create(), b),
+            "ByLaw content must be 4096 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_bylaw_content_at_boundary() {
+        let mut b = valid_bylaw();
+        b.content = "a".repeat(4096);
         assert_valid(validate_create_bylaw(fake_create(), b));
     }
 
@@ -1325,6 +1682,749 @@ mod tests {
         assert_invalid(
             validate_create_ballot(fake_create(), b),
             "Vote position cannot be empty",
+        );
+    }
+
+    // ── Vec max-length boundary tests ─────────────────────────────────
+
+    #[test]
+    fn create_meeting_agenda_at_max_count() {
+        let mut m = valid_meeting();
+        m.agenda = (0..50).map(|i| format!("Agenda item {i}")).collect();
+        assert_valid(validate_create_meeting(fake_create(), m));
+    }
+
+    #[test]
+    fn create_meeting_agenda_over_max_count() {
+        let mut m = valid_meeting();
+        m.agenda = (0..51).map(|i| format!("Agenda item {i}")).collect();
+        assert_invalid(
+            validate_create_meeting(fake_create(), m),
+            "Cannot have more than 50 agenda items",
+        );
+    }
+
+    #[test]
+    fn create_meeting_attendees_at_max_count() {
+        let mut m = valid_meeting();
+        m.attendees = (0..100).map(|_| agent_a()).collect();
+        assert_valid(validate_create_meeting(fake_create(), m));
+    }
+
+    #[test]
+    fn create_meeting_attendees_over_max_count() {
+        let mut m = valid_meeting();
+        m.attendees = (0..101).map(|_| agent_a()).collect();
+        assert_invalid(
+            validate_create_meeting(fake_create(), m),
+            "Cannot have more than 100 attendees",
+        );
+    }
+
+    #[test]
+    fn create_election_positions_at_max_count() {
+        let mut e = valid_election();
+        e.positions = (0..20).map(|i| format!("Position {i}")).collect();
+        e.candidates = vec![];
+        assert_valid(validate_create_election(fake_create(), e));
+    }
+
+    #[test]
+    fn create_election_positions_over_max_count() {
+        let mut e = valid_election();
+        e.positions = (0..21).map(|i| format!("Position {i}")).collect();
+        e.candidates = vec![];
+        assert_invalid(
+            validate_create_election(fake_create(), e),
+            "Cannot have more than 20 positions",
+        );
+    }
+
+    #[test]
+    fn create_election_candidates_at_max_count() {
+        let mut e = valid_election();
+        e.positions = vec!["President".to_string()];
+        e.candidates = (0..50).map(|_| CandidateEntry {
+            agent: agent_a(),
+            position: "President".to_string(),
+            statement: "I will serve.".to_string(),
+        }).collect();
+        assert_valid(validate_create_election(fake_create(), e));
+    }
+
+    #[test]
+    fn create_election_candidates_over_max_count() {
+        let mut e = valid_election();
+        e.positions = vec!["President".to_string()];
+        e.candidates = (0..51).map(|_| CandidateEntry {
+            agent: agent_a(),
+            position: "President".to_string(),
+            statement: "I will serve.".to_string(),
+        }).collect();
+        assert_invalid(
+            validate_create_election(fake_create(), e),
+            "Cannot have more than 50 candidates",
+        );
+    }
+
+    #[test]
+    fn create_ballot_votes_at_max_count() {
+        let mut b = valid_ballot();
+        b.votes = (0..50).map(|i| BallotVote {
+            position: format!("Position {i}"),
+            candidate: agent_a(),
+        }).collect();
+        assert_valid(validate_create_ballot(fake_create(), b));
+    }
+
+    #[test]
+    fn create_ballot_votes_over_max_count() {
+        let mut b = valid_ballot();
+        b.votes = (0..51).map(|i| BallotVote {
+            position: format!("Position {i}"),
+            candidate: agent_a(),
+        }).collect();
+        assert_invalid(
+            validate_create_ballot(fake_create(), b),
+            "Cannot have more than 50 votes",
+        );
+    }
+
+    // ── String max-length boundary tests ──────────────────────────────
+
+    #[test]
+    fn create_meeting_agenda_item_too_long() {
+        let mut m = valid_meeting();
+        m.agenda = vec!["x".repeat(513)];
+        assert_invalid(
+            validate_create_meeting(fake_create(), m),
+            "Each agenda item must be 512 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_meeting_agenda_item_at_boundary() {
+        let mut m = valid_meeting();
+        m.agenda = vec!["x".repeat(512)];
+        assert_valid(validate_create_meeting(fake_create(), m));
+    }
+
+    #[test]
+    fn create_meeting_location_too_long() {
+        let mut m = valid_meeting();
+        m.location = "x".repeat(257);
+        assert_invalid(
+            validate_create_meeting(fake_create(), m),
+            "Meeting location must be 256 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_meeting_location_at_boundary() {
+        let mut m = valid_meeting();
+        m.location = "x".repeat(256);
+        assert_valid(validate_create_meeting(fake_create(), m));
+    }
+
+    #[test]
+    fn create_meeting_minutes_too_long() {
+        let mut m = valid_meeting();
+        m.minutes = Some("x".repeat(4097));
+        assert_invalid(
+            validate_create_meeting(fake_create(), m),
+            "Meeting minutes must be 4096 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_meeting_minutes_at_boundary() {
+        let mut m = valid_meeting();
+        m.minutes = Some("x".repeat(4096));
+        assert_valid(validate_create_meeting(fake_create(), m));
+    }
+
+    #[test]
+    fn create_resolution_title_too_long() {
+        let mut r = valid_resolution();
+        r.title = "x".repeat(513);
+        assert_invalid(
+            validate_create_resolution(fake_create(), r),
+            "Resolution title must be 512 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_resolution_title_at_boundary() {
+        let mut r = valid_resolution();
+        r.title = "x".repeat(512);
+        assert_valid(validate_create_resolution(fake_create(), r));
+    }
+
+    #[test]
+    fn create_resolution_description_too_long() {
+        let mut r = valid_resolution();
+        r.description = "x".repeat(4097);
+        assert_invalid(
+            validate_create_resolution(fake_create(), r),
+            "Resolution description must be 4096 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_resolution_description_at_boundary() {
+        let mut r = valid_resolution();
+        r.description = "x".repeat(4096);
+        assert_valid(validate_create_resolution(fake_create(), r));
+    }
+
+    #[test]
+    fn create_bylaw_id_too_long() {
+        let mut b = valid_bylaw();
+        b.id = "x".repeat(65);
+        assert_invalid(
+            validate_create_bylaw(fake_create(), b),
+            "ByLaw ID must be 64 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_bylaw_id_at_boundary() {
+        let mut b = valid_bylaw();
+        b.id = "x".repeat(64);
+        assert_valid(validate_create_bylaw(fake_create(), b));
+    }
+
+    #[test]
+    fn create_bylaw_title_too_long() {
+        let mut b = valid_bylaw();
+        b.title = "x".repeat(513);
+        assert_invalid(
+            validate_create_bylaw(fake_create(), b),
+            "ByLaw title must be 512 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_bylaw_title_at_boundary() {
+        let mut b = valid_bylaw();
+        b.title = "x".repeat(512);
+        assert_valid(validate_create_bylaw(fake_create(), b));
+    }
+
+    #[test]
+    fn create_election_title_too_long() {
+        let mut e = valid_election();
+        e.title = "x".repeat(513);
+        assert_invalid(
+            validate_create_election(fake_create(), e),
+            "Election title must be 512 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_election_title_at_boundary() {
+        let mut e = valid_election();
+        e.title = "x".repeat(512);
+        assert_valid(validate_create_election(fake_create(), e));
+    }
+
+    #[test]
+    fn create_election_position_name_too_long() {
+        let mut e = valid_election();
+        e.positions = vec!["x".repeat(257)];
+        e.candidates = vec![];
+        assert_invalid(
+            validate_create_election(fake_create(), e),
+            "Each position name must be 256 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_election_position_name_at_boundary() {
+        let mut e = valid_election();
+        e.positions = vec!["x".repeat(256)];
+        e.candidates = vec![];
+        assert_valid(validate_create_election(fake_create(), e));
+    }
+
+    #[test]
+    fn create_election_candidate_statement_too_long() {
+        let mut e = valid_election();
+        e.candidates = vec![CandidateEntry {
+            agent: agent_a(),
+            position: "President".to_string(),
+            statement: "x".repeat(2049),
+        }];
+        assert_invalid(
+            validate_create_election(fake_create(), e),
+            "Candidate statement must be 2048 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_election_candidate_statement_at_boundary() {
+        let mut e = valid_election();
+        e.candidates = vec![CandidateEntry {
+            agent: agent_a(),
+            position: "President".to_string(),
+            statement: "x".repeat(2048),
+        }];
+        assert_valid(validate_create_election(fake_create(), e));
+    }
+
+    #[test]
+    fn create_ballot_vote_position_too_long() {
+        let mut b = valid_ballot();
+        b.votes = vec![BallotVote {
+            position: "x".repeat(257),
+            candidate: agent_a(),
+        }];
+        assert_invalid(
+            validate_create_ballot(fake_create(), b),
+            "Vote position must be 256 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_ballot_vote_position_at_boundary() {
+        let mut b = valid_ballot();
+        b.votes = vec![BallotVote {
+            position: "x".repeat(256),
+            candidate: agent_a(),
+        }];
+        assert_valid(validate_create_ballot(fake_create(), b));
+    }
+
+    // ── Update validator tests ────────────────────────────────────────
+
+    #[test]
+    fn update_meeting_valid() {
+        assert_valid(validate_update_meeting(valid_meeting()));
+    }
+
+    #[test]
+    fn update_meeting_title_too_long() {
+        let mut m = valid_meeting();
+        m.title = "x".repeat(513);
+        assert_invalid(validate_update_meeting(m), "Meeting title must be at most 512 characters");
+    }
+
+    #[test]
+    fn update_meeting_agenda_over_max() {
+        let mut m = valid_meeting();
+        m.agenda = (0..51).map(|i| format!("Item {i}")).collect();
+        assert_invalid(validate_update_meeting(m), "Cannot have more than 50 agenda items");
+    }
+
+    #[test]
+    fn update_meeting_attendees_over_max() {
+        let mut m = valid_meeting();
+        m.attendees = (0..101).map(|_| agent_a()).collect();
+        assert_invalid(validate_update_meeting(m), "Cannot have more than 100 attendees");
+    }
+
+    #[test]
+    fn update_meeting_location_too_long() {
+        let mut m = valid_meeting();
+        m.location = "x".repeat(257);
+        assert_invalid(validate_update_meeting(m), "Meeting location must be 256 characters or fewer");
+    }
+
+    #[test]
+    fn update_meeting_minutes_too_long() {
+        let mut m = valid_meeting();
+        m.minutes = Some("x".repeat(4097));
+        assert_invalid(validate_update_meeting(m), "Meeting minutes must be 4096 characters or fewer");
+    }
+
+    #[test]
+    fn update_resolution_valid() {
+        assert_valid(validate_update_resolution(valid_resolution()));
+    }
+
+    #[test]
+    fn update_resolution_title_too_long() {
+        let mut r = valid_resolution();
+        r.title = "x".repeat(513);
+        assert_invalid(validate_update_resolution(r), "Resolution title must be 512 characters or fewer");
+    }
+
+    #[test]
+    fn update_resolution_description_too_long() {
+        let mut r = valid_resolution();
+        r.description = "x".repeat(4097);
+        assert_invalid(validate_update_resolution(r), "Resolution description must be 4096 characters or fewer");
+    }
+
+    #[test]
+    fn update_bylaw_valid() {
+        assert_valid(validate_update_bylaw(valid_bylaw()));
+    }
+
+    #[test]
+    fn update_bylaw_id_too_long() {
+        let mut b = valid_bylaw();
+        b.id = "x".repeat(65);
+        assert_invalid(validate_update_bylaw(b), "ByLaw ID must be 64 characters or fewer");
+    }
+
+    #[test]
+    fn update_bylaw_title_too_long() {
+        let mut b = valid_bylaw();
+        b.title = "x".repeat(513);
+        assert_invalid(validate_update_bylaw(b), "ByLaw title must be 512 characters or fewer");
+    }
+
+    #[test]
+    fn update_bylaw_content_too_long() {
+        let mut b = valid_bylaw();
+        b.content = "x".repeat(4097);
+        assert_invalid(validate_update_bylaw(b), "ByLaw content must be 4096 characters or fewer");
+    }
+
+    #[test]
+    fn update_election_valid() {
+        assert_valid(validate_update_election(valid_election()));
+    }
+
+    #[test]
+    fn update_election_title_too_long() {
+        let mut e = valid_election();
+        e.title = "x".repeat(513);
+        assert_invalid(validate_update_election(e), "Election title must be 512 characters or fewer");
+    }
+
+    #[test]
+    fn update_election_positions_over_max() {
+        let mut e = valid_election();
+        e.positions = (0..21).map(|i| format!("Pos {i}")).collect();
+        e.candidates = vec![];
+        assert_invalid(validate_update_election(e), "Cannot have more than 20 positions");
+    }
+
+    #[test]
+    fn update_election_candidates_over_max() {
+        let mut e = valid_election();
+        e.candidates = (0..51).map(|_| CandidateEntry {
+            agent: agent_a(),
+            position: "President".to_string(),
+            statement: "Serve.".to_string(),
+        }).collect();
+        assert_invalid(validate_update_election(e), "Cannot have more than 50 candidates");
+    }
+
+    #[test]
+    fn update_election_candidate_statement_too_long() {
+        let mut e = valid_election();
+        e.candidates = vec![CandidateEntry {
+            agent: agent_a(),
+            position: "President".to_string(),
+            statement: "x".repeat(2049),
+        }];
+        assert_invalid(validate_update_election(e), "Candidate statement must be 2048 characters or fewer");
+    }
+
+    // ── Link tag validation tests ───────────────────────────────────────
+
+    /// Helper to simulate the create link tag validation logic (same as in validate()).
+    fn validate_create_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AllMeetings => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllMeetings link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::MeetingToResolution => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MeetingToResolution link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllByLaws => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllByLaws link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ByLawSupersedes => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ByLawSupersedes link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllElections => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllElections link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ElectionToBallot => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ElectionToBallot link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::VoterToBallot => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "VoterToBallot link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ProposerToResolution => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ProposerToResolution link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    fn validate_delete_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AllMeetings => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllMeetings delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::MeetingToResolution => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MeetingToResolution delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllByLaws => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllByLaws delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ByLawSupersedes => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ByLawSupersedes delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllElections => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllElections delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ElectionToBallot => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ElectionToBallot delete link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::VoterToBallot => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "VoterToBallot delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ProposerToResolution => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ProposerToResolution delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    // -- AllMeetings link tag tests --
+
+    #[test]
+    fn test_link_all_meetings_valid_tag() {
+        assert_valid(validate_create_link_tag(LinkTypes::AllMeetings, vec![0u8; 64]));
+    }
+
+    #[test]
+    fn test_link_all_meetings_empty_tag() {
+        assert_valid(validate_create_link_tag(LinkTypes::AllMeetings, vec![]));
+    }
+
+    #[test]
+    fn test_link_all_meetings_tag_at_limit() {
+        assert_valid(validate_create_link_tag(LinkTypes::AllMeetings, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_all_meetings_tag_too_long_rejected() {
+        assert_invalid(
+            validate_create_link_tag(LinkTypes::AllMeetings, vec![0u8; 257]),
+            "AllMeetings link tag too long",
+        );
+    }
+
+    // -- MeetingToResolution link tag tests --
+
+    #[test]
+    fn test_link_meeting_to_resolution_valid_tag() {
+        assert_valid(validate_create_link_tag(LinkTypes::MeetingToResolution, vec![0u8; 100]));
+    }
+
+    #[test]
+    fn test_link_meeting_to_resolution_tag_at_limit() {
+        assert_valid(validate_create_link_tag(LinkTypes::MeetingToResolution, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_meeting_to_resolution_tag_too_long_rejected() {
+        assert_invalid(
+            validate_create_link_tag(LinkTypes::MeetingToResolution, vec![0u8; 257]),
+            "MeetingToResolution link tag too long",
+        );
+    }
+
+    // -- AllByLaws link tag tests --
+
+    #[test]
+    fn test_link_all_bylaws_valid_tag() {
+        assert_valid(validate_create_link_tag(LinkTypes::AllByLaws, vec![0u8; 128]));
+    }
+
+    #[test]
+    fn test_link_all_bylaws_tag_too_long_rejected() {
+        assert_invalid(
+            validate_create_link_tag(LinkTypes::AllByLaws, vec![0u8; 257]),
+            "AllByLaws link tag too long",
+        );
+    }
+
+    // -- ByLawSupersedes link tag tests --
+
+    #[test]
+    fn test_link_bylaw_supersedes_valid_tag() {
+        assert_valid(validate_create_link_tag(LinkTypes::ByLawSupersedes, vec![0u8; 64]));
+    }
+
+    #[test]
+    fn test_link_bylaw_supersedes_tag_too_long_rejected() {
+        assert_invalid(
+            validate_create_link_tag(LinkTypes::ByLawSupersedes, vec![0u8; 257]),
+            "ByLawSupersedes link tag too long",
+        );
+    }
+
+    // -- ElectionToBallot link tag tests (512 byte limit) --
+
+    #[test]
+    fn test_link_election_to_ballot_valid_tag() {
+        assert_valid(validate_create_link_tag(LinkTypes::ElectionToBallot, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_election_to_ballot_tag_at_limit() {
+        assert_valid(validate_create_link_tag(LinkTypes::ElectionToBallot, vec![0u8; 512]));
+    }
+
+    #[test]
+    fn test_link_election_to_ballot_tag_too_long_rejected() {
+        assert_invalid(
+            validate_create_link_tag(LinkTypes::ElectionToBallot, vec![0u8; 513]),
+            "ElectionToBallot link tag too long",
+        );
+    }
+
+    // -- VoterToBallot link tag tests --
+
+    #[test]
+    fn test_link_voter_to_ballot_valid_tag() {
+        assert_valid(validate_create_link_tag(LinkTypes::VoterToBallot, vec![0u8; 128]));
+    }
+
+    #[test]
+    fn test_link_voter_to_ballot_tag_too_long_rejected() {
+        assert_invalid(
+            validate_create_link_tag(LinkTypes::VoterToBallot, vec![0u8; 257]),
+            "VoterToBallot link tag too long",
+        );
+    }
+
+    // -- ProposerToResolution link tag tests --
+
+    #[test]
+    fn test_link_proposer_to_resolution_valid_tag() {
+        assert_valid(validate_create_link_tag(LinkTypes::ProposerToResolution, vec![0u8; 128]));
+    }
+
+    #[test]
+    fn test_link_proposer_to_resolution_tag_too_long_rejected() {
+        assert_invalid(
+            validate_create_link_tag(LinkTypes::ProposerToResolution, vec![0u8; 257]),
+            "ProposerToResolution link tag too long",
+        );
+    }
+
+    // -- Delete link tag tests --
+
+    #[test]
+    fn test_delete_link_all_meetings_valid_tag() {
+        assert_valid(validate_delete_link_tag(LinkTypes::AllMeetings, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_delete_link_all_meetings_tag_too_long_rejected() {
+        assert_invalid(
+            validate_delete_link_tag(LinkTypes::AllMeetings, vec![0u8; 257]),
+            "AllMeetings delete link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_delete_link_election_to_ballot_valid_tag() {
+        assert_valid(validate_delete_link_tag(LinkTypes::ElectionToBallot, vec![0u8; 512]));
+    }
+
+    #[test]
+    fn test_delete_link_election_to_ballot_tag_too_long_rejected() {
+        assert_invalid(
+            validate_delete_link_tag(LinkTypes::ElectionToBallot, vec![0u8; 513]),
+            "ElectionToBallot delete link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_delete_link_voter_to_ballot_tag_too_long_rejected() {
+        assert_invalid(
+            validate_delete_link_tag(LinkTypes::VoterToBallot, vec![0u8; 257]),
+            "VoterToBallot delete link tag too long",
         );
     }
 }

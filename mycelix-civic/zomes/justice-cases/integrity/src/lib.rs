@@ -771,19 +771,123 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::Enforcement(e) => validate_enforcement(&e),
             EntryTypes::RestorativeCircle(r) => validate_restorative(&r),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
-            LinkTypes::ComplainantToCases => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::RespondentToCases => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::CaseToEvidence => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::CaseToMediation => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::CaseToArbitration => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::CaseToDecisions => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::DecisionToAppeals => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::DecisionToEnforcement => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::CaseToRestorativeCircle => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::ArbitratorToCases => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AllCases => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
+            EntryTypes::Case(c) => validate_case(&c),
+            EntryTypes::Evidence(e) => validate_evidence(&e),
+            EntryTypes::Mediation(m) => validate_mediation(&m),
+            EntryTypes::Arbitration(a) => validate_arbitration(&a),
+            EntryTypes::Decision(d) => validate_decision(&d),
+            EntryTypes::Appeal(a) => validate_appeal(&a),
+            EntryTypes::Enforcement(e) => validate_enforcement(&e),
+            EntryTypes::RestorativeCircle(r) => validate_restorative(&r),
         },
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            let tag_len = tag.0.len();
+            match link_type {
+                LinkTypes::ComplainantToCases => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::RespondentToCases => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::CaseToEvidence => {
+                    // Evidence links may carry content hash metadata in tags
+                    if tag_len > 512 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 512 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::CaseToMediation => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::CaseToArbitration => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::CaseToDecisions => {
+                    // Decision links may carry ruling metadata in tags
+                    if tag_len > 512 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 512 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::DecisionToAppeals => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::DecisionToEnforcement => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::CaseToRestorativeCircle => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::ArbitratorToCases => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AllCases => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
+        FlatOp::RegisterDeleteLink { link_type, tag, .. } => {
+            let tag_len = tag.0.len();
+            // All delete link tags get the same 256-byte limit
+            if tag_len > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Delete link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            match link_type {
+                _ => Ok(ValidateCallbackResult::Valid),
+            }
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -3544,5 +3648,264 @@ mod tests {
         }];
         let result = validate_restorative(&circle);
         assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // LINK TAG VALIDATION TESTS
+    // ========================================================================
+
+    /// Helper to test create-link tag validation for a given link type.
+    /// Mirrors the logic in the validate() FlatOp::RegisterCreateLink arm.
+    fn validate_create_link_tag(link_type: LinkTypes, tag: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let tag_len = tag.len();
+        match link_type {
+            LinkTypes::CaseToEvidence | LinkTypes::CaseToDecisions => {
+                if tag_len > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            _ => {
+                if tag_len > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    fn validate_delete_link_tag(tag: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        if tag.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Delete link tag too long (max 256 bytes)".into(),
+            ));
+        }
+        Ok(ValidateCallbackResult::Valid)
+    }
+
+    // -- ComplainantToCases (256 limit) --
+
+    #[test]
+    fn complainant_to_cases_link_tag_valid() {
+        let result = validate_create_link_tag(LinkTypes::ComplainantToCases, vec![0u8; 100]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn complainant_to_cases_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::ComplainantToCases, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn complainant_to_cases_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::ComplainantToCases, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- CaseToEvidence (512 limit) --
+
+    #[test]
+    fn case_to_evidence_link_tag_valid() {
+        let result = validate_create_link_tag(LinkTypes::CaseToEvidence, vec![0u8; 400]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_to_evidence_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::CaseToEvidence, vec![0u8; 512]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_to_evidence_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::CaseToEvidence, vec![0u8; 513]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- CaseToDecisions (512 limit) --
+
+    #[test]
+    fn case_to_decisions_link_tag_valid() {
+        let result = validate_create_link_tag(LinkTypes::CaseToDecisions, vec![0u8; 300]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_to_decisions_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::CaseToDecisions, vec![0u8; 512]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_to_decisions_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::CaseToDecisions, vec![0u8; 513]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- AllCases (256 limit) --
+
+    #[test]
+    fn all_cases_link_tag_empty() {
+        let result = validate_create_link_tag(LinkTypes::AllCases, vec![]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn all_cases_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::AllCases, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn all_cases_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::AllCases, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- RespondentToCases (256 limit) --
+
+    #[test]
+    fn respondent_to_cases_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::RespondentToCases, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn respondent_to_cases_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::RespondentToCases, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- ArbitratorToCases (256 limit) --
+
+    #[test]
+    fn arbitrator_to_cases_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::ArbitratorToCases, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn arbitrator_to_cases_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::ArbitratorToCases, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- DecisionToAppeals (256 limit) --
+
+    #[test]
+    fn decision_to_appeals_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::DecisionToAppeals, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_to_appeals_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::DecisionToAppeals, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- Large tag DoS prevention --
+
+    #[test]
+    fn massive_link_tag_rejected_all_standard_types() {
+        let huge_tag = vec![0xFFu8; 10_000];
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::ComplainantToCases, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::RespondentToCases, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::CaseToMediation, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::CaseToArbitration, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::DecisionToAppeals, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::DecisionToEnforcement, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::CaseToRestorativeCircle, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::ArbitratorToCases, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::AllCases, huge_tag.clone())));
+    }
+
+    #[test]
+    fn massive_link_tag_rejected_extended_types() {
+        let huge_tag = vec![0xFFu8; 10_000];
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::CaseToEvidence, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::CaseToDecisions, huge_tag.clone())));
+    }
+
+    // -- Delete link tag tests --
+
+    #[test]
+    fn delete_link_tag_valid() {
+        let result = validate_delete_link_tag(vec![0u8; 128]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn delete_link_tag_at_limit() {
+        let result = validate_delete_link_tag(vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn delete_link_tag_over_limit() {
+        let result = validate_delete_link_tag(vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn delete_link_tag_massive_rejected() {
+        let result = validate_delete_link_tag(vec![0xFFu8; 10_000]);
+        assert!(is_invalid(&result));
+    }
+
+    // ── Update validation tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_update_case_invalid_title_rejected() {
+        let mut case = make_case();
+        case.title = String::new();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn test_update_case_invalid_description_rejected() {
+        let mut case = make_case();
+        case.description = "  ".into();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn test_update_case_invalid_self_filing_rejected() {
+        let mut case = make_case();
+        case.complainant = "did:key:same".into();
+        case.respondent = "did:key:same".into();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn test_update_evidence_invalid_submitter_rejected() {
+        let mut ev = make_evidence();
+        ev.submitter = "not-a-did".into();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn test_update_evidence_invalid_description_rejected() {
+        let mut ev = make_evidence();
+        ev.description = String::new();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn test_update_evidence_invalid_content_hash_rejected() {
+        let mut ev = make_evidence();
+        ev.content.hash = "  ".into();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
     }
 }

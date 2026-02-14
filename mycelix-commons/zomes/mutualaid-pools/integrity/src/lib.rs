@@ -280,10 +280,35 @@ fn validate_mutual_aid_pool(pool: &MutualAidPool) -> ExternResult<ValidateCallba
     // Validate ID
     validate_id(&pool.id, "Pool ID")?;
 
+    if pool.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Pool ID must be 64 characters or fewer".into()
+        ));
+    }
+
     // Validate name is not empty
     if pool.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             PoolsError::EmptyName.to_string()
+        ));
+    }
+
+    if pool.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Pool name must be 256 characters or fewer".into()
+        ));
+    }
+
+    if pool.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Pool description must be 4096 characters or fewer".into()
+        ));
+    }
+
+    // Validate member count
+    if pool.members.len() > 500 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 500 members".into()
         ));
     }
 
@@ -329,6 +354,22 @@ fn validate_contribution(contribution: &Contribution) -> ExternResult<ValidateCa
     validate_id(&contribution.id, "Contribution ID")?;
     validate_id(&contribution.pool_id, "Pool ID")?;
 
+    if contribution.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contribution ID must be 64 characters or fewer".into()
+        ));
+    }
+    if contribution.pool_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Pool ID must be 64 characters or fewer".into()
+        ));
+    }
+    if contribution.member_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Member DID must be 256 characters or fewer".into()
+        ));
+    }
+
     // Validate member DID
     validate_did(&contribution.member_did)?;
 
@@ -339,6 +380,14 @@ fn validate_contribution(contribution: &Contribution) -> ExternResult<ValidateCa
         ));
     }
 
+    if let Some(ref note) = contribution.note {
+        if note.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Contribution note must be 4096 characters or fewer".into()
+            ));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -347,6 +396,22 @@ fn validate_disbursement(disbursement: &Disbursement) -> ExternResult<ValidateCa
     // Validate IDs
     validate_id(&disbursement.id, "Disbursement ID")?;
     validate_id(&disbursement.pool_id, "Pool ID")?;
+
+    if disbursement.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disbursement ID must be 64 characters or fewer".into()
+        ));
+    }
+    if disbursement.pool_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Pool ID must be 64 characters or fewer".into()
+        ));
+    }
+    if disbursement.recipient_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recipient DID must be 256 characters or fewer".into()
+        ));
+    }
 
     // Validate recipient DID
     validate_did(&disbursement.recipient_did)?;
@@ -365,6 +430,24 @@ fn validate_disbursement(disbursement: &Disbursement) -> ExternResult<ValidateCa
         ));
     }
 
+    if disbursement.reason.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disbursement reason must be 4096 characters or fewer".into()
+        ));
+    }
+
+    // Validate approver and rejector Vec limits
+    if disbursement.approved_by.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 100 approvers".into()
+        ));
+    }
+    if disbursement.rejected_by.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 100 rejectors".into()
+        ));
+    }
+
     // Validate approver and rejector DIDs
     for approver in &disbursement.approved_by {
         validate_did(approver)?;
@@ -380,6 +463,17 @@ fn validate_disbursement(disbursement: &Disbursement) -> ExternResult<ValidateCa
 fn validate_pool_membership(membership: &PoolMembership) -> ExternResult<ValidateCallbackResult> {
     // Validate IDs
     validate_id(&membership.pool_id, "Pool ID")?;
+
+    if membership.pool_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Pool ID must be 64 characters or fewer".into()
+        ));
+    }
+    if membership.member_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Member DID must be 256 characters or fewer".into()
+        ));
+    }
 
     // Validate member DID
     validate_did(&membership.member_did)?;
@@ -1268,5 +1362,235 @@ mod tests {
         let a1 = Anchor::new("same");
         let a2 = Anchor::new("same");
         assert_eq!(a1, a2);
+    }
+
+    // ── String/Vec length limit tests ─────────────────────────────────────
+
+    // Pool: id max 64
+    #[test]
+    fn validate_pool_id_exactly_64_ok() {
+        let mut pool = valid_pool();
+        pool.id = "x".repeat(64);
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_id_65_rejected() {
+        let mut pool = valid_pool();
+        pool.id = "x".repeat(65);
+        assert_invalid(
+            validate_mutual_aid_pool(&pool),
+            "Pool ID must be 64 characters or fewer",
+        );
+    }
+
+    // Pool: name max 256
+    #[test]
+    fn validate_pool_name_exactly_256_ok() {
+        let mut pool = valid_pool();
+        pool.name = "x".repeat(256);
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_name_257_rejected() {
+        let mut pool = valid_pool();
+        pool.name = "x".repeat(257);
+        assert_invalid(
+            validate_mutual_aid_pool(&pool),
+            "Pool name must be 256 characters or fewer",
+        );
+    }
+
+    // Pool: description max 4096
+    #[test]
+    fn validate_pool_description_exactly_4096_ok() {
+        let mut pool = valid_pool();
+        pool.description = "x".repeat(4096);
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_description_4097_rejected() {
+        let mut pool = valid_pool();
+        pool.description = "x".repeat(4097);
+        assert_invalid(
+            validate_mutual_aid_pool(&pool),
+            "Pool description must be 4096 characters or fewer",
+        );
+    }
+
+    // Pool: members max 500
+    #[test]
+    fn validate_pool_500_members_ok() {
+        let mut pool = valid_pool();
+        pool.members = (0..500)
+            .map(|i| format!("did:mycelix:member{}", i))
+            .collect();
+        assert_valid(validate_mutual_aid_pool(&pool));
+    }
+
+    #[test]
+    fn validate_pool_501_members_rejected() {
+        let mut pool = valid_pool();
+        pool.members = (0..501)
+            .map(|i| format!("did:mycelix:member{}", i))
+            .collect();
+        assert_invalid(
+            validate_mutual_aid_pool(&pool),
+            "Cannot have more than 500 members",
+        );
+    }
+
+    // Contribution: id max 64
+    #[test]
+    fn validate_contribution_id_exactly_64_ok() {
+        let mut contrib = valid_contribution();
+        contrib.id = "x".repeat(64);
+        assert_valid(validate_contribution(&contrib));
+    }
+
+    #[test]
+    fn validate_contribution_id_65_rejected() {
+        let mut contrib = valid_contribution();
+        contrib.id = "x".repeat(65);
+        assert_invalid(
+            validate_contribution(&contrib),
+            "Contribution ID must be 64 characters or fewer",
+        );
+    }
+
+    // Contribution: pool_id max 64
+    #[test]
+    fn validate_contribution_pool_id_exactly_64_ok() {
+        let mut contrib = valid_contribution();
+        contrib.pool_id = "x".repeat(64);
+        assert_valid(validate_contribution(&contrib));
+    }
+
+    #[test]
+    fn validate_contribution_pool_id_65_rejected() {
+        let mut contrib = valid_contribution();
+        contrib.pool_id = "x".repeat(65);
+        assert_invalid(
+            validate_contribution(&contrib),
+            "Pool ID must be 64 characters or fewer",
+        );
+    }
+
+    // Contribution: note max 4096
+    #[test]
+    fn validate_contribution_note_exactly_4096_ok() {
+        let mut contrib = valid_contribution();
+        contrib.note = Some("x".repeat(4096));
+        assert_valid(validate_contribution(&contrib));
+    }
+
+    #[test]
+    fn validate_contribution_note_4097_rejected() {
+        let mut contrib = valid_contribution();
+        contrib.note = Some("x".repeat(4097));
+        assert_invalid(
+            validate_contribution(&contrib),
+            "Contribution note must be 4096 characters or fewer",
+        );
+    }
+
+    // Disbursement: id max 64
+    #[test]
+    fn validate_disbursement_id_exactly_64_ok() {
+        let mut disb = valid_disbursement();
+        disb.id = "x".repeat(64);
+        assert_valid(validate_disbursement(&disb));
+    }
+
+    #[test]
+    fn validate_disbursement_id_65_rejected() {
+        let mut disb = valid_disbursement();
+        disb.id = "x".repeat(65);
+        assert_invalid(
+            validate_disbursement(&disb),
+            "Disbursement ID must be 64 characters or fewer",
+        );
+    }
+
+    // Disbursement: reason max 4096
+    #[test]
+    fn validate_disbursement_reason_exactly_4096_ok() {
+        let mut disb = valid_disbursement();
+        disb.reason = "x".repeat(4096);
+        assert_valid(validate_disbursement(&disb));
+    }
+
+    #[test]
+    fn validate_disbursement_reason_4097_rejected() {
+        let mut disb = valid_disbursement();
+        disb.reason = "x".repeat(4097);
+        assert_invalid(
+            validate_disbursement(&disb),
+            "Disbursement reason must be 4096 characters or fewer",
+        );
+    }
+
+    // Disbursement: approved_by max 100
+    #[test]
+    fn validate_disbursement_100_approvers_ok() {
+        let mut disb = valid_disbursement();
+        disb.approved_by = (0..100)
+            .map(|i| format!("did:mycelix:approver{}", i))
+            .collect();
+        assert_valid(validate_disbursement(&disb));
+    }
+
+    #[test]
+    fn validate_disbursement_101_approvers_rejected() {
+        let mut disb = valid_disbursement();
+        disb.approved_by = (0..101)
+            .map(|i| format!("did:mycelix:approver{}", i))
+            .collect();
+        assert_invalid(
+            validate_disbursement(&disb),
+            "Cannot have more than 100 approvers",
+        );
+    }
+
+    // Disbursement: rejected_by max 100
+    #[test]
+    fn validate_disbursement_100_rejectors_ok() {
+        let mut disb = valid_disbursement();
+        disb.rejected_by = (0..100)
+            .map(|i| format!("did:mycelix:rejector{}", i))
+            .collect();
+        assert_valid(validate_disbursement(&disb));
+    }
+
+    #[test]
+    fn validate_disbursement_101_rejectors_rejected() {
+        let mut disb = valid_disbursement();
+        disb.rejected_by = (0..101)
+            .map(|i| format!("did:mycelix:rejector{}", i))
+            .collect();
+        assert_invalid(
+            validate_disbursement(&disb),
+            "Cannot have more than 100 rejectors",
+        );
+    }
+
+    // PoolMembership: pool_id max 64
+    #[test]
+    fn validate_membership_pool_id_exactly_64_ok() {
+        let mut mem = valid_membership();
+        mem.pool_id = "x".repeat(64);
+        assert_valid(validate_pool_membership(&mem));
+    }
+
+    #[test]
+    fn validate_membership_pool_id_65_rejected() {
+        let mut mem = valid_membership();
+        mem.pool_id = "x".repeat(65);
+        assert_invalid(
+            validate_pool_membership(&mem),
+            "Pool ID must be 64 characters or fewer",
+        );
     }
 }

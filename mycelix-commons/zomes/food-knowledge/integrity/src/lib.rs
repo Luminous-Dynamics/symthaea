@@ -100,6 +100,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::TraditionalPractice(p) => validate_practice(p),
                 EntryTypes::Recipe(r) => validate_recipe(r),
             },
+            OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::SeedVariety(s) => validate_seed(s),
+                EntryTypes::TraditionalPractice(p) => validate_practice(p),
+                EntryTypes::Recipe(r) => validate_recipe(r),
+            },
             _ => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
@@ -633,5 +639,67 @@ mod tests {
         let json = serde_json::to_string(&a).unwrap();
         let back: Anchor = serde_json::from_str(&json).unwrap();
         assert_eq!(back, a);
+    }
+
+    // ── Update validation: SeedVariety ───────────────────────────────────
+
+    #[test]
+    fn test_update_seed_invalid_name_rejected() {
+        let mut s = valid_seed();
+        s.name = String::new();
+        assert_invalid(validate_seed(s), "Seed name cannot be empty");
+    }
+
+    #[test]
+    fn test_update_seed_invalid_species_rejected() {
+        let mut s = valid_seed();
+        s.species = "  ".into();
+        assert_invalid(validate_seed(s), "Species cannot be empty");
+    }
+
+    #[test]
+    fn test_update_seed_invalid_maturity_rejected() {
+        let mut s = valid_seed();
+        s.days_to_maturity = 0;
+        assert_invalid(validate_seed(s), "Days to maturity must be positive");
+    }
+
+    // ── Update validation: TraditionalPractice ───────────────────────────
+
+    #[test]
+    fn test_update_practice_invalid_name_rejected() {
+        let mut p = valid_practice();
+        p.name = String::new();
+        assert_invalid(validate_practice(p), "Practice name cannot be empty");
+    }
+
+    #[test]
+    fn test_update_practice_invalid_description_rejected() {
+        let mut p = valid_practice();
+        p.description = "  ".into();
+        assert_invalid(validate_practice(p), "Description cannot be empty");
+    }
+
+    // ── Update validation: Recipe ────────────────────────────────────────
+
+    #[test]
+    fn test_update_recipe_invalid_name_rejected() {
+        let mut r = valid_recipe();
+        r.name = String::new();
+        assert_invalid(validate_recipe(r), "Recipe name cannot be empty");
+    }
+
+    #[test]
+    fn test_update_recipe_invalid_ingredients_rejected() {
+        let mut r = valid_recipe();
+        r.ingredients = vec![];
+        assert_invalid(validate_recipe(r), "Must have at least one ingredient");
+    }
+
+    #[test]
+    fn test_update_recipe_invalid_servings_rejected() {
+        let mut r = valid_recipe();
+        r.servings = 0;
+        assert_invalid(validate_recipe(r), "Servings must be positive");
     }
 }

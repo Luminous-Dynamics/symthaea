@@ -217,9 +217,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 original_entry_hash: _,
             } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::StorageTank(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::RechargeProject(_) => Ok(ValidateCallbackResult::Valid),
-                _ => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::HarvestSystem(system) => validate_update_harvest_system(system),
+                EntryTypes::StorageTank(tank) => validate_update_storage_tank(tank),
+                EntryTypes::HarvestRecord(record) => validate_update_harvest_record(record),
+                EntryTypes::RechargeProject(project) => validate_update_recharge_project(project),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -264,9 +265,19 @@ fn validate_create_harvest_system(
             "Harvest system ID cannot be empty".into(),
         ));
     }
+    if system.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Harvest system ID must be 64 characters or fewer".into(),
+        ));
+    }
     if system.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Harvest system name cannot be empty".into(),
+        ));
+    }
+    if system.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Harvest system name must be 256 characters or fewer".into(),
         ));
     }
     if system.capacity_liters == 0 {
@@ -301,9 +312,19 @@ fn validate_create_storage_tank(
             "Tank ID cannot be empty".into(),
         ));
     }
+    if tank.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Tank ID must be 64 characters or fewer".into(),
+        ));
+    }
     if tank.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Tank name cannot be empty".into(),
+        ));
+    }
+    if tank.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Tank name must be 256 characters or fewer".into(),
         ));
     }
     if tank.capacity_liters == 0 {
@@ -338,6 +359,13 @@ fn validate_create_harvest_record(
             "Harvest liters must be greater than zero".into(),
         ));
     }
+    if let Some(ref wc) = record.weather_conditions {
+        if wc.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Weather conditions must be 4096 characters or fewer".into(),
+            ));
+        }
+    }
     if record.collection_period_end <= record.collection_period_start {
         return Ok(ValidateCallbackResult::Invalid(
             "Collection period end must be after start".into(),
@@ -355,14 +383,29 @@ fn validate_create_recharge_project(
             "Recharge project ID cannot be empty".into(),
         ));
     }
+    if project.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recharge project ID must be 64 characters or fewer".into(),
+        ));
+    }
     if project.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Recharge project name cannot be empty".into(),
         ));
     }
+    if project.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recharge project name must be 256 characters or fewer".into(),
+        ));
+    }
     if project.aquifer_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Aquifer ID cannot be empty".into(),
+        ));
+    }
+    if project.aquifer_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Aquifer ID must be 64 characters or fewer".into(),
         ));
     }
     if project.capacity_liters_per_day == 0 {
@@ -378,6 +421,66 @@ fn validate_create_recharge_project(
     if project.location_lon < -180.0 || project.location_lon > 180.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Longitude must be between -180 and 180".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_harvest_system(system: HarvestSystem) -> ExternResult<ValidateCallbackResult> {
+    if system.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Harvest system ID must be 64 characters or fewer".into(),
+        ));
+    }
+    if system.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Harvest system name must be 256 characters or fewer".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_storage_tank(tank: StorageTank) -> ExternResult<ValidateCallbackResult> {
+    if tank.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Tank ID must be 64 characters or fewer".into(),
+        ));
+    }
+    if tank.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Tank name must be 256 characters or fewer".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_harvest_record(record: HarvestRecord) -> ExternResult<ValidateCallbackResult> {
+    if let Some(ref wc) = record.weather_conditions {
+        if wc.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Weather conditions must be 4096 characters or fewer".into(),
+            ));
+        }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_recharge_project(
+    project: RechargeProject,
+) -> ExternResult<ValidateCallbackResult> {
+    if project.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recharge project ID must be 64 characters or fewer".into(),
+        ));
+    }
+    if project.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recharge project name must be 256 characters or fewer".into(),
+        ));
+    }
+    if project.aquifer_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Aquifer ID must be 64 characters or fewer".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -1312,8 +1415,178 @@ mod tests {
     }
 
     // ========================================================================
-    // NOTE: validate_update_* functions are not tested here because they
-    // call must_get_valid_record() which requires a live Holochain conductor.
-    // These are tested via sweettest integration tests.
+    // STRING LENGTH LIMIT TESTS - HARVEST SYSTEM
     // ========================================================================
+
+    #[test]
+    fn harvest_system_id_exactly_64_accepted() {
+        let mut sys = make_harvest_system();
+        sys.id = "x".repeat(64);
+        let result = validate_create_harvest_system(fake_create(), sys);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn harvest_system_id_65_rejected() {
+        let mut sys = make_harvest_system();
+        sys.id = "x".repeat(65);
+        let result = validate_create_harvest_system(fake_create(), sys);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Harvest system ID must be 64 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn harvest_system_name_exactly_256_accepted() {
+        let mut sys = make_harvest_system();
+        sys.name = "x".repeat(256);
+        let result = validate_create_harvest_system(fake_create(), sys);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn harvest_system_name_257_rejected() {
+        let mut sys = make_harvest_system();
+        sys.name = "x".repeat(257);
+        let result = validate_create_harvest_system(fake_create(), sys);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Harvest system name must be 256 characters or fewer"
+        );
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT TESTS - STORAGE TANK
+    // ========================================================================
+
+    #[test]
+    fn storage_tank_id_exactly_64_accepted() {
+        let mut tank = make_storage_tank();
+        tank.id = "x".repeat(64);
+        let result = validate_create_storage_tank(fake_create(), tank);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn storage_tank_id_65_rejected() {
+        let mut tank = make_storage_tank();
+        tank.id = "x".repeat(65);
+        let result = validate_create_storage_tank(fake_create(), tank);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Tank ID must be 64 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn storage_tank_name_exactly_256_accepted() {
+        let mut tank = make_storage_tank();
+        tank.name = "x".repeat(256);
+        let result = validate_create_storage_tank(fake_create(), tank);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn storage_tank_name_257_rejected() {
+        let mut tank = make_storage_tank();
+        tank.name = "x".repeat(257);
+        let result = validate_create_storage_tank(fake_create(), tank);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Tank name must be 256 characters or fewer"
+        );
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT TESTS - HARVEST RECORD
+    // ========================================================================
+
+    #[test]
+    fn harvest_record_weather_exactly_4096_accepted() {
+        let mut rec = make_harvest_record();
+        rec.weather_conditions = Some("x".repeat(4096));
+        let result = validate_create_harvest_record(fake_create(), rec);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn harvest_record_weather_4097_rejected() {
+        let mut rec = make_harvest_record();
+        rec.weather_conditions = Some("x".repeat(4097));
+        let result = validate_create_harvest_record(fake_create(), rec);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Weather conditions must be 4096 characters or fewer"
+        );
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT TESTS - RECHARGE PROJECT
+    // ========================================================================
+
+    #[test]
+    fn recharge_project_id_exactly_64_accepted() {
+        let mut proj = make_recharge_project();
+        proj.id = "x".repeat(64);
+        let result = validate_create_recharge_project(fake_create(), proj);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn recharge_project_id_65_rejected() {
+        let mut proj = make_recharge_project();
+        proj.id = "x".repeat(65);
+        let result = validate_create_recharge_project(fake_create(), proj);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Recharge project ID must be 64 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn recharge_project_name_exactly_256_accepted() {
+        let mut proj = make_recharge_project();
+        proj.name = "x".repeat(256);
+        let result = validate_create_recharge_project(fake_create(), proj);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn recharge_project_name_257_rejected() {
+        let mut proj = make_recharge_project();
+        proj.name = "x".repeat(257);
+        let result = validate_create_recharge_project(fake_create(), proj);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Recharge project name must be 256 characters or fewer"
+        );
+    }
+
+    #[test]
+    fn recharge_project_aquifer_id_exactly_64_accepted() {
+        let mut proj = make_recharge_project();
+        proj.aquifer_id = "x".repeat(64);
+        let result = validate_create_recharge_project(fake_create(), proj);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn recharge_project_aquifer_id_65_rejected() {
+        let mut proj = make_recharge_project();
+        proj.aquifer_id = "x".repeat(65);
+        let result = validate_create_recharge_project(fake_create(), proj);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Aquifer ID must be 64 characters or fewer"
+        );
+    }
 }

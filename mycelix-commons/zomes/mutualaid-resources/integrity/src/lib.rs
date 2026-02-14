@@ -94,6 +94,13 @@ fn validate_shared_resource(resource: SharedResource) -> ExternResult<ValidateCa
         ));
     }
 
+    // ID length limit
+    if resource.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource ID must be 64 characters or fewer".to_string(),
+        ));
+    }
+
     // Name must not be empty
     if resource.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -120,6 +127,31 @@ fn validate_shared_resource(resource: SharedResource) -> ExternResult<ValidateCa
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot have more than 10 photos".to_string(),
         ));
+    }
+
+    // Photo entry length limit
+    for photo in &resource.photos {
+        if photo.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each photo reference must be 256 characters or fewer".to_string(),
+            ));
+        }
+    }
+
+    // Usage instructions length limit
+    if resource.usage_instructions.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Usage instructions must be 4096 characters or fewer".to_string(),
+        ));
+    }
+
+    // Liability notes length limit
+    if let Some(ref notes) = resource.liability_notes {
+        if notes.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Liability notes must be 4096 characters or fewer".to_string(),
+            ));
+        }
     }
 
     // Sharing model validation
@@ -154,6 +186,13 @@ fn validate_booking(booking: Booking) -> ExternResult<ValidateCallbackResult> {
     if booking.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Booking ID cannot be empty".to_string(),
+        ));
+    }
+
+    // ID length limit
+    if booking.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Booking ID must be 64 characters or fewer".to_string(),
         ));
     }
 
@@ -197,6 +236,15 @@ fn validate_usage(usage: Usage) -> ExternResult<ValidateCallbackResult> {
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot report more than 10 issues".to_string(),
         ));
+    }
+
+    // Issue entry length limit
+    for issue in &usage.issues {
+        if issue.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each issue must be 256 characters or fewer".to_string(),
+            ));
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -246,6 +294,15 @@ fn validate_maintenance(maintenance: Maintenance) -> ExternResult<ValidateCallba
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot list more than 20 parts".to_string(),
         ));
+    }
+
+    // Part entry length limit
+    for part in &maintenance.parts_used {
+        if part.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each part name must be 256 characters or fewer".to_string(),
+            ));
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -1002,5 +1059,152 @@ mod tests {
             let result = validate_maintenance(maintenance);
             assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
         }
+    }
+
+    // =============================================================================
+    // STRING/VEC LENGTH LIMIT TESTS
+    // =============================================================================
+
+    // SharedResource: id max 64
+    #[test]
+    fn test_shared_resource_id_exactly_64() {
+        let mut resource = valid_shared_resource();
+        resource.id = "x".repeat(64);
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_shared_resource_id_65_rejected() {
+        let mut resource = valid_shared_resource();
+        resource.id = "x".repeat(65);
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // SharedResource: photo entry max 256
+    #[test]
+    fn test_shared_resource_photo_exactly_256() {
+        let mut resource = valid_shared_resource();
+        resource.photos = vec!["x".repeat(256)];
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_shared_resource_photo_257_rejected() {
+        let mut resource = valid_shared_resource();
+        resource.photos = vec!["x".repeat(257)];
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // SharedResource: usage_instructions max 4096
+    #[test]
+    fn test_shared_resource_usage_instructions_exactly_4096() {
+        let mut resource = valid_shared_resource();
+        resource.usage_instructions = "x".repeat(4096);
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_shared_resource_usage_instructions_4097_rejected() {
+        let mut resource = valid_shared_resource();
+        resource.usage_instructions = "x".repeat(4097);
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // SharedResource: liability_notes max 4096
+    #[test]
+    fn test_shared_resource_liability_notes_exactly_4096() {
+        let mut resource = valid_shared_resource();
+        resource.liability_notes = Some("x".repeat(4096));
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_shared_resource_liability_notes_4097_rejected() {
+        let mut resource = valid_shared_resource();
+        resource.liability_notes = Some("x".repeat(4097));
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_shared_resource_liability_notes_none_accepted() {
+        let mut resource = valid_shared_resource();
+        resource.liability_notes = None;
+        let result = validate_shared_resource(resource);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // Booking: id max 64
+    #[test]
+    fn test_booking_id_exactly_64() {
+        let mut booking = valid_booking();
+        booking.id = "x".repeat(64);
+        let result = validate_booking(booking);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_booking_id_65_rejected() {
+        let mut booking = valid_booking();
+        booking.id = "x".repeat(65);
+        let result = validate_booking(booking);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // Usage: issue entry max 256
+    #[test]
+    fn test_usage_issue_exactly_256() {
+        let mut usage = valid_usage();
+        usage.issues = vec!["x".repeat(256)];
+        let result = validate_usage(usage);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_usage_issue_257_rejected() {
+        let mut usage = valid_usage();
+        usage.issues = vec!["x".repeat(257)];
+        let result = validate_usage(usage);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_usage_multiple_issues_one_too_long() {
+        let mut usage = valid_usage();
+        usage.issues = vec!["valid issue".to_string(), "x".repeat(257)];
+        let result = validate_usage(usage);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // Maintenance: part entry max 256
+    #[test]
+    fn test_maintenance_part_exactly_256() {
+        let mut maintenance = valid_maintenance();
+        maintenance.parts_used = vec!["x".repeat(256)];
+        let result = validate_maintenance(maintenance);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_maintenance_part_257_rejected() {
+        let mut maintenance = valid_maintenance();
+        maintenance.parts_used = vec!["x".repeat(257)];
+        let result = validate_maintenance(maintenance);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_maintenance_multiple_parts_one_too_long() {
+        let mut maintenance = valid_maintenance();
+        maintenance.parts_used = vec!["valid part".to_string(), "x".repeat(257)];
+        let result = validate_maintenance(maintenance);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }

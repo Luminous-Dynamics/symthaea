@@ -771,6 +771,16 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::Enforcement(e) => validate_enforcement(&e),
             EntryTypes::RestorativeCircle(r) => validate_restorative(&r),
         },
+        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
+            EntryTypes::Case(c) => validate_case(&c),
+            EntryTypes::Evidence(e) => validate_evidence(&e),
+            EntryTypes::Mediation(m) => validate_mediation(&m),
+            EntryTypes::Arbitration(a) => validate_arbitration(&a),
+            EntryTypes::Decision(d) => validate_decision(&d),
+            EntryTypes::Appeal(a) => validate_appeal(&a),
+            EntryTypes::Enforcement(e) => validate_enforcement(&e),
+            EntryTypes::RestorativeCircle(r) => validate_restorative(&r),
+        },
         FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
             LinkTypes::ComplainantToCases => Ok(ValidateCallbackResult::Valid),
             LinkTypes::RespondentToCases => Ok(ValidateCallbackResult::Valid),
@@ -3059,5 +3069,61 @@ mod tests {
         let deserialized: CaseParty = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deserialized.did, party.did);
         assert_eq!(deserialized.role, party.role);
+    }
+
+    // ── Update validation tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_update_case_invalid_title_rejected() {
+        let mut case = make_case();
+        case.title = String::new();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("Case title required"));
+    }
+
+    #[test]
+    fn test_update_case_invalid_description_rejected() {
+        let mut case = make_case();
+        case.description = "  ".into();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("Case description required"));
+    }
+
+    #[test]
+    fn test_update_evidence_invalid_submitter_rejected() {
+        let mut ev = make_evidence();
+        ev.submitter = "not-a-did".into();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("DID"));
+    }
+
+    #[test]
+    fn test_update_evidence_invalid_description_rejected() {
+        let mut ev = make_evidence();
+        ev.description = String::new();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("description"));
+    }
+
+    #[test]
+    fn test_update_mediation_invalid_mediator_rejected() {
+        let mut med = make_mediation();
+        med.mediator = "not-a-did".into();
+        let result = validate_mediation(&med);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("Mediator must be a DID"));
+    }
+
+    #[test]
+    fn test_update_restorative_invalid_facilitator_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.facilitator = "not-a-did".into();
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("Facilitator must be a DID"));
     }
 }

@@ -771,6 +771,16 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::Enforcement(e) => validate_enforcement(&e),
             EntryTypes::RestorativeCircle(r) => validate_restorative(&r),
         },
+        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
+            EntryTypes::Case(c) => validate_case(&c),
+            EntryTypes::Evidence(e) => validate_evidence(&e),
+            EntryTypes::Mediation(m) => validate_mediation(&m),
+            EntryTypes::Arbitration(a) => validate_arbitration(&a),
+            EntryTypes::Decision(d) => validate_decision(&d),
+            EntryTypes::Appeal(a) => validate_appeal(&a),
+            EntryTypes::Enforcement(e) => validate_enforcement(&e),
+            EntryTypes::RestorativeCircle(r) => validate_restorative(&r),
+        },
         FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
             LinkTypes::ComplainantToCases => Ok(ValidateCallbackResult::Valid),
             LinkTypes::RespondentToCases => Ok(ValidateCallbackResult::Valid),
@@ -3259,5 +3269,87 @@ mod tests {
         ev.content.encrypted = true;
         ev.content.key_reference = None;
         assert!(is_valid(&validate_evidence(&ev)));
+    }
+
+    // ── Update validation tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_update_case_invalid_title_rejected() {
+        let mut case = make_case();
+        case.title = String::new();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("Case title required"));
+    }
+
+    #[test]
+    fn test_update_case_invalid_self_filing_rejected() {
+        let mut case = make_case();
+        case.complainant = "did:key:same".into();
+        case.respondent = "did:key:same".into();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("Cannot file case against self"));
+    }
+
+    #[test]
+    fn test_update_evidence_invalid_submitter_rejected() {
+        let mut ev = make_evidence();
+        ev.submitter = "not-a-did".into();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("DID"));
+    }
+
+    #[test]
+    fn test_update_evidence_invalid_description_rejected() {
+        let mut ev = make_evidence();
+        ev.description = String::new();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("description"));
+    }
+
+    #[test]
+    fn test_update_arbitration_invalid_even_panel_rejected() {
+        let arb = make_arbitration(vec![
+            Arbitrator {
+                did: "did:key:arb1".into(),
+                role: ArbitratorRole::Primary,
+                selected_at: ts(),
+                accepted: true,
+                recused: false,
+                recusal_reason: None,
+            },
+            Arbitrator {
+                did: "did:key:arb2".into(),
+                role: ArbitratorRole::PanelMember,
+                selected_at: ts(),
+                accepted: true,
+                recused: false,
+                recusal_reason: None,
+            },
+        ]);
+        let result = validate_arbitration(&arb);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("odd number"));
+    }
+
+    #[test]
+    fn test_update_decision_invalid_empty_reasoning_rejected() {
+        let mut dec = make_decision();
+        dec.reasoning = "  ".into();
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("Decision reasoning required"));
+    }
+
+    #[test]
+    fn test_update_appeal_invalid_appellant_rejected() {
+        let mut appeal = make_appeal();
+        appeal.appellant = "not-a-did".into();
+        let result = validate_appeal(&appeal);
+        assert!(is_invalid(&result));
+        assert!(invalid_msg(&result).contains("Appellant must be a DID"));
     }
 }

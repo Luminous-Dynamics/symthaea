@@ -129,20 +129,103 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink {
-            link_type: _,
+            link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => Ok(ValidateCallbackResult::Valid),
+        } => match link_type {
+            LinkTypes::AllCircles => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllCircles link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TypeToCircle => {
+                // Type tags may carry serialized CircleType data
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TypeToCircle link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CircleToMembership => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CircleToMembership link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToMembership => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToMembership link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToCreatedCircle => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToCreatedCircle link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink {
-            link_type: _,
+            link_type,
             original_action: _,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => Ok(ValidateCallbackResult::Valid),
+        } => match link_type {
+            LinkTypes::AllCircles => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllCircles delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TypeToCircle => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TypeToCircle delete link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CircleToMembership => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CircleToMembership delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToMembership => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToMembership delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToCreatedCircle => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToCreatedCircle delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
@@ -203,9 +286,29 @@ fn validate_update_circle(circle: CareCircle) -> ExternResult<ValidateCallbackRe
             "Circle name cannot be empty".into(),
         ));
     }
+    if circle.name.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle name must be 128 characters or fewer".into(),
+        ));
+    }
+    if circle.description.len() > 2048 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle description must be 2048 characters or fewer".into(),
+        ));
+    }
+    if circle.location.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Location must be 512 characters or fewer".into(),
+        ));
+    }
     if circle.max_members < 2 {
         return Ok(ValidateCallbackResult::Invalid(
             "Circle must allow at least 2 members".into(),
+        ));
+    }
+    if circle.max_members > 500 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle cannot have more than 500 members".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -652,26 +755,92 @@ mod tests {
     }
 
     #[test]
-    fn test_update_circle_allows_name_over_128_chars() {
-        // Update validation doesn't check name length
+    fn test_update_circle_name_at_max_length() {
         let mut circle = valid_circle();
-        circle.name = "a".repeat(200);
+        circle.name = "a".repeat(128);
         let result = validate_update_circle(circle).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]
-    fn test_update_circle_allows_max_members_over_500() {
-        // Update validation doesn't check max_members upper bound
+    fn test_update_circle_name_over_max_length_rejected() {
         let mut circle = valid_circle();
-        circle.max_members = 1000;
+        circle.name = "a".repeat(129);
+        let result = validate_update_circle(circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle name must be 128 characters or fewer");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_update_circle_description_at_max_length() {
+        let mut circle = valid_circle();
+        circle.description = "d".repeat(2048);
         let result = validate_update_circle(circle).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_circle_description_over_max_length_rejected() {
+        let mut circle = valid_circle();
+        circle.description = "d".repeat(2049);
+        let result = validate_update_circle(circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle description must be 2048 characters or fewer");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_update_circle_location_at_max_length() {
+        let mut circle = valid_circle();
+        circle.location = "l".repeat(512);
+        let result = validate_update_circle(circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_circle_location_over_max_length_rejected() {
+        let mut circle = valid_circle();
+        circle.location = "l".repeat(513);
+        let result = validate_update_circle(circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Location must be 512 characters or fewer");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_update_circle_max_members_at_maximum() {
+        let mut circle = valid_circle();
+        circle.max_members = 500;
+        let result = validate_update_circle(circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_circle_max_members_over_maximum_rejected() {
+        let mut circle = valid_circle();
+        circle.max_members = 501;
+        let result = validate_update_circle(circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle cannot have more than 500 members");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
     }
 
     #[test]
     fn test_update_circle_allows_empty_description() {
-        // Update validation doesn't check description
+        // Update validation allows empty description (may be clearing it)
         let mut circle = valid_circle();
         circle.description = "".to_string();
         let result = validate_update_circle(circle).unwrap();
@@ -680,7 +849,7 @@ mod tests {
 
     #[test]
     fn test_update_circle_allows_empty_location() {
-        // Update validation doesn't check location
+        // Update validation allows empty location (may be clearing it)
         let mut circle = valid_circle();
         circle.location = "".to_string();
         let result = validate_update_circle(circle).unwrap();
@@ -863,5 +1032,277 @@ mod tests {
             }
             _ => panic!("Expected Invalid result"),
         }
+    }
+
+    // ── Link tag validation tests ───────────────────────────────────────
+
+    fn assert_valid_result(result: ExternResult<ValidateCallbackResult>) {
+        match result {
+            Ok(ValidateCallbackResult::Valid) => {}
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                panic!("Expected Valid, got Invalid: {msg}")
+            }
+            other => panic!("Expected Valid, got {other:?}"),
+        }
+    }
+
+    fn assert_invalid_result(result: ExternResult<ValidateCallbackResult>, expected_substr: &str) {
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                assert!(
+                    msg.contains(expected_substr),
+                    "Expected Invalid message containing '{expected_substr}', got: '{msg}'"
+                );
+            }
+            Ok(ValidateCallbackResult::Valid) => {
+                panic!("Expected Invalid containing '{expected_substr}', got Valid")
+            }
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
+    }
+
+    /// Helper to simulate the create link tag validation logic (same as in validate()).
+    fn validate_create_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AllCircles => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllCircles link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TypeToCircle => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TypeToCircle link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CircleToMembership => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CircleToMembership link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToMembership => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToMembership link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToCreatedCircle => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToCreatedCircle link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    fn validate_delete_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AllCircles => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllCircles delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TypeToCircle => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TypeToCircle delete link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CircleToMembership => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CircleToMembership delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToMembership => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToMembership delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToCreatedCircle => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToCreatedCircle delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    // -- AllCircles link tag tests --
+
+    #[test]
+    fn test_link_all_circles_valid_tag() {
+        assert_valid_result(validate_create_link_tag(LinkTypes::AllCircles, vec![0u8; 64]));
+    }
+
+    #[test]
+    fn test_link_all_circles_empty_tag() {
+        assert_valid_result(validate_create_link_tag(LinkTypes::AllCircles, vec![]));
+    }
+
+    #[test]
+    fn test_link_all_circles_tag_at_limit() {
+        assert_valid_result(validate_create_link_tag(LinkTypes::AllCircles, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_all_circles_tag_too_long_rejected() {
+        assert_invalid_result(
+            validate_create_link_tag(LinkTypes::AllCircles, vec![0u8; 257]),
+            "AllCircles link tag too long",
+        );
+    }
+
+    // -- TypeToCircle link tag tests (512 byte limit) --
+
+    #[test]
+    fn test_link_type_to_circle_valid_tag() {
+        assert_valid_result(validate_create_link_tag(LinkTypes::TypeToCircle, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_type_to_circle_tag_at_limit() {
+        assert_valid_result(validate_create_link_tag(LinkTypes::TypeToCircle, vec![0u8; 512]));
+    }
+
+    #[test]
+    fn test_link_type_to_circle_tag_too_long_rejected() {
+        assert_invalid_result(
+            validate_create_link_tag(LinkTypes::TypeToCircle, vec![0u8; 513]),
+            "TypeToCircle link tag too long",
+        );
+    }
+
+    // -- CircleToMembership link tag tests --
+
+    #[test]
+    fn test_link_circle_to_membership_valid_tag() {
+        assert_valid_result(validate_create_link_tag(LinkTypes::CircleToMembership, vec![0u8; 100]));
+    }
+
+    #[test]
+    fn test_link_circle_to_membership_tag_at_limit() {
+        assert_valid_result(validate_create_link_tag(LinkTypes::CircleToMembership, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_circle_to_membership_tag_too_long_rejected() {
+        assert_invalid_result(
+            validate_create_link_tag(LinkTypes::CircleToMembership, vec![0u8; 257]),
+            "CircleToMembership link tag too long",
+        );
+    }
+
+    // -- AgentToMembership link tag tests --
+
+    #[test]
+    fn test_link_agent_to_membership_valid_tag() {
+        assert_valid_result(validate_create_link_tag(LinkTypes::AgentToMembership, vec![0u8; 128]));
+    }
+
+    #[test]
+    fn test_link_agent_to_membership_tag_too_long_rejected() {
+        assert_invalid_result(
+            validate_create_link_tag(LinkTypes::AgentToMembership, vec![0u8; 257]),
+            "AgentToMembership link tag too long",
+        );
+    }
+
+    // -- AgentToCreatedCircle link tag tests --
+
+    #[test]
+    fn test_link_agent_to_created_circle_valid_tag() {
+        assert_valid_result(validate_create_link_tag(LinkTypes::AgentToCreatedCircle, vec![0u8; 128]));
+    }
+
+    #[test]
+    fn test_link_agent_to_created_circle_tag_at_limit() {
+        assert_valid_result(validate_create_link_tag(LinkTypes::AgentToCreatedCircle, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_agent_to_created_circle_tag_too_long_rejected() {
+        assert_invalid_result(
+            validate_create_link_tag(LinkTypes::AgentToCreatedCircle, vec![0u8; 257]),
+            "AgentToCreatedCircle link tag too long",
+        );
+    }
+
+    // -- Delete link tag tests --
+
+    #[test]
+    fn test_delete_link_all_circles_valid_tag() {
+        assert_valid_result(validate_delete_link_tag(LinkTypes::AllCircles, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_delete_link_all_circles_tag_too_long_rejected() {
+        assert_invalid_result(
+            validate_delete_link_tag(LinkTypes::AllCircles, vec![0u8; 257]),
+            "AllCircles delete link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_delete_link_type_to_circle_valid_tag() {
+        assert_valid_result(validate_delete_link_tag(LinkTypes::TypeToCircle, vec![0u8; 512]));
+    }
+
+    #[test]
+    fn test_delete_link_type_to_circle_tag_too_long_rejected() {
+        assert_invalid_result(
+            validate_delete_link_tag(LinkTypes::TypeToCircle, vec![0u8; 513]),
+            "TypeToCircle delete link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_delete_link_circle_to_membership_tag_too_long_rejected() {
+        assert_invalid_result(
+            validate_delete_link_tag(LinkTypes::CircleToMembership, vec![0u8; 257]),
+            "CircleToMembership delete link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_delete_link_agent_to_membership_tag_too_long_rejected() {
+        assert_invalid_result(
+            validate_delete_link_tag(LinkTypes::AgentToMembership, vec![0u8; 257]),
+            "AgentToMembership delete link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_delete_link_agent_to_created_circle_tag_too_long_rejected() {
+        assert_invalid_result(
+            validate_delete_link_tag(LinkTypes::AgentToCreatedCircle, vec![0u8; 257]),
+            "AgentToCreatedCircle delete link tag too long",
+        );
     }
 }

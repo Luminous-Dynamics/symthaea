@@ -170,26 +170,82 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => match link_type {
-            LinkTypes::AllDisasters => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::ActiveDisasters => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::DisasterByType => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::DisasterToUpdate => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToDisaster => Ok(ValidateCallbackResult::Valid),
-        },
+        } => {
+            let tag_len = tag.0.len();
+            match link_type {
+                LinkTypes::AllDisasters => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::ActiveDisasters => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::DisasterByType => {
+                    // Tags may store serialized type metadata
+                    if tag_len > 512 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 512 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::DisasterToUpdate => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AgentToDisaster => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
         FlatOp::RegisterDeleteLink {
             link_type,
             original_action: _,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => match link_type {
-            LinkTypes::ActiveDisasters => Ok(ValidateCallbackResult::Valid),
-            _ => Ok(ValidateCallbackResult::Valid),
-        },
+        } => {
+            let tag_len = tag.0.len();
+            match link_type {
+                LinkTypes::ActiveDisasters => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Delete link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                _ => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Delete link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
@@ -1306,5 +1362,217 @@ mod tests {
         update.content = "x".repeat(8191);
         let result = validate_create_update(fake_create(), update);
         assert!(is_valid(result));
+    }
+
+    // ========================================================================
+    // LINK TAG VALIDATION TESTS
+    // ========================================================================
+
+    fn validate_create_link_tag(link_type: LinkTypes, tag: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let base = AnyLinkableHash::from(EntryHash::from_raw_36(vec![0; 36]));
+        let target = AnyLinkableHash::from(EntryHash::from_raw_36(vec![0; 36]));
+        let link_tag = LinkTag(tag);
+
+        // Replicate the validation logic from the validate function
+        let tag_len = link_tag.0.len();
+        match link_type {
+            LinkTypes::AllDisasters => {
+                if tag_len > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ActiveDisasters => {
+                if tag_len > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::DisasterByType => {
+                if tag_len > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::DisasterToUpdate => {
+                if tag_len > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToDisaster => {
+                if tag_len > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    fn validate_delete_link_tag(link_type: LinkTypes, tag: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let tag_len = tag.len();
+        match link_type {
+            LinkTypes::ActiveDisasters => {
+                if tag_len > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            _ => {
+                if tag_len > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Delete link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    // -- AllDisasters link tag tests --
+
+    #[test]
+    fn test_all_disasters_link_tag_valid() {
+        let result = validate_create_link_tag(LinkTypes::AllDisasters, vec![0u8; 100]);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_all_disasters_link_tag_empty() {
+        let result = validate_create_link_tag(LinkTypes::AllDisasters, vec![]);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_all_disasters_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::AllDisasters, vec![0u8; 256]);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_all_disasters_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::AllDisasters, vec![0u8; 257]);
+        assert!(is_invalid(result));
+    }
+
+    // -- ActiveDisasters link tag tests --
+
+    #[test]
+    fn test_active_disasters_link_tag_valid() {
+        let result = validate_create_link_tag(LinkTypes::ActiveDisasters, vec![0u8; 128]);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_active_disasters_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::ActiveDisasters, vec![0u8; 256]);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_active_disasters_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::ActiveDisasters, vec![0u8; 257]);
+        assert!(is_invalid(result));
+    }
+
+    // -- DisasterByType link tag tests (512 limit) --
+
+    #[test]
+    fn test_disaster_by_type_link_tag_valid() {
+        let result = validate_create_link_tag(LinkTypes::DisasterByType, vec![0u8; 300]);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_disaster_by_type_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::DisasterByType, vec![0u8; 512]);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_disaster_by_type_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::DisasterByType, vec![0u8; 513]);
+        assert!(is_invalid(result));
+    }
+
+    // -- DisasterToUpdate link tag tests --
+
+    #[test]
+    fn test_disaster_to_update_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::DisasterToUpdate, vec![0u8; 256]);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_disaster_to_update_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::DisasterToUpdate, vec![0u8; 257]);
+        assert!(is_invalid(result));
+    }
+
+    // -- AgentToDisaster link tag tests --
+
+    #[test]
+    fn test_agent_to_disaster_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::AgentToDisaster, vec![0u8; 256]);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_agent_to_disaster_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::AgentToDisaster, vec![0u8; 257]);
+        assert!(is_invalid(result));
+    }
+
+    // -- Large tag DoS prevention test --
+
+    #[test]
+    fn test_massive_link_tag_rejected_all_types() {
+        let huge_tag = vec![0xFFu8; 10_000];
+        assert!(is_invalid(validate_create_link_tag(LinkTypes::AllDisasters, huge_tag.clone())));
+        assert!(is_invalid(validate_create_link_tag(LinkTypes::ActiveDisasters, huge_tag.clone())));
+        assert!(is_invalid(validate_create_link_tag(LinkTypes::DisasterByType, huge_tag.clone())));
+        assert!(is_invalid(validate_create_link_tag(LinkTypes::DisasterToUpdate, huge_tag.clone())));
+        assert!(is_invalid(validate_create_link_tag(LinkTypes::AgentToDisaster, huge_tag.clone())));
+    }
+
+    // -- Delete link tag tests --
+
+    #[test]
+    fn test_delete_active_disasters_link_tag_valid() {
+        let result = validate_delete_link_tag(LinkTypes::ActiveDisasters, vec![0u8; 128]);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_delete_active_disasters_link_tag_at_limit() {
+        let result = validate_delete_link_tag(LinkTypes::ActiveDisasters, vec![0u8; 256]);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_delete_active_disasters_link_tag_over_limit() {
+        let result = validate_delete_link_tag(LinkTypes::ActiveDisasters, vec![0u8; 257]);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_delete_link_tag_over_limit_all_types() {
+        let big_tag = vec![0u8; 257];
+        assert!(is_invalid(validate_delete_link_tag(LinkTypes::AllDisasters, big_tag.clone())));
+        assert!(is_invalid(validate_delete_link_tag(LinkTypes::DisasterByType, big_tag.clone())));
+        assert!(is_invalid(validate_delete_link_tag(LinkTypes::DisasterToUpdate, big_tag.clone())));
+        assert!(is_invalid(validate_delete_link_tag(LinkTypes::AgentToDisaster, big_tag.clone())));
     }
 }

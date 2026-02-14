@@ -273,6 +273,11 @@ fn validate_create_alert(
             "Contaminant name cannot be empty".into(),
         ));
     }
+    if alert.contaminant.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contaminant name must be 256 characters or fewer".into(),
+        ));
+    }
     if alert.measured_value < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Measured value cannot be negative".into(),
@@ -294,10 +299,14 @@ fn validate_create_alert(
 
 fn validate_update_alert(
     _action: Update,
-    _alert: ContaminationAlert,
+    alert: ContaminationAlert,
     _original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Allow updates (e.g., marking as resolved)
+    if alert.contaminant.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contaminant name must be 256 characters or fewer".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -310,14 +319,34 @@ fn validate_create_remediation(
             "Remediation method cannot be empty".into(),
         ));
     }
+    if remediation.method.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Remediation method must be 4096 characters or fewer".into(),
+        ));
+    }
+    if remediation.notes.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Remediation notes must be 4096 characters or fewer".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_update_remediation(
     _action: Update,
-    _remediation: Remediation,
+    remediation: Remediation,
     _original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
+    if remediation.method.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Remediation method must be 4096 characters or fewer".into(),
+        ));
+    }
+    if remediation.notes.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Remediation notes must be 4096 characters or fewer".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -924,11 +953,23 @@ mod tests {
     }
 
     #[test]
-    fn remediation_long_notes_accepted() {
+    fn remediation_notes_exactly_4096_accepted() {
         let mut remediation = make_remediation();
-        remediation.notes = "A".repeat(10000);
+        remediation.notes = "A".repeat(4096);
         let result = validate_create_remediation(fake_create(), remediation);
         assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_notes_4097_rejected() {
+        let mut remediation = make_remediation();
+        remediation.notes = "A".repeat(4097);
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Remediation notes must be 4096 characters or fewer"
+        );
     }
 
     // ========================================================================
@@ -983,6 +1024,54 @@ mod tests {
             fake_action_hash(),
         );
         assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT TESTS - CONTAMINATION ALERT
+    // ========================================================================
+
+    #[test]
+    fn contamination_alert_contaminant_exactly_256_accepted() {
+        let mut alert = make_contamination_alert();
+        alert.contaminant = "x".repeat(256);
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn contamination_alert_contaminant_257_rejected() {
+        let mut alert = make_contamination_alert();
+        alert.contaminant = "x".repeat(257);
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Contaminant name must be 256 characters or fewer"
+        );
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT TESTS - REMEDIATION
+    // ========================================================================
+
+    #[test]
+    fn remediation_method_exactly_4096_accepted() {
+        let mut remediation = make_remediation();
+        remediation.method = "x".repeat(4096);
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_method_4097_rejected() {
+        let mut remediation = make_remediation();
+        remediation.method = "x".repeat(4097);
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Remediation method must be 4096 characters or fewer"
+        );
     }
 
     // ========================================================================

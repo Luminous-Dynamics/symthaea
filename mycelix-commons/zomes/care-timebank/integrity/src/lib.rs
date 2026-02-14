@@ -366,6 +366,16 @@ fn validate_create_request(
             "Location cannot be empty".into(),
         ));
     }
+    if request.location.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Location must be 512 characters or fewer".into(),
+        ));
+    }
+    if request.preferred_schedule.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Preferred schedule must be 512 characters or fewer".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -402,6 +412,11 @@ fn validate_create_exchange(
             ));
         }
     }
+    if exchange.notes.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Notes must be 4096 characters or fewer".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -428,6 +443,38 @@ fn validate_update_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackRe
             "Offer title cannot be empty".into(),
         ));
     }
+    if offer.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Offer title must be 256 characters or fewer".into(),
+        ));
+    }
+    if offer.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Offer description must be 4096 characters or fewer".into(),
+        ));
+    }
+    if offer.location.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Location must be 512 characters or fewer".into(),
+        ));
+    }
+    if offer.availability.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Availability must be 512 characters or fewer".into(),
+        ));
+    }
+    if offer.skills_required.len() > 20 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot list more than 20 skills".into(),
+        ));
+    }
+    for skill in &offer.skills_required {
+        if skill.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each skill must be 128 characters or fewer".into(),
+            ));
+        }
+    }
     if offer.hours_available < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Hours available cannot be negative".into(),
@@ -440,6 +487,26 @@ fn validate_update_request(request: ServiceRequest) -> ExternResult<ValidateCall
     if request.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Request title cannot be empty".into(),
+        ));
+    }
+    if request.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request title must be 256 characters or fewer".into(),
+        ));
+    }
+    if request.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request description must be 4096 characters or fewer".into(),
+        ));
+    }
+    if request.location.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Location must be 512 characters or fewer".into(),
+        ));
+    }
+    if request.preferred_schedule.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Preferred schedule must be 512 characters or fewer".into(),
         ));
     }
     if request.hours_needed < 0.0 {
@@ -469,6 +536,11 @@ fn validate_update_exchange(exchange: TimeExchange) -> ExternResult<ValidateCall
                 "Recipient rating must be 1-5".into(),
             ));
         }
+    }
+    if exchange.notes.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Notes must be 4096 characters or fewer".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -1457,6 +1529,254 @@ mod tests {
         assert_invalid(
             validate_update_exchange(e),
             "Exchange hours must be positive",
+        );
+    }
+
+    // ── Create request max-length boundary tests ──────────────────────
+
+    #[test]
+    fn create_request_location_at_max_length() {
+        let mut r = valid_request();
+        r.location = "x".repeat(512);
+        assert_valid(validate_create_request(fake_create(), r));
+    }
+
+    #[test]
+    fn create_request_location_over_max_length() {
+        let mut r = valid_request();
+        r.location = "x".repeat(513);
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Location must be 512 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn create_request_preferred_schedule_at_max_length() {
+        let mut r = valid_request();
+        r.preferred_schedule = "s".repeat(512);
+        assert_valid(validate_create_request(fake_create(), r));
+    }
+
+    #[test]
+    fn create_request_preferred_schedule_over_max_length() {
+        let mut r = valid_request();
+        r.preferred_schedule = "s".repeat(513);
+        assert_invalid(
+            validate_create_request(fake_create(), r),
+            "Preferred schedule must be 512 characters or fewer",
+        );
+    }
+
+    // ── Create exchange max-length boundary tests ─────────────────────
+
+    #[test]
+    fn create_exchange_notes_at_max_length() {
+        let mut e = valid_exchange();
+        e.notes = "n".repeat(4096);
+        assert_valid(validate_create_exchange(fake_create(), e));
+    }
+
+    #[test]
+    fn create_exchange_notes_over_max_length() {
+        let mut e = valid_exchange();
+        e.notes = "n".repeat(4097);
+        assert_invalid(
+            validate_create_exchange(fake_create(), e),
+            "Notes must be 4096 characters or fewer",
+        );
+    }
+
+    // ── Update offer max-length boundary tests ────────────────────────
+
+    #[test]
+    fn update_offer_title_at_max_length() {
+        let mut o = valid_offer();
+        o.title = "t".repeat(256);
+        assert_valid(validate_update_offer(o));
+    }
+
+    #[test]
+    fn update_offer_title_over_max_length() {
+        let mut o = valid_offer();
+        o.title = "t".repeat(257);
+        assert_invalid(
+            validate_update_offer(o),
+            "Offer title must be 256 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn update_offer_description_at_max_length() {
+        let mut o = valid_offer();
+        o.description = "d".repeat(4096);
+        assert_valid(validate_update_offer(o));
+    }
+
+    #[test]
+    fn update_offer_description_over_max_length() {
+        let mut o = valid_offer();
+        o.description = "d".repeat(4097);
+        assert_invalid(
+            validate_update_offer(o),
+            "Offer description must be 4096 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn update_offer_location_at_max_length() {
+        let mut o = valid_offer();
+        o.location = "l".repeat(512);
+        assert_valid(validate_update_offer(o));
+    }
+
+    #[test]
+    fn update_offer_location_over_max_length() {
+        let mut o = valid_offer();
+        o.location = "l".repeat(513);
+        assert_invalid(
+            validate_update_offer(o),
+            "Location must be 512 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn update_offer_availability_at_max_length() {
+        let mut o = valid_offer();
+        o.availability = "a".repeat(512);
+        assert_valid(validate_update_offer(o));
+    }
+
+    #[test]
+    fn update_offer_availability_over_max_length() {
+        let mut o = valid_offer();
+        o.availability = "a".repeat(513);
+        assert_invalid(
+            validate_update_offer(o),
+            "Availability must be 512 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn update_offer_skills_at_max_count() {
+        let mut o = valid_offer();
+        o.skills_required = (0..20).map(|i| format!("skill_{i}")).collect();
+        assert_valid(validate_update_offer(o));
+    }
+
+    #[test]
+    fn update_offer_skills_over_max_count() {
+        let mut o = valid_offer();
+        o.skills_required = (0..21).map(|i| format!("skill_{i}")).collect();
+        assert_invalid(
+            validate_update_offer(o),
+            "Cannot list more than 20 skills",
+        );
+    }
+
+    #[test]
+    fn update_offer_skill_at_max_length() {
+        let mut o = valid_offer();
+        o.skills_required = vec!["z".repeat(128)];
+        assert_valid(validate_update_offer(o));
+    }
+
+    #[test]
+    fn update_offer_skill_over_max_length() {
+        let mut o = valid_offer();
+        o.skills_required = vec!["z".repeat(129)];
+        assert_invalid(
+            validate_update_offer(o),
+            "Each skill must be 128 characters or fewer",
+        );
+    }
+
+    // ── Update request max-length boundary tests ──────────────────────
+
+    #[test]
+    fn update_request_title_at_max_length() {
+        let mut r = valid_request();
+        r.title = "t".repeat(256);
+        assert_valid(validate_update_request(r));
+    }
+
+    #[test]
+    fn update_request_title_over_max_length() {
+        let mut r = valid_request();
+        r.title = "t".repeat(257);
+        assert_invalid(
+            validate_update_request(r),
+            "Request title must be 256 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn update_request_description_at_max_length() {
+        let mut r = valid_request();
+        r.description = "d".repeat(4096);
+        assert_valid(validate_update_request(r));
+    }
+
+    #[test]
+    fn update_request_description_over_max_length() {
+        let mut r = valid_request();
+        r.description = "d".repeat(4097);
+        assert_invalid(
+            validate_update_request(r),
+            "Request description must be 4096 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn update_request_location_at_max_length() {
+        let mut r = valid_request();
+        r.location = "l".repeat(512);
+        assert_valid(validate_update_request(r));
+    }
+
+    #[test]
+    fn update_request_location_over_max_length() {
+        let mut r = valid_request();
+        r.location = "l".repeat(513);
+        assert_invalid(
+            validate_update_request(r),
+            "Location must be 512 characters or fewer",
+        );
+    }
+
+    #[test]
+    fn update_request_preferred_schedule_at_max_length() {
+        let mut r = valid_request();
+        r.preferred_schedule = "s".repeat(512);
+        assert_valid(validate_update_request(r));
+    }
+
+    #[test]
+    fn update_request_preferred_schedule_over_max_length() {
+        let mut r = valid_request();
+        r.preferred_schedule = "s".repeat(513);
+        assert_invalid(
+            validate_update_request(r),
+            "Preferred schedule must be 512 characters or fewer",
+        );
+    }
+
+    // ── Update exchange max-length boundary tests ─────────────────────
+
+    #[test]
+    fn update_exchange_notes_at_max_length() {
+        let mut e = valid_exchange();
+        e.notes = "n".repeat(4096);
+        assert_valid(validate_update_exchange(e));
+    }
+
+    #[test]
+    fn update_exchange_notes_over_max_length() {
+        let mut e = valid_exchange();
+        e.notes = "n".repeat(4097);
+        assert_invalid(
+            validate_update_exchange(e),
+            "Notes must be 4096 characters or fewer",
         );
     }
 }

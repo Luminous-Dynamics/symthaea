@@ -57,6 +57,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::Query(query) => validate_query(&query),
             EntryTypes::Event(event) => validate_event(&event),
         },
+        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
+            EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            EntryTypes::Query(query) => validate_query(&query),
+            EntryTypes::Event(event) => validate_event(&event),
+        },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
         _ => Ok(ValidateCallbackResult::Valid),
     }
@@ -593,5 +598,82 @@ mod tests {
         let a = Anchor("queries".to_string());
         let b = Anchor("events".to_string());
         assert_ne!(a, b);
+    }
+
+    // ── Update validation: Query ─────────────────────────────────────────
+
+    #[test]
+    fn test_update_query_invalid_domain_rejected() {
+        let q = make_query("property", "{}");
+        let result = validate_query(&q);
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                assert!(msg.contains("Invalid domain"), "got: {msg}");
+            }
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_update_query_invalid_empty_domain_rejected() {
+        let q = make_query("", "{}");
+        let result = validate_query(&q);
+        match result {
+            Ok(ValidateCallbackResult::Invalid(_)) => {}
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_update_query_invalid_oversized_params_rejected() {
+        let big = "x".repeat(8193);
+        let q = make_query("justice", &big);
+        let result = validate_query(&q);
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                assert!(msg.contains("8192"), "got: {msg}");
+            }
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
+    }
+
+    // ── Update validation: Event ─────────────────────────────────────────
+
+    #[test]
+    fn test_update_event_invalid_domain_rejected() {
+        let e = make_event("property", "{}");
+        let result = validate_event(&e);
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                assert!(msg.contains("Invalid domain"), "got: {msg}");
+            }
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_update_event_invalid_oversized_payload_rejected() {
+        let big = "x".repeat(8193);
+        let e = make_event("emergency", &big);
+        let result = validate_event(&e);
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                assert!(msg.contains("8192"), "got: {msg}");
+            }
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_update_event_invalid_too_many_hashes_rejected() {
+        let mut e = make_event("media", "{}");
+        e.related_hashes = (0..21).map(|i| format!("hash_{}", i)).collect();
+        let result = validate_event(&e);
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => {
+                assert!(msg.contains("20 related hashes"), "got: {msg}");
+            }
+            other => panic!("Expected Invalid, got {other:?}"),
+        }
     }
 }

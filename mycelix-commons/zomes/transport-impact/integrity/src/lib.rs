@@ -89,6 +89,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::TripLog(t) => validate_trip(t),
                 EntryTypes::CarbonCredit(c) => validate_credit(c),
             },
+            OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::TripLog(t) => validate_trip(t),
+                EntryTypes::CarbonCredit(c) => validate_credit(c),
+            },
             _ => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
@@ -442,5 +447,44 @@ mod tests {
         let json = serde_json::to_string(&a).unwrap();
         let back: Anchor = serde_json::from_str(&json).unwrap();
         assert_eq!(back, a);
+    }
+
+    // ── Update validation: TripLog ───────────────────────────────────────
+
+    #[test]
+    fn test_update_trip_invalid_distance_rejected() {
+        let mut t = valid_trip();
+        t.distance_km = 0.0;
+        assert_invalid(validate_trip(t), "Distance must be positive");
+    }
+
+    #[test]
+    fn test_update_trip_invalid_negative_distance_rejected() {
+        let mut t = valid_trip();
+        t.distance_km = -10.0;
+        assert_invalid(validate_trip(t), "Distance must be positive");
+    }
+
+    #[test]
+    fn test_update_trip_invalid_emissions_rejected() {
+        let mut t = valid_trip();
+        t.emissions_kg_co2 = -1.0;
+        assert_invalid(validate_trip(t), "Emissions cannot be negative");
+    }
+
+    // ── Update validation: CarbonCredit ──────────────────────────────────
+
+    #[test]
+    fn test_update_credit_invalid_zero_rejected() {
+        let mut c = valid_carbon_credit();
+        c.credits_kg_co2 = 0.0;
+        assert_invalid(validate_credit(c), "Credits must be positive");
+    }
+
+    #[test]
+    fn test_update_credit_invalid_negative_rejected() {
+        let mut c = valid_carbon_credit();
+        c.credits_kg_co2 = -5.0;
+        assert_invalid(validate_credit(c), "Credits must be positive");
     }
 }
