@@ -1202,25 +1202,24 @@ mod tests {
     }
 
     #[test]
-    fn create_trust_whitespace_only_id_is_not_empty() {
-        // A whitespace-only string is not empty, so this is valid per the code
+    fn create_trust_whitespace_only_id_rejected() {
         let mut t = valid_land_trust();
         t.id = "   ".to_string();
-        assert_valid(validate_create_trust(fake_create(), t));
+        assert_invalid(validate_create_trust(fake_create(), t), "Trust ID cannot be empty");
     }
 
     #[test]
-    fn create_trust_whitespace_only_name_is_not_empty() {
+    fn create_trust_whitespace_only_name_rejected() {
         let mut t = valid_land_trust();
         t.name = "\t\n".to_string();
-        assert_valid(validate_create_trust(fake_create(), t));
+        assert_invalid(validate_create_trust(fake_create(), t), "Trust name cannot be empty");
     }
 
     #[test]
-    fn create_trust_whitespace_only_mission_is_not_empty() {
+    fn create_trust_whitespace_only_mission_rejected() {
         let mut t = valid_land_trust();
         t.mission = " ".to_string();
-        assert_valid(validate_create_trust(fake_create(), t));
+        assert_invalid(validate_create_trust(fake_create(), t), "Trust mission cannot be empty");
     }
 
     #[test]

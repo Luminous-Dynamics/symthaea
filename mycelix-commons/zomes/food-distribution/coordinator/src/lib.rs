@@ -436,4 +436,215 @@ mod tests {
             assert_eq!(decoded.status, status);
         }
     }
+
+    // ========================================================================
+    // Boundary condition tests
+    // ========================================================================
+
+    #[test]
+    fn bridge_event_signal_empty_payload() {
+        let signal = BridgeEventSignal {
+            event_type: "test".to_string(),
+            source_zome: "food_distribution".to_string(),
+            payload: "".to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let decoded: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.payload, "");
+    }
+
+    #[test]
+    fn bridge_event_signal_very_long_payload() {
+        let long_payload = "x".repeat(10_000);
+        let signal = BridgeEventSignal {
+            event_type: "large_event".to_string(),
+            source_zome: "food_distribution".to_string(),
+            payload: long_payload.clone(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let decoded: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.payload.len(), 10_000);
+    }
+
+    #[test]
+    fn market_serde_empty_schedule() {
+        let market = Market {
+            id: "mkt-empty-sched".to_string(),
+            name: "No Schedule Market".to_string(),
+            location_lat: 0.0,
+            location_lon: 0.0,
+            market_type: MarketType::CoOp,
+            steward: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            schedule: "".to_string(),
+        };
+        let json = serde_json::to_string(&market).unwrap();
+        let decoded: Market = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.schedule, "");
+    }
+
+    #[test]
+    fn market_serde_extreme_coordinates() {
+        let market = Market {
+            id: "mkt-extreme".to_string(),
+            name: "Extreme Coords".to_string(),
+            location_lat: 90.0,
+            location_lon: -180.0,
+            market_type: MarketType::Farmers,
+            steward: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            schedule: "Always".to_string(),
+        };
+        let json = serde_json::to_string(&market).unwrap();
+        let decoded: Market = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.location_lat, 90.0);
+        assert_eq!(decoded.location_lon, -180.0);
+    }
+
+    #[test]
+    fn market_serde_zero_coordinates() {
+        let market = Market {
+            id: "mkt-zero".to_string(),
+            name: "Origin Market".to_string(),
+            location_lat: 0.0,
+            location_lon: 0.0,
+            market_type: MarketType::FoodBank,
+            steward: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            schedule: "Weekdays".to_string(),
+        };
+        let json = serde_json::to_string(&market).unwrap();
+        let decoded: Market = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.location_lat, 0.0);
+        assert_eq!(decoded.location_lon, 0.0);
+    }
+
+    #[test]
+    fn listing_serde_very_large_quantity() {
+        let listing = Listing {
+            market_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            producer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            product_name: "Bulk Wheat".to_string(),
+            quantity_kg: 999_999.99,
+            price_per_kg: 0.50,
+            available_from: u64::MAX,
+            status: ListingStatus::Available,
+        };
+        let json = serde_json::to_string(&listing).unwrap();
+        let decoded: Listing = serde_json::from_str(&json).unwrap();
+        assert!((decoded.quantity_kg - 999_999.99).abs() < 0.001);
+        assert_eq!(decoded.available_from, u64::MAX);
+    }
+
+    #[test]
+    fn listing_serde_empty_product_name() {
+        let listing = Listing {
+            market_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            producer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            product_name: "".to_string(),
+            quantity_kg: 1.0,
+            price_per_kg: 1.0,
+            available_from: 0,
+            status: ListingStatus::Available,
+        };
+        let json = serde_json::to_string(&listing).unwrap();
+        let decoded: Listing = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.product_name, "");
+    }
+
+    #[test]
+    fn order_serde_zero_quantity() {
+        let order = Order {
+            listing_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            buyer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            quantity_kg: 0.0,
+            status: OrderStatus::Pending,
+        };
+        let json = serde_json::to_string(&order).unwrap();
+        let decoded: Order = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity_kg, 0.0);
+    }
+
+    #[test]
+    fn order_serde_very_small_quantity() {
+        let order = Order {
+            listing_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            buyer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            quantity_kg: 0.001,
+            status: OrderStatus::Confirmed,
+        };
+        let json = serde_json::to_string(&order).unwrap();
+        let decoded: Order = serde_json::from_str(&json).unwrap();
+        assert!((decoded.quantity_kg - 0.001).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn update_order_status_input_serde_pending() {
+        let input = UpdateOrderStatusInput {
+            order_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            new_status: OrderStatus::Pending,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateOrderStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, OrderStatus::Pending);
+    }
+
+    #[test]
+    fn update_order_status_input_serde_confirmed() {
+        let input = UpdateOrderStatusInput {
+            order_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            new_status: OrderStatus::Confirmed,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateOrderStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, OrderStatus::Confirmed);
+    }
+
+    #[test]
+    fn bridge_event_signal_clone() {
+        let signal = BridgeEventSignal {
+            event_type: "clone_test".to_string(),
+            source_zome: "food_distribution".to_string(),
+            payload: r#"{"key":"value"}"#.to_string(),
+        };
+        let cloned = signal.clone();
+        assert_eq!(signal.event_type, cloned.event_type);
+        assert_eq!(signal.source_zome, cloned.source_zome);
+        assert_eq!(signal.payload, cloned.payload);
+    }
+
+    #[test]
+    fn market_serde_field_access() {
+        let market = Market {
+            id: "mkt-access".to_string(),
+            name: "Field Access Market".to_string(),
+            location_lat: 51.5074,
+            location_lon: -0.1278,
+            market_type: MarketType::CSA,
+            steward: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            schedule: "Tue/Thu 10am-2pm".to_string(),
+        };
+        let json = serde_json::to_string(&market).unwrap();
+        let decoded: Market = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "mkt-access");
+        assert_eq!(decoded.name, "Field Access Market");
+        assert!((decoded.location_lat - 51.5074).abs() < f64::EPSILON);
+        assert!((decoded.location_lon - (-0.1278)).abs() < f64::EPSILON);
+        assert_eq!(decoded.market_type, MarketType::CSA);
+        assert_eq!(decoded.schedule, "Tue/Thu 10am-2pm");
+    }
+
+    #[test]
+    fn listing_serde_available_from_zero() {
+        let listing = Listing {
+            market_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            producer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            product_name: "Epoch Start Produce".to_string(),
+            quantity_kg: 10.0,
+            price_per_kg: 3.0,
+            available_from: 0,
+            status: ListingStatus::Reserved,
+        };
+        let json = serde_json::to_string(&listing).unwrap();
+        let decoded: Listing = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.available_from, 0);
+        assert_eq!(decoded.status, ListingStatus::Reserved);
+    }
 }

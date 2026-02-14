@@ -6,7 +6,14 @@
 use hdk::prelude::*;
 use mutualaid_common::*;
 use mutualaid_resources_integrity::*;
-use commons_types::cross_domain::TimebankCreditResult;
+
+/// Result of crediting timebank hours after resource usage
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct TimebankCreditResult {
+    pub credited: bool,
+    pub hours: f64,
+    pub error: Option<String>,
+}
 
 // =============================================================================
 // INPUT TYPES

@@ -315,11 +315,10 @@ mod tests {
     }
 
     #[test]
-    fn batch_whitespace_id_accepted() {
-        // The validator uses is_empty(), not trim().is_empty()
+    fn batch_whitespace_id_rejected() {
         let mut b = valid_batch();
         b.id = "   ".into();
-        assert_valid(validate_batch(b));
+        assert_invalid(validate_batch(b), "Batch ID cannot be empty");
     }
 
     // ── validate_batch: method ──────────────────────────────────────────
@@ -332,10 +331,10 @@ mod tests {
     }
 
     #[test]
-    fn batch_whitespace_method_accepted() {
+    fn batch_whitespace_method_rejected() {
         let mut b = valid_batch();
         b.method = " ".into();
-        assert_valid(validate_batch(b));
+        assert_invalid(validate_batch(b), "Method cannot be empty");
     }
 
     // ── validate_batch: quantity_kg ─────────────────────────────────────
@@ -427,10 +426,10 @@ mod tests {
     }
 
     #[test]
-    fn method_whitespace_name_accepted() {
+    fn method_whitespace_name_rejected() {
         let mut m = valid_method();
         m.name = "  ".into();
-        assert_valid(validate_method(m));
+        assert_invalid(validate_method(m), "Method name cannot be empty");
     }
 
     // ── validate_method: description ────────────────────────────────────
@@ -443,10 +442,10 @@ mod tests {
     }
 
     #[test]
-    fn method_whitespace_description_accepted() {
+    fn method_whitespace_description_rejected() {
         let mut m = valid_method();
         m.description = " ".into();
-        assert_valid(validate_method(m));
+        assert_invalid(validate_method(m), "Description cannot be empty");
     }
 
     // ── validate_method: skill levels ───────────────────────────────────
@@ -498,10 +497,10 @@ mod tests {
     }
 
     #[test]
-    fn storage_whitespace_id_accepted() {
+    fn storage_whitespace_id_rejected() {
         let mut s = valid_storage();
         s.id = " ".into();
-        assert_valid(validate_storage(s));
+        assert_invalid(validate_storage(s), "Storage ID cannot be empty");
     }
 
     // ── validate_storage: name ──────────────────────────────────────────
@@ -514,10 +513,10 @@ mod tests {
     }
 
     #[test]
-    fn storage_whitespace_name_accepted() {
+    fn storage_whitespace_name_rejected() {
         let mut s = valid_storage();
         s.name = "  ".into();
-        assert_valid(validate_storage(s));
+        assert_invalid(validate_storage(s), "Storage name cannot be empty");
     }
 
     // ── validate_storage: capacity_kg ───────────────────────────────────

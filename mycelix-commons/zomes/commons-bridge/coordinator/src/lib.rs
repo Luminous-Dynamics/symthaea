@@ -1109,4 +1109,338 @@ mod tests {
         };
         assert_eq!(signal.signal_type, "commons_bridge_event");
     }
+
+    // ============================================================================
+    // Cross-domain dispatch edge case tests
+    // ============================================================================
+
+    // ---- Allowlist integrity ----
+
+    #[test]
+    fn allowed_zomes_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_ZOMES {
+            assert!(
+                seen.insert(zome),
+                "Duplicate zome in ALLOWED_ZOMES: '{}'",
+                zome
+            );
+        }
+    }
+
+    #[test]
+    fn allowed_civic_zomes_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_CIVIC_ZOMES {
+            assert!(
+                seen.insert(zome),
+                "Duplicate zome in ALLOWED_CIVIC_ZOMES: '{}'",
+                zome
+            );
+        }
+    }
+
+    #[test]
+    fn allowed_zomes_entries_are_non_empty() {
+        for zome in ALLOWED_ZOMES {
+            assert!(!zome.is_empty(), "ALLOWED_ZOMES contains an empty string");
+            assert!(
+                !zome.contains(' '),
+                "ALLOWED_ZOMES entry '{}' contains whitespace",
+                zome
+            );
+        }
+    }
+
+    #[test]
+    fn allowed_civic_zomes_entries_are_non_empty() {
+        for zome in ALLOWED_CIVIC_ZOMES {
+            assert!(!zome.is_empty(), "ALLOWED_CIVIC_ZOMES contains an empty string");
+            assert!(
+                !zome.contains(' '),
+                "ALLOWED_CIVIC_ZOMES entry '{}' contains whitespace",
+                zome
+            );
+        }
+    }
+
+    #[test]
+    fn allowed_zomes_per_domain_count() {
+        let property_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("property_")).count();
+        let housing_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("housing_")).count();
+        let care_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("care_")).count();
+        let mutualaid_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("mutualaid_")).count();
+        let water_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("water_")).count();
+        let food_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("food_")).count();
+        let transport_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("transport_")).count();
+        assert_eq!(property_count, 4, "Expected 4 property zomes");
+        assert_eq!(housing_count, 6, "Expected 6 housing zomes");
+        assert_eq!(care_count, 5, "Expected 5 care zomes");
+        assert_eq!(mutualaid_count, 7, "Expected 7 mutualaid zomes");
+        assert_eq!(water_count, 5, "Expected 5 water zomes");
+        assert_eq!(food_count, 4, "Expected 4 food zomes");
+        assert_eq!(transport_count, 3, "Expected 3 transport zomes");
+    }
+
+    // ---- resolve_domain_zome outputs are in ALLOWED_ZOMES ----
+
+    #[test]
+    fn resolve_outputs_are_in_allowlist() {
+        // Every zome name returned by resolve_domain_zome must be in ALLOWED_ZOMES
+        let test_cases = vec![
+            ("property", "get_property"),
+            ("property", "transfer_ownership"),
+            ("property", "file_dispute"),
+            ("property", "check_encumbrance"),
+            ("property", "check_title"),
+            ("housing", "create_clt_lease"),
+            ("housing", "add_member"),
+            ("housing", "pay_fee"),
+            ("housing", "report_maintenance"),
+            ("housing", "submit_proposal"),
+            ("housing", "list_units"),
+            ("care", "find_match"),
+            ("care", "join_circle"),
+            ("care", "verify_credential"),
+            ("care", "create_plan"),
+            ("care", "log_hours"),
+            ("mutualaid", "book_resource"),
+            ("mutualaid", "post_need"),
+            ("mutualaid", "join_pool"),
+            ("mutualaid", "submit_request"),
+            ("mutualaid", "form_circle"),
+            ("mutualaid", "propose_governance"),
+            ("mutualaid", "log_timebank"),
+            ("water", "test_purity"),
+            ("water", "log_capture"),
+            ("water", "assign_steward"),
+            ("water", "record_wisdom"),
+            ("water", "measure_flow_rate"),
+            ("food", "register_plot"),
+            ("food", "list_market"),
+            ("food", "start_batch"),
+            ("food", "catalog_seed"),
+            ("transport", "register_vehicle"),
+            ("transport", "post_ride_share"),
+            ("transport", "get_carbon_credits"),
+        ];
+        for (domain, query_type) in test_cases {
+            let resolved = resolve_domain_zome(domain, query_type);
+            assert!(
+                resolved.is_some(),
+                "resolve_domain_zome('{}', '{}') returned None",
+                domain, query_type
+            );
+            let zome_name = resolved.unwrap();
+            assert!(
+                ALLOWED_ZOMES.contains(&zome_name.as_str()),
+                "resolve_domain_zome('{}', '{}') returned '{}' which is not in ALLOWED_ZOMES",
+                domain, query_type, zome_name
+            );
+        }
+    }
+
+    // ---- Edge cases for resolve_domain_zome ----
+
+    #[test]
+    fn resolve_empty_query_type_uses_default() {
+        // Empty query_type should fall through to the default zome for each domain
+        assert_eq!(resolve_domain_zome("property", "").unwrap(), "property_registry");
+        assert_eq!(resolve_domain_zome("housing", "").unwrap(), "housing_units");
+        assert_eq!(resolve_domain_zome("care", "").unwrap(), "care_timebank");
+        assert_eq!(resolve_domain_zome("mutualaid", "").unwrap(), "mutualaid_timebank");
+        assert_eq!(resolve_domain_zome("water", "").unwrap(), "water_flow");
+        assert_eq!(resolve_domain_zome("food", "").unwrap(), "food_production");
+        assert_eq!(resolve_domain_zome("transport", "").unwrap(), "transport_routes");
+    }
+
+    #[test]
+    fn resolve_empty_domain_returns_none() {
+        assert!(resolve_domain_zome("", "get_property").is_none());
+    }
+
+    #[test]
+    fn resolve_case_sensitive_domain() {
+        // Domain matching is case-sensitive
+        assert!(resolve_domain_zome("Property", "get_property").is_none());
+        assert!(resolve_domain_zome("PROPERTY", "get_property").is_none());
+        assert!(resolve_domain_zome("HOUSING", "list_units").is_none());
+    }
+
+    #[test]
+    fn resolve_multiple_keywords_uses_first_match() {
+        // When query_type contains multiple matching keywords, the first
+        // match in the match arm order wins.
+        // "transfer_dispute" contains both "transfer" and "dispute";
+        // "transfer" is checked first in the property match.
+        assert_eq!(
+            resolve_domain_zome("property", "transfer_dispute").unwrap(),
+            "property_transfer"
+        );
+        // "ownership_dispute" contains "ownership" (matches transfer) and "dispute"
+        // "transfer" | "ownership" is checked first
+        assert_eq!(
+            resolve_domain_zome("property", "ownership_dispute").unwrap(),
+            "property_transfer"
+        );
+    }
+
+    #[test]
+    fn resolve_gibberish_query_type_uses_default() {
+        // Nonsensical query_type that matches no keywords should use default
+        assert_eq!(
+            resolve_domain_zome("property", "xyzzy_foobar").unwrap(),
+            "property_registry"
+        );
+        assert_eq!(
+            resolve_domain_zome("housing", "quantum_entanglement").unwrap(),
+            "housing_units"
+        );
+        assert_eq!(
+            resolve_domain_zome("care", "cosmic_rays").unwrap(),
+            "care_timebank"
+        );
+        assert_eq!(
+            resolve_domain_zome("water", "blockchain_mining").unwrap(),
+            "water_flow"
+        );
+    }
+
+    // ---- Health check domain list ----
+
+    #[test]
+    fn health_check_returns_exactly_seven_domains() {
+        // The health_check function hardcodes 7 domains; verify the list
+        // is consistent with what resolve_domain_zome accepts.
+        let expected_domains = vec![
+            "property", "housing", "care", "mutualaid", "water", "food", "transport",
+        ];
+        for domain in &expected_domains {
+            assert!(
+                resolve_domain_zome(domain, "anything").is_some(),
+                "Health check domain '{}' is not recognized by resolve_domain_zome",
+                domain
+            );
+        }
+    }
+
+    // ---- Mutualaid handoff keyword routing ----
+
+    #[test]
+    fn resolve_mutualaid_handoff_routes_to_needs() {
+        assert_eq!(
+            resolve_domain_zome("mutualaid", "confirm_handoff").unwrap(),
+            "mutualaid_needs"
+        );
+    }
+
+    // ---- Water quality alias routing ----
+
+    #[test]
+    fn resolve_water_quality_routes_to_purity() {
+        assert_eq!(
+            resolve_domain_zome("water", "check_quality").unwrap(),
+            "water_purity"
+        );
+    }
+
+    // ---- Food order keyword routing ----
+
+    #[test]
+    fn resolve_food_order_routes_to_distribution() {
+        assert_eq!(
+            resolve_domain_zome("food", "place_order").unwrap(),
+            "food_distribution"
+        );
+    }
+
+    // ---- Housing resale routing ----
+
+    #[test]
+    fn resolve_housing_resale_routes_to_clt() {
+        assert_eq!(
+            resolve_domain_zome("housing", "submit_resale").unwrap(),
+            "housing_clt"
+        );
+    }
+
+    // ---- Property encumbrance routing ----
+
+    #[test]
+    fn resolve_property_encumbrance_routes_to_registry() {
+        assert_eq!(
+            resolve_domain_zome("property", "add_encumbrance").unwrap(),
+            "property_registry"
+        );
+    }
+
+    // ---- Mutualaid booking keyword routing ----
+
+    #[test]
+    fn resolve_mutualaid_booking_routes_to_resources() {
+        assert_eq!(
+            resolve_domain_zome("mutualaid", "confirm_booking").unwrap(),
+            "mutualaid_resources"
+        );
+    }
+
+    // ---- Water harvest alias routing ----
+
+    #[test]
+    fn resolve_water_harvest_routes_to_capture() {
+        assert_eq!(
+            resolve_domain_zome("water", "log_harvest").unwrap(),
+            "water_capture"
+        );
+    }
+
+    // ---- Water guardian alias routing ----
+
+    #[test]
+    fn resolve_water_guardian_routes_to_steward() {
+        assert_eq!(
+            resolve_domain_zome("water", "appoint_guardian").unwrap(),
+            "water_steward"
+        );
+    }
+
+    // ---- Transport cargo keyword routing ----
+
+    #[test]
+    fn resolve_transport_cargo_routes_to_sharing() {
+        assert_eq!(
+            resolve_domain_zome("transport", "post_cargo_offer").unwrap(),
+            "transport_sharing"
+        );
+    }
+
+    // ---- Transport emission keyword routing ----
+
+    #[test]
+    fn resolve_transport_emission_routes_to_impact() {
+        assert_eq!(
+            resolve_domain_zome("transport", "log_emission").unwrap(),
+            "transport_impact"
+        );
+    }
+
+    // ---- Care credential keyword routing ----
+
+    #[test]
+    fn resolve_care_credential_routes_to_credentials() {
+        assert_eq!(
+            resolve_domain_zome("care", "issue_credential").unwrap(),
+            "care_credentials"
+        );
+    }
+
+    // ---- Food storage keyword routing ----
+
+    #[test]
+    fn resolve_food_storage_routes_to_preservation() {
+        assert_eq!(
+            resolve_domain_zome("food", "check_storage_capacity").unwrap(),
+            "food_preservation"
+        );
+    }
 }

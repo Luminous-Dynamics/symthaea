@@ -709,7 +709,7 @@ mod tests {
 
     // Edge case tests
     #[test]
-    fn publication_with_whitespace_only_title() {
+    fn publication_with_whitespace_only_title_rejected() {
         let mut pub_data = valid_publication();
         pub_data.title = "   ".into();
         let result = validate_create_publication(
@@ -719,8 +719,7 @@ mod tests {
             )),
             pub_data,
         );
-        // Current implementation accepts whitespace-only titles
-        assert!(is_valid(result));
+        assert!(is_invalid(result));
     }
 
     #[test]

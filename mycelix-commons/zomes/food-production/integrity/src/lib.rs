@@ -394,10 +394,10 @@ mod tests {
     }
 
     #[test]
-    fn plot_whitespace_id_accepted() {
+    fn plot_whitespace_id_rejected() {
         let mut p = valid_plot();
         p.id = " ".into();
-        assert_valid(validate_plot(p));
+        assert_invalid(validate_plot(p), "Plot ID cannot be empty");
     }
 
     // ── validate_plot: name ─────────────────────────────────────────────
@@ -410,10 +410,10 @@ mod tests {
     }
 
     #[test]
-    fn plot_whitespace_name_accepted() {
+    fn plot_whitespace_name_rejected() {
         let mut p = valid_plot();
         p.name = "  ".into();
-        assert_valid(validate_plot(p));
+        assert_invalid(validate_plot(p), "Plot name cannot be empty");
     }
 
     // ── validate_plot: area_sqm ─────────────────────────────────────────
@@ -568,10 +568,10 @@ mod tests {
     }
 
     #[test]
-    fn crop_whitespace_name_accepted() {
+    fn crop_whitespace_name_rejected() {
         let mut c = valid_crop();
         c.name = " ".into();
-        assert_valid(validate_crop(c));
+        assert_invalid(validate_crop(c), "Crop name cannot be empty");
     }
 
     // ── validate_crop: variety ──────────────────────────────────────────
@@ -584,10 +584,10 @@ mod tests {
     }
 
     #[test]
-    fn crop_whitespace_variety_accepted() {
+    fn crop_whitespace_variety_rejected() {
         let mut c = valid_crop();
         c.variety = "  ".into();
-        assert_valid(validate_crop(c));
+        assert_invalid(validate_crop(c), "Crop variety cannot be empty");
     }
 
     // ── validate_crop: status variants ──────────────────────────────────
@@ -690,10 +690,10 @@ mod tests {
     }
 
     #[test]
-    fn season_plan_whitespace_season_accepted() {
+    fn season_plan_whitespace_season_rejected() {
         let mut sp = valid_season_plan();
         sp.season = " ".into();
-        assert_valid(validate_season_plan(sp));
+        assert_invalid(validate_season_plan(sp), "Season cannot be empty");
     }
 
     // ── validate_season_plan: planned_crops ─────────────────────────────

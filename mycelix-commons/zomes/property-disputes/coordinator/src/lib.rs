@@ -531,4 +531,288 @@ mod tests {
             assert_eq!(decoded, status);
         }
     }
+
+    // ========================================================================
+    // Boundary condition tests
+    // ========================================================================
+
+    #[test]
+    fn file_dispute_input_empty_description() {
+        let input = FileDisputeInput {
+            property_id: "prop-001".to_string(),
+            dispute_type: DisputeType::Boundary,
+            claimant_did: "did:key:z6Mk001".to_string(),
+            respondent_did: "did:key:z6Mk002".to_string(),
+            description: "".to_string(),
+            evidence_ids: vec![],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FileDisputeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.description, "");
+        assert!(decoded.evidence_ids.is_empty());
+    }
+
+    #[test]
+    fn file_dispute_input_very_long_description() {
+        let long_desc = "D".repeat(10_000);
+        let input = FileDisputeInput {
+            property_id: "prop-001".to_string(),
+            dispute_type: DisputeType::Damage,
+            claimant_did: "did:key:z6Mk001".to_string(),
+            respondent_did: "did:key:z6Mk002".to_string(),
+            description: long_desc.clone(),
+            evidence_ids: vec!["e1".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FileDisputeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.description.len(), 10_000);
+    }
+
+    #[test]
+    fn file_dispute_input_many_evidence_ids() {
+        let evidence: Vec<String> = (0..100).map(|i| format!("evidence-{}", i)).collect();
+        let input = FileDisputeInput {
+            property_id: "prop-001".to_string(),
+            dispute_type: DisputeType::Ownership,
+            claimant_did: "did:key:z6Mk001".to_string(),
+            respondent_did: "did:key:z6Mk002".to_string(),
+            description: "Many evidence items".to_string(),
+            evidence_ids: evidence.clone(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FileDisputeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.evidence_ids.len(), 100);
+    }
+
+    #[test]
+    fn file_claim_input_empty_supporting_documents() {
+        let input = FileClaimInput {
+            property_id: "prop-001".to_string(),
+            claimant_did: "did:key:z6Mk001".to_string(),
+            claim_basis: ClaimBasis::PriorOwnership,
+            supporting_documents: vec![],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FileClaimInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.supporting_documents.is_empty());
+    }
+
+    #[test]
+    fn file_claim_input_many_documents() {
+        let docs: Vec<String> = (0..50).map(|i| format!("doc-{}.pdf", i)).collect();
+        let input = FileClaimInput {
+            property_id: "prop-001".to_string(),
+            claimant_did: "did:key:z6Mk001".to_string(),
+            claim_basis: ClaimBasis::DocumentaryEvidence,
+            supporting_documents: docs.clone(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FileClaimInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.supporting_documents.len(), 50);
+    }
+
+    // ========================================================================
+    // Dispute type Other variant with different strings
+    // ========================================================================
+
+    #[test]
+    fn dispute_type_other_empty_string() {
+        let dt = DisputeType::Other("".to_string());
+        let json = serde_json::to_string(&dt).unwrap();
+        let decoded: DisputeType = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, DisputeType::Other("".to_string()));
+    }
+
+    #[test]
+    fn claim_basis_other_empty_string() {
+        let cb = ClaimBasis::Other("".to_string());
+        let json = serde_json::to_string(&cb).unwrap();
+        let decoded: ClaimBasis = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, ClaimBasis::Other("".to_string()));
+    }
+
+    // ========================================================================
+    // Full struct field access tests
+    // ========================================================================
+
+    #[test]
+    fn file_dispute_input_all_fields_accessed() {
+        let input = FileDisputeInput {
+            property_id: "prop-full".to_string(),
+            dispute_type: DisputeType::Easement,
+            claimant_did: "did:key:z6MkAlpha".to_string(),
+            respondent_did: "did:key:z6MkBeta".to_string(),
+            description: "Access easement dispute".to_string(),
+            evidence_ids: vec!["deed-copy".to_string(), "map.pdf".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FileDisputeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "prop-full");
+        assert_eq!(decoded.dispute_type, DisputeType::Easement);
+        assert_eq!(decoded.claimant_did, "did:key:z6MkAlpha");
+        assert_eq!(decoded.respondent_did, "did:key:z6MkBeta");
+        assert_eq!(decoded.description, "Access easement dispute");
+        assert_eq!(decoded.evidence_ids.len(), 2);
+    }
+
+    #[test]
+    fn file_claim_input_all_fields_accessed() {
+        let input = FileClaimInput {
+            property_id: "prop-claim-full".to_string(),
+            claimant_did: "did:key:z6MkClaimer".to_string(),
+            claim_basis: ClaimBasis::AdversePossession,
+            supporting_documents: vec!["affidavit.pdf".to_string(), "tax-records.pdf".to_string(), "photos.zip".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FileClaimInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "prop-claim-full");
+        assert_eq!(decoded.claimant_did, "did:key:z6MkClaimer");
+        assert_eq!(decoded.claim_basis, ClaimBasis::AdversePossession);
+        assert_eq!(decoded.supporting_documents.len(), 3);
+    }
+
+    // ========================================================================
+    // All dispute type variants for FileDisputeInput
+    // ========================================================================
+
+    #[test]
+    fn file_dispute_input_all_dispute_types() {
+        let types = vec![
+            DisputeType::Boundary,
+            DisputeType::Ownership,
+            DisputeType::Encumbrance,
+            DisputeType::Easement,
+            DisputeType::Trespass,
+            DisputeType::Damage,
+            DisputeType::Other("Custom".to_string()),
+        ];
+        for dt in types {
+            let input = FileDisputeInput {
+                property_id: "prop-001".to_string(),
+                dispute_type: dt.clone(),
+                claimant_did: "did:key:z6Mk001".to_string(),
+                respondent_did: "did:key:z6Mk002".to_string(),
+                description: "test".to_string(),
+                evidence_ids: vec![],
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: FileDisputeInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.dispute_type, dt);
+        }
+    }
+
+    // ========================================================================
+    // All claim basis variants for FileClaimInput
+    // ========================================================================
+
+    #[test]
+    fn file_claim_input_all_claim_bases() {
+        let bases = vec![
+            ClaimBasis::PriorOwnership,
+            ClaimBasis::Inheritance,
+            ClaimBasis::AdversePossession,
+            ClaimBasis::FraudulentTransfer,
+            ClaimBasis::DocumentaryEvidence,
+            ClaimBasis::Other("Treaty".to_string()),
+        ];
+        for basis in bases {
+            let input = FileClaimInput {
+                property_id: "prop-001".to_string(),
+                claimant_did: "did:key:z6Mk001".to_string(),
+                claim_basis: basis.clone(),
+                supporting_documents: vec![],
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: FileClaimInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.claim_basis, basis);
+        }
+    }
+
+    // ========================================================================
+    // UpdateDisputeStatusInput all status variants
+    // ========================================================================
+
+    #[test]
+    fn update_dispute_status_all_variants() {
+        let statuses = vec![
+            DisputeStatus::Filed,
+            DisputeStatus::UnderReview,
+            DisputeStatus::Mediation,
+            DisputeStatus::Arbitration,
+            DisputeStatus::Resolved,
+            DisputeStatus::Dismissed,
+        ];
+        for status in statuses {
+            let input = UpdateDisputeStatusInput {
+                dispute_id: "dispute-001".to_string(),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdateDisputeStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+
+    // ========================================================================
+    // UpdateClaimStatusInput all status variants
+    // ========================================================================
+
+    #[test]
+    fn update_claim_status_all_variants() {
+        let statuses = vec![
+            ClaimStatus::Pending,
+            ClaimStatus::UnderInvestigation,
+            ClaimStatus::Validated,
+            ClaimStatus::Rejected,
+            ClaimStatus::Superseded,
+        ];
+        for status in statuses {
+            let input = UpdateClaimStatusInput {
+                claim_id: "claim-001".to_string(),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdateClaimStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+
+    // ========================================================================
+    // Empty string boundary tests
+    // ========================================================================
+
+    #[test]
+    fn escalate_input_empty_dispute_id() {
+        let input = EscalateInput {
+            dispute_id: "".to_string(),
+            justice_case_id: "case-001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: EscalateInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.dispute_id, "");
+    }
+
+    #[test]
+    fn add_evidence_input_empty_evidence_id() {
+        let input = AddEvidenceInput {
+            dispute_id: "dispute-001".to_string(),
+            evidence_id: "".to_string(),
+            submitter_did: "did:key:z6Mk001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddEvidenceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.evidence_id, "");
+    }
+
+    #[test]
+    fn add_document_input_empty_document_id() {
+        let input = AddDocumentInput {
+            claim_id: "claim-001".to_string(),
+            document_id: "".to_string(),
+            submitter_did: "did:key:z6Mk001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddDocumentInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.document_id, "");
+    }
 }

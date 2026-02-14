@@ -781,12 +781,12 @@ mod tests {
     }
 
     #[test]
-    fn practice_whitespace_only_id_accepted() {
-        // The validation only checks .is_empty(), so whitespace-only passes
+    fn practice_whitespace_only_id_rejected() {
         let mut p = make_practice();
         p.id = "   ".into();
         let result = validate_create_practice(fake_create(), p);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Practice ID cannot be empty");
     }
 
     // ========================================================================

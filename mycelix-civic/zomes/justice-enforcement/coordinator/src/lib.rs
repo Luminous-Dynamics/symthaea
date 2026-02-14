@@ -5,7 +5,22 @@
 
 use hdk::prelude::*;
 use justice_enforcement_integrity::*;
-use civic_types::cross_domain::{CaseVerificationResult, VerifyCaseForEnforcementInput};
+
+/// Input for verifying a case exists before enforcement
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct VerifyCaseForEnforcementInput {
+    pub case_id: String,
+}
+
+/// Result of case verification for enforcement
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct CaseVerificationResult {
+    pub case_found: bool,
+    pub case_id: Option<String>,
+    pub phase: Option<String>,
+    pub status: Option<String>,
+    pub error: Option<String>,
+}
 
 /// Create an enforcement action
 #[hdk_extern]

@@ -957,12 +957,11 @@ mod tests {
     }
 
     #[test]
-    fn fund_whitespace_only_name_accepted() {
-        // The validation only checks is_empty(), not is_blank()
+    fn fund_whitespace_only_name_rejected() {
         let mut fund = make_fund();
         fund.name = "   ".into();
         let result = validate_create_fund(fake_create(), fund);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
     }
 
     #[test]

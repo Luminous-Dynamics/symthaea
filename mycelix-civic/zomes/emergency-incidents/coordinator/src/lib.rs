@@ -466,4 +466,382 @@ mod tests {
         assert!(decoded.boundary.is_none());
         assert!(decoded.zones.is_empty());
     }
+
+    // ========================================================================
+    // Disaster struct full serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn disaster_full_struct_serde_roundtrip() {
+        let disaster = Disaster {
+            id: "dis-42".to_string(),
+            disaster_type: DisasterType::Earthquake,
+            title: "Major Quake".to_string(),
+            description: "7.2 magnitude earthquake".to_string(),
+            severity: SeverityLevel::Level5,
+            declared_by: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            declared_at: Timestamp::from_micros(1000000),
+            affected_area: AffectedArea {
+                center_lat: 37.77,
+                center_lon: -122.42,
+                radius_km: 200.0,
+                boundary: Some(vec![(37.0, -123.0), (38.0, -122.0)]),
+                zones: vec![],
+            },
+            status: DisasterStatus::Active,
+            estimated_affected: 2_000_000,
+            coordination_lead: Some(AgentPubKey::from_raw_36(vec![2u8; 36])),
+        };
+        let json = serde_json::to_string(&disaster).unwrap();
+        let decoded: Disaster = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "dis-42");
+        assert_eq!(decoded.disaster_type, DisasterType::Earthquake);
+        assert_eq!(decoded.severity, SeverityLevel::Level5);
+        assert_eq!(decoded.status, DisasterStatus::Active);
+        assert_eq!(decoded.estimated_affected, 2_000_000);
+        assert!(decoded.coordination_lead.is_some());
+    }
+
+    #[test]
+    fn disaster_no_coordination_lead_serde() {
+        let disaster = Disaster {
+            id: "dis-43".to_string(),
+            disaster_type: DisasterType::Wildfire,
+            title: "Forest Fire".to_string(),
+            description: "Spreading fire".to_string(),
+            severity: SeverityLevel::Level3,
+            declared_by: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            declared_at: Timestamp::from_micros(0),
+            affected_area: AffectedArea {
+                center_lat: 0.0,
+                center_lon: 0.0,
+                radius_km: 1.0,
+                boundary: None,
+                zones: vec![],
+            },
+            status: DisasterStatus::Declared,
+            estimated_affected: 0,
+            coordination_lead: None,
+        };
+        let json = serde_json::to_string(&disaster).unwrap();
+        let decoded: Disaster = serde_json::from_str(&json).unwrap();
+        assert!(decoded.coordination_lead.is_none());
+        assert_eq!(decoded.estimated_affected, 0);
+    }
+
+    // ========================================================================
+    // IncidentUpdate struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn incident_update_full_struct_serde_roundtrip() {
+        let update = IncidentUpdate {
+            disaster_hash: ActionHash::from_raw_36(vec![3u8; 36]),
+            author: AgentPubKey::from_raw_36(vec![4u8; 36]),
+            timestamp: Timestamp::from_micros(999999),
+            update_type: UpdateType::EvacuationOrder,
+            content: "Mandatory evacuation for Zone A".to_string(),
+        };
+        let json = serde_json::to_string(&update).unwrap();
+        let decoded: IncidentUpdate = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.update_type, UpdateType::EvacuationOrder);
+        assert_eq!(decoded.content, "Mandatory evacuation for Zone A");
+    }
+
+    // ========================================================================
+    // OperationalZone struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn operational_zone_serde_roundtrip() {
+        let zone = OperationalZone {
+            id: "zone-alpha".to_string(),
+            name: "Alpha Sector".to_string(),
+            boundary: vec![(30.0, -90.0), (31.0, -91.0), (30.5, -90.5)],
+            priority: ZonePriority::High,
+            status: ZoneStatus::Hazardous,
+        };
+        let json = serde_json::to_string(&zone).unwrap();
+        let decoded: OperationalZone = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "zone-alpha");
+        assert_eq!(decoded.name, "Alpha Sector");
+        assert_eq!(decoded.boundary.len(), 3);
+        assert_eq!(decoded.priority, ZonePriority::High);
+        assert_eq!(decoded.status, ZoneStatus::Hazardous);
+    }
+
+    #[test]
+    fn operational_zone_empty_boundary_serde() {
+        let zone = OperationalZone {
+            id: "zone-empty".to_string(),
+            name: "Empty Zone".to_string(),
+            boundary: vec![],
+            priority: ZonePriority::Low,
+            status: ZoneStatus::Unassessed,
+        };
+        let json = serde_json::to_string(&zone).unwrap();
+        let decoded: OperationalZone = serde_json::from_str(&json).unwrap();
+        assert!(decoded.boundary.is_empty());
+    }
+
+    // ========================================================================
+    // Boundary and edge-case tests for input validation logic
+    // ========================================================================
+
+    #[test]
+    fn declare_disaster_input_empty_title_boundary() {
+        let input = DeclareDisasterInput {
+            id: "d-1".to_string(),
+            disaster_type: DisasterType::Flood,
+            title: String::new(),
+            description: "Valid desc".to_string(),
+            severity: SeverityLevel::Level1,
+            affected_area: AffectedArea {
+                center_lat: 0.0,
+                center_lon: 0.0,
+                radius_km: 1.0,
+                boundary: None,
+                zones: vec![],
+            },
+            estimated_affected: 1,
+            coordination_lead: None,
+        };
+        // Empty title should serialize/deserialize fine (validation is coordinator-side)
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: DeclareDisasterInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.title.is_empty());
+    }
+
+    #[test]
+    fn declare_disaster_input_max_length_title() {
+        let input = DeclareDisasterInput {
+            id: "d-2".to_string(),
+            disaster_type: DisasterType::Tornado,
+            title: "A".repeat(256),
+            description: "Desc".to_string(),
+            severity: SeverityLevel::Level2,
+            affected_area: AffectedArea {
+                center_lat: 45.0,
+                center_lon: -90.0,
+                radius_km: 100.0,
+                boundary: None,
+                zones: vec![],
+            },
+            estimated_affected: 100,
+            coordination_lead: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: DeclareDisasterInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.title.len(), 256);
+    }
+
+    #[test]
+    fn declare_disaster_input_max_description() {
+        let input = DeclareDisasterInput {
+            id: "d-3".to_string(),
+            disaster_type: DisasterType::Pandemic,
+            title: "Test".to_string(),
+            description: "B".repeat(8192),
+            severity: SeverityLevel::Level3,
+            affected_area: AffectedArea {
+                center_lat: 0.0,
+                center_lon: 0.0,
+                radius_km: 10.0,
+                boundary: None,
+                zones: vec![],
+            },
+            estimated_affected: 0,
+            coordination_lead: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: DeclareDisasterInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.description.len(), 8192);
+    }
+
+    #[test]
+    fn declare_disaster_input_zero_estimated_affected() {
+        let input = DeclareDisasterInput {
+            id: "d-4".to_string(),
+            disaster_type: DisasterType::CyberAttack,
+            title: "Cyber Incident".to_string(),
+            description: "System breach".to_string(),
+            severity: SeverityLevel::Level1,
+            affected_area: AffectedArea {
+                center_lat: 40.0,
+                center_lon: -74.0,
+                radius_km: 5.0,
+                boundary: None,
+                zones: vec![],
+            },
+            estimated_affected: 0,
+            coordination_lead: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: DeclareDisasterInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.estimated_affected, 0);
+    }
+
+    #[test]
+    fn declare_disaster_input_max_estimated_affected() {
+        let input = DeclareDisasterInput {
+            id: "d-5".to_string(),
+            disaster_type: DisasterType::Infrastructure,
+            title: "Grid Failure".to_string(),
+            description: "Total grid failure".to_string(),
+            severity: SeverityLevel::Level5,
+            affected_area: AffectedArea {
+                center_lat: 0.0,
+                center_lon: 0.0,
+                radius_km: 1000.0,
+                boundary: None,
+                zones: vec![],
+            },
+            estimated_affected: u32::MAX,
+            coordination_lead: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: DeclareDisasterInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.estimated_affected, u32::MAX);
+    }
+
+    // ========================================================================
+    // DisasterType::Other with various strings
+    // ========================================================================
+
+    #[test]
+    fn disaster_type_other_empty_string_serde() {
+        let variant = DisasterType::Other(String::new());
+        let json = serde_json::to_string(&variant).unwrap();
+        let decoded: DisasterType = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, DisasterType::Other(String::new()));
+    }
+
+    #[test]
+    fn disaster_type_other_unicode_string_serde() {
+        let variant = DisasterType::Other("\u{6D2A}\u{6C34}".to_string()); // Chinese for "flood"
+        let json = serde_json::to_string(&variant).unwrap();
+        let decoded: DisasterType = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, variant);
+    }
+
+    // ========================================================================
+    // AffectedArea with multiple zones
+    // ========================================================================
+
+    #[test]
+    fn affected_area_multiple_zones_serde() {
+        let area = AffectedArea {
+            center_lat: 29.76,
+            center_lon: -95.37,
+            radius_km: 300.0,
+            boundary: Some(vec![(29.0, -96.0), (30.0, -95.0), (29.5, -94.5)]),
+            zones: vec![
+                OperationalZone {
+                    id: "z-1".to_string(),
+                    name: "Central".to_string(),
+                    boundary: vec![(29.7, -95.3)],
+                    priority: ZonePriority::Critical,
+                    status: ZoneStatus::Active,
+                },
+                OperationalZone {
+                    id: "z-2".to_string(),
+                    name: "Outer Ring".to_string(),
+                    boundary: vec![(29.8, -95.4), (29.9, -95.5)],
+                    priority: ZonePriority::Medium,
+                    status: ZoneStatus::Evacuated,
+                },
+                OperationalZone {
+                    id: "z-3".to_string(),
+                    name: "Cleared Area".to_string(),
+                    boundary: vec![],
+                    priority: ZonePriority::Low,
+                    status: ZoneStatus::Cleared,
+                },
+            ],
+        };
+        let json = serde_json::to_string(&area).unwrap();
+        let decoded: AffectedArea = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.zones.len(), 3);
+        assert_eq!(decoded.zones[0].priority, ZonePriority::Critical);
+        assert_eq!(decoded.zones[1].status, ZoneStatus::Evacuated);
+        assert_eq!(decoded.zones[2].status, ZoneStatus::Cleared);
+    }
+
+    // ========================================================================
+    // Add incident update input edge cases
+    // ========================================================================
+
+    #[test]
+    fn add_incident_update_input_all_update_types() {
+        let update_types = vec![
+            UpdateType::StatusChange,
+            UpdateType::SeverityChange,
+            UpdateType::AreaExpansion,
+            UpdateType::AreaContraction,
+            UpdateType::CasualtyReport,
+            UpdateType::ResourceUpdate,
+            UpdateType::WeatherUpdate,
+            UpdateType::InfrastructureUpdate,
+            UpdateType::EvacuationOrder,
+            UpdateType::AllClear,
+            UpdateType::General,
+        ];
+        for ut in update_types {
+            let input = AddIncidentUpdateInput {
+                disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                update_type: ut.clone(),
+                content: format!("Content for {:?}", ut),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: AddIncidentUpdateInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.update_type, ut);
+        }
+    }
+
+    #[test]
+    fn add_incident_update_input_max_content() {
+        let input = AddIncidentUpdateInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            update_type: UpdateType::General,
+            content: "X".repeat(8192),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddIncidentUpdateInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.content.len(), 8192);
+    }
+
+    // ========================================================================
+    // Affected area with extreme coordinate values
+    // ========================================================================
+
+    #[test]
+    fn affected_area_extreme_lat_lon_serde() {
+        let area = AffectedArea {
+            center_lat: -90.0,
+            center_lon: 180.0,
+            radius_km: 0.001,
+            boundary: None,
+            zones: vec![],
+        };
+        let json = serde_json::to_string(&area).unwrap();
+        let decoded: AffectedArea = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.center_lat, -90.0);
+        assert_eq!(decoded.center_lon, 180.0);
+        assert!((decoded.radius_km - 0.001).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn affected_area_large_radius_serde() {
+        let area = AffectedArea {
+            center_lat: 0.0,
+            center_lon: 0.0,
+            radius_km: 20015.0, // half Earth circumference
+            boundary: None,
+            zones: vec![],
+        };
+        let json = serde_json::to_string(&area).unwrap();
+        let decoded: AffectedArea = serde_json::from_str(&json).unwrap();
+        assert!((decoded.radius_km - 20015.0).abs() < 1.0);
+    }
+
 }

@@ -4,7 +4,22 @@
 
 use housing_clt_integrity::*;
 use hdk::prelude::*;
-use commons_types::cross_domain::{VerifyPropertyForLeaseInput, PropertyVerificationResult};
+
+/// Input for verifying a property before creating a CLT lease
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct VerifyPropertyForLeaseInput {
+    pub property_id: String,
+    pub expected_owner_did: Option<String>,
+}
+
+/// Result of property verification for CLT lease
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct PropertyVerificationResult {
+    pub verified: bool,
+    pub owner_did: Option<String>,
+    pub has_clear_title: bool,
+    pub error: Option<String>,
+}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());

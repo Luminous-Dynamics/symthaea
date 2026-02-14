@@ -9,11 +9,9 @@
 pub mod batch;
 pub mod anchors;
 pub mod bridge_types;
-pub mod cross_domain;
 pub mod geo;
 
 pub use batch::*;
 pub use anchors::*;
 pub use bridge_types::*;
-pub use cross_domain::*;
 pub use geo::*;

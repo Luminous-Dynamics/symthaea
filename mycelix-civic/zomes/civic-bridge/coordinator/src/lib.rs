@@ -1093,4 +1093,299 @@ mod tests {
         };
         assert_eq!(signal.signal_type, "civic_bridge_event");
     }
+
+    // ============================================================================
+    // Cross-domain dispatch edge case tests
+    // ============================================================================
+
+    // ---- Allowlist integrity ----
+
+    #[test]
+    fn allowed_zomes_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_ZOMES {
+            assert!(
+                seen.insert(zome),
+                "Duplicate zome in ALLOWED_ZOMES: '{}'",
+                zome
+            );
+        }
+    }
+
+    #[test]
+    fn allowed_commons_zomes_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_COMMONS_ZOMES {
+            assert!(
+                seen.insert(zome),
+                "Duplicate zome in ALLOWED_COMMONS_ZOMES: '{}'",
+                zome
+            );
+        }
+    }
+
+    #[test]
+    fn allowed_zomes_entries_are_non_empty() {
+        for zome in ALLOWED_ZOMES {
+            assert!(!zome.is_empty(), "ALLOWED_ZOMES contains an empty string");
+            assert!(
+                !zome.contains(' '),
+                "ALLOWED_ZOMES entry '{}' contains whitespace",
+                zome
+            );
+        }
+    }
+
+    #[test]
+    fn allowed_commons_zomes_entries_are_non_empty() {
+        for zome in ALLOWED_COMMONS_ZOMES {
+            assert!(!zome.is_empty(), "ALLOWED_COMMONS_ZOMES contains an empty string");
+            assert!(
+                !zome.contains(' '),
+                "ALLOWED_COMMONS_ZOMES entry '{}' contains whitespace",
+                zome
+            );
+        }
+    }
+
+    #[test]
+    fn allowed_zomes_per_domain_count() {
+        let justice_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("justice_")).count();
+        let emergency_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("emergency_")).count();
+        let media_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("media_")).count();
+        assert_eq!(justice_count, 5, "Expected 5 justice zomes");
+        assert_eq!(emergency_count, 6, "Expected 6 emergency zomes");
+        assert_eq!(media_count, 4, "Expected 4 media zomes");
+    }
+
+    // ---- resolve_domain_zome outputs are in ALLOWED_ZOMES ----
+
+    #[test]
+    fn resolve_outputs_are_in_allowlist() {
+        // Every zome name returned by resolve_domain_zome must be in ALLOWED_ZOMES
+        let test_cases = vec![
+            ("justice", "submit_evidence"),
+            ("justice", "start_arbitration"),
+            ("justice", "initiate_restorative"),
+            ("justice", "enforce_sanction"),
+            ("justice", "file_case"),
+            ("emergency", "assess_triage"),
+            ("emergency", "deploy_resource"),
+            ("emergency", "coordinate_response"),
+            ("emergency", "open_shelter"),
+            ("emergency", "send_alert"),
+            ("emergency", "report_incident"),
+            ("media", "verify_attribution"),
+            ("media", "run_factcheck"),
+            ("media", "curate_content"),
+            ("media", "submit_article"),
+        ];
+        for (domain, query_type) in test_cases {
+            let resolved = resolve_domain_zome(domain, query_type);
+            assert!(
+                resolved.is_some(),
+                "resolve_domain_zome('{}', '{}') returned None",
+                domain, query_type
+            );
+            let zome_name = resolved.unwrap();
+            assert!(
+                ALLOWED_ZOMES.contains(&zome_name.as_str()),
+                "resolve_domain_zome('{}', '{}') returned '{}' which is not in ALLOWED_ZOMES",
+                domain, query_type, zome_name
+            );
+        }
+    }
+
+    // ---- Edge cases for resolve_domain_zome ----
+
+    #[test]
+    fn resolve_empty_query_type_uses_default() {
+        // Empty query_type should fall through to the default zome for each domain
+        assert_eq!(resolve_domain_zome("justice", "").unwrap(), "justice_cases");
+        assert_eq!(resolve_domain_zome("emergency", "").unwrap(), "emergency_incidents");
+        assert_eq!(resolve_domain_zome("media", "").unwrap(), "media_publication");
+    }
+
+    #[test]
+    fn resolve_empty_domain_returns_none() {
+        assert!(resolve_domain_zome("", "file_case").is_none());
+    }
+
+    #[test]
+    fn resolve_case_sensitive_domain() {
+        // Domain matching is case-sensitive
+        assert!(resolve_domain_zome("Justice", "file_case").is_none());
+        assert!(resolve_domain_zome("JUSTICE", "file_case").is_none());
+        assert!(resolve_domain_zome("EMERGENCY", "report_incident").is_none());
+        assert!(resolve_domain_zome("Media", "submit_article").is_none());
+    }
+
+    #[test]
+    fn resolve_gibberish_query_type_uses_default() {
+        // Nonsensical query_type that matches no keywords should use default
+        assert_eq!(
+            resolve_domain_zome("justice", "xyzzy_foobar").unwrap(),
+            "justice_cases"
+        );
+        assert_eq!(
+            resolve_domain_zome("emergency", "quantum_entanglement").unwrap(),
+            "emergency_incidents"
+        );
+        assert_eq!(
+            resolve_domain_zome("media", "cosmic_rays").unwrap(),
+            "media_publication"
+        );
+    }
+
+    // ---- Health check domain list ----
+
+    #[test]
+    fn health_check_returns_exactly_three_domains() {
+        // The health_check function hardcodes 3 domains; verify the list
+        // is consistent with what resolve_domain_zome accepts.
+        let expected_domains = vec!["justice", "emergency", "media"];
+        for domain in &expected_domains {
+            assert!(
+                resolve_domain_zome(domain, "anything").is_some(),
+                "Health check domain '{}' is not recognized by resolve_domain_zome",
+                domain
+            );
+        }
+    }
+
+    // ---- Justice mediation keyword routing ----
+
+    #[test]
+    fn resolve_justice_mediation_routes_to_restorative() {
+        assert_eq!(
+            resolve_domain_zome("justice", "start_mediation").unwrap(),
+            "justice_restorative"
+        );
+    }
+
+    // ---- Justice sanction keyword routing ----
+
+    #[test]
+    fn resolve_justice_sanction_routes_to_enforcement() {
+        assert_eq!(
+            resolve_domain_zome("justice", "apply_sanction").unwrap(),
+            "justice_enforcement"
+        );
+    }
+
+    // ---- Emergency priority keyword routing ----
+
+    #[test]
+    fn resolve_emergency_priority_routes_to_triage() {
+        assert_eq!(
+            resolve_domain_zome("emergency", "set_priority_level").unwrap(),
+            "emergency_triage"
+        );
+    }
+
+    // ---- Emergency supply keyword routing ----
+
+    #[test]
+    fn resolve_emergency_supply_routes_to_resources() {
+        assert_eq!(
+            resolve_domain_zome("emergency", "request_supply").unwrap(),
+            "emergency_resources"
+        );
+    }
+
+    // ---- Emergency comm keyword routing ----
+
+    #[test]
+    fn resolve_emergency_comm_routes_to_comms() {
+        assert_eq!(
+            resolve_domain_zome("emergency", "broadcast_comm").unwrap(),
+            "emergency_comms"
+        );
+    }
+
+    // ---- Media source keyword routing ----
+
+    #[test]
+    fn resolve_media_source_routes_to_attribution() {
+        assert_eq!(
+            resolve_domain_zome("media", "add_source_reference").unwrap(),
+            "media_attribution"
+        );
+    }
+
+    // ---- Media verify keyword routing ----
+
+    #[test]
+    fn resolve_media_verify_routes_to_factcheck() {
+        assert_eq!(
+            resolve_domain_zome("media", "verify_claim").unwrap(),
+            "media_factcheck"
+        );
+    }
+
+    // ---- Media check keyword routing ----
+
+    #[test]
+    fn resolve_media_check_routes_to_factcheck() {
+        assert_eq!(
+            resolve_domain_zome("media", "run_check").unwrap(),
+            "media_factcheck"
+        );
+    }
+
+    // ---- Media recommend keyword routing ----
+
+    #[test]
+    fn resolve_media_recommend_routes_to_curation() {
+        assert_eq!(
+            resolve_domain_zome("media", "get_recommendations").unwrap(),
+            "media_curation"
+        );
+    }
+
+    // ---- Multiple keywords: first match wins ----
+
+    #[test]
+    fn resolve_multiple_keywords_uses_first_match() {
+        // "evidence_arbitration" contains both "evidence" and "arbitrat";
+        // "evidence" is checked first in the justice match.
+        assert_eq!(
+            resolve_domain_zome("justice", "evidence_arbitration").unwrap(),
+            "justice_evidence"
+        );
+        // "triage_resource" contains both "triage" and "resource";
+        // "triage" is checked first in the emergency match.
+        assert_eq!(
+            resolve_domain_zome("emergency", "triage_resource").unwrap(),
+            "emergency_triage"
+        );
+    }
+
+    // ---- Cross-cluster allowlist symmetry ----
+
+    #[test]
+    fn cross_cluster_commons_allowlist_includes_commons_bridge() {
+        assert!(
+            ALLOWED_COMMONS_ZOMES.contains(&"commons_bridge"),
+            "Civic should be able to call commons_bridge for cross-cluster queries"
+        );
+    }
+
+    #[test]
+    fn cross_cluster_commons_allowlist_per_domain_count() {
+        let property_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("property_")).count();
+        let housing_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("housing_")).count();
+        let care_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("care_")).count();
+        let mutualaid_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("mutualaid_")).count();
+        let water_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("water_")).count();
+        let food_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("food_")).count();
+        let transport_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("transport_")).count();
+        assert_eq!(property_count, 4, "Expected 4 property zomes in ALLOWED_COMMONS_ZOMES");
+        assert_eq!(housing_count, 6, "Expected 6 housing zomes in ALLOWED_COMMONS_ZOMES");
+        assert_eq!(care_count, 5, "Expected 5 care zomes in ALLOWED_COMMONS_ZOMES");
+        assert_eq!(mutualaid_count, 7, "Expected 7 mutualaid zomes in ALLOWED_COMMONS_ZOMES");
+        assert_eq!(water_count, 5, "Expected 5 water zomes in ALLOWED_COMMONS_ZOMES");
+        assert_eq!(food_count, 4, "Expected 4 food zomes in ALLOWED_COMMONS_ZOMES");
+        assert_eq!(transport_count, 3, "Expected 3 transport zomes in ALLOWED_COMMONS_ZOMES");
+    }
 }

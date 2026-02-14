@@ -359,10 +359,10 @@ mod tests {
     }
 
     #[test]
-    fn vehicle_whitespace_id_accepted() {
+    fn vehicle_whitespace_id_rejected() {
         let mut v = valid_vehicle();
         v.id = " ".into();
-        assert_valid(validate_vehicle(v));
+        assert_invalid(validate_vehicle(v), "Vehicle ID cannot be empty");
     }
 
     // ── validate_vehicle: capacity_kg ───────────────────────────────────
@@ -453,10 +453,10 @@ mod tests {
     }
 
     #[test]
-    fn route_whitespace_id_accepted() {
+    fn route_whitespace_id_rejected() {
         let mut r = valid_route();
         r.id = " ".into();
-        assert_valid(validate_route(r));
+        assert_invalid(validate_route(r), "Route ID cannot be empty");
     }
 
     // ── validate_route: name ────────────────────────────────────────────
@@ -469,10 +469,10 @@ mod tests {
     }
 
     #[test]
-    fn route_whitespace_name_accepted() {
+    fn route_whitespace_name_rejected() {
         let mut r = valid_route();
         r.name = "  ".into();
-        assert_valid(validate_route(r));
+        assert_invalid(validate_route(r), "Route name cannot be empty");
     }
 
     // ── validate_route: waypoints ───────────────────────────────────────
@@ -596,10 +596,10 @@ mod tests {
     }
 
     #[test]
-    fn stop_whitespace_name_accepted() {
+    fn stop_whitespace_name_rejected() {
         let mut s = valid_stop();
         s.name = " ".into();
-        assert_valid(validate_stop(s));
+        assert_invalid(validate_stop(s), "Stop name cannot be empty");
     }
 
     // ── validate_stop: latitude ─────────────────────────────────────────
