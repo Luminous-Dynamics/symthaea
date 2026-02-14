@@ -796,10 +796,39 @@ fn validate_case(case: &Case) -> ExternResult<ValidateCallbackResult> {
         ));
     }
 
+    // String length limits
+    if case.id.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Case ID too long (max 512)".into(),
+        ));
+    }
+    if case.title.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Case title too long (max 512)".into(),
+        ));
+    }
+
     // Description required
     if case.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Case description required".into(),
+        ));
+    }
+    if case.description.len() > 8192 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Case description too long (max 8192)".into(),
+        ));
+    }
+
+    // DID length limits
+    if case.complainant.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Complainant DID too long (max 256)".into(),
+        ));
+    }
+    if case.respondent.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Respondent DID too long (max 256)".into(),
         ));
     }
 
@@ -817,10 +846,73 @@ fn validate_case(case: &Case) -> ExternResult<ValidateCallbackResult> {
         ));
     }
 
+    // Vec length limits
+    if case.parties.len() > 20 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many parties (max 20)".into(),
+        ));
+    }
+
+    // Validate nested party DIDs
+    for party in &case.parties {
+        if party.did.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Party DID too long (max 256)".into(),
+            ));
+        }
+    }
+
+    // CaseContext string limits
+    if let Some(ref happ) = case.context.happ {
+        if happ.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Context happ too long (max 256)".into(),
+            ));
+        }
+    }
+    if let Some(ref reference_id) = case.context.reference_id {
+        if reference_id.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Context reference_id too long (max 256)".into(),
+            ));
+        }
+    }
+    if let Some(ref community) = case.context.community {
+        if community.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Context community too long (max 256)".into(),
+            ));
+        }
+    }
+    if let Some(ref jurisdiction) = case.context.jurisdiction {
+        if jurisdiction.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Context jurisdiction too long (max 4096)".into(),
+            ));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_evidence(evidence: &Evidence) -> ExternResult<ValidateCallbackResult> {
+    // String length limits
+    if evidence.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Evidence ID too long (max 256)".into(),
+        ));
+    }
+    if evidence.case_id.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Evidence case_id too long (max 512)".into(),
+        ));
+    }
+    if evidence.submitter.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Evidence submitter too long (max 256)".into(),
+        ));
+    }
+
     // Submitter must be DID
     if !evidence.submitter.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
@@ -834,6 +926,11 @@ fn validate_evidence(evidence: &Evidence) -> ExternResult<ValidateCallbackResult
             "Evidence description required".into(),
         ));
     }
+    if evidence.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Evidence description too long (max 4096)".into(),
+        ));
+    }
 
     // Content hash required
     if evidence.content.hash.trim().is_empty() {
@@ -842,33 +939,72 @@ fn validate_evidence(evidence: &Evidence) -> ExternResult<ValidateCallbackResult
         ));
     }
 
-    Ok(ValidateCallbackResult::Valid)
-}
-
-fn validate_mediation(mediation: &Mediation) -> ExternResult<ValidateCallbackResult> {
-    // Mediator must be DID
-    if !mediation.mediator.starts_with("did:") {
+    // Content string limits
+    if evidence.content.hash.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Mediator must be a DID".into(),
+            "Evidence content hash too long (max 256)".into(),
         ));
     }
-
-    Ok(ValidateCallbackResult::Valid)
-}
-
-fn validate_arbitration(arb: &Arbitration) -> ExternResult<ValidateCallbackResult> {
-    // Must have odd number of arbitrators for voting
-    if arb.arbitrators.len().is_multiple_of(2) {
+    if evidence.content.reference.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Arbitration panel must have odd number of arbitrators".into(),
+            "Evidence content reference too long (max 4096)".into(),
         ));
     }
-
-    // All arbitrators must be DIDs
-    for a in &arb.arbitrators {
-        if !a.did.starts_with("did:") {
+    if evidence.content.mime_type.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Evidence content mime_type too long (max 256)".into(),
+        ));
+    }
+    if let Some(ref key_ref) = evidence.content.key_reference {
+        if key_ref.len() > 256 {
             return Ok(ValidateCallbackResult::Invalid(
-                "All arbitrators must be DIDs".into(),
+                "Evidence key_reference too long (max 256)".into(),
+            ));
+        }
+    }
+
+    // Vec length limits
+    if evidence.custody.len() > 200 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many custody events (max 200)".into(),
+        ));
+    }
+
+    // Validate nested custody event strings
+    for event in &evidence.custody {
+        if event.actor.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Custody event actor too long (max 256)".into(),
+            ));
+        }
+        if let Some(ref notes) = event.notes {
+            if notes.len() > 4096 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Custody event notes too long (max 4096)".into(),
+                ));
+            }
+        }
+    }
+
+    // Verification string limits
+    if let Some(ref verifier) = evidence.verification.verifier {
+        if verifier.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Verification verifier too long (max 256)".into(),
+            ));
+        }
+    }
+    if let Some(ref method) = evidence.verification.method {
+        if method.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Verification method too long (max 4096)".into(),
+            ));
+        }
+    }
+    if let Some(ref notes) = evidence.verification.notes {
+        if notes.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Verification notes too long (max 4096)".into(),
             ));
         }
     }
@@ -876,11 +1012,158 @@ fn validate_arbitration(arb: &Arbitration) -> ExternResult<ValidateCallbackResul
     Ok(ValidateCallbackResult::Valid)
 }
 
+fn validate_mediation(mediation: &Mediation) -> ExternResult<ValidateCallbackResult> {
+    // String length limits
+    if mediation.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Mediation ID too long (max 256)".into(),
+        ));
+    }
+    if mediation.case_id.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Mediation case_id too long (max 512)".into(),
+        ));
+    }
+    if mediation.mediator.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Mediator DID too long (max 256)".into(),
+        ));
+    }
+
+    // Mediator must be DID
+    if !mediation.mediator.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Mediator must be a DID".into(),
+        ));
+    }
+
+    // Vec length limits
+    if mediation.sessions.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many mediation sessions (max 50)".into(),
+        ));
+    }
+    if mediation.proposals.len() > 10 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many proposals (max 10)".into(),
+        ));
+    }
+
+    // Validate nested session strings
+    for session in &mediation.sessions {
+        if let Some(ref notes) = session.notes {
+            if notes.len() > 4096 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Mediation session notes too long (max 4096)".into(),
+                ));
+            }
+        }
+        if let Some(ref outcome) = session.outcome {
+            if outcome.len() > 4096 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Mediation session outcome too long (max 4096)".into(),
+                ));
+            }
+        }
+    }
+
+    // Validate proposal IDs
+    for proposal in &mediation.proposals {
+        if proposal.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Proposal ID too long (max 256)".into(),
+            ));
+        }
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_arbitration(arb: &Arbitration) -> ExternResult<ValidateCallbackResult> {
+    // String length limits
+    if arb.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Arbitration ID too long (max 256)".into(),
+        ));
+    }
+    if arb.case_id.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Arbitration case_id too long (max 512)".into(),
+        ));
+    }
+
+    // Vec length limits
+    if arb.arbitrators.len() > 9 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many arbitrators (max 9)".into(),
+        ));
+    }
+
+    // Must have odd number of arbitrators for voting
+    if arb.arbitrators.len().is_multiple_of(2) {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Arbitration panel must have odd number of arbitrators".into(),
+        ));
+    }
+
+    // All arbitrators must be DIDs with length limits
+    for a in &arb.arbitrators {
+        if a.did.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Arbitrator DID too long (max 256)".into(),
+            ));
+        }
+        if !a.did.starts_with("did:") {
+            return Ok(ValidateCallbackResult::Invalid(
+                "All arbitrators must be DIDs".into(),
+            ));
+        }
+        if let Some(ref reason) = a.recusal_reason {
+            if reason.len() > 4096 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Arbitrator recusal reason too long (max 4096)".into(),
+                ));
+            }
+        }
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
 fn validate_decision(decision: &Decision) -> ExternResult<ValidateCallbackResult> {
+    // String length limits
+    if decision.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Decision ID too long (max 256)".into(),
+        ));
+    }
+    if decision.case_id.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Decision case_id too long (max 512)".into(),
+        ));
+    }
+    if decision.arbitration_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Decision arbitration_id too long (max 256)".into(),
+        ));
+    }
+
     // Reasoning required
     if decision.reasoning.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Decision reasoning required".into(),
+        ));
+    }
+    if decision.reasoning.len() > 16384 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Decision reasoning too long (max 16384)".into(),
+        ));
+    }
+
+    // Vec length limits
+    if decision.remedies.len() > 20 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many remedies (max 20)".into(),
         ));
     }
 
@@ -890,11 +1173,87 @@ fn validate_decision(decision: &Decision) -> ExternResult<ValidateCallbackResult
             "Decision must have votes".into(),
         ));
     }
+    if decision.votes.len() > 9 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many votes (max 9)".into(),
+        ));
+    }
+    if decision.dissents.len() > 9 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many dissenting opinions (max 9)".into(),
+        ));
+    }
+
+    // Validate nested remedy strings
+    for remedy in &decision.remedies {
+        if remedy.responsible_party.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Remedy responsible_party too long (max 256)".into(),
+            ));
+        }
+        if remedy.description.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Remedy description too long (max 4096)".into(),
+            ));
+        }
+        if let Some(ref currency) = remedy.currency {
+            if currency.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Remedy currency too long (max 256)".into(),
+                ));
+            }
+        }
+    }
+
+    // Validate nested vote strings
+    for vote in &decision.votes {
+        if vote.arbitrator.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Vote arbitrator DID too long (max 256)".into(),
+            ));
+        }
+    }
+
+    // Validate nested dissent strings
+    for dissent in &decision.dissents {
+        if dissent.arbitrator.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Dissent arbitrator DID too long (max 256)".into(),
+            ));
+        }
+        if dissent.opinion.len() > 16384 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Dissenting opinion too long (max 16384)".into(),
+            ));
+        }
+    }
 
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_appeal(appeal: &Appeal) -> ExternResult<ValidateCallbackResult> {
+    // String length limits
+    if appeal.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Appeal ID too long (max 256)".into(),
+        ));
+    }
+    if appeal.case_id.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Appeal case_id too long (max 512)".into(),
+        ));
+    }
+    if appeal.decision_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Appeal decision_id too long (max 256)".into(),
+        ));
+    }
+    if appeal.appellant.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Appellant DID too long (max 256)".into(),
+        ));
+    }
+
     // Appellant must be DID
     if !appeal.appellant.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
@@ -909,10 +1268,22 @@ fn validate_appeal(appeal: &Appeal) -> ExternResult<ValidateCallbackResult> {
         ));
     }
 
+    // Vec length limits
+    if appeal.grounds.len() > 10 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many appeal grounds (max 10)".into(),
+        ));
+    }
+
     // Argument required
     if appeal.argument.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Appeal argument required".into(),
+        ));
+    }
+    if appeal.argument.len() > 16384 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Appeal argument too long (max 16384)".into(),
         ));
     }
 
@@ -920,6 +1291,23 @@ fn validate_appeal(appeal: &Appeal) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_enforcement(enforcement: &Enforcement) -> ExternResult<ValidateCallbackResult> {
+    // String length limits
+    if enforcement.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Enforcement ID too long (max 256)".into(),
+        ));
+    }
+    if enforcement.decision_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Enforcement decision_id too long (max 256)".into(),
+        ));
+    }
+    if enforcement.enforcer.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Enforcer DID too long (max 256)".into(),
+        ));
+    }
+
     // Enforcer must be DID
     if !enforcement.enforcer.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
@@ -927,10 +1315,57 @@ fn validate_enforcement(enforcement: &Enforcement) -> ExternResult<ValidateCallb
         ));
     }
 
+    // Vec length limits
+    if enforcement.actions.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many enforcement actions (max 100)".into(),
+        ));
+    }
+
+    // Validate nested action strings
+    for action in &enforcement.actions {
+        if action.result.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Enforcement action result too long (max 4096)".into(),
+            ));
+        }
+        if let Some(ref target_happ) = action.target_happ {
+            if target_happ.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Enforcement action target_happ too long (max 256)".into(),
+                ));
+            }
+        }
+        if let Some(ref target_entry) = action.target_entry {
+            if target_entry.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Enforcement action target_entry too long (max 256)".into(),
+                ));
+            }
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_restorative(circle: &RestorativeCircle) -> ExternResult<ValidateCallbackResult> {
+    // String length limits
+    if circle.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RestorativeCircle ID too long (max 256)".into(),
+        ));
+    }
+    if circle.case_id.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RestorativeCircle case_id too long (max 512)".into(),
+        ));
+    }
+    if circle.facilitator.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Facilitator DID too long (max 256)".into(),
+        ));
+    }
+
     // Facilitator must be DID
     if !circle.facilitator.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
@@ -943,6 +1378,74 @@ fn validate_restorative(circle: &RestorativeCircle) -> ExternResult<ValidateCall
         return Ok(ValidateCallbackResult::Invalid(
             "Restorative circle must have participants".into(),
         ));
+    }
+
+    // Vec length limits
+    if circle.participants.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many participants (max 50)".into(),
+        ));
+    }
+    if circle.agreements.len() > 20 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many agreements (max 20)".into(),
+        ));
+    }
+
+    // Validate nested participant strings
+    for participant in &circle.participants {
+        if participant.did.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Participant DID too long (max 256)".into(),
+            ));
+        }
+        if participant.attended_sessions.len() > 100 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Too many attended sessions (max 100)".into(),
+            ));
+        }
+    }
+
+    // Validate agreement strings
+    for agreement in &circle.agreements {
+        if agreement.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Agreement too long (max 4096)".into(),
+            ));
+        }
+    }
+
+    // Validate circle sessions
+    if circle.sessions.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many circle sessions (max 50)".into(),
+        ));
+    }
+    for session in &circle.sessions {
+        if session.summary.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Circle session summary too long (max 4096)".into(),
+            ));
+        }
+        if session.next_steps.len() > 30 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Too many next steps (max 30)".into(),
+            ));
+        }
+        for step in &session.next_steps {
+            if step.len() > 4096 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Next step too long (max 4096)".into(),
+                ));
+            }
+        }
+        for attendee in &session.attendees {
+            if attendee.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Session attendee DID too long (max 256)".into(),
+                ));
+            }
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -1209,6 +1712,208 @@ mod tests {
         assert!(is_invalid(&result));
     }
 
+    // -- Case string length limits --
+
+    #[test]
+    fn case_id_too_long_rejected() {
+        let mut case = make_case();
+        case.id = "x".repeat(513);
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_id_at_limit_accepted() {
+        let mut case = make_case();
+        case.id = "x".repeat(512);
+        let result = validate_case(&case);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_title_too_long_rejected() {
+        let mut case = make_case();
+        case.title = "x".repeat(513);
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_title_at_limit_accepted() {
+        let mut case = make_case();
+        case.title = "x".repeat(512);
+        let result = validate_case(&case);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_description_too_long_rejected() {
+        let mut case = make_case();
+        case.description = "x".repeat(8193);
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_description_at_limit_accepted() {
+        let mut case = make_case();
+        case.description = "x".repeat(8192);
+        let result = validate_case(&case);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_complainant_did_too_long_rejected() {
+        let mut case = make_case();
+        case.complainant = format!("did:{}", "x".repeat(253));
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_complainant_did_at_limit_accepted() {
+        let mut case = make_case();
+        case.complainant = format!("did:{}", "x".repeat(252));
+        let result = validate_case(&case);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_respondent_did_too_long_rejected() {
+        let mut case = make_case();
+        case.respondent = format!("did:{}", "x".repeat(253));
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_respondent_did_at_limit_accepted() {
+        let mut case = make_case();
+        case.respondent = format!("did:{}", "y".repeat(252));
+        let result = validate_case(&case);
+        assert!(is_valid(&result));
+    }
+
+    // -- Case Vec length limits --
+
+    #[test]
+    fn case_too_many_parties_rejected() {
+        let mut case = make_case();
+        case.parties = (0..21)
+            .map(|i| CaseParty {
+                did: format!("did:example:party{}", i),
+                role: PartyRole::Witness,
+                joined_at: ts(),
+            })
+            .collect();
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_parties_at_limit_accepted() {
+        let mut case = make_case();
+        case.parties = (0..20)
+            .map(|i| CaseParty {
+                did: format!("did:example:party{}", i),
+                role: PartyRole::Witness,
+                joined_at: ts(),
+            })
+            .collect();
+        let result = validate_case(&case);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_party_did_too_long_rejected() {
+        let mut case = make_case();
+        case.parties = vec![CaseParty {
+            did: "x".repeat(257),
+            role: PartyRole::Witness,
+            joined_at: ts(),
+        }];
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_party_did_at_limit_accepted() {
+        let mut case = make_case();
+        case.parties = vec![CaseParty {
+            did: "x".repeat(256),
+            role: PartyRole::Witness,
+            joined_at: ts(),
+        }];
+        let result = validate_case(&case);
+        assert!(is_valid(&result));
+    }
+
+    // -- Case context string limits --
+
+    #[test]
+    fn case_context_happ_too_long_rejected() {
+        let mut case = make_case();
+        case.context.happ = Some("x".repeat(257));
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_context_happ_at_limit_accepted() {
+        let mut case = make_case();
+        case.context.happ = Some("x".repeat(256));
+        let result = validate_case(&case);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_context_reference_id_too_long_rejected() {
+        let mut case = make_case();
+        case.context.reference_id = Some("x".repeat(257));
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_context_reference_id_at_limit_accepted() {
+        let mut case = make_case();
+        case.context.reference_id = Some("x".repeat(256));
+        let result = validate_case(&case);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_context_community_too_long_rejected() {
+        let mut case = make_case();
+        case.context.community = Some("x".repeat(257));
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_context_community_at_limit_accepted() {
+        let mut case = make_case();
+        case.context.community = Some("x".repeat(256));
+        let result = validate_case(&case);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn case_context_jurisdiction_too_long_rejected() {
+        let mut case = make_case();
+        case.context.jurisdiction = Some("x".repeat(4097));
+        let result = validate_case(&case);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn case_context_jurisdiction_at_limit_accepted() {
+        let mut case = make_case();
+        case.context.jurisdiction = Some("x".repeat(4096));
+        let result = validate_case(&case);
+        assert!(is_valid(&result));
+    }
+
     // ========================================================================
     // EVIDENCE VALIDATION TESTS
     // ========================================================================
@@ -1243,6 +1948,270 @@ mod tests {
         assert!(is_invalid(&result));
     }
 
+    // -- Evidence string length limits --
+
+    #[test]
+    fn evidence_id_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.id = "x".repeat(257);
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_id_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.id = "x".repeat(256);
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_case_id_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.case_id = "x".repeat(513);
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_case_id_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.case_id = "x".repeat(512);
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_submitter_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.submitter = format!("did:{}", "x".repeat(253));
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_submitter_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.submitter = format!("did:{}", "x".repeat(252));
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_description_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.description = "x".repeat(4097);
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_description_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.description = "x".repeat(4096);
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_content_hash_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.content.hash = "x".repeat(257);
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_content_hash_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.content.hash = "x".repeat(256);
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_content_reference_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.content.reference = "x".repeat(4097);
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_content_reference_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.content.reference = "x".repeat(4096);
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_content_mime_type_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.content.mime_type = "x".repeat(257);
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_content_mime_type_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.content.mime_type = "x".repeat(256);
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_key_reference_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.content.key_reference = Some("x".repeat(257));
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_key_reference_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.content.key_reference = Some("x".repeat(256));
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    // -- Evidence Vec length limits --
+
+    #[test]
+    fn evidence_too_many_custody_events_rejected() {
+        let mut ev = make_evidence();
+        ev.custody = (0..201)
+            .map(|_| CustodyEvent {
+                action: CustodyAction::Accessed,
+                actor: "did:example:actor".into(),
+                timestamp: ts(),
+                notes: None,
+            })
+            .collect();
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_custody_events_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.custody = (0..200)
+            .map(|_| CustodyEvent {
+                action: CustodyAction::Accessed,
+                actor: "did:example:actor".into(),
+                timestamp: ts(),
+                notes: None,
+            })
+            .collect();
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_custody_actor_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.custody = vec![CustodyEvent {
+            action: CustodyAction::Submitted,
+            actor: "x".repeat(257),
+            timestamp: ts(),
+            notes: None,
+        }];
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_custody_actor_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.custody = vec![CustodyEvent {
+            action: CustodyAction::Submitted,
+            actor: "x".repeat(256),
+            timestamp: ts(),
+            notes: None,
+        }];
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_custody_notes_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.custody = vec![CustodyEvent {
+            action: CustodyAction::Submitted,
+            actor: "did:example:actor".into(),
+            timestamp: ts(),
+            notes: Some("x".repeat(4097)),
+        }];
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_custody_notes_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.custody = vec![CustodyEvent {
+            action: CustodyAction::Submitted,
+            actor: "did:example:actor".into(),
+            timestamp: ts(),
+            notes: Some("x".repeat(4096)),
+        }];
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    // -- Evidence verification string limits --
+
+    #[test]
+    fn evidence_verification_verifier_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.verification.verifier = Some("x".repeat(257));
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_verification_verifier_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.verification.verifier = Some("x".repeat(256));
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_verification_method_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.verification.method = Some("x".repeat(4097));
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_verification_method_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.verification.method = Some("x".repeat(4096));
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn evidence_verification_notes_too_long_rejected() {
+        let mut ev = make_evidence();
+        ev.verification.notes = Some("x".repeat(4097));
+        let result = validate_evidence(&ev);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn evidence_verification_notes_at_limit_accepted() {
+        let mut ev = make_evidence();
+        ev.verification.notes = Some("x".repeat(4096));
+        let result = validate_evidence(&ev);
+        assert!(is_valid(&result));
+    }
+
     // ========================================================================
     // MEDIATION VALIDATION TESTS
     // ========================================================================
@@ -1259,6 +2228,184 @@ mod tests {
         med.mediator = "mediator-person".into();
         let result = validate_mediation(&med);
         assert!(is_invalid(&result));
+    }
+
+    // -- Mediation string length limits --
+
+    #[test]
+    fn mediation_id_too_long_rejected() {
+        let mut med = make_mediation();
+        med.id = "x".repeat(257);
+        let result = validate_mediation(&med);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn mediation_id_at_limit_accepted() {
+        let mut med = make_mediation();
+        med.id = "x".repeat(256);
+        let result = validate_mediation(&med);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn mediation_case_id_too_long_rejected() {
+        let mut med = make_mediation();
+        med.case_id = "x".repeat(513);
+        let result = validate_mediation(&med);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn mediation_case_id_at_limit_accepted() {
+        let mut med = make_mediation();
+        med.case_id = "x".repeat(512);
+        let result = validate_mediation(&med);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn mediation_mediator_did_too_long_rejected() {
+        let mut med = make_mediation();
+        med.mediator = format!("did:{}", "x".repeat(253));
+        let result = validate_mediation(&med);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn mediation_mediator_did_at_limit_accepted() {
+        let mut med = make_mediation();
+        med.mediator = format!("did:{}", "x".repeat(252));
+        let result = validate_mediation(&med);
+        assert!(is_valid(&result));
+    }
+
+    // -- Mediation Vec length limits --
+
+    #[test]
+    fn mediation_too_many_sessions_rejected() {
+        let mut med = make_mediation();
+        med.sessions = (0..51)
+            .map(|i| MediationSession {
+                session_number: i,
+                scheduled_at: ts(),
+                actual_start: None,
+                actual_end: None,
+                notes: None,
+                outcome: None,
+            })
+            .collect();
+        let result = validate_mediation(&med);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn mediation_sessions_at_limit_accepted() {
+        let mut med = make_mediation();
+        med.sessions = (0..50)
+            .map(|i| MediationSession {
+                session_number: i,
+                scheduled_at: ts(),
+                actual_start: None,
+                actual_end: None,
+                notes: None,
+                outcome: None,
+            })
+            .collect();
+        let result = validate_mediation(&med);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn mediation_too_many_proposals_rejected() {
+        let mut med = make_mediation();
+        med.proposals = (0..11).map(|i| format!("settlement-{}", i)).collect();
+        let result = validate_mediation(&med);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn mediation_proposals_at_limit_accepted() {
+        let mut med = make_mediation();
+        med.proposals = (0..10).map(|i| format!("settlement-{}", i)).collect();
+        let result = validate_mediation(&med);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn mediation_session_notes_too_long_rejected() {
+        let mut med = make_mediation();
+        med.sessions = vec![MediationSession {
+            session_number: 1,
+            scheduled_at: ts(),
+            actual_start: None,
+            actual_end: None,
+            notes: Some("x".repeat(4097)),
+            outcome: None,
+        }];
+        let result = validate_mediation(&med);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn mediation_session_notes_at_limit_accepted() {
+        let mut med = make_mediation();
+        med.sessions = vec![MediationSession {
+            session_number: 1,
+            scheduled_at: ts(),
+            actual_start: None,
+            actual_end: None,
+            notes: Some("x".repeat(4096)),
+            outcome: None,
+        }];
+        let result = validate_mediation(&med);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn mediation_session_outcome_too_long_rejected() {
+        let mut med = make_mediation();
+        med.sessions = vec![MediationSession {
+            session_number: 1,
+            scheduled_at: ts(),
+            actual_start: None,
+            actual_end: None,
+            notes: None,
+            outcome: Some("x".repeat(4097)),
+        }];
+        let result = validate_mediation(&med);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn mediation_session_outcome_at_limit_accepted() {
+        let mut med = make_mediation();
+        med.sessions = vec![MediationSession {
+            session_number: 1,
+            scheduled_at: ts(),
+            actual_start: None,
+            actual_end: None,
+            notes: None,
+            outcome: Some("x".repeat(4096)),
+        }];
+        let result = validate_mediation(&med);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn mediation_proposal_id_too_long_rejected() {
+        let mut med = make_mediation();
+        med.proposals = vec!["x".repeat(257)];
+        let result = validate_mediation(&med);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn mediation_proposal_id_at_limit_accepted() {
+        let mut med = make_mediation();
+        med.proposals = vec!["x".repeat(256)];
+        let result = validate_mediation(&med);
+        assert!(is_valid(&result));
     }
 
     // ========================================================================
@@ -1297,6 +2444,126 @@ mod tests {
         assert!(is_invalid(&result));
     }
 
+    // -- Arbitration string length limits --
+
+    #[test]
+    fn arbitration_id_too_long_rejected() {
+        let mut arb = make_arbitration(vec![
+            make_arbitrator("did:example:arb1"),
+            make_arbitrator("did:example:arb2"),
+            make_arbitrator("did:example:arb3"),
+        ]);
+        arb.id = "x".repeat(257);
+        let result = validate_arbitration(&arb);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn arbitration_id_at_limit_accepted() {
+        let mut arb = make_arbitration(vec![
+            make_arbitrator("did:example:arb1"),
+            make_arbitrator("did:example:arb2"),
+            make_arbitrator("did:example:arb3"),
+        ]);
+        arb.id = "x".repeat(256);
+        let result = validate_arbitration(&arb);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn arbitration_case_id_too_long_rejected() {
+        let mut arb = make_arbitration(vec![
+            make_arbitrator("did:example:arb1"),
+            make_arbitrator("did:example:arb2"),
+            make_arbitrator("did:example:arb3"),
+        ]);
+        arb.case_id = "x".repeat(513);
+        let result = validate_arbitration(&arb);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn arbitration_case_id_at_limit_accepted() {
+        let mut arb = make_arbitration(vec![
+            make_arbitrator("did:example:arb1"),
+            make_arbitrator("did:example:arb2"),
+            make_arbitrator("did:example:arb3"),
+        ]);
+        arb.case_id = "x".repeat(512);
+        let result = validate_arbitration(&arb);
+        assert!(is_valid(&result));
+    }
+
+    // -- Arbitration Vec length limits --
+
+    #[test]
+    fn arbitration_too_many_arbitrators_rejected() {
+        let arb = make_arbitration(
+            (0..11)
+                .map(|i| make_arbitrator(&format!("did:example:arb{}", i)))
+                .collect(),
+        );
+        let result = validate_arbitration(&arb);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn arbitration_arbitrators_at_limit_accepted() {
+        let arb = make_arbitration(
+            (0..9)
+                .map(|i| make_arbitrator(&format!("did:example:arb{}", i)))
+                .collect(),
+        );
+        let result = validate_arbitration(&arb);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn arbitration_arbitrator_did_too_long_rejected() {
+        let arb = make_arbitration(vec![
+            make_arbitrator(&format!("did:{}", "x".repeat(253))),
+            make_arbitrator("did:example:arb2"),
+            make_arbitrator("did:example:arb3"),
+        ]);
+        let result = validate_arbitration(&arb);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn arbitration_arbitrator_did_at_limit_accepted() {
+        let arb = make_arbitration(vec![
+            make_arbitrator(&format!("did:{}", "x".repeat(252))),
+            make_arbitrator("did:example:arb2"),
+            make_arbitrator("did:example:arb3"),
+        ]);
+        let result = validate_arbitration(&arb);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn arbitration_recusal_reason_too_long_rejected() {
+        let mut arb = make_arbitration(vec![
+            make_arbitrator("did:example:arb1"),
+            make_arbitrator("did:example:arb2"),
+            make_arbitrator("did:example:arb3"),
+        ]);
+        arb.arbitrators[0].recusal_reason = Some("x".repeat(4097));
+        let result = validate_arbitration(&arb);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn arbitration_recusal_reason_at_limit_accepted() {
+        let mut arb = make_arbitration(vec![
+            make_arbitrator("did:example:arb1"),
+            make_arbitrator("did:example:arb2"),
+            make_arbitrator("did:example:arb3"),
+        ]);
+        arb.arbitrators[0].recusal_reason = Some("x".repeat(4096));
+        let result = validate_arbitration(&arb);
+        assert!(is_valid(&result));
+    }
+
     // ========================================================================
     // DECISION VALIDATION TESTS
     // ========================================================================
@@ -1321,6 +2588,320 @@ mod tests {
         dec.votes = vec![];
         let result = validate_decision(&dec);
         assert!(is_invalid(&result));
+    }
+
+    // -- Decision string length limits --
+
+    #[test]
+    fn decision_id_too_long_rejected() {
+        let mut dec = make_decision();
+        dec.id = "x".repeat(257);
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_id_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.id = "x".repeat(256);
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_case_id_too_long_rejected() {
+        let mut dec = make_decision();
+        dec.case_id = "x".repeat(513);
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_case_id_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.case_id = "x".repeat(512);
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_arbitration_id_too_long_rejected() {
+        let mut dec = make_decision();
+        dec.arbitration_id = "x".repeat(257);
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_arbitration_id_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.arbitration_id = "x".repeat(256);
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_reasoning_too_long_rejected() {
+        let mut dec = make_decision();
+        dec.reasoning = "x".repeat(16385);
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_reasoning_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.reasoning = "x".repeat(16384);
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    // -- Decision Vec length limits --
+
+    #[test]
+    fn decision_too_many_remedies_rejected() {
+        let mut dec = make_decision();
+        dec.remedies = (0..21)
+            .map(|_| Remedy {
+                remedy_type: RemedyType::Compensation,
+                responsible_party: "did:example:party".into(),
+                deadline: None,
+                amount: Some(100),
+                currency: Some("USD".into()),
+                description: "Pay up".into(),
+            })
+            .collect();
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_remedies_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.remedies = (0..20)
+            .map(|_| Remedy {
+                remedy_type: RemedyType::Compensation,
+                responsible_party: "did:example:party".into(),
+                deadline: None,
+                amount: Some(100),
+                currency: Some("USD".into()),
+                description: "Pay up".into(),
+            })
+            .collect();
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_too_many_votes_rejected() {
+        let mut dec = make_decision();
+        dec.votes = (0..10)
+            .map(|i| make_vote(&format!("did:example:arb{}", i)))
+            .collect();
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_votes_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.votes = (0..9)
+            .map(|i| make_vote(&format!("did:example:arb{}", i)))
+            .collect();
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_too_many_dissents_rejected() {
+        let mut dec = make_decision();
+        dec.dissents = (0..10)
+            .map(|i| DissentingOpinion {
+                arbitrator: format!("did:example:arb{}", i),
+                opinion: "I disagree".into(),
+                timestamp: ts(),
+            })
+            .collect();
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_dissents_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.dissents = (0..9)
+            .map(|i| DissentingOpinion {
+                arbitrator: format!("did:example:arb{}", i),
+                opinion: "I disagree".into(),
+                timestamp: ts(),
+            })
+            .collect();
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    // -- Decision nested string limits --
+
+    #[test]
+    fn decision_remedy_responsible_party_too_long_rejected() {
+        let mut dec = make_decision();
+        dec.remedies = vec![Remedy {
+            remedy_type: RemedyType::Compensation,
+            responsible_party: "x".repeat(257),
+            deadline: None,
+            amount: None,
+            currency: None,
+            description: "Test".into(),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_remedy_responsible_party_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.remedies = vec![Remedy {
+            remedy_type: RemedyType::Compensation,
+            responsible_party: "x".repeat(256),
+            deadline: None,
+            amount: None,
+            currency: None,
+            description: "Test".into(),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_remedy_description_too_long_rejected() {
+        let mut dec = make_decision();
+        dec.remedies = vec![Remedy {
+            remedy_type: RemedyType::Compensation,
+            responsible_party: "did:example:party".into(),
+            deadline: None,
+            amount: None,
+            currency: None,
+            description: "x".repeat(4097),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_remedy_description_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.remedies = vec![Remedy {
+            remedy_type: RemedyType::Compensation,
+            responsible_party: "did:example:party".into(),
+            deadline: None,
+            amount: None,
+            currency: None,
+            description: "x".repeat(4096),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_remedy_currency_too_long_rejected() {
+        let mut dec = make_decision();
+        dec.remedies = vec![Remedy {
+            remedy_type: RemedyType::Compensation,
+            responsible_party: "did:example:party".into(),
+            deadline: None,
+            amount: Some(100),
+            currency: Some("x".repeat(257)),
+            description: "Test".into(),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_remedy_currency_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.remedies = vec![Remedy {
+            remedy_type: RemedyType::Compensation,
+            responsible_party: "did:example:party".into(),
+            deadline: None,
+            amount: Some(100),
+            currency: Some("x".repeat(256)),
+            description: "Test".into(),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_vote_arbitrator_too_long_rejected() {
+        let mut dec = make_decision();
+        dec.votes = vec![ArbitratorVote {
+            arbitrator: "x".repeat(257),
+            vote: VoteChoice::ForComplainant,
+            timestamp: ts(),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_vote_arbitrator_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.votes = vec![ArbitratorVote {
+            arbitrator: "x".repeat(256),
+            vote: VoteChoice::ForComplainant,
+            timestamp: ts(),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_dissent_arbitrator_too_long_rejected() {
+        let mut dec = make_decision();
+        dec.dissents = vec![DissentingOpinion {
+            arbitrator: "x".repeat(257),
+            opinion: "I disagree".into(),
+            timestamp: ts(),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_dissent_arbitrator_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.dissents = vec![DissentingOpinion {
+            arbitrator: "x".repeat(256),
+            opinion: "I disagree".into(),
+            timestamp: ts(),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn decision_dissent_opinion_too_long_rejected() {
+        let mut dec = make_decision();
+        dec.dissents = vec![DissentingOpinion {
+            arbitrator: "did:example:arb1".into(),
+            opinion: "x".repeat(16385),
+            timestamp: ts(),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn decision_dissent_opinion_at_limit_accepted() {
+        let mut dec = make_decision();
+        dec.dissents = vec![DissentingOpinion {
+            arbitrator: "did:example:arb1".into(),
+            opinion: "x".repeat(16384),
+            timestamp: ts(),
+        }];
+        let result = validate_decision(&dec);
+        assert!(is_valid(&result));
     }
 
     // ========================================================================
@@ -1357,6 +2938,110 @@ mod tests {
         assert!(is_invalid(&result));
     }
 
+    // -- Appeal string length limits --
+
+    #[test]
+    fn appeal_id_too_long_rejected() {
+        let mut appeal = make_appeal();
+        appeal.id = "x".repeat(257);
+        let result = validate_appeal(&appeal);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn appeal_id_at_limit_accepted() {
+        let mut appeal = make_appeal();
+        appeal.id = "x".repeat(256);
+        let result = validate_appeal(&appeal);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn appeal_case_id_too_long_rejected() {
+        let mut appeal = make_appeal();
+        appeal.case_id = "x".repeat(513);
+        let result = validate_appeal(&appeal);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn appeal_case_id_at_limit_accepted() {
+        let mut appeal = make_appeal();
+        appeal.case_id = "x".repeat(512);
+        let result = validate_appeal(&appeal);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn appeal_decision_id_too_long_rejected() {
+        let mut appeal = make_appeal();
+        appeal.decision_id = "x".repeat(257);
+        let result = validate_appeal(&appeal);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn appeal_decision_id_at_limit_accepted() {
+        let mut appeal = make_appeal();
+        appeal.decision_id = "x".repeat(256);
+        let result = validate_appeal(&appeal);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn appeal_appellant_did_too_long_rejected() {
+        let mut appeal = make_appeal();
+        appeal.appellant = format!("did:{}", "x".repeat(253));
+        let result = validate_appeal(&appeal);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn appeal_appellant_did_at_limit_accepted() {
+        let mut appeal = make_appeal();
+        appeal.appellant = format!("did:{}", "x".repeat(252));
+        let result = validate_appeal(&appeal);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn appeal_argument_too_long_rejected() {
+        let mut appeal = make_appeal();
+        appeal.argument = "x".repeat(16385);
+        let result = validate_appeal(&appeal);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn appeal_argument_at_limit_accepted() {
+        let mut appeal = make_appeal();
+        appeal.argument = "x".repeat(16384);
+        let result = validate_appeal(&appeal);
+        assert!(is_valid(&result));
+    }
+
+    // -- Appeal Vec length limits --
+
+    #[test]
+    fn appeal_too_many_grounds_rejected() {
+        let mut appeal = make_appeal();
+        appeal.grounds = (0..11)
+            .map(|_| AppealGround::ProceduralError)
+            .collect();
+        let result = validate_appeal(&appeal);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn appeal_grounds_at_limit_accepted() {
+        let mut appeal = make_appeal();
+        appeal.grounds = (0..10)
+            .map(|_| AppealGround::ProceduralError)
+            .collect();
+        let result = validate_appeal(&appeal);
+        assert!(is_valid(&result));
+    }
+
     // ========================================================================
     // ENFORCEMENT VALIDATION TESTS
     // ========================================================================
@@ -1373,6 +3058,174 @@ mod tests {
         enf.enforcer = "system".into();
         let result = validate_enforcement(&enf);
         assert!(is_invalid(&result));
+    }
+
+    // -- Enforcement string length limits --
+
+    #[test]
+    fn enforcement_id_too_long_rejected() {
+        let mut enf = make_enforcement();
+        enf.id = "x".repeat(257);
+        let result = validate_enforcement(&enf);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn enforcement_id_at_limit_accepted() {
+        let mut enf = make_enforcement();
+        enf.id = "x".repeat(256);
+        let result = validate_enforcement(&enf);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn enforcement_decision_id_too_long_rejected() {
+        let mut enf = make_enforcement();
+        enf.decision_id = "x".repeat(257);
+        let result = validate_enforcement(&enf);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn enforcement_decision_id_at_limit_accepted() {
+        let mut enf = make_enforcement();
+        enf.decision_id = "x".repeat(256);
+        let result = validate_enforcement(&enf);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn enforcement_enforcer_did_too_long_rejected() {
+        let mut enf = make_enforcement();
+        enf.enforcer = format!("did:{}", "x".repeat(253));
+        let result = validate_enforcement(&enf);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn enforcement_enforcer_did_at_limit_accepted() {
+        let mut enf = make_enforcement();
+        enf.enforcer = format!("did:{}", "x".repeat(252));
+        let result = validate_enforcement(&enf);
+        assert!(is_valid(&result));
+    }
+
+    // -- Enforcement Vec length limits --
+
+    #[test]
+    fn enforcement_too_many_actions_rejected() {
+        let mut enf = make_enforcement();
+        enf.actions = (0..101)
+            .map(|_| EnforcementAction {
+                action_type: EnforcementActionType::Notification,
+                target_happ: None,
+                target_entry: None,
+                executed_at: ts(),
+                result: "done".into(),
+            })
+            .collect();
+        let result = validate_enforcement(&enf);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn enforcement_actions_at_limit_accepted() {
+        let mut enf = make_enforcement();
+        enf.actions = (0..100)
+            .map(|_| EnforcementAction {
+                action_type: EnforcementActionType::Notification,
+                target_happ: None,
+                target_entry: None,
+                executed_at: ts(),
+                result: "done".into(),
+            })
+            .collect();
+        let result = validate_enforcement(&enf);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn enforcement_action_result_too_long_rejected() {
+        let mut enf = make_enforcement();
+        enf.actions = vec![EnforcementAction {
+            action_type: EnforcementActionType::Notification,
+            target_happ: None,
+            target_entry: None,
+            executed_at: ts(),
+            result: "x".repeat(4097),
+        }];
+        let result = validate_enforcement(&enf);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn enforcement_action_result_at_limit_accepted() {
+        let mut enf = make_enforcement();
+        enf.actions = vec![EnforcementAction {
+            action_type: EnforcementActionType::Notification,
+            target_happ: None,
+            target_entry: None,
+            executed_at: ts(),
+            result: "x".repeat(4096),
+        }];
+        let result = validate_enforcement(&enf);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn enforcement_action_target_happ_too_long_rejected() {
+        let mut enf = make_enforcement();
+        enf.actions = vec![EnforcementAction {
+            action_type: EnforcementActionType::CrossHappAction,
+            target_happ: Some("x".repeat(257)),
+            target_entry: None,
+            executed_at: ts(),
+            result: "done".into(),
+        }];
+        let result = validate_enforcement(&enf);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn enforcement_action_target_happ_at_limit_accepted() {
+        let mut enf = make_enforcement();
+        enf.actions = vec![EnforcementAction {
+            action_type: EnforcementActionType::CrossHappAction,
+            target_happ: Some("x".repeat(256)),
+            target_entry: None,
+            executed_at: ts(),
+            result: "done".into(),
+        }];
+        let result = validate_enforcement(&enf);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn enforcement_action_target_entry_too_long_rejected() {
+        let mut enf = make_enforcement();
+        enf.actions = vec![EnforcementAction {
+            action_type: EnforcementActionType::CrossHappAction,
+            target_happ: None,
+            target_entry: Some("x".repeat(257)),
+            executed_at: ts(),
+            result: "done".into(),
+        }];
+        let result = validate_enforcement(&enf);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn enforcement_action_target_entry_at_limit_accepted() {
+        let mut enf = make_enforcement();
+        enf.actions = vec![EnforcementAction {
+            action_type: EnforcementActionType::CrossHappAction,
+            target_happ: None,
+            target_entry: Some("x".repeat(256)),
+            executed_at: ts(),
+            result: "done".into(),
+        }];
+        let result = validate_enforcement(&enf);
+        assert!(is_valid(&result));
     }
 
     // ========================================================================
@@ -1399,5 +3252,297 @@ mod tests {
         circle.facilitator = "facilitator".into();
         let result = validate_restorative(&circle);
         assert!(is_invalid(&result));
+    }
+
+    // -- RestorativeCircle string length limits --
+
+    #[test]
+    fn restorative_id_too_long_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.id = "x".repeat(257);
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_id_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.id = "x".repeat(256);
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn restorative_case_id_too_long_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.case_id = "x".repeat(513);
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_case_id_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.case_id = "x".repeat(512);
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn restorative_facilitator_did_too_long_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.facilitator = format!("did:{}", "x".repeat(253));
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_facilitator_did_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.facilitator = format!("did:{}", "x".repeat(252));
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    // -- RestorativeCircle Vec length limits --
+
+    #[test]
+    fn restorative_too_many_participants_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.participants = (0..51)
+            .map(|i| make_circle_participant(&format!("did:example:p{}", i)))
+            .collect();
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_participants_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.participants = (0..50)
+            .map(|i| make_circle_participant(&format!("did:example:p{}", i)))
+            .collect();
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn restorative_too_many_agreements_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.agreements = (0..21).map(|i| format!("Agreement {}", i)).collect();
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_agreements_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.agreements = (0..20).map(|i| format!("Agreement {}", i)).collect();
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn restorative_too_many_sessions_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.sessions = (0..51)
+            .map(|i| CircleSession {
+                session_number: i,
+                held_at: ts(),
+                attendees: vec![],
+                summary: "Summary".into(),
+                next_steps: vec![],
+            })
+            .collect();
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_sessions_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.sessions = (0..50)
+            .map(|i| CircleSession {
+                session_number: i,
+                held_at: ts(),
+                attendees: vec![],
+                summary: "Summary".into(),
+                next_steps: vec![],
+            })
+            .collect();
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    // -- RestorativeCircle nested string/vec limits --
+
+    #[test]
+    fn restorative_participant_did_too_long_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.participants = vec![CircleParticipant {
+            did: "x".repeat(257),
+            role: CircleRole::CommunityMember,
+            consented: true,
+            attended_sessions: vec![],
+        }];
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_participant_did_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.participants = vec![CircleParticipant {
+            did: "x".repeat(256),
+            role: CircleRole::CommunityMember,
+            consented: true,
+            attended_sessions: vec![],
+        }];
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn restorative_participant_too_many_attended_sessions_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.participants[0].attended_sessions = (0..101).collect();
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_participant_attended_sessions_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.participants[0].attended_sessions = (0..100).collect();
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn restorative_agreement_too_long_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.agreements = vec!["x".repeat(4097)];
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_agreement_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.agreements = vec!["x".repeat(4096)];
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn restorative_session_summary_too_long_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.sessions = vec![CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec![],
+            summary: "x".repeat(4097),
+            next_steps: vec![],
+        }];
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_session_summary_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.sessions = vec![CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec![],
+            summary: "x".repeat(4096),
+            next_steps: vec![],
+        }];
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn restorative_session_too_many_next_steps_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.sessions = vec![CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec![],
+            summary: "Summary".into(),
+            next_steps: (0..31).map(|i| format!("Step {}", i)).collect(),
+        }];
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_session_next_steps_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.sessions = vec![CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec![],
+            summary: "Summary".into(),
+            next_steps: (0..30).map(|i| format!("Step {}", i)).collect(),
+        }];
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn restorative_session_next_step_too_long_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.sessions = vec![CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec![],
+            summary: "Summary".into(),
+            next_steps: vec!["x".repeat(4097)],
+        }];
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_session_next_step_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.sessions = vec![CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec![],
+            summary: "Summary".into(),
+            next_steps: vec!["x".repeat(4096)],
+        }];
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn restorative_session_attendee_too_long_rejected() {
+        let mut circle = make_restorative_circle();
+        circle.sessions = vec![CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec!["x".repeat(257)],
+            summary: "Summary".into(),
+            next_steps: vec![],
+        }];
+        let result = validate_restorative(&circle);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn restorative_session_attendee_at_limit_accepted() {
+        let mut circle = make_restorative_circle();
+        circle.sessions = vec![CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec!["x".repeat(256)],
+            summary: "Summary".into(),
+            next_steps: vec![],
+        }];
+        let result = validate_restorative(&circle);
+        assert!(is_valid(&result));
     }
 }

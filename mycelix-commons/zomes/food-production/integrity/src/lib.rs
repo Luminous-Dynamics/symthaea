@@ -169,8 +169,14 @@ fn validate_plot(plot: Plot) -> ExternResult<ValidateCallbackResult> {
     if plot.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Plot ID cannot be empty".into()));
     }
+    if plot.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Plot ID must be 64 characters or fewer".into()));
+    }
     if plot.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Plot name cannot be empty".into()));
+    }
+    if plot.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Plot name must be 256 characters or fewer".into()));
     }
     if plot.area_sqm <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Area must be positive".into()));
@@ -188,8 +194,14 @@ fn validate_crop(crop: Crop) -> ExternResult<ValidateCallbackResult> {
     if crop.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Crop name cannot be empty".into()));
     }
+    if crop.name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Crop name must be 256 characters or fewer".into()));
+    }
     if crop.variety.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Crop variety cannot be empty".into()));
+    }
+    if crop.variety.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid("Crop variety must be 128 characters or fewer".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -198,6 +210,11 @@ fn validate_yield(yr: YieldRecord) -> ExternResult<ValidateCallbackResult> {
     if yr.quantity_kg <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Yield quantity must be positive".into()));
     }
+    if let Some(ref notes) = yr.notes {
+        if notes.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid("Yield notes must be 4096 characters or fewer".into()));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -205,8 +222,24 @@ fn validate_season_plan(sp: SeasonPlan) -> ExternResult<ValidateCallbackResult> 
     if sp.season.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Season cannot be empty".into()));
     }
+    if sp.season.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Season must be 64 characters or fewer".into()));
+    }
     if sp.planned_crops.is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Must plan at least one crop".into()));
+    }
+    if sp.planned_crops.len() > 100 {
+        return Ok(ValidateCallbackResult::Invalid("Cannot plan more than 100 crops".into()));
+    }
+    for crop_name in &sp.planned_crops {
+        if crop_name.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Each planned crop name must be 256 characters or fewer".into()));
+        }
+    }
+    if let Some(ref notes) = sp.rotation_notes {
+        if notes.len() > 2048 {
+            return Ok(ValidateCallbackResult::Invalid("Rotation notes must be 2048 characters or fewer".into()));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -753,5 +786,217 @@ mod tests {
         let json = serde_json::to_string(&a).unwrap();
         let back: Anchor = serde_json::from_str(&json).unwrap();
         assert_eq!(back, a);
+    }
+
+    // ── validate_plot: string length limits ─────────────────────────────
+
+    #[test]
+    fn plot_id_too_long_rejected() {
+        let mut p = valid_plot();
+        p.id = "x".repeat(65);
+        assert_invalid(validate_plot(p), "Plot ID must be 64 characters or fewer");
+    }
+
+    #[test]
+    fn plot_id_exactly_64_chars_accepted() {
+        let mut p = valid_plot();
+        p.id = "x".repeat(64);
+        assert_valid(validate_plot(p));
+    }
+
+    #[test]
+    fn plot_id_63_chars_accepted() {
+        let mut p = valid_plot();
+        p.id = "x".repeat(63);
+        assert_valid(validate_plot(p));
+    }
+
+    #[test]
+    fn plot_name_too_long_rejected() {
+        let mut p = valid_plot();
+        p.name = "x".repeat(257);
+        assert_invalid(validate_plot(p), "Plot name must be 256 characters or fewer");
+    }
+
+    #[test]
+    fn plot_name_exactly_256_chars_accepted() {
+        let mut p = valid_plot();
+        p.name = "x".repeat(256);
+        assert_valid(validate_plot(p));
+    }
+
+    #[test]
+    fn plot_name_255_chars_accepted() {
+        let mut p = valid_plot();
+        p.name = "x".repeat(255);
+        assert_valid(validate_plot(p));
+    }
+
+    // ── validate_crop: string length limits ─────────────────────────────
+
+    #[test]
+    fn crop_name_too_long_rejected() {
+        let mut c = valid_crop();
+        c.name = "x".repeat(257);
+        assert_invalid(validate_crop(c), "Crop name must be 256 characters or fewer");
+    }
+
+    #[test]
+    fn crop_name_exactly_256_chars_accepted() {
+        let mut c = valid_crop();
+        c.name = "x".repeat(256);
+        assert_valid(validate_crop(c));
+    }
+
+    #[test]
+    fn crop_name_255_chars_accepted() {
+        let mut c = valid_crop();
+        c.name = "x".repeat(255);
+        assert_valid(validate_crop(c));
+    }
+
+    #[test]
+    fn crop_variety_too_long_rejected() {
+        let mut c = valid_crop();
+        c.variety = "x".repeat(129);
+        assert_invalid(validate_crop(c), "Crop variety must be 128 characters or fewer");
+    }
+
+    #[test]
+    fn crop_variety_exactly_128_chars_accepted() {
+        let mut c = valid_crop();
+        c.variety = "x".repeat(128);
+        assert_valid(validate_crop(c));
+    }
+
+    #[test]
+    fn crop_variety_127_chars_accepted() {
+        let mut c = valid_crop();
+        c.variety = "x".repeat(127);
+        assert_valid(validate_crop(c));
+    }
+
+    // ── validate_yield: notes string length limit ───────────────────────
+
+    #[test]
+    fn yield_notes_too_long_rejected() {
+        let mut yr = valid_yield_record();
+        yr.notes = Some("x".repeat(4097));
+        assert_invalid(validate_yield(yr), "Yield notes must be 4096 characters or fewer");
+    }
+
+    #[test]
+    fn yield_notes_exactly_4096_chars_accepted() {
+        let mut yr = valid_yield_record();
+        yr.notes = Some("x".repeat(4096));
+        assert_valid(validate_yield(yr));
+    }
+
+    #[test]
+    fn yield_notes_4095_chars_accepted() {
+        let mut yr = valid_yield_record();
+        yr.notes = Some("x".repeat(4095));
+        assert_valid(validate_yield(yr));
+    }
+
+    // ── validate_season_plan: string length limits ──────────────────────
+
+    #[test]
+    fn season_plan_season_too_long_rejected() {
+        let mut sp = valid_season_plan();
+        sp.season = "x".repeat(65);
+        assert_invalid(validate_season_plan(sp), "Season must be 64 characters or fewer");
+    }
+
+    #[test]
+    fn season_plan_season_exactly_64_chars_accepted() {
+        let mut sp = valid_season_plan();
+        sp.season = "x".repeat(64);
+        assert_valid(validate_season_plan(sp));
+    }
+
+    #[test]
+    fn season_plan_season_63_chars_accepted() {
+        let mut sp = valid_season_plan();
+        sp.season = "x".repeat(63);
+        assert_valid(validate_season_plan(sp));
+    }
+
+    #[test]
+    fn season_plan_rotation_notes_too_long_rejected() {
+        let mut sp = valid_season_plan();
+        sp.rotation_notes = Some("x".repeat(2049));
+        assert_invalid(validate_season_plan(sp), "Rotation notes must be 2048 characters or fewer");
+    }
+
+    #[test]
+    fn season_plan_rotation_notes_exactly_2048_chars_accepted() {
+        let mut sp = valid_season_plan();
+        sp.rotation_notes = Some("x".repeat(2048));
+        assert_valid(validate_season_plan(sp));
+    }
+
+    #[test]
+    fn season_plan_rotation_notes_2047_chars_accepted() {
+        let mut sp = valid_season_plan();
+        sp.rotation_notes = Some("x".repeat(2047));
+        assert_valid(validate_season_plan(sp));
+    }
+
+    // ── validate_season_plan: Vec length limits ─────────────────────────
+
+    #[test]
+    fn season_plan_too_many_planned_crops_rejected() {
+        let mut sp = valid_season_plan();
+        sp.planned_crops = (0..101).map(|i| format!("crop_{i}")).collect();
+        assert_invalid(validate_season_plan(sp), "Cannot plan more than 100 crops");
+    }
+
+    #[test]
+    fn season_plan_exactly_100_planned_crops_accepted() {
+        let mut sp = valid_season_plan();
+        sp.planned_crops = (0..100).map(|i| format!("crop_{i}")).collect();
+        assert_valid(validate_season_plan(sp));
+    }
+
+    #[test]
+    fn season_plan_99_planned_crops_accepted() {
+        let mut sp = valid_season_plan();
+        sp.planned_crops = (0..99).map(|i| format!("crop_{i}")).collect();
+        assert_valid(validate_season_plan(sp));
+    }
+
+    // ── validate_season_plan: individual crop name length ───────────────
+
+    #[test]
+    fn season_plan_planned_crop_name_too_long_rejected() {
+        let mut sp = valid_season_plan();
+        sp.planned_crops = vec!["x".repeat(257)];
+        assert_invalid(validate_season_plan(sp), "Each planned crop name must be 256 characters or fewer");
+    }
+
+    #[test]
+    fn season_plan_planned_crop_name_exactly_256_chars_accepted() {
+        let mut sp = valid_season_plan();
+        sp.planned_crops = vec!["x".repeat(256)];
+        assert_valid(validate_season_plan(sp));
+    }
+
+    #[test]
+    fn season_plan_planned_crop_name_255_chars_accepted() {
+        let mut sp = valid_season_plan();
+        sp.planned_crops = vec!["x".repeat(255)];
+        assert_valid(validate_season_plan(sp));
+    }
+
+    #[test]
+    fn season_plan_second_crop_name_too_long_rejected() {
+        let mut sp = valid_season_plan();
+        sp.planned_crops = vec![
+            "Valid crop".to_string(),
+            "x".repeat(257),
+            "Another valid".to_string(),
+        ];
+        assert_invalid(validate_season_plan(sp), "Each planned crop name must be 256 characters or fewer");
     }
 }

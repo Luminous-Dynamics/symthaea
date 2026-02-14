@@ -181,18 +181,74 @@ fn validate_create_property(
     if property.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Property ID cannot be empty".into()));
     }
+    if property.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Property ID must be 64 characters or fewer".into()));
+    }
     if property.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Property title cannot be empty".into()));
+    }
+    if property.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Property title must be 256 characters or fewer".into()));
+    }
+    if property.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Property description must be 4096 characters or fewer".into()));
     }
     if !property.owner_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Owner must be a valid DID".into()));
     }
+    if property.owner_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Owner DID must be 256 characters or fewer".into()));
+    }
+    // Vec limits
+    if property.co_owners.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 co-owners".into()));
+    }
+    if property.metadata.attachments.len() > 20 {
+        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 20 attachments".into()));
+    }
+    // Address string limits
+    if let Some(ref addr) = property.address {
+        if addr.street.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Street must be 256 characters or fewer".into()));
+        }
+        if addr.city.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("City must be 256 characters or fewer".into()));
+        }
+        if addr.region.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Region must be 256 characters or fewer".into()));
+        }
+        if addr.country.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Country must be 256 characters or fewer".into()));
+        }
+        if let Some(ref pc) = addr.postal_code {
+            if pc.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid("Postal code must be 256 characters or fewer".into()));
+            }
+        }
+    }
+    // Metadata string limits
+    if let Some(ref ld) = property.metadata.legal_description {
+        if ld.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid("Legal description must be 4096 characters or fewer".into()));
+        }
+    }
+    if let Some(ref pn) = property.metadata.parcel_number {
+        if pn.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid("Parcel number must be 128 characters or fewer".into()));
+        }
+    }
+    // Geolocation validation
     if let Some(ref geo) = property.geolocation {
         if geo.latitude < -90.0 || geo.latitude > 90.0 {
             return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
         }
         if geo.longitude < -180.0 || geo.longitude > 180.0 {
             return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+        }
+        if let Some(ref boundaries) = geo.boundaries {
+            if boundaries.len() > 1000 {
+                return Ok(ValidateCallbackResult::Invalid("Cannot have more than 1000 boundary points".into()));
+            }
         }
         if let Some(area) = geo.area_sqm {
             if area <= 0.0 {
@@ -210,6 +266,9 @@ fn validate_create_property(
         if !co_owner.did.starts_with("did:") {
             return Ok(ValidateCallbackResult::Invalid("Co-owner must be a valid DID".into()));
         }
+        if co_owner.did.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Co-owner DID must be 256 characters or fewer".into()));
+        }
         if co_owner.share_percentage <= 0.0 || co_owner.share_percentage > 100.0 {
             return Ok(ValidateCallbackResult::Invalid("Share must be between 0 and 100".into()));
         }
@@ -223,8 +282,67 @@ fn validate_create_property(
 
 fn validate_update_property(
     _action: Update,
-    _property: Property,
+    property: Property,
 ) -> ExternResult<ValidateCallbackResult> {
+    if property.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Property ID must be 64 characters or fewer".into()));
+    }
+    if property.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Property title must be 256 characters or fewer".into()));
+    }
+    if property.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Property description must be 4096 characters or fewer".into()));
+    }
+    if property.owner_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Owner DID must be 256 characters or fewer".into()));
+    }
+    if property.co_owners.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 co-owners".into()));
+    }
+    if property.metadata.attachments.len() > 20 {
+        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 20 attachments".into()));
+    }
+    if let Some(ref addr) = property.address {
+        if addr.street.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Street must be 256 characters or fewer".into()));
+        }
+        if addr.city.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("City must be 256 characters or fewer".into()));
+        }
+        if addr.region.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Region must be 256 characters or fewer".into()));
+        }
+        if addr.country.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Country must be 256 characters or fewer".into()));
+        }
+        if let Some(ref pc) = addr.postal_code {
+            if pc.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid("Postal code must be 256 characters or fewer".into()));
+            }
+        }
+    }
+    if let Some(ref ld) = property.metadata.legal_description {
+        if ld.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid("Legal description must be 4096 characters or fewer".into()));
+        }
+    }
+    if let Some(ref pn) = property.metadata.parcel_number {
+        if pn.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid("Parcel number must be 128 characters or fewer".into()));
+        }
+    }
+    if let Some(ref geo) = property.geolocation {
+        if let Some(ref boundaries) = geo.boundaries {
+            if boundaries.len() > 1000 {
+                return Ok(ValidateCallbackResult::Invalid("Cannot have more than 1000 boundary points".into()));
+            }
+        }
+    }
+    for co_owner in &property.co_owners {
+        if co_owner.did.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Co-owner DID must be 256 characters or fewer".into()));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -235,15 +353,35 @@ fn validate_create_title_deed(
     if deed.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Deed ID cannot be empty".into()));
     }
+    if deed.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Deed ID must be 64 characters or fewer".into()));
+    }
     if deed.property_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Deed property_id cannot be empty".into()));
+    }
+    if deed.property_id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid("Deed property_id must be 64 characters or fewer".into()));
     }
     if !deed.owner_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Owner must be a valid DID".into()));
     }
+    if deed.owner_did.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Owner DID must be 256 characters or fewer".into()));
+    }
+    if let Some(ref prev) = deed.previous_deed_id {
+        if prev.len() > 64 {
+            return Ok(ValidateCallbackResult::Invalid("Previous deed ID must be 64 characters or fewer".into()));
+        }
+    }
+    if deed.encumbrances.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 encumbrances".into()));
+    }
     for enc in &deed.encumbrances {
         if !enc.holder_did.starts_with("did:") {
             return Ok(ValidateCallbackResult::Invalid("Encumbrance holder must be a valid DID".into()));
+        }
+        if enc.holder_did.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Encumbrance holder DID must be 256 characters or fewer".into()));
         }
         if let Some(amount) = enc.amount {
             if amount < 0.0 {
@@ -292,6 +430,24 @@ mod tests {
 
     fn fake_entry_creation_action() -> EntryCreationAction {
         EntryCreationAction::Create(fake_create())
+    }
+
+    fn fake_update() -> Update {
+        Update {
+            author: fake_agent(),
+            timestamp: Timestamp::from_micros(0),
+            action_seq: 1,
+            prev_action: fake_action_hash(),
+            original_action_address: fake_action_hash(),
+            original_entry_address: fake_entry_hash(),
+            entry_type: EntryType::App(AppEntryDef::new(
+                EntryDefIndex(0),
+                ZomeIndex(0),
+                EntryVisibility::Public,
+            )),
+            entry_hash: fake_entry_hash(),
+            weight: EntryRateWeight::default(),
+        }
     }
 
     fn is_valid(result: &ExternResult<ValidateCallbackResult>) -> bool {
@@ -862,6 +1018,646 @@ mod tests {
             expires: None,
         }];
         let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // PROPERTY STRING LENGTH VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn property_id_too_long_rejected() {
+        let mut p = make_property();
+        p.id = "x".repeat(65);
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_id_exactly_64_chars_accepted() {
+        let mut p = make_property();
+        p.id = "x".repeat(64);
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_id_63_chars_accepted() {
+        let mut p = make_property();
+        p.id = "x".repeat(63);
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_title_too_long_rejected() {
+        let mut p = make_property();
+        p.title = "x".repeat(257);
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_title_exactly_256_chars_accepted() {
+        let mut p = make_property();
+        p.title = "x".repeat(256);
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_title_255_chars_accepted() {
+        let mut p = make_property();
+        p.title = "x".repeat(255);
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_description_too_long_rejected() {
+        let mut p = make_property();
+        p.description = "x".repeat(4097);
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_description_exactly_4096_chars_accepted() {
+        let mut p = make_property();
+        p.description = "x".repeat(4096);
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_description_4095_chars_accepted() {
+        let mut p = make_property();
+        p.description = "x".repeat(4095);
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_owner_did_too_long_rejected() {
+        let mut p = make_property();
+        p.owner_did = format!("did:{}", "x".repeat(253));
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_owner_did_exactly_256_chars_accepted() {
+        let mut p = make_property();
+        p.owner_did = format!("did:{}", "x".repeat(252));
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // PROPERTY VEC LENGTH VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn property_too_many_co_owners_rejected() {
+        let mut p = make_property();
+        p.co_owners = (0..51)
+            .map(|i| CoOwner {
+                did: format!("did:key:z6Mk{:03}", i),
+                share_percentage: 1.0,
+            })
+            .collect();
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_exactly_50_co_owners_accepted() {
+        let mut p = make_property();
+        p.co_owners = (0..50)
+            .map(|i| CoOwner {
+                did: format!("did:key:z6Mk{:03}", i),
+                share_percentage: 1.0,
+            })
+            .collect();
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_49_co_owners_accepted() {
+        let mut p = make_property();
+        p.co_owners = (0..49)
+            .map(|i| CoOwner {
+                did: format!("did:key:z6Mk{:03}", i),
+                share_percentage: 1.0,
+            })
+            .collect();
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_too_many_attachments_rejected() {
+        let mut p = make_property();
+        p.metadata.attachments = (0..21).map(|i| format!("doc_{}.pdf", i)).collect();
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_exactly_20_attachments_accepted() {
+        let mut p = make_property();
+        p.metadata.attachments = (0..20).map(|i| format!("doc_{}.pdf", i)).collect();
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_19_attachments_accepted() {
+        let mut p = make_property();
+        p.metadata.attachments = (0..19).map(|i| format!("doc_{}.pdf", i)).collect();
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_too_many_boundaries_rejected() {
+        let mut p = make_property();
+        p.geolocation = Some(GeoLocation {
+            latitude: 32.9,
+            longitude: -96.7,
+            boundaries: Some((0..1001).map(|i| (i as f64, i as f64)).collect()),
+            area_sqm: Some(500.0),
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_exactly_1000_boundaries_accepted() {
+        let mut p = make_property();
+        p.geolocation = Some(GeoLocation {
+            latitude: 32.9,
+            longitude: -96.7,
+            boundaries: Some((0..1000).map(|i| (i as f64, i as f64)).collect()),
+            area_sqm: Some(500.0),
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_999_boundaries_accepted() {
+        let mut p = make_property();
+        p.geolocation = Some(GeoLocation {
+            latitude: 32.9,
+            longitude: -96.7,
+            boundaries: Some((0..999).map(|i| (i as f64, i as f64)).collect()),
+            area_sqm: Some(500.0),
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // PROPERTY ADDRESS STRING LENGTH VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn property_street_too_long_rejected() {
+        let mut p = make_property();
+        p.address = Some(Address {
+            street: "x".repeat(257),
+            city: "City".into(),
+            region: "Region".into(),
+            country: "US".into(),
+            postal_code: None,
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_street_exactly_256_chars_accepted() {
+        let mut p = make_property();
+        p.address = Some(Address {
+            street: "x".repeat(256),
+            city: "City".into(),
+            region: "Region".into(),
+            country: "US".into(),
+            postal_code: None,
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_city_too_long_rejected() {
+        let mut p = make_property();
+        p.address = Some(Address {
+            street: "123 Main St".into(),
+            city: "x".repeat(257),
+            region: "Region".into(),
+            country: "US".into(),
+            postal_code: None,
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_city_exactly_256_chars_accepted() {
+        let mut p = make_property();
+        p.address = Some(Address {
+            street: "123 Main St".into(),
+            city: "x".repeat(256),
+            region: "Region".into(),
+            country: "US".into(),
+            postal_code: None,
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_region_too_long_rejected() {
+        let mut p = make_property();
+        p.address = Some(Address {
+            street: "123 Main St".into(),
+            city: "City".into(),
+            region: "x".repeat(257),
+            country: "US".into(),
+            postal_code: None,
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_region_exactly_256_chars_accepted() {
+        let mut p = make_property();
+        p.address = Some(Address {
+            street: "123 Main St".into(),
+            city: "City".into(),
+            region: "x".repeat(256),
+            country: "US".into(),
+            postal_code: None,
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_country_too_long_rejected() {
+        let mut p = make_property();
+        p.address = Some(Address {
+            street: "123 Main St".into(),
+            city: "City".into(),
+            region: "Region".into(),
+            country: "x".repeat(257),
+            postal_code: None,
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_country_exactly_256_chars_accepted() {
+        let mut p = make_property();
+        p.address = Some(Address {
+            street: "123 Main St".into(),
+            city: "City".into(),
+            region: "Region".into(),
+            country: "x".repeat(256),
+            postal_code: None,
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_postal_code_too_long_rejected() {
+        let mut p = make_property();
+        p.address = Some(Address {
+            street: "123 Main St".into(),
+            city: "City".into(),
+            region: "Region".into(),
+            country: "US".into(),
+            postal_code: Some("x".repeat(257)),
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_postal_code_exactly_256_chars_accepted() {
+        let mut p = make_property();
+        p.address = Some(Address {
+            street: "123 Main St".into(),
+            city: "City".into(),
+            region: "Region".into(),
+            country: "US".into(),
+            postal_code: Some("x".repeat(256)),
+        });
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // PROPERTY METADATA STRING LENGTH VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn property_legal_description_too_long_rejected() {
+        let mut p = make_property();
+        p.metadata.legal_description = Some("x".repeat(4097));
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_legal_description_exactly_4096_chars_accepted() {
+        let mut p = make_property();
+        p.metadata.legal_description = Some("x".repeat(4096));
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_legal_description_4095_chars_accepted() {
+        let mut p = make_property();
+        p.metadata.legal_description = Some("x".repeat(4095));
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_parcel_number_too_long_rejected() {
+        let mut p = make_property();
+        p.metadata.parcel_number = Some("x".repeat(129));
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_parcel_number_exactly_128_chars_accepted() {
+        let mut p = make_property();
+        p.metadata.parcel_number = Some("x".repeat(128));
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn property_parcel_number_127_chars_accepted() {
+        let mut p = make_property();
+        p.metadata.parcel_number = Some("x".repeat(127));
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // CO-OWNER DID STRING LENGTH VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn property_co_owner_did_too_long_rejected() {
+        let mut p = make_property();
+        p.co_owners = vec![CoOwner {
+            did: format!("did:{}", "x".repeat(253)),
+            share_percentage: 25.0,
+        }];
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_co_owner_did_exactly_256_chars_accepted() {
+        let mut p = make_property();
+        p.co_owners = vec![CoOwner {
+            did: format!("did:{}", "x".repeat(252)),
+            share_percentage: 25.0,
+        }];
+        let result = validate_create_property(fake_entry_creation_action(), p);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // TITLE DEED STRING LENGTH VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn deed_id_too_long_rejected() {
+        let mut deed = make_title_deed();
+        deed.id = "x".repeat(65);
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn deed_id_exactly_64_chars_accepted() {
+        let mut deed = make_title_deed();
+        deed.id = "x".repeat(64);
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn deed_id_63_chars_accepted() {
+        let mut deed = make_title_deed();
+        deed.id = "x".repeat(63);
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn deed_property_id_too_long_rejected() {
+        let mut deed = make_title_deed();
+        deed.property_id = "x".repeat(65);
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn deed_property_id_exactly_64_chars_accepted() {
+        let mut deed = make_title_deed();
+        deed.property_id = "x".repeat(64);
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn deed_owner_did_too_long_rejected() {
+        let mut deed = make_title_deed();
+        deed.owner_did = format!("did:{}", "x".repeat(253));
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn deed_owner_did_exactly_256_chars_accepted() {
+        let mut deed = make_title_deed();
+        deed.owner_did = format!("did:{}", "x".repeat(252));
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn deed_previous_deed_id_too_long_rejected() {
+        let mut deed = make_title_deed();
+        deed.previous_deed_id = Some("x".repeat(65));
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn deed_previous_deed_id_exactly_64_chars_accepted() {
+        let mut deed = make_title_deed();
+        deed.previous_deed_id = Some("x".repeat(64));
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // TITLE DEED VEC LENGTH VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn deed_too_many_encumbrances_rejected() {
+        let mut deed = make_title_deed();
+        deed.encumbrances = (0..51)
+            .map(|_| Encumbrance {
+                encumbrance_type: EncumbranceType::Lien,
+                holder_did: "did:key:z6MkHolder".into(),
+                amount: Some(1000.0),
+                registered: Timestamp::from_micros(1_000_000),
+                expires: None,
+            })
+            .collect();
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn deed_exactly_50_encumbrances_accepted() {
+        let mut deed = make_title_deed();
+        deed.encumbrances = (0..50)
+            .map(|_| Encumbrance {
+                encumbrance_type: EncumbranceType::Lien,
+                holder_did: "did:key:z6MkHolder".into(),
+                amount: Some(1000.0),
+                registered: Timestamp::from_micros(1_000_000),
+                expires: None,
+            })
+            .collect();
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn deed_49_encumbrances_accepted() {
+        let mut deed = make_title_deed();
+        deed.encumbrances = (0..49)
+            .map(|_| Encumbrance {
+                encumbrance_type: EncumbranceType::Lien,
+                holder_did: "did:key:z6MkHolder".into(),
+                amount: Some(1000.0),
+                registered: Timestamp::from_micros(1_000_000),
+                expires: None,
+            })
+            .collect();
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // ENCUMBRANCE HOLDER DID STRING LENGTH VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn deed_encumbrance_holder_did_too_long_rejected() {
+        let mut deed = make_title_deed();
+        deed.encumbrances = vec![Encumbrance {
+            encumbrance_type: EncumbranceType::Mortgage,
+            holder_did: format!("did:{}", "x".repeat(253)),
+            amount: Some(100_000.0),
+            registered: Timestamp::from_micros(1_000_000),
+            expires: None,
+        }];
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn deed_encumbrance_holder_did_exactly_256_chars_accepted() {
+        let mut deed = make_title_deed();
+        deed.encumbrances = vec![Encumbrance {
+            encumbrance_type: EncumbranceType::Mortgage,
+            holder_did: format!("did:{}", "x".repeat(252)),
+            amount: Some(100_000.0),
+            registered: Timestamp::from_micros(1_000_000),
+            expires: None,
+        }];
+        let result = validate_create_title_deed(fake_entry_creation_action(), deed);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // PROPERTY UPDATE VALIDATION TESTS (length limits)
+    // ========================================================================
+
+    #[test]
+    fn property_update_title_too_long_rejected() {
+        let mut p = make_property();
+        p.title = "x".repeat(257);
+        let result = validate_update_property(fake_update(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_update_description_too_long_rejected() {
+        let mut p = make_property();
+        p.description = "x".repeat(4097);
+        let result = validate_update_property(fake_update(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_update_too_many_co_owners_rejected() {
+        let mut p = make_property();
+        p.co_owners = (0..51)
+            .map(|i| CoOwner {
+                did: format!("did:key:z6Mk{:03}", i),
+                share_percentage: 1.0,
+            })
+            .collect();
+        let result = validate_update_property(fake_update(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_update_too_many_attachments_rejected() {
+        let mut p = make_property();
+        p.metadata.attachments = (0..21).map(|i| format!("doc_{}.pdf", i)).collect();
+        let result = validate_update_property(fake_update(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_update_too_many_boundaries_rejected() {
+        let mut p = make_property();
+        p.geolocation = Some(GeoLocation {
+            latitude: 32.9,
+            longitude: -96.7,
+            boundaries: Some((0..1001).map(|i| (i as f64, i as f64)).collect()),
+            area_sqm: Some(500.0),
+        });
+        let result = validate_update_property(fake_update(), p);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn property_update_valid_passes() {
+        let result = validate_update_property(fake_update(), make_property());
         assert!(is_valid(&result));
     }
 }

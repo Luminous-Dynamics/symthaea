@@ -206,14 +206,29 @@ fn validate_create_disaster(
             "Disaster ID cannot be empty".into(),
         ));
     }
+    if disaster.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disaster ID too long (max 64)".into(),
+        ));
+    }
     if disaster.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Disaster title cannot be empty".into(),
         ));
     }
+    if disaster.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disaster title too long (max 256)".into(),
+        ));
+    }
     if disaster.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Disaster description cannot be empty".into(),
+        ));
+    }
+    if disaster.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disaster description too long (max 4096)".into(),
         ));
     }
     if disaster.affected_area.radius_km <= 0.0 {
@@ -231,6 +246,37 @@ fn validate_create_disaster(
             "Longitude must be between -180 and 180".into(),
         ));
     }
+    // Vec length limits for boundary and zones
+    if let Some(ref boundary) = disaster.affected_area.boundary {
+        if boundary.len() > 2000 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Affected area boundary too many points (max 2000)".into(),
+            ));
+        }
+    }
+    if disaster.affected_area.zones.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many operational zones (max 50)".into(),
+        ));
+    }
+    // Validate nested zone fields
+    for zone in &disaster.affected_area.zones {
+        if zone.id.len() > 64 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Zone ID too long (max 64)".into(),
+            ));
+        }
+        if zone.name.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Zone name too long (max 128)".into(),
+            ));
+        }
+        if zone.boundary.len() > 500 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Zone boundary too many points (max 500)".into(),
+            ));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -240,10 +286,55 @@ fn validate_update_disaster(disaster: Disaster) -> ExternResult<ValidateCallback
             "Disaster ID cannot be empty".into(),
         ));
     }
+    if disaster.id.len() > 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disaster ID too long (max 64)".into(),
+        ));
+    }
     if disaster.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Disaster title cannot be empty".into(),
         ));
+    }
+    if disaster.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disaster title too long (max 256)".into(),
+        ));
+    }
+    if disaster.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disaster description too long (max 4096)".into(),
+        ));
+    }
+    // Vec length limits on update too
+    if let Some(ref boundary) = disaster.affected_area.boundary {
+        if boundary.len() > 2000 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Affected area boundary too many points (max 2000)".into(),
+            ));
+        }
+    }
+    if disaster.affected_area.zones.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many operational zones (max 50)".into(),
+        ));
+    }
+    for zone in &disaster.affected_area.zones {
+        if zone.id.len() > 64 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Zone ID too long (max 64)".into(),
+            ));
+        }
+        if zone.name.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Zone name too long (max 128)".into(),
+            ));
+        }
+        if zone.boundary.len() > 500 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Zone boundary too many points (max 500)".into(),
+            ));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -255,6 +346,11 @@ fn validate_create_update(
     if update.content.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Update content cannot be empty".into(),
+        ));
+    }
+    if update.content.len() > 8192 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Update content too long (max 8192)".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -727,6 +823,192 @@ mod tests {
         }
     }
 
+    // -- Disaster string length limits --
+
+    #[test]
+    fn test_disaster_id_too_long_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.id = "x".repeat(65);
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_disaster_id_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.id = "x".repeat(64);
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_disaster_title_too_long_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.title = "x".repeat(257);
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_disaster_title_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.title = "x".repeat(256);
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_disaster_description_too_long_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.description = "x".repeat(4097);
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_disaster_description_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.description = "x".repeat(4096);
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_valid(result));
+    }
+
+    // -- Disaster Vec length limits --
+
+    #[test]
+    fn test_disaster_boundary_too_many_points_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.boundary = Some((0..2001).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect());
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_disaster_boundary_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.boundary = Some((0..2000).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect());
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_disaster_too_many_zones_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = (0..51)
+            .map(|i| OperationalZone {
+                id: format!("zone-{:03}", i),
+                name: format!("Zone {}", i),
+                boundary: vec![(35.0, -80.0)],
+                priority: ZonePriority::Medium,
+                status: ZoneStatus::Unassessed,
+            })
+            .collect();
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_disaster_zones_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = (0..50)
+            .map(|i| OperationalZone {
+                id: format!("zone-{:03}", i),
+                name: format!("Zone {}", i),
+                boundary: vec![(35.0, -80.0)],
+                priority: ZonePriority::Medium,
+                status: ZoneStatus::Unassessed,
+            })
+            .collect();
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_valid(result));
+    }
+
+    // -- Disaster zone nested limits --
+
+    #[test]
+    fn test_disaster_zone_id_too_long_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "x".repeat(65),
+            name: "Zone".into(),
+            boundary: vec![(35.0, -80.0)],
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_disaster_zone_id_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "x".repeat(64),
+            name: "Zone".into(),
+            boundary: vec![(35.0, -80.0)],
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_disaster_zone_name_too_long_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "zone-001".into(),
+            name: "x".repeat(129),
+            boundary: vec![(35.0, -80.0)],
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_disaster_zone_name_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "zone-001".into(),
+            name: "x".repeat(128),
+            boundary: vec![(35.0, -80.0)],
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_disaster_zone_boundary_too_many_points_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "zone-001".into(),
+            name: "Zone".into(),
+            boundary: (0..501).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect(),
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_disaster_zone_boundary_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "zone-001".into(),
+            name: "Zone".into(),
+            boundary: (0..500).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect(),
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_create_disaster(fake_create(), disaster);
+        assert!(is_valid(result));
+    }
+
     // validate_update_disaster tests
     #[test]
     fn test_validate_update_disaster_valid() {
@@ -776,6 +1058,190 @@ mod tests {
         assert!(is_valid(result));
     }
 
+    // -- Update disaster string length limits --
+
+    #[test]
+    fn test_update_disaster_id_too_long_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.id = "x".repeat(65);
+        let result = validate_update_disaster(disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_id_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.id = "x".repeat(64);
+        let result = validate_update_disaster(disaster);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_title_too_long_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.title = "x".repeat(257);
+        let result = validate_update_disaster(disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_title_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.title = "x".repeat(256);
+        let result = validate_update_disaster(disaster);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_description_too_long_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.description = "x".repeat(4097);
+        let result = validate_update_disaster(disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_description_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.description = "x".repeat(4096);
+        let result = validate_update_disaster(disaster);
+        assert!(is_valid(result));
+    }
+
+    // -- Update disaster Vec length limits --
+
+    #[test]
+    fn test_update_disaster_boundary_too_many_points_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.boundary = Some((0..2001).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect());
+        let result = validate_update_disaster(disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_boundary_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.boundary = Some((0..2000).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect());
+        let result = validate_update_disaster(disaster);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_too_many_zones_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = (0..51)
+            .map(|i| OperationalZone {
+                id: format!("zone-{:03}", i),
+                name: format!("Zone {}", i),
+                boundary: vec![(35.0, -80.0)],
+                priority: ZonePriority::Medium,
+                status: ZoneStatus::Unassessed,
+            })
+            .collect();
+        let result = validate_update_disaster(disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_zones_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = (0..50)
+            .map(|i| OperationalZone {
+                id: format!("zone-{:03}", i),
+                name: format!("Zone {}", i),
+                boundary: vec![(35.0, -80.0)],
+                priority: ZonePriority::Medium,
+                status: ZoneStatus::Unassessed,
+            })
+            .collect();
+        let result = validate_update_disaster(disaster);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_zone_id_too_long_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "x".repeat(65),
+            name: "Zone".into(),
+            boundary: vec![(35.0, -80.0)],
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_update_disaster(disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_zone_id_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "x".repeat(64),
+            name: "Zone".into(),
+            boundary: vec![(35.0, -80.0)],
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_update_disaster(disaster);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_zone_name_too_long_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "zone-001".into(),
+            name: "x".repeat(129),
+            boundary: vec![(35.0, -80.0)],
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_update_disaster(disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_zone_name_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "zone-001".into(),
+            name: "x".repeat(128),
+            boundary: vec![(35.0, -80.0)],
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_update_disaster(disaster);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_zone_boundary_too_many_points_rejected() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "zone-001".into(),
+            name: "Zone".into(),
+            boundary: (0..501).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect(),
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_update_disaster(disaster);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_update_disaster_zone_boundary_at_limit_accepted() {
+        let mut disaster = valid_disaster();
+        disaster.affected_area.zones = vec![OperationalZone {
+            id: "zone-001".into(),
+            name: "Zone".into(),
+            boundary: (0..500).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect(),
+            priority: ZonePriority::Medium,
+            status: ZoneStatus::Unassessed,
+        }];
+        let result = validate_update_disaster(disaster);
+        assert!(is_valid(result));
+    }
+
     // validate_create_update tests
     #[test]
     fn test_validate_create_update_valid() {
@@ -816,10 +1282,28 @@ mod tests {
         }
     }
 
+    // -- IncidentUpdate string length limits --
+
     #[test]
-    fn test_validate_create_update_long_content() {
+    fn test_update_content_too_long_rejected() {
         let mut update = valid_incident_update();
-        update.content = "a".repeat(10000);
+        update.content = "x".repeat(8193);
+        let result = validate_create_update(fake_create(), update);
+        assert!(is_invalid(result));
+    }
+
+    #[test]
+    fn test_update_content_at_limit_accepted() {
+        let mut update = valid_incident_update();
+        update.content = "x".repeat(8192);
+        let result = validate_create_update(fake_create(), update);
+        assert!(is_valid(result));
+    }
+
+    #[test]
+    fn test_update_content_below_limit_accepted() {
+        let mut update = valid_incident_update();
+        update.content = "x".repeat(8191);
         let result = validate_create_update(fake_create(), update);
         assert!(is_valid(result));
     }

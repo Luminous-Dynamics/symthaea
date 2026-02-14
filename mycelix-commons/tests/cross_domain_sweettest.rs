@@ -1396,6 +1396,787 @@ async fn test_cross_cluster_housing_governance_escalates_to_justice() {
 }
 
 // ============================================================================
+// Intra-cluster dispatch: Care, Mutual Aid, Housing domains
+// ============================================================================
+
+// -- Care Plans mirror types --
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum CareType {
+    Childcare,
+    Eldercare,
+    DisabilitySupport,
+    PostSurgery,
+    MentalHealth,
+    Respite,
+    Other(String),
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum PlanStatus {
+    Draft,
+    Active,
+    Paused,
+    Completed,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct CarePlan {
+    recipient: AgentPubKey,
+    title: String,
+    description: String,
+    care_type: CareType,
+    schedule: String,
+    caregivers: Vec<AgentPubKey>,
+    status: PlanStatus,
+    created_at: Timestamp,
+    updated_at: Timestamp,
+    hours_per_week: f32,
+    special_instructions: String,
+}
+
+// -- Care Matching mirror types --
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum ServiceCategory {
+    Childcare,
+    Eldercare,
+    PetCare,
+    Cooking,
+    Cleaning,
+    Gardening,
+    Tutoring,
+    TechSupport,
+    Transportation,
+    Companionship,
+    HealthSupport,
+    HomeRepair,
+    LegalAdvice,
+    Counseling,
+    ArtMusic,
+    LanguageHelp,
+    Administrative,
+    Other(String),
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum UrgencyLevel {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+// -- Mutual Aid Requests mirror types --
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum RequestType {
+    Financial,
+    Housing,
+    Food,
+    Medical,
+    Childcare,
+    Transportation,
+    Legal,
+    Other(String),
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum Urgency {
+    Critical,
+    High,
+    Medium,
+    Low,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct CreateRequestInput {
+    requester_did: String,
+    request_type: RequestType,
+    description: String,
+    urgency: Urgency,
+    location: Option<String>,
+    amount_needed: Option<u64>,
+}
+
+// -- Mutual Aid Pools mirror types --
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct CreatePoolInput {
+    name: String,
+    description: String,
+    creator_did: String,
+    contribution_rules: Option<ContributionRule>,
+    disbursement_rules: Option<DisbursementRule>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct ContributionRule {
+    min_monthly: u64,
+    max_withdrawal: u64,
+    cooldown_days: u32,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct DisbursementRule {
+    min_approvals: u32,
+    approval_threshold_percent: u32,
+    max_disbursement: u64,
+    allow_emergency_bypass: bool,
+}
+
+// -- Housing CLT mirror types --
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct LandTrust {
+    id: String,
+    name: String,
+    mission: String,
+    boundary: Vec<(f64, f64)>,
+    charter_hash: Option<ActionHash>,
+    stewardship_board: Vec<AgentPubKey>,
+    affordability_target_ami_percent: u32,
+    created_at: Timestamp,
+}
+
+// -- Housing Governance mirror types --
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum MeetingType {
+    Regular,
+    Special,
+    Annual,
+    Emergency,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct BoardMeeting {
+    cooperative_hash: Option<ActionHash>,
+    title: String,
+    agenda: Vec<String>,
+    scheduled_at: Timestamp,
+    location: String,
+    meeting_type: MeetingType,
+    minutes: Option<String>,
+    attendees: Vec<AgentPubKey>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum ResolutionCategory {
+    Budget,
+    Maintenance,
+    Membership,
+    Rules,
+    Assessment,
+    Improvement,
+    Emergency,
+    Other(String),
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct Resolution {
+    meeting_hash: Option<ActionHash>,
+    title: String,
+    description: String,
+    proposed_by: AgentPubKey,
+    category: ResolutionCategory,
+    votes_for: u32,
+    votes_against: u32,
+    votes_abstain: u32,
+    quorum_met: bool,
+    passed: bool,
+    effective_date: Option<Timestamp>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct CandidateEntry {
+    agent: AgentPubKey,
+    position: String,
+    statement: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct Election {
+    title: String,
+    positions: Vec<String>,
+    candidates: Vec<CandidateEntry>,
+    voting_opens: Timestamp,
+    voting_closes: Timestamp,
+    results: Option<Vec<ElectionResult>>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct ElectionResult {
+    position: String,
+    winner: AgentPubKey,
+    votes_received: u32,
+}
+
+// ============================================================================
+// Intra-cluster: Care domain dispatch tests
+// ============================================================================
+
+/// Test: Cross-domain dispatch from bridge to care_plans's create_care_plan
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_cross_domain_dispatch_care_plans() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let agent = cell.agent_pubkey().clone();
+    let caregiver = AgentPubKey::from_raw_36(vec![2u8; 36]);
+    let now = Timestamp::now();
+
+    let plan = CarePlan {
+        recipient: agent.clone(),
+        title: "Daily Eldercare for Mom".to_string(),
+        description: "Morning and evening check-ins, medication management".to_string(),
+        care_type: CareType::Eldercare,
+        schedule: "Mon/Wed/Fri mornings, daily evenings".to_string(),
+        caregivers: vec![caregiver],
+        status: PlanStatus::Active,
+        created_at: now,
+        updated_at: now,
+        hours_per_week: 14.0,
+        special_instructions: "Allergic to penicillin".to_string(),
+    };
+
+    // Call care_plans directly first
+    let _record: Record = conductor
+        .call(&cell.zome("care_plans"), "create_care_plan", plan.clone())
+        .await;
+
+    // Now dispatch through the bridge
+    let payload = ExternIO::encode(plan).unwrap().0;
+    let dispatch = DispatchInput {
+        zome: "care_plans".to_string(),
+        fn_name: "create_care_plan".to_string(),
+        payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Care plans dispatch should succeed");
+    assert!(result.response.is_some(), "Should have response payload");
+}
+
+/// Test: Cross-domain dispatch from bridge to care_matching (care needs matching)
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_cross_domain_dispatch_care_needs() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    // Use bridge to query care matching (may be empty, but dispatch should succeed)
+    let dispatch = DispatchInput {
+        zome: "care_matching".to_string(),
+        fn_name: "get_all_matches".to_string(),
+        payload: ExternIO::encode(()).unwrap().0,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Care matching dispatch should succeed");
+}
+
+// ============================================================================
+// Intra-cluster: Mutual Aid domain dispatch tests
+// ============================================================================
+
+/// Test: Cross-domain dispatch from bridge to mutualaid_requests's create_request
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_cross_domain_dispatch_mutualaid_requests() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let request_input = CreateRequestInput {
+        requester_did: "did:mycelix:alice".to_string(),
+        request_type: RequestType::Medical,
+        description: "Need help with emergency prescription costs".to_string(),
+        urgency: Urgency::High,
+        location: Some("Richardson, TX".to_string()),
+        amount_needed: Some(350),
+    };
+
+    // Call mutualaid_requests directly first
+    let _record: Record = conductor
+        .call(
+            &cell.zome("mutualaid_requests"),
+            "create_request",
+            request_input.clone(),
+        )
+        .await;
+
+    // Now dispatch through the bridge
+    let payload = ExternIO::encode(request_input).unwrap().0;
+    let dispatch = DispatchInput {
+        zome: "mutualaid_requests".to_string(),
+        fn_name: "create_request".to_string(),
+        payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Mutual aid requests dispatch should succeed");
+    assert!(result.response.is_some(), "Should have response payload");
+}
+
+/// Test: Cross-domain dispatch from bridge to mutualaid_pools's create_pool
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_cross_domain_dispatch_mutualaid_pools() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let pool_input = CreatePoolInput {
+        name: "Richardson Neighbors Fund".to_string(),
+        description: "Emergency mutual aid pool for the neighborhood".to_string(),
+        creator_did: "did:mycelix:alice".to_string(),
+        contribution_rules: Some(ContributionRule {
+            min_monthly: 50,
+            max_withdrawal: 500,
+            cooldown_days: 7,
+        }),
+        disbursement_rules: Some(DisbursementRule {
+            min_approvals: 2,
+            approval_threshold_percent: 60,
+            max_disbursement: 1000,
+            allow_emergency_bypass: true,
+        }),
+    };
+
+    // Call mutualaid_pools directly first
+    let _record: Record = conductor
+        .call(
+            &cell.zome("mutualaid_pools"),
+            "create_pool",
+            pool_input.clone(),
+        )
+        .await;
+
+    // Now dispatch through the bridge
+    let payload = ExternIO::encode(pool_input).unwrap().0;
+    let dispatch = DispatchInput {
+        zome: "mutualaid_pools".to_string(),
+        fn_name: "create_pool".to_string(),
+        payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Mutual aid pools dispatch should succeed");
+    assert!(result.response.is_some(), "Should have response payload");
+}
+
+// ============================================================================
+// Intra-cluster: Housing domain dispatch tests
+// ============================================================================
+
+/// Test: Cross-domain dispatch from bridge to housing_clt's create_land_trust
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_cross_domain_dispatch_housing_clt() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let agent = cell.agent_pubkey().clone();
+    let now = Timestamp::now();
+
+    let trust = LandTrust {
+        id: "trust-sweet-001".to_string(),
+        name: "Richardson Community Land Trust".to_string(),
+        mission: "Permanent affordable housing through community stewardship".to_string(),
+        boundary: vec![
+            (32.94, -96.74),
+            (32.96, -96.74),
+            (32.96, -96.72),
+            (32.94, -96.72),
+        ],
+        charter_hash: None,
+        stewardship_board: vec![agent],
+        affordability_target_ami_percent: 80,
+        created_at: now,
+    };
+
+    // Call housing_clt directly first
+    let _record: Record = conductor
+        .call(&cell.zome("housing_clt"), "create_land_trust", trust.clone())
+        .await;
+
+    // Now dispatch through the bridge
+    let payload = ExternIO::encode(trust).unwrap().0;
+    let dispatch = DispatchInput {
+        zome: "housing_clt".to_string(),
+        fn_name: "create_land_trust".to_string(),
+        payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Housing CLT dispatch should succeed");
+    assert!(result.response.is_some(), "Should have response payload");
+}
+
+/// Test: Cross-domain dispatch from bridge to housing_governance's schedule_meeting
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_cross_domain_dispatch_housing_governance() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let agent = cell.agent_pubkey().clone();
+    let now = Timestamp::now();
+
+    let meeting = BoardMeeting {
+        cooperative_hash: None,
+        title: "Monthly Board Meeting — February 2026".to_string(),
+        agenda: vec![
+            "Budget review Q1".to_string(),
+            "New member applications".to_string(),
+            "Maintenance schedule update".to_string(),
+        ],
+        scheduled_at: now,
+        location: "Community Room, Building A".to_string(),
+        meeting_type: MeetingType::Regular,
+        minutes: None,
+        attendees: vec![agent],
+    };
+
+    // Call housing_governance directly first
+    let _record: Record = conductor
+        .call(
+            &cell.zome("housing_governance"),
+            "schedule_meeting",
+            meeting.clone(),
+        )
+        .await;
+
+    // Now dispatch through the bridge
+    let payload = ExternIO::encode(meeting).unwrap().0;
+    let dispatch = DispatchInput {
+        zome: "housing_governance".to_string(),
+        fn_name: "schedule_meeting".to_string(),
+        payload,
+    };
+
+    let result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
+        .await;
+
+    assert!(result.success, "Housing governance dispatch should succeed");
+    assert!(result.response.is_some(), "Should have response payload");
+}
+
+// ============================================================================
+// Cross-domain integration: Care, Mutual Aid, Housing queries via bridge
+// ============================================================================
+
+/// Test: Care domain queries (plans, matching) dispatched through the bridge
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_care_queries_via_bridge() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let agent = cell.agent_pubkey().clone();
+    let caregiver = AgentPubKey::from_raw_36(vec![2u8; 36]);
+    let now = Timestamp::now();
+
+    // Register a care plan first
+    let plan = CarePlan {
+        recipient: agent,
+        title: "Post-Surgery Recovery".to_string(),
+        description: "Assistance during knee surgery recovery".to_string(),
+        care_type: CareType::PostSurgery,
+        schedule: "Daily 9am-12pm".to_string(),
+        caregivers: vec![caregiver],
+        status: PlanStatus::Active,
+        created_at: now,
+        updated_at: now,
+        hours_per_week: 21.0,
+        special_instructions: "Ice packs every 2 hours".to_string(),
+    };
+
+    let _record: Record = conductor
+        .call(&cell.zome("care_plans"), "create_care_plan", plan)
+        .await;
+
+    // Query all care plans via bridge
+    let dispatch_plans = DispatchInput {
+        zome: "care_plans".to_string(),
+        fn_name: "get_all_care_plans".to_string(),
+        payload: ExternIO::encode(()).unwrap().0,
+    };
+
+    let result_plans: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch_plans)
+        .await;
+
+    assert!(
+        result_plans.success,
+        "Care plans query via bridge should succeed"
+    );
+
+    // Query care matching via bridge (may be empty)
+    let dispatch_matching = DispatchInput {
+        zome: "care_matching".to_string(),
+        fn_name: "get_all_matches".to_string(),
+        payload: ExternIO::encode(()).unwrap().0,
+    };
+
+    let result_matching: DispatchResult = conductor
+        .call(
+            &cell.zome("commons_bridge"),
+            "dispatch_call",
+            dispatch_matching,
+        )
+        .await;
+
+    assert!(
+        result_matching.success,
+        "Care matching query via bridge should succeed"
+    );
+}
+
+/// Test: Mutual aid queries (requests, pools) dispatched through the bridge
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_mutualaid_queries_via_bridge() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    // Create an aid request first
+    let request_input = CreateRequestInput {
+        requester_did: "did:mycelix:bob".to_string(),
+        request_type: RequestType::Food,
+        description: "Need groceries for the week".to_string(),
+        urgency: Urgency::Medium,
+        location: Some("Downtown Richardson".to_string()),
+        amount_needed: Some(150),
+    };
+
+    let _record: Record = conductor
+        .call(
+            &cell.zome("mutualaid_requests"),
+            "create_request",
+            request_input,
+        )
+        .await;
+
+    // Query open requests via bridge
+    let dispatch_requests = DispatchInput {
+        zome: "mutualaid_requests".to_string(),
+        fn_name: "get_open_requests".to_string(),
+        payload: ExternIO::encode(()).unwrap().0,
+    };
+
+    let result_requests: DispatchResult = conductor
+        .call(
+            &cell.zome("commons_bridge"),
+            "dispatch_call",
+            dispatch_requests,
+        )
+        .await;
+
+    assert!(
+        result_requests.success,
+        "Mutual aid requests query via bridge should succeed"
+    );
+
+    // Query all pools via bridge (may be empty)
+    let dispatch_pools = DispatchInput {
+        zome: "mutualaid_pools".to_string(),
+        fn_name: "get_all_pools".to_string(),
+        payload: ExternIO::encode(()).unwrap().0,
+    };
+
+    let result_pools: DispatchResult = conductor
+        .call(
+            &cell.zome("commons_bridge"),
+            "dispatch_call",
+            dispatch_pools,
+        )
+        .await;
+
+    assert!(
+        result_pools.success,
+        "Mutual aid pools query via bridge should succeed"
+    );
+
+    // Query mutual aid circles via bridge (may be empty, but dispatch verifies routing)
+    let dispatch_circles = DispatchInput {
+        zome: "mutualaid_circles".to_string(),
+        fn_name: "get_all_circles".to_string(),
+        payload: ExternIO::encode(()).unwrap().0,
+    };
+
+    let result_circles: DispatchResult = conductor
+        .call(
+            &cell.zome("commons_bridge"),
+            "dispatch_call",
+            dispatch_circles,
+        )
+        .await;
+
+    assert!(
+        result_circles.success,
+        "Mutual aid circles query via bridge should succeed"
+    );
+}
+
+/// Test: Housing governance queries (meetings, resolutions, elections) via bridge
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires conductor"]
+async fn test_housing_governance_queries_via_bridge() {
+    let (conductor, _app, cell) = setup_conductor().await;
+
+    let agent = cell.agent_pubkey().clone();
+    let now = Timestamp::now();
+
+    // Schedule a board meeting first
+    let meeting = BoardMeeting {
+        cooperative_hash: None,
+        title: "Emergency Meeting — Plumbing Issue".to_string(),
+        agenda: vec![
+            "Assess plumbing damage".to_string(),
+            "Emergency repair authorization".to_string(),
+        ],
+        scheduled_at: now,
+        location: "Virtual".to_string(),
+        meeting_type: MeetingType::Emergency,
+        minutes: None,
+        attendees: vec![agent.clone()],
+    };
+
+    let _record: Record = conductor
+        .call(
+            &cell.zome("housing_governance"),
+            "schedule_meeting",
+            meeting,
+        )
+        .await;
+
+    // Propose a resolution
+    let resolution = Resolution {
+        meeting_hash: None,
+        title: "Authorize emergency plumbing repair".to_string(),
+        description: "Authorize up to $3000 for emergency plumbing repair in Building B"
+            .to_string(),
+        proposed_by: agent.clone(),
+        category: ResolutionCategory::Emergency,
+        votes_for: 0,
+        votes_against: 0,
+        votes_abstain: 0,
+        quorum_met: false,
+        passed: false,
+        effective_date: None,
+    };
+
+    let _res_record: Record = conductor
+        .call(
+            &cell.zome("housing_governance"),
+            "propose_resolution",
+            resolution,
+        )
+        .await;
+
+    // Create an election
+    let election = Election {
+        title: "Annual Board Election 2026".to_string(),
+        positions: vec!["President".to_string(), "Treasurer".to_string()],
+        candidates: vec![CandidateEntry {
+            agent: agent.clone(),
+            position: "President".to_string(),
+            statement: "I will serve the cooperative with integrity.".to_string(),
+        }],
+        voting_opens: now,
+        voting_closes: Timestamp::from_micros(now.as_micros() + 7 * 24 * 3600 * 1_000_000),
+        results: None,
+    };
+
+    let _election_record: Record = conductor
+        .call(
+            &cell.zome("housing_governance"),
+            "create_election",
+            election,
+        )
+        .await;
+
+    // Now query via bridge — dispatch to housing_governance for meetings
+    let dispatch_meetings = DispatchInput {
+        zome: "housing_governance".to_string(),
+        fn_name: "schedule_meeting".to_string(),
+        // We query by dispatching a minimal meeting payload; the key test is that
+        // the bridge routes to the correct zome without rejecting the dispatch.
+        // In practice, a "get_all_meetings" function would be used; this tests
+        // that the bridge allowlist accepts housing_governance.
+        payload: ExternIO::encode(BoardMeeting {
+            cooperative_hash: None,
+            title: "Bridge-dispatched query meeting".to_string(),
+            agenda: vec!["Bridge routing test".to_string()],
+            scheduled_at: now,
+            location: "Test".to_string(),
+            meeting_type: MeetingType::Regular,
+            minutes: None,
+            attendees: vec![agent.clone()],
+        })
+        .unwrap()
+        .0,
+    };
+
+    let result_meetings: DispatchResult = conductor
+        .call(
+            &cell.zome("commons_bridge"),
+            "dispatch_call",
+            dispatch_meetings,
+        )
+        .await;
+
+    assert!(
+        result_meetings.success,
+        "Housing governance meeting dispatch via bridge should succeed"
+    );
+
+    // Dispatch a resolution proposal through the bridge
+    let dispatch_resolution = DispatchInput {
+        zome: "housing_governance".to_string(),
+        fn_name: "propose_resolution".to_string(),
+        payload: ExternIO::encode(Resolution {
+            meeting_hash: None,
+            title: "Bridge-dispatched resolution".to_string(),
+            description: "Testing resolution dispatch through commons bridge".to_string(),
+            proposed_by: agent.clone(),
+            category: ResolutionCategory::Rules,
+            votes_for: 0,
+            votes_against: 0,
+            votes_abstain: 0,
+            quorum_met: false,
+            passed: false,
+            effective_date: None,
+        })
+        .unwrap()
+        .0,
+    };
+
+    let result_resolution: DispatchResult = conductor
+        .call(
+            &cell.zome("commons_bridge"),
+            "dispatch_call",
+            dispatch_resolution,
+        )
+        .await;
+
+    assert!(
+        result_resolution.success,
+        "Housing governance resolution dispatch via bridge should succeed"
+    );
+}
+
+// ============================================================================
 // Conductor setup helpers
 // ============================================================================
 

@@ -596,7 +596,7 @@ fn test_consciousness_snapshot_needs_attention() {
     // Verify needs_attention returns a valid boolean and phi is finite
     let needs = snapshot.needs_attention();
     assert!(needs || !needs, "needs_attention should return a valid bool");
-    assert!(snapshot.phi.is_finite(), "Snapshot phi should be finite");
+    assert!(snapshot.unified_phi.is_finite(), "Snapshot phi should be finite");
 }
 
 #[test]
