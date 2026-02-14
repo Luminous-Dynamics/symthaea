@@ -46,7 +46,6 @@
 #![allow(clippy::wrong_self_convention)]
 #![allow(clippy::redundant_guards)]
 #![allow(clippy::duplicated_attributes)]
-#![allow(clippy::sort_unstable)]
 
 pub mod encoding;
 pub mod features;
