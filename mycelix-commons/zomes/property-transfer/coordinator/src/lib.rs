@@ -611,3 +611,235 @@ pub fn check_water_rights_before_transfer(input: CheckWaterRightsInput) -> Exter
         }),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn initiate_transfer_input_serde_roundtrip() {
+        let input = InitiateTransferInput {
+            property_id: "prop-001".to_string(),
+            from_did: "did:key:z6Mk001".to_string(),
+            to_did: "did:key:z6Mk002".to_string(),
+            transfer_type: TransferType::Sale,
+            price: Some(250_000.0),
+            currency: Some("USD".to_string()),
+            conditions: vec![],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: InitiateTransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "prop-001");
+        assert_eq!(decoded.price, Some(250_000.0));
+    }
+
+    #[test]
+    fn create_escrow_input_serde_roundtrip() {
+        let input = CreateEscrowInput {
+            transfer_id: "transfer-001".to_string(),
+            escrow_agent_did: Some("did:key:z6MkAgent".to_string()),
+            amount: 250_000.0,
+            currency: "USD".to_string(),
+            release_conditions: vec!["Inspection passed".to_string(), "Title cleared".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateEscrowInput = serde_json::from_str(&json).unwrap();
+        assert!((decoded.amount - 250_000.0).abs() < f64::EPSILON);
+        assert_eq!(decoded.release_conditions.len(), 2);
+    }
+
+    #[test]
+    fn satisfy_condition_input_serde_roundtrip() {
+        let input = SatisfyConditionInput {
+            transfer_id: "transfer-001".to_string(),
+            condition_index: 0,
+            verifier_did: "did:key:z6MkInspector".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SatisfyConditionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.condition_index, 0);
+        assert_eq!(decoded.verifier_did, "did:key:z6MkInspector");
+    }
+
+    #[test]
+    fn cancel_transfer_input_serde_roundtrip() {
+        let input = CancelTransferInput {
+            transfer_id: "transfer-001".to_string(),
+            requester_did: "did:key:z6Mk001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CancelTransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.transfer_id, "transfer-001");
+    }
+
+    #[test]
+    fn accept_transfer_input_serde_roundtrip() {
+        let input = AcceptTransferInput {
+            transfer_id: "transfer-001".to_string(),
+            requester_did: "did:key:z6Mk002".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AcceptTransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.requester_did, "did:key:z6Mk002");
+    }
+
+    #[test]
+    fn dispute_transfer_input_serde_roundtrip() {
+        let input = DisputeTransferInput {
+            transfer_id: "transfer-001".to_string(),
+            requester_did: "did:key:z6Mk001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: DisputeTransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.transfer_id, "transfer-001");
+    }
+
+    #[test]
+    fn add_condition_input_serde_roundtrip() {
+        let input = AddConditionInput {
+            transfer_id: "transfer-001".to_string(),
+            condition_type: ConditionType::InspectionComplete,
+            description: "Professional home inspection".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddConditionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.description, "Professional home inspection");
+    }
+
+    #[test]
+    fn check_water_rights_input_serde_roundtrip() {
+        let input = CheckWaterRightsInput {
+            property_id: "prop-001".to_string(),
+            watershed_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CheckWaterRightsInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "prop-001");
+    }
+
+    #[test]
+    fn water_rights_check_result_serde_roundtrip() {
+        let result = WaterRightsCheckResult {
+            has_water_rights: true,
+            water_rights_count: 2,
+            warning: Some("Property has 2 water right(s)".to_string()),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: WaterRightsCheckResult = serde_json::from_str(&json).unwrap();
+        assert!(decoded.has_water_rights);
+        assert_eq!(decoded.water_rights_count, 2);
+        assert!(decoded.warning.is_some());
+        assert!(decoded.error.is_none());
+    }
+
+    #[test]
+    fn transfer_type_all_variants_serialize() {
+        let variants = vec![
+            TransferType::Sale,
+            TransferType::Gift,
+            TransferType::Inheritance,
+            TransferType::CourtOrder,
+            TransferType::Exchange,
+            TransferType::Other,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: TransferType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn transfer_status_all_variants_serialize() {
+        let statuses = vec![
+            TransferStatus::Initiated,
+            TransferStatus::AwaitingAcceptance,
+            TransferStatus::InEscrow,
+            TransferStatus::ConditionsPending,
+            TransferStatus::Completed,
+            TransferStatus::Cancelled,
+            TransferStatus::Disputed,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let decoded: TransferStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, status);
+        }
+    }
+
+    #[test]
+    fn condition_type_all_variants_serialize() {
+        let types = vec![
+            ConditionType::PaymentReceived,
+            ConditionType::InspectionComplete,
+            ConditionType::TitleClear,
+            ConditionType::DocumentsSigned,
+            ConditionType::TaxesPaid,
+            ConditionType::Custom("Zoning approval".to_string()),
+        ];
+        for ct in types {
+            let json = serde_json::to_string(&ct).unwrap();
+            let decoded: ConditionType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, ct);
+        }
+    }
+
+    #[test]
+    fn initiate_transfer_with_conditions() {
+        let input = InitiateTransferInput {
+            property_id: "prop-001".to_string(),
+            from_did: "did:key:z6MkSeller".to_string(),
+            to_did: "did:key:z6MkBuyer".to_string(),
+            transfer_type: TransferType::Sale,
+            price: Some(500_000.0),
+            currency: Some("USD".to_string()),
+            conditions: vec![
+                TransferCondition {
+                    condition_type: ConditionType::PaymentReceived,
+                    description: "Full payment".to_string(),
+                    satisfied: false,
+                    verified_by: None,
+                },
+                TransferCondition {
+                    condition_type: ConditionType::InspectionComplete,
+                    description: "Home inspection".to_string(),
+                    satisfied: true,
+                    verified_by: Some("did:key:z6MkInspector".to_string()),
+                },
+            ],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: InitiateTransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.conditions.len(), 2);
+        assert!(!decoded.conditions[0].satisfied);
+        assert!(decoded.conditions[1].satisfied);
+    }
+
+    #[test]
+    fn water_rights_result_no_rights() {
+        let result = WaterRightsCheckResult {
+            has_water_rights: false,
+            water_rights_count: 0,
+            warning: None,
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: WaterRightsCheckResult = serde_json::from_str(&json).unwrap();
+        assert!(!decoded.has_water_rights);
+        assert_eq!(decoded.water_rights_count, 0);
+    }
+
+    #[test]
+    fn water_rights_result_with_error() {
+        let result = WaterRightsCheckResult {
+            has_water_rights: false,
+            water_rights_count: 0,
+            warning: None,
+            error: Some("Network error querying water rights".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: WaterRightsCheckResult = serde_json::from_str(&json).unwrap();
+        assert!(decoded.error.is_some());
+    }
+}

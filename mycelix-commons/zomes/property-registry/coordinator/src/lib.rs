@@ -531,3 +531,184 @@ pub struct VerifyOwnershipInput {
     pub property_id: String,
     pub did: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn register_property_input_serde_roundtrip() {
+        let input = RegisterPropertyInput {
+            property_type: PropertyType::Building,
+            title: "Test House".to_string(),
+            description: "A test property".to_string(),
+            owner_did: "did:key:z6Mk001".to_string(),
+            co_owners: vec![CoOwner { did: "did:key:z6Mk002".to_string(), share_percentage: 25.0 }],
+            geolocation: Some(GeoLocation { latitude: 32.9483, longitude: -96.7299, boundaries: None, area_sqm: Some(500.0) }),
+            address: Some(Address { street: "123 Main St".to_string(), city: "Richardson".to_string(), region: "TX".to_string(), country: "US".to_string(), postal_code: Some("75080".to_string()) }),
+            metadata: PropertyMetadata { appraised_value: Some(250_000.0), currency: Some("USD".to_string()), legal_description: None, parcel_number: None, attachments: vec![] },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RegisterPropertyInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.title, "Test House");
+        assert_eq!(decoded.owner_did, "did:key:z6Mk001");
+        assert_eq!(decoded.co_owners.len(), 1);
+    }
+
+    #[test]
+    fn add_encumbrance_input_serde_roundtrip() {
+        let input = AddEncumbranceInput {
+            property_id: "prop-001".to_string(),
+            encumbrance_type: EncumbranceType::Mortgage,
+            holder_did: "did:key:z6MkBank".to_string(),
+            amount: Some(150_000.0),
+            expires: Some(Timestamp::from_micros(9_000_000)),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddEncumbranceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "prop-001");
+        assert_eq!(decoded.amount, Some(150_000.0));
+    }
+
+    #[test]
+    fn location_search_input_serde_roundtrip() {
+        let input = LocationSearchInput {
+            latitude: 32.9483,
+            longitude: -96.7299,
+            radius_km: 5.0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: LocationSearchInput = serde_json::from_str(&json).unwrap();
+        assert!((decoded.latitude - 32.9483).abs() < f64::EPSILON);
+        assert!((decoded.radius_km - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn update_metadata_input_serde_roundtrip() {
+        let input = UpdateMetadataInput {
+            property_id: "prop-001".to_string(),
+            requester_did: "did:key:z6Mk001".to_string(),
+            metadata: PropertyMetadata {
+                appraised_value: Some(300_000.0),
+                currency: Some("USD".to_string()),
+                legal_description: Some("Lot 1".to_string()),
+                parcel_number: None,
+                attachments: vec!["doc.pdf".to_string()],
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateMetadataInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "prop-001");
+        assert_eq!(decoded.metadata.appraised_value, Some(300_000.0));
+    }
+
+    #[test]
+    fn remove_encumbrance_input_serde_roundtrip() {
+        let input = RemoveEncumbranceInput {
+            property_id: "prop-001".to_string(),
+            encumbrance_index: 0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RemoveEncumbranceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.encumbrance_index, 0);
+    }
+
+    #[test]
+    fn add_co_owner_input_serde_roundtrip() {
+        let input = AddCoOwnerInput {
+            property_id: "prop-001".to_string(),
+            requester_did: "did:key:z6Mk001".to_string(),
+            co_owner: CoOwner { did: "did:key:z6Mk003".to_string(), share_percentage: 30.0 },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddCoOwnerInput = serde_json::from_str(&json).unwrap();
+        assert!((decoded.co_owner.share_percentage - 30.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn remove_co_owner_input_serde_roundtrip() {
+        let input = RemoveCoOwnerInput {
+            property_id: "prop-001".to_string(),
+            requester_did: "did:key:z6Mk001".to_string(),
+            co_owner_did: "did:key:z6Mk003".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RemoveCoOwnerInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.co_owner_did, "did:key:z6Mk003");
+    }
+
+    #[test]
+    fn verify_ownership_input_serde_roundtrip() {
+        let input = VerifyOwnershipInput {
+            property_id: "prop-001".to_string(),
+            did: "did:key:z6Mk001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: VerifyOwnershipInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.did, "did:key:z6Mk001");
+    }
+
+    #[test]
+    fn transfer_ownership_input_serde_roundtrip() {
+        let input = TransferOwnershipInput {
+            property_id: "prop-001".to_string(),
+            from_did: "did:key:z6Mk001".to_string(),
+            to_did: "did:key:z6Mk002".to_string(),
+            transfer_type: "Sale".to_string(),
+            transfer_id: Some("transfer-001".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferOwnershipInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.transfer_type, "Sale");
+        assert_eq!(decoded.transfer_id, Some("transfer-001".to_string()));
+    }
+
+    #[test]
+    fn transfer_ownership_result_serde_roundtrip() {
+        let result = TransferOwnershipResult {
+            property_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            new_deed_id: "deed-002".to_string(),
+            deed_action_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            previous_deed_id: "deed-001".to_string(),
+            encumbrances_carried: 1,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: TransferOwnershipResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_deed_id, "deed-002");
+        assert_eq!(decoded.encumbrances_carried, 1);
+    }
+
+    #[test]
+    fn ownership_record_serde_roundtrip() {
+        let record = OwnershipRecord {
+            deed_id: "deed-001".to_string(),
+            owner_did: "did:key:z6Mk001".to_string(),
+            deed_type: DeedType::Original,
+            issued: Timestamp::from_micros(1_000_000),
+            previous_deed_id: None,
+        };
+        let json = serde_json::to_string(&record).unwrap();
+        let decoded: OwnershipRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.deed_id, "deed-001");
+        assert_eq!(decoded.previous_deed_id, None);
+    }
+
+    #[test]
+    fn register_input_without_optional_fields() {
+        let input = RegisterPropertyInput {
+            property_type: PropertyType::Land,
+            title: "Bare Land".to_string(),
+            description: "Empty lot".to_string(),
+            owner_did: "did:key:z6Mk001".to_string(),
+            co_owners: vec![],
+            geolocation: None,
+            address: None,
+            metadata: PropertyMetadata { appraised_value: None, currency: None, legal_description: None, parcel_number: None, attachments: vec![] },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RegisterPropertyInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.geolocation.is_none());
+        assert!(decoded.address.is_none());
+        assert!(decoded.co_owners.is_empty());
+    }
+}

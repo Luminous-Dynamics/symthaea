@@ -266,3 +266,204 @@ pub fn get_plan_session_summary(plan_hash: ActionHash) -> ExternResult<PlanSessi
         caregivers_active: caregiver_set.len() as u32,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Helpers ─────────────────────────────────────────────────────────
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    // ── UpdatePlanStatusInput serde roundtrip ────────────────────────────
+
+    #[test]
+    fn update_plan_status_input_serde_roundtrip() {
+        let input = UpdatePlanStatusInput {
+            plan_hash: fake_action_hash(),
+            new_status: PlanStatus::Active,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdatePlanStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.plan_hash, input.plan_hash);
+        assert_eq!(decoded.new_status, PlanStatus::Active);
+    }
+
+    #[test]
+    fn update_plan_status_input_all_statuses() {
+        for status in [
+            PlanStatus::Draft,
+            PlanStatus::Active,
+            PlanStatus::Paused,
+            PlanStatus::Completed,
+            PlanStatus::Cancelled,
+        ] {
+            let input = UpdatePlanStatusInput {
+                plan_hash: fake_action_hash(),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdatePlanStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+
+    // ── PlanSessionSummary serde roundtrip ───────────────────────────────
+
+    #[test]
+    fn plan_session_summary_serde_roundtrip() {
+        let summary = PlanSessionSummary {
+            plan_hash: fake_action_hash(),
+            total_sessions: 12,
+            total_hours: 36.5,
+            caregivers_active: 3,
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        let decoded: PlanSessionSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.plan_hash, summary.plan_hash);
+        assert_eq!(decoded.total_sessions, 12);
+        assert!((decoded.total_hours - 36.5).abs() < f32::EPSILON);
+        assert_eq!(decoded.caregivers_active, 3);
+    }
+
+    #[test]
+    fn plan_session_summary_zero_values_roundtrip() {
+        let summary = PlanSessionSummary {
+            plan_hash: fake_action_hash(),
+            total_sessions: 0,
+            total_hours: 0.0,
+            caregivers_active: 0,
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        let decoded: PlanSessionSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_sessions, 0);
+        assert_eq!(decoded.total_hours, 0.0);
+        assert_eq!(decoded.caregivers_active, 0);
+    }
+
+    // ── PlanStatus serde roundtrip (all variants) ───────────────────────
+
+    #[test]
+    fn plan_status_serde_all_variants() {
+        let statuses = vec![
+            PlanStatus::Draft,
+            PlanStatus::Active,
+            PlanStatus::Paused,
+            PlanStatus::Completed,
+            PlanStatus::Cancelled,
+        ];
+        for status in &statuses {
+            let json = serde_json::to_string(status).unwrap();
+            let decoded: PlanStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, status);
+        }
+    }
+
+    // ── CareType serde roundtrip (all variants) ─────────────────────────
+
+    #[test]
+    fn care_type_serde_all_variants() {
+        let types = vec![
+            CareType::Childcare,
+            CareType::Eldercare,
+            CareType::DisabilitySupport,
+            CareType::PostSurgery,
+            CareType::MentalHealth,
+            CareType::Respite,
+            CareType::Other("Palliative".to_string()),
+        ];
+        for ct in &types {
+            let json = serde_json::to_string(ct).unwrap();
+            let decoded: CareType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, ct);
+        }
+    }
+
+    // ── CareType::anchor_key pure function tests ────────────────────────
+
+    #[test]
+    fn care_type_anchor_key_known_variants() {
+        assert_eq!(CareType::Childcare.anchor_key(), "childcare");
+        assert_eq!(CareType::Eldercare.anchor_key(), "eldercare");
+        assert_eq!(CareType::DisabilitySupport.anchor_key(), "disability");
+        assert_eq!(CareType::PostSurgery.anchor_key(), "postsurgery");
+        assert_eq!(CareType::MentalHealth.anchor_key(), "mentalhealth");
+        assert_eq!(CareType::Respite.anchor_key(), "respite");
+    }
+
+    #[test]
+    fn care_type_anchor_key_other_lowercases_and_replaces_spaces() {
+        let ct = CareType::Other("Home Health Aide".to_string());
+        assert_eq!(ct.anchor_key(), "other_home_health_aide");
+    }
+
+    #[test]
+    fn care_type_anchor_key_other_empty_string() {
+        let ct = CareType::Other(String::new());
+        assert_eq!(ct.anchor_key(), "other_");
+    }
+
+    // ── CarePlan serde roundtrip ────────────────────────────────────────
+
+    #[test]
+    fn care_plan_serde_roundtrip() {
+        let agent_b = AgentPubKey::from_raw_36(vec![2u8; 36]);
+        let plan = CarePlan {
+            recipient: fake_agent(),
+            title: "Daily Care for Mom".to_string(),
+            description: "Morning and evening check-ins".to_string(),
+            care_type: CareType::Eldercare,
+            schedule: "Mon/Wed/Fri mornings".to_string(),
+            caregivers: vec![agent_b],
+            status: PlanStatus::Active,
+            created_at: Timestamp::from_micros(1000),
+            updated_at: Timestamp::from_micros(2000),
+            hours_per_week: 12.0,
+            special_instructions: "Allergic to penicillin".to_string(),
+        };
+        let json = serde_json::to_string(&plan).unwrap();
+        let decoded: CarePlan = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, plan);
+    }
+
+    // ── CareSession serde roundtrip ─────────────────────────────────────
+
+    #[test]
+    fn care_session_serde_roundtrip() {
+        let session = CareSession {
+            plan_hash: fake_action_hash(),
+            caregiver: fake_agent(),
+            started_at: Timestamp::from_micros(1000),
+            ended_at: Timestamp::from_micros(5000),
+            hours: 4.0,
+            notes: "Went well".to_string(),
+            tasks_completed: vec!["Medication".to_string(), "Lunch".to_string()],
+        };
+        let json = serde_json::to_string(&session).unwrap();
+        let decoded: CareSession = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, session);
+    }
+
+    #[test]
+    fn care_session_empty_tasks_roundtrip() {
+        let session = CareSession {
+            plan_hash: fake_action_hash(),
+            caregiver: fake_agent(),
+            started_at: Timestamp::from_micros(0),
+            ended_at: Timestamp::from_micros(3600),
+            hours: 1.0,
+            notes: String::new(),
+            tasks_completed: vec![],
+        };
+        let json = serde_json::to_string(&session).unwrap();
+        let decoded: CareSession = serde_json::from_str(&json).unwrap();
+        assert!(decoded.tasks_completed.is_empty());
+        assert!(decoded.notes.is_empty());
+    }
+}

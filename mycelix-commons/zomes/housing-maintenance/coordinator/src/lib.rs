@@ -420,3 +420,395 @@ fn map_maintenance_to_resource_type(category: &str) -> Option<MutualAidResourceT
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    // ── Pure function tests: map_maintenance_to_resource_type ──────────
+
+    #[test]
+    fn map_plumbing_to_power_tool() {
+        let result = map_maintenance_to_resource_type("plumbing");
+        assert!(matches!(result, Some(MutualAidResourceType::PowerTool)));
+    }
+
+    #[test]
+    fn map_electrical_to_power_tool() {
+        let result = map_maintenance_to_resource_type("electrical");
+        assert!(matches!(result, Some(MutualAidResourceType::PowerTool)));
+    }
+
+    #[test]
+    fn map_structural_to_power_tool() {
+        let result = map_maintenance_to_resource_type("structural");
+        assert!(matches!(result, Some(MutualAidResourceType::PowerTool)));
+    }
+
+    #[test]
+    fn map_painting_to_hand_tool() {
+        let result = map_maintenance_to_resource_type("painting");
+        assert!(matches!(result, Some(MutualAidResourceType::HandTool)));
+    }
+
+    #[test]
+    fn map_carpentry_to_hand_tool() {
+        let result = map_maintenance_to_resource_type("carpentry");
+        assert!(matches!(result, Some(MutualAidResourceType::HandTool)));
+    }
+
+    #[test]
+    fn map_general_to_hand_tool() {
+        let result = map_maintenance_to_resource_type("general");
+        assert!(matches!(result, Some(MutualAidResourceType::HandTool)));
+    }
+
+    #[test]
+    fn map_landscaping_to_garden_tool() {
+        let result = map_maintenance_to_resource_type("landscaping");
+        assert!(matches!(result, Some(MutualAidResourceType::GardenTool)));
+    }
+
+    #[test]
+    fn map_grounds_to_garden_tool() {
+        let result = map_maintenance_to_resource_type("grounds");
+        assert!(matches!(result, Some(MutualAidResourceType::GardenTool)));
+    }
+
+    #[test]
+    fn map_workshop_to_crafting_supplies() {
+        let result = map_maintenance_to_resource_type("workshop");
+        assert!(matches!(
+            result,
+            Some(MutualAidResourceType::CraftingSupplies)
+        ));
+    }
+
+    #[test]
+    fn map_fabrication_to_crafting_supplies() {
+        let result = map_maintenance_to_resource_type("fabrication");
+        assert!(matches!(
+            result,
+            Some(MutualAidResourceType::CraftingSupplies)
+        ));
+    }
+
+    #[test]
+    fn map_unknown_category_returns_none() {
+        assert!(map_maintenance_to_resource_type("hvac").is_none());
+        assert!(map_maintenance_to_resource_type("roofing").is_none());
+        assert!(map_maintenance_to_resource_type("pest control").is_none());
+        assert!(map_maintenance_to_resource_type("").is_none());
+    }
+
+    #[test]
+    fn map_category_case_insensitive() {
+        assert!(matches!(
+            map_maintenance_to_resource_type("PLUMBING"),
+            Some(MutualAidResourceType::PowerTool)
+        ));
+        assert!(matches!(
+            map_maintenance_to_resource_type("Painting"),
+            Some(MutualAidResourceType::HandTool)
+        ));
+        assert!(matches!(
+            map_maintenance_to_resource_type("LANDSCAPING"),
+            Some(MutualAidResourceType::GardenTool)
+        ));
+        assert!(matches!(
+            map_maintenance_to_resource_type("Workshop"),
+            Some(MutualAidResourceType::CraftingSupplies)
+        ));
+    }
+
+    // ── Coordinator struct serde roundtrips ────────────────────────────
+
+    #[test]
+    fn acknowledge_request_input_serde_roundtrip() {
+        let input = AcknowledgeRequestInput {
+            request_hash: fake_action_hash(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AcknowledgeRequestInput = serde_json::from_str(&json).unwrap();
+        let json2 = serde_json::to_string(&decoded).unwrap();
+        assert_eq!(json, json2);
+    }
+
+    #[test]
+    fn complete_work_order_input_serde_roundtrip() {
+        let input = CompleteWorkOrderInput {
+            work_order_hash: fake_action_hash(),
+            actual_cost_cents: Some(25000),
+            notes: "Fixed the leak under the sink".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CompleteWorkOrderInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.actual_cost_cents, Some(25000));
+        assert_eq!(decoded.notes, "Fixed the leak under the sink");
+    }
+
+    #[test]
+    fn complete_work_order_input_no_cost_serde_roundtrip() {
+        let input = CompleteWorkOrderInput {
+            work_order_hash: fake_action_hash(),
+            actual_cost_cents: None,
+            notes: String::new(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CompleteWorkOrderInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.actual_cost_cents.is_none());
+        assert!(decoded.notes.is_empty());
+    }
+
+    #[test]
+    fn record_inspection_input_serde_roundtrip() {
+        let input = RecordInspectionInput {
+            inspection_hash: fake_action_hash(),
+            findings: vec!["Minor crack in wall".to_string(), "Water stain on ceiling".to_string()],
+            passed: false,
+            next_due: Some(Timestamp::from_micros(1_000_000)),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordInspectionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.findings.len(), 2);
+        assert!(!decoded.passed);
+        assert!(decoded.next_due.is_some());
+    }
+
+    #[test]
+    fn record_inspection_input_passed_no_next_due_serde() {
+        let input = RecordInspectionInput {
+            inspection_hash: fake_action_hash(),
+            findings: vec![],
+            passed: true,
+            next_due: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordInspectionInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.findings.is_empty());
+        assert!(decoded.passed);
+        assert!(decoded.next_due.is_none());
+    }
+
+    #[test]
+    fn find_community_resources_input_serde_roundtrip() {
+        let input = FindCommunityResourcesInput {
+            maintenance_category: "plumbing".to_string(),
+            query: Some("wrench".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FindCommunityResourcesInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.maintenance_category, "plumbing");
+        assert_eq!(decoded.query, Some("wrench".to_string()));
+    }
+
+    #[test]
+    fn find_community_resources_input_no_query_serde() {
+        let input = FindCommunityResourcesInput {
+            maintenance_category: "electrical".to_string(),
+            query: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FindCommunityResourcesInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.query.is_none());
+    }
+
+    #[test]
+    fn community_resources_result_found_serde_roundtrip() {
+        let result = CommunityResourcesResult {
+            resources_found: 3,
+            has_resources: true,
+            resource_type_searched: Some("PowerTool".to_string()),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: CommunityResourcesResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.resources_found, 3);
+        assert!(decoded.has_resources);
+        assert_eq!(decoded.resource_type_searched, Some("PowerTool".to_string()));
+        assert!(decoded.error.is_none());
+    }
+
+    #[test]
+    fn community_resources_result_error_serde_roundtrip() {
+        let result = CommunityResourcesResult {
+            resources_found: 0,
+            has_resources: false,
+            resource_type_searched: None,
+            error: Some("Network error: connection refused".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: CommunityResourcesResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.resources_found, 0);
+        assert!(!decoded.has_resources);
+        assert!(decoded.error.as_ref().unwrap().contains("connection refused"));
+    }
+
+    // ── Integrity enum serde roundtrips ────────────────────────────────
+
+    #[test]
+    fn maintenance_category_all_variants_serde() {
+        let variants = vec![
+            MaintenanceCategory::Plumbing,
+            MaintenanceCategory::Electrical,
+            MaintenanceCategory::HVAC,
+            MaintenanceCategory::Structural,
+            MaintenanceCategory::Appliance,
+            MaintenanceCategory::Exterior,
+            MaintenanceCategory::CommonArea,
+            MaintenanceCategory::Safety,
+            MaintenanceCategory::Pest,
+            MaintenanceCategory::Other("Custom".to_string()),
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: MaintenanceCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    #[test]
+    fn maintenance_priority_all_variants_serde() {
+        let variants = vec![
+            MaintenancePriority::Emergency,
+            MaintenancePriority::Urgent,
+            MaintenancePriority::Normal,
+            MaintenancePriority::Low,
+            MaintenancePriority::Scheduled,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: MaintenancePriority = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    #[test]
+    fn maintenance_status_all_variants_serde() {
+        let variants = vec![
+            MaintenanceStatus::Reported,
+            MaintenanceStatus::Acknowledged,
+            MaintenanceStatus::Scheduled,
+            MaintenanceStatus::InProgress,
+            MaintenanceStatus::Completed,
+            MaintenanceStatus::Deferred,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: MaintenanceStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    #[test]
+    fn inspection_type_all_variants_serde() {
+        let variants = vec![
+            InspectionType::Annual,
+            InspectionType::Safety,
+            InspectionType::Code,
+            InspectionType::PreMove,
+            InspectionType::PostMove,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: InspectionType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    // ── Integrity entry struct serde roundtrips ────────────────────────
+
+    #[test]
+    fn maintenance_request_serde_roundtrip() {
+        let req = MaintenanceRequest {
+            unit_hash: Some(fake_action_hash()),
+            building_hash: fake_action_hash(),
+            reported_by: fake_agent(),
+            title: "Leaking faucet".to_string(),
+            description: "Kitchen faucet drips constantly".to_string(),
+            category: MaintenanceCategory::Plumbing,
+            priority: MaintenancePriority::Normal,
+            status: MaintenanceStatus::Reported,
+            reported_at: Timestamp::from_micros(1000),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let decoded: MaintenanceRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, req);
+    }
+
+    #[test]
+    fn work_order_serde_roundtrip() {
+        let order = WorkOrder {
+            request_hash: fake_action_hash(),
+            assigned_to: "Bob the Plumber".to_string(),
+            description: "Replace faucet cartridge".to_string(),
+            estimated_cost_cents: Some(15000),
+            actual_cost_cents: None,
+            scheduled_date: Some(Timestamp::from_micros(2000)),
+            completed_date: None,
+            notes: "Need to order parts first".to_string(),
+        };
+        let json = serde_json::to_string(&order).unwrap();
+        let decoded: WorkOrder = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, order);
+    }
+
+    #[test]
+    fn inspection_serde_roundtrip() {
+        let inspection = Inspection {
+            building_hash: fake_action_hash(),
+            inspector: fake_agent(),
+            inspection_type: InspectionType::Annual,
+            date: Timestamp::from_micros(3000),
+            findings: vec!["All clear".to_string()],
+            passed: true,
+            next_due: Some(Timestamp::from_micros(4000)),
+        };
+        let json = serde_json::to_string(&inspection).unwrap();
+        let decoded: Inspection = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, inspection);
+    }
+
+    // ── MutualAidResourceType serde roundtrip ─────────────────────────
+
+    #[test]
+    fn mutual_aid_resource_type_serde_roundtrip() {
+        let variants: Vec<MutualAidResourceType> = vec![
+            MutualAidResourceType::PowerTool,
+            MutualAidResourceType::HandTool,
+            MutualAidResourceType::GardenTool,
+            MutualAidResourceType::CookingEquipment,
+            MutualAidResourceType::CraftingSupplies,
+            MutualAidResourceType::Car,
+            MutualAidResourceType::Truck,
+            MutualAidResourceType::Bicycle,
+            MutualAidResourceType::Trailer,
+            MutualAidResourceType::Boat,
+            MutualAidResourceType::MeetingRoom,
+            MutualAidResourceType::Workshop,
+            MutualAidResourceType::Kitchen,
+            MutualAidResourceType::GardenPlot,
+            MutualAidResourceType::StorageSpace,
+            MutualAidResourceType::ParkingSpot,
+            MutualAidResourceType::CampingGear,
+            MutualAidResourceType::SportsEquipment,
+            MutualAidResourceType::MusicInstrument,
+            MutualAidResourceType::Photography,
+            MutualAidResourceType::Projector,
+            MutualAidResourceType::Custom("Custom tool".to_string()),
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: MutualAidResourceType = serde_json::from_str(&json).unwrap();
+            assert_eq!(format!("{:?}", decoded), format!("{:?}", v));
+        }
+    }
+}

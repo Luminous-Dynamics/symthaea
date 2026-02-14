@@ -313,3 +313,135 @@ pub fn mark_synced(message_hash: ActionHash) -> ExternResult<Record> {
         "Could not find updated message".into()
     )))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // Coordinator input struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn send_message_input_serde_roundtrip() {
+        let input = SendMessageInput {
+            channel_hash: Some(ActionHash::from_raw_36(vec![0u8; 36])),
+            priority: MessagePriority::Flash,
+            content: "Evacuation notice for Zone A".to_string(),
+            location: Some((29.76, -95.37)),
+            ttl_hours: 24,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SendMessageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.priority, MessagePriority::Flash);
+        assert_eq!(decoded.content, "Evacuation notice for Zone A");
+        assert!(decoded.channel_hash.is_some());
+        assert_eq!(decoded.location, Some((29.76, -95.37)));
+        assert_eq!(decoded.ttl_hours, 24);
+    }
+
+    #[test]
+    fn send_message_input_minimal_serde() {
+        let input = SendMessageInput {
+            channel_hash: None,
+            priority: MessagePriority::Routine,
+            content: "Status check".to_string(),
+            location: None,
+            ttl_hours: 1,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SendMessageInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.channel_hash.is_none());
+        assert!(decoded.location.is_none());
+        assert_eq!(decoded.ttl_hours, 1);
+    }
+
+    #[test]
+    fn create_channel_input_serde_roundtrip() {
+        let input = CreateChannelInput {
+            name: "Medical Ops Channel".to_string(),
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            channel_type: ChannelType::Medical,
+            participants: vec![
+                AgentPubKey::from_raw_36(vec![1u8; 36]),
+                AgentPubKey::from_raw_36(vec![2u8; 36]),
+            ],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateChannelInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "Medical Ops Channel");
+        assert_eq!(decoded.channel_type, ChannelType::Medical);
+        assert_eq!(decoded.participants.len(), 2);
+    }
+
+    #[test]
+    fn broadcast_input_serde_roundtrip() {
+        let input = BroadcastInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            broadcast_type: BroadcastType::Evacuation,
+            content: "Evacuate Zone B immediately".to_string(),
+            target_area: (29.76, -95.37, 10.0),
+            expires_at: Timestamp::from_micros(1000000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: BroadcastInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.broadcast_type, BroadcastType::Evacuation);
+        assert_eq!(decoded.content, "Evacuate Zone B immediately");
+        assert_eq!(decoded.target_area.0, 29.76);
+        assert_eq!(decoded.target_area.1, -95.37);
+        assert_eq!(decoded.target_area.2, 10.0);
+    }
+
+    // ========================================================================
+    // Integrity enum serde tests (all variants)
+    // ========================================================================
+
+    #[test]
+    fn message_priority_all_variants_serde() {
+        let variants = vec![
+            MessagePriority::Flash,
+            MessagePriority::Immediate,
+            MessagePriority::Priority,
+            MessagePriority::Routine,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: MessagePriority = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn channel_type_all_variants_serde() {
+        let variants = vec![
+            ChannelType::Command,
+            ChannelType::Operations,
+            ChannelType::Logistics,
+            ChannelType::Medical,
+            ChannelType::Public,
+            ChannelType::Volunteer,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: ChannelType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn broadcast_type_all_variants_serde() {
+        let variants = vec![
+            BroadcastType::Evacuation,
+            BroadcastType::ShelterInPlace,
+            BroadcastType::AllClear,
+            BroadcastType::ResourceDrop,
+            BroadcastType::MedicalAlert,
+            BroadcastType::WeatherWarning,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: BroadcastType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+}

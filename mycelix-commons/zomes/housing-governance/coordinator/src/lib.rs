@@ -416,3 +416,341 @@ pub fn tally_election(election_hash: ActionHash) -> ExternResult<Record> {
         "Could not find updated election".into()
     )))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    // ── Coordinator struct serde roundtrips ────────────────────────────
+
+    #[test]
+    fn record_minutes_input_serde_roundtrip() {
+        let agent_a = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let agent_b = AgentPubKey::from_raw_36(vec![2u8; 36]);
+        let input = RecordMinutesInput {
+            meeting_hash: fake_action_hash(),
+            minutes: "Discussed budget and maintenance schedule.".to_string(),
+            attendees: vec![agent_a.clone(), agent_b.clone()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordMinutesInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.minutes, "Discussed budget and maintenance schedule.");
+        assert_eq!(decoded.attendees.len(), 2);
+        assert_eq!(decoded.attendees[0], agent_a);
+    }
+
+    #[test]
+    fn record_minutes_input_empty_attendees_serde() {
+        let input = RecordMinutesInput {
+            meeting_hash: fake_action_hash(),
+            minutes: "Brief meeting.".to_string(),
+            attendees: vec![],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordMinutesInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.attendees.is_empty());
+    }
+
+    #[test]
+    fn vote_on_resolution_input_serde_roundtrip() {
+        let input = VoteOnResolutionInput {
+            resolution_hash: fake_action_hash(),
+            votes_for: 10,
+            votes_against: 3,
+            votes_abstain: 2,
+            quorum_met: true,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: VoteOnResolutionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.votes_for, 10);
+        assert_eq!(decoded.votes_against, 3);
+        assert_eq!(decoded.votes_abstain, 2);
+        assert!(decoded.quorum_met);
+    }
+
+    #[test]
+    fn vote_on_resolution_input_no_quorum_serde() {
+        let input = VoteOnResolutionInput {
+            resolution_hash: fake_action_hash(),
+            votes_for: 2,
+            votes_against: 1,
+            votes_abstain: 0,
+            quorum_met: false,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: VoteOnResolutionInput = serde_json::from_str(&json).unwrap();
+        assert!(!decoded.quorum_met);
+    }
+
+    #[test]
+    fn vote_on_resolution_input_zero_votes_serde() {
+        let input = VoteOnResolutionInput {
+            resolution_hash: fake_action_hash(),
+            votes_for: 0,
+            votes_against: 0,
+            votes_abstain: 0,
+            quorum_met: false,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: VoteOnResolutionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.votes_for, 0);
+        assert_eq!(decoded.votes_against, 0);
+        assert_eq!(decoded.votes_abstain, 0);
+    }
+
+    #[test]
+    fn amend_bylaw_input_serde_roundtrip() {
+        let input = AmendByLawInput {
+            original_hash: fake_action_hash(),
+            new_content: "Updated quiet hours: 11pm to 6am.".to_string(),
+            new_title: Some("Revised Noise Policy".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AmendByLawInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_content, "Updated quiet hours: 11pm to 6am.");
+        assert_eq!(decoded.new_title, Some("Revised Noise Policy".to_string()));
+    }
+
+    #[test]
+    fn amend_bylaw_input_no_new_title_serde() {
+        let input = AmendByLawInput {
+            original_hash: fake_action_hash(),
+            new_content: "Minor wording change.".to_string(),
+            new_title: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AmendByLawInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.new_title.is_none());
+    }
+
+    // ── Integrity enum serde roundtrips ────────────────────────────────
+
+    #[test]
+    fn meeting_type_all_variants_serde() {
+        let variants = vec![
+            MeetingType::Regular,
+            MeetingType::Special,
+            MeetingType::Annual,
+            MeetingType::Emergency,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: MeetingType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    #[test]
+    fn resolution_category_all_variants_serde() {
+        let variants = vec![
+            ResolutionCategory::Budget,
+            ResolutionCategory::Maintenance,
+            ResolutionCategory::Membership,
+            ResolutionCategory::Rules,
+            ResolutionCategory::Assessment,
+            ResolutionCategory::Improvement,
+            ResolutionCategory::Emergency,
+            ResolutionCategory::Other("Custom Category".to_string()),
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: ResolutionCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    // ── Integrity entry struct serde roundtrips ────────────────────────
+
+    #[test]
+    fn board_meeting_serde_roundtrip() {
+        let meeting = BoardMeeting {
+            cooperative_hash: None,
+            title: "Monthly Board Meeting".to_string(),
+            agenda: vec!["Budget review".to_string(), "New member applications".to_string()],
+            scheduled_at: Timestamp::from_micros(1000000),
+            location: "Community Room".to_string(),
+            meeting_type: MeetingType::Regular,
+            minutes: None,
+            attendees: vec![fake_agent()],
+        };
+        let json = serde_json::to_string(&meeting).unwrap();
+        let decoded: BoardMeeting = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, meeting);
+    }
+
+    #[test]
+    fn board_meeting_with_minutes_serde_roundtrip() {
+        let meeting = BoardMeeting {
+            cooperative_hash: Some(fake_action_hash()),
+            title: "Annual Meeting".to_string(),
+            agenda: vec!["Election".to_string()],
+            scheduled_at: Timestamp::from_micros(2000000),
+            location: "Main Hall".to_string(),
+            meeting_type: MeetingType::Annual,
+            minutes: Some("Meeting concluded with elections.".to_string()),
+            attendees: vec![fake_agent()],
+        };
+        let json = serde_json::to_string(&meeting).unwrap();
+        let decoded: BoardMeeting = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, meeting);
+    }
+
+    #[test]
+    fn resolution_serde_roundtrip() {
+        let resolution = Resolution {
+            meeting_hash: Some(fake_action_hash()),
+            title: "Approve landscaping budget".to_string(),
+            description: "Allocate $5000 for landscaping".to_string(),
+            proposed_by: fake_agent(),
+            category: ResolutionCategory::Budget,
+            votes_for: 8,
+            votes_against: 2,
+            votes_abstain: 1,
+            quorum_met: true,
+            passed: true,
+            effective_date: Some(Timestamp::from_micros(3000000)),
+        };
+        let json = serde_json::to_string(&resolution).unwrap();
+        let decoded: Resolution = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, resolution);
+    }
+
+    #[test]
+    fn bylaw_serde_roundtrip() {
+        let bylaw = ByLaw {
+            id: "BL-001".to_string(),
+            title: "Noise Policy".to_string(),
+            content: "Quiet hours 10pm to 7am.".to_string(),
+            version: 1,
+            adopted_at: Timestamp::from_micros(1000000),
+            amended_at: None,
+            supersedes: None,
+        };
+        let json = serde_json::to_string(&bylaw).unwrap();
+        let decoded: ByLaw = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, bylaw);
+    }
+
+    #[test]
+    fn bylaw_amended_serde_roundtrip() {
+        let bylaw = ByLaw {
+            id: "BL-001".to_string(),
+            title: "Revised Noise Policy".to_string(),
+            content: "Quiet hours 11pm to 6am.".to_string(),
+            version: 2,
+            adopted_at: Timestamp::from_micros(1000000),
+            amended_at: Some(Timestamp::from_micros(2000000)),
+            supersedes: Some(fake_action_hash()),
+        };
+        let json = serde_json::to_string(&bylaw).unwrap();
+        let decoded: ByLaw = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, bylaw);
+    }
+
+    #[test]
+    fn candidate_entry_serde_roundtrip() {
+        let candidate = CandidateEntry {
+            agent: fake_agent(),
+            position: "President".to_string(),
+            statement: "I will serve with integrity.".to_string(),
+        };
+        let json = serde_json::to_string(&candidate).unwrap();
+        let decoded: CandidateEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, candidate);
+    }
+
+    #[test]
+    fn election_result_serde_roundtrip() {
+        let result = ElectionResult {
+            position: "Treasurer".to_string(),
+            winner: fake_agent(),
+            votes_received: 15,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: ElectionResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, result);
+    }
+
+    #[test]
+    fn election_serde_roundtrip() {
+        let election = Election {
+            title: "Annual Board Election".to_string(),
+            positions: vec!["President".to_string(), "Treasurer".to_string()],
+            candidates: vec![CandidateEntry {
+                agent: fake_agent(),
+                position: "President".to_string(),
+                statement: "Vote for me".to_string(),
+            }],
+            voting_opens: Timestamp::from_micros(1000000),
+            voting_closes: Timestamp::from_micros(2000000),
+            results: None,
+        };
+        let json = serde_json::to_string(&election).unwrap();
+        let decoded: Election = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, election);
+    }
+
+    #[test]
+    fn election_with_results_serde_roundtrip() {
+        let election = Election {
+            title: "Completed Election".to_string(),
+            positions: vec!["President".to_string()],
+            candidates: vec![CandidateEntry {
+                agent: fake_agent(),
+                position: "President".to_string(),
+                statement: "I ran.".to_string(),
+            }],
+            voting_opens: Timestamp::from_micros(1000000),
+            voting_closes: Timestamp::from_micros(2000000),
+            results: Some(vec![ElectionResult {
+                position: "President".to_string(),
+                winner: fake_agent(),
+                votes_received: 20,
+            }]),
+        };
+        let json = serde_json::to_string(&election).unwrap();
+        let decoded: Election = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, election);
+    }
+
+    #[test]
+    fn ballot_vote_serde_roundtrip() {
+        let vote = BallotVote {
+            position: "President".to_string(),
+            candidate: fake_agent(),
+        };
+        let json = serde_json::to_string(&vote).unwrap();
+        let decoded: BallotVote = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, vote);
+    }
+
+    #[test]
+    fn ballot_serde_roundtrip() {
+        let ballot = Ballot {
+            election_hash: fake_action_hash(),
+            voter: fake_agent(),
+            votes: vec![
+                BallotVote {
+                    position: "President".to_string(),
+                    candidate: fake_agent(),
+                },
+                BallotVote {
+                    position: "Treasurer".to_string(),
+                    candidate: AgentPubKey::from_raw_36(vec![2u8; 36]),
+                },
+            ],
+            cast_at: Timestamp::from_micros(1500000),
+        };
+        let json = serde_json::to_string(&ballot).unwrap();
+        let decoded: Ballot = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, ballot);
+    }
+}

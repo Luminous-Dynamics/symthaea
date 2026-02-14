@@ -267,6 +267,8 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
             proof_value: String::new(), // Will be filled
             cryptosuite: Some(AlgorithmId::Ed25519.cryptosuite().to_string()),
             algorithm: Some(AlgorithmId::Ed25519.as_u16()),
+            challenge: None,
+            domain: None,
         },
         mycelix_schema_id: input.schema_id.clone(),
         mycelix_created: now,
@@ -329,15 +331,20 @@ pub fn verify_credential(credential_id: String) -> ExternResult<VerificationResu
     let now = sys_time()?;
     let mut errors = Vec::new();
 
-    // Check expiration using ISO 8601 parsing
-    let expired = if let Some(valid_until) = &credential.valid_until {
-        parse_iso8601_expired(valid_until, now)
-    } else {
-        false
-    };
-
-    if expired {
-        errors.push("Credential has expired".to_string());
+    // Check expiration using ISO 8601 parsing (fail-closed)
+    if let Some(valid_until) = &credential.valid_until {
+        match parse_iso8601_expired(valid_until, now) {
+            ExpirationStatus::Expired => {
+                errors.push("Credential has expired".to_string());
+            }
+            ExpirationStatus::ParseError => {
+                errors.push(format!(
+                    "Credential expiration date unparseable (fail-closed): '{}'",
+                    valid_until
+                ));
+            }
+            ExpirationStatus::Valid => {}
+        }
     }
 
     // Verify ed25519 signature using HDK
@@ -517,6 +524,8 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
         proof_value: tagged_sig.to_multibase(),
         cryptosuite: Some(AlgorithmId::Ed25519.cryptosuite().to_string()),
         algorithm: Some(AlgorithmId::Ed25519.as_u16()),
+        challenge: input.challenge.clone(),
+        domain: input.domain.clone(),
     };
 
     let vp = VerifiablePresentation {
@@ -580,20 +589,57 @@ pub fn verify_presentation(input: VerifyPresentationInput) -> ExternResult<Prese
         errors.push("Presentation proof purpose must be 'authentication'".to_string());
     }
 
-    // 2. Verify holder's proof signature
+    // 2. Validate challenge/domain binding (replay protection)
+    // If the proof was created with a challenge, the verifier MUST supply the same one.
+    // If the verifier expects a challenge but the proof has none, that's also a failure.
+    if let Some(expected) = &input.expected_challenge {
+        match &vp.proof.challenge {
+            Some(stored) if stored == expected => {} // match
+            Some(stored) => errors.push(format!(
+                "Presentation challenge mismatch: expected '{}', proof has '{}'",
+                expected, stored
+            )),
+            None => errors.push(format!(
+                "Presentation has no challenge but verifier expected '{}'",
+                expected
+            )),
+        }
+    } else if vp.proof.challenge.is_some() {
+        errors.push("Presentation has challenge but verifier did not supply expected_challenge".to_string());
+    }
+
+    if let Some(expected) = &input.expected_domain {
+        match &vp.proof.domain {
+            Some(stored) if stored == expected => {} // match
+            Some(stored) => errors.push(format!(
+                "Presentation domain mismatch: expected '{}', proof has '{}'",
+                expected, stored
+            )),
+            None => errors.push(format!(
+                "Presentation has no domain but verifier expected '{}'",
+                expected
+            )),
+        }
+    } else if vp.proof.domain.is_some() {
+        errors.push("Presentation has domain but verifier did not supply expected_domain".to_string());
+    }
+
+    // 3. Verify holder's proof signature
     let holder_pubkey_str = vp.holder.strip_prefix("did:mycelix:");
     if let Some(pubkey_str) = holder_pubkey_str {
         if let Ok(holder_pubkey) = AgentPubKey::try_from(pubkey_str.to_string()) {
-            // Reconstruct the signed data (mirrors create_presentation)
+            // Reconstruct the signed data (mirrors create_presentation).
+            // Use the values stored IN the proof, not from the verifier's input,
+            // since these are what was actually signed.
             let mut presentation_data = vp.id.as_bytes().to_vec();
             presentation_data.extend(vp.holder.as_bytes());
             for cred in &vp.verifiable_credential {
                 presentation_data.extend(cred.id.as_bytes());
             }
-            if let Some(challenge) = &input.expected_challenge {
+            if let Some(challenge) = &vp.proof.challenge {
                 presentation_data.extend(challenge.as_bytes());
             }
-            if let Some(domain) = &input.expected_domain {
+            if let Some(domain) = &vp.proof.domain {
                 presentation_data.extend(domain.as_bytes());
             }
 
@@ -664,10 +710,19 @@ pub fn verify_presentation(input: VerifyPresentationInput) -> ExternResult<Prese
             _ => {}
         }
 
-        // Check expiration
+        // Check expiration (fail-closed)
         if let Some(valid_until) = &cred.valid_until {
-            if parse_iso8601_expired(valid_until, now) {
-                cred_errors.push("Credential expired".to_string());
+            match parse_iso8601_expired(valid_until, now) {
+                ExpirationStatus::Expired => {
+                    cred_errors.push("Credential expired".to_string());
+                }
+                ExpirationStatus::ParseError => {
+                    cred_errors.push(format!(
+                        "Credential expiration date unparseable (fail-closed): '{}'",
+                        valid_until
+                    ));
+                }
+                ExpirationStatus::Valid => {}
             }
         }
 
@@ -1465,20 +1520,34 @@ fn base58_decode(s: &str) -> Option<Vec<u8>> {
 /// - `2024-12-31T23:59:59+00:00` (with timezone offset)
 /// - `2024-12-31` (date only, assumes end of day UTC)
 ///
-/// Returns true if the datetime is in the past relative to `now`.
-fn parse_iso8601_expired(datetime_str: &str, now: Timestamp) -> bool {
-    // Try to parse the ISO 8601 string
+/// Returns the expiration status of a datetime string relative to `now`.
+///
+/// Fail-closed: if the datetime string cannot be parsed, returns
+/// `ExpirationStatus::ParseError` so callers can treat it as a verification
+/// failure rather than silently accepting a potentially expired credential.
+fn parse_iso8601_expired(datetime_str: &str, now: Timestamp) -> ExpirationStatus {
     match parse_iso8601_to_micros(datetime_str) {
         Some(expiry_micros) => {
             let now_micros = now.as_micros();
-            now_micros > expiry_micros
+            if now_micros > expiry_micros {
+                ExpirationStatus::Expired
+            } else {
+                ExpirationStatus::Valid
+            }
         }
-        None => {
-            // If parsing fails, assume not expired (fail open for usability)
-            // In production, you might want to fail closed instead
-            false
-        }
+        None => ExpirationStatus::ParseError,
     }
+}
+
+/// Result of checking a credential's expiration date.
+#[derive(Debug, Clone, PartialEq)]
+enum ExpirationStatus {
+    /// The credential has not yet expired.
+    Valid,
+    /// The credential has expired.
+    Expired,
+    /// The expiration date could not be parsed (fail-closed: treat as invalid).
+    ParseError,
 }
 
 /// Parse ISO 8601 datetime string to microseconds since Unix epoch
@@ -1784,19 +1853,23 @@ mod tests {
     #[test]
     fn expired_past_date() {
         let now = Timestamp::from_micros(1_700_000_000_000_000); // ~2023-11-14
-        assert!(parse_iso8601_expired("2020-01-01T00:00:00Z", now));
+        assert_eq!(parse_iso8601_expired("2020-01-01T00:00:00Z", now), ExpirationStatus::Expired);
     }
 
     #[test]
     fn not_expired_future_date() {
         let now = Timestamp::from_micros(1_700_000_000_000_000);
-        assert!(!parse_iso8601_expired("2030-01-01T00:00:00Z", now));
+        assert_eq!(parse_iso8601_expired("2030-01-01T00:00:00Z", now), ExpirationStatus::Valid);
     }
 
     #[test]
-    fn unparseable_defaults_not_expired() {
+    fn unparseable_fails_closed() {
         let now = Timestamp::from_micros(1_700_000_000_000_000);
-        assert!(!parse_iso8601_expired("garbage", now));
+        assert_eq!(
+            parse_iso8601_expired("garbage", now),
+            ExpirationStatus::ParseError,
+            "Unparseable dates must fail closed (ParseError), not silently pass"
+        );
     }
 
     // --- format_timestamp_iso8601 ---
@@ -1879,6 +1952,8 @@ mod tests {
                 proof_value: "zSig".into(),
                 cryptosuite: None,
                 algorithm: None,
+                challenge: None,
+                domain: None,
             },
             mycelix_schema_id: "mycelix:schema:test:v1".into(),
             mycelix_created: Timestamp::from_micros(0),
@@ -1912,6 +1987,8 @@ mod tests {
                 proof_value: "zSig".into(),
                 cryptosuite: None,
                 algorithm: None,
+                challenge: None,
+                domain: None,
             },
             mycelix_schema_id: "mycelix:schema:test:v1".into(),
             mycelix_created: Timestamp::from_micros(0),

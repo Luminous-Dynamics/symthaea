@@ -409,3 +409,246 @@ fn update_agent_credit(agent: &AgentPubKey, new_credit: H2OCredit) -> ExternResu
 
     Ok(action_hash)
 }
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_agent_2() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    // ========================================================================
+    // COORDINATOR STRUCT SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn update_source_status_input_serde_roundtrip() {
+        let input = UpdateSourceStatusInput {
+            source_hash: fake_action_hash(),
+            new_status: SourceStatus::Active,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateSourceStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, SourceStatus::Active);
+    }
+
+    #[test]
+    fn update_source_status_input_all_statuses() {
+        for status in [
+            SourceStatus::Active,
+            SourceStatus::Seasonal,
+            SourceStatus::Depleted,
+            SourceStatus::Contaminated,
+            SourceStatus::UnderMaintenance,
+        ] {
+            let input = UpdateSourceStatusInput {
+                source_hash: fake_action_hash(),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdateSourceStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+
+    #[test]
+    fn transfer_credits_input_serde_roundtrip() {
+        let input = TransferCreditsInput {
+            to_agent: fake_agent_2(),
+            liters: 500,
+            transaction_type: TransactionType::Transfer,
+            source_hash: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferCreditsInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.liters, 500);
+        assert_eq!(decoded.transaction_type, TransactionType::Transfer);
+        assert!(decoded.source_hash.is_none());
+    }
+
+    #[test]
+    fn transfer_credits_input_with_source_hash() {
+        let input = TransferCreditsInput {
+            to_agent: fake_agent(),
+            liters: 1000,
+            transaction_type: TransactionType::Donation,
+            source_hash: Some(fake_action_hash()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferCreditsInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.liters, 1000);
+        assert_eq!(decoded.transaction_type, TransactionType::Donation);
+        assert!(decoded.source_hash.is_some());
+    }
+
+    #[test]
+    fn transfer_credits_input_all_transaction_types() {
+        for tx_type in [
+            TransactionType::Allocation,
+            TransactionType::Transfer,
+            TransactionType::Purchase,
+            TransactionType::Donation,
+            TransactionType::Emergency,
+        ] {
+            let input = TransferCreditsInput {
+                to_agent: fake_agent(),
+                liters: 100,
+                transaction_type: tx_type.clone(),
+                source_hash: None,
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: TransferCreditsInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.transaction_type, tx_type);
+        }
+    }
+
+    #[test]
+    fn record_usage_input_serde_roundtrip() {
+        let input = RecordUsageInput {
+            source_hash: fake_action_hash(),
+            liters_used: 250,
+            usage_category: WaterClassification::Irrigation,
+            meter_reference: Some("METER-001".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordUsageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.liters_used, 250);
+        assert_eq!(decoded.usage_category, WaterClassification::Irrigation);
+        assert_eq!(decoded.meter_reference, Some("METER-001".to_string()));
+    }
+
+    #[test]
+    fn record_usage_input_without_meter_reference() {
+        let input = RecordUsageInput {
+            source_hash: fake_action_hash(),
+            liters_used: 100,
+            usage_category: WaterClassification::Potable,
+            meter_reference: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordUsageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.liters_used, 100);
+        assert_eq!(decoded.usage_category, WaterClassification::Potable);
+        assert!(decoded.meter_reference.is_none());
+    }
+
+    #[test]
+    fn record_usage_input_all_classifications() {
+        for category in [
+            WaterClassification::Potable,
+            WaterClassification::Cooking,
+            WaterClassification::Hygiene,
+            WaterClassification::Irrigation,
+            WaterClassification::Industrial,
+            WaterClassification::Recreation,
+            WaterClassification::Greywater,
+        ] {
+            let input = RecordUsageInput {
+                source_hash: fake_action_hash(),
+                liters_used: 50,
+                usage_category: category.clone(),
+                meter_reference: None,
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: RecordUsageInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.usage_category, category);
+        }
+    }
+
+    // ========================================================================
+    // INTEGRITY ENUM SERDE ROUNDTRIP TESTS (via coordinator re-export)
+    // ========================================================================
+
+    #[test]
+    fn water_source_type_all_variants_serde() {
+        for variant in [
+            WaterSourceType::Municipal,
+            WaterSourceType::Well,
+            WaterSourceType::Spring,
+            WaterSourceType::Rainwater,
+            WaterSourceType::Aquifer,
+            WaterSourceType::River,
+            WaterSourceType::Lake,
+            WaterSourceType::Recycled,
+            WaterSourceType::Desalinated,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: WaterSourceType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn source_status_all_variants_serde() {
+        for variant in [
+            SourceStatus::Active,
+            SourceStatus::Seasonal,
+            SourceStatus::Depleted,
+            SourceStatus::Contaminated,
+            SourceStatus::UnderMaintenance,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: SourceStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn allocation_type_all_variants_serde() {
+        for variant in [
+            AllocationType::Fixed,
+            AllocationType::Proportional,
+            AllocationType::Priority,
+            AllocationType::Emergency,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: AllocationType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn water_classification_all_variants_serde() {
+        for variant in [
+            WaterClassification::Potable,
+            WaterClassification::Cooking,
+            WaterClassification::Hygiene,
+            WaterClassification::Irrigation,
+            WaterClassification::Industrial,
+            WaterClassification::Recreation,
+            WaterClassification::Greywater,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: WaterClassification = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn transaction_type_all_variants_serde() {
+        for variant in [
+            TransactionType::Allocation,
+            TransactionType::Transfer,
+            TransactionType::Purchase,
+            TransactionType::Donation,
+            TransactionType::Emergency,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: TransactionType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+}

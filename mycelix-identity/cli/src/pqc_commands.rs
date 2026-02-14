@@ -48,6 +48,10 @@ pub struct CredentialProof {
     pub proof_value: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub algorithm: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub challenge: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
 }
 
 /// Parse algorithm name to AlgorithmId.
@@ -204,6 +208,8 @@ pub fn sign(key_path: &Path, credential_path: &Path, output: &Path) -> Result<()
             proof_purpose: "assertionMethod".into(),
             proof_value: signature.to_multibase(),
             algorithm: Some(alg.as_u16()),
+            challenge: None,
+            domain: None,
         },
     };
 
@@ -269,6 +275,8 @@ pub fn hybrid_sign(
             proof_purpose: "assertionMethod".into(),
             proof_value: hybrid_sig.to_multibase(),
             algorithm: Some(AlgorithmId::HybridEd25519MlDsa65.as_u16()),
+            challenge: None,
+            domain: None,
         },
     };
 

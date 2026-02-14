@@ -253,3 +253,159 @@ pub fn get_all_cases(_: ()) -> ExternResult<Vec<Record>> {
 
     Ok(records)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts() -> Timestamp {
+        Timestamp::from_micros(0)
+    }
+
+    // ========================================================================
+    // Coordinator input struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn update_phase_input_serde_roundtrip() {
+        let input = UpdatePhaseInput {
+            case_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            new_phase: CasePhase::Mediation,
+            deadline: Some(ts()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdatePhaseInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_phase, CasePhase::Mediation);
+        assert!(decoded.deadline.is_some());
+    }
+
+    #[test]
+    fn update_phase_input_no_deadline_serde() {
+        let input = UpdatePhaseInput {
+            case_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            new_phase: CasePhase::Closed,
+            deadline: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdatePhaseInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_phase, CasePhase::Closed);
+        assert!(decoded.deadline.is_none());
+    }
+
+    #[test]
+    fn update_status_input_serde_roundtrip() {
+        let input = UpdateStatusInput {
+            case_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            new_status: CaseStatus::Resolved,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, CaseStatus::Resolved);
+    }
+
+    #[test]
+    fn add_party_input_serde_roundtrip() {
+        let input = AddPartyInput {
+            case_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            party_did: "did:example:witness1".to_string(),
+            role: PartyRole::Witness,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddPartyInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.party_did, "did:example:witness1");
+        assert_eq!(decoded.role, PartyRole::Witness);
+    }
+
+    // ========================================================================
+    // Integrity enum serde tests (all variants)
+    // ========================================================================
+
+    #[test]
+    fn case_phase_all_variants_serde() {
+        let variants = vec![
+            CasePhase::Filed,
+            CasePhase::Negotiation,
+            CasePhase::Mediation,
+            CasePhase::Arbitration,
+            CasePhase::Appeal,
+            CasePhase::Enforcement,
+            CasePhase::Closed,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: CasePhase = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn case_status_all_variants_serde() {
+        let variants = vec![
+            CaseStatus::Active,
+            CaseStatus::OnHold,
+            CaseStatus::AwaitingResponse,
+            CaseStatus::InDeliberation,
+            CaseStatus::DecisionRendered,
+            CaseStatus::Enforcing,
+            CaseStatus::Resolved,
+            CaseStatus::Dismissed,
+            CaseStatus::Withdrawn,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: CaseStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn party_role_all_variants_serde() {
+        let variants = vec![
+            PartyRole::Complainant,
+            PartyRole::Respondent,
+            PartyRole::Witness,
+            PartyRole::Expert,
+            PartyRole::Intervenor,
+            PartyRole::Affected,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: PartyRole = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn case_severity_all_variants_serde() {
+        let variants = vec![
+            CaseSeverity::Minor,
+            CaseSeverity::Moderate,
+            CaseSeverity::Serious,
+            CaseSeverity::Critical,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: CaseSeverity = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn case_type_all_variants_serde() {
+        let variants: Vec<CaseType> = vec![
+            CaseType::ContractDispute,
+            CaseType::ConductViolation,
+            CaseType::PropertyDispute,
+            CaseType::FinancialDispute,
+            CaseType::GovernanceDispute,
+            CaseType::IdentityDispute,
+            CaseType::IPDispute,
+            CaseType::Other { category: "Custom".to_string() },
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: CaseType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+}

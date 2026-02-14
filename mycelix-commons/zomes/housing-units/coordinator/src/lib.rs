@@ -294,3 +294,190 @@ pub fn vacate_unit(unit_action_hash: ActionHash) -> ExternResult<Record> {
         "Could not find updated unit".into()
     )))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    // ── Coordinator struct serde roundtrips ────────────────────────────
+
+    #[test]
+    fn update_unit_status_input_serde_roundtrip() {
+        let input = UpdateUnitStatusInput {
+            unit_action_hash: fake_action_hash(),
+            new_status: UnitStatus::UnderMaintenance,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateUnitStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, UnitStatus::UnderMaintenance);
+    }
+
+    #[test]
+    fn assign_occupant_input_serde_roundtrip() {
+        let input = AssignOccupantInput {
+            unit_action_hash: fake_action_hash(),
+            occupant: fake_agent(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AssignOccupantInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.occupant, fake_agent());
+    }
+
+    // ── Integrity enum serde roundtrips ────────────────────────────────
+
+    #[test]
+    fn building_type_all_variants_serde() {
+        let variants = vec![
+            BuildingType::Apartment,
+            BuildingType::Townhouse,
+            BuildingType::SingleFamily,
+            BuildingType::Duplex,
+            BuildingType::CoHousing,
+            BuildingType::MixedUse,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: BuildingType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    #[test]
+    fn unit_type_all_variants_serde() {
+        let variants = vec![
+            UnitType::Studio,
+            UnitType::OneBedroom,
+            UnitType::TwoBedroom,
+            UnitType::ThreeBedroom,
+            UnitType::FourPlus,
+            UnitType::Accessible,
+            UnitType::Family,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: UnitType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    #[test]
+    fn access_feature_all_variants_serde() {
+        let variants = vec![
+            AccessFeature::WheelchairAccessible,
+            AccessFeature::Elevator,
+            AccessFeature::GrabBars,
+            AccessFeature::WideDoorways,
+            AccessFeature::LowCounters,
+            AccessFeature::VisualAlerts,
+            AccessFeature::HearingLoop,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: AccessFeature = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    #[test]
+    fn unit_status_all_variants_serde() {
+        let variants = vec![
+            UnitStatus::Available,
+            UnitStatus::Occupied,
+            UnitStatus::UnderMaintenance,
+            UnitStatus::Reserved,
+            UnitStatus::Renovation,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: UnitStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    // ── Integrity entry struct serde roundtrips ────────────────────────
+
+    #[test]
+    fn building_serde_roundtrip() {
+        let building = Building {
+            id: "bldg-001".to_string(),
+            name: "Oak Terrace".to_string(),
+            address: "123 Main St".to_string(),
+            location_lat: 45.5,
+            location_lon: -122.6,
+            total_units: 24,
+            year_built: Some(1985),
+            building_type: BuildingType::Apartment,
+            cooperative_hash: None,
+        };
+        let json = serde_json::to_string(&building).unwrap();
+        let decoded: Building = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, building);
+    }
+
+    #[test]
+    fn unit_serde_roundtrip() {
+        let unit = Unit {
+            building_hash: fake_action_hash(),
+            unit_number: "4B".to_string(),
+            unit_type: UnitType::TwoBedroom,
+            square_meters: 75,
+            floor: 4,
+            bedrooms: 2,
+            bathrooms: 1,
+            accessibility_features: vec![AccessFeature::Elevator, AccessFeature::WideDoorways],
+            current_occupant: Some(fake_agent()),
+            status: UnitStatus::Occupied,
+        };
+        let json = serde_json::to_string(&unit).unwrap();
+        let decoded: Unit = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, unit);
+    }
+
+    #[test]
+    fn unit_no_occupant_serde_roundtrip() {
+        let unit = Unit {
+            building_hash: fake_action_hash(),
+            unit_number: "1A".to_string(),
+            unit_type: UnitType::Studio,
+            square_meters: 30,
+            floor: 1,
+            bedrooms: 0,
+            bathrooms: 1,
+            accessibility_features: vec![],
+            current_occupant: None,
+            status: UnitStatus::Available,
+        };
+        let json = serde_json::to_string(&unit).unwrap();
+        let decoded: Unit = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, unit);
+    }
+
+    // ── UpdateUnitStatusInput with all statuses ───────────────────────
+
+    #[test]
+    fn update_unit_status_all_statuses_serde() {
+        for status in [
+            UnitStatus::Available,
+            UnitStatus::Occupied,
+            UnitStatus::UnderMaintenance,
+            UnitStatus::Reserved,
+            UnitStatus::Renovation,
+        ] {
+            let input = UpdateUnitStatusInput {
+                unit_action_hash: fake_action_hash(),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdateUnitStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+}

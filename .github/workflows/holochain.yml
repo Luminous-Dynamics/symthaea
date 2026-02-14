@@ -349,6 +349,16 @@ jobs:
             echo "SDK clippy: skipped (covered by SDK CI)"
           '
 
+      - name: Cargo doc (cluster zomes)
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Building Cluster Documentation ==="
+            RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --manifest-path mycelix-commons/Cargo.toml
+            echo "✓ Commons docs built"
+            RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --manifest-path mycelix-civic/Cargo.toml
+            echo "✓ Civic docs built"
+          '
+
   # ============================================================================
   # Package DNAs
   # ============================================================================
@@ -697,11 +707,11 @@ jobs:
         run: |
           nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release fl_bridge_e2e::sdk_tests"
 
-      - name: Run sweettest - Commons cluster (8 tests)
+      - name: Run sweettest - Commons cluster (14 tests)
         run: |
           nix develop ./mycelix-commons --command bash -c "cd mycelix-commons/tests && cargo test --release -- --ignored --test-threads=1 --nocapture"
 
-      - name: Run sweettest - Civic cluster (7 tests)
+      - name: Run sweettest - Civic cluster (14 tests)
         run: |
           nix develop ./mycelix-civic --command bash -c "cd mycelix-civic/tests && cargo test --release -- --ignored --test-threads=1 --nocapture"
 
@@ -1069,11 +1079,11 @@ jobs:
           echo "| Sweettest Marketplace | 10 | Listings, transactions, reputation, Bridge |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Climate | 11 | Carbon credits, transfers, footprints, projects |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest FL Bridge** | 6 | PoGQ round-trip, honest accept, Byzantine reject, SDK validation |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Sweettest Commons** | 8 | Property, housing-CLT, care-matching, bridge, cross-domain |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Sweettest Civic** | 7 | Media, justice, emergency, bridge, cross-domain |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Sweettest Commons** | 14 | Property, housing, care, mutualaid, water, food, transport, bridge, cross-domain |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Sweettest Civic** | 14 | Justice, emergency, media, bridge, cross-domain |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest Cross-Cluster** | 12 | OtherRole dispatch, allowlist, typed helpers, bidirectional health |" >> $GITHUB_STEP_SUMMARY
-          echo "| Commons unit tests | 323 | Bridge + domain zome unit tests (includes cross-cluster dispatch + rate limiting + audit trail + integrity validation) |" >> $GITHUB_STEP_SUMMARY
-          echo "| Civic unit tests | 400 | Bridge + domain zome unit tests (includes cross-cluster dispatch + rate limiting + audit trail + integrity validation) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commons unit tests | 1,695 | Bridge + domain zome unit tests (includes cross-cluster dispatch + rate limiting + audit trail + integrity validation) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Civic unit tests | 1,320 | Bridge + domain zome unit tests (includes cross-cluster dispatch + rate limiting + audit trail + integrity validation) |" >> $GITHUB_STEP_SUMMARY
           echo "| Bridge-common unit tests | 29 | Dispatch validation, serde roundtrips, rate limiting, typed helpers, audit trail |" >> $GITHUB_STEP_SUMMARY
           echo "| SDK cluster integration | 49 | CommonsBridgeClient + CivicBridgeClient + typed convenience + cross-cluster + audit trail |" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | 3+ | Multi-conductor network tests |" >> $GITHUB_STEP_SUMMARY

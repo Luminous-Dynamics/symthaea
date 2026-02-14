@@ -370,3 +370,284 @@ pub fn get_members(_: ()) -> ExternResult<Vec<Record>> {
 
     Ok(members)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    // ── Coordinator struct serde roundtrips ────────────────────────────
+
+    #[test]
+    fn review_application_input_serde_roundtrip() {
+        let input = ReviewApplicationInput {
+            application_hash: fake_action_hash(),
+            new_status: ApplicationStatus::Approved,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ReviewApplicationInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, ApplicationStatus::Approved);
+    }
+
+    #[test]
+    fn approve_member_input_serde_roundtrip() {
+        let input = ApproveMemberInput {
+            application_hash: fake_action_hash(),
+            unit_hash: Some(fake_action_hash()),
+            membership_type: MembershipType::FullShare,
+            share_equity_cents: 50000,
+            monthly_charge_cents: 120000,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ApproveMemberInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.membership_type, MembershipType::FullShare);
+        assert_eq!(decoded.share_equity_cents, 50000);
+        assert_eq!(decoded.monthly_charge_cents, 120000);
+    }
+
+    #[test]
+    fn approve_member_input_no_unit_serde_roundtrip() {
+        let input = ApproveMemberInput {
+            application_hash: fake_action_hash(),
+            unit_hash: None,
+            membership_type: MembershipType::Associate,
+            share_equity_cents: 0,
+            monthly_charge_cents: 0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ApproveMemberInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.unit_hash.is_none());
+        assert_eq!(decoded.membership_type, MembershipType::Associate);
+    }
+
+    #[test]
+    fn add_to_waitlist_input_serde_roundtrip() {
+        let input = AddToWaitlistInput {
+            application_hash: fake_action_hash(),
+            unit_type_preference: Some(housing_membership_integrity::UnitType::TwoBedroom),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddToWaitlistInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            decoded.unit_type_preference,
+            Some(housing_membership_integrity::UnitType::TwoBedroom)
+        );
+    }
+
+    #[test]
+    fn add_to_waitlist_input_no_preference_serde_roundtrip() {
+        let input = AddToWaitlistInput {
+            application_hash: fake_action_hash(),
+            unit_type_preference: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddToWaitlistInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.unit_type_preference.is_none());
+    }
+
+    #[test]
+    fn create_rent_to_own_input_serde_roundtrip() {
+        let input = CreateRentToOwnInput {
+            member: fake_agent(),
+            unit_hash: fake_action_hash(),
+            total_purchase_price_cents: 30000000,
+            monthly_rent_cents: 150000,
+            equity_portion_percent: 25,
+            target_completion: Timestamp::from_micros(1_000_000_000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateRentToOwnInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_purchase_price_cents, 30000000);
+        assert_eq!(decoded.monthly_rent_cents, 150000);
+        assert_eq!(decoded.equity_portion_percent, 25);
+    }
+
+    #[test]
+    fn record_rent_payment_input_serde_roundtrip() {
+        let input = RecordRentPaymentInput {
+            agreement_hash: fake_action_hash(),
+            payment_amount_cents: 150000,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordRentPaymentInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.payment_amount_cents, 150000);
+    }
+
+    // ── Integrity enum serde roundtrips ────────────────────────────────
+
+    #[test]
+    fn membership_type_all_variants_serde() {
+        let variants = vec![
+            MembershipType::FullShare,
+            MembershipType::LimitedEquity,
+            MembershipType::RentToOwn,
+            MembershipType::Renter,
+            MembershipType::Associate,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: MembershipType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    #[test]
+    fn member_status_all_variants_serde() {
+        let variants = vec![
+            MemberStatus::Active,
+            MemberStatus::OnLeave,
+            MemberStatus::Suspended,
+            MemberStatus::Former,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: MemberStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    #[test]
+    fn application_status_all_variants_serde() {
+        let variants = vec![
+            ApplicationStatus::Pending,
+            ApplicationStatus::UnderReview,
+            ApplicationStatus::Approved,
+            ApplicationStatus::Rejected,
+            ApplicationStatus::Waitlisted,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: ApplicationStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    #[test]
+    fn agreement_status_all_variants_serde() {
+        let variants = vec![
+            AgreementStatus::Active,
+            AgreementStatus::Completed,
+            AgreementStatus::Defaulted,
+            AgreementStatus::Terminated,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: AgreementStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    #[test]
+    fn unit_type_all_variants_serde() {
+        let variants = vec![
+            housing_membership_integrity::UnitType::Studio,
+            housing_membership_integrity::UnitType::OneBedroom,
+            housing_membership_integrity::UnitType::TwoBedroom,
+            housing_membership_integrity::UnitType::ThreeBedroom,
+            housing_membership_integrity::UnitType::FourPlus,
+            housing_membership_integrity::UnitType::Accessible,
+            housing_membership_integrity::UnitType::Family,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: housing_membership_integrity::UnitType =
+                serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    // ── Integrity entry struct serde roundtrips ────────────────────────
+
+    #[test]
+    fn member_application_serde_roundtrip() {
+        let app = MemberApplication {
+            applicant: fake_agent(),
+            requested_unit: Some(fake_action_hash()),
+            membership_type_requested: MembershipType::LimitedEquity,
+            applied_at: Timestamp::from_micros(1000),
+            household_size: 3,
+            income_verified: true,
+            references: vec!["Ref 1".to_string(), "Ref 2".to_string()],
+            status: ApplicationStatus::Pending,
+        };
+        let json = serde_json::to_string(&app).unwrap();
+        let decoded: MemberApplication = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, app);
+    }
+
+    #[test]
+    fn member_serde_roundtrip() {
+        let member = Member {
+            agent: fake_agent(),
+            unit_hash: Some(fake_action_hash()),
+            membership_type: MembershipType::FullShare,
+            share_equity_cents: 50000,
+            joined_at: Timestamp::from_micros(2000),
+            monthly_charge_cents: 120000,
+            voting_rights: true,
+            status: MemberStatus::Active,
+        };
+        let json = serde_json::to_string(&member).unwrap();
+        let decoded: Member = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, member);
+    }
+
+    #[test]
+    fn rent_to_own_agreement_serde_roundtrip() {
+        let agreement = RentToOwnAgreement {
+            member: fake_agent(),
+            unit_hash: fake_action_hash(),
+            total_purchase_price_cents: 30000000,
+            monthly_rent_cents: 150000,
+            equity_portion_percent: 25,
+            accumulated_equity_cents: 750000,
+            started_at: Timestamp::from_micros(1000),
+            target_completion: Timestamp::from_micros(1_000_000_000),
+            status: AgreementStatus::Active,
+        };
+        let json = serde_json::to_string(&agreement).unwrap();
+        let decoded: RentToOwnAgreement = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, agreement);
+    }
+
+    #[test]
+    fn waitlist_entry_serde_roundtrip() {
+        let entry = WaitListEntry {
+            application_hash: fake_action_hash(),
+            position: 5,
+            unit_type_preference: Some(housing_membership_integrity::UnitType::Family),
+            added_at: Timestamp::from_micros(3000),
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        let decoded: WaitListEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, entry);
+    }
+
+    // ── Review input with all statuses ────────────────────────────────
+
+    #[test]
+    fn review_application_input_all_statuses_serde() {
+        for status in [
+            ApplicationStatus::Pending,
+            ApplicationStatus::UnderReview,
+            ApplicationStatus::Approved,
+            ApplicationStatus::Rejected,
+            ApplicationStatus::Waitlisted,
+        ] {
+            let input = ReviewApplicationInput {
+                application_hash: fake_action_hash(),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: ReviewApplicationInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+}

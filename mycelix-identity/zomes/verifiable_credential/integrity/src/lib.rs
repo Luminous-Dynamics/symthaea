@@ -122,6 +122,14 @@ pub struct CredentialProof {
     /// Algorithm identifier (multicodec u16). None defaults to Ed25519 (0xed01).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub algorithm: Option<u16>,
+    /// Challenge value for replay protection (W3C Data Integrity spec).
+    /// When present, the verifier MUST supply the same challenge to verify.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenge: Option<String>,
+    /// Domain restriction (W3C Data Integrity spec).
+    /// When present, the verifier MUST supply the same domain to verify.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
 }
 
 /// Verifiable Presentation - for presenting credentials
@@ -653,6 +661,8 @@ mod tests {
             proof_value: "zBase64EncodedSignature".into(),
             cryptosuite: None,
             algorithm: None,
+            challenge: None,
+            domain: None,
         }
     }
 

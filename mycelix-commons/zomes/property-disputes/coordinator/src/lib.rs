@@ -350,3 +350,185 @@ pub fn get_respondent_disputes(respondent_did: String) -> ExternResult<Vec<Recor
     }
     Ok(results)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_dispute_input_serde_roundtrip() {
+        let input = FileDisputeInput {
+            property_id: "prop-001".to_string(),
+            dispute_type: DisputeType::Boundary,
+            claimant_did: "did:key:z6Mk001".to_string(),
+            respondent_did: "did:key:z6Mk002".to_string(),
+            description: "Fence encroachment on north side".to_string(),
+            evidence_ids: vec!["survey-001".to_string(), "photo-001".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FileDisputeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "prop-001");
+        assert_eq!(decoded.evidence_ids.len(), 2);
+    }
+
+    #[test]
+    fn file_claim_input_serde_roundtrip() {
+        let input = FileClaimInput {
+            property_id: "prop-001".to_string(),
+            claimant_did: "did:key:z6Mk003".to_string(),
+            claim_basis: ClaimBasis::Inheritance,
+            supporting_documents: vec!["will.pdf".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FileClaimInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.claimant_did, "did:key:z6Mk003");
+        assert_eq!(decoded.supporting_documents.len(), 1);
+    }
+
+    #[test]
+    fn escalate_input_serde_roundtrip() {
+        let input = EscalateInput {
+            dispute_id: "dispute-001".to_string(),
+            justice_case_id: "case-001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: EscalateInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.justice_case_id, "case-001");
+    }
+
+    #[test]
+    fn resolve_dispute_input_serde_roundtrip_resolved() {
+        let input = ResolveDisputeInput {
+            dispute_id: "dispute-001".to_string(),
+            dismissed: false,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ResolveDisputeInput = serde_json::from_str(&json).unwrap();
+        assert!(!decoded.dismissed);
+    }
+
+    #[test]
+    fn resolve_dispute_input_serde_roundtrip_dismissed() {
+        let input = ResolveDisputeInput {
+            dispute_id: "dispute-001".to_string(),
+            dismissed: true,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ResolveDisputeInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.dismissed);
+    }
+
+    #[test]
+    fn update_dispute_status_input_serde_roundtrip() {
+        let input = UpdateDisputeStatusInput {
+            dispute_id: "dispute-001".to_string(),
+            new_status: DisputeStatus::Mediation,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateDisputeStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, DisputeStatus::Mediation);
+    }
+
+    #[test]
+    fn update_claim_status_input_serde_roundtrip() {
+        let input = UpdateClaimStatusInput {
+            claim_id: "claim-001".to_string(),
+            new_status: ClaimStatus::UnderInvestigation,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateClaimStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, ClaimStatus::UnderInvestigation);
+    }
+
+    #[test]
+    fn add_evidence_input_serde_roundtrip() {
+        let input = AddEvidenceInput {
+            dispute_id: "dispute-001".to_string(),
+            evidence_id: "photo-002".to_string(),
+            submitter_did: "did:key:z6Mk001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddEvidenceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.evidence_id, "photo-002");
+    }
+
+    #[test]
+    fn add_document_input_serde_roundtrip() {
+        let input = AddDocumentInput {
+            claim_id: "claim-001".to_string(),
+            document_id: "deed-scan.pdf".to_string(),
+            submitter_did: "did:key:z6Mk003".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddDocumentInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.document_id, "deed-scan.pdf");
+    }
+
+    #[test]
+    fn dispute_type_all_variants_serialize() {
+        let types = vec![
+            DisputeType::Boundary,
+            DisputeType::Ownership,
+            DisputeType::Encumbrance,
+            DisputeType::Easement,
+            DisputeType::Trespass,
+            DisputeType::Damage,
+            DisputeType::Other("Nuisance".to_string()),
+        ];
+        for dt in types {
+            let json = serde_json::to_string(&dt).unwrap();
+            let decoded: DisputeType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, dt);
+        }
+    }
+
+    #[test]
+    fn dispute_status_all_variants_serialize() {
+        let statuses = vec![
+            DisputeStatus::Filed,
+            DisputeStatus::UnderReview,
+            DisputeStatus::Mediation,
+            DisputeStatus::Arbitration,
+            DisputeStatus::Resolved,
+            DisputeStatus::Dismissed,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let decoded: DisputeStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, status);
+        }
+    }
+
+    #[test]
+    fn claim_basis_all_variants_serialize() {
+        let bases = vec![
+            ClaimBasis::PriorOwnership,
+            ClaimBasis::Inheritance,
+            ClaimBasis::AdversePossession,
+            ClaimBasis::FraudulentTransfer,
+            ClaimBasis::DocumentaryEvidence,
+            ClaimBasis::Other("Custom basis".to_string()),
+        ];
+        for basis in bases {
+            let json = serde_json::to_string(&basis).unwrap();
+            let decoded: ClaimBasis = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, basis);
+        }
+    }
+
+    #[test]
+    fn claim_status_all_variants_serialize() {
+        let statuses = vec![
+            ClaimStatus::Pending,
+            ClaimStatus::UnderInvestigation,
+            ClaimStatus::Validated,
+            ClaimStatus::Rejected,
+            ClaimStatus::Superseded,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let decoded: ClaimStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, status);
+        }
+    }
+}

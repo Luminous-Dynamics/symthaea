@@ -260,3 +260,133 @@ pub fn get_patient_triage_history(patient_id: String) -> ExternResult<Vec<Record
     records.sort_by_key(|a| a.action().timestamp());
     Ok(records)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // Coordinator input struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn triage_patient_input_serde_roundtrip() {
+        let input = TriagePatientInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            patient_id: "patient-001".to_string(),
+            patient_hash: None,
+            category: TriageCategory::Immediate,
+            injuries: "Multiple fractures, internal bleeding".to_string(),
+            location: "Zone A, Building 3".to_string(),
+            transport_priority: TransportPriority::Urgent,
+            notes: "Requires surgical intervention".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TriagePatientInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.patient_id, "patient-001");
+        assert_eq!(decoded.category, TriageCategory::Immediate);
+        assert_eq!(decoded.transport_priority, TransportPriority::Urgent);
+        assert!(decoded.patient_hash.is_none());
+    }
+
+    #[test]
+    fn triage_patient_input_with_hash_serde() {
+        let input = TriagePatientInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            patient_id: "patient-002".to_string(),
+            patient_hash: Some(ActionHash::from_raw_36(vec![1u8; 36])),
+            category: TriageCategory::Minor,
+            injuries: "Abrasions".to_string(),
+            location: "Triage tent".to_string(),
+            transport_priority: TransportPriority::Routine,
+            notes: "".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TriagePatientInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.patient_hash.is_some());
+        assert_eq!(decoded.category, TriageCategory::Minor);
+    }
+
+    #[test]
+    fn update_triage_input_serde_roundtrip() {
+        let input = UpdateTriageInput {
+            original_triage_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            original_disaster_hash: ActionHash::from_raw_36(vec![1u8; 36]),
+            old_category: TriageCategory::Delayed,
+            new_category: TriageCategory::Immediate,
+            injuries: Some("Condition deteriorated".to_string()),
+            transport_priority: Some(TransportPriority::Urgent),
+            notes: Some("Re-triaged due to vitals decline".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTriageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.old_category, TriageCategory::Delayed);
+        assert_eq!(decoded.new_category, TriageCategory::Immediate);
+        assert!(decoded.injuries.is_some());
+        assert!(decoded.transport_priority.is_some());
+    }
+
+    #[test]
+    fn update_triage_input_minimal_serde() {
+        let input = UpdateTriageInput {
+            original_triage_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            original_disaster_hash: ActionHash::from_raw_36(vec![1u8; 36]),
+            old_category: TriageCategory::Minor,
+            new_category: TriageCategory::Delayed,
+            injuries: None,
+            transport_priority: None,
+            notes: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTriageInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.injuries.is_none());
+        assert!(decoded.transport_priority.is_none());
+        assert!(decoded.notes.is_none());
+    }
+
+    #[test]
+    fn triage_by_category_input_serde_roundtrip() {
+        let input = TriageByCategoryInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            category: TriageCategory::Expectant,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TriageByCategoryInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.category, TriageCategory::Expectant);
+    }
+
+    // ========================================================================
+    // Integrity enum serde tests (all variants)
+    // ========================================================================
+
+    #[test]
+    fn triage_category_all_variants_serde() {
+        let variants = vec![
+            TriageCategory::Immediate,
+            TriageCategory::Delayed,
+            TriageCategory::Minor,
+            TriageCategory::Expectant,
+            TriageCategory::Dead,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: TriageCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn transport_priority_all_variants_serde() {
+        let variants = vec![
+            TransportPriority::Urgent,
+            TransportPriority::Priority,
+            TransportPriority::Routine,
+            TransportPriority::None,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: TransportPriority = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+}

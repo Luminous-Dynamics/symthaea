@@ -255,3 +255,215 @@ pub fn get_disaster_timeline(disaster_hash: ActionHash) -> ExternResult<Vec<Reco
 
     Ok(updates)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // Coordinator input struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn declare_disaster_input_serde_roundtrip() {
+        let input = DeclareDisasterInput {
+            id: "disaster-1".to_string(),
+            disaster_type: DisasterType::Hurricane,
+            title: "Hurricane Alpha".to_string(),
+            description: "Category 4 hurricane approaching coast".to_string(),
+            severity: SeverityLevel::Level4,
+            affected_area: AffectedArea {
+                center_lat: 29.76,
+                center_lon: -95.37,
+                radius_km: 150.0,
+                boundary: None,
+                zones: vec![],
+            },
+            estimated_affected: 500000,
+            coordination_lead: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: DeclareDisasterInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "disaster-1");
+        assert_eq!(decoded.title, "Hurricane Alpha");
+        assert_eq!(decoded.estimated_affected, 500000);
+        assert!(decoded.coordination_lead.is_none());
+    }
+
+    #[test]
+    fn update_disaster_status_input_serde_roundtrip() {
+        let input = UpdateDisasterStatusInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            new_status: DisasterStatus::Recovery,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateDisasterStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, DisasterStatus::Recovery);
+    }
+
+    #[test]
+    fn add_incident_update_input_serde_roundtrip() {
+        let input = AddIncidentUpdateInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            update_type: UpdateType::CasualtyReport,
+            content: "15 confirmed injuries, 0 fatalities".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddIncidentUpdateInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.content, "15 confirmed injuries, 0 fatalities");
+    }
+
+    // ========================================================================
+    // Integrity enum serde tests (all variants)
+    // ========================================================================
+
+    #[test]
+    fn disaster_type_all_variants_serde() {
+        let variants = vec![
+            DisasterType::Hurricane,
+            DisasterType::Earthquake,
+            DisasterType::Wildfire,
+            DisasterType::Flood,
+            DisasterType::Tornado,
+            DisasterType::Pandemic,
+            DisasterType::Industrial,
+            DisasterType::MassCasualty,
+            DisasterType::CyberAttack,
+            DisasterType::Infrastructure,
+            DisasterType::Other("Chemical Spill".to_string()),
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: DisasterType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn severity_level_all_variants_serde() {
+        let variants = vec![
+            SeverityLevel::Level1,
+            SeverityLevel::Level2,
+            SeverityLevel::Level3,
+            SeverityLevel::Level4,
+            SeverityLevel::Level5,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: SeverityLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn disaster_status_all_variants_serde() {
+        let variants = vec![
+            DisasterStatus::Declared,
+            DisasterStatus::Active,
+            DisasterStatus::Recovery,
+            DisasterStatus::Closed,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: DisasterStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn update_type_all_variants_serde() {
+        let variants = vec![
+            UpdateType::StatusChange,
+            UpdateType::SeverityChange,
+            UpdateType::AreaExpansion,
+            UpdateType::AreaContraction,
+            UpdateType::CasualtyReport,
+            UpdateType::ResourceUpdate,
+            UpdateType::WeatherUpdate,
+            UpdateType::InfrastructureUpdate,
+            UpdateType::EvacuationOrder,
+            UpdateType::AllClear,
+            UpdateType::General,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: UpdateType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn zone_priority_all_variants_serde() {
+        let variants = vec![
+            ZonePriority::Critical,
+            ZonePriority::High,
+            ZonePriority::Medium,
+            ZonePriority::Low,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: ZonePriority = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn zone_status_all_variants_serde() {
+        let variants = vec![
+            ZoneStatus::Unassessed,
+            ZoneStatus::Active,
+            ZoneStatus::Cleared,
+            ZoneStatus::Hazardous,
+            ZoneStatus::Evacuated,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: ZoneStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // AffectedArea struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn affected_area_serde_roundtrip() {
+        let area = AffectedArea {
+            center_lat: 34.05,
+            center_lon: -118.25,
+            radius_km: 50.0,
+            boundary: Some(vec![(34.0, -118.0), (34.1, -118.5)]),
+            zones: vec![OperationalZone {
+                id: "zone-1".to_string(),
+                name: "Downtown".to_string(),
+                boundary: vec![(34.05, -118.25), (34.06, -118.26)],
+                priority: ZonePriority::Critical,
+                status: ZoneStatus::Active,
+            }],
+        };
+        let json = serde_json::to_string(&area).unwrap();
+        let decoded: AffectedArea = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.center_lat, 34.05);
+        assert_eq!(decoded.center_lon, -118.25);
+        assert_eq!(decoded.radius_km, 50.0);
+        assert_eq!(decoded.zones.len(), 1);
+        assert_eq!(decoded.zones[0].name, "Downtown");
+        assert_eq!(decoded.zones[0].priority, ZonePriority::Critical);
+    }
+
+    #[test]
+    fn affected_area_no_boundary_serde() {
+        let area = AffectedArea {
+            center_lat: 0.0,
+            center_lon: 0.0,
+            radius_km: 10.0,
+            boundary: None,
+            zones: vec![],
+        };
+        let json = serde_json::to_string(&area).unwrap();
+        let decoded: AffectedArea = serde_json::from_str(&json).unwrap();
+        assert!(decoded.boundary.is_none());
+        assert!(decoded.zones.is_empty());
+    }
+}

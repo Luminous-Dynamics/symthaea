@@ -257,3 +257,134 @@ pub fn get_circles_by_status(status: CircleStatus) -> ExternResult<Vec<Record>> 
 
     Ok(records)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts() -> Timestamp {
+        Timestamp::from_micros(0)
+    }
+
+    // ========================================================================
+    // Coordinator input struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn consent_input_serde_roundtrip() {
+        let input = ConsentInput {
+            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            participant_did: "did:example:alice".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ConsentInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.participant_did, "did:example:alice");
+    }
+
+    #[test]
+    fn record_session_input_serde_roundtrip() {
+        let session = CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec!["did:example:alice".to_string(), "did:example:bob".to_string()],
+            summary: "Initial hearing of all parties".to_string(),
+            next_steps: vec!["Schedule follow-up".to_string()],
+        };
+        let input = RecordSessionInput {
+            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            session,
+            attendees: vec!["did:example:alice".to_string(), "did:example:bob".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordSessionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.session.session_number, 1);
+        assert_eq!(decoded.session.summary, "Initial hearing of all parties");
+        assert_eq!(decoded.attendees.len(), 2);
+    }
+
+    #[test]
+    fn add_agreement_input_serde_roundtrip() {
+        let input = AddAgreementInput {
+            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            agreement: "Both parties agree to mediated settlement terms".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddAgreementInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.agreement, "Both parties agree to mediated settlement terms");
+    }
+
+    #[test]
+    fn update_circle_status_input_serde_roundtrip() {
+        let input = UpdateCircleStatusInput {
+            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            new_status: CircleStatus::AgreementReached,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateCircleStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, CircleStatus::AgreementReached);
+    }
+
+    #[test]
+    fn complete_circle_input_serde_roundtrip() {
+        let input = CompleteCircleInput {
+            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            final_agreements: vec![
+                "Restitution payment of 500 credits".to_string(),
+                "Public apology within 7 days".to_string(),
+            ],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CompleteCircleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.final_agreements.len(), 2);
+        assert_eq!(decoded.final_agreements[0], "Restitution payment of 500 credits");
+    }
+
+    #[test]
+    fn complete_circle_input_empty_agreements_serde() {
+        let input = CompleteCircleInput {
+            circle_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            final_agreements: vec![],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CompleteCircleInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.final_agreements.is_empty());
+    }
+
+    // ========================================================================
+    // Integrity enum serde tests (all variants)
+    // ========================================================================
+
+    #[test]
+    fn circle_status_all_variants_serde() {
+        let variants = vec![
+            CircleStatus::Forming,
+            CircleStatus::Active,
+            CircleStatus::AgreementReached,
+            CircleStatus::Monitoring,
+            CircleStatus::Completed,
+            CircleStatus::Discontinued,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: CircleStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn circle_role_all_variants_serde() {
+        let variants = vec![
+            CircleRole::Facilitator,
+            CircleRole::HarmDoer,
+            CircleRole::HarmReceiver,
+            CircleRole::CommunityMember,
+            CircleRole::SupportPerson,
+            CircleRole::Elder,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: CircleRole = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+}

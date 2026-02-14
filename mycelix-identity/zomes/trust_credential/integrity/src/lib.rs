@@ -79,7 +79,7 @@ pub enum TrustTier {
 
 impl TrustTier {
     /// Get the minimum trust score for this tier
-    pub fn min_score(&self) -> f32 {
+    pub fn min_score(&self) -> f64 {
         match self {
             TrustTier::Observer => 0.0,
             TrustTier::Basic => 0.3,
@@ -89,8 +89,12 @@ impl TrustTier {
         }
     }
 
-    /// Determine tier from trust score
-    pub fn from_score(score: f32) -> Self {
+    /// Determine tier from trust score.
+    ///
+    /// Accepts f64 to avoid precision loss at tier boundaries when computing
+    /// the midpoint of an f32 range (e.g., `(0.39 + 0.41) / 2.0` in f32 could
+    /// round to 0.3999... instead of 0.4).
+    pub fn from_score(score: f64) -> Self {
         if score >= 0.8 {
             TrustTier::Guardian
         } else if score >= 0.6 {
@@ -355,7 +359,7 @@ fn validate_create_credential(
 
     // Trust tier must be consistent with range
     let tier_min = cred.trust_tier.min_score();
-    if cred.trust_score_range.upper < tier_min {
+    if (cred.trust_score_range.upper as f64) < tier_min {
         return Ok(ValidateCallbackResult::Invalid(
             "Trust score range is inconsistent with claimed tier".into(),
         ));

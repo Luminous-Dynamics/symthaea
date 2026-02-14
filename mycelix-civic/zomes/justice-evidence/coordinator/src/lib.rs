@@ -181,3 +181,141 @@ pub fn get_evidence_by_submitter(submitter: String) -> ExternResult<Vec<Record>>
     )?;
     records_from_links(links)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts() -> Timestamp {
+        Timestamp::from_micros(0)
+    }
+
+    // ========================================================================
+    // Coordinator input struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn verify_evidence_input_serde_roundtrip() {
+        let input = VerifyEvidenceInput {
+            evidence_id: "ev-1".to_string(),
+            verifier: "did:example:juror1".to_string(),
+            status: VerificationStatus::Verified,
+            notes: Some("Verified via chain analysis".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: VerifyEvidenceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.evidence_id, "ev-1");
+        assert_eq!(decoded.verifier, "did:example:juror1");
+        assert_eq!(decoded.status, VerificationStatus::Verified);
+        assert_eq!(decoded.notes, Some("Verified via chain analysis".to_string()));
+    }
+
+    #[test]
+    fn verify_evidence_input_no_notes_serde() {
+        let input = VerifyEvidenceInput {
+            evidence_id: "ev-2".to_string(),
+            verifier: "did:example:juror2".to_string(),
+            status: VerificationStatus::Pending,
+            notes: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: VerifyEvidenceInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.notes.is_none());
+        assert_eq!(decoded.status, VerificationStatus::Pending);
+    }
+
+    #[test]
+    fn dispute_evidence_input_serde_roundtrip() {
+        let input = DisputeEvidenceInput {
+            evidence_id: "ev-1".to_string(),
+            disputant: "did:example:bob".to_string(),
+            reason: "Document has been altered".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: DisputeEvidenceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.evidence_id, "ev-1");
+        assert_eq!(decoded.disputant, "did:example:bob");
+        assert_eq!(decoded.reason, "Document has been altered");
+    }
+
+    // ========================================================================
+    // Integrity enum serde tests (all variants)
+    // ========================================================================
+
+    #[test]
+    fn evidence_type_all_variants_serde() {
+        let variants = vec![
+            EvidenceType::Document,
+            EvidenceType::Testimony,
+            EvidenceType::Transaction,
+            EvidenceType::CrossReference,
+            EvidenceType::Media,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: EvidenceType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn verification_status_all_variants_serde() {
+        let variants = vec![
+            VerificationStatus::Verified,
+            VerificationStatus::Challenged,
+            VerificationStatus::Rejected,
+            VerificationStatus::Pending,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: VerificationStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // Evidence entry struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn evidence_serde_roundtrip() {
+        let evidence = Evidence {
+            id: "ev-1".to_string(),
+            complaint_id: "case-1".to_string(),
+            submitter: "did:example:alice".to_string(),
+            evidence_type: EvidenceType::Document,
+            title: "Contract PDF".to_string(),
+            description: "Original signed contract".to_string(),
+            content_hash: "sha256:abc123".to_string(),
+            encrypted_content: None,
+            submitted: ts(),
+        };
+        let json = serde_json::to_string(&evidence).unwrap();
+        let decoded: Evidence = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "ev-1");
+        assert_eq!(decoded.complaint_id, "case-1");
+        assert_eq!(decoded.submitter, "did:example:alice");
+        assert_eq!(decoded.evidence_type, EvidenceType::Document);
+        assert_eq!(decoded.title, "Contract PDF");
+        assert_eq!(decoded.content_hash, "sha256:abc123");
+        assert!(decoded.encrypted_content.is_none());
+    }
+
+    #[test]
+    fn evidence_with_encrypted_content_serde() {
+        let evidence = Evidence {
+            id: "ev-2".to_string(),
+            complaint_id: "case-2".to_string(),
+            submitter: "did:example:bob".to_string(),
+            evidence_type: EvidenceType::Media,
+            title: "Video Evidence".to_string(),
+            description: "Encrypted surveillance footage".to_string(),
+            content_hash: "sha256:def456".to_string(),
+            encrypted_content: Some("base64-encrypted-data".to_string()),
+            submitted: ts(),
+        };
+        let json = serde_json::to_string(&evidence).unwrap();
+        let decoded: Evidence = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.encrypted_content, Some("base64-encrypted-data".to_string()));
+    }
+}

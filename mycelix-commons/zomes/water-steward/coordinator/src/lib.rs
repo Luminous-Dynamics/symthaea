@@ -440,3 +440,321 @@ pub fn check_property_for_water_right(input: CheckPropertyForWaterRightInput) ->
         },
     })
 }
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_agent_2() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    // ========================================================================
+    // COORDINATOR STRUCT SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn transfer_right_input_serde_roundtrip() {
+        let input = TransferRightInput {
+            right_hash: fake_action_hash(),
+            to_holder: fake_agent_2(),
+            volume_liters: 5000,
+            transfer_type: TransferType::Sale,
+            approved_by: Some(fake_agent()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferRightInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.volume_liters, 5000);
+        assert_eq!(decoded.transfer_type, TransferType::Sale);
+        assert!(decoded.approved_by.is_some());
+    }
+
+    #[test]
+    fn transfer_right_input_without_approval() {
+        let input = TransferRightInput {
+            right_hash: fake_action_hash(),
+            to_holder: fake_agent(),
+            volume_liters: 100,
+            transfer_type: TransferType::Donation,
+            approved_by: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferRightInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.volume_liters, 100);
+        assert_eq!(decoded.transfer_type, TransferType::Donation);
+        assert!(decoded.approved_by.is_none());
+    }
+
+    #[test]
+    fn transfer_right_input_all_transfer_types() {
+        for transfer_type in [
+            TransferType::Sale,
+            TransferType::Lease,
+            TransferType::Donation,
+            TransferType::Inheritance,
+            TransferType::Emergency,
+        ] {
+            let input = TransferRightInput {
+                right_hash: fake_action_hash(),
+                to_holder: fake_agent(),
+                volume_liters: 1000,
+                transfer_type: transfer_type.clone(),
+                approved_by: None,
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: TransferRightInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.transfer_type, transfer_type);
+        }
+    }
+
+    #[test]
+    fn resolve_dispute_input_serde_roundtrip() {
+        let input = ResolveDisputeInput {
+            dispute_hash: fake_action_hash(),
+            new_status: DisputeStatus::Resolved,
+            resolution_text: "Parties agreed to share water access equally".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ResolveDisputeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, DisputeStatus::Resolved);
+        assert_eq!(
+            decoded.resolution_text,
+            "Parties agreed to share water access equally"
+        );
+    }
+
+    #[test]
+    fn resolve_dispute_input_dismissed() {
+        let input = ResolveDisputeInput {
+            dispute_hash: fake_action_hash(),
+            new_status: DisputeStatus::Dismissed,
+            resolution_text: "Insufficient evidence".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ResolveDisputeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, DisputeStatus::Dismissed);
+        assert_eq!(decoded.resolution_text, "Insufficient evidence");
+    }
+
+    #[test]
+    fn resolve_dispute_input_all_statuses() {
+        for status in [
+            DisputeStatus::Filed,
+            DisputeStatus::UnderReview,
+            DisputeStatus::Mediation,
+            DisputeStatus::Arbitration,
+            DisputeStatus::Resolved,
+            DisputeStatus::Dismissed,
+        ] {
+            let input = ResolveDisputeInput {
+                dispute_hash: fake_action_hash(),
+                new_status: status.clone(),
+                resolution_text: "Test resolution".to_string(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: ResolveDisputeInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+
+    #[test]
+    fn check_property_for_water_right_input_serde_roundtrip() {
+        let input = CheckPropertyForWaterRightInput {
+            property_id: "PROP-123".to_string(),
+            expected_owner_did: Some("did:holo:abc123".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CheckPropertyForWaterRightInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "PROP-123");
+        assert_eq!(
+            decoded.expected_owner_did,
+            Some("did:holo:abc123".to_string())
+        );
+    }
+
+    #[test]
+    fn check_property_for_water_right_input_without_owner() {
+        let input = CheckPropertyForWaterRightInput {
+            property_id: "PROP-456".to_string(),
+            expected_owner_did: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CheckPropertyForWaterRightInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "PROP-456");
+        assert!(decoded.expected_owner_did.is_none());
+    }
+
+    #[test]
+    fn property_check_result_serde_roundtrip_success() {
+        let result = PropertyCheckResult {
+            property_exists: true,
+            has_clear_title: true,
+            owner_matches: true,
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: PropertyCheckResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_exists, true);
+        assert_eq!(decoded.has_clear_title, true);
+        assert_eq!(decoded.owner_matches, true);
+        assert!(decoded.error.is_none());
+    }
+
+    #[test]
+    fn property_check_result_serde_roundtrip_not_found() {
+        let result = PropertyCheckResult {
+            property_exists: false,
+            has_clear_title: false,
+            owner_matches: false,
+            error: Some("Property 'PROP-999' not found in registry".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: PropertyCheckResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_exists, false);
+        assert_eq!(
+            decoded.error,
+            Some("Property 'PROP-999' not found in registry".to_string())
+        );
+    }
+
+    #[test]
+    fn property_check_result_serde_roundtrip_encumbered() {
+        let result = PropertyCheckResult {
+            property_exists: true,
+            has_clear_title: false,
+            owner_matches: true,
+            error: Some("Property has encumbrances".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: PropertyCheckResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_exists, true);
+        assert_eq!(decoded.has_clear_title, false);
+        assert_eq!(decoded.owner_matches, true);
+        assert!(decoded.error.is_some());
+    }
+
+    // ========================================================================
+    // INTEGRITY ENUM SERDE ROUNDTRIP TESTS (via coordinator re-export)
+    // ========================================================================
+
+    #[test]
+    fn stewardship_type_all_variants_serde() {
+        for variant in [
+            StewardshipType::Riparian,
+            StewardshipType::PriorAppropriation,
+            StewardshipType::Commons,
+            StewardshipType::Hybrid,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: StewardshipType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn right_type_all_variants_serde() {
+        for variant in [
+            RightType::Riparian,
+            RightType::Appropriative,
+            RightType::Prescriptive,
+            RightType::Aboriginal,
+            RightType::Commons,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: RightType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn right_status_all_variants_serde() {
+        for variant in [
+            RightStatus::Active,
+            RightStatus::Suspended,
+            RightStatus::Revoked,
+            RightStatus::Transferred,
+            RightStatus::Expired,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: RightStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn transfer_type_all_variants_serde() {
+        for variant in [
+            TransferType::Sale,
+            TransferType::Lease,
+            TransferType::Donation,
+            TransferType::Inheritance,
+            TransferType::Emergency,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: TransferType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn dispute_type_all_variants_serde() {
+        for variant in [
+            DisputeType::Allocation,
+            DisputeType::Quality,
+            DisputeType::Access,
+            DisputeType::Overuse,
+            DisputeType::Encroachment,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: DisputeType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn dispute_status_all_variants_serde() {
+        for variant in [
+            DisputeStatus::Filed,
+            DisputeStatus::UnderReview,
+            DisputeStatus::Mediation,
+            DisputeStatus::Arbitration,
+            DisputeStatus::Resolved,
+            DisputeStatus::Dismissed,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: DisputeStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn water_source_type_all_variants_serde() {
+        for variant in [
+            WaterSourceType::Municipal,
+            WaterSourceType::Well,
+            WaterSourceType::Spring,
+            WaterSourceType::Rainwater,
+            WaterSourceType::Aquifer,
+            WaterSourceType::River,
+            WaterSourceType::Lake,
+            WaterSourceType::Recycled,
+            WaterSourceType::Desalinated,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: WaterSourceType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+}

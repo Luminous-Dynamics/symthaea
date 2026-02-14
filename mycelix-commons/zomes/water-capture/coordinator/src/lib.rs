@@ -280,3 +280,116 @@ pub fn get_all_recharge_projects(_: ()) -> ExternResult<Vec<Record>> {
     )?;
     records_from_links(links)
 }
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    // ========================================================================
+    // COORDINATOR STRUCT SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn update_tank_level_input_serde_roundtrip() {
+        let input = UpdateTankLevelInput {
+            tank_hash: fake_action_hash(),
+            new_level_liters: 5000,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTankLevelInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_level_liters, 5000);
+    }
+
+    #[test]
+    fn update_tank_level_input_zero_level() {
+        let input = UpdateTankLevelInput {
+            tank_hash: fake_action_hash(),
+            new_level_liters: 0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTankLevelInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_level_liters, 0);
+    }
+
+    #[test]
+    fn update_tank_level_input_max_level() {
+        let input = UpdateTankLevelInput {
+            tank_hash: fake_action_hash(),
+            new_level_liters: u64::MAX,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTankLevelInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_level_liters, u64::MAX);
+    }
+
+    // ========================================================================
+    // INTEGRITY ENUM SERDE ROUNDTRIP TESTS (via coordinator re-export)
+    // ========================================================================
+
+    #[test]
+    fn harvest_type_all_variants_serde() {
+        for variant in [
+            HarvestType::RoofRainwater,
+            HarvestType::GroundCatchment,
+            HarvestType::FogCollection,
+            HarvestType::DewCollection,
+            HarvestType::Snowmelt,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: HarvestType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn tank_type_all_variants_serde() {
+        for variant in [
+            TankType::Underground,
+            TankType::Aboveground,
+            TankType::Bladder,
+            TankType::Cistern,
+            TankType::Dam,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: TankType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn recharge_method_all_variants_serde() {
+        for variant in [
+            RechargeMethod::Basin,
+            RechargeMethod::Injection,
+            RechargeMethod::Spreading,
+            RechargeMethod::Infiltration,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: RechargeMethod = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn recharge_status_all_variants_serde() {
+        for variant in [
+            RechargeStatus::Proposed,
+            RechargeStatus::Active,
+            RechargeStatus::Paused,
+            RechargeStatus::Completed,
+            RechargeStatus::Abandoned,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: RechargeStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+}

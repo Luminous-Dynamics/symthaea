@@ -313,3 +313,168 @@ pub fn get_circles_by_type(circle_type: CircleType) -> ExternResult<Vec<Record>>
     )?;
     records_from_links(links)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Helper ──────────────────────────────────────────────────────────
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    // ── JoinCircleInput serde roundtrip ─────────────────────────────────
+
+    #[test]
+    fn join_circle_input_serde_roundtrip() {
+        let input = JoinCircleInput {
+            circle_hash: fake_action_hash(),
+            role: MemberRole::Member,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: JoinCircleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.circle_hash, input.circle_hash);
+        assert_eq!(decoded.role, MemberRole::Member);
+    }
+
+    #[test]
+    fn join_circle_input_serde_organizer_role() {
+        let input = JoinCircleInput {
+            circle_hash: fake_action_hash(),
+            role: MemberRole::Organizer,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: JoinCircleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.role, MemberRole::Organizer);
+    }
+
+    #[test]
+    fn join_circle_input_serde_observer_role() {
+        let input = JoinCircleInput {
+            circle_hash: fake_action_hash(),
+            role: MemberRole::Observer,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: JoinCircleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.role, MemberRole::Observer);
+    }
+
+    // ── MemberRole serde roundtrip (all variants) ───────────────────────
+
+    #[test]
+    fn member_role_serde_all_variants() {
+        let roles = vec![
+            MemberRole::Organizer,
+            MemberRole::Member,
+            MemberRole::Observer,
+        ];
+        for role in &roles {
+            let json = serde_json::to_string(role).unwrap();
+            let decoded: MemberRole = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, role);
+        }
+    }
+
+    // ── CircleType serde roundtrip (all variants) ───────────────────────
+
+    #[test]
+    fn circle_type_serde_all_variants() {
+        let types = vec![
+            CircleType::Neighborhood,
+            CircleType::Workplace,
+            CircleType::Faith,
+            CircleType::Family,
+            CircleType::School,
+            CircleType::Custom("Book Club".to_string()),
+        ];
+        for ct in &types {
+            let json = serde_json::to_string(ct).unwrap();
+            let decoded: CircleType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, ct);
+        }
+    }
+
+    // ── CircleType::anchor_key pure function tests ──────────────────────
+
+    #[test]
+    fn circle_type_anchor_key_known_variants() {
+        assert_eq!(CircleType::Neighborhood.anchor_key(), "neighborhood");
+        assert_eq!(CircleType::Workplace.anchor_key(), "workplace");
+        assert_eq!(CircleType::Faith.anchor_key(), "faith");
+        assert_eq!(CircleType::Family.anchor_key(), "family");
+        assert_eq!(CircleType::School.anchor_key(), "school");
+    }
+
+    #[test]
+    fn circle_type_anchor_key_custom_lowercases_and_replaces_spaces() {
+        let ct = CircleType::Custom("Book Club".to_string());
+        assert_eq!(ct.anchor_key(), "custom_book_club");
+    }
+
+    #[test]
+    fn circle_type_anchor_key_custom_already_lowercase() {
+        let ct = CircleType::Custom("garden".to_string());
+        assert_eq!(ct.anchor_key(), "custom_garden");
+    }
+
+    #[test]
+    fn circle_type_anchor_key_custom_empty_string() {
+        let ct = CircleType::Custom(String::new());
+        assert_eq!(ct.anchor_key(), "custom_");
+    }
+
+    // ── CareCircle serde roundtrip ──────────────────────────────────────
+
+    #[test]
+    fn care_circle_serde_roundtrip() {
+        let circle = CareCircle {
+            name: "Helpers United".to_string(),
+            description: "A neighborhood support circle".to_string(),
+            location: "Downtown".to_string(),
+            max_members: 20,
+            created_by: fake_agent(),
+            circle_type: CircleType::Neighborhood,
+            active: true,
+            created_at: Timestamp::from_micros(1000),
+        };
+        let json = serde_json::to_string(&circle).unwrap();
+        let decoded: CareCircle = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, circle);
+    }
+
+    // ── CircleMembership serde roundtrip ────────────────────────────────
+
+    #[test]
+    fn circle_membership_serde_roundtrip() {
+        let membership = CircleMembership {
+            circle_hash: fake_action_hash(),
+            member: fake_agent(),
+            role: MemberRole::Organizer,
+            joined_at: Timestamp::from_micros(5000),
+            active: true,
+        };
+        let json = serde_json::to_string(&membership).unwrap();
+        let decoded: CircleMembership = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, membership);
+    }
+
+    #[test]
+    fn circle_membership_inactive_serde_roundtrip() {
+        let membership = CircleMembership {
+            circle_hash: fake_action_hash(),
+            member: fake_agent(),
+            role: MemberRole::Observer,
+            joined_at: Timestamp::from_micros(0),
+            active: false,
+        };
+        let json = serde_json::to_string(&membership).unwrap();
+        let decoded: CircleMembership = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.active, false);
+        assert_eq!(decoded.role, MemberRole::Observer);
+    }
+}

@@ -424,3 +424,255 @@ pub fn update_trust_board(input: UpdateTrustBoardInput) -> ExternResult<Record> 
         "Could not find updated trust".into()
     )))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    // ── Coordinator struct serde roundtrips ────────────────────────────
+
+    #[test]
+    fn calculate_resale_input_serde_roundtrip() {
+        let input = CalculateResaleInput {
+            lease_hash: fake_action_hash(),
+            original_price_cents: 30000000,
+            years_held: 5,
+            improvements_value_cents: 2000000,
+            ami_at_purchase: Some(6000000),
+            current_ami: Some(6500000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CalculateResaleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_price_cents, 30000000);
+        assert_eq!(decoded.years_held, 5);
+        assert_eq!(decoded.improvements_value_cents, 2000000);
+        assert_eq!(decoded.ami_at_purchase, Some(6000000));
+        assert_eq!(decoded.current_ami, Some(6500000));
+    }
+
+    #[test]
+    fn calculate_resale_input_no_ami_serde() {
+        let input = CalculateResaleInput {
+            lease_hash: fake_action_hash(),
+            original_price_cents: 25000000,
+            years_held: 10,
+            improvements_value_cents: 0,
+            ami_at_purchase: None,
+            current_ami: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CalculateResaleInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.ami_at_purchase.is_none());
+        assert!(decoded.current_ami.is_none());
+        assert_eq!(decoded.improvements_value_cents, 0);
+    }
+
+    #[test]
+    fn transfer_lease_input_serde_roundtrip() {
+        let input = TransferLeaseInput {
+            lease_hash: fake_action_hash(),
+            new_leaseholder: fake_agent(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferLeaseInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_leaseholder, fake_agent());
+    }
+
+    #[test]
+    fn generate_affordability_input_serde_roundtrip() {
+        let input = GenerateAffordabilityInput {
+            trust_hash: fake_action_hash(),
+            total_units: 100,
+            affordable_units: 85,
+            average_monthly_cost_cents: 120000,
+            median_area_income_cents: 6000000,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: GenerateAffordabilityInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_units, 100);
+        assert_eq!(decoded.affordable_units, 85);
+        assert_eq!(decoded.average_monthly_cost_cents, 120000);
+        assert_eq!(decoded.median_area_income_cents, 6000000);
+    }
+
+    #[test]
+    fn update_trust_board_input_serde_roundtrip() {
+        let agent_a = AgentPubKey::from_raw_36(vec![1u8; 36]);
+        let agent_b = AgentPubKey::from_raw_36(vec![2u8; 36]);
+        let input = UpdateTrustBoardInput {
+            trust_hash: fake_action_hash(),
+            new_board: vec![agent_a.clone(), agent_b.clone()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTrustBoardInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_board.len(), 2);
+        assert_eq!(decoded.new_board[0], agent_a);
+        assert_eq!(decoded.new_board[1], agent_b);
+    }
+
+    #[test]
+    fn update_trust_board_input_single_member_serde() {
+        let input = UpdateTrustBoardInput {
+            trust_hash: fake_action_hash(),
+            new_board: vec![fake_agent()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTrustBoardInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_board.len(), 1);
+    }
+
+    // ── Cross-domain types serde roundtrips ────────────────────────────
+
+    #[test]
+    fn verify_property_input_serde_roundtrip() {
+        let input = VerifyPropertyForLeaseInput {
+            property_id: "PROP-123".to_string(),
+            expected_owner_did: Some("did:key:z6Mk...".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: VerifyPropertyForLeaseInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "PROP-123");
+        assert_eq!(decoded.expected_owner_did, Some("did:key:z6Mk...".to_string()));
+    }
+
+    #[test]
+    fn property_verification_result_serde_roundtrip() {
+        let result = PropertyVerificationResult {
+            verified: true,
+            owner_did: Some("did:key:z6Mk...".to_string()),
+            has_clear_title: true,
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: PropertyVerificationResult = serde_json::from_str(&json).unwrap();
+        assert!(decoded.verified);
+        assert!(decoded.has_clear_title);
+        assert!(decoded.error.is_none());
+    }
+
+    #[test]
+    fn property_verification_result_failed_serde() {
+        let result = PropertyVerificationResult {
+            verified: false,
+            owner_did: None,
+            has_clear_title: false,
+            error: Some("Property not found".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: PropertyVerificationResult = serde_json::from_str(&json).unwrap();
+        assert!(!decoded.verified);
+        assert!(!decoded.has_clear_title);
+        assert!(decoded.error.as_ref().unwrap().contains("not found"));
+    }
+
+    // ── Integrity enum serde roundtrips ────────────────────────────────
+
+    #[test]
+    fn formula_type_all_variants_serde() {
+        let variants = vec![
+            FormulaType::AppreciationCap,
+            FormulaType::AreaMedianIncome,
+            FormulaType::ConsumerPriceIndex,
+            FormulaType::Hybrid,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let decoded: FormulaType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, v);
+        }
+    }
+
+    // ── Integrity entry struct serde roundtrips ────────────────────────
+
+    #[test]
+    fn land_trust_serde_roundtrip() {
+        let trust = LandTrust {
+            id: "trust-001".to_string(),
+            name: "Community Housing Trust".to_string(),
+            mission: "Affordable housing for all".to_string(),
+            boundary: vec![(45.0, -122.0), (45.1, -122.0), (45.1, -122.1)],
+            charter_hash: Some(fake_action_hash()),
+            stewardship_board: vec![fake_agent()],
+            affordability_target_ami_percent: 80,
+            created_at: Timestamp::from_micros(1000),
+        };
+        let json = serde_json::to_string(&trust).unwrap();
+        let decoded: LandTrust = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, trust);
+    }
+
+    #[test]
+    fn resale_formula_serde_roundtrip() {
+        let formula = ResaleFormula {
+            formula_type: FormulaType::Hybrid,
+            max_appreciation_percent_annual: Some(3),
+            ami_cap_percent: Some(80),
+            improvement_credit_percent: Some(100),
+        };
+        let json = serde_json::to_string(&formula).unwrap();
+        let decoded: ResaleFormula = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, formula);
+    }
+
+    #[test]
+    fn ground_lease_serde_roundtrip() {
+        let lease = GroundLease {
+            trust_hash: fake_action_hash(),
+            unit_hash: fake_action_hash(),
+            leaseholder: fake_agent(),
+            lease_term_years: 99,
+            ground_rent_monthly_cents: 50000,
+            resale_formula: ResaleFormula {
+                formula_type: FormulaType::AppreciationCap,
+                max_appreciation_percent_annual: Some(2),
+                ami_cap_percent: None,
+                improvement_credit_percent: Some(75),
+            },
+            started_at: Timestamp::from_micros(1000),
+            expires_at: Timestamp::from_micros(2000000),
+        };
+        let json = serde_json::to_string(&lease).unwrap();
+        let decoded: GroundLease = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, lease);
+    }
+
+    #[test]
+    fn resale_calculation_serde_roundtrip() {
+        let calc = ResaleCalculation {
+            lease_hash: fake_action_hash(),
+            original_price_cents: 30000000,
+            years_held: 5,
+            improvements_value_cents: 2000000,
+            calculated_max_price_cents: 35000000,
+            ami_at_purchase: Some(6000000),
+            current_ami: Some(6500000),
+        };
+        let json = serde_json::to_string(&calc).unwrap();
+        let decoded: ResaleCalculation = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, calc);
+    }
+
+    #[test]
+    fn affordability_report_serde_roundtrip() {
+        let report = AffordabilityReport {
+            trust_hash: fake_action_hash(),
+            report_date: Timestamp::from_micros(2000),
+            total_units: 100,
+            affordable_units: 85,
+            average_monthly_cost_cents: 120000,
+            median_area_income_cents: 6000000,
+            affordability_ratio: 0.24,
+        };
+        let json = serde_json::to_string(&report).unwrap();
+        let decoded: AffordabilityReport = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, report);
+    }
+}

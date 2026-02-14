@@ -46,7 +46,7 @@ pub fn issue_trust_credential(input: IssueTrustCredentialInput) -> ExternResult<
     }
 
     // Determine trust tier from the proven range
-    let mid_score = (input.trust_score_lower + input.trust_score_upper) / 2.0;
+    let mid_score = (input.trust_score_lower as f64 + input.trust_score_upper as f64) / 2.0;
     let trust_tier = TrustTier::from_score(mid_score);
 
     let credential = TrustCredential {
@@ -445,7 +445,7 @@ pub fn fulfill_attestation(input: FulfillAttestationInput) -> ExternResult<Fulfi
     }
 
     // Verify the provided proof meets request requirements
-    let mid_score = (input.trust_score_lower + input.trust_score_upper) / 2.0;
+    let mid_score = (input.trust_score_lower as f64 + input.trust_score_upper as f64) / 2.0;
     let trust_tier = TrustTier::from_score(mid_score);
 
     if let Some(min_score) = req.min_trust_score {
@@ -742,7 +742,7 @@ pub fn verify_credential(credential_id: String) -> ExternResult<VerificationResu
         && !cred.trust_score_range.upper.is_nan();
 
     // Check tier consistency: verify tier matches the score range
-    let mid_score = (cred.trust_score_range.lower + cred.trust_score_range.upper) / 2.0;
+    let mid_score = (cred.trust_score_range.lower as f64 + cred.trust_score_range.upper as f64) / 2.0;
     let expected_tier = TrustTier::from_score(mid_score);
     let tier_consistent = range_valid && cred.trust_tier == expected_tier;
 
@@ -803,7 +803,7 @@ pub fn verify_credential_pure(
         && !trust_score_range.lower.is_nan()
         && !trust_score_range.upper.is_nan();
 
-    let mid_score = (trust_score_range.lower + trust_score_range.upper) / 2.0;
+    let mid_score = (trust_score_range.lower as f64 + trust_score_range.upper as f64) / 2.0;
     let expected_tier = TrustTier::from_score(mid_score);
     let tier_consistent = range_valid && *trust_tier == expected_tier;
 

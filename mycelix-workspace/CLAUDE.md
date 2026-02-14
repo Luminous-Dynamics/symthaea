@@ -107,8 +107,8 @@ hc dna pack .
 | Rust SDK | 996 pass (1002 w/ parallel) | Verified 2026-02-04 |
 | TypeScript SDK | 6,316 pass / 15 skip | All pass (libsodium ESM compat fixed) |
 | Identity unit | 23 | Pass (recovery + trust_credential) |
-| Commons cluster unit | 396 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation (property-registry 29, water-flow 54, care-timebank 87, mutualaid-pools 76, water-capture 80, housing-governance 64) |
-| Civic cluster unit | 640 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation (justice-cases 28, justice-enforcement 104, emergency-shelters 31, media-curation 65, justice-restorative 149, emergency-incidents 41, media-publication 34) |
+| Commons cluster unit | 1,695 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation across all 35 zomes |
+| Civic cluster unit | 1,320 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation across all 16 zomes |
 | Bridge-common | 29 | Shared dispatch types, allowlist validation, rate limiting, typed helpers, audit trail |
 | SDK cluster integration | 49 | CommonsBridgeClient + CivicBridgeClient + typed convenience + cross-cluster + signal type guards + audit trail |
 | SDK conductor cluster | 22 | Typed convenience, rate limiting, allowlist, audit trail mock tests |

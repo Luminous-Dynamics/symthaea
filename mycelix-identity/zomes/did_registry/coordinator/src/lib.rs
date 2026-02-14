@@ -355,6 +355,23 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
                 )));
             }
         }
+
+        // Cross-validate: key_agreement fragment IDs must reference verification
+        // methods that exist in the (potentially updated) verification method list.
+        let effective_methods = input
+            .verification_method
+            .as_ref()
+            .unwrap_or(&current_did.verification_method);
+        let method_ids: std::collections::HashSet<&str> =
+            effective_methods.iter().map(|m| m.id.as_str()).collect();
+        for ka_ref in ka {
+            if !method_ids.contains(ka_ref.as_str()) {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Key agreement '{}' references a verification method that does not exist in the document",
+                    ka_ref
+                ))));
+            }
+        }
     }
 
     // Build updated document
@@ -486,10 +503,11 @@ pub fn deactivate_did(reason: String) -> ExternResult<Record> {
         (),
     )?;
 
-    // Cascade: revoke all credentials issued by this DID
-    if let Err(e) = cascade_revoke_credentials_for_did(&current_did.id, &reason, now) {
-        warn!("Failed to cascade-revoke credentials for deactivated DID: {:?}", e);
-    }
+    // Cascade: revoke all credentials issued by this DID.
+    // The DID deactivation entry is already committed above, so even if cascade
+    // revocation fails, the DID itself is deactivated. We propagate the error so
+    // the caller knows credentials may still be active and can retry.
+    cascade_revoke_credentials_for_did(&current_did.id, &reason, now)?;
 
     // Notify bridge of deactivation for ecosystem-wide awareness
     if let Err(e) = notify_bridge_of_deactivation(&current_did.id, &reason, now) {
@@ -565,22 +583,39 @@ fn cascade_revoke_credentials_for_did(did: &str, reason: &str, _deactivated_at: 
 
     let credential_ids: Vec<String> = match response {
         ZomeCallResponse::Ok(result) => {
-            // Returns Vec<Record>, extract credential IDs from each
-            let records: Vec<Record> = result.decode().unwrap_or_default();
+            let records: Vec<Record> = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Cascade revocation: failed to decode credential list for DID {}: {}",
+                    did, e
+                )))
+            })?;
             records.iter().filter_map(|r| {
                 r.action().entry_hash().map(|h| h.to_string())
             }).collect()
         }
-        other => {
-            warn!("Could not query credentials for DID cascade revocation: {:?}",
-                  match &other {
-                      ZomeCallResponse::Unauthorized(_, _, z, f) => format!("unauthorized zome={:?} fn={:?}", z, f),
-                      ZomeCallResponse::NetworkError(e) => format!("network: {}", e),
-                      ZomeCallResponse::CountersigningSession(e) => format!("countersigning: {}", e),
-                      ZomeCallResponse::AuthenticationFailed(_, _) => "auth_failed".to_string(),
-                      _ => "unknown".to_string(),
-                  });
-            return Ok(());
+        ZomeCallResponse::Unauthorized(_, _, zome, fn_name) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade revocation failed: unauthorized to query credentials (zome={:?} fn={:?}) for DID {}",
+                zome, fn_name, did
+            ))));
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade revocation failed: network error querying credentials for DID {}: {}",
+                did, err
+            ))));
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade revocation failed: countersigning error for DID {}: {}",
+                did, err
+            ))));
+        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade revocation failed: authentication failed querying credentials for DID {}",
+                did
+            ))));
         }
     };
 
@@ -611,20 +646,28 @@ fn cascade_revoke_credentials_for_did(did: &str, reason: &str, _deactivated_at: 
             Ok(())
         }
         ZomeCallResponse::Unauthorized(_, _, zome, fn_name) => {
-            warn!("Cascade revocation unauthorized: zome={:?} fn={:?} did={}", zome, fn_name, did);
-            Ok(())
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade batch revocation unauthorized: zome={:?} fn={:?} did={}",
+                zome, fn_name, did
+            ))))
         }
         ZomeCallResponse::NetworkError(err) => {
-            warn!("Cascade revocation network error: {} did={}", err, did);
-            Ok(())
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade batch revocation network error: {} did={}",
+                err, did
+            ))))
         }
         ZomeCallResponse::CountersigningSession(err) => {
-            warn!("Cascade revocation countersigning error: {} did={}", err, did);
-            Ok(())
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade batch revocation countersigning error: {} did={}",
+                err, did
+            ))))
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
-            warn!("Cascade revocation auth failed: did={}", did);
-            Ok(())
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade batch revocation auth failed: did={}",
+                did
+            ))))
         }
     }
 }

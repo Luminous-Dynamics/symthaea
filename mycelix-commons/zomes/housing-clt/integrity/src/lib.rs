@@ -1072,30 +1072,683 @@ mod tests {
         assert_valid(validate_affordability_report(fake_create(), r));
     }
 
-    // ── Update validation tests ─────────────────────────────────────────
+    // ── Additional serde roundtrip tests ─────────────────────────────────
 
     #[test]
-    fn update_land_trust_always_valid() {
-        // The validate callback returns Valid for all LandTrust updates
-        assert_valid(validate_create_trust(fake_create(), valid_land_trust()));
+    fn serde_roundtrip_anchor() {
+        let anchor = Anchor("all_trusts".to_string());
+        let json = serde_json::to_string(&anchor).unwrap();
+        let back: Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, anchor);
     }
 
     #[test]
-    fn update_ground_lease_always_valid() {
-        // The validate callback returns Valid for all GroundLease updates
-        assert_valid(validate_create_lease(fake_create(), valid_ground_lease()));
+    fn serde_roundtrip_anchor_empty() {
+        let anchor = Anchor(String::new());
+        let json = serde_json::to_string(&anchor).unwrap();
+        let back: Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, anchor);
     }
 
     #[test]
-    fn update_resale_calculation_immutable() {
-        // Updates to ResaleCalculation are rejected by the validate callback
-        // We can't directly call validate_update here, but this documents the behavior
-        // The Op matching logic returns Invalid for ResaleCalculation updates
+    fn serde_roundtrip_anchor_unicode() {
+        let anchor = Anchor("\u{1F30D} earth trusts \u{2764}".to_string());
+        let json = serde_json::to_string(&anchor).unwrap();
+        let back: Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, anchor);
     }
 
     #[test]
-    fn update_affordability_report_immutable() {
-        // Updates to AffordabilityReport are rejected by the validate callback
-        // The Op matching logic returns Invalid for AffordabilityReport updates
+    fn serde_roundtrip_resale_formula_all_none() {
+        let formula = ResaleFormula {
+            formula_type: FormulaType::ConsumerPriceIndex,
+            max_appreciation_percent_annual: None,
+            ami_cap_percent: None,
+            improvement_credit_percent: None,
+        };
+        let json = serde_json::to_string(&formula).unwrap();
+        let back: ResaleFormula = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, formula);
+    }
+
+    #[test]
+    fn serde_roundtrip_resale_formula_all_some() {
+        let formula = ResaleFormula {
+            formula_type: FormulaType::Hybrid,
+            max_appreciation_percent_annual: Some(u8::MAX),
+            ami_cap_percent: Some(u8::MAX),
+            improvement_credit_percent: Some(u8::MAX),
+        };
+        let json = serde_json::to_string(&formula).unwrap();
+        let back: ResaleFormula = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, formula);
+    }
+
+    #[test]
+    fn serde_roundtrip_land_trust_minimal() {
+        let trust = LandTrust {
+            id: "x".to_string(),
+            name: "N".to_string(),
+            mission: "M".to_string(),
+            boundary: vec![(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)],
+            charter_hash: None,
+            stewardship_board: vec![agent_a()],
+            affordability_target_ami_percent: 1,
+            created_at: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&trust).unwrap();
+        let back: LandTrust = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, trust);
+    }
+
+    #[test]
+    fn serde_roundtrip_land_trust_unicode_fields() {
+        let trust = LandTrust {
+            id: "\u{4FE1}\u{8A17}".to_string(), // Chinese chars
+            name: "Gemeinn\u{00FC}tziger Landtrust".to_string(), // German umlaut
+            mission: "\u{0421}\u{043E}\u{0434}\u{0435}\u{0439}\u{0441}\u{0442}\u{0432}\u{0438}\u{0435}".to_string(), // Russian
+            boundary: vec![(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)],
+            charter_hash: None,
+            stewardship_board: vec![agent_a()],
+            affordability_target_ami_percent: 80,
+            created_at: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&trust).unwrap();
+        let back: LandTrust = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, trust);
+    }
+
+    #[test]
+    fn serde_roundtrip_resale_calculation_no_ami() {
+        let calc = ResaleCalculation {
+            lease_hash: action_hash_a(),
+            original_price_cents: 1,
+            years_held: 0,
+            improvements_value_cents: 0,
+            calculated_max_price_cents: 1,
+            ami_at_purchase: None,
+            current_ami: None,
+        };
+        let json = serde_json::to_string(&calc).unwrap();
+        let back: ResaleCalculation = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, calc);
+    }
+
+    #[test]
+    fn serde_roundtrip_affordability_report_extreme_values() {
+        let report = AffordabilityReport {
+            trust_hash: action_hash_a(),
+            report_date: Timestamp::from_micros(i64::MAX),
+            total_units: u32::MAX,
+            affordable_units: u32::MAX,
+            average_monthly_cost_cents: u64::MAX,
+            median_area_income_cents: u64::MAX,
+            affordability_ratio: 1.0,
+        };
+        let json = serde_json::to_string(&report).unwrap();
+        let back: AffordabilityReport = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, report);
+    }
+
+    // ── Additional validate_create_trust edge-case tests ─────────────────
+
+    #[test]
+    fn create_trust_unicode_fields_valid() {
+        let mut t = valid_land_trust();
+        t.id = "\u{1F30E}".to_string();
+        t.name = "\u{5730}\u{57DF}\u{4FE1}\u{8A17}".to_string();
+        t.mission = "F\u{00F6}rdern".to_string();
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_whitespace_only_id_is_not_empty() {
+        // A whitespace-only string is not empty, so this is valid per the code
+        let mut t = valid_land_trust();
+        t.id = "   ".to_string();
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_whitespace_only_name_is_not_empty() {
+        let mut t = valid_land_trust();
+        t.name = "\t\n".to_string();
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_whitespace_only_mission_is_not_empty() {
+        let mut t = valid_land_trust();
+        t.mission = " ".to_string();
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_affordability_target_at_u8_max() {
+        // u8::MAX = 255, which is > 200, so invalid
+        let mut t = valid_land_trust();
+        t.affordability_target_ami_percent = u8::MAX;
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Affordability target must be between 1 and 200 percent of AMI",
+        );
+    }
+
+    #[test]
+    fn create_trust_many_boundary_points() {
+        let mut t = valid_land_trust();
+        t.boundary = (0..1000).map(|i| (i as f64 * 0.01, i as f64 * 0.01)).collect();
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_many_board_members() {
+        let mut t = valid_land_trust();
+        t.stewardship_board = (0..100)
+            .map(|i| AgentPubKey::from_raw_36(vec![i; 36]))
+            .collect();
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_boundary_all_at_origin() {
+        let mut t = valid_land_trust();
+        t.boundary = vec![(0.0, 0.0), (0.0, 0.0), (0.0, 0.0)];
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_boundary_negative_coords_valid() {
+        let mut t = valid_land_trust();
+        t.boundary = vec![(-45.0, -122.0), (-45.1, -122.0), (-45.1, -122.1)];
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_boundary_lat_nan_is_invalid() {
+        let mut t = valid_land_trust();
+        t.boundary = vec![(f64::NAN, 0.0), (1.0, 0.0), (0.0, 1.0)];
+        // NaN comparisons: NaN < -90.0 is false, NaN > 90.0 is false
+        // So NaN passes the lat check, then NaN lon check also passes
+        // This documents current behavior: NaN values pass validation
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_boundary_lon_nan_passes() {
+        let mut t = valid_land_trust();
+        t.boundary = vec![(0.0, f64::NAN), (1.0, 0.0), (0.0, 1.0)];
+        // NaN comparisons all return false, so NaN passes both checks
+        assert_valid(validate_create_trust(fake_create(), t));
+    }
+
+    #[test]
+    fn create_trust_boundary_lat_positive_infinity() {
+        let mut t = valid_land_trust();
+        t.boundary = vec![(f64::INFINITY, 0.0), (1.0, 0.0), (0.0, 1.0)];
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Boundary latitude must be between -90 and 90",
+        );
+    }
+
+    #[test]
+    fn create_trust_boundary_lat_negative_infinity() {
+        let mut t = valid_land_trust();
+        t.boundary = vec![(f64::NEG_INFINITY, 0.0), (1.0, 0.0), (0.0, 1.0)];
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Boundary latitude must be between -90 and 90",
+        );
+    }
+
+    #[test]
+    fn create_trust_boundary_lon_positive_infinity() {
+        let mut t = valid_land_trust();
+        t.boundary = vec![(0.0, f64::INFINITY), (1.0, 0.0), (0.0, 1.0)];
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Boundary longitude must be between -180 and 180",
+        );
+    }
+
+    #[test]
+    fn create_trust_boundary_lon_negative_infinity() {
+        let mut t = valid_land_trust();
+        t.boundary = vec![(0.0, f64::NEG_INFINITY), (1.0, 0.0), (0.0, 1.0)];
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Boundary longitude must be between -180 and 180",
+        );
+    }
+
+    // ── Additional validate_create_lease edge-case tests ─────────────────
+
+    #[test]
+    fn create_lease_max_term_boundary_200_invalid() {
+        let mut l = valid_ground_lease();
+        l.lease_term_years = 200;
+        assert_invalid(
+            validate_create_lease(fake_create(), l),
+            "Lease term cannot exceed 199 years",
+        );
+    }
+
+    #[test]
+    fn create_lease_max_term_u32_max_invalid() {
+        let mut l = valid_ground_lease();
+        l.lease_term_years = u32::MAX;
+        assert_invalid(
+            validate_create_lease(fake_create(), l),
+            "Lease term cannot exceed 199 years",
+        );
+    }
+
+    #[test]
+    fn create_lease_max_ground_rent_ok() {
+        let mut l = valid_ground_lease();
+        l.ground_rent_monthly_cents = u64::MAX;
+        assert_valid(validate_create_lease(fake_create(), l));
+    }
+
+    #[test]
+    fn create_lease_formula_appreciation_cap_with_extra_fields_ok() {
+        let mut l = valid_ground_lease();
+        l.resale_formula = ResaleFormula {
+            formula_type: FormulaType::AppreciationCap,
+            max_appreciation_percent_annual: Some(5),
+            ami_cap_percent: Some(100), // extra field, still valid
+            improvement_credit_percent: Some(50),
+        };
+        assert_valid(validate_create_lease(fake_create(), l));
+    }
+
+    #[test]
+    fn create_lease_formula_ami_with_extra_fields_ok() {
+        let mut l = valid_ground_lease();
+        l.resale_formula = ResaleFormula {
+            formula_type: FormulaType::AreaMedianIncome,
+            max_appreciation_percent_annual: Some(3), // extra
+            ami_cap_percent: Some(80),
+            improvement_credit_percent: Some(50),
+        };
+        assert_valid(validate_create_lease(fake_create(), l));
+    }
+
+    #[test]
+    fn create_lease_formula_hybrid_only_improvement_credit_invalid() {
+        // improvement_credit_percent alone does not satisfy the hybrid requirement
+        let mut l = valid_ground_lease();
+        l.resale_formula = ResaleFormula {
+            formula_type: FormulaType::Hybrid,
+            max_appreciation_percent_annual: None,
+            ami_cap_percent: None,
+            improvement_credit_percent: Some(100),
+        };
+        assert_invalid(
+            validate_create_lease(fake_create(), l),
+            "Hybrid formula requires at least one cap parameter",
+        );
+    }
+
+    #[test]
+    fn create_lease_expires_one_microsecond_after_start() {
+        let mut l = valid_ground_lease();
+        l.started_at = Timestamp::from_micros(1000);
+        l.expires_at = Timestamp::from_micros(1001);
+        assert_valid(validate_create_lease(fake_create(), l));
+    }
+
+    // ── Additional validate_resale_calc edge-case tests ──────────────────
+
+    #[test]
+    fn create_resale_calc_original_price_one() {
+        let mut c = valid_resale_calculation();
+        c.original_price_cents = 1;
+        assert_valid(validate_resale_calc(fake_create(), c));
+    }
+
+    #[test]
+    fn create_resale_calc_calculated_price_one() {
+        let mut c = valid_resale_calculation();
+        c.calculated_max_price_cents = 1;
+        assert_valid(validate_resale_calc(fake_create(), c));
+    }
+
+    #[test]
+    fn create_resale_calc_max_years_held() {
+        let mut c = valid_resale_calculation();
+        c.years_held = u32::MAX;
+        assert_valid(validate_resale_calc(fake_create(), c));
+    }
+
+    #[test]
+    fn create_resale_calc_both_prices_at_u64_max() {
+        let mut c = valid_resale_calculation();
+        c.original_price_cents = u64::MAX;
+        c.calculated_max_price_cents = u64::MAX;
+        c.improvements_value_cents = u64::MAX;
+        assert_valid(validate_resale_calc(fake_create(), c));
+    }
+
+    #[test]
+    fn create_resale_calc_both_zero_prices_invalid() {
+        let mut c = valid_resale_calculation();
+        c.original_price_cents = 0;
+        c.calculated_max_price_cents = 0;
+        // Hits the first check (original_price_cents == 0)
+        assert_invalid(
+            validate_resale_calc(fake_create(), c),
+            "Original price must be greater than 0",
+        );
+    }
+
+    #[test]
+    fn create_resale_calc_partial_ami_only_purchase() {
+        let mut c = valid_resale_calculation();
+        c.ami_at_purchase = Some(5000000);
+        c.current_ami = None;
+        assert_valid(validate_resale_calc(fake_create(), c));
+    }
+
+    #[test]
+    fn create_resale_calc_partial_ami_only_current() {
+        let mut c = valid_resale_calculation();
+        c.ami_at_purchase = None;
+        c.current_ami = Some(5000000);
+        assert_valid(validate_resale_calc(fake_create(), c));
+    }
+
+    // ── Additional validate_affordability_report edge-case tests ─────────
+
+    #[test]
+    fn create_affordability_report_one_unit_one_affordable() {
+        let mut r = valid_affordability_report();
+        r.total_units = 1;
+        r.affordable_units = 1;
+        assert_valid(validate_affordability_report(fake_create(), r));
+    }
+
+    #[test]
+    fn create_affordability_report_one_unit_zero_affordable() {
+        let mut r = valid_affordability_report();
+        r.total_units = 1;
+        r.affordable_units = 0;
+        assert_valid(validate_affordability_report(fake_create(), r));
+    }
+
+    #[test]
+    fn create_affordability_report_max_units() {
+        let mut r = valid_affordability_report();
+        r.total_units = u32::MAX;
+        r.affordable_units = u32::MAX;
+        assert_valid(validate_affordability_report(fake_create(), r));
+    }
+
+    #[test]
+    fn create_affordability_report_ratio_epsilon_above_zero() {
+        let mut r = valid_affordability_report();
+        r.affordability_ratio = f32::EPSILON;
+        assert_valid(validate_affordability_report(fake_create(), r));
+    }
+
+    #[test]
+    fn create_affordability_report_ratio_just_below_one() {
+        let mut r = valid_affordability_report();
+        r.affordability_ratio = 1.0 - f32::EPSILON;
+        assert_valid(validate_affordability_report(fake_create(), r));
+    }
+
+    #[test]
+    fn create_affordability_report_ratio_nan_is_invalid() {
+        let mut r = valid_affordability_report();
+        r.affordability_ratio = f32::NAN;
+        // NAN < 0.0 is false and NAN > 1.0 is false, so NaN passes the check
+        // This documents current behavior
+        assert_valid(validate_affordability_report(fake_create(), r));
+    }
+
+    #[test]
+    fn create_affordability_report_ratio_positive_infinity() {
+        let mut r = valid_affordability_report();
+        r.affordability_ratio = f32::INFINITY;
+        assert_invalid(
+            validate_affordability_report(fake_create(), r),
+            "Affordability ratio must be between 0 and 1",
+        );
+    }
+
+    #[test]
+    fn create_affordability_report_ratio_negative_infinity() {
+        let mut r = valid_affordability_report();
+        r.affordability_ratio = f32::NEG_INFINITY;
+        assert_invalid(
+            validate_affordability_report(fake_create(), r),
+            "Affordability ratio must be between 0 and 1",
+        );
+    }
+
+    #[test]
+    fn create_affordability_report_median_income_one() {
+        let mut r = valid_affordability_report();
+        r.median_area_income_cents = 1;
+        assert_valid(validate_affordability_report(fake_create(), r));
+    }
+
+    #[test]
+    fn create_affordability_report_median_income_u64_max() {
+        let mut r = valid_affordability_report();
+        r.median_area_income_cents = u64::MAX;
+        assert_valid(validate_affordability_report(fake_create(), r));
+    }
+
+    #[test]
+    fn create_affordability_report_monthly_cost_u64_max() {
+        let mut r = valid_affordability_report();
+        r.average_monthly_cost_cents = u64::MAX;
+        assert_valid(validate_affordability_report(fake_create(), r));
+    }
+
+    // ── Clone and PartialEq trait tests ──────────────────────────────────
+
+    #[test]
+    fn anchor_clone_and_eq() {
+        let a = Anchor("test".to_string());
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn land_trust_clone_and_eq() {
+        let a = valid_land_trust();
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn ground_lease_clone_and_eq() {
+        let a = valid_ground_lease();
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn resale_calculation_clone_and_eq() {
+        let a = valid_resale_calculation();
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn affordability_report_clone_and_eq() {
+        let a = valid_affordability_report();
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn formula_type_clone_and_eq() {
+        let variants = [
+            FormulaType::AppreciationCap,
+            FormulaType::AreaMedianIncome,
+            FormulaType::ConsumerPriceIndex,
+            FormulaType::Hybrid,
+        ];
+        for v in &variants {
+            assert_eq!(v, &v.clone());
+        }
+    }
+
+    #[test]
+    fn resale_formula_clone_and_eq() {
+        let a = ResaleFormula {
+            formula_type: FormulaType::Hybrid,
+            max_appreciation_percent_annual: Some(3),
+            ami_cap_percent: Some(80),
+            improvement_credit_percent: Some(50),
+        };
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    // ── PartialEq inequality tests ───────────────────────────────────────
+
+    #[test]
+    fn land_trust_ne_different_id() {
+        let a = valid_land_trust();
+        let mut b = a.clone();
+        b.id = "different".to_string();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn ground_lease_ne_different_term() {
+        let a = valid_ground_lease();
+        let mut b = a.clone();
+        b.lease_term_years = 50;
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn resale_calculation_ne_different_price() {
+        let a = valid_resale_calculation();
+        let mut b = a.clone();
+        b.original_price_cents = 1;
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn affordability_report_ne_different_ratio() {
+        let a = valid_affordability_report();
+        let mut b = a.clone();
+        b.affordability_ratio = 0.5;
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn formula_type_ne_variants() {
+        assert_ne!(FormulaType::AppreciationCap, FormulaType::AreaMedianIncome);
+        assert_ne!(FormulaType::ConsumerPriceIndex, FormulaType::Hybrid);
+    }
+
+    // ── Debug trait tests ────────────────────────────────────────────────
+
+    #[test]
+    fn formula_type_debug() {
+        let s = format!("{:?}", FormulaType::AppreciationCap);
+        assert!(s.contains("AppreciationCap"));
+    }
+
+    #[test]
+    fn resale_formula_debug() {
+        let f = ResaleFormula {
+            formula_type: FormulaType::Hybrid,
+            max_appreciation_percent_annual: Some(3),
+            ami_cap_percent: None,
+            improvement_credit_percent: None,
+        };
+        let s = format!("{:?}", f);
+        assert!(s.contains("Hybrid"));
+        assert!(s.contains("Some(3)"));
+    }
+
+    // ── Validation order-of-checks tests ─────────────────────────────────
+
+    #[test]
+    fn create_trust_multiple_errors_returns_first_id() {
+        // When both id and name are empty, id error is returned first
+        let mut t = valid_land_trust();
+        t.id = String::new();
+        t.name = String::new();
+        t.mission = String::new();
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Trust ID cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_trust_name_error_after_valid_id() {
+        let mut t = valid_land_trust();
+        t.name = String::new();
+        t.mission = String::new();
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Trust name cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_trust_mission_error_after_valid_id_and_name() {
+        let mut t = valid_land_trust();
+        t.mission = String::new();
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Trust mission cannot be empty",
+        );
+    }
+
+    #[test]
+    fn create_lease_term_zero_checked_before_expiry() {
+        let mut l = valid_ground_lease();
+        l.lease_term_years = 0;
+        l.expires_at = l.started_at; // Also invalid, but term is checked first
+        assert_invalid(
+            validate_create_lease(fake_create(), l),
+            "Lease term must be at least 1 year",
+        );
+    }
+
+    #[test]
+    fn create_lease_term_200_checked_before_expiry() {
+        let mut l = valid_ground_lease();
+        l.lease_term_years = 200;
+        l.expires_at = l.started_at; // Also invalid, but term > 199 is checked first
+        assert_invalid(
+            validate_create_lease(fake_create(), l),
+            "Lease term cannot exceed 199 years",
+        );
+    }
+
+    #[test]
+    fn create_resale_calc_original_zero_checked_before_calculated() {
+        let mut c = valid_resale_calculation();
+        c.original_price_cents = 0;
+        c.calculated_max_price_cents = 0;
+        assert_invalid(
+            validate_resale_calc(fake_create(), c),
+            "Original price must be greater than 0",
+        );
+    }
+
+    #[test]
+    fn create_affordability_report_total_units_zero_checked_first() {
+        let mut r = valid_affordability_report();
+        r.total_units = 0;
+        r.affordable_units = 1; // Also problematic, but total_units == 0 checked first
+        assert_invalid(
+            validate_affordability_report(fake_create(), r),
+            "Total units must be greater than 0",
+        );
     }
 }

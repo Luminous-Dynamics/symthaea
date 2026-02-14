@@ -323,3 +323,155 @@ pub struct CompleteRemediationInput {
     pub post_treatment_reading: Option<ActionHash>,
     pub notes: Option<String>,
 }
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    // ========================================================================
+    // COORDINATOR STRUCT SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn potability_result_serde_roundtrip() {
+        let result = PotabilityResult {
+            is_potable: true,
+            potability_score: 0.95,
+            meets_who: true,
+            meets_epa: true,
+            warnings: vec!["Minor turbidity".to_string()],
+            reading_timestamp: Timestamp::from_micros(1000),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: PotabilityResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.is_potable, true);
+        assert_eq!(decoded.potability_score, 0.95);
+        assert_eq!(decoded.meets_who, true);
+        assert_eq!(decoded.meets_epa, true);
+        assert_eq!(decoded.warnings.len(), 1);
+        assert_eq!(decoded.warnings[0], "Minor turbidity");
+    }
+
+    #[test]
+    fn potability_result_not_potable() {
+        let result = PotabilityResult {
+            is_potable: false,
+            potability_score: 0.2,
+            meets_who: false,
+            meets_epa: false,
+            warnings: vec![
+                "pH out of range: 5.0".to_string(),
+                "Lead exceeds limit: 20.0 ug/L".to_string(),
+            ],
+            reading_timestamp: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: PotabilityResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.is_potable, false);
+        assert_eq!(decoded.potability_score, 0.2);
+        assert_eq!(decoded.warnings.len(), 2);
+    }
+
+    #[test]
+    fn potability_result_no_warnings() {
+        let result = PotabilityResult {
+            is_potable: true,
+            potability_score: 1.0,
+            meets_who: true,
+            meets_epa: true,
+            warnings: vec![],
+            reading_timestamp: Timestamp::from_micros(500),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: PotabilityResult = serde_json::from_str(&json).unwrap();
+        assert!(decoded.warnings.is_empty());
+        assert_eq!(decoded.potability_score, 1.0);
+    }
+
+    #[test]
+    fn resolve_alert_input_serde_roundtrip() {
+        let input = ResolveAlertInput {
+            alert_hash: fake_action_hash(),
+            remediation_hash: Some(fake_action_hash()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ResolveAlertInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.remediation_hash.is_some());
+    }
+
+    #[test]
+    fn resolve_alert_input_without_remediation() {
+        let input = ResolveAlertInput {
+            alert_hash: fake_action_hash(),
+            remediation_hash: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ResolveAlertInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.remediation_hash.is_none());
+    }
+
+    #[test]
+    fn complete_remediation_input_serde_roundtrip() {
+        let input = CompleteRemediationInput {
+            remediation_hash: fake_action_hash(),
+            post_treatment_reading: Some(fake_action_hash()),
+            notes: Some("Treatment successful".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CompleteRemediationInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.post_treatment_reading.is_some());
+        assert_eq!(decoded.notes, Some("Treatment successful".to_string()));
+    }
+
+    #[test]
+    fn complete_remediation_input_minimal() {
+        let input = CompleteRemediationInput {
+            remediation_hash: fake_action_hash(),
+            post_treatment_reading: None,
+            notes: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CompleteRemediationInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.post_treatment_reading.is_none());
+        assert!(decoded.notes.is_none());
+    }
+
+    // ========================================================================
+    // INTEGRITY ENUM SERDE ROUNDTRIP TESTS (via coordinator re-export)
+    // ========================================================================
+
+    #[test]
+    fn alert_severity_all_variants_serde() {
+        for variant in [
+            AlertSeverity::Advisory,
+            AlertSeverity::Warning,
+            AlertSeverity::Emergency,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: AlertSeverity = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn alert_type_all_variants_serde() {
+        for variant in [
+            AlertType::Chemical,
+            AlertType::Biological,
+            AlertType::Physical,
+            AlertType::Radiological,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: AlertType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+}

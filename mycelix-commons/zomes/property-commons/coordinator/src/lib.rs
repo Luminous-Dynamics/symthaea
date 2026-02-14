@@ -437,3 +437,235 @@ pub struct UpdateQuotaInput {
     pub steward_did: String,
     pub new_quota: Option<f64>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_resource_input_serde_roundtrip() {
+        let input = CreateResourceInput {
+            name: "Community Garden".to_string(),
+            description: "Shared urban garden".to_string(),
+            resource_type: ResourceType::Land,
+            property_id: Some("prop-001".to_string()),
+            stewards: vec!["did:key:z6Mk001".to_string(), "did:key:z6Mk002".to_string()],
+            governance_rules: GovernanceRules {
+                access_rules: vec!["Members only".to_string()],
+                usage_limits: vec![UsageLimit { limit_type: "water_liters".to_string(), max_per_period: 500.0, period_days: 7 }],
+                maintenance_rotation: true,
+                decision_method: DecisionMethod::Consensus,
+                penalty_for_violation: Some("Warning".to_string()),
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateResourceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "Community Garden");
+        assert_eq!(decoded.stewards.len(), 2);
+        assert!(decoded.governance_rules.maintenance_rotation);
+    }
+
+    #[test]
+    fn grant_right_input_serde_roundtrip() {
+        let input = GrantRightInput {
+            resource_id: "commons-001".to_string(),
+            holder_did: "did:key:z6Mk003".to_string(),
+            right_type: RightType::Access,
+            quota: Some(100.0),
+            expires: Some(Timestamp::from_micros(9_000_000)),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: GrantRightInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.resource_id, "commons-001");
+        assert_eq!(decoded.quota, Some(100.0));
+    }
+
+    #[test]
+    fn log_usage_input_serde_roundtrip() {
+        let input = LogUsageInput {
+            resource_id: "commons-001".to_string(),
+            user_did: "did:key:z6Mk003".to_string(),
+            usage_type: "irrigation".to_string(),
+            quantity: 50.0,
+            unit: "liters".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: LogUsageInput = serde_json::from_str(&json).unwrap();
+        assert!((decoded.quantity - 50.0).abs() < f64::EPSILON);
+        assert_eq!(decoded.unit, "liters");
+    }
+
+    #[test]
+    fn check_quota_input_serde_roundtrip() {
+        let input = CheckQuotaInput {
+            resource_id: "commons-001".to_string(),
+            user_did: "did:key:z6Mk003".to_string(),
+            requested_amount: 25.0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CheckQuotaInput = serde_json::from_str(&json).unwrap();
+        assert!((decoded.requested_amount - 25.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn revoke_right_input_serde_roundtrip() {
+        let input = RevokeRightInput {
+            right_id: "right-001".to_string(),
+            revoker_did: "did:key:z6Mk001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RevokeRightInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.right_id, "right-001");
+    }
+
+    #[test]
+    fn add_steward_input_serde_roundtrip() {
+        let input = AddStewardInput {
+            resource_id: "commons-001".to_string(),
+            new_steward_did: "did:key:z6Mk004".to_string(),
+            added_by_did: "did:key:z6Mk001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddStewardInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_steward_did, "did:key:z6Mk004");
+    }
+
+    #[test]
+    fn remove_steward_input_serde_roundtrip() {
+        let input = RemoveStewardInput {
+            resource_id: "commons-001".to_string(),
+            steward_did: "did:key:z6Mk002".to_string(),
+            removed_by_did: "did:key:z6Mk001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RemoveStewardInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.steward_did, "did:key:z6Mk002");
+    }
+
+    #[test]
+    fn update_governance_input_serde_roundtrip() {
+        let input = UpdateGovernanceInput {
+            resource_id: "commons-001".to_string(),
+            steward_did: "did:key:z6Mk001".to_string(),
+            new_rules: GovernanceRules {
+                access_rules: vec!["Open access".to_string()],
+                usage_limits: vec![],
+                maintenance_rotation: false,
+                decision_method: DecisionMethod::Majority,
+                penalty_for_violation: None,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateGovernanceInput = serde_json::from_str(&json).unwrap();
+        assert!(!decoded.new_rules.maintenance_rotation);
+    }
+
+    #[test]
+    fn update_quota_input_serde_roundtrip() {
+        let input = UpdateQuotaInput {
+            right_id: "right-001".to_string(),
+            steward_did: "did:key:z6Mk001".to_string(),
+            new_quota: Some(200.0),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateQuotaInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_quota, Some(200.0));
+    }
+
+    #[test]
+    fn user_usage_input_serde_roundtrip() {
+        let input = UserUsageInput {
+            resource_id: "commons-001".to_string(),
+            user_did: "did:key:z6Mk003".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UserUsageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.user_did, "did:key:z6Mk003");
+    }
+
+    #[test]
+    fn resource_type_all_variants_serialize() {
+        let types = vec![
+            ResourceType::Land,
+            ResourceType::Water,
+            ResourceType::Forest,
+            ResourceType::Fishery,
+            ResourceType::Pasture,
+            ResourceType::Infrastructure,
+            ResourceType::Digital,
+            ResourceType::Other("Custom".to_string()),
+        ];
+        for rt in types {
+            let json = serde_json::to_string(&rt).unwrap();
+            let decoded: ResourceType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, rt);
+        }
+    }
+
+    #[test]
+    fn decision_method_all_variants_serialize() {
+        let methods = vec![
+            DecisionMethod::Consensus,
+            DecisionMethod::Majority,
+            DecisionMethod::SuperMajority,
+            DecisionMethod::Stewards,
+        ];
+        for method in methods {
+            let json = serde_json::to_string(&method).unwrap();
+            let decoded: DecisionMethod = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, method);
+        }
+    }
+
+    #[test]
+    fn right_type_all_variants_serialize() {
+        let types = vec![
+            RightType::Access,
+            RightType::Extraction,
+            RightType::Management,
+            RightType::Exclusion,
+            RightType::Alienation,
+        ];
+        for rt in types {
+            let json = serde_json::to_string(&rt).unwrap();
+            let decoded: RightType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, rt);
+        }
+    }
+
+    #[test]
+    fn create_resource_without_optional_fields() {
+        let input = CreateResourceInput {
+            name: "Digital Commons".to_string(),
+            description: "Shared knowledge base".to_string(),
+            resource_type: ResourceType::Digital,
+            property_id: None,
+            stewards: vec!["did:key:z6Mk001".to_string()],
+            governance_rules: GovernanceRules {
+                access_rules: vec![],
+                usage_limits: vec![],
+                maintenance_rotation: false,
+                decision_method: DecisionMethod::Stewards,
+                penalty_for_violation: None,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateResourceInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.property_id.is_none());
+    }
+
+    #[test]
+    fn grant_right_without_quota_or_expiry() {
+        let input = GrantRightInput {
+            resource_id: "commons-001".to_string(),
+            holder_did: "did:key:z6Mk003".to_string(),
+            right_type: RightType::Access,
+            quota: None,
+            expires: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: GrantRightInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.quota.is_none());
+        assert!(decoded.expires.is_none());
+    }
+}

@@ -263,3 +263,107 @@ pub fn get_all_climate_patterns(_: ()) -> ExternResult<Vec<Record>> {
     )?;
     records_from_links(links)
 }
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // INTEGRITY ENUM SERDE ROUNDTRIP TESTS (via coordinator re-export)
+    // ========================================================================
+
+    #[test]
+    fn water_classification_all_variants_serde() {
+        for variant in [
+            WaterClassification::Potable,
+            WaterClassification::Cooking,
+            WaterClassification::Hygiene,
+            WaterClassification::Irrigation,
+            WaterClassification::Industrial,
+            WaterClassification::Recreation,
+            WaterClassification::Greywater,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: WaterClassification = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn practice_type_all_variants_serde() {
+        for variant in [
+            PracticeType::Irrigation,
+            PracticeType::Conservation,
+            PracticeType::Purification,
+            PracticeType::Harvesting,
+            PracticeType::Divining,
+            PracticeType::Ceremony,
+            PracticeType::Seasonal,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: PracticeType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn access_level_all_variants_serde() {
+        for variant in [
+            AccessLevel::Public,
+            AccessLevel::CommunityOnly,
+            AccessLevel::ElderApproved,
+            AccessLevel::Sacred,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: AccessLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn cost_level_all_variants_serde() {
+        for variant in [
+            CostLevel::Free,
+            CostLevel::Low,
+            CostLevel::Medium,
+            CostLevel::High,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: CostLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn difficulty_level_all_variants_serde() {
+        for variant in [
+            DifficultyLevel::Beginner,
+            DifficultyLevel::Intermediate,
+            DifficultyLevel::Advanced,
+            DifficultyLevel::Expert,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: DifficultyLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn pattern_type_all_variants_serde() {
+        for variant in [
+            PatternType::Drought,
+            PatternType::Flood,
+            PatternType::SeasonalShift,
+            PatternType::QualityChange,
+            PatternType::LevelChange,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: PatternType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+}

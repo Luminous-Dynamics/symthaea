@@ -264,6 +264,258 @@ pub fn get_arbitrator_cases(arbitrator_did: String) -> ExternResult<Vec<Record>>
     Ok(records)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts() -> Timestamp {
+        Timestamp::from_micros(0)
+    }
+
+    // ========================================================================
+    // Coordinator input struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn update_arb_status_input_serde_roundtrip() {
+        let input = UpdateArbStatusInput {
+            arbitration_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            new_status: ArbitrationStatus::Hearing,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateArbStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, ArbitrationStatus::Hearing);
+    }
+
+    #[test]
+    fn arbitrator_response_input_serde_roundtrip() {
+        let input = ArbitratorResponseInput {
+            arbitration_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            arbitrator_did: "did:example:arb1".to_string(),
+            accepted: true,
+            recused: false,
+            recusal_reason: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ArbitratorResponseInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.arbitrator_did, "did:example:arb1");
+        assert!(decoded.accepted);
+        assert!(!decoded.recused);
+        assert!(decoded.recusal_reason.is_none());
+    }
+
+    #[test]
+    fn arbitrator_response_recusal_serde() {
+        let input = ArbitratorResponseInput {
+            arbitration_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            arbitrator_did: "did:example:arb2".to_string(),
+            accepted: false,
+            recused: true,
+            recusal_reason: Some("Conflict of interest".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ArbitratorResponseInput = serde_json::from_str(&json).unwrap();
+        assert!(!decoded.accepted);
+        assert!(decoded.recused);
+        assert_eq!(decoded.recusal_reason, Some("Conflict of interest".to_string()));
+    }
+
+    #[test]
+    fn update_appeal_status_input_serde_roundtrip() {
+        let input = UpdateAppealStatusInput {
+            appeal_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            new_status: AppealStatus::Granted,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateAppealStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, AppealStatus::Granted);
+    }
+
+    #[test]
+    fn finalize_decision_input_serde_roundtrip() {
+        let input = FinalizeDecisionInput {
+            decision_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let _decoded: FinalizeDecisionInput = serde_json::from_str(&json).unwrap();
+    }
+
+    #[test]
+    fn check_emergency_context_input_serde_roundtrip() {
+        let input = CheckEmergencyContextInput {
+            case_id: "case-42".to_string(),
+            keyword: Some("flood".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CheckEmergencyContextInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.case_id, "case-42");
+        assert_eq!(decoded.keyword, Some("flood".to_string()));
+    }
+
+    #[test]
+    fn check_emergency_context_input_no_keyword_serde() {
+        let input = CheckEmergencyContextInput {
+            case_id: "case-99".to_string(),
+            keyword: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CheckEmergencyContextInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.case_id, "case-99");
+        assert!(decoded.keyword.is_none());
+    }
+
+    #[test]
+    fn emergency_context_result_serde_roundtrip() {
+        let result = EmergencyContextResult {
+            has_active_emergencies: true,
+            active_emergency_count: 3,
+            matching_disaster: Some("Hurricane Alpha".to_string()),
+            matching_severity: Some("Level3".to_string()),
+            recommendation: Some("Expedite case".to_string()),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: EmergencyContextResult = serde_json::from_str(&json).unwrap();
+        assert!(decoded.has_active_emergencies);
+        assert_eq!(decoded.active_emergency_count, 3);
+        assert_eq!(decoded.matching_disaster, Some("Hurricane Alpha".to_string()));
+        assert!(decoded.error.is_none());
+    }
+
+    #[test]
+    fn emergency_context_result_error_serde() {
+        let result = EmergencyContextResult {
+            has_active_emergencies: false,
+            active_emergency_count: 0,
+            matching_disaster: None,
+            matching_severity: None,
+            recommendation: None,
+            error: Some("Network timeout".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: EmergencyContextResult = serde_json::from_str(&json).unwrap();
+        assert!(!decoded.has_active_emergencies);
+        assert_eq!(decoded.error, Some("Network timeout".to_string()));
+    }
+
+    // ========================================================================
+    // Integrity enum serde tests (all variants)
+    // ========================================================================
+
+    #[test]
+    fn arbitration_status_all_variants_serde() {
+        let variants = vec![
+            ArbitrationStatus::PanelFormation,
+            ArbitrationStatus::EvidenceReview,
+            ArbitrationStatus::Hearing,
+            ArbitrationStatus::Deliberation,
+            ArbitrationStatus::DecisionDrafting,
+            ArbitrationStatus::DecisionRendered,
+            ArbitrationStatus::Appealed,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: ArbitrationStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn appeal_status_all_variants_serde() {
+        let variants = vec![
+            AppealStatus::Filed,
+            AppealStatus::UnderReview,
+            AppealStatus::Granted,
+            AppealStatus::Denied,
+            AppealStatus::Remanded,
+            AppealStatus::Resolved,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: AppealStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn decision_type_all_variants_serde() {
+        let variants = vec![
+            DecisionType::MeritsDecision,
+            DecisionType::InterimDecision,
+            DecisionType::DefaultDecision,
+            DecisionType::ConsentDecision,
+            DecisionType::Dismissal,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: DecisionType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn decision_outcome_all_variants_serde() {
+        let variants = vec![
+            DecisionOutcome::ForComplainant,
+            DecisionOutcome::ForRespondent,
+            DecisionOutcome::SplitDecision,
+            DecisionOutcome::Dismissed,
+            DecisionOutcome::Settled,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: DecisionOutcome = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn vote_choice_all_variants_serde() {
+        let variants = vec![
+            VoteChoice::ForComplainant,
+            VoteChoice::ForRespondent,
+            VoteChoice::Abstain,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: VoteChoice = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn appeal_ground_all_variants_serde() {
+        let variants = vec![
+            AppealGround::ProceduralError,
+            AppealGround::NewEvidence,
+            AppealGround::LegalError,
+            AppealGround::Bias,
+            AppealGround::ExcessiveRemedy,
+            AppealGround::InsufficientRemedy,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: AppealGround = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn arbitrator_selection_all_variants_serde() {
+        let variants: Vec<ArbitratorSelection> = vec![
+            ArbitratorSelection::Random,
+            ArbitratorSelection::MATLWeighted,
+            ArbitratorSelection::PartyAgreed,
+            ArbitratorSelection::ExpertiseBased { domain: "Finance".to_string() },
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: ArbitratorSelection = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+}
+
 // ============================================================================
 // Cross-domain: Check emergency context for justice cases
 // ============================================================================
