@@ -9,10 +9,7 @@ members = [
     "crates/symthaea-dynamics",
     "crates/symthaea-perception",
 ]
-# WIP crate: cross-references main crate modules (circular dep), needs architectural rework
-exclude = [
-    "crates/symthaea-consciousness",
-]
+
 
 [workspace.dependencies]
 ndarray = { version = "0.16", features = ["rayon", "serde"] }

@@ -103,13 +103,6 @@ pub enum PhiMethod {
     Auto,
 }
 
-impl PhiMethod {
-    /// Backward-compatible alias for `SpectralConnectivity`.
-    #[deprecated(since = "0.2.0", note = "Renamed to SpectralConnectivity for scientific accuracy")]
-    pub const CONTINUOUS: PhiMethod = PhiMethod::SpectralConnectivity;
-}
-
-
 impl PhiEngine {
     /// Create a new PhiEngine with specified method
     pub fn new(method: PhiMethod) -> Self {

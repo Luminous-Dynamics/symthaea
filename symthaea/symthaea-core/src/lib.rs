@@ -28,6 +28,7 @@
 //! - **[`genesis`]** — System bootstrap and initialization
 //! - **[`observability`]** — Metrics, tracing, and introspection
 
+#![warn(missing_docs)]
 #![allow(clippy::needless_range_loop)]
 // Suppress test-harness-generated deprecated warnings for phi_real module tests.
 // phi_real is #![deprecated] (renamed to spectral_connectivity), but the linter
@@ -35,9 +36,21 @@
 // at crate level which cannot be suppressed locally.
 #![cfg_attr(test, allow(deprecated))]
 
+/// Core consciousness state types and configuration.
+#[allow(missing_docs)]
 pub mod core;
+/// System bootstrap and initialization.
+#[allow(missing_docs)]
 pub mod genesis;
+/// Hyperdimensional computing: vector types, encoding, binding, bundling, similarity, and consciousness topology.
+#[allow(missing_docs)]
 pub mod hdc;
+/// Metrics, tracing, and introspection.
+#[allow(missing_docs)]
 pub mod observability;
+/// Integrated Information (Phi) calculation engine.
+#[allow(missing_docs)]
 pub mod phi_engine;
+/// Physics-grounded modeling: periodic table, emergence, kinetics, IIT, and thermodynamics.
+#[allow(missing_docs)]
 pub mod physics;
