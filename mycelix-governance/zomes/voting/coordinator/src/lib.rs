@@ -1103,10 +1103,38 @@ pub fn get_proposal_votes(proposal_id: String) -> ExternResult<Vec<Record>> {
     Ok(votes)
 }
 
-/// Tally votes for a proposal (legacy)
+/// Input for tally with configurable thresholds
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TallyVotesInput {
+    pub proposal_id: String,
+    /// Proposal tier determines default quorum/approval thresholds. If None, uses Major.
+    pub tier: Option<ProposalTier>,
+    /// Override quorum threshold (0-1). If None, uses tier default.
+    pub quorum_override: Option<f64>,
+    /// Override approval threshold (0-1). If None, uses tier default.
+    pub approval_override: Option<f64>,
+}
+
+/// Tally votes for a proposal
 #[hdk_extern]
-pub fn tally_votes(proposal_id: String) -> ExternResult<Record> {
-    let vote_records = get_proposal_votes(proposal_id.clone())?;
+pub fn tally_votes(input: TallyVotesInput) -> ExternResult<Record> {
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+
+    let tier = input.tier.unwrap_or(ProposalTier::Major);
+    let quorum_threshold = input.quorum_override.unwrap_or_else(|| tier.quorum_requirement());
+    let approval_threshold = input.approval_override.unwrap_or_else(|| tier.approval_threshold());
+
+    // Validate overrides
+    if quorum_threshold < 0.0 || quorum_threshold > 1.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Quorum threshold must be between 0 and 1".into())));
+    }
+    if approval_threshold < 0.0 || approval_threshold > 1.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Approval threshold must be between 0 and 1".into())));
+    }
+
+    let vote_records = get_proposal_votes(input.proposal_id.clone())?;
 
     let mut votes_for = 0.0;
     let mut votes_against = 0.0;
@@ -1128,18 +1156,16 @@ pub fn tally_votes(proposal_id: String) -> ExternResult<Record> {
 
     let total_weight = votes_for + votes_against + abstentions;
 
-    // Calculate if quorum reached (simplified)
-    let quorum_threshold = 0.25;
     let quorum_reached = total_weight >= quorum_threshold;
 
-    // Calculate if approved
-    let approval_threshold = 0.6;
-    let approved = quorum_reached && (votes_for / (votes_for + votes_against)) >= approval_threshold;
+    // Avoid division by zero when no decisive votes cast
+    let decisive_weight = votes_for + votes_against;
+    let approved = quorum_reached && decisive_weight > 0.0 && (votes_for / decisive_weight) >= approval_threshold;
 
     let now = sys_time()?;
 
     let tally = VoteTally {
-        proposal_id: proposal_id.clone(),
+        proposal_id: input.proposal_id.clone(),
         votes_for,
         votes_against,
         abstentions,
@@ -1153,7 +1179,7 @@ pub fn tally_votes(proposal_id: String) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::VoteTally(tally))?;
 
     // Create anchor and link proposal to tally
-    let tally_anchor = format!("tally:{}", proposal_id);
+    let tally_anchor = format!("tally:{}", input.proposal_id);
     create_entry(&EntryTypes::Anchor(Anchor(tally_anchor.clone())))?;
     create_link(
         anchor_hash(&tally_anchor)?,
@@ -2728,6 +2754,27 @@ mod tests {
         assert!((QuadraticVote::calculate_weight(100) - 10.0).abs() < 1e-10);
         // Quadratic cost: doubling vote weight from 3→6 costs 9→36 (4x credits)
         assert!((QuadraticVote::calculate_weight(36) - 6.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_proposal_tier_thresholds() {
+        // Basic: simple majority, low quorum
+        assert!((ProposalTier::Basic.quorum_requirement() - 0.15).abs() < 1e-10);
+        assert!((ProposalTier::Basic.approval_threshold() - 0.50).abs() < 1e-10);
+
+        // Major: stricter
+        assert!((ProposalTier::Major.quorum_requirement() - 0.25).abs() < 1e-10);
+        assert!((ProposalTier::Major.approval_threshold() - 0.60).abs() < 1e-10);
+
+        // Constitutional: strictest
+        assert!((ProposalTier::Constitutional.quorum_requirement() - 0.40).abs() < 1e-10);
+        assert!((ProposalTier::Constitutional.approval_threshold() - 0.67).abs() < 1e-10);
+
+        // Ensure ordering: Constitutional > Major > Basic for both thresholds
+        assert!(ProposalTier::Constitutional.quorum_requirement() > ProposalTier::Major.quorum_requirement());
+        assert!(ProposalTier::Major.quorum_requirement() > ProposalTier::Basic.quorum_requirement());
+        assert!(ProposalTier::Constitutional.approval_threshold() > ProposalTier::Major.approval_threshold());
+        assert!(ProposalTier::Major.approval_threshold() > ProposalTier::Basic.approval_threshold());
     }
 
     #[test]
