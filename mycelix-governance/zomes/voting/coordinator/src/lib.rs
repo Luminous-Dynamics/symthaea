@@ -730,24 +730,97 @@ pub struct CastQuadraticVoteInput {
     pub reason: Option<String>,
 }
 
-/// Get voter's voice credits (placeholder)
-fn get_voter_credits(_voter_did: &str) -> ExternResult<VoiceCredits> {
-    // In production, this would query the actual voice credits entry
+/// Get voter's current voice credits from DHT
+fn get_voter_credits(voter_did: &str) -> ExternResult<VoiceCredits> {
     let now = sys_time()?;
-    Ok(VoiceCredits {
-        owner: _voter_did.to_string(),
-        allocated: 100,
-        spent: 0,
-        remaining: 100,
-        period_start: now,
-        period_end: Timestamp::from_micros(now.as_micros() + 30 * 24 * 60 * 60 * 1_000_000), // 30 days
-    })
+    let owner_anchor = format!("credits:{}", voter_did);
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&owner_anchor)?, LinkTypes::VoterToVoiceCredits)?,
+        GetStrategy::default(),
+    )?;
+
+    // Find the most recent active (non-expired) credits entry
+    let mut best: Option<VoiceCredits> = None;
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid credits link target".into())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(credits) = record
+                .entry()
+                .to_app_option::<VoiceCredits>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                // Skip expired periods
+                if credits.period_end <= now {
+                    continue;
+                }
+                // Keep the most recently started period
+                match &best {
+                    Some(existing) if existing.period_start >= credits.period_start => {}
+                    _ => best = Some(credits),
+                }
+            }
+        }
+    }
+
+    best.ok_or_else(|| wasm_error!(WasmErrorInner::Guest(format!(
+        "No active voice credits found for voter '{}'. Credits must be allocated via allocate_voice_credits first.",
+        voter_did
+    ))))
 }
 
-/// Spend voter's credits (placeholder)
-fn spend_voter_credits(_voter_did: &str, _amount: u64) -> ExternResult<()> {
-    // In production, this would update the voice credits entry
-    Ok(())
+/// Spend voter's credits by updating the DHT entry
+fn spend_voter_credits(voter_did: &str, amount: u64) -> ExternResult<()> {
+    let now = sys_time()?;
+    let owner_anchor = format!("credits:{}", voter_did);
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&owner_anchor)?, LinkTypes::VoterToVoiceCredits)?,
+        GetStrategy::default(),
+    )?;
+
+    // Find the active credits entry and its action hash for update
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid credits link target".into())))?;
+
+        if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+            if let Some(credits) = record
+                .entry()
+                .to_app_option::<VoiceCredits>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                // Skip expired periods
+                if credits.period_end <= now {
+                    continue;
+                }
+
+                if credits.remaining < amount {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Insufficient credits: {} remaining, {} requested",
+                        credits.remaining, amount
+                    ))));
+                }
+
+                let updated = VoiceCredits {
+                    spent: credits.spent + amount,
+                    remaining: credits.remaining - amount,
+                    ..credits
+                };
+
+                update_entry(action_hash, &EntryTypes::VoiceCredits(updated))?;
+                return Ok(());
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(format!(
+        "No active voice credits found for voter '{}'",
+        voter_did
+    ))))
 }
 
 /// Allocate voice credits to a voter
@@ -792,6 +865,15 @@ pub struct AllocateCreditsInput {
     pub owner_did: String,
     pub amount: u64,
     pub period_end: Timestamp,
+}
+
+/// Query a voter's current voice credit balance
+#[hdk_extern]
+pub fn query_voice_credits(voter_did: String) -> ExternResult<VoiceCredits> {
+    if voter_did.is_empty() || voter_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+    }
+    get_voter_credits(&voter_did)
 }
 
 // ============================================================================
@@ -2609,5 +2691,66 @@ mod tests {
         // The cycle is broken — A is not double-counted
 
         assert_eq!(chain.len(), 3, "Chain should contain A, B, C (no duplicates)");
+    }
+
+    #[test]
+    fn test_voice_credits_spend_updates_balance() {
+        // Verify the VoiceCredits struct correctly tracks spend/remaining
+        let credits = VoiceCredits {
+            owner: "did:test:voter".to_string(),
+            allocated: 100,
+            spent: 0,
+            remaining: 100,
+            period_start: Timestamp::from_micros(0),
+            period_end: Timestamp::from_micros(1_000_000),
+        };
+
+        // Simulate spending 25 credits
+        let after_spend = VoiceCredits {
+            spent: credits.spent + 25,
+            remaining: credits.remaining - 25,
+            ..credits.clone()
+        };
+
+        assert_eq!(after_spend.spent, 25);
+        assert_eq!(after_spend.remaining, 75);
+        assert_eq!(after_spend.allocated, 100);
+        // Integrity invariant: remaining == allocated - spent
+        assert_eq!(after_spend.remaining, after_spend.allocated - after_spend.spent);
+    }
+
+    #[test]
+    fn test_quadratic_weight_calculation() {
+        // √1 = 1, √4 = 2, √9 = 3, √16 = 4, √100 = 10
+        assert!((QuadraticVote::calculate_weight(1) - 1.0).abs() < 1e-10);
+        assert!((QuadraticVote::calculate_weight(4) - 2.0).abs() < 1e-10);
+        assert!((QuadraticVote::calculate_weight(9) - 3.0).abs() < 1e-10);
+        assert!((QuadraticVote::calculate_weight(100) - 10.0).abs() < 1e-10);
+        // Quadratic cost: doubling vote weight from 3→6 costs 9→36 (4x credits)
+        assert!((QuadraticVote::calculate_weight(36) - 6.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_voice_credits_period_expiry() {
+        // Credits with period_end in the past should be considered expired
+        let now_micros = 1_000_000_i64;
+        let now = Timestamp::from_micros(now_micros);
+
+        let expired = VoiceCredits {
+            owner: "did:test:voter".to_string(),
+            allocated: 100,
+            spent: 0,
+            remaining: 100,
+            period_start: Timestamp::from_micros(0),
+            period_end: Timestamp::from_micros(500_000), // ended before now
+        };
+
+        let active = VoiceCredits {
+            period_end: Timestamp::from_micros(2_000_000), // ends after now
+            ..expired.clone()
+        };
+
+        assert!(expired.period_end <= now, "Expired credits should be filtered out");
+        assert!(active.period_end > now, "Active credits should be returned");
     }
 }
