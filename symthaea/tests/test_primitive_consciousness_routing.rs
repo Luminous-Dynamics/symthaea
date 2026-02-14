@@ -70,6 +70,10 @@ fn test_tier_activation_pattern_reflects_input() {
         let timestamp = i as f64;
         let state = processor.process_input(&input, timestamp);
 
+        assert!(state.phi >= 0.0 && state.phi <= 1.0,
+            "Phi should be in [0,1], got {}", state.phi);
+        assert!(state.phi.is_finite(), "Phi should be finite for input {}", label);
+
         println!("Input {}: {} active tiers, phi={:.4}",
             label, state.active_by_tier.len(), state.phi);
     }
@@ -143,6 +147,8 @@ fn test_adaptive_selector_learns_from_feedback() {
 
     // The chain has been created, selector can learn from it
     selector.update_from_chain(&chain, task);
+
+    assert!(chain.total_phi >= 0.0, "Chain total_phi should be non-negative");
 
     println!("✓ Adaptive selector can update from reasoning chain");
 }
@@ -262,13 +268,18 @@ fn test_dominant_tier_detection() {
         ((0..64).map(|_| 0.5).collect::<Vec<_>>(), "Uniform"),
     ];
 
+    let mut results = Vec::new();
     for (semantic, label) in profiles {
-        if let Some(tier) = decomposer.dominant_tier(&semantic) {
-            println!("{} profile → {:?} tier dominant", label, tier);
+        let tier = decomposer.dominant_tier(&semantic);
+        results.push(tier);
+        if let Some(t) = tier {
+            println!("{} profile → {:?} tier dominant", label, t);
         } else {
             println!("{} profile → No dominant tier", label);
         }
     }
+
+    assert_eq!(results.len(), 3, "Should have results for all 3 profiles");
 
     println!("✓ Dominant tier detection works for different profiles");
 }
@@ -300,6 +311,13 @@ fn test_binding_engine_operations() {
 
     for binding_type in binding_types {
         let binding = engine.bind(prim1, prim2, binding_type);
+
+        assert!(binding.strength.is_finite(),
+            "{:?} binding strength should be finite", binding_type);
+        assert!(binding.strength >= 0.0,
+            "{:?} binding strength should be non-negative", binding_type);
+        assert!(binding.phi_contribution.is_finite(),
+            "{:?} phi contribution should be finite", binding_type);
 
         println!("{:?} binding:", binding_type);
         println!("  Strength: {:.4}", binding.strength);
@@ -335,6 +353,13 @@ fn test_binding_affects_affinity() {
 
     // AND should appear in suggestions after repeated binding
     let has_and = suggestions.iter().any(|(n, _)| n == "AND");
+    assert!(has_and, "AND should appear in suggestions after repeated binding");
+
+    for (_, score) in &suggestions {
+        assert!(score.is_finite(), "Suggestion score should be finite");
+        assert!(*score >= 0.0, "Suggestion score should be non-negative");
+    }
+
     println!("AND in suggestions: {}", has_and);
 
     println!("✓ Binding operations affect affinity suggestions");
@@ -413,6 +438,11 @@ fn test_evolution_feedback_mechanism() {
     // Generate primitive feedback
     let prim_feedback = coordinator.generate_primitive_feedback();
 
+    assert!(prim_feedback.primitive_fitness.is_finite(),
+        "Primitive fitness should be finite");
+    assert!(prim_feedback.primitive_fitness >= 0.0 && prim_feedback.primitive_fitness <= 1.0,
+        "Primitive fitness should be in [0,1], got {}", prim_feedback.primitive_fitness);
+
     println!("Generated primitive feedback:");
     println!("  Fitness: {:.4}", prim_feedback.primitive_fitness);
     println!("  New primitives: {:?}", prim_feedback.new_primitives);
@@ -468,7 +498,10 @@ fn test_full_primitive_consciousness_pipeline() {
     println!("6. Evolution stepped: ran = {}", evo_result.primitive_evolution_ran);
 
     // Verify end-to-end data flow
-    assert!(state.phi >= 0.0, "Phi should be valid");
+    assert!(state.phi >= 0.0 && state.phi <= 1.0, "Phi should be in [0,1]");
+    assert!(state.phi.is_finite(), "Phi should be finite");
+    assert!(chain.total_phi >= 0.0, "Chain total_phi should be non-negative");
+    assert!(coordinator.generation() >= 1, "Coordinator should have advanced at least 1 generation");
 
     println!("\n✓ Full primitive → consciousness pipeline test PASSED");
 }

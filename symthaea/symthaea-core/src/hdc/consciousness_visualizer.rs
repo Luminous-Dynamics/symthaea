@@ -365,8 +365,8 @@ mod tests {
         let viz = ConsciousnessVisualizer::new().with_color(false);
 
         for phi in [0.1, 0.3, 0.5, 0.7, 0.9] {
-            println!("Φ = {}", phi);
-            println!("{}", viz.render_phi_meter(phi));
+            let meter = viz.render_phi_meter(phi);
+            assert!(!meter.is_empty(), "Phi meter for {} should be non-empty", phi);
         }
     }
 
@@ -376,7 +376,7 @@ mod tests {
         let values = vec![0.3, 0.35, 0.4, 0.45, 0.5, 0.48, 0.52, 0.55, 0.5, 0.45];
 
         let sparkline = viz.render_sparkline(&values, "Φ");
-        println!("{}", sparkline);
+        assert!(!sparkline.is_empty(), "Sparkline should be non-empty");
     }
 
     #[test]
@@ -386,11 +386,13 @@ mod tests {
         let high = ConsciousnessDimensions {
             phi: 0.7, workspace: 0.6, ..Default::default()
         };
-        println!("High integration:{}", viz.render_mandala(&high));
+        let high_mandala = viz.render_mandala(&high);
+        assert!(!high_mandala.is_empty(), "High integration mandala should be non-empty");
 
         let low = ConsciousnessDimensions {
             phi: 0.2, workspace: 0.2, ..Default::default()
         };
-        println!("Low integration:{}", viz.render_mandala(&low));
+        let low_mandala = viz.render_mandala(&low);
+        assert!(!low_mandala.is_empty(), "Low integration mandala should be non-empty");
     }
 }

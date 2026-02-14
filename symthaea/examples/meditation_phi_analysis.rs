@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::RealPhiCalculator,
+    spectral_connectivity::ConnectivityCalculator,
     HDC_DIMENSION,
 };
 
@@ -89,7 +89,7 @@ struct AggregateStats {
 /// Analyze a single subject's meditation session
 fn analyze_subject(
     subject_dir: &Path,
-    calc: &RealPhiCalculator,
+    calc: &ConnectivityCalculator,
     dim: usize,
 ) -> Option<SubjectResults> {
     let subject_id = subject_dir.file_name()?.to_str()?;
@@ -225,7 +225,7 @@ fn main() {
         println!();
     }
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
     let dim = HDC_DIMENSION;
 
     // Collect all subject directories

@@ -608,16 +608,6 @@ impl BinaryHV {
         Self(result)
     }
 
-    /// Alias for [`permute`] - the fast implementation is now the default.
-    ///
-    /// This method exists for backward compatibility. New code should use
-    /// [`permute`] directly.
-    #[inline]
-    #[deprecated(since = "0.6.0", note = "permute() now uses the fast implementation by default")]
-    pub fn permute_fast(&self, shift: usize) -> Self {
-        self.permute(shift)
-    }
-
     /// N-gram sequence encoding
     ///
     /// Encodes an ordered sequence of vectors using the standard HDC n-gram:
@@ -1577,10 +1567,13 @@ mod tests {
         println!("  Hub ↔ Bind(Hub, R2): {:.4}", sim_hub_bound2);
         println!("  Bind(Hub, R1) ↔ Bind(Hub, R2): {:.4}", sim_bound1_bound2);
 
-        println!("\n💡 Insight:");
-        println!("  All similarities are ~0.5, which is expected for XOR with random vectors.");
-        println!("  BIND creates correlation, but not the heterogeneous structure needed.");
-        println!("{}", "=".repeat(80));
+        // XOR (bind) with random vectors should produce ~0.5 similarity
+        assert!((sim_hub_bound1 - 0.5).abs() < 0.1,
+            "Hub-Bind similarity should be near 0.5, got {}", sim_hub_bound1);
+        assert!((sim_hub_bound2 - 0.5).abs() < 0.1,
+            "Hub-Bind similarity should be near 0.5, got {}", sim_hub_bound2);
+        assert!((sim_bound1_bound2 - 0.5).abs() < 0.1,
+            "Bind-Bind similarity should be near 0.5, got {}", sim_bound1_bound2);
     }
 
     /// PERMUTE HYPOTHESIS TEST: Does PERMUTE create heterogeneous similarity?
@@ -2555,7 +2548,3 @@ mod tests {
     }
 }
 
-/// Backward-compatible alias: `HV16` is now `BinaryHV`.
-/// Use `BinaryHV` directly in new code.
-#[deprecated(since = "0.5.0", note = "renamed to BinaryHV — use BinaryHV instead")]
-pub type HV16 = BinaryHV;

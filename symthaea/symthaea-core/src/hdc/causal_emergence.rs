@@ -38,7 +38,7 @@
 
 use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
-use crate::hdc::phi_real::RealPhiCalculator;
+use crate::hdc::spectral_connectivity::ConnectivityCalculator;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for emergence detection
@@ -116,7 +116,7 @@ pub struct Partition {
 #[derive(Debug)]
 pub struct CausalEmergenceDetector {
     config: EmergenceConfig,
-    phi_calculator: RealPhiCalculator,
+    phi_calculator: ConnectivityCalculator,
 }
 
 impl CausalEmergenceDetector {
@@ -124,7 +124,7 @@ impl CausalEmergenceDetector {
     pub fn new(config: EmergenceConfig) -> Self {
         Self {
             config,
-            phi_calculator: RealPhiCalculator::new(),
+            phi_calculator: ConnectivityCalculator::new(),
         }
     }
 

@@ -119,19 +119,15 @@ impl PhysicsConsciousnessBridge {
         }
     }
 
-    /// Measure phenomenal character of a vector
+    /// Estimate phenomenal character of a vector via concept similarity.
     ///
-    /// How similar is this vector to phenomenal vs functional concepts?
+    /// Computes how similar this vector is to phenomenal vs functional concepts.
+    /// Range: -1 (fully functional) to +1 (fully phenomenal).
     ///
-    /// Note: This measures similarity to labeled concept vectors (qualia, awareness, etc.)
-    /// which is somewhat circular. For a more rigorous measure based on Shannon entropy
-    /// and information integration, use `EmergenceChain::phenomenal_index_rigorous()`.
-    #[deprecated(
-        since = "0.6.0",
-        note = "Use EmergenceChain::phenomenal_index_rigorous() for entropy-based computation. \
-                This method relies on concept vector similarity which may be circular."
-    )]
-    pub fn phenomenal_index(&self, vector: &ContinuousHV) -> f32 {
+    /// This is a fast heuristic based on labeled concept vector similarity.
+    /// For rigorous measurement based on Shannon entropy and information
+    /// integration, use `EmergenceChain::phenomenal_index_rigorous()`.
+    pub fn estimate_phenomenal_index(&self, vector: &ContinuousHV) -> f32 {
         let phenomenal_sim = (
             vector.similarity(&self.qualia)
             + vector.similarity(&self.awareness)
@@ -614,9 +610,8 @@ impl PhysicsConsciousnessBridge {
     }
 
     /// Create a temporal consciousness state from a physical vector
-    #[allow(deprecated)]
     pub fn create_conscious_state(&self, physical: &ContinuousHV, time: f64) -> TemporalConsciousnessState {
-        let phenomenal_index = self.phenomenal_index(physical);
+        let phenomenal_index = self.estimate_phenomenal_index(physical);
         TemporalConsciousnessState {
             state: physical.clone(),
             time,
@@ -674,15 +669,14 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_phenomenal_index() {
         let (_, _, _, _, bridge, _) = setup();
 
         // Qualia should have high phenomenal index
-        let qualia_index = bridge.phenomenal_index(&bridge.qualia);
+        let qualia_index = bridge.estimate_phenomenal_index(&bridge.qualia);
 
         // Computation should have low phenomenal index
-        let comp_index = bridge.phenomenal_index(&bridge.computation);
+        let comp_index = bridge.estimate_phenomenal_index(&bridge.computation);
 
         assert!(
             qualia_index > comp_index,
@@ -730,7 +724,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_embody_qualia() {
         let (model, _, _, _, bridge, _) = setup();
 
@@ -745,8 +738,8 @@ mod tests {
         );
 
         // Should have some phenomenal character
-        let phen_index = bridge.phenomenal_index(&embodied);
-        let electron_index = bridge.phenomenal_index(&model.electron);
+        let phen_index = bridge.estimate_phenomenal_index(&embodied);
+        let electron_index = bridge.estimate_phenomenal_index(&model.electron);
 
         // Embodiment should increase phenomenal index
         assert!(

@@ -12,7 +12,7 @@ Memory IS computation — no separate storage needed!
   Used for gradient-based learning, Φ computation, and smooth transformations.
 - [`HV`] — Unified enum wrapping both representations for polymorphic APIs.
 
-Backward-compatible aliases: `HV16 = BinaryHV`, `RealHV = ContinuousHV`.
+Backward-compatible alias: `RealHV = ContinuousHV`.
 
 ## Key Submodules
 
@@ -434,8 +434,6 @@ pub mod quantum_circuit;                   // Quantum circuit simulation engine 
 
 // Re-export BinaryHV at module level for convenience (used by language/nix_* modules)
 pub use binary_hv::BinaryHV;
-#[allow(deprecated)]
-pub use binary_hv::HV16;
 // Backward compat: RealHV alias is still available via real_hv module
 
 // Re-export unified HV types
@@ -737,9 +735,6 @@ pub use consciousness_topology_generators::{ConsciousnessTopology, TopologyType}
 // Re-export phi calculators
 // Re-export spectral connectivity calculator (renamed from phi_real)
 pub use spectral_connectivity::ConnectivityCalculator;
-#[allow(deprecated)]  // Intentional backward compatibility re-export
-#[deprecated(since = "0.5.0", note = "Use ConnectivityCalculator from spectral_connectivity - this measures λ₂, NOT IIT Φ")]
-pub use spectral_connectivity::RealPhiCalculator;  // Backward compatibility alias
 pub use tiered_phi::{TieredPhi, ApproximationTier};
 
 // Re-export autodiff Phi types (reverse-mode autodiff for consciousness optimization)

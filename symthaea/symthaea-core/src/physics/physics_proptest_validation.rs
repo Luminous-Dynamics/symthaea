@@ -539,31 +539,40 @@ proptest! {
         }
     }
 
-    /// Logistic map Lyapunov exponent at r=4 is exactly ln(2) ≈ 0.693
+    /// Logistic map Lyapunov exponent at r=4 is exactly ln(2) ≈ 0.693.
+    /// At r=4 the map is fully chaotic for all x0 in (0,1), so we fix r=4
+    /// and vary the initial condition to avoid narrow periodic windows
+    /// that exist for r slightly below 4.
     #[test]
     fn prop_logistic_lyapunov_positive_chaos(
-        r in 3.999_f64..4.0,
+        x0 in 0.01_f64..0.99,
     ) {
+        let r = 4.0;
         let n_transient = 1000;
         let n_calc = 10000;
-        let mut x = 0.4;
+        let mut x = x0;
 
         for _ in 0..n_transient {
             x = systems::logistic(x, r);
         }
 
         let mut lambda_sum = 0.0;
+        let mut n_counted = 0u64;
         for _ in 0..n_calc {
             let derivative = (r * (1.0 - 2.0 * x)).abs();
             if derivative > 1e-15 {
                 lambda_sum += derivative.ln();
+                n_counted += 1;
             }
             x = systems::logistic(x, r);
         }
 
-        let lambda = lambda_sum / n_calc as f64;
+        // Guard against degenerate orbits (should not happen at r=4)
+        prop_assume!(n_counted > (n_calc as u64) / 2);
+
+        let lambda = lambda_sum / n_counted as f64;
         prop_assert!(lambda > 0.5,
-            "Logistic Lyapunov near r=4 should be > 0.5, got {lambda} at r={r}");
+            "Logistic Lyapunov at r=4 should be > 0.5 (ln(2) ≈ 0.693), got {lambda} at x0={x0}");
     }
 }
 

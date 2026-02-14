@@ -399,10 +399,9 @@ mod tests {
             optimizer.optimize_step();
         }
 
-        // Should have stored some high-Φ states
-        // (May be 0 if Φ never exceeded 0.5, which is possible with random initialization)
-        let _num_stored = optimizer.num_stored_states();
-        // Just check the method works - value can be 0 with random initialization
+        // Stored states should not exceed the number of optimization steps
+        let num_stored = optimizer.num_stored_states();
+        assert!(num_stored <= 30, "Stored states ({}) should not exceed optimization steps (30)", num_stored);
     }
 
     #[test]

@@ -14,7 +14,7 @@
 //! | [`ContinuousHV`](hdc::ContinuousHV) | `Vec<f32>`, configurable dimension | Gradients, phi computation, learning |
 //! | [`HV`](hdc::HV) | Enum wrapping both | Unified API across representations |
 //!
-//! Backward-compatible aliases `HV16` and `RealHV` are available but new code should
+//! Backward-compatible alias `RealHV` is available but new code should
 //! use `BinaryHV` and `ContinuousHV` directly.
 //!
 //! ## Modules

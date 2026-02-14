@@ -250,11 +250,6 @@ impl Default for ConnectivityCalculator {
 // BACKWARD COMPATIBILITY ALIASES
 // ============================================================================
 
-/// Deprecated type alias for backward compatibility
-///
-/// Use `ConnectivityCalculator` instead. This alias will be removed in v1.0.0.
-#[deprecated(since = "0.5.0", note = "Use ConnectivityCalculator instead - this measures λ₂, NOT IIT Φ")]
-pub type RealPhiCalculator = ConnectivityCalculator;
 
 #[cfg(test)]
 mod tests {

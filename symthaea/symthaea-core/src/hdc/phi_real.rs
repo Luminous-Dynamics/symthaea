@@ -49,14 +49,11 @@ mod tests {
     #[test]
     fn test_phi_real_reexports_calculator() {
         let calc = ConnectivityCalculator::new();
-        let _ = calc;
+        let result = calc.algebraic_connectivity(&[]);
+        assert_eq!(result, 0.0, "Empty input should produce 0.0 connectivity");
     }
 
-    #[test]
-    fn test_phi_real_reexports_type_alias() {
-        let calc = RealPhiCalculator::new();
-        let _ = calc;
-    }
+
 
     #[test]
     fn test_phi_real_algebraic_connectivity_empty() {

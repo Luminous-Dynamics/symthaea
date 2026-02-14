@@ -515,12 +515,16 @@ mod tests {
         let capture_target = ContinuousHV::random(1024, 100);
         attention.add_target(capture_target.clone(), 0.95);
 
-        println!("\nAttention Capture Test:");
-        for i in 0..10 {
+        let mut saw_spotlight = false;
+        for _ in 0..10 {
             let alloc = attention.step(None);
-            println!("Step {}: mode={:?}, entropy={:.3}",
-                    i, alloc.mode, alloc.entropy);
+            assert!(alloc.entropy.is_finite(), "Entropy should be finite");
+            assert!(alloc.entropy >= 0.0, "Entropy should be non-negative");
+            if matches!(alloc.mode, AttentionMode::Spotlight) {
+                saw_spotlight = true;
+            }
         }
+        assert!(saw_spotlight, "High salience target should trigger spotlight mode");
     }
 
     #[test]
@@ -532,19 +536,22 @@ mod tests {
             attention.add_target(ContinuousHV::random(1024, i), 0.5);
         }
 
-        println!("\nMode Transition Test:");
-
         for _ in 0..5 {
             let alloc = attention.step(None);
-            println!("Diffuse phase: {:?}", alloc.mode);
+            assert!(alloc.entropy.is_finite(), "Entropy should be finite in diffuse phase");
         }
 
         // Boost one target -> should become spotlight
         attention.targets[0].salience = 0.95;
 
-        for i in 0..10 {
+        let mut saw_spotlight = false;
+        for _ in 0..10 {
             let alloc = attention.step(None);
-            println!("Step {}: {:?}, entropy={:.3}", i, alloc.mode, alloc.entropy);
+            assert!(alloc.entropy.is_finite(), "Entropy should be finite after boost");
+            if matches!(alloc.mode, AttentionMode::Spotlight) {
+                saw_spotlight = true;
+            }
         }
+        assert!(saw_spotlight, "Boosting salience should trigger spotlight mode");
     }
 }
