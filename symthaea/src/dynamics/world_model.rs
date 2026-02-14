@@ -19,7 +19,7 @@
 //! └────────────────────────────────────────────────────────────┘
 //! ```
 
-use crate::dynamics::cfc::{CfCNetwork, CfCNetworkConfig, CfCConfig};
+use crate::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
 use crate::dynamics::CrystalizedConcept;
 use ndarray::{Array1, Array2};
 use rand::Rng;
@@ -177,7 +177,12 @@ impl WorldModelLayer {
 
         // Update statistics
         self.stats.updates += 1;
-        let error_norm: f32 = self.prediction_error.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let error_norm: f32 = self
+            .prediction_error
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
         // Use exponential moving average (EMA) instead of running average.
         // Running average (n-1)/n freezes when n > ~16M because (n-1)/n == 1.0 in f32.
         const EMA_ALPHA: f32 = 0.001;
@@ -329,7 +334,12 @@ impl HierarchicalCfCWorldModel {
             let layer_label = format!("{}::layer_{}", label, i);
 
             layers.push(WorldModelLayer::from_genesis(
-                i, input_dim, hidden_dim, time_scale, genesis, &layer_label,
+                i,
+                input_dim,
+                hidden_dim,
+                time_scale,
+                genesis,
+                &layer_label,
             ));
         }
 
@@ -388,7 +398,12 @@ impl HierarchicalCfCWorldModel {
 
         // Top-down processing if bidirectional
         if self.config.bidirectional {
-            let mut top_down = self.layers.last().expect("layers always has at least one entry").state().clone();
+            let mut top_down = self
+                .layers
+                .last()
+                .expect("layers always has at least one entry")
+                .state()
+                .clone();
 
             for i in (0..self.down_projections.len()).rev() {
                 top_down = self.down_projections[i].dot(&top_down);
@@ -403,7 +418,11 @@ impl HierarchicalCfCWorldModel {
         self.stats.total_updates += 1;
 
         // Return top-level representation
-        self.layers.last().expect("layers always has at least one entry").state().clone()
+        self.layers
+            .last()
+            .expect("layers always has at least one entry")
+            .state()
+            .clone()
     }
 
     /// Make predictions at all levels
@@ -414,7 +433,9 @@ impl HierarchicalCfCWorldModel {
     /// # Returns
     /// Predictions at each level (ordered from lowest to highest)
     pub fn predict(&mut self, dt: f32) -> Vec<Array1<f32>> {
-        let predictions: Vec<_> = self.layers.iter_mut()
+        let predictions: Vec<_> = self
+            .layers
+            .iter_mut()
             .map(|layer| layer.predict(dt))
             .collect();
 
@@ -471,13 +492,17 @@ impl HierarchicalCfCWorldModel {
             return Vec::new();
         }
 
-        let mut similarities: Vec<_> = self.concepts.values()
+        let mut similarities: Vec<_> = self
+            .concepts
+            .values()
             .filter_map(|concept| {
                 if concept.embedding.len() != embedding.len() {
                     return None;
                 }
 
-                let dot: f32 = concept.embedding.iter()
+                let dot: f32 = concept
+                    .embedding
+                    .iter()
                     .zip(embedding.iter())
                     .map(|(a, b)| a * b)
                     .sum();
@@ -541,9 +566,7 @@ impl HierarchicalCfCWorldModel {
         }
 
         let mean = states.iter().sum::<f32>() / states.len() as f32;
-        let variance = states.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f32>() / states.len() as f32;
+        let variance = states.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / states.len() as f32;
 
         // Normalize to 0-1 range using sigmoid-like function
         let normalized = (variance * 10.0).tanh();

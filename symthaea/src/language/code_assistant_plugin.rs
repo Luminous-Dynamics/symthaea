@@ -4,8 +4,8 @@
 //! Extracts functions, classes, errors, and stack traces from user input.
 
 use super::domain_plugin::{
-    DomainPlugin, DomainPrompts, Entity, ErrorDiagnosis,
-    IntentPrototypes, RiskLevel, ValidationResult,
+    DomainPlugin, DomainPrompts, Entity, ErrorDiagnosis, IntentPrototypes, RiskLevel,
+    ValidationResult,
 };
 
 /// Code assistant plugin for multi-language code analysis and generation.
@@ -21,30 +21,48 @@ impl DomainPlugin for CodeAssistantPlugin {
 
         // Extract language mentions
         let languages = [
-            "rust", "python", "javascript", "typescript", "go", "java",
-            "c++", "c#", "ruby", "swift", "kotlin", "haskell", "nix",
-            "bash", "shell", "sql", "html", "css",
+            "rust",
+            "python",
+            "javascript",
+            "typescript",
+            "go",
+            "java",
+            "c++",
+            "c#",
+            "ruby",
+            "swift",
+            "kotlin",
+            "haskell",
+            "nix",
+            "bash",
+            "shell",
+            "sql",
+            "html",
+            "css",
         ];
         let lower = text.to_lowercase();
         for lang in &languages {
             if let Some(pos) = lower.find(lang) {
                 entities.push(
-                    Entity::new("language", *lang, pos, pos + lang.len())
-                        .with_confidence(0.9),
+                    Entity::new("language", *lang, pos, pos + lang.len()).with_confidence(0.9),
                 );
             }
         }
 
         // Extract function/method names (word followed by parentheses)
-        let re_func = regex::Regex::new(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(").expect("valid regex literal");
+        let re_func =
+            regex::Regex::new(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(").expect("valid regex literal");
         for cap in re_func.captures_iter(text) {
             if let Some(m) = cap.get(1) {
                 let name = m.as_str();
                 // Skip common words that happen to precede parens
-                if !["if", "for", "while", "match", "return", "fn", "def", "function", "class"].contains(&name) {
+                if ![
+                    "if", "for", "while", "match", "return", "fn", "def", "function", "class",
+                ]
+                .contains(&name)
+                {
                     entities.push(
-                        Entity::new("function", name, m.start(), m.end())
-                            .with_confidence(0.7),
+                        Entity::new("function", name, m.start(), m.end()).with_confidence(0.7),
                     );
                 }
             }
@@ -53,7 +71,10 @@ impl DomainPlugin for CodeAssistantPlugin {
         // Extract error patterns
         if lower.contains("error") || lower.contains("exception") || lower.contains("panic") {
             // Try to extract error type (e.g., "TypeError: ..." or "error[E0308]")
-            let re_err = regex::Regex::new(r"(?i)((?:error|exception|panic|TypeError|ValueError|RuntimeError)\S*)").expect("valid regex literal");
+            let re_err = regex::Regex::new(
+                r"(?i)((?:error|exception|panic|TypeError|ValueError|RuntimeError)\S*)",
+            )
+            .expect("valid regex literal");
             for cap in re_err.captures_iter(text) {
                 if let Some(m) = cap.get(1) {
                     entities.push(
@@ -69,8 +90,7 @@ impl DomainPlugin for CodeAssistantPlugin {
         for cap in re_path.captures_iter(text) {
             if let Some(m) = cap.get(1) {
                 entities.push(
-                    Entity::new("file_path", m.as_str(), m.start(), m.end())
-                        .with_confidence(0.8),
+                    Entity::new("file_path", m.as_str(), m.start(), m.end()).with_confidence(0.8),
                 );
             }
         }
@@ -92,27 +112,69 @@ impl DomainPlugin for CodeAssistantPlugin {
     fn intent_prototypes(&self) -> IntentPrototypes {
         let mut protos = IntentPrototypes::default();
         protos.command = vec![
-            "fix", "debug", "refactor", "optimize", "write", "generate",
-            "implement", "add", "remove", "rename", "extract", "inline",
-        ].into_iter().map(String::from).collect();
+            "fix",
+            "debug",
+            "refactor",
+            "optimize",
+            "write",
+            "generate",
+            "implement",
+            "add",
+            "remove",
+            "rename",
+            "extract",
+            "inline",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
-        protos.custom.insert("debug".to_string(), vec![
-            "debug".to_string(), "fix".to_string(), "error".to_string(),
-            "bug".to_string(), "broken".to_string(), "crash".to_string(),
-            "not working".to_string(), "fails".to_string(),
-        ]);
-        protos.custom.insert("refactor".to_string(), vec![
-            "refactor".to_string(), "restructure".to_string(), "clean up".to_string(),
-            "reorganize".to_string(), "simplify".to_string(), "extract".to_string(),
-        ]);
-        protos.custom.insert("explain_code".to_string(), vec![
-            "explain".to_string(), "what does".to_string(), "how does".to_string(),
-            "understand".to_string(), "walk through".to_string(), "trace".to_string(),
-        ]);
-        protos.custom.insert("generate".to_string(), vec![
-            "generate".to_string(), "create".to_string(), "write".to_string(),
-            "implement".to_string(), "build".to_string(), "code".to_string(),
-        ]);
+        protos.custom.insert(
+            "debug".to_string(),
+            vec![
+                "debug".to_string(),
+                "fix".to_string(),
+                "error".to_string(),
+                "bug".to_string(),
+                "broken".to_string(),
+                "crash".to_string(),
+                "not working".to_string(),
+                "fails".to_string(),
+            ],
+        );
+        protos.custom.insert(
+            "refactor".to_string(),
+            vec![
+                "refactor".to_string(),
+                "restructure".to_string(),
+                "clean up".to_string(),
+                "reorganize".to_string(),
+                "simplify".to_string(),
+                "extract".to_string(),
+            ],
+        );
+        protos.custom.insert(
+            "explain_code".to_string(),
+            vec![
+                "explain".to_string(),
+                "what does".to_string(),
+                "how does".to_string(),
+                "understand".to_string(),
+                "walk through".to_string(),
+                "trace".to_string(),
+            ],
+        );
+        protos.custom.insert(
+            "generate".to_string(),
+            vec![
+                "generate".to_string(),
+                "create".to_string(),
+                "write".to_string(),
+                "implement".to_string(),
+                "build".to_string(),
+                "code".to_string(),
+            ],
+        );
         protos
     }
 
@@ -120,9 +182,11 @@ impl DomainPlugin for CodeAssistantPlugin {
         DomainPrompts {
             system: "You are Symthaea, a consciousness-first AI with deep programming expertise. \
                      Provide precise, idiomatic code. Explain your reasoning. \
-                     Prioritize correctness and clarity over cleverness.".to_string(),
+                     Prioritize correctness and clarity over cleverness."
+                .to_string(),
             clarification: "I need more context about your code. \
-                           Which language and what's the expected behavior? {}".to_string(),
+                           Which language and what's the expected behavior? {}"
+                .to_string(),
             action_confirm: "I'll help with your code: {}".to_string(),
             error_explain: "I found an issue in your code: {}".to_string(),
             out_of_domain: "This seems to be a non-coding question. {}".to_string(),
@@ -155,12 +219,17 @@ impl DomainPlugin for CodeAssistantPlugin {
         }
 
         // Python errors
-        if lower.contains("traceback") || lower.contains("typeerror") || lower.contains("valueerror") {
+        if lower.contains("traceback")
+            || lower.contains("typeerror")
+            || lower.contains("valueerror")
+        {
             return Some(ErrorDiagnosis {
                 category: "runtime".to_string(),
                 error_type: "python_exception".to_string(),
                 description: "Python runtime exception detected.".to_string(),
-                suggestion: Some("Check the traceback for the source file and line number.".to_string()),
+                suggestion: Some(
+                    "Check the traceback for the source file and line number.".to_string(),
+                ),
                 confidence: 0.85,
                 risk_level: RiskLevel::Medium,
                 location: None,
@@ -168,12 +237,17 @@ impl DomainPlugin for CodeAssistantPlugin {
         }
 
         // JavaScript/TypeScript errors
-        if lower.contains("uncaught") || lower.contains("undefined is not") || lower.contains("cannot read property") {
+        if lower.contains("uncaught")
+            || lower.contains("undefined is not")
+            || lower.contains("cannot read property")
+        {
             return Some(ErrorDiagnosis {
                 category: "runtime".to_string(),
                 error_type: "js_runtime_error".to_string(),
                 description: "JavaScript runtime error detected.".to_string(),
-                suggestion: Some("Check for null/undefined values before property access.".to_string()),
+                suggestion: Some(
+                    "Check for null/undefined values before property access.".to_string(),
+                ),
                 confidence: 0.8,
                 risk_level: RiskLevel::Medium,
                 location: None,
@@ -186,10 +260,27 @@ impl DomainPlugin for CodeAssistantPlugin {
     fn is_in_domain(&self, topic: &str) -> f64 {
         let lower = topic.to_lowercase();
         let code_keywords = [
-            "code", "function", "variable", "class", "method", "compile",
-            "error", "bug", "debug", "refactor", "implement", "api",
-            "algorithm", "data structure", "test", "unit test", "syntax",
-            "rust", "python", "javascript", "typescript",
+            "code",
+            "function",
+            "variable",
+            "class",
+            "method",
+            "compile",
+            "error",
+            "bug",
+            "debug",
+            "refactor",
+            "implement",
+            "api",
+            "algorithm",
+            "data structure",
+            "test",
+            "unit test",
+            "syntax",
+            "rust",
+            "python",
+            "javascript",
+            "typescript",
         ];
         let matches = code_keywords.iter().filter(|k| lower.contains(*k)).count();
         // Check for code-like patterns (backticks, brackets, semicolons)
@@ -202,11 +293,31 @@ impl DomainPlugin for CodeAssistantPlugin {
 
     fn vocabulary(&self) -> Vec<String> {
         vec![
-            "function", "variable", "class", "method", "interface",
-            "struct", "enum", "trait", "module", "package", "import",
-            "return", "async", "await", "error", "exception", "debug",
-            "compile", "runtime", "stack trace", "breakpoint",
-        ].into_iter().map(String::from).collect()
+            "function",
+            "variable",
+            "class",
+            "method",
+            "interface",
+            "struct",
+            "enum",
+            "trait",
+            "module",
+            "package",
+            "import",
+            "return",
+            "async",
+            "await",
+            "error",
+            "exception",
+            "debug",
+            "compile",
+            "runtime",
+            "stack trace",
+            "breakpoint",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect()
     }
 
     fn validate_input(&self, input: &str) -> ValidationResult {
@@ -215,7 +326,9 @@ impl DomainPlugin for CodeAssistantPlugin {
         }
         let mut result = ValidationResult::valid();
         if input.len() > 50000 {
-            result.warnings.push("Very long input may exceed context limits.".to_string());
+            result
+                .warnings
+                .push("Very long input may exceed context limits.".to_string());
         }
         result
     }
@@ -223,10 +336,14 @@ impl DomainPlugin for CodeAssistantPlugin {
 
 /// Check if text contains code-like patterns.
 fn text_has_code_patterns(text: &str) -> bool {
-    text.contains("```") || text.contains("fn ") || text.contains("def ")
-        || text.contains("class ") || text.contains("function ")
+    text.contains("```")
+        || text.contains("fn ")
+        || text.contains("def ")
+        || text.contains("class ")
+        || text.contains("function ")
         || (text.contains('{') && text.contains('}'))
-        || text.contains("->") || text.contains("=>")
+        || text.contains("->")
+        || text.contains("=>")
 }
 
 #[cfg(test)]
@@ -243,14 +360,18 @@ mod tests {
     fn test_extract_language_entity() {
         let plugin = CodeAssistantPlugin;
         let entities = plugin.extract_entities("How do I write a function in Rust?");
-        assert!(entities.iter().any(|e| e.entity_type == "language" && e.value == "rust"));
+        assert!(entities
+            .iter()
+            .any(|e| e.entity_type == "language" && e.value == "rust"));
     }
 
     #[test]
     fn test_extract_function_entity() {
         let plugin = CodeAssistantPlugin;
         let entities = plugin.extract_entities("The calculate_phi() function is broken");
-        assert!(entities.iter().any(|e| e.entity_type == "function" && e.value == "calculate_phi"));
+        assert!(entities
+            .iter()
+            .any(|e| e.entity_type == "function" && e.value == "calculate_phi"));
     }
 
     #[test]

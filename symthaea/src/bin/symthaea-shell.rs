@@ -43,29 +43,38 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use symthaea::shell::{
-    ShellContext, IntelliSenseEngine, PhiGate, GateDecision,
-    Completion, CompletionKind,
-    classify_command_destructiveness,
-    ipc_client::{
-        ShellIpcClient, ConnectionState,
-        discover_socket, MetricsSnapshot,
-    },
-    // B5: Epistemic Overlays
-    EpistemicOverlayEngine, EpistemicOverlay, EpistemicStyle,
-    OverlayPosition, OverlayType, KnowledgeSource, CommandContext,
-    // B6: Session Persistence
-    StateManager,
-    // B7: Live Flake Context
-    FlakeContext, SuggestionSource,
-    // B8: Error Explanation
-    ErrorExplainer, ErrorExplanation,
-    // B9: What-If Simulation
-    WhatIfSimulator, WhatIfResult,
-};
-use symthaea::action::DestructivenessLevel;
 use std::path::PathBuf;
 use std::sync::Arc;
+use symthaea::action::DestructivenessLevel;
+use symthaea::shell::{
+    classify_command_destructiveness,
+    ipc_client::{discover_socket, ConnectionState, MetricsSnapshot, ShellIpcClient},
+    CommandContext,
+    Completion,
+    CompletionKind,
+    EpistemicOverlay,
+    // B5: Epistemic Overlays
+    EpistemicOverlayEngine,
+    EpistemicStyle,
+    // B8: Error Explanation
+    ErrorExplainer,
+    ErrorExplanation,
+    // B7: Live Flake Context
+    FlakeContext,
+    GateDecision,
+    IntelliSenseEngine,
+    KnowledgeSource,
+    OverlayPosition,
+    OverlayType,
+    PhiGate,
+    ShellContext,
+    // B6: Session Persistence
+    StateManager,
+    SuggestionSource,
+    WhatIfResult,
+    // B9: What-If Simulation
+    WhatIfSimulator,
+};
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
 
@@ -211,9 +220,9 @@ struct PendingCommand {
 /// Risk level for pending commands
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RiskLevel {
-    Low,      // Reversible operations
-    Medium,   // Needs confirmation but recoverable
-    High,     // Destructive, non-reversible
+    Low,    // Reversible operations
+    Medium, // Needs confirmation but recoverable
+    High,   // Destructive, non-reversible
 }
 
 /// B3: Command preview showing what a command will do
@@ -281,17 +290,17 @@ enum ShellMode {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(dead_code)]
 enum NixToken {
-    Keyword,      // let, in, if, then, else, with, inherit, rec
-    Builtin,      // builtins, import, fetchurl, derivation
-    String,       // "..." or ''...''
-    Path,         // ./path or /absolute/path
-    Comment,      // # comment
-    Operator,     // = : ; { } [ ] @ ? //
-    Number,       // 123, 1.5
-    Identifier,   // variable names
-    Attribute,    // attr.path
-    Boolean,      // true, false, null
-    Normal,       // default
+    Keyword,    // let, in, if, then, else, with, inherit, rec
+    Builtin,    // builtins, import, fetchurl, derivation
+    String,     // "..." or ''...''
+    Path,       // ./path or /absolute/path
+    Comment,    // # comment
+    Operator,   // = : ; { } [ ] @ ? //
+    Number,     // 123, 1.5
+    Identifier, // variable names
+    Attribute,  // attr.path
+    Boolean,    // true, false, null
+    Normal,     // default
 }
 
 #[allow(dead_code)]
@@ -320,16 +329,37 @@ struct NixHighlighter;
 #[allow(dead_code)]
 impl NixHighlighter {
     const KEYWORDS: &'static [&'static str] = &[
-        "let", "in", "if", "then", "else", "with", "inherit", "rec",
-        "assert", "or", "and", "import", "throw", "abort",
+        "let", "in", "if", "then", "else", "with", "inherit", "rec", "assert", "or", "and",
+        "import", "throw", "abort",
     ];
 
     const BUILTINS: &'static [&'static str] = &[
-        "builtins", "fetchurl", "fetchTarball", "fetchGit", "derivation",
-        "toString", "toJSON", "fromJSON", "map", "filter", "foldl'",
-        "pkgs", "lib", "config", "options", "nixpkgs", "mkOption",
-        "mkIf", "mkMerge", "mkDefault", "mkForce", "mkOverride",
-        "services", "programs", "environment", "systemPackages",
+        "builtins",
+        "fetchurl",
+        "fetchTarball",
+        "fetchGit",
+        "derivation",
+        "toString",
+        "toJSON",
+        "fromJSON",
+        "map",
+        "filter",
+        "foldl'",
+        "pkgs",
+        "lib",
+        "config",
+        "options",
+        "nixpkgs",
+        "mkOption",
+        "mkIf",
+        "mkMerge",
+        "mkDefault",
+        "mkForce",
+        "mkOverride",
+        "services",
+        "programs",
+        "environment",
+        "systemPackages",
     ];
 
     fn highlight(input: &str) -> Vec<(String, NixToken)> {
@@ -347,7 +377,11 @@ impl NixHighlighter {
                     }
                     let mut s = String::from(c);
                     while let Some(&nc) = chars.peek() {
-                        s.push(chars.next().expect("peek() returned Some so next() must succeed"));
+                        s.push(
+                            chars
+                                .next()
+                                .expect("peek() returned Some so next() must succeed"),
+                        );
                         if nc == '"' && !s.ends_with("\\\"") {
                             break;
                         }
@@ -365,13 +399,16 @@ impl NixHighlighter {
                         if nc == '\n' {
                             break;
                         }
-                        s.push(chars.next().expect("peek() returned Some so next() must succeed"));
+                        s.push(
+                            chars
+                                .next()
+                                .expect("peek() returned Some so next() must succeed"),
+                        );
                     }
                     tokens.push((s, NixToken::Comment));
                 }
                 // Operators and punctuation
-                '=' | ':' | ';' | '{' | '}' | '[' | ']' | '(' | ')' |
-                '@' | '?' | ',' | '.' => {
+                '=' | ':' | ';' | '{' | '}' | '[' | ']' | '(' | ')' | '@' | '?' | ',' | '.' => {
                     if !current.is_empty() {
                         tokens.push((current.clone(), Self::classify_word(&current)));
                         current.clear();
@@ -442,9 +479,7 @@ impl NixHighlighter {
     fn to_spans(input: &str) -> Vec<Span<'static>> {
         Self::highlight(input)
             .into_iter()
-            .map(|(text, token)| {
-                Span::styled(text, Style::default().fg(token.color()))
-            })
+            .map(|(text, token)| Span::styled(text, Style::default().fg(token.color())))
             .collect()
     }
 }
@@ -452,9 +487,7 @@ impl NixHighlighter {
 impl App {
     fn new() -> Self {
         // Create tokio runtime for async IPC
-        let runtime = Arc::new(
-            Runtime::new().expect("Failed to create tokio runtime")
-        );
+        let runtime = Arc::new(Runtime::new().expect("Failed to create tokio runtime"));
 
         let mut context = ShellContext::new();
         // Initial consciousness state (will be updated from service if connected)
@@ -480,45 +513,47 @@ impl App {
             ..Default::default()
         };
 
-        let (ipc_client, connection_state, metrics_rx, initial_phi, initial_coherence, initial_conscious) =
-            if let Some(ref path) = socket_path {
-                // Try to connect to the service
-                let mut client = ShellIpcClient::with_socket_path(path);
-                let connected = runtime.block_on(async {
-                    client.connect().await.is_ok()
-                });
+        let (
+            ipc_client,
+            connection_state,
+            metrics_rx,
+            initial_phi,
+            initial_coherence,
+            initial_conscious,
+        ) = if let Some(ref path) = socket_path {
+            // Try to connect to the service
+            let mut client = ShellIpcClient::with_socket_path(path);
+            let connected = runtime.block_on(async { client.connect().await.is_ok() });
 
-                if connected {
-                    // Try to set up streaming metrics
-                    let metrics_receiver = runtime.block_on(async {
-                        client.subscribe_metrics_watch(500).await.ok()
-                    });
+            if connected {
+                // Try to set up streaming metrics
+                let metrics_receiver =
+                    runtime.block_on(async { client.subscribe_metrics_watch(500).await.ok() });
 
-                    // Get initial status
-                    let (phi, coherence, conscious) = if let Some(ref rx) = metrics_receiver {
-                        let m = rx.borrow();
-                        (m.phi, m.coherence, m.is_conscious)
-                    } else {
-                        // Fallback to polling if streaming not available
-                        runtime.block_on(async {
-                            client.get_status().await.unwrap_or((0.75, 0.85, true))
-                        })
-                    };
-
-                    (
-                        Some(client),
-                        ConnectionState::Connected,
-                        metrics_receiver,
-                        phi,
-                        coherence,
-                        conscious,
-                    )
+                // Get initial status
+                let (phi, coherence, conscious) = if let Some(ref rx) = metrics_receiver {
+                    let m = rx.borrow();
+                    (m.phi, m.coherence, m.is_conscious)
                 } else {
-                    (None, ConnectionState::Disconnected, None, 0.75, 0.85, true)
-                }
+                    // Fallback to polling if streaming not available
+                    runtime
+                        .block_on(async { client.get_status().await.unwrap_or((0.75, 0.85, true)) })
+                };
+
+                (
+                    Some(client),
+                    ConnectionState::Connected,
+                    metrics_receiver,
+                    phi,
+                    coherence,
+                    conscious,
+                )
             } else {
                 (None, ConnectionState::Disconnected, None, 0.75, 0.85, true)
-            };
+            }
+        } else {
+            (None, ConnectionState::Disconnected, None, 0.75, 0.85, true)
+        };
 
         // Update context and gates with service metrics
         context.update_metrics(initial_phi, initial_coherence, initial_conscious);
@@ -621,10 +656,7 @@ impl App {
     }
 
     /// Create an App with deterministic RNG from a genesis seed.
-    fn from_genesis(
-        genesis: &symthaea_core::genesis::GenesisSeed,
-        label: &str,
-    ) -> Self {
+    fn from_genesis(genesis: &symthaea_core::genesis::GenesisSeed, label: &str) -> Self {
         let mut app = Self::new();
         app.viz_rng = Some(genesis.domain(&format!("{label}::shell_viz")));
         app
@@ -671,7 +703,8 @@ impl App {
         } else {
             // Filter by fuzzy match
             let query_lower = self.history_search_query.to_lowercase();
-            self.history_search_matches = self.history
+            self.history_search_matches = self
+                .history
                 .iter()
                 .enumerate()
                 .filter(|(_, entry)| entry.command.to_lowercase().contains(&query_lower))
@@ -684,7 +717,10 @@ impl App {
 
     /// Accept the selected history search result
     fn accept_history_search(&mut self) {
-        if let Some(&idx) = self.history_search_matches.get(self.history_search_selected) {
+        if let Some(&idx) = self
+            .history_search_matches
+            .get(self.history_search_selected)
+        {
             if let Some(entry) = self.history.get(idx) {
                 self.input = entry.command.clone();
                 self.cursor = self.input.len();
@@ -769,31 +805,27 @@ impl App {
                     estimated_time: Some("~1-5 sec".to_string()),
                 }
             }
-            "rebuild" | "switch" => {
-                CommandPreview {
-                    description: "Rebuild NixOS configuration".to_string(),
-                    steps: vec![
-                        "Evaluate configuration".to_string(),
-                        "Build derivations".to_string(),
-                        "Activate new generation".to_string(),
-                    ],
-                    affected: vec![
-                        "/nix/store/...".to_string(),
-                        "/run/current-system".to_string(),
-                    ],
-                    needs_confirmation: true,
-                    estimated_time: Some("~2-10 min".to_string()),
-                }
-            }
-            _ => {
-                CommandPreview {
-                    description: format!("Execute: {}", input),
-                    steps: vec!["Run command".to_string()],
-                    affected: vec![],
-                    needs_confirmation: false,
-                    estimated_time: None,
-                }
-            }
+            "rebuild" | "switch" => CommandPreview {
+                description: "Rebuild NixOS configuration".to_string(),
+                steps: vec![
+                    "Evaluate configuration".to_string(),
+                    "Build derivations".to_string(),
+                    "Activate new generation".to_string(),
+                ],
+                affected: vec![
+                    "/nix/store/...".to_string(),
+                    "/run/current-system".to_string(),
+                ],
+                needs_confirmation: true,
+                estimated_time: Some("~2-10 min".to_string()),
+            },
+            _ => CommandPreview {
+                description: format!("Execute: {}", input),
+                steps: vec!["Run command".to_string()],
+                affected: vec![],
+                needs_confirmation: false,
+                estimated_time: None,
+            },
         }
     }
 
@@ -816,7 +848,11 @@ impl App {
                 (snapshot.phi, snapshot.coherence, snapshot.is_conscious)
             } else {
                 // Use last known values
-                (self.service_phi, self.service_coherence, self.service_conscious)
+                (
+                    self.service_phi,
+                    self.service_coherence,
+                    self.service_conscious,
+                )
             }
         } else if matches!(self.connection_state, ConnectionState::Connected) {
             // Fallback: Poll if streaming not available but connected
@@ -853,10 +889,18 @@ impl App {
                         }
                     }
                 } else {
-                    (self.service_phi, self.service_coherence, self.service_conscious)
+                    (
+                        self.service_phi,
+                        self.service_coherence,
+                        self.service_conscious,
+                    )
                 }
             } else {
-                (self.service_phi, self.service_coherence, self.service_conscious)
+                (
+                    self.service_phi,
+                    self.service_coherence,
+                    self.service_conscious,
+                )
             }
         } else {
             // Local mode: Natural Phi drift simulation
@@ -870,8 +914,10 @@ impl App {
             (new_phi, self.context.current_coherence, new_phi > 0.5)
         };
 
-        self.context.update_metrics(new_phi, new_coherence, is_conscious);
-        self.phi_gate.update_metrics(new_phi, new_coherence, is_conscious);
+        self.context
+            .update_metrics(new_phi, new_coherence, is_conscious);
+        self.phi_gate
+            .update_metrics(new_phi, new_coherence, is_conscious);
         self.intellisense.set_phi(new_phi);
 
         self.last_update = Instant::now();
@@ -913,7 +959,9 @@ impl App {
             };
 
             // Insert based on confidence (higher confidence = earlier position)
-            let pos = self.completions.iter()
+            let pos = self
+                .completions
+                .iter()
                 .position(|c| c.confidence < completion.confidence)
                 .unwrap_or(self.completions.len());
             self.completions.insert(pos, completion);
@@ -934,7 +982,10 @@ impl App {
             if self.flake_context.reload_if_changed() {
                 // Notify user of flake reload
                 self.output_lines.push(OutputLine {
-                    content: format!("Flake context reloaded: {}", self.flake_context.status_summary()),
+                    content: format!(
+                        "Flake context reloaded: {}",
+                        self.flake_context.status_summary()
+                    ),
                     style: OutputStyle::Info,
                     timestamp: chrono::Local::now(),
                 });
@@ -948,7 +999,11 @@ impl App {
         // Build context from current state
         let context = if let Some(completion) = self.completions.first() {
             // Use first completion's confidence as basis
-            let source = if self.history.iter().any(|h| h.command.starts_with(&completion.text)) {
+            let source = if self
+                .history
+                .iter()
+                .any(|h| h.command.starts_with(&completion.text))
+            {
                 KnowledgeSource::UserHistory
             } else if completion.text.contains("nix") {
                 KnowledgeSource::NixosDocs
@@ -984,7 +1039,9 @@ impl App {
             }
         };
 
-        self.active_overlays = self.epistemic_engine.generate_for_command(&self.input, &context);
+        self.active_overlays = self
+            .epistemic_engine
+            .generate_for_command(&self.input, &context);
     }
 
     fn execute_command(&mut self) {
@@ -1018,7 +1075,8 @@ impl App {
                 self.output_lines.push(OutputLine {
                     content: format!(
                         "[Phi: {:.2}] Command executed (confidence: {:.0}%)",
-                        phi, confidence * 100.0
+                        phi,
+                        confidence * 100.0
                     ),
                     style: OutputStyle::Phi,
                     timestamp: chrono::Local::now(),
@@ -1038,7 +1096,11 @@ impl App {
                 self.persist_command(&command, phi, true);
             }
 
-            GateDecision::NeedsConfirmation { reason, phi, prompt: _ } => {
+            GateDecision::NeedsConfirmation {
+                reason,
+                phi,
+                prompt: _,
+            } => {
                 // Classify risk level and get rollback hint
                 let (risk_level, rollback_hint) = Self::classify_command_risk(&command);
 
@@ -1116,7 +1178,11 @@ impl App {
                 self.record_veto();
             }
 
-            GateDecision::InsufficientPhi { current_phi, required_phi, centering_time_secs } => {
+            GateDecision::InsufficientPhi {
+                current_phi,
+                required_phi,
+                centering_time_secs,
+            } => {
                 self.output_lines.push(OutputLine {
                     content: format!("$ {}", command),
                     style: OutputStyle::Warning,
@@ -1133,7 +1199,10 @@ impl App {
                 });
 
                 self.output_lines.push(OutputLine {
-                    content: format!("Wait ~{:.0}s for centering, or use /center", centering_time_secs),
+                    content: format!(
+                        "Wait ~{:.0}s for centering, or use /center",
+                        centering_time_secs
+                    ),
                     style: OutputStyle::Info,
                     timestamp: chrono::Local::now(),
                 });
@@ -1177,7 +1246,8 @@ impl App {
         // Medium risk: system changes that can be reverted
         if cmd_lower.contains("nixos-rebuild")
             || first_word == "nix-env" && cmd_lower.contains("-e")
-            || cmd_lower.contains("systemctl") && (cmd_lower.contains("stop") || cmd_lower.contains("restart"))
+            || cmd_lower.contains("systemctl")
+                && (cmd_lower.contains("stop") || cmd_lower.contains("restart"))
             || cmd_lower.contains("service") && cmd_lower.contains("restart")
         {
             let rollback = if cmd_lower.contains("nixos-rebuild") {
@@ -1228,10 +1298,7 @@ impl App {
         });
 
         self.output_lines.push(OutputLine {
-            content: format!(
-                "[Phi: {:.2}] Confirmed command executed",
-                current_phi
-            ),
+            content: format!("[Phi: {:.2}] Confirmed command executed", current_phi),
             style: OutputStyle::Phi,
             timestamp: chrono::Local::now(),
         });
@@ -1348,9 +1415,7 @@ impl App {
         self.output_lines.push(OutputLine {
             content: format!(
                 "{} {} ({}% confidence)",
-                explanation.icon,
-                explanation.summary,
-                explanation.confidence
+                explanation.icon, explanation.summary, explanation.confidence
             ),
             style: OutputStyle::Warning,
             timestamp: chrono::Local::now(),
@@ -1366,7 +1431,12 @@ impl App {
         }
 
         // Show primary fix if available
-        if let Some(fix) = explanation.fixes.iter().find(|f| f.primary).or_else(|| explanation.fixes.first()) {
+        if let Some(fix) = explanation
+            .fixes
+            .iter()
+            .find(|f| f.primary)
+            .or_else(|| explanation.fixes.first())
+        {
             self.output_lines.push(OutputLine {
                 content: format!(
                     "   {} Fix: {} [{}]",
@@ -1401,12 +1471,10 @@ impl App {
     /// Run a what-if simulation and display results
     fn run_whatif_simulation(&mut self, command: &str) {
         // Update simulator with current flake context
-        self.whatif_simulator.set_known_packages(
-            self.flake_context.installed_packages.clone()
-        );
-        self.whatif_simulator.set_known_services(
-            self.flake_context.enabled_services.clone()
-        );
+        self.whatif_simulator
+            .set_known_packages(self.flake_context.installed_packages.clone());
+        self.whatif_simulator
+            .set_known_services(self.flake_context.enabled_services.clone());
 
         // Run simulation
         let result = self.whatif_simulator.simulate(command);
@@ -1517,11 +1585,7 @@ impl App {
         if let Some(ref explanation) = self.last_error {
             // Header
             self.output_lines.push(OutputLine {
-                content: format!(
-                    "=== {} {} ===",
-                    explanation.icon,
-                    explanation.summary
-                ),
+                content: format!("=== {} {} ===", explanation.icon, explanation.summary),
                 style: OutputStyle::Warning,
                 timestamp: chrono::Local::now(),
             });
@@ -1530,9 +1594,7 @@ impl App {
             self.output_lines.push(OutputLine {
                 content: format!(
                     "Category: {} | Type: {} | Confidence: {}%",
-                    explanation.category,
-                    explanation.error_type,
-                    explanation.confidence
+                    explanation.category, explanation.error_type, explanation.confidence
                 ),
                 style: OutputStyle::Info,
                 timestamp: chrono::Local::now(),
@@ -1612,7 +1674,8 @@ impl App {
             }
         } else {
             self.output_lines.push(OutputLine {
-                content: "No recent error to explain. Errors are captured when Nix commands fail.".to_string(),
+                content: "No recent error to explain. Errors are captured when Nix commands fail."
+                    .to_string(),
                 style: OutputStyle::Info,
                 timestamp: chrono::Local::now(),
             });
@@ -1667,7 +1730,11 @@ impl App {
                         self.connection_state.label(),
                         self.context.current_phi,
                         self.context.current_coherence * 100.0,
-                        if self.context.is_conscious { "YES" } else { "NO" }
+                        if self.context.is_conscious {
+                            "YES"
+                        } else {
+                            "NO"
+                        }
                     ),
                     style: OutputStyle::Phi,
                     timestamp: chrono::Local::now(),
@@ -1716,26 +1783,26 @@ impl App {
                         let rt = Arc::clone(&self.runtime);
 
                         // Try connect with retry (exponential backoff)
-                        let connected = rt.block_on(async {
-                            client.connect_with_retry(3).await.is_ok()
-                        });
+                        let connected =
+                            rt.block_on(async { client.connect_with_retry(3).await.is_ok() });
 
                         if connected {
                             self.socket_path = discovered;
                             self.connection_state = ConnectionState::Connected;
 
                             // Try to set up streaming metrics
-                            let metrics_receiver = rt.block_on(async {
-                                client.subscribe_metrics_watch(500).await.ok()
-                            });
+                            let metrics_receiver = rt
+                                .block_on(async { client.subscribe_metrics_watch(500).await.ok() });
 
                             if let Some(ref rx) = metrics_receiver {
                                 let m = rx.borrow();
                                 self.service_phi = m.phi;
                                 self.service_coherence = m.coherence;
                                 self.service_conscious = m.is_conscious;
-                                self.context.update_metrics(m.phi, m.coherence, m.is_conscious);
-                                self.phi_gate.update_metrics(m.phi, m.coherence, m.is_conscious);
+                                self.context
+                                    .update_metrics(m.phi, m.coherence, m.is_conscious);
+                                self.phi_gate
+                                    .update_metrics(m.phi, m.coherence, m.is_conscious);
                             }
 
                             self.ipc_client = Some(client);
@@ -1746,7 +1813,11 @@ impl App {
                                     "{} Connected! Phi: {:.2} | Streaming: {}",
                                     self.connection_state.indicator(),
                                     self.service_phi,
-                                    if self.metrics_rx.is_some() { "YES" } else { "NO" }
+                                    if self.metrics_rx.is_some() {
+                                        "YES"
+                                    } else {
+                                        "NO"
+                                    }
                                 ),
                                 style: OutputStyle::Success,
                                 timestamp: chrono::Local::now(),
@@ -1806,9 +1877,15 @@ impl App {
                         self.output_lines.push(OutputLine {
                             content: format!(
                                 "{:2}. [Phi:{:.2}] {}",
-                                i + 1, entry.phi_at_execution, entry.command
+                                i + 1,
+                                entry.phi_at_execution,
+                                entry.command
                             ),
-                            style: if entry.success { OutputStyle::Normal } else { OutputStyle::Error },
+                            style: if entry.success {
+                                OutputStyle::Normal
+                            } else {
+                                OutputStyle::Error
+                            },
                             timestamp: chrono::Local::now(),
                         });
                     }
@@ -1824,7 +1901,11 @@ impl App {
                 self.output_lines.push(OutputLine {
                     content: format!(
                         "Epistemic overlays: {}",
-                        if self.show_epistemic_overlays { "ON" } else { "OFF" }
+                        if self.show_epistemic_overlays {
+                            "ON"
+                        } else {
+                            "OFF"
+                        }
                     ),
                     style: OutputStyle::Info,
                     timestamp: chrono::Local::now(),
@@ -1847,7 +1928,9 @@ impl App {
 
                 // Show installed packages
                 if !self.flake_context.installed_packages.is_empty() {
-                    let pkgs: Vec<&str> = self.flake_context.installed_packages
+                    let pkgs: Vec<&str> = self
+                        .flake_context
+                        .installed_packages
                         .iter()
                         .take(10)
                         .map(|s| s.as_str())
@@ -1861,7 +1944,9 @@ impl App {
 
                 // Show enabled services
                 if !self.flake_context.enabled_services.is_empty() {
-                    let svcs: Vec<&str> = self.flake_context.enabled_services
+                    let svcs: Vec<&str> = self
+                        .flake_context
+                        .enabled_services
                         .iter()
                         .take(10)
                         .map(|s| s.as_str())
@@ -2025,7 +2110,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             }
                             KeyCode::Down => {
-                                if app.show_completions && app.selected_completion < app.completions.len().saturating_sub(1) {
+                                if app.show_completions
+                                    && app.selected_completion
+                                        < app.completions.len().saturating_sub(1)
+                                {
                                     app.selected_completion += 1;
                                 }
                             }
@@ -2037,14 +2125,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         app.selected_completion =
                                             (app.selected_completion + 1) % app.completions.len();
                                         // Update input to show selected completion
-                                        if let Some(completion) = app.completions.get(app.selected_completion) {
+                                        if let Some(completion) =
+                                            app.completions.get(app.selected_completion)
+                                        {
                                             app.input = completion.text.clone();
                                             app.cursor = app.input.len();
                                         }
                                     } else {
                                         // First Tab: show first completion
                                         app.tab_pressed = true;
-                                        if let Some(completion) = app.completions.get(app.selected_completion) {
+                                        if let Some(completion) =
+                                            app.completions.get(app.selected_completion)
+                                        {
                                             app.input = completion.text.clone();
                                             app.cursor = app.input.len();
                                         }
@@ -2060,7 +2152,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     } else {
                                         app.selected_completion = app.completions.len() - 1;
                                     }
-                                    if let Some(completion) = app.completions.get(app.selected_completion) {
+                                    if let Some(completion) =
+                                        app.completions.get(app.selected_completion)
+                                    {
                                         app.input = completion.text.clone();
                                         app.cursor = app.input.len();
                                     }
@@ -2086,7 +2180,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // Execute the pending command
                                 if let Some(pending) = app.pending_command.take() {
                                     app.output_lines.push(OutputLine {
-                                        content: format!("Confirmed - executing: {}", pending.command),
+                                        content: format!(
+                                            "Confirmed - executing: {}",
+                                            pending.command
+                                        ),
                                         style: OutputStyle::Success,
                                         timestamp: chrono::Local::now(),
                                     });
@@ -2107,12 +2204,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // Dry-run mode
                                 if let Some(ref pending) = app.pending_command {
                                     app.output_lines.push(OutputLine {
-                                        content: format!("[DRY-RUN] Would execute: {}", pending.command),
+                                        content: format!(
+                                            "[DRY-RUN] Would execute: {}",
+                                            pending.command
+                                        ),
                                         style: OutputStyle::Info,
                                         timestamp: chrono::Local::now(),
                                     });
                                     app.output_lines.push(OutputLine {
-                                        content: "No changes made. Press 'y' to execute for real.".to_string(),
+                                        content: "No changes made. Press 'y' to execute for real."
+                                            .to_string(),
                                         style: OutputStyle::Info,
                                         timestamp: chrono::Local::now(),
                                     });
@@ -2141,7 +2242,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // B2: History search mode
                     ShellMode::HistorySearch => {
                         match key.code {
-                            KeyCode::Esc | KeyCode::Char('g') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            KeyCode::Esc | KeyCode::Char('g')
+                                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+                            {
                                 // Cancel search
                                 app.mode = ShellMode::Normal;
                             }
@@ -2149,15 +2252,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // Accept selected
                                 app.accept_history_search();
                             }
-                            KeyCode::Up | KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            KeyCode::Up | KeyCode::Char('p')
+                                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+                            {
                                 // Previous match
                                 if app.history_search_selected > 0 {
                                     app.history_search_selected -= 1;
                                 }
                             }
-                            KeyCode::Down | KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            KeyCode::Down | KeyCode::Char('n')
+                                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+                            {
                                 // Next match
-                                if app.history_search_selected < app.history_search_matches.len().saturating_sub(1) {
+                                if app.history_search_selected
+                                    < app.history_search_matches.len().saturating_sub(1)
+                                {
                                     app.history_search_selected += 1;
                                 }
                             }
@@ -2199,9 +2308,9 @@ fn ui(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),   // Input
-            Constraint::Min(10),     // Main area
-            Constraint::Length(3),   // Status bar
+            Constraint::Length(3), // Input
+            Constraint::Min(10),   // Main area
+            Constraint::Length(3), // Status bar
         ])
         .split(f.area());
 
@@ -2223,17 +2332,13 @@ fn ui(f: &mut Frame, app: &App) {
         ))
         .border_style(Style::default().fg(connection_color));
 
-    let input_text = Paragraph::new(format!("> {}", app.input))
-        .block(input_block);
+    let input_text = Paragraph::new(format!("> {}", app.input)).block(input_block);
     f.render_widget(input_text, chunks[0]);
 
     // Main area split
     let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(70),
-            Constraint::Percentage(30),
-        ])
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
         .split(chunks[1]);
 
     // Left side: Output + Completions
@@ -2246,7 +2351,9 @@ fn ui(f: &mut Frame, app: &App) {
         .split(main_chunks[0]);
 
     // Output area
-    let output_items: Vec<ListItem> = app.output_lines.iter()
+    let output_items: Vec<ListItem> = app
+        .output_lines
+        .iter()
         .rev()
         .take(20)
         .rev()
@@ -2263,19 +2370,23 @@ fn ui(f: &mut Frame, app: &App) {
         })
         .collect();
 
-    let output_list = List::new(output_items)
-        .block(Block::default().borders(Borders::ALL).title(" Output "));
+    let output_list =
+        List::new(output_items).block(Block::default().borders(Borders::ALL).title(" Output "));
     f.render_widget(output_list, left_chunks[0]);
 
     // Completions popup
     if app.show_completions && !app.completions.is_empty() {
-        let completion_items: Vec<ListItem> = app.completions.iter()
+        let completion_items: Vec<ListItem> = app
+            .completions
+            .iter()
             .enumerate()
             .take(6)
             .map(|(i, c)| {
                 let selected = i == app.selected_completion;
                 let style = if selected {
-                    Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
                 };
@@ -2294,14 +2405,17 @@ fn ui(f: &mut Frame, app: &App) {
                     Span::raw(" "),
                     Span::styled(
                         format!("[{:.0}%]", c.confidence * 100.0),
-                        Style::default().fg(destructiveness_color)
+                        Style::default().fg(destructiveness_color),
                     ),
                 ]))
             })
             .collect();
 
-        let completions_list = List::new(completion_items)
-            .block(Block::default().borders(Borders::ALL).title(" Completions (Tab to accept) "));
+        let completions_list = List::new(completion_items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Completions (Tab to accept) "),
+        );
         f.render_widget(completions_list, left_chunks[1]);
     }
 
@@ -2309,7 +2423,7 @@ fn ui(f: &mut Frame, app: &App) {
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(12),  // Expanded for more metrics
+            Constraint::Length(12), // Expanded for more metrics
             Constraint::Min(5),
         ])
         .split(main_chunks[1]);
@@ -2318,21 +2432,31 @@ fn ui(f: &mut Frame, app: &App) {
     let metrics_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Phi gauge
-            Constraint::Length(3),  // Coherence gauge
-            Constraint::Length(3),  // Status line
+            Constraint::Length(3), // Phi gauge
+            Constraint::Length(3), // Coherence gauge
+            Constraint::Length(3), // Status line
         ])
         .split(right_chunks[0]);
 
     // Phi gauge with streaming indicator
-    let stream_indicator = if app.metrics_rx.is_some() { " [LIVE]" } else { "" };
+    let stream_indicator = if app.metrics_rx.is_some() {
+        " [LIVE]"
+    } else {
+        ""
+    };
     let phi_gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).title(format!(" Phi{} ", stream_indicator)))
-        .gauge_style(Style::default().fg(
-            if app.context.current_phi >= 0.7 { Color::Green }
-            else if app.context.current_phi >= 0.4 { Color::Yellow }
-            else { Color::Red }
-        ))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!(" Phi{} ", stream_indicator)),
+        )
+        .gauge_style(Style::default().fg(if app.context.current_phi >= 0.7 {
+            Color::Green
+        } else if app.context.current_phi >= 0.4 {
+            Color::Yellow
+        } else {
+            Color::Red
+        }))
         .ratio(app.context.current_phi.clamp(0.0, 1.0))
         .label(format!("{:.2}", app.context.current_phi));
     f.render_widget(phi_gauge, metrics_chunks[0]);
@@ -2340,30 +2464,56 @@ fn ui(f: &mut Frame, app: &App) {
     // Coherence gauge
     let coherence_gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(" Coherence "))
-        .gauge_style(Style::default().fg(
-            if app.context.current_coherence >= 0.8 { Color::Cyan }
-            else if app.context.current_coherence >= 0.5 { Color::Blue }
-            else { Color::Magenta }
-        ))
+        .gauge_style(
+            Style::default().fg(if app.context.current_coherence >= 0.8 {
+                Color::Cyan
+            } else if app.context.current_coherence >= 0.5 {
+                Color::Blue
+            } else {
+                Color::Magenta
+            }),
+        )
         .ratio(app.context.current_coherence.clamp(0.0, 1.0))
         .label(format!("{:.0}%", app.context.current_coherence * 100.0));
     f.render_widget(coherence_gauge, metrics_chunks[1]);
 
     // Status line with threat level and connection
     let threat_level = app.phi_gate.threat_level_value();
-    let threat_color = if threat_level >= 0.8 { Color::Red }
-        else if threat_level >= 0.5 { Color::Yellow }
-        else { Color::Green };
-    let conscious_icon = if app.context.is_conscious { "●" } else { "○" };
-    let connection = if app.ipc_client.is_some() { "Connected" } else { "Local" };
+    let threat_color = if threat_level >= 0.8 {
+        Color::Red
+    } else if threat_level >= 0.5 {
+        Color::Yellow
+    } else {
+        Color::Green
+    };
+    let conscious_icon = if app.context.is_conscious {
+        "●"
+    } else {
+        "○"
+    };
+    let connection = if app.ipc_client.is_some() {
+        "Connected"
+    } else {
+        "Local"
+    };
 
     let status_spans = vec![
-        Span::styled(format!("{} ", conscious_icon),
-            Style::default().fg(if app.context.is_conscious { Color::Green } else { Color::DarkGray })),
-        Span::styled(format!("Threat: {:.0}% ", threat_level * 100.0),
-            Style::default().fg(threat_color)),
-        Span::styled(format!("| {} ", connection),
-            Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("{} ", conscious_icon),
+            Style::default().fg(if app.context.is_conscious {
+                Color::Green
+            } else {
+                Color::DarkGray
+            }),
+        ),
+        Span::styled(
+            format!("Threat: {:.0}% ", threat_level * 100.0),
+            Style::default().fg(threat_color),
+        ),
+        Span::styled(
+            format!("| {} ", connection),
+            Style::default().fg(Color::DarkGray),
+        ),
     ];
     let status_para = Paragraph::new(Line::from(status_spans))
         .block(Block::default().borders(Borders::ALL).title(" Status "));
@@ -2375,7 +2525,7 @@ fn ui(f: &mut Frame, app: &App) {
         let mut lines: Vec<Line> = vec![
             Line::from(Span::styled(
                 format!("Search: {}_", app.history_search_query),
-                Style::default().add_modifier(Modifier::BOLD)
+                Style::default().add_modifier(Modifier::BOLD),
             )),
             Line::from(""),
         ];
@@ -2394,14 +2544,14 @@ fn ui(f: &mut Frame, app: &App) {
         if app.history_search_matches.is_empty() && !app.history_search_query.is_empty() {
             lines.push(Line::from(Span::styled(
                 "No matches",
-                Style::default().fg(Color::DarkGray)
+                Style::default().fg(Color::DarkGray),
             )));
         }
 
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "↑↓ Navigate | Enter Accept | Esc Cancel",
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(Color::DarkGray),
         )));
         lines
     } else if let Some(ref preview) = app.command_preview {
@@ -2409,21 +2559,31 @@ fn ui(f: &mut Frame, app: &App) {
         let mut lines: Vec<Line> = vec![
             Line::from(Span::styled(
                 &preview.description,
-                Style::default().add_modifier(Modifier::BOLD).fg(
-                    if preview.needs_confirmation { Color::Yellow } else { Color::Green }
-                )
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .fg(if preview.needs_confirmation {
+                        Color::Yellow
+                    } else {
+                        Color::Green
+                    }),
             )),
             Line::from(""),
         ];
 
-        lines.push(Line::from(Span::styled("Steps:", Style::default().fg(Color::Cyan))));
+        lines.push(Line::from(Span::styled(
+            "Steps:",
+            Style::default().fg(Color::Cyan),
+        )));
         for (i, step) in preview.steps.iter().enumerate() {
             lines.push(Line::from(format!("  {}. {}", i + 1, step)));
         }
 
         if !preview.affected.is_empty() {
             lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled("Affected:", Style::default().fg(Color::Yellow))));
+            lines.push(Line::from(Span::styled(
+                "Affected:",
+                Style::default().fg(Color::Yellow),
+            )));
             for path in &preview.affected {
                 lines.push(Line::from(format!("  • {}", path)));
             }
@@ -2438,7 +2598,7 @@ fn ui(f: &mut Frame, app: &App) {
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "⚠ Requires confirmation",
-                Style::default().fg(Color::Yellow)
+                Style::default().fg(Color::Yellow),
             )));
         }
 
@@ -2449,16 +2609,13 @@ fn ui(f: &mut Frame, app: &App) {
             let mut lines: Vec<Line> = vec![
                 Line::from(Span::styled(
                     format!("Command: {}", completion.text),
-                    Style::default().add_modifier(Modifier::BOLD)
+                    Style::default().add_modifier(Modifier::BOLD),
                 )),
                 Line::from(""),
             ];
 
             for step in &preview.steps {
-                lines.push(Line::from(format!(
-                    "{}. {}",
-                    step.number, step.description
-                )));
+                lines.push(Line::from(format!("{}. {}", step.number, step.description)));
             }
 
             if let Some(ref time) = preview.estimated_time {
@@ -2487,7 +2644,7 @@ fn ui(f: &mut Frame, app: &App) {
                 " History Search (Ctrl+R) "
             } else {
                 " Preview "
-            }
+            },
         ))
         .wrap(Wrap { trim: true });
     f.render_widget(preview, right_chunks[1]);
@@ -2534,7 +2691,9 @@ fn ui(f: &mut Frame, app: &App) {
             let mut lines: Vec<Line> = vec![
                 Line::from(Span::styled(
                     format!("{}{}", icon, risk_label),
-                    Style::default().fg(title_color).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(title_color)
+                        .add_modifier(Modifier::BOLD),
                 )),
                 Line::from(""),
                 Line::from(vec![
@@ -2560,23 +2719,42 @@ fn ui(f: &mut Frame, app: &App) {
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "─".repeat(popup_width.saturating_sub(4) as usize),
-                Style::default().fg(Color::DarkGray)
+                Style::default().fg(Color::DarkGray),
             )));
             lines.push(Line::from(vec![
-                Span::styled(" [Y] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    " [Y] ",
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::raw("Confirm  "),
-                Span::styled(" [D] ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    " [D] ",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::raw("Dry-run  "),
-                Span::styled(" [N] ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    " [N] ",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
                 Span::raw("Cancel"),
             ]));
 
             let dialog = Paragraph::new(lines)
-                .block(Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(border_color))
-                    .title(" Confirm Execution ")
-                    .title_style(Style::default().fg(title_color).add_modifier(Modifier::BOLD)))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(border_color))
+                        .title(" Confirm Execution ")
+                        .title_style(
+                            Style::default()
+                                .fg(title_color)
+                                .add_modifier(Modifier::BOLD),
+                        ),
+                )
                 .wrap(Wrap { trim: true });
             f.render_widget(dialog, popup_area);
         }
@@ -2639,12 +2817,12 @@ fn ui(f: &mut Frame, app: &App) {
                 };
 
                 // Build overlay content
-                let mut lines: Vec<Line> = vec![
-                    Line::from(Span::styled(
-                        &overlay.header,
-                        Style::default().fg(style_color).add_modifier(Modifier::BOLD)
-                    )),
-                ];
+                let mut lines: Vec<Line> = vec![Line::from(Span::styled(
+                    &overlay.header,
+                    Style::default()
+                        .fg(style_color)
+                        .add_modifier(Modifier::BOLD),
+                ))];
 
                 for body_line in &overlay.body {
                     lines.push(Line::from(Span::raw(body_line)));
@@ -2653,23 +2831,28 @@ fn ui(f: &mut Frame, app: &App) {
                 if let Some(ref footer) = overlay.footer {
                     lines.push(Line::from(Span::styled(
                         footer,
-                        Style::default().fg(Color::DarkGray)
+                        Style::default().fg(Color::DarkGray),
                     )));
                 }
 
                 // Clear area and render
                 f.render_widget(Clear, overlay_area);
                 let overlay_widget = Paragraph::new(lines)
-                    .block(Block::default()
-                        .borders(Borders::ALL)
-                        .border_style(Style::default().fg(style_color))
-                        .title(format!(" {} ", match overlay.overlay_type {
-                            OverlayType::KnowledgeSource => "K",
-                            OverlayType::UncertaintyWarning => "?",
-                            OverlayType::SafetyHint => "!",
-                            OverlayType::ConfidenceLevel => "%",
-                            OverlayType::TheoryInsight => "T",
-                        })))
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .border_style(Style::default().fg(style_color))
+                            .title(format!(
+                                " {} ",
+                                match overlay.overlay_type {
+                                    OverlayType::KnowledgeSource => "K",
+                                    OverlayType::UncertaintyWarning => "?",
+                                    OverlayType::SafetyHint => "!",
+                                    OverlayType::ConfidenceLevel => "%",
+                                    OverlayType::TheoryInsight => "T",
+                                }
+                            )),
+                    )
                     .wrap(Wrap { trim: true });
                 f.render_widget(overlay_widget, overlay_area);
             }

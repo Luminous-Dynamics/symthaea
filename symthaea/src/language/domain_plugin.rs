@@ -74,7 +74,12 @@ pub struct Entity {
 
 impl Entity {
     /// Create a new entity
-    pub fn new(entity_type: impl Into<String>, value: impl Into<String>, start: usize, end: usize) -> Self {
+    pub fn new(
+        entity_type: impl Into<String>,
+        value: impl Into<String>,
+        start: usize,
+        end: usize,
+    ) -> Self {
         Self {
             entity_type: entity_type.into(),
             value: value.into(),
@@ -178,25 +183,68 @@ impl Default for IntentPrototypes {
     fn default() -> Self {
         Self {
             greeting: vec![
-                "hello", "hi", "hey", "greetings", "good morning",
-                "good afternoon", "good evening",
-            ].into_iter().map(String::from).collect(),
+                "hello",
+                "hi",
+                "hey",
+                "greetings",
+                "good morning",
+                "good afternoon",
+                "good evening",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
             question: vec![
-                "what", "why", "how", "when", "where", "which",
-                "can", "could", "would", "is", "are", "do", "does",
-            ].into_iter().map(String::from).collect(),
+                "what", "why", "how", "when", "where", "which", "can", "could", "would", "is",
+                "are", "do", "does",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
             command: vec![
-                "install", "remove", "update", "configure", "set",
-                "enable", "disable", "start", "stop", "create", "delete",
-            ].into_iter().map(String::from).collect(),
+                "install",
+                "remove",
+                "update",
+                "configure",
+                "set",
+                "enable",
+                "disable",
+                "start",
+                "stop",
+                "create",
+                "delete",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
             complaint: vec![
-                "problem", "issue", "error", "broken", "not working",
-                "failed", "doesn't work", "can't", "unable",
-            ].into_iter().map(String::from).collect(),
+                "problem",
+                "issue",
+                "error",
+                "broken",
+                "not working",
+                "failed",
+                "doesn't work",
+                "can't",
+                "unable",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
             feedback: vec![
-                "thanks", "thank you", "great", "awesome", "perfect",
-                "excellent", "good", "nice", "helpful",
-            ].into_iter().map(String::from).collect(),
+                "thanks",
+                "thank you",
+                "great",
+                "awesome",
+                "perfect",
+                "excellent",
+                "good",
+                "nice",
+                "helpful",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
             custom: HashMap::new(),
         }
     }
@@ -468,7 +516,9 @@ impl PluginRegistry {
 
     /// Get the default plugin
     pub fn default_plugin(&self) -> &dyn DomainPlugin {
-        self.plugins.get(&self.default_plugin).map(|p| p.as_ref())
+        self.plugins
+            .get(&self.default_plugin)
+            .map(|p| p.as_ref())
             .expect("default_plugin key must exist in plugins map")
     }
 
@@ -509,7 +559,9 @@ impl PluginRegistry {
         registry.register(Box::new(super::nixos_plugin::NixOsPlugin));
         registry.register(Box::new(super::math_plugin::MathPlugin::new()));
         registry.register(Box::new(super::programming_plugin::ProgrammingPlugin));
-        registry.register(Box::new(super::general_assistant_plugin::GeneralAssistantPlugin));
+        registry.register(Box::new(
+            super::general_assistant_plugin::GeneralAssistantPlugin,
+        ));
         registry.register(Box::new(super::code_assistant_plugin::CodeAssistantPlugin));
         registry.register(Box::new(super::research_plugin::ResearchPlugin));
         #[cfg(feature = "code_generation")]
@@ -565,7 +617,10 @@ mod tests {
         assert_eq!(entity.entity_type, "product");
         assert_eq!(entity.value, "Widget");
         assert_eq!(entity.confidence, 0.95);
-        assert_eq!(entity.metadata.get("category"), Some(&"electronics".to_string()));
+        assert_eq!(
+            entity.metadata.get("category"),
+            Some(&"electronics".to_string())
+        );
     }
 
     #[test]
@@ -607,7 +662,10 @@ mod tests {
 
         // "Hello world" scores 0.1 for TestPlugin, below threshold 0.3
         let detected = registry.detect_domain("Hello world");
-        assert_eq!(detected, "generic", "Low-score plugin should not be selected");
+        assert_eq!(
+            detected, "generic",
+            "Low-score plugin should not be selected"
+        );
     }
 
     #[test]

@@ -58,13 +58,13 @@
 //! - `TriggerSoftLanding` -> `ReflectionInitiate` (controlled wind-down)
 //! - `EmergencyShutdown` -> `ExpectationReset` (immediate state reset)
 
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
-use serde::{Deserialize, Serialize};
 
 use crate::consciousness::fep_active_inference::{
-    ActiveInferenceAgent, ActiveInferenceAgentConfig, MotorCommandType,
-    Observation, TemporalDifferenceLearningConfig,
+    ActiveInferenceAgent, ActiveInferenceAgentConfig, MotorCommandType, Observation,
+    TemporalDifferenceLearningConfig,
 };
 use crate::language::phi_monitor::{PhiMonitor, PhiTrend};
 
@@ -270,7 +270,11 @@ impl PlasmaControlAction {
                 delta_bp: intensity * 0.05,
             },
             3 => PlasmaControlAction::InjectGas {
-                species: if intensity > 0.7 { GasSpecies::Argon } else { GasSpecies::Neon },
+                species: if intensity > 0.7 {
+                    GasSpecies::Argon
+                } else {
+                    GasSpecies::Neon
+                },
                 amount: intensity,
             },
             4 => PlasmaControlAction::TriggerSoftLanding,
@@ -374,11 +378,11 @@ impl PlasmaControlState {
     pub fn new(phi: f64, timestamp_ns: u64) -> Self {
         Self {
             phi,
-            bt: 5.3,   // Typical ITER value
+            bt: 5.3, // Typical ITER value
             bp: 0.3,
-            ip: 15.0,  // 15 MA
-            ne: 10.0,  // 10^20 m^-3
-            te: 10.0,  // 10 keV
+            ip: 15.0,     // 15 MA
+            ne: 10.0,     // 10^20 m^-3
+            te: 10.0,     // 10 keV
             p_heat: 50.0, // 50 MW
             timestamp_ns,
         }
@@ -471,12 +475,17 @@ impl PlasmaStabilityAssessment {
     /// Check if this is an emergency situation
     pub fn is_emergency(&self) -> bool {
         matches!(self.regime, StabilityRegime::Emergency)
-            || matches!(self.recommended_action, PlasmaControlAction::EmergencyShutdown)
+            || matches!(
+                self.recommended_action,
+                PlasmaControlAction::EmergencyShutdown
+            )
     }
 
     /// Get the urgency level (0.0 - 1.0)
     pub fn urgency(&self) -> f32 {
-        self.regime.urgency().max(self.recommended_action.severity())
+        self.regime
+            .urgency()
+            .max(self.recommended_action.severity())
     }
 }
 
@@ -620,9 +629,8 @@ impl PlasmaControlLoop {
         let time_to_critical = self.estimate_time_to_critical(phi, phi_rate);
 
         // Determine recommended action
-        let (recommended_action, confidence) = self.determine_action(
-            phi, regime, trend, volatility, phi_rate, plasma_state
-        );
+        let (recommended_action, confidence) =
+            self.determine_action(phi, regime, trend, volatility, phi_rate, plasma_state);
 
         PlasmaStabilityAssessment {
             current_phi: phi,
@@ -657,7 +665,8 @@ impl PlasmaControlLoop {
         if let Some(last_time) = self.last_cycle_time {
             let latency = last_time.elapsed().as_micros() as u64;
             let n = self.stats.total_cycles as f64;
-            self.stats.avg_latency_us = (self.stats.avg_latency_us * (n - 1.0) + latency as f64) / n;
+            self.stats.avg_latency_us =
+                (self.stats.avg_latency_us * (n - 1.0) + latency as f64) / n;
             self.stats.max_latency_us = self.stats.max_latency_us.max(latency);
         }
         self.last_cycle_time = Some(cycle_start);
@@ -677,7 +686,10 @@ impl PlasmaControlLoop {
     }
 
     /// Execute a control cycle: assess, update, and return action
-    pub fn control_cycle(&mut self, plasma_state: &PlasmaControlState) -> PlasmaStabilityAssessment {
+    pub fn control_cycle(
+        &mut self,
+        plasma_state: &PlasmaControlState,
+    ) -> PlasmaStabilityAssessment {
         // Update internal state
         self.update(plasma_state.phi, plasma_state.timestamp_ns);
 
@@ -715,10 +727,13 @@ impl PlasmaControlLoop {
             }
 
             // Use FEP action if confidence is high enough
-            if action_result.action_probabilities.iter()
+            if action_result
+                .action_probabilities
+                .iter()
                 .max_by(|a, b| a.total_cmp(b))
                 .copied()
-                .unwrap_or(0.0) > self.config.min_action_confidence as f64
+                .unwrap_or(0.0)
+                > self.config.min_action_confidence as f64
             {
                 // FEP agent has high confidence - could use its action
                 // For now we still use rule-based but log the FEP recommendation
@@ -785,8 +800,12 @@ impl PlasmaControlLoop {
         }
 
         // Calculate rate (Phi per second)
-        let newest = recent.first().expect("recent has at least 2 elements (checked above)");
-        let oldest = recent.last().expect("recent has at least 2 elements (checked above)");
+        let newest = recent
+            .first()
+            .expect("recent has at least 2 elements (checked above)");
+        let oldest = recent
+            .last()
+            .expect("recent has at least 2 elements (checked above)");
         let dt_ns = newest.timestamp_ns.saturating_sub(oldest.timestamp_ns);
         let dt_s = dt_ns as f64 / 1_000_000_000.0;
 
@@ -815,16 +834,16 @@ impl PlasmaControlLoop {
             return 0.0;
         }
 
-        let values: Vec<f64> = self.phi_history.iter()
+        let values: Vec<f64> = self
+            .phi_history
+            .iter()
             .rev()
             .take(self.config.history_window)
             .map(|e| e.phi)
             .collect();
 
         let mean = values.iter().sum::<f64>() / values.len() as f64;
-        let variance = values.iter()
-            .map(|v| (v - mean).powi(2))
-            .sum::<f64>() / values.len() as f64;
+        let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
 
         variance.sqrt()
     }
@@ -865,20 +884,26 @@ impl PlasmaControlLoop {
             }
 
             // Try aggressive intervention first
-            return (PlasmaControlAction::InjectGas {
-                species: GasSpecies::Argon,
-                amount: 0.8,
-            }, 0.85);
+            return (
+                PlasmaControlAction::InjectGas {
+                    species: GasSpecies::Argon,
+                    amount: 0.8,
+                },
+                0.85,
+            );
         }
 
         // Warning regime - moderate intervention
         if regime == StabilityRegime::Warning {
             // High volatility - inject cooling gas
             if volatility > self.config.volatility_threshold as f64 {
-                return (PlasmaControlAction::InjectGas {
-                    species: GasSpecies::Neon,
-                    amount: 0.5,
-                }, 0.7);
+                return (
+                    PlasmaControlAction::InjectGas {
+                        species: GasSpecies::Neon,
+                        amount: 0.5,
+                    },
+                    0.7,
+                );
             }
 
             // Falling trend - reduce power
@@ -888,10 +913,13 @@ impl PlasmaControlLoop {
             }
 
             // Otherwise try field adjustment
-            return (PlasmaControlAction::AdjustMagneticField {
-                delta_bt: 0.05,
-                delta_bp: 0.02,
-            }, 0.6);
+            return (
+                PlasmaControlAction::AdjustMagneticField {
+                    delta_bt: 0.05,
+                    delta_bp: 0.02,
+                },
+                0.6,
+            );
         }
 
         // Stable regime - maintain or fine-tune
@@ -903,10 +931,13 @@ impl PlasmaControlLoop {
 
             // High volatility even in stable regime
             if volatility > self.config.volatility_threshold as f64 * 0.8 {
-                return (PlasmaControlAction::AdjustMagneticField {
-                    delta_bt: 0.02,
-                    delta_bp: 0.01,
-                }, 0.4);
+                return (
+                    PlasmaControlAction::AdjustMagneticField {
+                        delta_bt: 0.02,
+                        delta_bp: 0.01,
+                    },
+                    0.4,
+                );
             }
 
             // Suppress unused variable warnings
@@ -968,25 +999,13 @@ pub struct PlasmaSimulator {
 #[derive(Debug, Clone)]
 pub enum DisruptionScenario {
     /// Gradual density limit approach
-    DensityLimit {
-        start_time_ns: u64,
-        rate: f64,
-    },
+    DensityLimit { start_time_ns: u64, rate: f64 },
     /// Rapid MHD event
-    MhdEvent {
-        trigger_time_ns: u64,
-        severity: f64,
-    },
+    MhdEvent { trigger_time_ns: u64, severity: f64 },
     /// Oscillating instability
-    Oscillation {
-        period_ns: u64,
-        amplitude: f64,
-    },
+    Oscillation { period_ns: u64, amplitude: f64 },
     /// Edge localized mode (ELM)
-    Elm {
-        period_ns: u64,
-        drop_magnitude: f64,
-    },
+    Elm { period_ns: u64, drop_magnitude: f64 },
 }
 
 impl PlasmaSimulator {
@@ -1055,7 +1074,9 @@ impl PlasmaSimulator {
                 self.state.ne += amount * 2.0;
                 self.state.te *= 1.0 - amount * 0.1;
                 // Cooling effect improves Phi for instabilities
-                self.state.phi = (self.state.phi + species.cooling_factor() as f64 * *amount as f64 * 0.1).min(1.0);
+                self.state.phi = (self.state.phi
+                    + species.cooling_factor() as f64 * *amount as f64 * 0.1)
+                    .min(1.0);
             }
             PlasmaControlAction::TriggerSoftLanding => {
                 // Soft landing ramps down everything
@@ -1079,24 +1100,37 @@ impl PlasmaSimulator {
 
     fn apply_scenario(&mut self, scenario: DisruptionScenario) {
         match scenario {
-            DisruptionScenario::DensityLimit { start_time_ns, rate } => {
+            DisruptionScenario::DensityLimit {
+                start_time_ns,
+                rate,
+            } => {
                 if self.current_time_ns >= start_time_ns {
                     let dt = (self.current_time_ns - start_time_ns) as f64 / 1_000_000_000.0;
                     self.state.phi = (0.8 - rate * dt).max(0.0);
                 }
             }
-            DisruptionScenario::MhdEvent { trigger_time_ns, severity } => {
+            DisruptionScenario::MhdEvent {
+                trigger_time_ns,
+                severity,
+            } => {
                 if self.current_time_ns >= trigger_time_ns
                     && self.current_time_ns < trigger_time_ns + 10_000_000
                 {
                     self.state.phi = (self.state.phi - severity * 0.1).max(0.0);
                 }
             }
-            DisruptionScenario::Oscillation { period_ns, amplitude } => {
-                let phase = (self.current_time_ns as f64 / period_ns as f64) * std::f64::consts::TAU;
+            DisruptionScenario::Oscillation {
+                period_ns,
+                amplitude,
+            } => {
+                let phase =
+                    (self.current_time_ns as f64 / period_ns as f64) * std::f64::consts::TAU;
                 self.state.phi = 0.5 + amplitude * phase.sin();
             }
-            DisruptionScenario::Elm { period_ns, drop_magnitude } => {
+            DisruptionScenario::Elm {
+                period_ns,
+                drop_magnitude,
+            } => {
                 let cycle_position = self.current_time_ns % period_ns;
                 if cycle_position < period_ns / 10 {
                     self.state.phi = (self.state.phi - drop_magnitude).max(0.1);
@@ -1319,11 +1353,10 @@ mod tests {
 
     #[test]
     fn test_simulator_density_limit() {
-        let mut sim = PlasmaSimulator::new(42)
-            .with_scenario(DisruptionScenario::DensityLimit {
-                start_time_ns: 10_000_000,
-                rate: 1.0, // 1.0 per second => drops ~0.09 per 90ms of simulation
-            });
+        let mut sim = PlasmaSimulator::new(42).with_scenario(DisruptionScenario::DensityLimit {
+            start_time_ns: 10_000_000,
+            rate: 1.0, // 1.0 per second => drops ~0.09 per 90ms of simulation
+        });
 
         // Step 200 times at 1ms each = 200ms total
         // After start_time (10ms), 190ms of decay at rate 1.0/s => phi = 0.8 - 1.0*0.19 = 0.61
@@ -1334,8 +1367,11 @@ mod tests {
 
         // 500ms total, 490ms after start => phi = 0.8 - 1.0*0.49 = 0.31 (plus noise override)
         // The scenario directly sets phi = (0.8 - rate * dt), so it should be well below 0.5
-        assert!(sim.state().phi < 0.5,
-                "Phi should have dropped below 0.5 due to density limit, got {}", sim.state().phi);
+        assert!(
+            sim.state().phi < 0.5,
+            "Phi should have dropped below 0.5 due to density limit, got {}",
+            sim.state().phi
+        );
     }
 
     #[test]
@@ -1436,7 +1472,10 @@ mod tests {
         }
 
         // Control should have intervened
-        assert!(!actions_taken.is_empty(), "Control should have taken actions");
+        assert!(
+            !actions_taken.is_empty(),
+            "Control should have taken actions"
+        );
 
         // Final state should not be in emergency (control prevented disruption)
         // or we caught it and shut down safely
@@ -1445,7 +1484,8 @@ mod tests {
             final_assessment.regime != StabilityRegime::Emergency
                 || actions_taken.iter().any(|a| matches!(
                     a,
-                    PlasmaControlAction::EmergencyShutdown | PlasmaControlAction::TriggerSoftLanding
+                    PlasmaControlAction::EmergencyShutdown
+                        | PlasmaControlAction::TriggerSoftLanding
                 )),
             "Either avoided emergency or shut down safely"
         );

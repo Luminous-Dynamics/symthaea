@@ -68,13 +68,13 @@ use anyhow::Result;
 use ndarray::Array1;
 use serde::{Deserialize, Serialize};
 
-use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use symthaea_core::genesis::GenesisSeed;
+use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
-use crate::dynamics::cfc::{CfCNetwork, CfCNetworkConfig, CfCConfig};
-use crate::embeddings::{HdcBridge, BridgeConfig};
-use crate::hdc::{BinaryHV};
 use crate::bridges::{HdcCfcBridge, HdcCfcBridgeConfig};
+use crate::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
+use crate::embeddings::{BridgeConfig, HdcBridge};
+use crate::hdc::BinaryHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -239,7 +239,9 @@ impl TwoTrackOutput {
 /// Convert a ContinuousHV to BinaryHV by thresholding
 fn continuous_to_hv16(hv: &ContinuousHV) -> BinaryHV {
     // Convert continuous values to bipolar (-1, +1) representation
-    let bipolar: Vec<f32> = hv.values.iter()
+    let bipolar: Vec<f32> = hv
+        .values
+        .iter()
         .map(|&v| if v > 0.0 { 1.0 } else { -1.0 })
         .collect();
     BinaryHV::from_bipolar(&bipolar)
@@ -367,11 +369,7 @@ impl TwoTrackProcessor {
     /// Create a new two-track processor
     pub fn new(config: TwoTrackConfig) -> Self {
         // Create HDC projector
-        let hdc_projector = HdcProjector::new(
-            config.input_dim,
-            config.hdc_dim,
-            config.seed,
-        );
+        let hdc_projector = HdcProjector::new(config.input_dim, config.hdc_dim, config.seed);
 
         // Create CfC network
         let cfc_config = CfCNetworkConfig {
@@ -390,7 +388,10 @@ impl TwoTrackProcessor {
             online_learning_config: Default::default(),
         };
 
-        let genesis = config.genesis_phrase.as_ref().map(|p| GenesisSeed::from_phrase(p));
+        let genesis = config
+            .genesis_phrase
+            .as_ref()
+            .map(|p| GenesisSeed::from_phrase(p));
 
         let cfc_temporal = if let Some(ref g) = genesis {
             CfCNetwork::from_genesis(cfc_config, g, "two_track_cfc")
@@ -399,17 +400,11 @@ impl TwoTrackProcessor {
         };
 
         // Create projection matrices
-        let input_to_cfc = Self::init_projection(
-            config.input_dim,
-            config.input_dim,
-            config.seed + 1,
-        );
+        let input_to_cfc =
+            Self::init_projection(config.input_dim, config.input_dim, config.seed + 1);
 
-        let temporal_to_hdc = Self::init_projection(
-            config.cfc_output_dim,
-            config.hdc_dim,
-            config.seed + 2,
-        );
+        let temporal_to_hdc =
+            Self::init_projection(config.cfc_output_dim, config.hdc_dim, config.seed + 2);
 
         // Create optional bridge if enabled
         let bridge = if config.enable_bridge {
@@ -424,7 +419,11 @@ impl TwoTrackProcessor {
                 ..Default::default()
             };
             if let Some(ref g) = genesis {
-                Some(HdcCfcBridge::from_genesis(bridge_config, g, "two_track_bridge"))
+                Some(HdcCfcBridge::from_genesis(
+                    bridge_config,
+                    g,
+                    "two_track_bridge",
+                ))
             } else {
                 Some(HdcCfcBridge::new(bridge_config))
             }
@@ -481,13 +480,16 @@ impl TwoTrackProcessor {
         let cfc_input_array = Array1::from_vec(cfc_input);
 
         // Step the CfC network
-        let temporal_output = self.cfc_temporal.forward(&cfc_input_array, self.config.cfc_delta_t);
+        let temporal_output = self
+            .cfc_temporal
+            .forward(&cfc_input_array, self.config.cfc_delta_t);
         let temporal_state: Vec<f32> = temporal_output.iter().cloned().collect();
 
         // Track temporal confidence (based on output magnitude stability)
         let magnitude = temporal_state.iter().map(|x| x * x).sum::<f32>().sqrt();
         let alpha = 0.1f32;
-        self.temporal_magnitude_avg = alpha * magnitude + (1.0 - alpha) * self.temporal_magnitude_avg;
+        self.temporal_magnitude_avg =
+            alpha * magnitude + (1.0 - alpha) * self.temporal_magnitude_avg;
         let temporal_confidence = 1.0 / (1.0 + (magnitude - self.temporal_magnitude_avg).abs());
 
         // === FUSION ===
@@ -505,7 +507,11 @@ impl TwoTrackProcessor {
     }
 
     /// Process with training: updates CfC based on prediction error
-    pub fn process_and_train(&mut self, embedding: &[f32], target: Option<&[f32]>) -> Result<(TwoTrackOutput, Option<f32>)> {
+    pub fn process_and_train(
+        &mut self,
+        embedding: &[f32],
+        target: Option<&[f32]>,
+    ) -> Result<(TwoTrackOutput, Option<f32>)> {
         let output = self.process(embedding);
 
         let loss = if let Some(target_emb) = target {
@@ -542,7 +548,9 @@ impl TwoTrackProcessor {
         let cfc_input = self.project_for_cfc(&input);
         let cfc_input_array = Array1::from_vec(cfc_input);
 
-        let output = self.cfc_temporal.forward(&cfc_input_array, self.config.cfc_delta_t);
+        let output = self
+            .cfc_temporal
+            .forward(&cfc_input_array, self.config.cfc_delta_t);
         output.iter().cloned().collect()
     }
 
@@ -601,7 +609,9 @@ impl TwoTrackProcessor {
     ///
     /// Returns None if bridge is not enabled.
     pub fn encode_semantic_to_temporal(&self, hv: &ContinuousHV) -> Option<Vec<f32>> {
-        self.bridge.as_ref().map(|b| b.encode_semantic_to_temporal(hv))
+        self.bridge
+            .as_ref()
+            .map(|b| b.encode_semantic_to_temporal(hv))
     }
 
     /// Decode CfC temporal state to HDC semantic vector using the bridge
@@ -611,7 +621,9 @@ impl TwoTrackProcessor {
     ///
     /// Returns None if bridge is not enabled.
     pub fn decode_temporal_to_semantic(&self, state: &[f32]) -> Option<ContinuousHV> {
-        self.bridge.as_ref().map(|b| b.decode_temporal_to_semantic(state))
+        self.bridge
+            .as_ref()
+            .map(|b| b.decode_temporal_to_semantic(state))
     }
 
     /// Process with bridge-enhanced fusion
@@ -642,14 +654,19 @@ impl TwoTrackProcessor {
 
         // === TEMPORAL TRACK (CfC) with bridge-enhanced input ===
         // Use bridge to encode semantic HV with temporal context
-        let current_temporal_state: Vec<f32> = if let Some(state) = self.cfc_temporal.state().last() {
+        let current_temporal_state: Vec<f32> = if let Some(state) = self.cfc_temporal.state().last()
+        {
             state.iter().cloned().collect()
         } else {
             vec![0.0; self.config.cfc_hidden_dim]
         };
 
-        let bridge = self.bridge.as_ref().expect("bridge confirmed Some by is_none() check above");
-        let bridge_encoded = bridge.encode_with_temporal_context(&semantic_hv, &current_temporal_state);
+        let bridge = self
+            .bridge
+            .as_ref()
+            .expect("bridge confirmed Some by is_none() check above");
+        let bridge_encoded =
+            bridge.encode_with_temporal_context(&semantic_hv, &current_temporal_state);
 
         // Pad bridge output to match CfC input_dim if needed
         // Bridge outputs cfc_hidden_dim, but CfC expects input_dim
@@ -662,13 +679,16 @@ impl TwoTrackProcessor {
         };
         let cfc_input_array = Array1::from_vec(cfc_input);
 
-        let temporal_output = self.cfc_temporal.forward(&cfc_input_array, self.config.cfc_delta_t);
+        let temporal_output = self
+            .cfc_temporal
+            .forward(&cfc_input_array, self.config.cfc_delta_t);
         let temporal_state: Vec<f32> = temporal_output.iter().cloned().collect();
 
         // Track temporal confidence
         let magnitude = temporal_state.iter().map(|x| x * x).sum::<f32>().sqrt();
         let alpha = 0.1f32;
-        self.temporal_magnitude_avg = alpha * magnitude + (1.0 - alpha) * self.temporal_magnitude_avg;
+        self.temporal_magnitude_avg =
+            alpha * magnitude + (1.0 - alpha) * self.temporal_magnitude_avg;
         let temporal_confidence = 1.0 / (1.0 + (magnitude - self.temporal_magnitude_avg).abs());
 
         // === BRIDGE-ENHANCED FUSION ===
@@ -681,10 +701,12 @@ impl TwoTrackProcessor {
         } else {
             temporal_state[..self.config.cfc_hidden_dim].to_vec()
         };
-        let temporal_semantic = bridge.decode_with_semantic_context(&temporal_for_decode, &semantic_hv);
+        let temporal_semantic =
+            bridge.decode_with_semantic_context(&temporal_for_decode, &semantic_hv);
 
         let (sem_weight, temp_weight) = self.config.fusion_weights;
-        let fused = self.weighted_hv_fusion(&semantic_hv, &temporal_semantic, sem_weight, temp_weight);
+        let fused =
+            self.weighted_hv_fusion(&semantic_hv, &temporal_semantic, sem_weight, temp_weight);
 
         self.total_steps += 1;
 
@@ -709,7 +731,9 @@ impl TwoTrackProcessor {
     /// Returns the cosine similarity between original and reconstructed HV,
     /// or None if bridge is not enabled.
     pub fn measure_bridge_roundtrip(&self, hv: &ContinuousHV) -> Option<f32> {
-        self.bridge.as_ref().map(|b| b.measure_roundtrip_similarity(hv))
+        self.bridge
+            .as_ref()
+            .map(|b| b.measure_roundtrip_similarity(hv))
     }
 
     /// Get bridge reconstruction loss EMA
@@ -718,7 +742,13 @@ impl TwoTrackProcessor {
     }
 
     /// Weighted fusion of two HVs
-    fn weighted_hv_fusion(&self, a: &ContinuousHV, b: &ContinuousHV, w_a: f32, w_b: f32) -> ContinuousHV {
+    fn weighted_hv_fusion(
+        &self,
+        a: &ContinuousHV,
+        b: &ContinuousHV,
+        w_a: f32,
+        w_b: f32,
+    ) -> ContinuousHV {
         let dim = a.dim().max(b.dim());
 
         let values: Vec<f32> = (0..dim)
@@ -826,7 +856,11 @@ impl TwoTrackProcessor {
         let fused_values: Vec<f32> = (0..hdc_dim)
             .map(|i| {
                 let s = if i < norm_sem.len() { norm_sem[i] } else { 0.0 };
-                let t = if i < norm_temp.len() { norm_temp[i] } else { 0.0 };
+                let t = if i < norm_temp.len() {
+                    norm_temp[i]
+                } else {
+                    0.0
+                };
                 sem_weight * s + temp_weight * t
             })
             .collect();
@@ -962,10 +996,7 @@ mod tests {
         let second_half_avg: f32 = losses[5..].iter().sum::<f32>() / 5.0;
 
         // Check that training didn't diverge
-        assert!(
-            second_half_avg.is_finite(),
-            "Training should not diverge"
-        );
+        assert!(second_half_avg.is_finite(), "Training should not diverge");
 
         // Note: We don't strictly require loss decrease as CfC learning
         // can be noisy, but we check it doesn't explode
@@ -1019,9 +1050,24 @@ mod tests {
         let out3 = processor.process(&embedding);
 
         // Temporal states should differ as CfC evolves
-        let state1_mag: f32 = out1.temporal_state.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let state2_mag: f32 = out2.temporal_state.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let state3_mag: f32 = out3.temporal_state.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let state1_mag: f32 = out1
+            .temporal_state
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
+        let state2_mag: f32 = out2
+            .temporal_state
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
+        let state3_mag: f32 = out3
+            .temporal_state
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
 
         // States should be different (CfC dynamics)
         assert!(
@@ -1112,7 +1158,10 @@ mod tests {
 
         // Same genesis should produce identical semantic outputs
         let sim = out1.semantic_hv.similarity(&out2.semantic_hv);
-        assert_eq!(sim, 1.0, "Same genesis should produce identical semantic HVs");
+        assert_eq!(
+            sim, 1.0,
+            "Same genesis should produce identical semantic HVs"
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1124,7 +1173,10 @@ mod tests {
         let config = TwoTrackConfig::default();
         let processor = TwoTrackProcessor::new(config);
 
-        assert!(!processor.has_bridge(), "Bridge should be disabled by default");
+        assert!(
+            !processor.has_bridge(),
+            "Bridge should be disabled by default"
+        );
         assert!(processor.bridge().is_none());
     }
 
@@ -1133,7 +1185,10 @@ mod tests {
         let config = TwoTrackConfig::with_bridge();
         let processor = TwoTrackProcessor::new(config);
 
-        assert!(processor.has_bridge(), "Bridge should be enabled with with_bridge()");
+        assert!(
+            processor.has_bridge(),
+            "Bridge should be enabled with with_bridge()"
+        );
         assert!(processor.bridge().is_some());
     }
 
@@ -1143,7 +1198,9 @@ mod tests {
         let processor_no_bridge = TwoTrackProcessor::new(config_no_bridge);
 
         let hv = ContinuousHV::random_default(42);
-        assert!(processor_no_bridge.encode_semantic_to_temporal(&hv).is_none());
+        assert!(processor_no_bridge
+            .encode_semantic_to_temporal(&hv)
+            .is_none());
 
         let config_with_bridge = TwoTrackConfig::with_bridge();
         let processor_with_bridge = TwoTrackProcessor::new(config_with_bridge);
@@ -1159,7 +1216,9 @@ mod tests {
         let processor_no_bridge = TwoTrackProcessor::new(config_no_bridge);
 
         let temporal_state = vec![0.5f32; 128];
-        assert!(processor_no_bridge.decode_temporal_to_semantic(&temporal_state).is_none());
+        assert!(processor_no_bridge
+            .decode_temporal_to_semantic(&temporal_state)
+            .is_none());
 
         let config_with_bridge = TwoTrackConfig::with_bridge();
         let processor_with_bridge = TwoTrackProcessor::new(config_with_bridge);
@@ -1183,7 +1242,10 @@ mod tests {
 
         // Should be identical when bridge is disabled
         let sim = out1.semantic_hv.similarity(&out2.semantic_hv);
-        assert!(sim > 0.99, "process_with_bridge should match process when bridge disabled");
+        assert!(
+            sim > 0.99,
+            "process_with_bridge should match process when bridge disabled"
+        );
     }
 
     #[test]
@@ -1197,7 +1259,10 @@ mod tests {
         assert!(similarity.is_some());
         // Untrained bridge will have some similarity (random projections)
         let sim = similarity.unwrap();
-        assert!(sim > -1.0 && sim <= 1.0, "Similarity should be in valid range");
+        assert!(
+            sim > -1.0 && sim <= 1.0,
+            "Similarity should be in valid range"
+        );
     }
 
     #[test]
@@ -1205,7 +1270,7 @@ mod tests {
     fn test_bridge_training() {
         let config = TwoTrackConfig {
             enable_bridge: true,
-            hdc_dim: 1024,  // Smaller for faster test
+            hdc_dim: 1024, // Smaller for faster test
             bridge_intermediate_dim: 128,
             ..Default::default()
         };
@@ -1266,7 +1331,10 @@ mod tests {
 
         // Same genesis should produce identical encodings
         for (a, b) in encoded1.iter().zip(encoded2.iter()) {
-            assert!((a - b).abs() < 1e-6, "Genesis should make bridge deterministic");
+            assert!(
+                (a - b).abs() < 1e-6,
+                "Genesis should make bridge deterministic"
+            );
         }
     }
 
@@ -1335,12 +1403,21 @@ mod tests {
         let embedding: Vec<f32> = vec![0.3; 256];
         let output = processor.process(&embedding);
 
-        assert_eq!(output.semantic_hv.dim(), config.hdc_dim,
-            "Semantic HV must match configured hdc_dim");
-        assert_eq!(output.temporal_state.len(), config.cfc_output_dim,
-            "Temporal state must match cfc_output_dim");
-        assert_eq!(output.fused.dim(), config.hdc_dim,
-            "Fused HV must match hdc_dim");
+        assert_eq!(
+            output.semantic_hv.dim(),
+            config.hdc_dim,
+            "Semantic HV must match configured hdc_dim"
+        );
+        assert_eq!(
+            output.temporal_state.len(),
+            config.cfc_output_dim,
+            "Temporal state must match cfc_output_dim"
+        );
+        assert_eq!(
+            output.fused.dim(),
+            config.hdc_dim,
+            "Fused HV must match hdc_dim"
+        );
     }
 
     #[test]
@@ -1363,10 +1440,14 @@ mod tests {
             for (i, v) in output.fused.values.iter().enumerate() {
                 assert!(v.is_finite(), "fused[{}] = {} is not finite", i, v);
             }
-            assert!(output.semantic_stability.is_finite(),
-                "semantic_stability must be finite");
-            assert!(output.temporal_confidence.is_finite(),
-                "temporal_confidence must be finite");
+            assert!(
+                output.semantic_stability.is_finite(),
+                "semantic_stability must be finite"
+            );
+            assert!(
+                output.temporal_confidence.is_finite(),
+                "temporal_confidence must be finite"
+            );
         }
     }
 
@@ -1399,8 +1480,11 @@ mod tests {
         let embedding: Vec<f32> = vec![0.2; 256];
         let temporal = processor.step_temporal(&embedding);
 
-        assert_eq!(temporal.len(), config.cfc_output_dim,
-            "step_temporal output must match cfc_output_dim");
+        assert_eq!(
+            temporal.len(),
+            config.cfc_output_dim,
+            "step_temporal output must match cfc_output_dim"
+        );
 
         for (i, v) in temporal.iter().enumerate() {
             assert!(v.is_finite(), "step_temporal[{}] = {} is not finite", i, v);
@@ -1425,10 +1509,16 @@ mod tests {
 
         // State and step count should be unchanged
         let state_after = processor.temporal_state();
-        assert_eq!(steps_before, processor.total_steps(),
-            "semantic_only must not increment total_steps");
-        assert_eq!(state_before.len(), state_after.len(),
-            "semantic_only must not alter temporal state count");
+        assert_eq!(
+            steps_before,
+            processor.total_steps(),
+            "semantic_only must not increment total_steps"
+        );
+        assert_eq!(
+            state_before.len(),
+            state_after.len(),
+            "semantic_only must not alter temporal state count"
+        );
     }
 
     #[test]
@@ -1487,10 +1577,16 @@ mod tests {
         let output = processor.process(&zeros);
 
         for v in output.semantic_hv.values.iter() {
-            assert!(v.is_finite(), "zero input should produce finite semantic HV");
+            assert!(
+                v.is_finite(),
+                "zero input should produce finite semantic HV"
+            );
         }
         for v in output.temporal_state.iter() {
-            assert!(v.is_finite(), "zero input should produce finite temporal state");
+            assert!(
+                v.is_finite(),
+                "zero input should produce finite temporal state"
+            );
         }
         for v in output.fused.values.iter() {
             assert!(v.is_finite(), "zero input should produce finite fused HV");
@@ -1506,12 +1602,16 @@ mod tests {
 
         for _ in 0..10 {
             let output = processor.process(&embedding);
-            assert!(output.temporal_confidence > 0.0,
+            assert!(
+                output.temporal_confidence > 0.0,
                 "temporal_confidence must be positive, got {}",
-                output.temporal_confidence);
-            assert!(output.temporal_confidence <= 1.0,
+                output.temporal_confidence
+            );
+            assert!(
+                output.temporal_confidence <= 1.0,
                 "temporal_confidence must be <= 1.0, got {}",
-                output.temporal_confidence);
+                output.temporal_confidence
+            );
         }
     }
 
@@ -1528,16 +1628,26 @@ mod tests {
         let fused_hv16 = output.fused_hv16();
 
         // BinaryHV has DIM = 16384 bits represented in 2048 bytes
-        assert_eq!(sem_hv16.0.len(), 2048,
-            "semantic_hv16 should have 2048 bytes");
-        assert_eq!(fused_hv16.0.len(), 2048,
-            "fused_hv16 should have 2048 bytes");
+        assert_eq!(
+            sem_hv16.0.len(),
+            2048,
+            "semantic_hv16 should have 2048 bytes"
+        );
+        assert_eq!(
+            fused_hv16.0.len(),
+            2048,
+            "fused_hv16 should have 2048 bytes"
+        );
 
         // Verify bipolar roundtrip: to_bipolar should produce -1.0 or +1.0 values only
         let bipolar = sem_hv16.to_bipolar();
         for (i, v) in bipolar.iter().enumerate() {
-            assert!(*v == -1.0 || *v == 1.0,
-                "bipolar[{}] should be -1.0 or 1.0, got {}", i, v);
+            assert!(
+                *v == -1.0 || *v == 1.0,
+                "bipolar[{}] should be -1.0 or 1.0, got {}",
+                i,
+                v
+            );
         }
     }
 

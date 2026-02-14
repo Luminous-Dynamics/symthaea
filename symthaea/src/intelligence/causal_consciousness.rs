@@ -47,7 +47,7 @@
 //! └─────────────────────────────────────────────────────────────────────┘
 //! ```
 
-use super::causal_discovery::{CausalDiscoveryEngine, CausalDirection, MetaFeatures};
+use super::causal_discovery::{CausalDirection, CausalDiscoveryEngine, MetaFeatures};
 use rand::prelude::*;
 use std::collections::HashMap;
 
@@ -68,18 +68,21 @@ pub struct HSICTest {
 
 impl HSICTest {
     pub fn new() -> Self {
-        Self { sigma: None, seeded_rng: None }
+        Self {
+            sigma: None,
+            seeded_rng: None,
+        }
     }
 
     pub fn with_bandwidth(sigma: f64) -> Self {
-        Self { sigma: Some(sigma), seeded_rng: None }
+        Self {
+            sigma: Some(sigma),
+            seeded_rng: None,
+        }
     }
 
     /// Create an HSIC test with deterministic RNG from a genesis seed.
-    pub fn from_genesis(
-        genesis: &symthaea_core::genesis::GenesisSeed,
-        label: &str,
-    ) -> Self {
+    pub fn from_genesis(genesis: &symthaea_core::genesis::GenesisSeed, label: &str) -> Self {
         use rand::SeedableRng;
         let mut shake = genesis.domain(&format!("{label}::hsic"));
         let seed: u64 = rand::Rng::gen(&mut shake);
@@ -152,9 +155,7 @@ impl HSICTest {
             null_hsics.push(self.compute(x, y_perm));
         }
 
-        let p_value = null_hsics.iter()
-            .filter(|&&h| h >= hsic)
-            .count() as f64 / n_perms as f64;
+        let p_value = null_hsics.iter().filter(|&&h| h >= hsic).count() as f64 / n_perms as f64;
 
         (p_value > threshold, p_value)
     }
@@ -197,7 +198,8 @@ impl HSICTest {
         let mut centered = vec![vec![0.0; n]; n];
 
         // Compute row and column means
-        let row_means: Vec<f64> = k.iter()
+        let row_means: Vec<f64> = k
+            .iter()
             .map(|row| row.iter().sum::<f64>() / n as f64)
             .collect();
         let total_mean: f64 = row_means.iter().sum::<f64>() / n as f64;
@@ -249,10 +251,10 @@ pub struct LiveLearningRouter {
 
 #[derive(Debug, Clone)]
 struct ThresholdAdjustments {
-    noise_threshold: f64,      // Default 0.85
-    nonlin_threshold: f64,     // Default 0.4
-    corr_threshold: f64,       // Default 0.85
-    kurtosis_threshold: f64,   // Default 3.0
+    noise_threshold: f64,    // Default 0.85
+    nonlin_threshold: f64,   // Default 0.4
+    corr_threshold: f64,     // Default 0.85
+    kurtosis_threshold: f64, // Default 3.0
 }
 
 impl Default for ThresholdAdjustments {
@@ -267,7 +269,7 @@ impl Default for ThresholdAdjustments {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]  // Reserved for learning history analysis
+#[allow(dead_code)] // Reserved for learning history analysis
 struct PredictionOutcome {
     meta_features: MetaFeatures,
     predicted: CausalDirection,
@@ -292,7 +294,11 @@ impl LiveLearningRouter {
     }
 
     /// Predict and return meta-information for learning
-    fn predict_with_info(&mut self, x: &[f64], y: &[f64]) -> (CausalDirection, MetaFeatures, String) {
+    fn predict_with_info(
+        &mut self,
+        x: &[f64],
+        y: &[f64],
+    ) -> (CausalDirection, MetaFeatures, String) {
         // Use adaptive thresholds
         let direction = self.engine.predict(x, y);
 
@@ -354,8 +360,10 @@ impl LiveLearningRouter {
             self.threshold_adjustments.noise_threshold.clamp(0.7, 0.95);
         self.threshold_adjustments.corr_threshold =
             self.threshold_adjustments.corr_threshold.clamp(0.7, 0.95);
-        self.threshold_adjustments.kurtosis_threshold =
-            self.threshold_adjustments.kurtosis_threshold.clamp(2.0, 5.0);
+        self.threshold_adjustments.kurtosis_threshold = self
+            .threshold_adjustments
+            .kurtosis_threshold
+            .clamp(2.0, 5.0);
     }
 
     fn extract_meta(&self, x: &[f64], y: &[f64]) -> MetaFeatures {
@@ -367,9 +375,12 @@ impl LiveLearningRouter {
         let var_x: f64 = x.iter().map(|&xi| (xi - mx).powi(2)).sum::<f64>() / (n - 1) as f64;
         let var_y: f64 = y.iter().map(|&yi| (yi - my).powi(2)).sum::<f64>() / (n - 1) as f64;
 
-        let cov: f64 = x.iter().zip(y.iter())
+        let cov: f64 = x
+            .iter()
+            .zip(y.iter())
             .map(|(&xi, &yi)| (xi - mx) * (yi - my))
-            .sum::<f64>() / (n - 1) as f64;
+            .sum::<f64>()
+            / (n - 1) as f64;
 
         let correlation = if var_x > 1e-10 && var_y > 1e-10 {
             cov / (var_x.sqrt() * var_y.sqrt())
@@ -380,17 +391,15 @@ impl LiveLearningRouter {
         // Kurtosis
         let std_x = var_x.sqrt().max(1e-10);
         let std_y = var_y.sqrt().max(1e-10);
-        let kurtosis_x: f64 = x.iter()
-            .map(|&xi| ((xi - mx) / std_x).powi(4))
-            .sum::<f64>() / n as f64 - 3.0;
-        let kurtosis_y: f64 = y.iter()
-            .map(|&yi| ((yi - my) / std_y).powi(4))
-            .sum::<f64>() / n as f64 - 3.0;
+        let kurtosis_x: f64 =
+            x.iter().map(|&xi| ((xi - mx) / std_x).powi(4)).sum::<f64>() / n as f64 - 3.0;
+        let kurtosis_y: f64 =
+            y.iter().map(|&yi| ((yi - my) / std_y).powi(4)).sum::<f64>() / n as f64 - 3.0;
 
         MetaFeatures {
             n_samples: n,
             correlation,
-            noise_ratio: 0.5, // Simplified
+            noise_ratio: 0.5,  // Simplified
             nonlinearity: 0.0, // Simplified
             kurtosis_x,
             kurtosis_y,
@@ -404,7 +413,9 @@ impl LiveLearningRouter {
             "high_noise_nonlin".to_string()
         } else if meta.correlation.abs() > adj.corr_threshold {
             "high_correlation".to_string()
-        } else if meta.kurtosis_x > adj.kurtosis_threshold || meta.kurtosis_y > adj.kurtosis_threshold {
+        } else if meta.kurtosis_x > adj.kurtosis_threshold
+            || meta.kurtosis_y > adj.kurtosis_threshold
+        {
             "heavy_tails".to_string()
         } else {
             "majority".to_string()
@@ -414,17 +425,22 @@ impl LiveLearningRouter {
     /// Get current learned thresholds
     pub fn get_thresholds(&self) -> (f64, f64, f64, f64) {
         let adj = &self.threshold_adjustments;
-        (adj.noise_threshold, adj.nonlin_threshold, adj.corr_threshold, adj.kurtosis_threshold)
+        (
+            adj.noise_threshold,
+            adj.nonlin_threshold,
+            adj.corr_threshold,
+            adj.kurtosis_threshold,
+        )
     }
 
     /// Get accuracy on history
     pub fn get_accuracy(&self) -> f64 {
-        let correct = self.history.iter()
+        let correct = self
+            .history
+            .iter()
             .filter(|o| o.actual.map(|a| a == o.predicted).unwrap_or(false))
             .count();
-        let total = self.history.iter()
-            .filter(|o| o.actual.is_some())
-            .count();
+        let total = self.history.iter().filter(|o| o.actual.is_some()).count();
 
         if total > 0 {
             correct as f64 / total as f64
@@ -456,9 +472,9 @@ pub struct CausalAttention {
 #[derive(Debug, Clone)]
 pub struct CausalEdge {
     pub direction: CausalDirection,
-    pub strength: f64,      // 0.0 - 1.0
-    pub confidence: f64,    // 0.0 - 1.0
-    pub is_direct: bool,    // vs mediated
+    pub strength: f64,   // 0.0 - 1.0
+    pub confidence: f64, // 0.0 - 1.0
+    pub is_direct: bool, // vs mediated
 }
 
 impl CausalAttention {
@@ -484,10 +500,9 @@ impl CausalAttention {
                     continue;
                 }
 
-                let (direction, confidence) = self.engine.predict_with_confidence(
-                    &variables[i],
-                    &variables[j]
-                );
+                let (direction, confidence) = self
+                    .engine
+                    .predict_with_confidence(&variables[i], &variables[j]);
 
                 // Compute causal strength using HSIC
                 let hsic_val = self.hsic.compute(&variables[i], &variables[j]);
@@ -606,7 +621,11 @@ impl CausalLTCBridge {
     }
 
     /// Discover causal structure at a specific level
-    pub fn discover_level_causality(&mut self, level: usize, signals: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    pub fn discover_level_causality(
+        &mut self,
+        level: usize,
+        signals: &[Vec<f64>],
+    ) -> Vec<Vec<f64>> {
         if level >= self.level_attention.len() {
             return vec![];
         }
@@ -615,17 +634,22 @@ impl CausalLTCBridge {
     }
 
     /// Discover cross-level causality (does level i cause level j?)
-    pub fn discover_cross_level(&mut self,
-                                 level_i: usize,
-                                 level_j: usize,
-                                 signal_i: &[f64],
-                                 signal_j: &[f64]) -> CausalDirection {
+    pub fn discover_cross_level(
+        &mut self,
+        level_i: usize,
+        level_j: usize,
+        signal_i: &[f64],
+        signal_j: &[f64],
+    ) -> CausalDirection {
         if level_i >= self.level_attention.len() || level_j >= self.level_attention.len() {
             return CausalDirection::Forward;
         }
 
-        let direction = self.level_attention[level_i].engine.predict(signal_i, signal_j);
-        self.cross_level_causality.insert((level_i, level_j), direction);
+        let direction = self.level_attention[level_i]
+            .engine
+            .predict(signal_i, signal_j);
+        self.cross_level_causality
+            .insert((level_i, level_j), direction);
         direction
     }
 
@@ -660,7 +684,9 @@ impl CausalLTCBridge {
         }
 
         // Sum of absolute causal strengths normalized by number of connections
-        let total: f64 = self.cross_level_causality.values()
+        let total: f64 = self
+            .cross_level_causality
+            .values()
             .map(|d| match d {
                 CausalDirection::Forward => 1.0,
                 CausalDirection::Backward => 1.0,
@@ -668,7 +694,8 @@ impl CausalLTCBridge {
             .sum();
 
         let n = self.cross_level_causality.len() as f64;
-        let max_possible = self.level_attention.len() as f64 * (self.level_attention.len() as f64 - 1.0);
+        let max_possible =
+            self.level_attention.len() as f64 * (self.level_attention.len() as f64 - 1.0);
 
         if max_possible > 0.0 {
             // Normalize by actual connection density (n / max_possible) and total strength
@@ -754,7 +781,12 @@ impl CausalConsciousness {
         }
     }
 
-    fn compute_residual_independence(&self, x: &[f64], y: &[f64], direction: CausalDirection) -> f64 {
+    fn compute_residual_independence(
+        &self,
+        x: &[f64],
+        y: &[f64],
+        direction: CausalDirection,
+    ) -> f64 {
         // Compute linear residuals
         let (cause, effect) = match direction {
             CausalDirection::Forward => (x, y),
@@ -765,7 +797,9 @@ impl CausalConsciousness {
         let mc: f64 = cause.iter().sum::<f64>() / n as f64;
         let me: f64 = effect.iter().sum::<f64>() / n as f64;
 
-        let num: f64 = cause.iter().zip(effect.iter())
+        let num: f64 = cause
+            .iter()
+            .zip(effect.iter())
             .map(|(&c, &e)| (c - mc) * (e - me))
             .sum();
         let den: f64 = cause.iter().map(|&c| (c - mc).powi(2)).sum();
@@ -773,7 +807,9 @@ impl CausalConsciousness {
         let slope = if den > 1e-10 { num / den } else { 0.0 };
         let intercept = me - slope * mc;
 
-        let residuals: Vec<f64> = effect.iter().zip(cause.iter())
+        let residuals: Vec<f64> = effect
+            .iter()
+            .zip(cause.iter())
             .map(|(&e, &c)| e - (slope * c + intercept))
             .collect();
 
@@ -914,7 +950,10 @@ impl ThresholdTuner {
     /// Run grid search on training data
     ///
     /// data: Vec of (x, y, true_direction) tuples
-    pub fn grid_search(&mut self, data: &[(Vec<f64>, Vec<f64>, CausalDirection)]) -> GridSearchResult {
+    pub fn grid_search(
+        &mut self,
+        data: &[(Vec<f64>, Vec<f64>, CausalDirection)],
+    ) -> GridSearchResult {
         let mut best = GridSearchResult {
             noise_threshold: 0.85,
             nonlin_threshold: 0.4,
@@ -929,9 +968,8 @@ impl ThresholdTuner {
             for &nonlin_t in &self.nonlin_range {
                 for &corr_t in &self.corr_range {
                     for &kurt_t in &self.kurtosis_range {
-                        let result = self.evaluate_thresholds(
-                            data, noise_t, nonlin_t, corr_t, kurt_t
-                        );
+                        let result =
+                            self.evaluate_thresholds(data, noise_t, nonlin_t, corr_t, kurt_t);
 
                         if result.accuracy > best.accuracy {
                             best = result;
@@ -1000,9 +1038,12 @@ impl ThresholdTuner {
         let var_x: f64 = x.iter().map(|&xi| (xi - mx).powi(2)).sum::<f64>() / (n - 1).max(1) as f64;
         let var_y: f64 = y.iter().map(|&yi| (yi - my).powi(2)).sum::<f64>() / (n - 1).max(1) as f64;
 
-        let cov: f64 = x.iter().zip(y.iter())
+        let cov: f64 = x
+            .iter()
+            .zip(y.iter())
             .map(|(&xi, &yi)| (xi - mx) * (yi - my))
-            .sum::<f64>() / (n - 1).max(1) as f64;
+            .sum::<f64>()
+            / (n - 1).max(1) as f64;
 
         let correlation = if var_x > 1e-10 && var_y > 1e-10 {
             cov / (var_x.sqrt() * var_y.sqrt())
@@ -1013,24 +1054,27 @@ impl ThresholdTuner {
         // Kurtosis
         let std_x = var_x.sqrt().max(1e-10);
         let std_y = var_y.sqrt().max(1e-10);
-        let kurtosis_x: f64 = x.iter()
-            .map(|&xi| ((xi - mx) / std_x).powi(4))
-            .sum::<f64>() / n as f64 - 3.0;
-        let kurtosis_y: f64 = y.iter()
-            .map(|&yi| ((yi - my) / std_y).powi(4))
-            .sum::<f64>() / n as f64 - 3.0;
+        let kurtosis_x: f64 =
+            x.iter().map(|&xi| ((xi - mx) / std_x).powi(4)).sum::<f64>() / n as f64 - 3.0;
+        let kurtosis_y: f64 =
+            y.iter().map(|&yi| ((yi - my) / std_y).powi(4)).sum::<f64>() / n as f64 - 3.0;
 
         // Estimate noise ratio via residual variance
-        let num: f64 = x.iter().zip(y.iter())
+        let num: f64 = x
+            .iter()
+            .zip(y.iter())
             .map(|(&xi, &yi)| (xi - mx) * (yi - my))
             .sum();
         let den: f64 = x.iter().map(|&xi| (xi - mx).powi(2)).sum();
         let slope = if den > 1e-10 { num / den } else { 0.0 };
         let intercept = my - slope * mx;
 
-        let residual_var: f64 = y.iter().zip(x.iter())
+        let residual_var: f64 = y
+            .iter()
+            .zip(x.iter())
             .map(|(&yi, &xi)| (yi - (slope * xi + intercept)).powi(2))
-            .sum::<f64>() / n as f64;
+            .sum::<f64>()
+            / n as f64;
 
         let noise_ratio = if var_y > 1e-10 {
             (residual_var / var_y).sqrt().min(1.0)
@@ -1039,10 +1083,10 @@ impl ThresholdTuner {
         };
 
         // Estimate nonlinearity
-        let predicted: Vec<f64> = x.iter()
-            .map(|&xi| slope * xi + intercept)
-            .collect();
-        let residuals: Vec<f64> = y.iter().zip(predicted.iter())
+        let predicted: Vec<f64> = x.iter().map(|&xi| slope * xi + intercept).collect();
+        let residuals: Vec<f64> = y
+            .iter()
+            .zip(predicted.iter())
             .map(|(&yi, &pi)| yi - pi)
             .collect();
 
@@ -1054,7 +1098,11 @@ impl ThresholdTuner {
         for &r in &residuals {
             let sign = if r > 0.0 { 1 } else { -1 };
             if sign != last_sign {
-                if sign > 0 { pos_runs += 1; } else { neg_runs += 1; }
+                if sign > 0 {
+                    pos_runs += 1;
+                } else {
+                    neg_runs += 1;
+                }
                 last_sign = sign;
             }
         }
@@ -1094,18 +1142,22 @@ impl ThresholdTuner {
 
                         for fold in 0..k_folds {
                             let start = fold * fold_size;
-                            let end = if fold == k_folds - 1 { n } else { start + fold_size };
+                            let end = if fold == k_folds - 1 {
+                                n
+                            } else {
+                                start + fold_size
+                            };
 
                             // Test on this fold, using different seed for each fold
                             let test_data: Vec<_> = data[start..end].to_vec();
-                            let result = self.evaluate_thresholds(
-                                &test_data, noise_t, nonlin_t, corr_t, kurt_t
-                            );
+                            let result = self
+                                .evaluate_thresholds(&test_data, noise_t, nonlin_t, corr_t, kurt_t);
 
                             fold_accuracies.push(result.accuracy);
                         }
 
-                        let avg_accuracy: f64 = fold_accuracies.iter().sum::<f64>() / k_folds as f64;
+                        let avg_accuracy: f64 =
+                            fold_accuracies.iter().sum::<f64>() / k_folds as f64;
 
                         if avg_accuracy > best_avg_accuracy {
                             best_avg_accuracy = avg_accuracy;
@@ -1127,7 +1179,12 @@ impl ThresholdTuner {
     /// Get best found thresholds
     pub fn best_thresholds(&self) -> Option<(f64, f64, f64, f64)> {
         self.best_result.as_ref().map(|r| {
-            (r.noise_threshold, r.nonlin_threshold, r.corr_threshold, r.kurtosis_threshold)
+            (
+                r.noise_threshold,
+                r.nonlin_threshold,
+                r.corr_threshold,
+                r.kurtosis_threshold,
+            )
         })
     }
 
@@ -1184,7 +1241,8 @@ impl RandomThresholdSearch {
             let corr_t = rng.gen_range(0.70..0.95);
             let kurt_t = rng.gen_range(2.0..5.0);
 
-            let result = self.evaluate_thresholds(data, noise_t, nonlin_t, corr_t, kurt_t, &mut rng);
+            let result =
+                self.evaluate_thresholds(data, noise_t, nonlin_t, corr_t, kurt_t, &mut rng);
 
             if result.accuracy > best.accuracy {
                 best = result;
@@ -1265,9 +1323,15 @@ mod tests {
         let (is_indep2, p_val2) = hsic.test_independence(&x, &y_dep, 0.05);
         println!("Dependent test: is_indep={}, p_value={}", is_indep2, p_val2);
 
-        assert!(p_val2.is_finite(), "P-value for dependent test should be finite");
+        assert!(
+            p_val2.is_finite(),
+            "P-value for dependent test should be finite"
+        );
         // Dependent variables should NOT be detected as independent
-        assert!(!is_indep2, "Perfectly correlated variables should not be independent");
+        assert!(
+            !is_indep2,
+            "Perfectly correlated variables should not be independent"
+        );
     }
 
     #[test]
@@ -1299,15 +1363,20 @@ mod tests {
 
         // Test data: Y = 2X + noise
         let x: Vec<f64> = (0..100).map(|i| i as f64).collect();
-        let y: Vec<f64> = x.iter().map(|&xi| 2.0 * xi + 0.1 * (xi as f64).sin()).collect();
+        let y: Vec<f64> = x
+            .iter()
+            .map(|&xi| 2.0 * xi + 0.1 * (xi as f64).sin())
+            .collect();
 
         let result = cc.analyze(&x, &y);
         println!("Causal analysis result: {:?}", result);
 
         // Result should have a valid confidence
         assert!(result.confidence.is_finite(), "Confidence should be finite");
-        assert!(result.confidence >= 0.0 && result.confidence <= 1.0,
-                "Confidence should be in [0, 1]");
+        assert!(
+            result.confidence >= 0.0 && result.confidence <= 1.0,
+            "Confidence should be in [0, 1]"
+        );
 
         // Provide feedback
         cc.learn(&x, &y, CausalDirection::Forward);
@@ -1344,7 +1413,10 @@ mod tests {
 
         // Verify grid search completes and returns valid result
         assert!(result.n_total == 15, "Should process all data points");
-        assert!(tuner.best_thresholds().is_some(), "Should find best thresholds");
+        assert!(
+            tuner.best_thresholds().is_some(),
+            "Should find best thresholds"
+        );
     }
 
     #[test]

@@ -63,7 +63,7 @@ impl Default for VoiceFeedbackConfig {
             rate_stability_weight: 0.10,
             prediction_accuracy_weight: 0.10,
             history_length: 50,
-            target_speech_rate: 4.0,  // ~4 syllables/second (natural speech)
+            target_speech_rate: 4.0, // ~4 syllables/second (natural speech)
             acceptable_rate_variance: 0.25,
             min_articulation_threshold: 0.7,
         }
@@ -139,7 +139,7 @@ impl VoiceOutputMetrics {
             speech_rate: actual_rate,
             pitch_stability,
             coarticulation_smoothness: transition_smoothness,
-            listener_prediction: 0.5,  // Default until feedback received
+            listener_prediction: 0.5, // Default until feedback received
             duration_accuracy,
             energy_consistency,
         }
@@ -236,7 +236,8 @@ impl VoiceFeedbackBridge {
         self.update_count += 1;
 
         // Update histories
-        self.articulation_history.push_back(metrics.articulation_score);
+        self.articulation_history
+            .push_back(metrics.articulation_score);
         if self.articulation_history.len() > self.config.history_length {
             self.articulation_history.pop_front();
         }
@@ -246,7 +247,8 @@ impl VoiceFeedbackBridge {
             self.rate_history.pop_front();
         }
 
-        self.prediction_history.push_back(metrics.listener_prediction);
+        self.prediction_history
+            .push_back(metrics.listener_prediction);
         if self.prediction_history.len() > self.config.history_length {
             self.prediction_history.pop_front();
         }
@@ -271,7 +273,7 @@ impl VoiceFeedbackBridge {
     /// Get speech rate stability (inverse of coefficient of variation)
     pub fn rate_stability(&self) -> f32 {
         if self.rate_history.len() < 2 {
-            return 1.0;  // Assume stable with limited data
+            return 1.0; // Assume stable with limited data
         }
 
         let mean: f32 = self.rate_history.iter().sum::<f32>() / self.rate_history.len() as f32;
@@ -279,9 +281,12 @@ impl VoiceFeedbackBridge {
             return 0.0;
         }
 
-        let variance: f32 = self.rate_history.iter()
+        let variance: f32 = self
+            .rate_history
+            .iter()
             .map(|r| (r - mean).powi(2))
-            .sum::<f32>() / self.rate_history.len() as f32;
+            .sum::<f32>()
+            / self.rate_history.len() as f32;
         let std_dev = variance.sqrt();
         let cv = std_dev / mean;
 
@@ -298,7 +303,14 @@ impl VoiceFeedbackBridge {
         }
 
         let recent: Vec<f32> = self.rate_history.iter().rev().take(5).cloned().collect();
-        let older: Vec<f32> = self.rate_history.iter().rev().skip(5).take(5).cloned().collect();
+        let older: Vec<f32> = self
+            .rate_history
+            .iter()
+            .rev()
+            .skip(5)
+            .take(5)
+            .cloned()
+            .collect();
 
         if older.is_empty() {
             return 0.0;
@@ -313,7 +325,7 @@ impl VoiceFeedbackBridge {
     /// Get listener prediction success rate
     pub fn prediction_success(&self) -> f32 {
         if self.prediction_history.is_empty() {
-            return 0.5;  // Neutral assumption
+            return 0.5; // Neutral assumption
         }
         self.prediction_history.iter().sum::<f32>() / self.prediction_history.len() as f32
     }
@@ -333,7 +345,8 @@ impl VoiceFeedbackBridge {
 
         // Uncertainty penalty
         let articulation_penalty = if articulation < self.config.min_articulation_threshold {
-            (self.config.min_articulation_threshold - articulation) * self.config.articulation_weight
+            (self.config.min_articulation_threshold - articulation)
+                * self.config.articulation_weight
         } else {
             0.0
         };
@@ -342,7 +355,7 @@ impl VoiceFeedbackBridge {
 
         // Net phi adjustment
         let adjustment = understanding_boost - uncertainty_penalty;
-        adjustment.clamp(-0.3, 0.3)  // Limit extreme adjustments
+        adjustment.clamp(-0.3, 0.3) // Limit extreme adjustments
     }
 
     /// Compute learning rate modifier based on voice confidence
@@ -364,7 +377,11 @@ impl VoiceFeedbackBridge {
 
     /// Get current quality summary
     pub fn summary(&self) -> VoiceQualitySummary {
-        let current_rate = self.rate_history.back().copied().unwrap_or(self.config.target_speech_rate);
+        let current_rate = self
+            .rate_history
+            .back()
+            .copied()
+            .unwrap_or(self.config.target_speech_rate);
 
         VoiceQualitySummary {
             articulation_quality: self.smoothed_articulation(),
@@ -392,7 +409,10 @@ impl VoiceFeedbackBridge {
             return false;
         }
 
-        let current_rate = *self.rate_history.back().expect("rate_history checked non-empty above");
+        let current_rate = *self
+            .rate_history
+            .back()
+            .expect("rate_history checked non-empty above");
         let target = self.config.target_speech_rate;
         let acceptable_range = target * self.config.acceptable_rate_variance;
 
@@ -423,13 +443,13 @@ mod tests {
     #[test]
     fn test_voice_metrics_creation() {
         let metrics = VoiceOutputMetrics::from_articulator_output(
-            8,   // formants_hit
-            10,  // formants_total
-            4.0, // actual_rate
-            0.1, // pitch_variance
-            0.8, // transition_smoothness
-            0.05,// duration_error
-            0.1, // energy_variance
+            8,    // formants_hit
+            10,   // formants_total
+            4.0,  // actual_rate
+            0.1,  // pitch_variance
+            0.8,  // transition_smoothness
+            0.05, // duration_error
+            0.1,  // energy_variance
         );
 
         assert!((metrics.articulation_score - 0.8).abs() < 0.001);
@@ -451,8 +471,11 @@ mod tests {
             bridge.update(metrics);
         }
 
-        assert!(bridge.rate_stability() > 0.8,
-                "Uniform rate should have high stability: {}", bridge.rate_stability());
+        assert!(
+            bridge.rate_stability() > 0.8,
+            "Uniform rate should have high stability: {}",
+            bridge.rate_stability()
+        );
     }
 
     #[test]
@@ -461,7 +484,7 @@ mod tests {
 
         // Variable rate = lower stability
         for i in 0..20 {
-            let rate = if i % 2 == 0 { 2.0 } else { 6.0 };  // Alternating slow/fast
+            let rate = if i % 2 == 0 { 2.0 } else { 6.0 }; // Alternating slow/fast
             let metrics = VoiceOutputMetrics {
                 speech_rate: rate,
                 articulation_score: 0.8,
@@ -470,8 +493,11 @@ mod tests {
             bridge.update(metrics);
         }
 
-        assert!(bridge.rate_stability() < 0.5,
-                "Variable rate should have lower stability: {}", bridge.rate_stability());
+        assert!(
+            bridge.rate_stability() < 0.5,
+            "Variable rate should have lower stability: {}",
+            bridge.rate_stability()
+        );
     }
 
     #[test]
@@ -490,8 +516,11 @@ mod tests {
         }
 
         let phi_adj = bridge.compute_phi_adjustment();
-        assert!(phi_adj > 0.0,
-                "Good quality should give positive phi adjustment: {}", phi_adj);
+        assert!(
+            phi_adj > 0.0,
+            "Good quality should give positive phi adjustment: {}",
+            phi_adj
+        );
     }
 
     #[test]
@@ -501,17 +530,20 @@ mod tests {
         // Poor articulation, unstable rate
         for i in 0..20 {
             let metrics = VoiceOutputMetrics {
-                articulation_score: 0.4,  // Below threshold
-                speech_rate: if i % 2 == 0 { 2.0 } else { 6.0 },  // Unstable
-                listener_prediction: 0.3,  // Poor prediction
+                articulation_score: 0.4,                         // Below threshold
+                speech_rate: if i % 2 == 0 { 2.0 } else { 6.0 }, // Unstable
+                listener_prediction: 0.3,                        // Poor prediction
                 ..Default::default()
             };
             bridge.update(metrics);
         }
 
         let phi_adj = bridge.compute_phi_adjustment();
-        assert!(phi_adj < 0.0,
-                "Poor quality should give negative phi adjustment: {}", phi_adj);
+        assert!(
+            phi_adj < 0.0,
+            "Poor quality should give negative phi adjustment: {}",
+            phi_adj
+        );
     }
 
     #[test]
@@ -541,9 +573,12 @@ mod tests {
         }
         let low_quality_lr = bridge.learning_rate_modifier();
 
-        assert!(high_quality_lr > low_quality_lr,
-                "High quality should have higher LR modifier: {} vs {}",
-                high_quality_lr, low_quality_lr);
+        assert!(
+            high_quality_lr > low_quality_lr,
+            "High quality should have higher LR modifier: {} vs {}",
+            high_quality_lr,
+            low_quality_lr
+        );
     }
 
     #[test]
@@ -552,7 +587,7 @@ mod tests {
 
         // Normal rate
         let metrics = VoiceOutputMetrics {
-            speech_rate: 4.0,  // Target is 4.0
+            speech_rate: 4.0, // Target is 4.0
             ..Default::default()
         };
         bridge.update(metrics);
@@ -560,7 +595,7 @@ mod tests {
 
         // Very fast rate
         let metrics = VoiceOutputMetrics {
-            speech_rate: 8.0,  // Way above target
+            speech_rate: 8.0, // Way above target
             ..Default::default()
         };
         bridge.update(metrics);
@@ -586,7 +621,7 @@ mod tests {
         bridge.reset();
         for _ in 0..10 {
             let metrics = VoiceOutputMetrics {
-                articulation_score: 0.5,  // Below threshold
+                articulation_score: 0.5, // Below threshold
                 speech_rate: 4.0,
                 ..Default::default()
             };
@@ -622,14 +657,17 @@ mod tests {
         // Gradually increasing rate
         for i in 0..20 {
             let metrics = VoiceOutputMetrics {
-                speech_rate: 3.0 + i as f32 * 0.1,  // 3.0 → 5.0
+                speech_rate: 3.0 + i as f32 * 0.1, // 3.0 → 5.0
                 articulation_score: 0.8,
                 ..Default::default()
             };
             bridge.update(metrics);
         }
 
-        assert!(bridge.rate_trend() > 0.0,
-                "Increasing rate should have positive trend: {}", bridge.rate_trend());
+        assert!(
+            bridge.rate_trend() > 0.0,
+            "Increasing rate should have positive trend: {}",
+            bridge.rate_trend()
+        );
     }
 }
