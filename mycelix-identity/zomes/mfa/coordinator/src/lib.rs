@@ -362,6 +362,15 @@ pub fn enroll_factor(input: EnrollFactorInput) -> ExternResult<MfaStateOutput> {
         )));
     }
 
+    // Limit total factors per DID to prevent resource exhaustion
+    const MAX_FACTORS_PER_DID: usize = 20;
+    if current_state.factors.len() >= MAX_FACTORS_PER_DID {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Maximum {} factors per DID reached; remove an existing factor before enrolling a new one",
+            MAX_FACTORS_PER_DID
+        ))));
+    }
+
     // Check for duplicate factor ID
     if current_state
         .factors
@@ -1867,10 +1876,11 @@ fn parse_last_counter_from_metadata(factor_id: &str) -> u32 {
     // For now, we attempt to find a FactorVerification with this factor_id
     // that contains counter information in its metadata.
     let factor_hash = string_to_entry_hash(factor_id);
-    let links = get_links(
-        LinkQuery::try_new(factor_hash.clone(), LinkTypes::DidToVerifications).ok().unwrap(),
-        GetStrategy::default(),
-    );
+    let link_query = match LinkQuery::try_new(factor_hash.clone(), LinkTypes::DidToVerifications) {
+        Ok(q) => q,
+        Err(_) => return 0, // Cannot build query — no counter data available
+    };
+    let links = get_links(link_query, GetStrategy::default());
 
     if let Ok(verification_links) = links {
         let mut max_counter: u32 = 0;

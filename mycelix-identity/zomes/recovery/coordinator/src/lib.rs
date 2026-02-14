@@ -116,19 +116,19 @@ fn enroll_social_recovery_factor(did: &str, trustees: &[String]) -> ExternResult
     match response {
         ZomeCallResponse::Ok(_) => Ok(()),
         ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            debug!("MFA zome unauthorized - recovery setup without MFA factor enrollment");
+            warn!("MFA zome unauthorized - recovery setup WITHOUT MFA factor enrollment");
             Ok(())
         }
         ZomeCallResponse::NetworkError(err) => {
-            debug!("MFA network error during factor enrollment: {}", err);
+            warn!("MFA network error during factor enrollment: {} - recovery setup WITHOUT MFA", err);
             Ok(())
         }
         ZomeCallResponse::CountersigningSession(err) => {
-            debug!("MFA countersigning error during factor enrollment: {}", err);
+            warn!("MFA countersigning error during factor enrollment: {} - recovery setup WITHOUT MFA", err);
             Ok(())
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
-            debug!("MFA authentication failed during factor enrollment");
+            warn!("MFA authentication failed - recovery setup WITHOUT MFA factor enrollment");
             Ok(())
         }
     }

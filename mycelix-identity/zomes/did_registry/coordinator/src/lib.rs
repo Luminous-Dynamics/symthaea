@@ -87,22 +87,22 @@ fn auto_create_mfa_state(did: &str, agent_pub_key: &AgentPubKey) -> ExternResult
             Ok(())
         }
         ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            // MFA zome not accessible - log but don't fail DID creation
-            // This allows DID creation even if MFA zome is not installed
-            debug!("MFA zome unauthorized - DID created without MFA state");
+            // MFA zome not accessible - warn and continue DID creation.
+            // This allows DID creation even if MFA zome is not installed,
+            // but the warning ensures operators notice MFA is missing.
+            warn!("MFA zome unauthorized - DID created WITHOUT MFA state (MFA enrollment will be required separately)");
             Ok(())
         }
         ZomeCallResponse::NetworkError(err) => {
-            // Network error - log but don't fail DID creation
-            debug!("MFA zome network error: {} - DID created without MFA state", err);
+            warn!("MFA zome network error: {} - DID created WITHOUT MFA state", err);
             Ok(())
         }
         ZomeCallResponse::CountersigningSession(err) => {
-            debug!("MFA zome countersigning error: {} - DID created without MFA state", err);
+            warn!("MFA zome countersigning error: {} - DID created WITHOUT MFA state", err);
             Ok(())
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
-            debug!("MFA zome authentication failed - DID created without MFA state");
+            warn!("MFA zome authentication failed - DID created WITHOUT MFA state");
             Ok(())
         }
     }

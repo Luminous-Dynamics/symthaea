@@ -462,6 +462,16 @@ pub fn get_credential(credential_id: String) -> ExternResult<Option<Record>> {
 /// Get credentials issued by a DID
 #[hdk_extern]
 pub fn get_credentials_issued_by(issuer_did: String) -> ExternResult<Vec<Record>> {
+    if issuer_did.is_empty() || issuer_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer DID must be 1-256 characters".into()
+        )));
+    }
+    if !issuer_did.starts_with("did:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer must be a valid DID".into()
+        )));
+    }
     let issuer_hash = string_to_entry_hash(&issuer_did);
     let links = get_links(
         LinkQuery::try_new(issuer_hash, LinkTypes::IssuerToCredential)?,
@@ -482,6 +492,16 @@ pub fn get_credentials_issued_by(issuer_did: String) -> ExternResult<Vec<Record>
 /// Get credentials about a subject DID
 #[hdk_extern]
 pub fn get_credentials_for_subject(subject_did: String) -> ExternResult<Vec<Record>> {
+    if subject_did.is_empty() || subject_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject DID must be 1-256 characters".into()
+        )));
+    }
+    if !subject_did.starts_with("did:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject must be a valid DID".into()
+        )));
+    }
     let subject_hash = string_to_entry_hash(&subject_did);
     let links = get_links(
         LinkQuery::try_new(subject_hash, LinkTypes::SubjectToCredential)?,
@@ -506,6 +526,30 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
     let holder_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
     let now = sys_time()?;
     let now_iso = format_timestamp_iso8601(now);
+
+    // Validate challenge/domain inputs
+    if let Some(ref challenge) = input.challenge {
+        if challenge.is_empty() || challenge.len() > 512 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Challenge must be 1-512 characters".into()
+            )));
+        }
+    }
+    if let Some(ref domain) = input.domain {
+        if domain.is_empty() || domain.len() > 256 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Domain must be 1-256 characters".into()
+            )));
+        }
+        // Domain requires a challenge (W3C Data Integrity spec: domain without
+        // challenge is meaningless since there's nothing binding the domain to
+        // a specific verification session)
+        if input.challenge.is_none() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Domain requires a challenge to be set (replay protection)".into()
+            )));
+        }
+    }
 
     // Gather credentials
     let mut credentials = Vec::new();
