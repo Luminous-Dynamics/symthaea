@@ -138,16 +138,6 @@ impl ConnectivityCalculator {
         (lambda2 / self.max_connectivity).clamp(0.0, 1.0)
     }
 
-    /// Deprecated: Use `algebraic_connectivity()` instead
-    ///
-    /// This method is kept for backward compatibility but will be removed
-    /// in a future version. The name "compute" was misleading as it implied
-    /// IIT Φ calculation, which this does NOT perform.
-    #[deprecated(since = "0.5.0", note = "Use algebraic_connectivity() instead - this measures λ₂, NOT IIT Φ")]
-    pub fn compute(&self, components: &[ContinuousHV]) -> f64 {
-        self.algebraic_connectivity(components)
-    }
-
     /// Build pairwise cosine similarity matrix (optimized: exploits symmetry)
     ///
     /// Returns n×n matrix where entry (i,j) is cosine similarity between
@@ -365,22 +355,6 @@ mod tests {
         let lambda2_k3 = calc.compute_lambda2(&matrix_k3);
 
         assert!((lambda2_k3 - 1.5).abs() < 0.01, "K3 λ₂ should be ~1.5, got {}", lambda2_k3);
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn test_backward_compatibility() {
-        let calc: RealPhiCalculator = RealPhiCalculator::new();
-        let components = vec![
-            ContinuousHV::random(128, 1),
-            ContinuousHV::random(128, 2),
-        ];
-
-        let result = calc.compute(&components);
-        assert!(result >= 0.0 && result <= 1.0);
-
-        let new_result = calc.algebraic_connectivity(&components);
-        assert!((result - new_result).abs() < 1e-10);
     }
 
     // ===== Migrated from phi_real (Round 5) =====

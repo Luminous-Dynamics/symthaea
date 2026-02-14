@@ -21,7 +21,6 @@ Backward-compatible aliases: `HV16 = BinaryHV`, `RealHV = ContinuousHV`.
 | `binary_hv` | `BinaryHV` type, SIMD ops, batch similarity, binding |
 | `unified_hv` | `ContinuousHV`, `HV` enum, normalize/scale/permute |
 | `simd_ops` | Low-level SIMD kernels (popcount, bundle, XOR) |
-| `compat` | `BinaryHV` ↔ `ContinuousHV` conversion with dimension interpolation |
 | `hv_pool` | Arena-based pooling for zero-allocation HV reuse |
 | `integrated_information` | IIT Φ measurement over HV ensembles |
 | `consciousness_topology` | Topology-aware Φ with graph structure |
@@ -297,7 +296,6 @@ pub mod semantic_decoder;  // HV → Primitive sequence (generative direction) -
 pub mod unified_hv;     // Unified hypervector types (ContinuousHV)
 pub mod config;         // Centralized HDC configuration (runtime dimension management)
 pub mod projection;     // Learned projection layers for dimension conversion
-pub mod compat;         // Compatibility layer for BinaryHV ↔ ContinuousHV migration
 
 // Global Workspace Theory (conscious access, competition, broadcasting)
 pub mod global_workspace;                  // GWT implementation with competitive dynamics
@@ -463,10 +461,6 @@ pub use projection::{
     RandomProjection,
 };
 
-// Re-export compatibility utilities (deprecated — prefer BinaryHV::to_continuous())
-#[allow(deprecated)]
-pub use compat::HVCompat;
-pub use compat::{hv16_to_core, core_to_hv16};
 
 // Re-export key types for convenience
 pub use statistical_retrieval::{
@@ -787,8 +781,6 @@ pub use hv_pool::{
     pooled_bind, pooled_similarity,
 };
 
-#[allow(deprecated)]
-pub use hv_pool::{PooledHV16, HV16Pool};
 // Re-export SIMD continuous HV operations (4x+ speedup for 16K-dim vectors)
 pub use simd_continuous::{
     dot_product_simd as continuous_dot_product_simd,
