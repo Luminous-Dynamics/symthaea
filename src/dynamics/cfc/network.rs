@@ -1405,7 +1405,10 @@ mod tests {
 
         // A large prediction error should trigger adaptation
         let adapted = net.adapt_online(10.0, &input, &target, 0.1);
-        assert!(adapted, "adapt_online should return true when error exceeds threshold");
+        assert!(
+            adapted,
+            "adapt_online should return true when error exceeds threshold"
+        );
 
         let stats = net.online_stats();
         assert_eq!(stats.total_adaptation_calls, 1);
@@ -1439,8 +1442,16 @@ mod tests {
         // Run forward to populate cell states
         net.forward(&small_input(), 0.1);
         let div = net.state_diversity();
-        assert!(div.is_finite(), "state_diversity should be finite, got {}", div);
-        assert!(div >= 0.0 && div <= 1.0, "diversity is sigmoid-scaled [0,1], got {}", div);
+        assert!(
+            div.is_finite(),
+            "state_diversity should be finite, got {}",
+            div
+        );
+        assert!(
+            div >= 0.0 && div <= 1.0,
+            "diversity is sigmoid-scaled [0,1], got {}",
+            div
+        );
     }
 
     // ---------------------------------------------------------------
@@ -1461,10 +1472,7 @@ mod tests {
             diag.condition_number.is_finite(),
             "condition_number should be finite"
         );
-        assert!(
-            diag.state_norm.is_finite(),
-            "state_norm should be finite"
-        );
+        assert!(diag.state_norm.is_finite(), "state_norm should be finite");
     }
 
     // ---------------------------------------------------------------
@@ -1488,7 +1496,10 @@ mod tests {
             .iter()
             .zip(weights_after_train.iter())
             .any(|(a, b)| (a - b).abs() > 1e-10);
-        assert!(any_changed, "training should have modified at least some weights");
+        assert!(
+            any_changed,
+            "training should have modified at least some weights"
+        );
 
         // Restore original weights
         net.set_weights(&weights_orig);

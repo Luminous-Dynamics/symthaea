@@ -968,7 +968,11 @@ mod tests {
 
     /// Helper: build a normal/benign primitive.
     fn make_benign_primitive() -> CandidatePrimitive {
-        make_primitive("valid_prim", "A well-formed definition of reasonable length", 0.5)
+        make_primitive(
+            "valid_prim",
+            "A well-formed definition of reasonable length",
+            0.5,
+        )
     }
 
     // -----------------------------------------------------------------------
@@ -1018,9 +1022,18 @@ mod tests {
 
         assert!((features.phi - 0.5).abs() < f64::EPSILON);
         assert_eq!(features.name_length, "valid_prim".len());
-        assert!(features.phi_suspicion < 0.1, "normal phi should not be suspicious");
-        assert!(features.name_suspicion < 0.1, "normal name should not be suspicious");
-        assert!(features.definition_suspicion < 0.1, "normal definition should not be suspicious");
+        assert!(
+            features.phi_suspicion < 0.1,
+            "normal phi should not be suspicious"
+        );
+        assert!(
+            features.name_suspicion < 0.1,
+            "normal name should not be suspicious"
+        );
+        assert!(
+            features.definition_suspicion < 0.1,
+            "normal definition should not be suspicious"
+        );
         assert!(features.overall_suspicion < 0.1);
     }
 
@@ -1030,9 +1043,18 @@ mod tests {
         let prim = make_suspicious_primitive();
         let features = cbd.extract_features(&prim);
 
-        assert!(features.phi_suspicion > 0.5, "extreme phi should be suspicious");
-        assert!(features.name_suspicion > 0.5, "short name should be suspicious");
-        assert!(features.definition_suspicion > 0.5, "short definition should be suspicious");
+        assert!(
+            features.phi_suspicion > 0.5,
+            "extreme phi should be suspicious"
+        );
+        assert!(
+            features.name_suspicion > 0.5,
+            "short name should be suspicious"
+        );
+        assert!(
+            features.definition_suspicion > 0.5,
+            "short definition should be suspicious"
+        );
         assert!(features.overall_suspicion > 0.5);
     }
 
@@ -1185,9 +1207,7 @@ mod tests {
         assert_eq!(cbd.causal_graph().edge_count(), 0);
         assert_eq!(cbd.causal_graph().node_count(), 0);
 
-        let (outcome, explanation) = cbd
-            .causal_contribute("test-node", suspicious)
-            .unwrap();
+        let (outcome, explanation) = cbd.causal_contribute("test-node", suspicious).unwrap();
 
         // Suspicious primitive should be detected as malicious by mock detection.
         assert!(

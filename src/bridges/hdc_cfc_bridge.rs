@@ -662,7 +662,9 @@ impl HdcCfcBridge {
         };
 
         // Step 3: Attention-based refinement
-        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
+        let attended = self
+            .attention
+            .forward(normalized.as_slice().expect("array must be contiguous"));
         let attended_array = Array1::from_vec(attended.values);
 
         // Step 4: Second projection to CfC dimension
@@ -693,7 +695,9 @@ impl HdcCfcBridge {
         };
 
         // Step 3: Attention-based refinement
-        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
+        let attended = self
+            .attention
+            .forward(normalized.as_slice().expect("array must be contiguous"));
         let attended_array = Array1::from_vec(attended.values);
 
         // Step 4: Second projection to HDC dimension
@@ -732,7 +736,9 @@ impl HdcCfcBridge {
         // Step 3: Context-aware attention
         let attended = self.attention.forward_with_context(
             normalized.as_slice().expect("array must be contiguous"),
-            context_intermediate.as_slice().expect("array must be contiguous"),
+            context_intermediate
+                .as_slice()
+                .expect("array must be contiguous"),
         );
         let attended_array = Array1::from_vec(attended.values);
 
@@ -770,7 +776,9 @@ impl HdcCfcBridge {
         // Step 3: Context-aware attention
         let attended = self.attention.forward_with_context(
             normalized.as_slice().expect("array must be contiguous"),
-            context_intermediate.as_slice().expect("array must be contiguous"),
+            context_intermediate
+                .as_slice()
+                .expect("array must be contiguous"),
         );
         let attended_array = Array1::from_vec(attended.values);
 
@@ -937,7 +945,9 @@ impl HdcCfcBridge {
         } else {
             intermediate
         };
-        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
+        let attended = self
+            .attention
+            .forward(normalized.as_slice().expect("array must be contiguous"));
         let output = self.w_encode_2.dot(&Array1::from_vec(attended.values));
         let encoded: Vec<f32> = output.iter().map(|x| x.tanh()).collect();
 
@@ -990,7 +1000,9 @@ impl HdcCfcBridge {
         } else {
             intermediate
         };
-        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
+        let attended = self
+            .attention
+            .forward(normalized.as_slice().expect("array must be contiguous"));
         let output = w.dot(&Array1::from_vec(attended.values));
         let encoded: Vec<f32> = output.iter().map(|x| x.tanh()).collect();
 
@@ -1043,7 +1055,9 @@ impl HdcCfcBridge {
         } else {
             intermediate
         };
-        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
+        let attended = self
+            .attention
+            .forward(normalized.as_slice().expect("array must be contiguous"));
         let output = self.w_decode_2.dot(&Array1::from_vec(attended.values));
 
         let values: Vec<f32> = output.iter().cloned().collect();
@@ -1093,7 +1107,9 @@ impl HdcCfcBridge {
         } else {
             intermediate
         };
-        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
+        let attended = self
+            .attention
+            .forward(normalized.as_slice().expect("array must be contiguous"));
 
         let mut w = self.w_decode_2.clone();
         w[[i, j]] += delta;
@@ -1153,7 +1169,9 @@ impl HdcCfcBridge {
         } else {
             intermediate
         };
-        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
+        let attended = self
+            .attention
+            .forward(normalized.as_slice().expect("array must be contiguous"));
         let output = w_encode_2.dot(&Array1::from_vec(attended.values));
         output.iter().map(|x| x.tanh()).collect()
     }

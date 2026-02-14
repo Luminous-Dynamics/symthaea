@@ -156,7 +156,10 @@ impl CsvSink {
 impl TelemetrySink for CsvSink {
     fn export(&self, event: &ReasoningEvent) -> Result<(), TelemetryError> {
         let mut writer = self.writer.lock().unwrap_or_else(|e| e.into_inner());
-        let mut header_written = self.header_written.lock().unwrap_or_else(|e| e.into_inner());
+        let mut header_written = self
+            .header_written
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
 
         if !*header_written {
             self.write_header(&mut writer)?;

@@ -350,7 +350,10 @@ impl NarrativeAlgebra {
             .primitives
             .conflict
             .bind(&self.hash_string(conflict_desc));
-        let mood_hv = self.primitives.mood.bind(self.mood_hvs.get(&mood).expect("map covers all variants"));
+        let mood_hv = self
+            .primitives
+            .mood
+            .bind(self.mood_hvs.get(&mood).expect("map covers all variants"));
 
         // Bundle all elements
         let mut components = vec![setting_hv, conflict_hv, mood_hv];
@@ -362,17 +365,26 @@ impl NarrativeAlgebra {
 
     /// Encode an arc phase as a hypervector.
     pub fn encode_arc_phase(&self, phase: ArcPhase) -> ContinuousHV {
-        self.phase_hvs.get(&phase).expect("map covers all variants").clone()
+        self.phase_hvs
+            .get(&phase)
+            .expect("map covers all variants")
+            .clone()
     }
 
     /// Encode a tension level as a hypervector.
     pub fn encode_tension(&self, level: TensionLevel) -> ContinuousHV {
-        self.tension_hvs.get(&level).expect("map covers all variants").clone()
+        self.tension_hvs
+            .get(&level)
+            .expect("map covers all variants")
+            .clone()
     }
 
     /// Encode a mood as a hypervector.
     pub fn encode_mood(&self, mood: NarrativeMood) -> ContinuousHV {
-        self.mood_hvs.get(&mood).expect("map covers all variants").clone()
+        self.mood_hvs
+            .get(&mood)
+            .expect("map covers all variants")
+            .clone()
     }
 
     // ========================================================================
