@@ -8,9 +8,9 @@
 //! These widgets integrate with the egui framework and provide
 //! consciousness-aware visualization of NixOS state.
 
-use std::process::Command;
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
+use std::process::Command;
 
 // ============================================================================
 // C1: NixOS Module Browser
@@ -159,7 +159,11 @@ impl ModuleBrowser {
 
         // Query nix-instantiate for option metadata
         let output = Command::new("nix-instantiate")
-            .args(["--eval", "--json", "-E", r#"
+            .args([
+                "--eval",
+                "--json",
+                "-E",
+                r#"
                 let
                   pkgs = import <nixpkgs> {};
                   lib = pkgs.lib;
@@ -182,7 +186,8 @@ impl ModuleBrowser {
                          else []
                     ) opts);
                 in lib.take 1000 (collectOptions "" options)
-            "#])
+            "#,
+            ])
             .output()
             .map_err(|e| format!("Failed to run nix-instantiate: {}", e))?;
 
@@ -196,11 +201,12 @@ impl ModuleBrowser {
 
         // Parse JSON output
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let parsed: Vec<serde_json::Value> = serde_json::from_str(&stdout)
-            .map_err(|e| format!("Failed to parse options: {}", e))?;
+        let parsed: Vec<serde_json::Value> =
+            serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse options: {}", e))?;
 
-        self.options = parsed.into_iter().map(|v| {
-            NixOption {
+        self.options = parsed
+            .into_iter()
+            .map(|v| NixOption {
                 path: v["path"].as_str().unwrap_or("").to_string(),
                 option_type: v["type"].as_str().unwrap_or("unknown").to_string(),
                 description: v["description"].as_str().unwrap_or("").to_string(),
@@ -209,12 +215,14 @@ impl ModuleBrowser {
                 declared_by: Vec::new(),
                 is_set: false,
                 current_value: None,
-            }
-        }).collect();
+            })
+            .collect();
 
         // Update category counts
         for cat in &mut self.categories {
-            cat.option_count = self.options.iter()
+            cat.option_count = self
+                .options
+                .iter()
                 .filter(|o| o.path.starts_with(&cat.path_prefix))
                 .count();
         }
@@ -229,7 +237,10 @@ impl ModuleBrowser {
     pub fn filter(&mut self) {
         let query = self.search_query.to_lowercase();
 
-        self.filtered_options = self.options.iter().enumerate()
+        self.filtered_options = self
+            .options
+            .iter()
+            .enumerate()
             .filter(|(_, opt)| {
                 // Category filter
                 if let Some(ref cat) = self.selected_category {
@@ -362,7 +373,8 @@ impl GenerationTimeline {
         // Find current/booted
         if let Ok(current_link) = std::fs::read_link("/run/current-system") {
             // Extract generation number from link
-            if let Some(num) = current_link.to_string_lossy()
+            if let Some(num) = current_link
+                .to_string_lossy()
                 .split('-')
                 .find_map(|s| s.parse::<u32>().ok())
             {
@@ -387,9 +399,10 @@ impl GenerationTimeline {
 
                     // Parse date
                     let date_str = format!("{} {}", parts[1], parts[2]);
-                    let created_at = chrono::NaiveDateTime::parse_from_str(&date_str, "%Y-%m-%d %H:%M:%S")
-                        .map(|dt| Utc.from_utc_datetime(&dt))
-                        .unwrap_or_else(|_| Utc::now());
+                    let created_at =
+                        chrono::NaiveDateTime::parse_from_str(&date_str, "%Y-%m-%d %H:%M:%S")
+                            .map(|dt| Utc.from_utc_datetime(&dt))
+                            .unwrap_or_else(|_| Utc::now());
 
                     generations.push(Generation {
                         number: num,
@@ -414,7 +427,8 @@ impl GenerationTimeline {
     pub fn diff(&self, gen1: u32, gen2: u32) -> Result<GenerationChanges, String> {
         let output = Command::new("nix")
             .args([
-                "store", "diff-closures",
+                "store",
+                "diff-closures",
                 &format!("/nix/var/nix/profiles/system-{}-link", gen1),
                 &format!("/nix/var/nix/profiles/system-{}-link", gen2),
             ])
@@ -437,7 +451,12 @@ impl GenerationTimeline {
                 let parts: Vec<&str> = line.split("->").collect();
                 if parts.len() == 2 {
                     let name = parts[0].trim().split('-').next().unwrap_or("").to_string();
-                    let old_ver = parts[0].trim().split('-').next_back().unwrap_or("").to_string();
+                    let old_ver = parts[0]
+                        .trim()
+                        .split('-')
+                        .next_back()
+                        .unwrap_or("")
+                        .to_string();
                     let new_ver = parts[1].trim().to_string();
                     changes.upgraded.push((name, old_ver, new_ver));
                 }
@@ -540,8 +559,8 @@ impl LiveConfigDiff {
     /// Load original config from file
     pub fn load_original(&mut self, path: &str) -> Result<(), String> {
         self.file_path = path.to_string();
-        self.original = std::fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read {}: {}", path, e))?;
+        self.original =
+            std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {}", path, e))?;
         self.compute_diff();
         Ok(())
     }
@@ -595,7 +614,9 @@ impl LiveConfigDiff {
                         });
                     }
 
-                    let hunk = current_hunk.as_mut().expect("current_hunk initialized above when None");
+                    let hunk = current_hunk
+                        .as_mut()
+                        .expect("current_hunk initialized above when None");
                     hunk.lines.push(DiffLine {
                         diff_type: DiffType::Removed,
                         line_number_old: Some(old_idx as u32 + 1),
@@ -626,7 +647,9 @@ impl LiveConfigDiff {
                         });
                     }
 
-                    let hunk = current_hunk.as_mut().expect("current_hunk initialized above when None");
+                    let hunk = current_hunk
+                        .as_mut()
+                        .expect("current_hunk initialized above when None");
                     hunk.lines.push(DiffLine {
                         diff_type: DiffType::Removed,
                         line_number_old: Some(old_idx as u32 + 1),
@@ -649,7 +672,9 @@ impl LiveConfigDiff {
                         });
                     }
 
-                    let hunk = current_hunk.as_mut().expect("current_hunk initialized above when None");
+                    let hunk = current_hunk
+                        .as_mut()
+                        .expect("current_hunk initialized above when None");
                     hunk.lines.push(DiffLine {
                         diff_type: DiffType::Added,
                         line_number_old: None,
@@ -706,8 +731,7 @@ impl LiveConfigDiff {
         for hunk in &self.hunks {
             output.push_str(&format!(
                 "@@ -{},{} +{},{} @@\n",
-                hunk.old_start, hunk.old_count,
-                hunk.new_start, hunk.new_count
+                hunk.old_start, hunk.old_count, hunk.new_start, hunk.new_count
             ));
 
             for line in &hunk.lines {
@@ -765,7 +789,7 @@ impl UnitState {
 
     pub fn color(&self) -> (u8, u8, u8) {
         match self {
-            Self::Active => (100, 200, 100),      // Green
+            Self::Active => (100, 200, 100),       // Green
             Self::Inactive => (150, 150, 150),     // Gray
             Self::Failed => (200, 100, 100),       // Red
             Self::Activating => (200, 200, 100),   // Yellow
@@ -884,7 +908,13 @@ impl ServiceDashboard {
 
         // List all services
         let output = Command::new("systemctl")
-            .args(["list-units", "--type=service", "--all", "--no-pager", "--plain"])
+            .args([
+                "list-units",
+                "--type=service",
+                "--all",
+                "--no-pager",
+                "--plain",
+            ])
             .output()
             .map_err(|e| format!("Failed to list units: {}", e))?;
 
@@ -909,7 +939,8 @@ impl ServiceDashboard {
     fn parse_units(&self, output: &str) -> Vec<SystemdUnit> {
         let mut units = Vec::new();
 
-        for line in output.lines().skip(1) { // Skip header
+        for line in output.lines().skip(1) {
+            // Skip header
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() >= 4 {
                 let name = parts[0].to_string();
@@ -1001,7 +1032,8 @@ impl ServiceDashboard {
 
     /// Filter units
     pub fn filtered_units(&self) -> Vec<&SystemdUnit> {
-        self.units.iter()
+        self.units
+            .iter()
             .filter(|u| {
                 // State filter
                 if let Some(ref state) = self.state_filter {
@@ -1012,16 +1044,22 @@ impl ServiceDashboard {
 
                 // Name filter
                 if !self.name_filter.is_empty()
-                    && !u.name.to_lowercase().contains(&self.name_filter.to_lowercase())
-                        && !u.description.to_lowercase().contains(&self.name_filter.to_lowercase()) {
-                        return false;
-                    }
+                    && !u
+                        .name
+                        .to_lowercase()
+                        .contains(&self.name_filter.to_lowercase())
+                    && !u
+                        .description
+                        .to_lowercase()
+                        .contains(&self.name_filter.to_lowercase())
+                {
+                    return false;
+                }
 
                 // NixOS filter (check if unit file is in /nix/store)
-                if self.nixos_only
-                    && !u.unit_file.starts_with("/nix/store") {
-                        return false;
-                    }
+                if self.nixos_only && !u.unit_file.starts_with("/nix/store") {
+                    return false;
+                }
 
                 true
             })
@@ -1038,14 +1076,18 @@ impl ServiceDashboard {
                 SortField::Name => a.name.cmp(&b.name),
                 SortField::State => format!("{:?}", a.state).cmp(&format!("{:?}", b.state)),
                 SortField::Memory => a.memory_bytes.cmp(&b.memory_bytes),
-                SortField::Cpu => {
-                    a.cpu_percent.partial_cmp(&b.cpu_percent)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                }
+                SortField::Cpu => a
+                    .cpu_percent
+                    .partial_cmp(&b.cpu_percent)
+                    .unwrap_or(std::cmp::Ordering::Equal),
                 SortField::ActiveSince => a.active_since.cmp(&b.active_since),
             };
 
-            if ascending { cmp } else { cmp.reverse() }
+            if ascending {
+                cmp
+            } else {
+                cmp.reverse()
+            }
         });
     }
 

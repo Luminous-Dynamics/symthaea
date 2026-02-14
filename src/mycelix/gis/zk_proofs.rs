@@ -51,7 +51,9 @@ impl FieldElement {
         let mut hasher = Hasher::new();
         hasher.update(bytes);
         let hash = hasher.finalize();
-        let arr: [u8; 16] = hash.as_bytes()[0..16].try_into().expect("16-byte slice fits [u8; 16]");
+        let arr: [u8; 16] = hash.as_bytes()[0..16]
+            .try_into()
+            .expect("16-byte slice fits [u8; 16]");
         Self::new(u128::from_le_bytes(arr))
     }
 
@@ -97,7 +99,10 @@ impl FieldElement {
         let low_carry = if low_part < lo_lo { 1u128 } else { 0u128 };
 
         // Higher bits
-        let high_part = hi_hi.wrapping_add(mid >> 64).wrapping_add(carry << 64).wrapping_add(low_carry);
+        let high_part = hi_hi
+            .wrapping_add(mid >> 64)
+            .wrapping_add(carry << 64)
+            .wrapping_add(low_carry);
 
         // Reduce mod (2^127 - 1): x = low_part + high_part * 2^128
         // = low_part + high_part * 2 * 2^127 = low_part + high_part * 2 * (p + 1)
@@ -105,7 +110,8 @@ impl FieldElement {
 
         let reduced = if high_part > 0 {
             // For very large products, just take mod
-            (low_part % FIELD_MODULUS).wrapping_add((high_part % FIELD_MODULUS) << 1) % FIELD_MODULUS
+            (low_part % FIELD_MODULUS).wrapping_add((high_part % FIELD_MODULUS) << 1)
+                % FIELD_MODULUS
         } else {
             low_part % FIELD_MODULUS
         };
@@ -325,8 +331,12 @@ impl BulletproofRangeProof {
             let bit_val = if bit { 1u64 } else { 0u64 };
 
             // Commitment to bit: C_i = bit * G_i + r_i * H
-            let r_i = FieldElement::random(transcript.finalize().as_bytes()[0..8]
-                .try_into().map(u64::from_le_bytes).unwrap_or(i as u64));
+            let r_i = FieldElement::random(
+                transcript.finalize().as_bytes()[0..8]
+                    .try_into()
+                    .map(u64::from_le_bytes)
+                    .unwrap_or(i as u64),
+            );
 
             let bit_commitment = params.bit_generators[i]
                 .scalar_mul(bit_val)
@@ -457,7 +467,11 @@ impl SchnorrProof {
                 .as_nanos();
             hasher.update(&now.to_le_bytes());
             let hash = hasher.finalize();
-            u64::from_le_bytes(hash.as_bytes()[0..8].try_into().expect("8-byte slice fits [u8; 8]"))
+            u64::from_le_bytes(
+                hash.as_bytes()[0..8]
+                    .try_into()
+                    .expect("8-byte slice fits [u8; 8]"),
+            )
         };
         let r = FieldElement::random(r_seed);
 
@@ -659,7 +673,9 @@ impl TopicValidityProof {
         hasher.update(&(topic.chars().filter(|c| c.is_alphabetic()).count() as u64).to_le_bytes());
 
         let hash = hasher.finalize();
-        hash.as_bytes()[0..32].try_into().expect("32-byte slice fits [u8; 32]")
+        hash.as_bytes()[0..32]
+            .try_into()
+            .expect("32-byte slice fits [u8; 32]")
     }
 
     /// Get proof size
@@ -712,7 +728,8 @@ impl ZKTopicCommitment {
     /// Open the commitment (reveals topic)
     pub fn open(&self, topic: &str) -> bool {
         if let Some(ref opening) = self.pedersen.opening {
-            self.pedersen.verify_opening(topic.as_bytes(), &opening.randomness)
+            self.pedersen
+                .verify_opening(topic.as_bytes(), &opening.randomness)
         } else {
             false
         }

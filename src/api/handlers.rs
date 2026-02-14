@@ -1,5 +1,9 @@
 //! API request handlers
 
+use crate::api::{
+    models::*,
+    state::{AppState, Submission, SubmissionRequestStored},
+};
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -7,16 +11,10 @@ use axum::{
 };
 use serde::Deserialize;
 use std::sync::Arc;
-use uuid::Uuid;
-use crate::api::{
-    models::*,
-    state::{AppState, Submission, SubmissionRequestStored},
-};
 use symthaea_core::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
-    HDC_DIMENSION,
-    ContinuousHV,
+    consciousness_topology_generators::ConsciousnessTopology, ContinuousHV, HDC_DIMENSION,
 };
+use uuid::Uuid;
 
 /// Health check endpoint
 pub async fn health_check() -> Json<serde_json::Value> {
@@ -27,6 +25,7 @@ pub async fn health_check() -> Json<serde_json::Value> {
     }))
 }
 
+#[derive(Debug)]
 enum CustomInput<'a> {
     NodeRepresentations(&'a [Vec<f32>]),
     AdjacencyMatrix(&'a [Vec<f32>]),
@@ -69,12 +68,11 @@ fn custom_input(request: &SubmissionRequest) -> Result<Option<CustomInput<'_>>, 
 
     if let Some(node_representations) = request.node_representations.as_ref() {
         if node_representations.len() < 2 {
-            return Err(ApiError::bad_request("node_representations must have at least 2 nodes"));
+            return Err(ApiError::bad_request(
+                "node_representations must have at least 2 nodes",
+            ));
         }
-        let dim = node_representations
-            .first()
-            .map(|v| v.len())
-            .unwrap_or(0);
+        let dim = node_representations.first().map(|v| v.len()).unwrap_or(0);
         if dim != HDC_DIMENSION {
             return Err(ApiError::bad_request(
                 "node_representations must use HDC_DIMENSION (16384)",
@@ -90,7 +88,9 @@ fn custom_input(request: &SubmissionRequest) -> Result<Option<CustomInput<'_>>, 
 
     if let Some(adjacency_matrix) = request.adjacency_matrix.as_ref() {
         if adjacency_matrix.len() < 2 {
-            return Err(ApiError::bad_request("adjacency_matrix must be at least 2x2"));
+            return Err(ApiError::bad_request(
+                "adjacency_matrix must be at least 2x2",
+            ));
         }
         let n_nodes = adjacency_matrix.len();
         if adjacency_matrix.iter().any(|row| row.len() != n_nodes) {
@@ -117,7 +117,9 @@ fn custom_input(request: &SubmissionRequest) -> Result<Option<CustomInput<'_>>, 
             .unwrap_or(0);
         let n_nodes = request.n_nodes.unwrap_or(max_index + 1);
         if n_nodes < 2 {
-            return Err(ApiError::bad_request("edge_list must include at least 2 nodes"));
+            return Err(ApiError::bad_request(
+                "edge_list must include at least 2 nodes",
+            ));
         }
         if max_index >= n_nodes {
             return Err(ApiError::bad_request("edge_list index exceeds n_nodes"));
@@ -164,7 +166,11 @@ fn build_custom_node_representations(
                         continue;
                     }
                     let bound = node_identities[i].bind(&node_identities[j]);
-                    let weighted = if *weight == 1.0 { bound } else { bound.scale(*weight) };
+                    let weighted = if *weight == 1.0 {
+                        bound
+                    } else {
+                        bound.scale(*weight)
+                    };
                     connections.push(weighted);
                 }
 
@@ -222,18 +228,10 @@ fn build_node_representations(
     let seed = 42u64;
     let n_nodes = standard_node_count(request);
     let topology = match request.topology_type {
-        Some(TopologyType::Ring) => {
-            ConsciousnessTopology::ring(n_nodes, HDC_DIMENSION, seed)
-        }
-        Some(TopologyType::Star) => {
-            ConsciousnessTopology::star(n_nodes, HDC_DIMENSION, seed)
-        }
-        Some(TopologyType::Random) => {
-            ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, seed)
-        }
-        Some(TopologyType::Torus) => {
-            ConsciousnessTopology::torus_square(3, HDC_DIMENSION, seed)
-        }
+        Some(TopologyType::Ring) => ConsciousnessTopology::ring(n_nodes, HDC_DIMENSION, seed),
+        Some(TopologyType::Star) => ConsciousnessTopology::star(n_nodes, HDC_DIMENSION, seed),
+        Some(TopologyType::Random) => ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, seed),
+        Some(TopologyType::Torus) => ConsciousnessTopology::torus_square(3, HDC_DIMENSION, seed),
         Some(TopologyType::Hypercube) => {
             ConsciousnessTopology::hypercube(request.dimension.unwrap_or(3), HDC_DIMENSION, seed)
         }
@@ -266,7 +264,9 @@ pub async fn submit_model(
     if request.model_name.len() > 100 {
         return Err((
             StatusCode::BAD_REQUEST,
-            Json(ApiError::bad_request("model_name must be 100 characters or less")),
+            Json(ApiError::bad_request(
+                "model_name must be 100 characters or less",
+            )),
         ));
     }
 
@@ -304,8 +304,10 @@ pub async fn submit_model(
                     Json(ApiError::bad_request("n_nodes must be at least 2")),
                 ));
             }
-            if matches!(request.topology_type, Some(TopologyType::Ring | TopologyType::SmallWorld))
-                && n_nodes < 3
+            if matches!(
+                request.topology_type,
+                Some(TopologyType::Ring | TopologyType::SmallWorld)
+            ) && n_nodes < 3
             {
                 return Err((
                     StatusCode::BAD_REQUEST,
@@ -350,7 +352,11 @@ pub async fn submit_model(
         created_at: now,
     };
 
-    state.submissions.write().expect("submissions RwLock poisoned").insert(submission_id, submission);
+    state
+        .submissions
+        .write()
+        .expect("submissions RwLock poisoned")
+        .insert(submission_id, submission);
 
     // Estimate processing time based on node count
     let n_nodes = match &custom {
@@ -367,7 +373,12 @@ pub async fn submit_model(
 
     let process_inline = n_nodes <= 16;
     if process_inline {
-        if let Some(submission) = state.submissions.write().expect("submissions RwLock poisoned").get_mut(&submission_id) {
+        if let Some(submission) = state
+            .submissions
+            .write()
+            .expect("submissions RwLock poisoned")
+            .get_mut(&submission_id)
+        {
             submission.status = SubmissionStatus::Processing;
         }
 
@@ -379,7 +390,10 @@ pub async fn submit_model(
     }
 
     // Get queue position
-    let queue_position = state.submissions.read().expect("submissions RwLock poisoned")
+    let queue_position = state
+        .submissions
+        .read()
+        .expect("submissions RwLock poisoned")
         .values()
         .filter(|s| s.status == SubmissionStatus::Queued)
         .count() as u32;
@@ -404,15 +418,16 @@ pub async fn submit_model(
 }
 
 /// Process a small submission inline
-fn process_submission_inline(
-    state: &AppState,
-    submission_id: Uuid,
-    request: &SubmissionRequest,
-) {
+fn process_submission_inline(state: &AppState, submission_id: Uuid, request: &SubmissionRequest) {
     let (node_representations, _n_nodes) = match build_node_representations(request) {
         Ok(values) => values,
         Err(_) => {
-            if let Some(submission) = state.submissions.write().expect("submissions RwLock poisoned").get_mut(&submission_id) {
+            if let Some(submission) = state
+                .submissions
+                .write()
+                .expect("submissions RwLock poisoned")
+                .get_mut(&submission_id)
+            {
                 submission.status = SubmissionStatus::Failed;
             }
             return;
@@ -425,7 +440,11 @@ fn process_submission_inline(
         .algebraic_connectivity(&node_representations) as f32;
 
     // Get random baseline for comparison
-    let random_phi = state.baselines.get("random").map(|b| b.mean_phi).unwrap_or(0.4358);
+    let random_phi = state
+        .baselines
+        .get("random")
+        .map(|b| b.mean_phi)
+        .unwrap_or(0.4358);
 
     // Create result
     let now = chrono::Utc::now();
@@ -446,26 +465,43 @@ fn process_submission_inline(
         percentile: 50.0,
         comparison_vs_baselines: {
             let mut comparisons = std::collections::HashMap::new();
-            comparisons.insert("random".to_string(), BaselineComparison {
-                phi_difference: connectivity - random_phi,
-                percent_difference: (connectivity - random_phi) / random_phi * 100.0,
-                significantly_different: (connectivity - random_phi).abs() > 0.01,
-                p_value: 0.01,
-            });
+            comparisons.insert(
+                "random".to_string(),
+                BaselineComparison {
+                    phi_difference: connectivity - random_phi,
+                    percent_difference: (connectivity - random_phi) / random_phi * 100.0,
+                    significantly_different: (connectivity - random_phi).abs() > 0.01,
+                    p_value: 0.01,
+                },
+            );
             comparisons
         },
         detailed_metrics: None,
-        created_at: state.submissions.read().expect("submissions RwLock poisoned").get(&submission_id)
-            .map(|s| s.created_at).unwrap_or(now),
+        created_at: state
+            .submissions
+            .read()
+            .expect("submissions RwLock poisoned")
+            .get(&submission_id)
+            .map(|s| s.created_at)
+            .unwrap_or(now),
         completed_at: Some(now),
         processing_time_seconds: Some(0.5),
     };
 
     // Store result
-    state.results.write().expect("results RwLock poisoned").insert(submission_id, result);
+    state
+        .results
+        .write()
+        .expect("results RwLock poisoned")
+        .insert(submission_id, result);
 
     // Update submission status
-    if let Some(sub) = state.submissions.write().expect("submissions RwLock poisoned").get_mut(&submission_id) {
+    if let Some(sub) = state
+        .submissions
+        .write()
+        .expect("submissions RwLock poisoned")
+        .get_mut(&submission_id)
+    {
         sub.status = SubmissionStatus::Completed;
     }
 }
@@ -477,12 +513,22 @@ pub async fn get_results(
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<EvaluationResult>, (StatusCode, Json<ApiError>)> {
     // Check if result exists
-    if let Some(result) = state.results.read().expect("results RwLock poisoned").get(&submission_id) {
+    if let Some(result) = state
+        .results
+        .read()
+        .expect("results RwLock poisoned")
+        .get(&submission_id)
+    {
         return Ok(Json(result.clone()));
     }
 
     // Check if submission exists and is still processing
-    if let Some(submission) = state.submissions.read().expect("submissions RwLock poisoned").get(&submission_id) {
+    if let Some(submission) = state
+        .submissions
+        .read()
+        .expect("submissions RwLock poisoned")
+        .get(&submission_id)
+    {
         if submission.status == SubmissionStatus::Failed {
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -532,7 +578,8 @@ pub async fn get_leaderboard(
     let offset = params.offset.unwrap_or(0);
 
     let entries = state.get_leaderboard(limit, offset);
-    let total = state.results.read().expect("results RwLock poisoned").len() + state.baselines.len();
+    let total =
+        state.results.read().expect("results RwLock poisoned").len() + state.baselines.len();
 
     Json(LeaderboardResponse {
         total_submissions: total as u32,
@@ -543,9 +590,7 @@ pub async fn get_leaderboard(
 }
 
 /// Get topology-specific rankings
-pub async fn get_topology_rankings(
-    State(state): State<Arc<AppState>>,
-) -> Json<TopologyRankings> {
+pub async fn get_topology_rankings(State(state): State<Arc<AppState>>) -> Json<TopologyRankings> {
     Json(TopologyRankings {
         rankings: state.get_topology_rankings(),
     })
@@ -563,7 +608,8 @@ pub async fn list_datasets(
                 category: "consciousness".to_string(),
                 size_mb: 0.5,
                 n_samples: 260,
-                description: "Φ measurements for 19 network topologies (8 original + 11 exotic)".to_string(),
+                description: "Φ measurements for 19 network topologies (8 original + 11 exotic)"
+                    .to_string(),
                 license: "MIT".to_string(),
             },
             DatasetSummary {
@@ -572,7 +618,9 @@ pub async fn list_datasets(
                 category: "ethics".to_string(),
                 size_mb: 35.0,
                 n_samples: 95000,
-                description: "Justice, deontology, virtue, utilitarianism, and commonsense moral judgments".to_string(),
+                description:
+                    "Justice, deontology, virtue, utilitarianism, and commonsense moral judgments"
+                        .to_string(),
                 license: "MIT".to_string(),
             },
             DatasetSummary {
@@ -661,7 +709,11 @@ pub async fn compare_models(
     };
 
     let significant = t_stat.abs() > 2.0;
-    let cohens_d = if pooled_std > 0.0 { diff / pooled_std } else { 0.0 };
+    let cohens_d = if pooled_std > 0.0 {
+        diff / pooled_std
+    } else {
+        0.0
+    };
 
     let winner = if diff > 0.01 {
         "model_a".to_string()
@@ -674,7 +726,11 @@ pub async fn compare_models(
     let interpretation = if significant {
         format!(
             "{} has significantly higher Φ ({:.4} vs {:.4}, p<0.05)",
-            if diff > 0.0 { &model_a.name } else { &model_b.name },
+            if diff > 0.0 {
+                &model_a.name
+            } else {
+                &model_b.name
+            },
             model_a.phi.max(model_b.phi),
             model_a.phi.min(model_b.phi)
         )
@@ -698,17 +754,28 @@ pub async fn compare_models(
     }))
 }
 
-fn get_model_info(state: &AppState, reference: &ModelReference) -> Result<ModelInfo, (StatusCode, Json<ApiError>)> {
+fn get_model_info(
+    state: &AppState,
+    reference: &ModelReference,
+) -> Result<ModelInfo, (StatusCode, Json<ApiError>)> {
     match reference {
         ModelReference::SubmissionId(id) => {
-            if let Some(result) = state.results.read().expect("results RwLock poisoned").get(id) {
+            if let Some(result) = state
+                .results
+                .read()
+                .expect("results RwLock poisoned")
+                .get(id)
+            {
                 Ok(ModelInfo {
                     name: result.model_name.clone(),
                     phi: result.phi,
                     std_dev: result.standard_deviation,
                 })
             } else {
-                Err((StatusCode::NOT_FOUND, Json(ApiError::not_found("Model not found"))))
+                Err((
+                    StatusCode::NOT_FOUND,
+                    Json(ApiError::not_found("Model not found")),
+                ))
             }
         }
         ModelReference::BaselineName(name) => {
@@ -719,7 +786,13 @@ fn get_model_info(state: &AppState, reference: &ModelReference) -> Result<ModelI
                     std_dev: baseline.std_dev,
                 })
             } else {
-                Err((StatusCode::NOT_FOUND, Json(ApiError::not_found(&format!("Baseline '{}' not found", name)))))
+                Err((
+                    StatusCode::NOT_FOUND,
+                    Json(ApiError::not_found(&format!(
+                        "Baseline '{}' not found",
+                        name
+                    ))),
+                ))
             }
         }
     }
@@ -755,7 +828,11 @@ pub async fn dimensional_sweep(
 ///
 /// Returns metrics in Prometheus text format for scraping by Prometheus server.
 /// Standard endpoint: GET /metrics
-pub async fn metrics_prometheus() -> (StatusCode, [(axum::http::header::HeaderName, &'static str); 1], String) {
+pub async fn metrics_prometheus() -> (
+    StatusCode,
+    [(axum::http::header::HeaderName, &'static str); 1],
+    String,
+) {
     let metrics = crate::api::metrics::global();
 
     // Increment request counter
@@ -765,7 +842,10 @@ pub async fn metrics_prometheus() -> (StatusCode, [(axum::http::header::HeaderNa
 
     (
         StatusCode::OK,
-        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
         body,
     )
 }
@@ -827,7 +907,8 @@ mod tests {
     fn custom_input_accepts_node_representations() {
         let mut request = base_request();
         request.topology_type = Some(TopologyType::Custom);
-        request.node_representations = Some(vec![vec![0.0; HDC_DIMENSION], vec![1.0; HDC_DIMENSION]]);
+        request.node_representations =
+            Some(vec![vec![0.0; HDC_DIMENSION], vec![1.0; HDC_DIMENSION]]);
 
         let custom = custom_input(&request).unwrap();
         assert!(matches!(custom, Some(CustomInput::NodeRepresentations(_))));
