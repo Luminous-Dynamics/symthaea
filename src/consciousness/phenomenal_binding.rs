@@ -32,7 +32,7 @@
  *
  * ## The Binding Equation
  *
- * ```ignore
+ * ```text
  * Ψ = Σ [φᵢ(t) × φⱼ(t) × exp(-|tᵢ - tⱼ|/τ_bind)]
  *
  * Where:

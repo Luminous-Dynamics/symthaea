@@ -199,7 +199,7 @@ impl StatMechEncoder {
             .bind(&self.canonical)
     }
 
-    /// Boltzmann distribution: P_i = exp(-βE_i)/Z
+    /// Boltzmann distribution: `P_i = exp(-βE_i)/Z`
     pub fn boltzmann_distribution(&self) -> ContinuousHV {
         self.boltzmann
             .bind(&self.probability)
@@ -270,7 +270,7 @@ impl StatMechEncoder {
         }
     }
 
-    /// Equipartition theorem: <E> = ½kT per quadratic DOF
+    /// Equipartition theorem: `<E> = ½kT` per quadratic DOF
     pub fn equipartition(&self, dof: u32) -> ContinuousHV {
         let equipart = self.genesis.hv("theorem::equipartition", PHYSICS_DIM);
         equipart

@@ -9,11 +9,11 @@
 //!
 //! ## Modules
 //!
-//! - [`types`] - Configuration types, activation functions, and utility functions
-//! - [`cell`] - Single CfC cell with forward/backward passes
-//! - [`gradients`] - Gradient accumulators and Adam optimizer state
-//! - [`network`] - Multi-layer CfC network with BPTT and SPSA training
-//! - [`phi_gated`] - Phi-gated attention utilities for IIT integration
+//! - `types` - Configuration types, activation functions, and utility functions
+//! - `cell` - Single CfC cell with forward/backward passes
+//! - `gradients` - Gradient accumulators and Adam optimizer state
+//! - `network` - Multi-layer CfC network with BPTT and SPSA training
+//! - `phi_gated` - Phi-gated attention utilities for IIT integration
 
 mod cell;
 mod gradients;
