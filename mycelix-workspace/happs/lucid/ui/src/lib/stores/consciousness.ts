@@ -11,6 +11,15 @@
 
 import { writable, derived, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
+import { lucidClient } from './holochain';
+import type {
+  BeliefTrajectoryRecord,
+  TrajectoryAnalysis,
+  ConsciousnessEvolution,
+  RecordSnapshotInput,
+  RecordEvolutionInput,
+  SnapshotTrigger as SnapshotTriggerType,
+} from '@mycelix/lucid-client';
 
 // ============================================================================
 // TYPES
@@ -100,6 +109,14 @@ export const entrenchmentWarnings = writable<EntrenchmentWarning[]>([]);
 // Past self dialogue
 export const pastSelfMessages = writable<PastSelfMessage[]>([]);
 
+// Holochain-persisted trajectory and evolution data
+export const evolutionHistory = writable<ConsciousnessEvolution[]>([]);
+export const trajectoryCache = writable<Map<string, TrajectoryAnalysis>>(new Map());
+
+// Snapshot persistence counter (persist every Nth snapshot to reduce DHT writes)
+let snapshotCounter = 0;
+const PERSIST_EVERY_N_SNAPSHOTS = 5;
+
 // Polling state
 let pollInterval: number | null = null;
 let isPolling = false;
@@ -182,7 +199,8 @@ export async function fetchMindState(): Promise<MindState | null> {
 }
 
 /**
- * Take a consciousness snapshot and add to history
+ * Take a consciousness snapshot and add to history.
+ * Periodically persists to Holochain temporal-consciousness zome.
  */
 export async function takeSnapshot(): Promise<ConsciousnessSnapshot | null> {
   try {
@@ -199,9 +217,133 @@ export async function takeSnapshot(): Promise<ConsciousnessSnapshot | null> {
     // Check for entrenchment patterns
     checkEntrenchment(snapshot);
 
+    // Persist to Holochain every Nth snapshot to reduce DHT writes
+    snapshotCounter++;
+    if (snapshotCounter >= PERSIST_EVERY_N_SNAPSHOTS) {
+      snapshotCounter = 0;
+      persistSnapshotToHolochain(snapshot).catch(() => {
+        // Silently fail — Holochain persistence is best-effort
+      });
+    }
+
     return snapshot;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Persist a consciousness snapshot to Holochain's temporal-consciousness zome.
+ * Maps the Symthaea snapshot format to the Holochain RecordSnapshotInput.
+ */
+async function persistSnapshotToHolochain(snapshot: ConsciousnessSnapshot): Promise<void> {
+  const client = get(lucidClient);
+  if (!client) return;
+
+  const input: RecordSnapshotInput = {
+    thought_id: `session_${snapshot.tick}`,
+    epistemic_code: `phi:${snapshot.phi.toFixed(2)}`,
+    confidence: snapshot.meta_awareness,
+    phi: snapshot.phi,
+    coherence: 1.0 - snapshot.cognitive_load, // Inverse of load as coherence proxy
+    trigger: 'Scheduled' as SnapshotTriggerType,
+  };
+
+  await client.temporalConsciousness.recordBeliefSnapshot(input);
+}
+
+/**
+ * Fetch trajectory analysis for a thought from Holochain
+ */
+export async function fetchTrajectoryAnalysis(thoughtId: string): Promise<TrajectoryAnalysis | null> {
+  const client = get(lucidClient);
+  if (!client) return null;
+
+  try {
+    const analysis = await client.temporalConsciousness.analyzeBeliefTrajectory(thoughtId);
+
+    // Cache it
+    trajectoryCache.update((cache) => {
+      const newCache = new Map(cache);
+      newCache.set(thoughtId, analysis);
+      return newCache;
+    });
+
+    return analysis;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch consciousness evolution history from Holochain
+ */
+export async function fetchEvolutionHistory(): Promise<ConsciousnessEvolution[]> {
+  const client = get(lucidClient);
+  if (!client) return [];
+
+  try {
+    const history = await client.temporalConsciousness.getMyEvolutionHistory();
+    evolutionHistory.set(history);
+    return history;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Record a consciousness evolution summary to Holochain.
+ * Called at the end of a session or periodically.
+ */
+export async function recordEvolutionSummary(): Promise<void> {
+  const client = get(lucidClient);
+  if (!client) return;
+
+  const history = get(consciousnessHistory);
+  if (history.length < 5) return;
+
+  const firstSnapshot = history[0];
+  const lastSnapshot = history[history.length - 1];
+
+  // Calculate trends
+  const phiValues = history.map((s) => s.phi);
+  const avgPhi = phiValues.reduce((a, b) => a + b, 0) / phiValues.length;
+  const phiTrend = phiValues.length >= 2
+    ? (phiValues[phiValues.length - 1] - phiValues[0]) / phiValues.length
+    : 0;
+
+  const cogLoadValues = history.map((s) => s.cognitive_load);
+  const avgCoherence = 1 - cogLoadValues.reduce((a, b) => a + b, 0) / cogLoadValues.length;
+  const coherenceTrend = cogLoadValues.length >= 2
+    ? (cogLoadValues[0] - cogLoadValues[cogLoadValues.length - 1]) / cogLoadValues.length
+    : 0;
+
+  // Gather insights from warnings
+  const warnings = get(entrenchmentWarnings);
+  const insights = warnings.map((w) => w.message);
+
+  const input: RecordEvolutionInput = {
+    period_start: firstSnapshot.timestamp * 1000, // to microseconds
+    period_end: lastSnapshot.timestamp * 1000,
+    avg_phi: avgPhi,
+    phi_trend: Math.max(-1, Math.min(1, phiTrend)),
+    avg_coherence: avgCoherence,
+    coherence_trend: Math.max(-1, Math.min(1, coherenceTrend)),
+    stable_belief_count: history.filter((s) => Math.abs(s.phi - avgPhi) < 0.05).length,
+    growing_belief_count: history.filter((_, i, arr) =>
+      i > 0 && arr[i].phi > arr[i - 1].phi + 0.02
+    ).length,
+    weakening_belief_count: history.filter((_, i, arr) =>
+      i > 0 && arr[i].phi < arr[i - 1].phi - 0.02
+    ).length,
+    entrenched_belief_count: warnings.filter((w) => w.type === 'phi_stagnation').length,
+    insights,
+  };
+
+  try {
+    await client.temporalConsciousness.recordConsciousnessEvolution(input);
+  } catch {
+    // Best-effort persistence
   }
 }
 
@@ -223,6 +365,9 @@ export function startPolling(intervalMs: number = 5000): void {
   if (isPolling) return;
   isPolling = true;
 
+  // Load evolution history from Holochain on start
+  fetchEvolutionHistory().catch(() => {});
+
   const poll = async () => {
     await Promise.all([fetchProfile(), fetchMindState()]);
 
@@ -239,7 +384,7 @@ export function startPolling(intervalMs: number = 5000): void {
 }
 
 /**
- * Stop polling
+ * Stop polling. Records an evolution summary to Holochain before stopping.
  */
 export function stopPolling(): void {
   if (pollInterval) {
@@ -247,6 +392,9 @@ export function stopPolling(): void {
     pollInterval = null;
   }
   isPolling = false;
+
+  // Record evolution summary to Holochain on session end
+  recordEvolutionSummary().catch(() => {});
 }
 
 // ============================================================================
@@ -421,5 +569,8 @@ export function resetConsciousnessState(): void {
   consciousnessHistory.set([]);
   entrenchmentWarnings.set([]);
   pastSelfMessages.set([]);
+  evolutionHistory.set([]);
+  trajectoryCache.set(new Map());
   isConnected.set(false);
+  snapshotCounter = 0;
 }
