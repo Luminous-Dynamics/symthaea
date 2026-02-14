@@ -639,7 +639,7 @@ mod tests {
 
         // After processing, stats should reflect the learning attempt
         let stats = engine.stats();
-        assert!(stats.gated_attempts >= 1, "Should have recorded at least 1 learning attempt");
+        assert_eq!(stats.total_attempts, 1, "Should have recorded exactly 1 learning attempt");
     }
 
     #[test]
