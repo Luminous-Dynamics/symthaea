@@ -25,6 +25,9 @@ pub mod general_assistant_plugin;
 pub mod code_assistant_plugin;
 pub mod research_plugin;
 
+// Narrative prompt compiler (CfC Ghost Signal → LLM writing instructions)
+pub mod narrative_compiler;
+
 // LLM provider backends
 pub mod openai_backend;
 pub mod anthropic_backend;
@@ -88,6 +91,7 @@ pub use anthropic_backend::AnthropicBackend;
 pub use general_assistant_plugin::GeneralAssistantPlugin;
 pub use code_assistant_plugin::CodeAssistantPlugin;
 pub use research_plugin::ResearchPlugin;
+pub use narrative_compiler::{NarrativeCompiler, NarrativeThought, NARRATIVE_SYSTEM_PROMPT};
 
 // ============================================================================
 // NixOS Error Diagnoser (for shell module integration)

@@ -54,6 +54,9 @@ pub mod wavelet;
 // (Modulation Index, Mean Vector Length, comodulogram)
 pub mod phase_amplitude_coupling;
 
+// Narrative arc dynamics using HierarchicalCfC
+pub mod narrative_dynamics;
+
 // Code understanding dynamics (Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]
 pub mod cfc_code_sequencer;
@@ -299,6 +302,9 @@ pub use stochastic_dynamics::{
     OrnsteinUhlenbeck, StochasticCfC, FokkerPlanckSolver, LangevinDynamics,
     SimpleRng,
 };
+
+// Narrative arc dynamics
+pub use narrative_dynamics::{StoryArcDynamics, StoryArcConfig, NarrativeSignal};
 
 #[cfg(test)]
 mod tests {

@@ -1,0 +1,699 @@
+//! LanceDB-Backed Persistent Memory Storage
+//!
+//! Columnar, async-native storage backend for Symthaea's consciousness system.
+//! Uses Apache Arrow format for efficient I/O and metadata filtering.
+//!
+//! # Important: Similarity Search Strategy
+//!
+//! LanceDB's native ANN index only supports float vectors with cosine/L2/dot.
+//! Since BinaryHV uses 16,384-bit Hamming distance, this backend loads candidate
+//! records and computes similarity in-memory using `BinaryHV::similarity()`.
+//!
+//! # Feature Gate
+//!
+//! Requires the `lancedb-backend` feature flag:
+//! ```toml
+//! symthaea = { version = "0.5", features = ["lancedb-backend"] }
+//! ```
+
+use super::{
+    ConsciousnessDatabase, DatabaseError, DatabaseStats, DbResult, MemoryRecord, MemoryType,
+    SearchResult,
+};
+use arrow_array::{
+    builder::FixedSizeBinaryBuilder, FixedSizeBinaryArray, Float32Array, Float64Array,
+    Int32Array, Int64Array, RecordBatch, RecordBatchIterator, StringArray,
+};
+use arrow_schema::{ArrowError, DataType, Field, Schema};
+use async_trait::async_trait;
+use futures::TryStreamExt;
+use std::sync::Arc;
+use symthaea_core::hdc::binary_hv::BinaryHV;
+
+// ============================================================================
+// Schema
+// ============================================================================
+
+/// Arrow schema for the memories table.
+fn memories_schema() -> Arc<Schema> {
+    Arc::new(Schema::new(vec![
+        Field::new("id", DataType::Utf8, false),
+        Field::new(
+            "encoding",
+            DataType::FixedSizeBinary(BinaryHV::BYTES as i32),
+            false,
+        ),
+        Field::new("timestamp_ms", DataType::Int64, false),
+        Field::new("memory_type", DataType::Utf8, false),
+        Field::new("content", DataType::Utf8, false),
+        Field::new("valence", DataType::Float32, false),
+        Field::new("arousal", DataType::Float32, false),
+        Field::new("phi", DataType::Float64, false),
+        Field::new("topics", DataType::Utf8, false),
+        Field::new("metadata", DataType::Utf8, false),
+        Field::new("consolidation_strength", DataType::Float64, false),
+        Field::new("retrieval_count", DataType::Int32, false),
+    ]))
+}
+
+// ============================================================================
+// Conversion Helpers
+// ============================================================================
+
+fn memory_type_to_str(mt: MemoryType) -> &'static str {
+    match mt {
+        MemoryType::Episodic => "episodic",
+        MemoryType::Semantic => "semantic",
+        MemoryType::Procedural => "procedural",
+        MemoryType::Working => "working",
+    }
+}
+
+fn str_to_memory_type(s: &str) -> MemoryType {
+    match s {
+        "episodic" => MemoryType::Episodic,
+        "semantic" => MemoryType::Semantic,
+        "procedural" => MemoryType::Procedural,
+        "working" => MemoryType::Working,
+        _ => MemoryType::Episodic,
+    }
+}
+
+/// Convert a single MemoryRecord to an Arrow RecordBatch.
+fn record_to_batch(record: &MemoryRecord) -> DbResult<RecordBatch> {
+    let schema = memories_schema();
+
+    let mut encoding_builder = FixedSizeBinaryBuilder::new(BinaryHV::BYTES as i32);
+    encoding_builder
+        .append_value(record.encoding.0.as_slice())
+        .map_err(|e| DatabaseError::InsertFailed(format!("Encoding serialization failed: {e}")))?;
+
+    let topics_json = serde_json::to_string(&record.topics).unwrap_or_else(|_| "[]".to_string());
+
+    RecordBatch::try_new(
+        schema,
+        vec![
+            Arc::new(StringArray::from(vec![record.id.as_str()])),
+            Arc::new(encoding_builder.finish()),
+            Arc::new(Int64Array::from(vec![record.timestamp_ms as i64])),
+            Arc::new(StringArray::from(vec![memory_type_to_str(
+                record.memory_type,
+            )])),
+            Arc::new(StringArray::from(vec![record.content.as_str()])),
+            Arc::new(Float32Array::from(vec![record.valence])),
+            Arc::new(Float32Array::from(vec![record.arousal])),
+            Arc::new(Float64Array::from(vec![record.phi])),
+            Arc::new(StringArray::from(vec![topics_json.as_str()])),
+            Arc::new(StringArray::from(vec![record.metadata.as_str()])),
+            Arc::new(Float64Array::from(vec![record.consolidation_strength])),
+            Arc::new(Int32Array::from(vec![record.retrieval_count as i32])),
+        ],
+    )
+    .map_err(|e| DatabaseError::InsertFailed(format!("RecordBatch creation failed: {e}")))
+}
+
+/// Convert an Arrow RecordBatch to a Vec of MemoryRecords.
+fn batch_to_records(batch: &RecordBatch) -> Vec<MemoryRecord> {
+    let num_rows = batch.num_rows();
+    if num_rows == 0 {
+        return Vec::new();
+    }
+
+    // Downcast all columns; bail if any fails
+    let Some(id_col) = batch.column(0).as_any().downcast_ref::<StringArray>() else {
+        return Vec::new();
+    };
+    let Some(enc_col) = batch.column(1).as_any().downcast_ref::<FixedSizeBinaryArray>() else {
+        return Vec::new();
+    };
+    let Some(ts_col) = batch.column(2).as_any().downcast_ref::<Int64Array>() else {
+        return Vec::new();
+    };
+    let Some(mt_col) = batch.column(3).as_any().downcast_ref::<StringArray>() else {
+        return Vec::new();
+    };
+    let Some(content_col) = batch.column(4).as_any().downcast_ref::<StringArray>() else {
+        return Vec::new();
+    };
+    let Some(val_col) = batch.column(5).as_any().downcast_ref::<Float32Array>() else {
+        return Vec::new();
+    };
+    let Some(ar_col) = batch.column(6).as_any().downcast_ref::<Float32Array>() else {
+        return Vec::new();
+    };
+    let Some(phi_col) = batch.column(7).as_any().downcast_ref::<Float64Array>() else {
+        return Vec::new();
+    };
+    let Some(topics_col) = batch.column(8).as_any().downcast_ref::<StringArray>() else {
+        return Vec::new();
+    };
+    let Some(meta_col) = batch.column(9).as_any().downcast_ref::<StringArray>() else {
+        return Vec::new();
+    };
+    let Some(cs_col) = batch.column(10).as_any().downcast_ref::<Float64Array>() else {
+        return Vec::new();
+    };
+    let Some(rc_col) = batch.column(11).as_any().downcast_ref::<Int32Array>() else {
+        return Vec::new();
+    };
+
+    (0..num_rows)
+        .map(|i| {
+            let encoding_bytes = enc_col.value(i);
+            let mut arr = [0u8; BinaryHV::BYTES];
+            if encoding_bytes.len() >= BinaryHV::BYTES {
+                arr.copy_from_slice(&encoding_bytes[..BinaryHV::BYTES]);
+            }
+
+            let topics: Vec<String> =
+                serde_json::from_str(topics_col.value(i)).unwrap_or_default();
+
+            let ts = ts_col.value(i);
+
+            MemoryRecord {
+                id: id_col.value(i).to_string(),
+                encoding: BinaryHV(arr),
+                timestamp_ms: if ts < 0 { 0u64 } else { ts as u64 },
+                memory_type: str_to_memory_type(mt_col.value(i)),
+                content: content_col.value(i).to_string(),
+                valence: val_col.value(i),
+                arousal: ar_col.value(i),
+                phi: phi_col.value(i),
+                topics,
+                metadata: meta_col.value(i).to_string(),
+                consolidation_strength: cs_col.value(i),
+                retrieval_count: rc_col.value(i) as u32,
+            }
+        })
+        .collect()
+}
+
+// ============================================================================
+// LanceMemory
+// ============================================================================
+
+/// LanceDB-backed persistent memory database.
+///
+/// Uses Apache Arrow columnar format for efficient storage and retrieval.
+/// Similarity search loads candidates and computes Hamming distance in-memory,
+/// since LanceDB's native ANN index does not support binary vectors.
+pub struct LanceMemory {
+    db: lancedb::Connection,
+    table: tokio::sync::RwLock<Option<lancedb::Table>>,
+    path: String,
+}
+
+impl LanceMemory {
+    /// Create a persistent LanceDB database at the given directory path.
+    pub async fn new(path: &str) -> DbResult<Self> {
+        let db = lancedb::connect(path)
+            .execute()
+            .await
+            .map_err(|e| DatabaseError::ConnectionFailed(format!("LanceDB connect failed: {e}")))?;
+
+        let mem = Self {
+            db,
+            table: tokio::sync::RwLock::new(None),
+            path: path.to_string(),
+        };
+
+        mem.ensure_table().await?;
+        eprintln!("[LanceMemory] Initialized at: {path}");
+        Ok(mem)
+    }
+
+    /// Create a LanceDB database in a temporary directory.
+    ///
+    /// The directory is created under `/tmp/symthaea_lance_{pid}_{random}`
+    /// and persists until manually removed.
+    pub async fn in_memory() -> DbResult<Self> {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_lance_{}_{:08x}",
+            std::process::id(),
+            rand::random::<u32>()
+        ));
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| DatabaseError::ConnectionFailed(format!("Temp dir creation failed: {e}")))?;
+
+        Self::new(&dir.to_string_lossy()).await
+    }
+
+    /// Ensure the "memories" table exists, creating it if necessary.
+    async fn ensure_table(&self) -> DbResult<()> {
+        {
+            let guard = self.table.read().await;
+            if guard.is_some() {
+                return Ok(());
+            }
+        }
+
+        let mut guard = self.table.write().await;
+        // Double-check after acquiring write lock
+        if guard.is_some() {
+            return Ok(());
+        }
+
+        let table = match self.db.open_table("memories").execute().await {
+            Ok(t) => t,
+            Err(_) => self
+                .db
+                .create_empty_table("memories", memories_schema())
+                .execute()
+                .await
+                .map_err(|e| {
+                    DatabaseError::ConnectionFailed(format!("Create table failed: {e}"))
+                })?,
+        };
+
+        *guard = Some(table);
+        Ok(())
+    }
+
+    /// Get a clone of the table handle.
+    async fn table(&self) -> DbResult<lancedb::Table> {
+        self.ensure_table().await?;
+        self.table
+            .read()
+            .await
+            .clone()
+            .ok_or_else(|| DatabaseError::ConnectionFailed("Table not initialized".into()))
+    }
+
+    /// Bump retrieval_count and consolidation_strength for returned search results.
+    async fn bump_retrieval_stats(&self, ids: &[String]) -> DbResult<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        let table = self.table().await?;
+        let quoted: Vec<String> = ids
+            .iter()
+            .map(|id| format!("'{}'", id.replace('\'', "''")))
+            .collect();
+        let predicate = format!("id IN ({})", quoted.join(", "));
+
+        table
+            .update()
+            .only_if(&predicate)
+            .column("retrieval_count", "retrieval_count + 1")
+            .column("consolidation_strength", "consolidation_strength + 0.05")
+            .execute()
+            .await
+            .map_err(|e| {
+                DatabaseError::QueryFailed(format!("Reconsolidation update failed: {e}"))
+            })?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl ConsciousnessDatabase for LanceMemory {
+    async fn store(&self, record: MemoryRecord) -> DbResult<()> {
+        let table = self.table().await?;
+        let batch = record_to_batch(&record)?;
+        let schema = memories_schema();
+
+        let batches: Vec<Result<RecordBatch, ArrowError>> = vec![Ok(batch)];
+        let reader = RecordBatchIterator::new(batches, schema);
+
+        table
+            .merge_insert(&["id"])
+            .when_matched_update_all(None::<String>)
+            .when_not_matched_insert_all()
+            .execute(Box::new(reader))
+            .await
+            .map_err(|e| DatabaseError::InsertFailed(format!("LanceDB upsert failed: {e}")))?;
+
+        Ok(())
+    }
+
+    async fn search_similar(
+        &self,
+        query: &BinaryHV,
+        top_k: usize,
+    ) -> DbResult<Vec<SearchResult>> {
+        let table = self.table().await?;
+        let query = *query;
+
+        // Load all records (brute force — LanceDB can't do Hamming ANN)
+        let stream = table
+            .query()
+            .execute()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Search query failed: {e}")))?;
+
+        let batches: Vec<RecordBatch> = stream
+            .try_collect()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Batch collection failed: {e}")))?;
+
+        let mut results: Vec<SearchResult> = batches
+            .iter()
+            .flat_map(batch_to_records)
+            .map(|record| {
+                let similarity = query.similarity(&record.encoding);
+                SearchResult { record, similarity }
+            })
+            .collect();
+
+        results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
+        results.truncate(top_k);
+
+        // Reconsolidate: bump stats on returned results
+        let returned_ids: Vec<String> = results.iter().map(|r| r.record.id.clone()).collect();
+        if let Err(e) = self.bump_retrieval_stats(&returned_ids).await {
+            tracing::warn!("Reconsolidation bump failed: {e}");
+        }
+
+        Ok(results)
+    }
+
+    async fn get(&self, id: &str) -> DbResult<Option<MemoryRecord>> {
+        let table = self.table().await?;
+        let escaped_id = id.replace('\'', "''");
+        let filter = format!("id = '{escaped_id}'");
+
+        let stream = table
+            .query()
+            .only_if(filter)
+            .limit(1)
+            .execute()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Get query failed: {e}")))?;
+
+        let batches: Vec<RecordBatch> = stream
+            .try_collect()
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Get batch failed: {e}")))?;
+
+        let records: Vec<MemoryRecord> = batches.iter().flat_map(batch_to_records).collect();
+        Ok(records.into_iter().next())
+    }
+
+    async fn delete(&self, id: &str) -> DbResult<bool> {
+        let table = self.table().await?;
+        let escaped_id = id.replace('\'', "''");
+        let predicate = format!("id = '{escaped_id}'");
+
+        let count = table
+            .count_rows(Some(predicate.clone()))
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Pre-delete count failed: {e}")))?;
+
+        if count == 0 {
+            return Ok(false);
+        }
+
+        table
+            .delete(&predicate)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Delete failed: {e}")))?;
+
+        Ok(true)
+    }
+
+    async fn count(&self) -> DbResult<usize> {
+        let table = self.table().await?;
+        table
+            .count_rows(None)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Count failed: {e}")))
+    }
+
+    async fn health_check(&self) -> DbResult<bool> {
+        let table = self.table().await?;
+        table
+            .count_rows(None)
+            .await
+            .map(|_| true)
+            .map_err(|e| DatabaseError::QueryFailed(format!("Health check failed: {e}")))
+    }
+
+    async fn stats(&self) -> DbResult<DatabaseStats> {
+        let table = self.table().await?;
+
+        let total_records = table
+            .count_rows(None)
+            .await
+            .map_err(|e| DatabaseError::QueryFailed(format!("Count failed: {e}")))?;
+
+        // Memory type distribution
+        let mut type_counts = Vec::new();
+        for mt in &["episodic", "semantic", "procedural", "working"] {
+            let count = table
+                .count_rows(Some(format!("memory_type = '{mt}'")))
+                .await
+                .unwrap_or(0);
+            if count > 0 {
+                type_counts.push((mt.to_string(), count));
+            }
+        }
+
+        // Scan phi and timestamp columns
+        let (avg_phi, oldest_ts, newest_ts) = if total_records > 0 {
+            let stream = table
+                .query()
+                .execute()
+                .await
+                .map_err(|e| DatabaseError::QueryFailed(format!("Stats scan failed: {e}")))?;
+
+            let batches: Vec<RecordBatch> = stream.try_collect().await.unwrap_or_default();
+
+            let mut phi_sum = 0.0f64;
+            let mut phi_count = 0usize;
+            let mut min_ts = i64::MAX;
+            let mut max_ts = i64::MIN;
+
+            for batch in &batches {
+                // Column 7 = phi (Float64)
+                if let Some(phi_arr) = batch.column(7).as_any().downcast_ref::<Float64Array>() {
+                    for i in 0..phi_arr.len() {
+                        phi_sum += phi_arr.value(i);
+                        phi_count += 1;
+                    }
+                }
+                // Column 2 = timestamp_ms (Int64)
+                if let Some(ts_arr) = batch.column(2).as_any().downcast_ref::<Int64Array>() {
+                    for i in 0..ts_arr.len() {
+                        let v = ts_arr.value(i);
+                        min_ts = min_ts.min(v);
+                        max_ts = max_ts.max(v);
+                    }
+                }
+            }
+
+            let avg = if phi_count > 0 {
+                phi_sum / phi_count as f64
+            } else {
+                0.0
+            };
+            let oldest = if min_ts == i64::MAX {
+                0u64
+            } else {
+                min_ts.max(0) as u64
+            };
+            let newest = if max_ts == i64::MIN {
+                0u64
+            } else {
+                max_ts.max(0) as u64
+            };
+
+            (avg, oldest, newest)
+        } else {
+            (0.0, 0, 0)
+        };
+
+        let version = table.version().await.unwrap_or(0);
+        let database_size_bytes = dir_size(&self.path);
+        let backend_status = format!("lance:v{version}");
+
+        Ok(DatabaseStats {
+            total_records,
+            database_size_bytes,
+            page_count: 0,
+            page_size: 0,
+            freelist_count: 0,
+            cache_hit_ratio: 0.0,
+            cache_hits: 0,
+            cache_misses: 0,
+            avg_query_latency_us: 0,
+            total_queries: 0,
+            memory_type_counts: type_counts,
+            avg_phi,
+            oldest_timestamp_ms: oldest_ts,
+            newest_timestamp_ms: newest_ts,
+            backend_status,
+        })
+    }
+}
+
+/// Calculate total size of a directory in bytes.
+fn dir_size(path: &str) -> u64 {
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return 0;
+    };
+    entries
+        .filter_map(|e| e.ok())
+        .map(|e| {
+            let meta = e.metadata().ok();
+            let file_type = e.file_type().ok();
+            match (meta, file_type) {
+                (Some(m), Some(ft)) if ft.is_file() => m.len(),
+                (_, Some(ft)) if ft.is_dir() => dir_size(&e.path().to_string_lossy()),
+                _ => 0,
+            }
+        })
+        .sum()
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_record(id: &str, seed: u64) -> MemoryRecord {
+        MemoryRecord {
+            id: id.to_string(),
+            encoding: BinaryHV::random(seed),
+            timestamp_ms: 1234567890 + seed,
+            memory_type: MemoryType::Episodic,
+            content: format!("Test memory {id}"),
+            valence: 0.8,
+            arousal: 0.5,
+            phi: 0.75,
+            topics: vec!["test".to_string()],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_lance_memory_basic() {
+        let db = LanceMemory::in_memory().await.unwrap();
+
+        // Store
+        db.store(test_record("test-1", 42)).await.unwrap();
+        assert_eq!(db.count().await.unwrap(), 1);
+
+        // Get by ID
+        let retrieved = db.get("test-1").await.unwrap().unwrap();
+        assert_eq!(retrieved.content, "Test memory test-1");
+        assert!((retrieved.phi - 0.75).abs() < 0.001);
+
+        // Search similar (same seed = identical encoding)
+        let results = db.search_similar(&BinaryHV::random(42), 5).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].similarity > 0.99);
+
+        // Delete
+        assert!(db.delete("test-1").await.unwrap());
+        assert_eq!(db.count().await.unwrap(), 0);
+        assert!(!db.delete("test-1").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_lance_persistence() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_lance_persist_test_{:08x}",
+            rand::random::<u32>()
+        ));
+        let path = dir.to_string_lossy().to_string();
+
+        // Create and store
+        {
+            let db = LanceMemory::new(&path).await.unwrap();
+            db.store(test_record("persist-1", 123)).await.unwrap();
+            assert_eq!(db.count().await.unwrap(), 1);
+        }
+
+        // Reopen and verify
+        {
+            let db = LanceMemory::new(&path).await.unwrap();
+            let record = db.get("persist-1").await.unwrap().unwrap();
+            assert_eq!(record.content, "Test memory persist-1");
+            assert_eq!(db.count().await.unwrap(), 1);
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn test_lance_stats() {
+        let db = LanceMemory::in_memory().await.unwrap();
+
+        let stats = db.stats().await.unwrap();
+        assert_eq!(stats.total_records, 0);
+        assert!(stats.backend_status.starts_with("lance:v"));
+
+        for i in 0..5u64 {
+            let mut rec = test_record(&format!("stats-{i}"), i);
+            rec.memory_type = if i % 2 == 0 {
+                MemoryType::Episodic
+            } else {
+                MemoryType::Semantic
+            };
+            rec.phi = 0.5 + i as f64 * 0.1;
+            rec.timestamp_ms = 1000000000 + i * 1000;
+            db.store(rec).await.unwrap();
+        }
+
+        let stats = db.stats().await.unwrap();
+        assert_eq!(stats.total_records, 5);
+        assert!(!stats.memory_type_counts.is_empty());
+
+        let total_type_count: usize = stats.memory_type_counts.iter().map(|(_, c)| c).sum();
+        assert_eq!(total_type_count, 5);
+
+        // avg phi: (0.5 + 0.6 + 0.7 + 0.8 + 0.9) / 5 = 0.7
+        assert!((stats.avg_phi - 0.7).abs() < 0.01);
+        assert_eq!(stats.oldest_timestamp_ms, 1000000000);
+        assert_eq!(stats.newest_timestamp_ms, 1000004000);
+    }
+
+    #[tokio::test]
+    async fn test_lance_search_similar() {
+        let db = LanceMemory::in_memory().await.unwrap();
+
+        for i in 0..10u64 {
+            db.store(test_record(&format!("search-{i}"), i * 100))
+                .await
+                .unwrap();
+        }
+
+        // Search for the encoding from seed 0
+        let query = BinaryHV::random(0);
+        let results = db.search_similar(&query, 3).await.unwrap();
+        assert_eq!(results.len(), 3);
+        // First result should be the exact match
+        assert!(results[0].similarity > 0.99);
+        assert_eq!(results[0].record.id, "search-0");
+        // Results should be sorted descending
+        assert!(results[0].similarity >= results[1].similarity);
+        assert!(results[1].similarity >= results[2].similarity);
+    }
+
+    #[tokio::test]
+    async fn test_lance_upsert() {
+        let db = LanceMemory::in_memory().await.unwrap();
+
+        let mut rec = test_record("upsert-1", 42);
+        rec.content = "Original content".to_string();
+        db.store(rec).await.unwrap();
+        assert_eq!(db.count().await.unwrap(), 1);
+
+        // Upsert with same ID, different content
+        let mut rec2 = test_record("upsert-1", 42);
+        rec2.content = "Updated content".to_string();
+        db.store(rec2).await.unwrap();
+
+        // Should still be 1 record, with updated content
+        assert_eq!(db.count().await.unwrap(), 1);
+        let retrieved = db.get("upsert-1").await.unwrap().unwrap();
+        assert_eq!(retrieved.content, "Updated content");
+    }
+}

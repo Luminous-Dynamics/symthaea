@@ -73,6 +73,9 @@ use symthaea_core::hdc::binary_hv::BinaryHV;
 
 pub mod sqlite_client;
 
+#[cfg(feature = "lancedb-backend")]
+pub mod lance_client;
+
 // ============================================================================
 // Core Types
 // ============================================================================
@@ -412,3 +415,6 @@ pub trait ConsciousnessDatabase: Send + Sync {
 
 // Re-exports
 pub use sqlite_client::SqliteMemory;
+
+#[cfg(feature = "lancedb-backend")]
+pub use lance_client::LanceMemory;

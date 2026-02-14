@@ -1931,7 +1931,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks for EEG processing"]
     fn test_wake_detection() {
         // Use default config with reduced steps for faster test
         let mut config = SleepSentinelConfig::default();
@@ -1953,7 +1953,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks for EEG processing"]
     fn test_deep_sleep_detection() {
         // Use default config with reduced steps for faster test
         let mut config = SleepSentinelConfig::default();
@@ -1975,7 +1975,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks for EEG processing"]
     fn test_rem_paradox() {
         // Use default config with reduced steps for faster test
         let mut config = SleepSentinelConfig::default();
@@ -1996,7 +1996,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks, tests stage discrimination across Wake/N3/REM"]
     fn test_discrimination() {
         let config = SleepSentinelConfig::default();
         let mut sentinel = SleepSentinel::new(config);
@@ -2368,7 +2368,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks with adaptive threshold calibration"]
     fn test_sentinel_with_adaptive_thresholds() {
         let mut config = SleepSentinelConfig::default();
         config.enable_adaptive_thresholds = true;
@@ -2401,7 +2401,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks, tests calibration export/import"]
     fn test_sentinel_calibration_persistence() {
         let mut config = SleepSentinelConfig::default();
         config.enable_adaptive_thresholds = true;
