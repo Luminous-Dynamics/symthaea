@@ -7,7 +7,7 @@
  *
  * ## Architecture
  *
- * All 5 domains share one DNA role (`commons`) and communicate via
+ * All 7 domains share one DNA role (`commons`) and communicate via
  * `commons_bridge` — a coordinator zome that dispatches calls between
  * domain zomes using `call(CallTargetCell::Local, ...)`.
  *
@@ -35,7 +35,7 @@
  *   payload: JSON.stringify({ ... }),
  * });
  *
- * // Health check across all 5 domains
+ * // Health check across all 7 domains
  * const health = await bridge.healthCheck();
  * ```
  *

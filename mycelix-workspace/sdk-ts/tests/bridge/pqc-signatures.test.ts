@@ -39,7 +39,7 @@ describe('PQCKeyManager', () => {
       expect(kp.publicKey).toBeInstanceOf(Uint8Array);
       expect(kp.privateKey).toBeInstanceOf(Uint8Array);
       expect(kp.publicKey.length).toBe(1952);
-      expect(kp.privateKey.length).toBe(4016);
+      expect(kp.privateKey.length).toBe(4032);
       expect(kp.keyId).toMatch(/^pqc-dilithium3-/);
     });
 
@@ -457,9 +457,9 @@ describe('PQC Singletons', () => {
 
 describe('PQC Utility Functions', () => {
   it('getRecommendedAlgorithm returns correct algorithms', () => {
-    expect(getRecommendedAlgorithm('standard')).toBe('Dilithium3');
-    expect(getRecommendedAlgorithm('high')).toBe('Dilithium5');
-    expect(getRecommendedAlgorithm('maximum')).toBe('SPHINCS+');
+    expect(getRecommendedAlgorithm('standard')).toBe('ML-DSA-65');
+    expect(getRecommendedAlgorithm('high')).toBe('ML-DSA-87');
+    expect(getRecommendedAlgorithm('maximum')).toBe('SLH-DSA-SHA2-128s');
   });
 
   it('isAlgorithmSecure returns true for all supported algorithms', () => {
@@ -469,11 +469,11 @@ describe('PQC Utility Functions', () => {
     }
   });
 
-  it('estimateSignatureSize returns positive numbers', () => {
-    expect(estimateSignatureSize('Dilithium3')).toBe(3293);
-    expect(estimateSignatureSize('Dilithium5')).toBe(4595);
-    expect(estimateSignatureSize('Falcon512')).toBe(666);
+  it('estimateSignatureSize returns FIPS-standard sizes', () => {
+    expect(estimateSignatureSize('Dilithium3')).toBe(3309);
+    expect(estimateSignatureSize('Dilithium5')).toBe(4627);
+    expect(estimateSignatureSize('Falcon512')).toBe(3309);
     expect(estimateSignatureSize('SPHINCS+')).toBe(7856);
-    expect(estimateSignatureSize('Hybrid-Ed25519-Dilithium3')).toBe(64 + 3293);
+    expect(estimateSignatureSize('Hybrid-Ed25519-Dilithium3')).toBe(64 + 3309);
   });
 });

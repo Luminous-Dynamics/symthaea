@@ -68,9 +68,9 @@ function createMockClient() {
 // ============================================================================
 
 describe('Cluster Constants', () => {
-  it('should export all 5 commons domains', () => {
-    expect(COMMONS_DOMAINS).toEqual(['property', 'housing', 'care', 'mutualaid', 'water']);
-    expect(COMMONS_DOMAINS).toHaveLength(5);
+  it('should export all 7 commons domains', () => {
+    expect(COMMONS_DOMAINS).toEqual(['property', 'housing', 'care', 'mutualaid', 'water', 'food', 'transport']);
+    expect(COMMONS_DOMAINS).toHaveLength(7);
   });
 
   it('should export all 3 civic domains', () => {
@@ -447,7 +447,7 @@ describe('CommonsBridgeClient', () => {
         agent: 'uhCAk...',
         total_events: 42,
         total_queries: 7,
-        domains: ['property', 'housing', 'care', 'mutualaid', 'water'],
+        domains: ['property', 'housing', 'care', 'mutualaid', 'water', 'food', 'transport'],
       };
       client.callZome.mockResolvedValue(mockHealth);
 
@@ -460,7 +460,7 @@ describe('CommonsBridgeClient', () => {
         payload: null,
       });
       expect(result.healthy).toBe(true);
-      expect(result.domains).toHaveLength(5);
+      expect(result.domains).toHaveLength(7);
     });
   });
 });
