@@ -10,11 +10,9 @@
 //! 3. **Backend Parity Tests**: Compare behavior between CfC and HdcLtcUnified
 //! 4. **Configuration Tests**: Verify config options work correctly
 
-use symthaea::cognitive_loop::{
-    CognitiveLoopConfig, CognitiveLoopService, TemporalBackend,
-};
-use symthaea::hdc_ltc_bridge::{HdcLtcBridge, HdcLtcBridgeConfig, BridgeActivation};
 use ndarray::Array1;
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, TemporalBackend};
+use symthaea::hdc_ltc_bridge::{BridgeActivation, HdcLtcBridge, HdcLtcBridgeConfig};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // BRIDGE TESTS
@@ -389,7 +387,10 @@ fn test_backend_parity_multiple_cycles() {
     }
 
     // Both should have processed same number of cycles
-    assert_eq!(service_cfc.stats().total_cycles, service_hdc.stats().total_cycles);
+    assert_eq!(
+        service_cfc.stats().total_cycles,
+        service_hdc.stats().total_cycles
+    );
 }
 
 #[test]

@@ -16,7 +16,7 @@
 //! 4. **Consciousness Threshold**: Adapts based on running Φ average to prevent
 //!    the system from being perpetually conscious or unconscious
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Configuration for the Phi feedback controller
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,7 +106,7 @@ impl PhiFeedbackController {
     /// Create with custom configuration
     pub fn with_config(config: PhiFeedbackConfig) -> Self {
         Self {
-            binding_threshold: 0.7,   // Default starting point
+            binding_threshold: 0.7,    // Default starting point
             workspace_capacity_f: 3.0, // Default starting point
             consciousness_threshold: 0.5,
             phi_ema: 0.0,
@@ -133,7 +133,8 @@ impl PhiFeedbackController {
         if self.step_count == 1 {
             self.phi_ema = phi;
         } else {
-            self.phi_ema = self.config.ema_alpha * phi + (1.0 - self.config.ema_alpha) * self.phi_ema;
+            self.phi_ema =
+                self.config.ema_alpha * phi + (1.0 - self.config.ema_alpha) * self.phi_ema;
         }
 
         // Compute error and trend
@@ -148,19 +149,24 @@ impl PhiFeedbackController {
         // PD control: modulation = learning_rate * (P * error + D * derivative)
         let p_gain = 1.0;
         let d_gain = 0.5;
-        let modulation = self.config.learning_rate * confidence * (p_gain * error + d_gain * derivative);
+        let modulation =
+            self.config.learning_rate * confidence * (p_gain * error + d_gain * derivative);
 
         // === 1. Adaptive Binding Threshold ===
         // Rising Φ (positive error) → tighter binding (higher threshold, more selective)
         // Falling Φ (negative error) → looser binding (lower threshold, more exploratory)
-        self.binding_threshold = (self.binding_threshold + modulation * 0.5)
-            .clamp(self.config.min_binding_threshold, self.config.max_binding_threshold);
+        self.binding_threshold = (self.binding_threshold + modulation * 0.5).clamp(
+            self.config.min_binding_threshold,
+            self.config.max_binding_threshold,
+        );
 
         // === 2. Workspace Capacity ===
         // High Φ → expand workspace (system can integrate more)
         // Low Φ → contract workspace (focus on fewer items)
-        self.workspace_capacity_f = (self.workspace_capacity_f + modulation * 2.0)
-            .clamp(self.config.min_workspace_capacity as f64, self.config.max_workspace_capacity as f64);
+        self.workspace_capacity_f = (self.workspace_capacity_f + modulation * 2.0).clamp(
+            self.config.min_workspace_capacity as f64,
+            self.config.max_workspace_capacity as f64,
+        );
 
         // === 3. Attention Gain ===
         // Positive trend → exploit (sharpen attention)
@@ -256,7 +262,8 @@ impl PhiFeedbackController {
 
     /// Check if Φ has stabilized (variance below threshold)
     pub fn is_stable(&self, variance_threshold: f64) -> bool {
-        self.phi_history.len() >= self.config.window_size && self.phi_variance() < variance_threshold
+        self.phi_history.len() >= self.config.window_size
+            && self.phi_variance() < variance_threshold
     }
 
     /// Reset the controller state while keeping configuration
@@ -327,7 +334,11 @@ mod tests {
         }
 
         // Binding threshold should have risen (more selective)
-        assert!(last_binding > 0.7, "Rising Φ above target should tighten binding, got {}", last_binding);
+        assert!(
+            last_binding > 0.7,
+            "Rising Φ above target should tighten binding, got {}",
+            last_binding
+        );
     }
 
     #[test]
@@ -348,7 +359,11 @@ mod tests {
         }
 
         // Binding threshold should have dropped (more exploratory)
-        assert!(last_binding < 0.7, "Falling Φ below target should loosen binding, got {}", last_binding);
+        assert!(
+            last_binding < 0.7,
+            "Falling Φ below target should loosen binding, got {}",
+            last_binding
+        );
     }
 
     #[test]
@@ -367,7 +382,11 @@ mod tests {
             last_capacity = m.workspace_capacity;
         }
 
-        assert!(last_capacity > 3, "High Φ should expand workspace, got {}", last_capacity);
+        assert!(
+            last_capacity > 3,
+            "High Φ should expand workspace, got {}",
+            last_capacity
+        );
     }
 
     #[test]
@@ -386,7 +405,11 @@ mod tests {
             last_capacity = m.workspace_capacity;
         }
 
-        assert!(last_capacity < 3, "Low Φ should contract workspace, got {}", last_capacity);
+        assert!(
+            last_capacity < 3,
+            "Low Φ should contract workspace, got {}",
+            last_capacity
+        );
     }
 
     #[test]
@@ -402,7 +425,11 @@ mod tests {
         }
         let m = ctrl.step(0.95);
 
-        assert!(m.attention_gain > 1.0, "Positive trend should sharpen attention, got {}", m.attention_gain);
+        assert!(
+            m.attention_gain > 1.0,
+            "Positive trend should sharpen attention, got {}",
+            m.attention_gain
+        );
     }
 
     #[test]
@@ -418,7 +445,11 @@ mod tests {
         }
         let m = ctrl.step(0.1);
 
-        assert!(m.attention_gain < 1.0, "Negative trend should broaden attention, got {}", m.attention_gain);
+        assert!(
+            m.attention_gain < 1.0,
+            "Negative trend should broaden attention, got {}",
+            m.attention_gain
+        );
     }
 
     #[test]
@@ -437,8 +468,11 @@ mod tests {
         }
         let m = ctrl.step(0.8);
 
-        assert!(m.consciousness_threshold > 0.5,
-            "High Φ should raise consciousness threshold, got {}", m.consciousness_threshold);
+        assert!(
+            m.consciousness_threshold > 0.5,
+            "High Φ should raise consciousness threshold, got {}",
+            m.consciousness_threshold
+        );
     }
 
     #[test]
@@ -531,7 +565,11 @@ mod tests {
         }
         let m10 = ctrl.step(0.5);
         // At 11 steps with window 10, confidence should be 1.0 (window is full)
-        assert!((m10.confidence - 1.0).abs() < 1e-10, "Full window should have confidence 1.0, got {}", m10.confidence);
+        assert!(
+            (m10.confidence - 1.0).abs() < 1e-10,
+            "Full window should have confidence 1.0, got {}",
+            m10.confidence
+        );
     }
 
     #[test]
@@ -549,7 +587,10 @@ mod tests {
             ctrl.step(0.7);
         }
 
-        assert!(ctrl.phi_trend() > 0.0, "Rising sequence should have positive trend");
+        assert!(
+            ctrl.phi_trend() > 0.0,
+            "Rising sequence should have positive trend"
+        );
 
         ctrl.reset();
 
@@ -561,6 +602,9 @@ mod tests {
             ctrl.step(0.3);
         }
 
-        assert!(ctrl.phi_trend() < 0.0, "Falling sequence should have negative trend");
+        assert!(
+            ctrl.phi_trend() < 0.0,
+            "Falling sequence should have negative trend"
+        );
     }
 }

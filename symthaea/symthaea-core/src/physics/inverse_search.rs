@@ -30,13 +30,13 @@
 //! Each explores a different "universe."
 //! Bundle results to find consensus candidates.
 
+use super::electron_nuclear_coupling::ElectronNuclearCoupling;
+use super::hadrons::Hadrons;
+use super::periodic_table::PeriodicTable;
+use super::phonon_dynamics::PhononDynamics;
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::periodic_table::PeriodicTable;
-use super::hadrons::Hadrons;
-use super::electron_nuclear_coupling::ElectronNuclearCoupling;
-use super::phonon_dynamics::PhononDynamics;
 use serde::{Deserialize, Serialize};
 
 /// Target property specification
@@ -61,13 +61,13 @@ pub struct TargetProperties {
 impl Default for TargetProperties {
     fn default() -> Self {
         Self {
-            energy_density: 0.8,      // High but not antimatter
+            energy_density: 0.8,        // High but not antimatter
             trigger_accessibility: 0.9, // Accessible with lasers
-            stability: 0.7,           // Years to decades
-            abundance: 0.6,           // Reasonably available
-            neec_coupling: 0.5,       // Some coupling
-            phonon_coupling: 0.5,     // Some coupling
-            safety: 0.7,              // Reasonably safe
+            stability: 0.7,             // Years to decades
+            abundance: 0.6,             // Reasonably available
+            neec_coupling: 0.5,         // Some coupling
+            phonon_coupling: 0.5,       // Some coupling
+            safety: 0.7,                // Reasonably safe
         }
     }
 }
@@ -89,24 +89,24 @@ impl TargetProperties {
     /// Optimized for Lattice Confinement Fusion
     pub fn lcf_optimized() -> Self {
         Self {
-            energy_density: 1.0,      // Fusion energy
+            energy_density: 1.0,        // Fusion energy
             trigger_accessibility: 0.7, // X-ray trigger OK
-            stability: 0.3,           // Transient is fine
-            abundance: 1.0,           // Deuterium from water
-            neec_coupling: 0.3,       // Less important for fusion
-            phonon_coupling: 1.0,     // Critical for LCF
-            safety: 0.6,              // Fusion is energetic
+            stability: 0.3,             // Transient is fine
+            abundance: 1.0,             // Deuterium from water
+            neec_coupling: 0.3,         // Less important for fusion
+            phonon_coupling: 1.0,       // Critical for LCF
+            safety: 0.6,                // Fusion is energetic
         }
     }
 
     /// Optimized for nuclear clock (Thorium-229m style)
     pub fn nuclear_clock() -> Self {
         Self {
-            energy_density: 0.1,      // Low energy is fine
+            energy_density: 0.1,        // Low energy is fine
             trigger_accessibility: 1.0, // Must be laser accessible
-            stability: 0.8,           // Stable enough to measure
-            abundance: 0.4,           // Rare is OK for clocks
-            neec_coupling: 0.9,       // High coupling needed
+            stability: 0.8,             // Stable enough to measure
+            abundance: 0.4,             // Rare is OK for clocks
+            neec_coupling: 0.9,         // High coupling needed
             phonon_coupling: 0.5,
             safety: 0.8,
         }
@@ -233,21 +233,12 @@ impl InverseSearchEngine {
             &self.trigger_access_vec,
             &self.difficult_trigger_vec,
         );
-        let stability = self.interpolate_property(
-            target.stability,
-            &self.stability_vec,
-            &self.unstable_vec,
-        );
-        let abundance = self.interpolate_property(
-            target.abundance,
-            &self.abundance_vec,
-            &self.rare_vec,
-        );
-        let safety = self.interpolate_property(
-            target.safety,
-            &self.safety_vec,
-            &self.dangerous_vec,
-        );
+        let stability =
+            self.interpolate_property(target.stability, &self.stability_vec, &self.unstable_vec);
+        let abundance =
+            self.interpolate_property(target.abundance, &self.abundance_vec, &self.rare_vec);
+        let safety =
+            self.interpolate_property(target.safety, &self.safety_vec, &self.dangerous_vec);
 
         // Weight by importance
         let neec = self.neec_vec.scale(target.neec_coupling);
@@ -255,7 +246,9 @@ impl InverseSearchEngine {
 
         // Bundle all properties
         ContinuousHV::weighted_bundle(
-            &[&energy, &trigger, &stability, &abundance, &safety, &neec, &phonon],
+            &[
+                &energy, &trigger, &stability, &abundance, &safety, &neec, &phonon,
+            ],
             &[1.0, 1.0, 1.0, 1.0, 1.0, 0.8, 0.8],
         )
     }
@@ -267,10 +260,7 @@ impl InverseSearchEngine {
         high: &ContinuousHV,
         low: &ContinuousHV,
     ) -> ContinuousHV {
-        ContinuousHV::weighted_bundle(
-            &[high, low],
-            &[value, 1.0 - value],
-        )
+        ContinuousHV::weighted_bundle(&[high, low], &[value, 1.0 - value])
     }
 
     /// Score a candidate against target properties
@@ -280,13 +270,38 @@ impl InverseSearchEngine {
         target: &TargetProperties,
     ) -> PropertyScores {
         PropertyScores {
-            energy_density: self.score_property(candidate, target.energy_density, &self.energy_density_vec, &self.low_energy_vec),
-            trigger_accessibility: self.score_property(candidate, target.trigger_accessibility, &self.trigger_access_vec, &self.difficult_trigger_vec),
-            stability: self.score_property(candidate, target.stability, &self.stability_vec, &self.unstable_vec),
-            abundance: self.score_property(candidate, target.abundance, &self.abundance_vec, &self.rare_vec),
+            energy_density: self.score_property(
+                candidate,
+                target.energy_density,
+                &self.energy_density_vec,
+                &self.low_energy_vec,
+            ),
+            trigger_accessibility: self.score_property(
+                candidate,
+                target.trigger_accessibility,
+                &self.trigger_access_vec,
+                &self.difficult_trigger_vec,
+            ),
+            stability: self.score_property(
+                candidate,
+                target.stability,
+                &self.stability_vec,
+                &self.unstable_vec,
+            ),
+            abundance: self.score_property(
+                candidate,
+                target.abundance,
+                &self.abundance_vec,
+                &self.rare_vec,
+            ),
             neec_coupling: candidate.similarity(&self.neec_vec).max(0.0),
             phonon_coupling: candidate.similarity(&self.phonon_vec).max(0.0),
-            safety: self.score_property(candidate, target.safety, &self.safety_vec, &self.dangerous_vec),
+            safety: self.score_property(
+                candidate,
+                target.safety,
+                &self.safety_vec,
+                &self.dangerous_vec,
+            ),
         }
     }
 
@@ -342,9 +357,11 @@ impl InverseSearchEngine {
             let trigger = self.infer_trigger(coupling.nuclear.energy_ev);
 
             candidates.push(SearchCandidate {
-                name: format!("{}-{}m (NEEC)",
+                name: format!(
+                    "{}-{}m (NEEC)",
                     element_symbol(coupling.nuclear.z),
-                    coupling.nuclear.a),
+                    coupling.nuclear.a
+                ),
                 z: coupling.nuclear.z,
                 a: Some(coupling.nuclear.a),
                 host_material: None,
@@ -387,7 +404,9 @@ impl InverseSearchEngine {
 
         // Sort by match score
         candidates.sort_by(|a, b| {
-            b.match_score.partial_cmp(&a.match_score).unwrap_or(std::cmp::Ordering::Equal)
+            b.match_score
+                .partial_cmp(&a.match_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         candidates
@@ -406,7 +425,8 @@ impl InverseSearchEngine {
             (scores.safety, 0.9),
         ];
 
-        let (sum, total_weight): (f32, f32) = weights.iter()
+        let (sum, total_weight): (f32, f32) = weights
+            .iter()
             .map(|(score, weight)| (score * weight, *weight))
             .fold((0.0, 0.0), |acc, x| (acc.0 + x.0, acc.1 + x.1));
 
@@ -498,7 +518,8 @@ impl InverseSearchEngine {
         }
 
         // Convert to (candidate, consensus_score)
-        let mut results: Vec<(SearchCandidate, f32)> = aggregated.into_iter()
+        let mut results: Vec<(SearchCandidate, f32)> = aggregated
+            .into_iter()
             .map(|(_, (candidate, count))| {
                 let consensus = count as f32 / n_seeds as f32;
                 (candidate, consensus)
@@ -509,7 +530,9 @@ impl InverseSearchEngine {
         results.sort_by(|a, b| {
             let score_a = a.1 * a.0.match_score;
             let score_b = b.1 * b.0.match_score;
-            score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         results
@@ -536,13 +559,13 @@ pub struct CausalFactor {
 /// Category of causal factor
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CausalCategory {
-    Symmetry,        // Conservation laws, gauge invariance
-    Interaction,     // Forces, couplings
-    QuantumEffect,   // Tunneling, entanglement
-    Thermodynamic,   // Entropy, temperature
-    Kinetic,         // Rates, barriers
-    Structural,      // Geometry, topology
-    Emergent,        // Collective phenomena
+    Symmetry,      // Conservation laws, gauge invariance
+    Interaction,   // Forces, couplings
+    QuantumEffect, // Tunneling, entanglement
+    Thermodynamic, // Entropy, temperature
+    Kinetic,       // Rates, barriers
+    Structural,    // Geometry, topology
+    Emergent,      // Collective phenomena
 }
 
 /// Causal Reasoning Engine for physics
@@ -562,70 +585,229 @@ impl CausalReasoningEngine {
         let mut factors = std::collections::HashMap::new();
 
         // Register phenomena
-        phenomena.insert("superconductivity".to_string(), genesis.hv("phenomenon::superconductivity", PHYSICS_DIM));
-        phenomena.insert("turbulence".to_string(), genesis.hv("phenomenon::turbulence", PHYSICS_DIM));
-        phenomena.insert("superfluidity".to_string(), genesis.hv("phenomenon::superfluidity", PHYSICS_DIM));
-        phenomena.insert("ferromagnetism".to_string(), genesis.hv("phenomenon::ferromagnetism", PHYSICS_DIM));
-        phenomena.insert("bec".to_string(), genesis.hv("phenomenon::bec", PHYSICS_DIM));
-        phenomena.insert("laser".to_string(), genesis.hv("phenomenon::laser", PHYSICS_DIM));
-        phenomena.insert("fusion".to_string(), genesis.hv("phenomenon::fusion", PHYSICS_DIM));
-        phenomena.insert("catalysis".to_string(), genesis.hv("phenomenon::catalysis", PHYSICS_DIM));
-        phenomena.insert("photosynthesis".to_string(), genesis.hv("phenomenon::photosynthesis", PHYSICS_DIM));
-        phenomena.insert("consciousness".to_string(), genesis.hv("phenomenon::consciousness", PHYSICS_DIM));
+        phenomena.insert(
+            "superconductivity".to_string(),
+            genesis.hv("phenomenon::superconductivity", PHYSICS_DIM),
+        );
+        phenomena.insert(
+            "turbulence".to_string(),
+            genesis.hv("phenomenon::turbulence", PHYSICS_DIM),
+        );
+        phenomena.insert(
+            "superfluidity".to_string(),
+            genesis.hv("phenomenon::superfluidity", PHYSICS_DIM),
+        );
+        phenomena.insert(
+            "ferromagnetism".to_string(),
+            genesis.hv("phenomenon::ferromagnetism", PHYSICS_DIM),
+        );
+        phenomena.insert(
+            "bec".to_string(),
+            genesis.hv("phenomenon::bec", PHYSICS_DIM),
+        );
+        phenomena.insert(
+            "laser".to_string(),
+            genesis.hv("phenomenon::laser", PHYSICS_DIM),
+        );
+        phenomena.insert(
+            "fusion".to_string(),
+            genesis.hv("phenomenon::fusion", PHYSICS_DIM),
+        );
+        phenomena.insert(
+            "catalysis".to_string(),
+            genesis.hv("phenomenon::catalysis", PHYSICS_DIM),
+        );
+        phenomena.insert(
+            "photosynthesis".to_string(),
+            genesis.hv("phenomenon::photosynthesis", PHYSICS_DIM),
+        );
+        phenomena.insert(
+            "consciousness".to_string(),
+            genesis.hv("phenomenon::consciousness", PHYSICS_DIM),
+        );
 
         // Register causal factors
-        factors.insert("cooper_pairs".to_string(),
-            (genesis.hv("cause::cooper_pairs", PHYSICS_DIM), CausalCategory::QuantumEffect));
-        factors.insert("phonon_exchange".to_string(),
-            (genesis.hv("cause::phonon_exchange", PHYSICS_DIM), CausalCategory::Interaction));
-        factors.insert("bcs_theory".to_string(),
-            (genesis.hv("cause::bcs_theory", PHYSICS_DIM), CausalCategory::Emergent));
-        factors.insert("high_reynolds".to_string(),
-            (genesis.hv("cause::high_reynolds", PHYSICS_DIM), CausalCategory::Kinetic));
-        factors.insert("instability".to_string(),
-            (genesis.hv("cause::instability", PHYSICS_DIM), CausalCategory::Kinetic));
-        factors.insert("energy_cascade".to_string(),
-            (genesis.hv("cause::energy_cascade", PHYSICS_DIM), CausalCategory::Thermodynamic));
-        factors.insert("bose_statistics".to_string(),
-            (genesis.hv("cause::bose_statistics", PHYSICS_DIM), CausalCategory::QuantumEffect));
-        factors.insert("exchange_interaction".to_string(),
-            (genesis.hv("cause::exchange_interaction", PHYSICS_DIM), CausalCategory::Interaction));
-        factors.insert("spin_alignment".to_string(),
-            (genesis.hv("cause::spin_alignment", PHYSICS_DIM), CausalCategory::Structural));
-        factors.insert("population_inversion".to_string(),
-            (genesis.hv("cause::population_inversion", PHYSICS_DIM), CausalCategory::QuantumEffect));
-        factors.insert("stimulated_emission".to_string(),
-            (genesis.hv("cause::stimulated_emission", PHYSICS_DIM), CausalCategory::QuantumEffect));
-        factors.insert("coulomb_barrier".to_string(),
-            (genesis.hv("cause::coulomb_barrier", PHYSICS_DIM), CausalCategory::Interaction));
-        factors.insert("quantum_tunneling".to_string(),
-            (genesis.hv("cause::quantum_tunneling", PHYSICS_DIM), CausalCategory::QuantumEffect));
-        factors.insert("strong_force".to_string(),
-            (genesis.hv("cause::strong_force", PHYSICS_DIM), CausalCategory::Interaction));
-        factors.insert("activation_energy_lowering".to_string(),
-            (genesis.hv("cause::activation_energy_lowering", PHYSICS_DIM), CausalCategory::Kinetic));
-        factors.insert("transition_state".to_string(),
-            (genesis.hv("cause::transition_state", PHYSICS_DIM), CausalCategory::Structural));
-        factors.insert("light_harvesting".to_string(),
-            (genesis.hv("cause::light_harvesting", PHYSICS_DIM), CausalCategory::QuantumEffect));
-        factors.insert("electron_transport".to_string(),
-            (genesis.hv("cause::electron_transport", PHYSICS_DIM), CausalCategory::Kinetic));
-        factors.insert("integrated_information".to_string(),
-            (genesis.hv("cause::integrated_information", PHYSICS_DIM), CausalCategory::Emergent));
-        factors.insert("neural_synchrony".to_string(),
-            (genesis.hv("cause::neural_synchrony", PHYSICS_DIM), CausalCategory::Emergent));
-        factors.insert("symmetry_breaking".to_string(),
-            (genesis.hv("cause::symmetry_breaking", PHYSICS_DIM), CausalCategory::Symmetry));
-        factors.insert("gauge_invariance".to_string(),
-            (genesis.hv("cause::gauge_invariance", PHYSICS_DIM), CausalCategory::Symmetry));
-        factors.insert("entropy_increase".to_string(),
-            (genesis.hv("cause::entropy_increase", PHYSICS_DIM), CausalCategory::Thermodynamic));
-        factors.insert("low_temperature".to_string(),
-            (genesis.hv("cause::low_temperature", PHYSICS_DIM), CausalCategory::Thermodynamic));
-        factors.insert("high_temperature".to_string(),
-            (genesis.hv("cause::high_temperature", PHYSICS_DIM), CausalCategory::Thermodynamic));
+        factors.insert(
+            "cooper_pairs".to_string(),
+            (
+                genesis.hv("cause::cooper_pairs", PHYSICS_DIM),
+                CausalCategory::QuantumEffect,
+            ),
+        );
+        factors.insert(
+            "phonon_exchange".to_string(),
+            (
+                genesis.hv("cause::phonon_exchange", PHYSICS_DIM),
+                CausalCategory::Interaction,
+            ),
+        );
+        factors.insert(
+            "bcs_theory".to_string(),
+            (
+                genesis.hv("cause::bcs_theory", PHYSICS_DIM),
+                CausalCategory::Emergent,
+            ),
+        );
+        factors.insert(
+            "high_reynolds".to_string(),
+            (
+                genesis.hv("cause::high_reynolds", PHYSICS_DIM),
+                CausalCategory::Kinetic,
+            ),
+        );
+        factors.insert(
+            "instability".to_string(),
+            (
+                genesis.hv("cause::instability", PHYSICS_DIM),
+                CausalCategory::Kinetic,
+            ),
+        );
+        factors.insert(
+            "energy_cascade".to_string(),
+            (
+                genesis.hv("cause::energy_cascade", PHYSICS_DIM),
+                CausalCategory::Thermodynamic,
+            ),
+        );
+        factors.insert(
+            "bose_statistics".to_string(),
+            (
+                genesis.hv("cause::bose_statistics", PHYSICS_DIM),
+                CausalCategory::QuantumEffect,
+            ),
+        );
+        factors.insert(
+            "exchange_interaction".to_string(),
+            (
+                genesis.hv("cause::exchange_interaction", PHYSICS_DIM),
+                CausalCategory::Interaction,
+            ),
+        );
+        factors.insert(
+            "spin_alignment".to_string(),
+            (
+                genesis.hv("cause::spin_alignment", PHYSICS_DIM),
+                CausalCategory::Structural,
+            ),
+        );
+        factors.insert(
+            "population_inversion".to_string(),
+            (
+                genesis.hv("cause::population_inversion", PHYSICS_DIM),
+                CausalCategory::QuantumEffect,
+            ),
+        );
+        factors.insert(
+            "stimulated_emission".to_string(),
+            (
+                genesis.hv("cause::stimulated_emission", PHYSICS_DIM),
+                CausalCategory::QuantumEffect,
+            ),
+        );
+        factors.insert(
+            "coulomb_barrier".to_string(),
+            (
+                genesis.hv("cause::coulomb_barrier", PHYSICS_DIM),
+                CausalCategory::Interaction,
+            ),
+        );
+        factors.insert(
+            "quantum_tunneling".to_string(),
+            (
+                genesis.hv("cause::quantum_tunneling", PHYSICS_DIM),
+                CausalCategory::QuantumEffect,
+            ),
+        );
+        factors.insert(
+            "strong_force".to_string(),
+            (
+                genesis.hv("cause::strong_force", PHYSICS_DIM),
+                CausalCategory::Interaction,
+            ),
+        );
+        factors.insert(
+            "activation_energy_lowering".to_string(),
+            (
+                genesis.hv("cause::activation_energy_lowering", PHYSICS_DIM),
+                CausalCategory::Kinetic,
+            ),
+        );
+        factors.insert(
+            "transition_state".to_string(),
+            (
+                genesis.hv("cause::transition_state", PHYSICS_DIM),
+                CausalCategory::Structural,
+            ),
+        );
+        factors.insert(
+            "light_harvesting".to_string(),
+            (
+                genesis.hv("cause::light_harvesting", PHYSICS_DIM),
+                CausalCategory::QuantumEffect,
+            ),
+        );
+        factors.insert(
+            "electron_transport".to_string(),
+            (
+                genesis.hv("cause::electron_transport", PHYSICS_DIM),
+                CausalCategory::Kinetic,
+            ),
+        );
+        factors.insert(
+            "integrated_information".to_string(),
+            (
+                genesis.hv("cause::integrated_information", PHYSICS_DIM),
+                CausalCategory::Emergent,
+            ),
+        );
+        factors.insert(
+            "neural_synchrony".to_string(),
+            (
+                genesis.hv("cause::neural_synchrony", PHYSICS_DIM),
+                CausalCategory::Emergent,
+            ),
+        );
+        factors.insert(
+            "symmetry_breaking".to_string(),
+            (
+                genesis.hv("cause::symmetry_breaking", PHYSICS_DIM),
+                CausalCategory::Symmetry,
+            ),
+        );
+        factors.insert(
+            "gauge_invariance".to_string(),
+            (
+                genesis.hv("cause::gauge_invariance", PHYSICS_DIM),
+                CausalCategory::Symmetry,
+            ),
+        );
+        factors.insert(
+            "entropy_increase".to_string(),
+            (
+                genesis.hv("cause::entropy_increase", PHYSICS_DIM),
+                CausalCategory::Thermodynamic,
+            ),
+        );
+        factors.insert(
+            "low_temperature".to_string(),
+            (
+                genesis.hv("cause::low_temperature", PHYSICS_DIM),
+                CausalCategory::Thermodynamic,
+            ),
+        );
+        factors.insert(
+            "high_temperature".to_string(),
+            (
+                genesis.hv("cause::high_temperature", PHYSICS_DIM),
+                CausalCategory::Thermodynamic,
+            ),
+        );
 
-        Self { _genesis: genesis.clone(), phenomena, factors }
+        Self {
+            _genesis: genesis.clone(),
+            phenomena,
+            factors,
+        }
     }
 
     /// Query: "What causes phenomenon X?"
@@ -636,7 +818,9 @@ impl CausalReasoningEngine {
             None => return vec![], // Unknown phenomenon
         };
 
-        let mut results: Vec<CausalFactor> = self.factors.iter()
+        let mut results: Vec<CausalFactor> = self
+            .factors
+            .iter()
             .map(|(name, (vec, cat))| {
                 // Similarity indicates causal connection
                 // In a real system, we'd have explicit causal bindings
@@ -651,7 +835,11 @@ impl CausalReasoningEngine {
             .filter(|f| f.strength > 0.05) // Filter weak connections
             .collect();
 
-        results.sort_by(|a, b| b.strength.partial_cmp(&a.strength).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.strength
+                .partial_cmp(&a.strength)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results
     }
 
@@ -662,7 +850,9 @@ impl CausalReasoningEngine {
             None => return vec![],
         };
 
-        let mut results: Vec<(String, f64)> = self.phenomena.iter()
+        let mut results: Vec<(String, f64)> = self
+            .phenomena
+            .iter()
             .map(|(name, vec)| {
                 let strength = factor_vec.similarity(vec).abs() as f64;
                 (name.clone(), strength)
@@ -693,7 +883,9 @@ impl CausalReasoningEngine {
         let mut chain = vec![from.to_string()];
 
         // Simple greedy search: find factors that are similar to both
-        let mut intermediates: Vec<(String, f64)> = self.factors.iter()
+        let mut intermediates: Vec<(String, f64)> = self
+            .factors
+            .iter()
             .map(|(name, (vec, _))| {
                 let from_sim = from_vec.similarity(vec).abs();
                 let to_sim = vec.similarity(&to_vec).abs();
@@ -726,7 +918,9 @@ impl CausalReasoningEngine {
 
     /// Build causal explanation for a vector
     pub fn explain(&self, target: &ContinuousHV) -> Vec<CausalFactor> {
-        let mut explanations: Vec<CausalFactor> = self.factors.iter()
+        let mut explanations: Vec<CausalFactor> = self
+            .factors
+            .iter()
             .map(|(name, (vec, cat))| {
                 let strength = target.similarity(vec).abs() as f64;
                 CausalFactor {
@@ -739,7 +933,11 @@ impl CausalReasoningEngine {
             .filter(|f| f.strength > 0.1)
             .collect();
 
-        explanations.sort_by(|a, b| b.strength.partial_cmp(&a.strength).unwrap_or(std::cmp::Ordering::Equal));
+        explanations.sort_by(|a, b| {
+            b.strength
+                .partial_cmp(&a.strength)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         explanations
     }
 }
@@ -747,12 +945,35 @@ impl CausalReasoningEngine {
 /// Convert atomic number to element symbol
 fn element_symbol(z: u8) -> &'static str {
     match z {
-        1 => "H", 2 => "He", 3 => "Li", 4 => "Be", 5 => "B",
-        6 => "C", 7 => "N", 8 => "O", 9 => "F", 10 => "Ne",
-        11 => "Na", 12 => "Mg", 13 => "Al", 14 => "Si", 15 => "P",
-        16 => "S", 17 => "Cl", 18 => "Ar", 19 => "K", 20 => "Ca",
-        26 => "Fe", 42 => "Mo", 43 => "Tc", 46 => "Pd", 68 => "Er",
-        72 => "Hf", 73 => "Ta", 90 => "Th", 92 => "U",
+        1 => "H",
+        2 => "He",
+        3 => "Li",
+        4 => "Be",
+        5 => "B",
+        6 => "C",
+        7 => "N",
+        8 => "O",
+        9 => "F",
+        10 => "Ne",
+        11 => "Na",
+        12 => "Mg",
+        13 => "Al",
+        14 => "Si",
+        15 => "P",
+        16 => "S",
+        17 => "Cl",
+        18 => "Ar",
+        19 => "K",
+        20 => "Ca",
+        26 => "Fe",
+        42 => "Mo",
+        43 => "Tc",
+        46 => "Pd",
+        68 => "Er",
+        72 => "Hf",
+        73 => "Ta",
+        90 => "Th",
+        92 => "U",
         _ => "X",
     }
 }
@@ -761,7 +982,14 @@ fn element_symbol(z: u8) -> &'static str {
 mod tests {
     use super::*;
 
-    fn setup() -> (GenesisSeed, InverseSearchEngine, ElectronNuclearCoupling, PhononDynamics, PeriodicTable, Hadrons) {
+    fn setup() -> (
+        GenesisSeed,
+        InverseSearchEngine,
+        ElectronNuclearCoupling,
+        PhononDynamics,
+        PeriodicTable,
+        Hadrons,
+    ) {
         let genesis = GenesisSeed::from_phrase("inverse search test");
         let model = super::super::StandardModel::from_genesis(&genesis);
         let hadrons = Hadrons::from_model(&model, &genesis);
@@ -806,8 +1034,7 @@ mod tests {
         let candidates = engine.search(&target, &neec, &phonons, &table, &hadrons);
 
         // Thorium-229m should score well for nuclear clock
-        let th229 = candidates.iter()
-            .find(|c| c.name.contains("Th-229"));
+        let th229 = candidates.iter().find(|c| c.name.contains("Th-229"));
 
         assert!(th229.is_some(), "Th-229m should be in results");
         let th229 = th229.unwrap();
@@ -825,8 +1052,7 @@ mod tests {
         let candidates = engine.search(&target, &neec, &phonons, &table, &hadrons);
 
         // Should find LCF candidates
-        let lcf = candidates.iter()
-            .find(|c| c.name.contains("LCF"));
+        let lcf = candidates.iter().find(|c| c.name.contains("LCF"));
 
         assert!(lcf.is_some(), "Should find LCF candidates");
     }

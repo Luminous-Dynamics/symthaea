@@ -66,7 +66,10 @@ impl SwarmConfig {
         Self {
             max_peers: 100,
             min_trust_level: 0.7,
-            bootstrap_peers: MYCELIX_BOOTSTRAP_NODES.iter().map(|s| s.to_string()).collect(),
+            bootstrap_peers: MYCELIX_BOOTSTRAP_NODES
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             ..Default::default()
         }
     }
@@ -131,7 +134,10 @@ pub struct BootstrapConfig {
 impl Default for BootstrapConfig {
     fn default() -> Self {
         Self {
-            primary: MYCELIX_BOOTSTRAP_NODES.iter().map(|s| s.to_string()).collect(),
+            primary: MYCELIX_BOOTSTRAP_NODES
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             fallback: vec![],
             enable_local_discovery: true,
             bootstrap_timeout_ms: 10000,
@@ -167,7 +173,10 @@ impl BootstrapConfig {
 
     /// Get all bootstrap nodes (primary then fallback)
     pub fn all_nodes(&self) -> impl Iterator<Item = &str> {
-        self.primary.iter().chain(self.fallback.iter()).map(|s| s.as_str())
+        self.primary
+            .iter()
+            .chain(self.fallback.iter())
+            .map(|s| s.as_str())
     }
 }
 

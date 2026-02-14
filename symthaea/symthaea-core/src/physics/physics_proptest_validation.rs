@@ -10,32 +10,34 @@
 //! - Block 3 (128 cases): Moderate cost (P16-P19)
 //! - Block 4 (128 cases): Round 7 expansion (P26-P40)
 
-use proptest::prelude::*;
-use super::decoherence::{Complex64, DecoherenceChannel, DensityMatrix, LindbladEvolution, simulate_decoherence};
-use super::quantum_tunneling::TunnelingCalculator;
-use super::thermodynamics::ThermoEncoder;
+use super::antimatter::Antimatter;
+use super::chaos_dynamics::systems;
+use super::chemical_kinetics::{KineticsEncoder, ReactionOrder, ReactionType};
+use super::chemistry::BondType;
+use super::condensed_matter::CMEncoder;
+use super::constants::{HBAR, K_BOLTZMANN, M_ELECTRON};
+use super::cosmology::CosmologyEncoder;
+use super::decoherence::{
+    simulate_decoherence, Complex64, DecoherenceChannel, DensityMatrix, LindbladEvolution,
+};
+use super::electromagnetism::EMEncoder;
 use super::fluid_dynamics::FluidEncoder;
 use super::general_relativity::GREncoder;
-use super::condensed_matter::CMEncoder;
-use super::cosmology::CosmologyEncoder;
-use super::chaos_dynamics::systems;
-use super::constants::{M_ELECTRON, HBAR, K_BOLTZMANN};
-use super::electromagnetism::EMEncoder;
-use super::nonequilibrium::{FluctuationDissipation, JarzynskiEstimator, OnsagerCoefficients};
-use super::optics::{OpticsEncoder, PhotonStatistics};
-use super::plasma_physics::PlasmaEncoder;
-use super::chemical_kinetics::{KineticsEncoder, ReactionType, ReactionOrder};
-use super::molecular_biology::DNABase;
-use super::phonon_dynamics::CrystalStructure;
 use super::geophysics::EarthLayer;
-use super::radiation_damage::FusionReaction;
-use super::chemistry::BondType;
 use super::hadrons::{Baryon, Meson};
-use super::standard_model::{QuarkFlavor, GaugeBoson, StandardModel, PHYSICS_DIM};
+use super::molecular_biology::DNABase;
+use super::nonequilibrium::{FluctuationDissipation, JarzynskiEstimator, OnsagerCoefficients};
 use super::nuclear::EnergyScale;
-use super::antimatter::Antimatter;
-use crate::hdc::unified_hv::ContinuousHV;
+use super::optics::{OpticsEncoder, PhotonStatistics};
+use super::phonon_dynamics::CrystalStructure;
+use super::plasma_physics::PlasmaEncoder;
+use super::quantum_tunneling::TunnelingCalculator;
+use super::radiation_damage::FusionReaction;
+use super::standard_model::{GaugeBoson, QuarkFlavor, StandardModel, PHYSICS_DIM};
+use super::thermodynamics::ThermoEncoder;
 use crate::genesis::GenesisSeed;
+use crate::hdc::unified_hv::ContinuousHV;
+use proptest::prelude::*;
 
 /// Generate a random pure state on the Bloch sphere for a 2-level system.
 fn arb_pure_state_2d() -> impl Strategy<Value = DensityMatrix> {
@@ -64,7 +66,11 @@ fn arb_tunneling_params() -> impl Strategy<Value = (f64, f64, f64)> {
         // V₀ must be > E
         let e_j = e_ev * 1.6e-19;
         let v_min_ev = e_ev + 0.1;
-        (Just(e_j), (v_min_ev..20.0_f64).prop_map(|v| v * 1.6e-19), Just(width_angstrom * 1e-10))
+        (
+            Just(e_j),
+            (v_min_ev..20.0_f64).prop_map(|v| v * 1.6e-19),
+            Just(width_angstrom * 1e-10),
+        )
     })
 }
 

@@ -23,13 +23,11 @@ use serde::{Deserialize, Serialize};
 
 // Re-export from user_state_inference for convenience
 pub use crate::user_state_inference::{
-    UserState as UserStateInferred,
-    ContextKind, ExperienceLevel, Verbosity,
+    ContextKind, ExperienceLevel, UserState as UserStateInferred, Verbosity,
 };
 
 /// Cognitive load level for response adaptation
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum CognitiveLoad {
     /// Low cognitive load - user can handle detailed information
     Low,
@@ -101,7 +99,6 @@ impl CognitiveLoad {
     }
 }
 
-
 /// User state for resonant speech (simplified version)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserState {
@@ -155,8 +152,8 @@ impl UserState {
             experience: inferred.experience,
             context: inferred.context,
             is_rushed: inferred.idle_time_secs < 0.5 && inferred.interaction_count > 5,
-            is_learning: inferred.context == ContextKind::Help ||
-                        inferred.context == ContextKind::Exploration,
+            is_learning: inferred.context == ContextKind::Help
+                || inferred.context == ContextKind::Exploration,
             // Trust starts high and degrades with frustration
             trust_in_sophia: (1.0 - inferred.frustration * 0.5).max(0.0),
         }
@@ -169,8 +166,8 @@ impl UserState {
 
     /// Check if user is overwhelmed
     pub fn is_overwhelmed(&self) -> bool {
-        self.cognitive_load == CognitiveLoad::Overloaded ||
-            (self.cognitive_load == CognitiveLoad::High && self.frustration > 0.5)
+        self.cognitive_load == CognitiveLoad::Overloaded
+            || (self.cognitive_load == CognitiveLoad::High && self.frustration > 0.5)
     }
 }
 
@@ -279,14 +276,17 @@ impl ResonantSpeech {
 
         // Add empathic prefix if needed
         if self.user_state.needs_empathy() && !self.templates.empathic_prefixes.is_empty() {
-            let idx = (self.stats.total_responses as usize) % self.templates.empathic_prefixes.len();
+            let idx =
+                (self.stats.total_responses as usize) % self.templates.empathic_prefixes.len();
             response.push_str(&self.templates.empathic_prefixes[idx]);
             response.push(' ');
             self.stats.empathic_responses += 1;
         }
 
         // Add acknowledgment for task contexts
-        if self.user_state.context == ContextKind::Task && !self.templates.acknowledgments.is_empty() {
+        if self.user_state.context == ContextKind::Task
+            && !self.templates.acknowledgments.is_empty()
+        {
             let idx = (self.stats.total_responses as usize) % self.templates.acknowledgments.len();
             response.push_str(&self.templates.acknowledgments[idx]);
             response.push(' ');
@@ -302,12 +302,15 @@ impl ResonantSpeech {
         }
 
         // Add encouraging suffix for learning contexts
-        if self.user_state.is_learning && self.user_state.confidence < 0.5
-            && !self.templates.encouraging_suffixes.is_empty() {
-                let idx = (self.stats.total_responses as usize) % self.templates.encouraging_suffixes.len();
-                response.push(' ');
-                response.push_str(&self.templates.encouraging_suffixes[idx]);
-            }
+        if self.user_state.is_learning
+            && self.user_state.confidence < 0.5
+            && !self.templates.encouraging_suffixes.is_empty()
+        {
+            let idx =
+                (self.stats.total_responses as usize) % self.templates.encouraging_suffixes.len();
+            response.push(' ');
+            response.push_str(&self.templates.encouraging_suffixes[idx]);
+        }
 
         // Update stats
         self.stats.total_responses += 1;

@@ -4,8 +4,8 @@
 //! the epistemic consciousness system. The actual implementations
 //! are in their respective modules (researcher, verifier, integrator, etc.).
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // ============================================================================
 // Enums
@@ -238,7 +238,9 @@ impl VerifiedClaim {
             confidence: 0.0,
             supporting_sources: Vec::new(),
             contradicting_sources: Vec::new(),
-            hedge: EpistemicStatus::InsufficientEvidence.hedge_phrase().to_string(),
+            hedge: EpistemicStatus::InsufficientEvidence
+                .hedge_phrase()
+                .to_string(),
         }
     }
 

@@ -70,8 +70,10 @@ fn main() {
     let mut passed = 0;
     let mut total = 0;
 
-    println!("{:<12} {:>10} {:>14} {:>14} {:>12} {:>12}",
-        "Params", "Bytes(f32)", "HyperFeel(B)", "Ratio", "MSE", "CosSimil");
+    println!(
+        "{:<12} {:>10} {:>14} {:>14} {:>12} {:>12}",
+        "Params", "Bytes(f32)", "HyperFeel(B)", "Ratio", "MSE", "CosSimil"
+    );
     println!("{}", "-".repeat(80));
 
     for &size in &sizes {
@@ -97,7 +99,11 @@ fn main() {
         let actual_ratio = original_bytes as f64 / compressed_bytes as f64;
 
         // Cosine similarity
-        let dot: f32 = gradients.iter().zip(hf_decompressed.iter()).map(|(a, b)| a * b).sum();
+        let dot: f32 = gradients
+            .iter()
+            .zip(hf_decompressed.iter())
+            .map(|(a, b)| a * b)
+            .sum();
         let norm_a: f32 = gradients.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm_b: f32 = hf_decompressed.iter().map(|x| x * x).sum::<f32>().sqrt();
         let cos_sim = if norm_a > 0.0 && norm_b > 0.0 {
@@ -181,14 +187,37 @@ fn main() {
         &compressed_result.aggregated.gradients,
     );
 
-    let dot: f32 = uncompressed_result.aggregated.gradients.iter()
+    let dot: f32 = uncompressed_result
+        .aggregated
+        .gradients
+        .iter()
         .zip(compressed_result.aggregated.gradients.iter())
-        .map(|(a, b)| a * b).sum();
-    let norm_a: f32 = uncompressed_result.aggregated.gradients.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = compressed_result.aggregated.gradients.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let agg_cos_sim = if norm_a > 0.0 && norm_b > 0.0 { dot / (norm_a * norm_b) } else { 0.0 };
+        .map(|(a, b)| a * b)
+        .sum();
+    let norm_a: f32 = uncompressed_result
+        .aggregated
+        .gradients
+        .iter()
+        .map(|x| x * x)
+        .sum::<f32>()
+        .sqrt();
+    let norm_b: f32 = compressed_result
+        .aggregated
+        .gradients
+        .iter()
+        .map(|x| x * x)
+        .sum::<f32>()
+        .sqrt();
+    let agg_cos_sim = if norm_a > 0.0 && norm_b > 0.0 {
+        dot / (norm_a * norm_b)
+    } else {
+        0.0
+    };
 
-    println!("Aggregation MSE (compressed vs uncompressed): {:.6}", agg_mse);
+    println!(
+        "Aggregation MSE (compressed vs uncompressed): {:.6}",
+        agg_mse
+    );
     println!("Aggregation cosine similarity: {:.4}", agg_cos_sim);
 
     total += 1;
@@ -206,7 +235,10 @@ fn main() {
     println!("  100K params -> ~200x compression");
     println!("  1M params  -> ~2,000x compression");
     println!("  10M params -> ~20,000x compression");
-    println!("\nFixed output size: {} bytes (HV16 + 8 byte header)", HV_SIZE + 8);
+    println!(
+        "\nFixed output size: {} bytes (HV16 + 8 byte header)",
+        HV_SIZE + 8
+    );
     println!("Reconstruction is lossy — cosine similarity degrades with higher compression.");
 
     println!("\n=== RESULTS: {}/{} passed ===", passed, total);

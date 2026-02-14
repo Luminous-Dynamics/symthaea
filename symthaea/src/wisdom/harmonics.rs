@@ -39,13 +39,13 @@ use std::fmt;
 /// The seven harmonies as an enumeration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ActiveHarmonic {
-    Coherence,      // Resonant Coherence
-    Flourishing,    // Pan-Sentient Flourishing
-    Wisdom,         // Integral Wisdom
-    Play,           // Infinite Play
-    Interconnect,   // Universal Interconnectedness
-    Reciprocity,    // Sacred Reciprocity
-    Evolution,      // Evolutionary Progression
+    Coherence,    // Resonant Coherence
+    Flourishing,  // Pan-Sentient Flourishing
+    Wisdom,       // Integral Wisdom
+    Play,         // Infinite Play
+    Interconnect, // Universal Interconnectedness
+    Reciprocity,  // Sacred Reciprocity
+    Evolution,    // Evolutionary Progression
 }
 
 impl ActiveHarmonic {
@@ -174,7 +174,7 @@ impl ReasoningBias {
 #[derive(Debug, Clone, Copy)]
 pub struct HarmonicMode {
     pub harmonic: ActiveHarmonic,
-    pub activation: f32,  // 0.0 to 1.0
+    pub activation: f32, // 0.0 to 1.0
 }
 
 impl HarmonicMode {
@@ -187,7 +187,10 @@ impl HarmonicMode {
 
     /// Get the effective weight modifier for a primitive type
     pub fn weight_for_primitive(&self, primitive_type: &str) -> f32 {
-        let base_modifier = self.harmonic.bias().primitive_weight_modifier(primitive_type);
+        let base_modifier = self
+            .harmonic
+            .bias()
+            .primitive_weight_modifier(primitive_type);
         // Activation scales the effect: at 0.5 activation, effect is neutral (1.0)
         // At 1.0 activation, full effect; at 0.0 activation, no effect
         let scale = (self.activation - 0.5) * 2.0; // -1.0 to 1.0

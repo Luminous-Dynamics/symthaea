@@ -21,10 +21,10 @@
 //! - Lindblad (1976) - "On the generators of quantum dynamical semigroups"
 //! - Zurek (2003) - "Decoherence, einselection, and the quantum origins of the classical"
 
+use super::constants::{HBAR, K_BOLTZMANN};
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::{HBAR, K_BOLTZMANN};
 use serde::{Deserialize, Serialize};
 
 /// Complex number representation (simple implementation)
@@ -47,7 +47,10 @@ impl Complex64 {
 
     /// Complex conjugate
     pub fn conj(&self) -> Self {
-        Self { re: self.re, im: -self.im }
+        Self {
+            re: self.re,
+            im: -self.im,
+        }
     }
 
     /// Magnitude squared |z|²
@@ -86,7 +89,10 @@ impl Complex64 {
 
     /// Scale by real number
     pub fn scale(&self, s: f64) -> Self {
-        Self { re: self.re * s, im: self.im * s }
+        Self {
+            re: self.re * s,
+            im: self.im * s,
+        }
     }
 
     /// Imaginary unit
@@ -366,14 +372,8 @@ impl DensityMatrix {
             let mut new_rp = vec![(0.0f64, 0.0f64); n];
             let mut new_rq = vec![(0.0f64, 0.0f64); n];
             for j in 0..n {
-                new_rp[j] = (
-                    c * re[p][j] - s * re[q][j],
-                    c * im[p][j] - s * im[q][j],
-                );
-                new_rq[j] = (
-                    s * re[p][j] + c * re[q][j],
-                    s * im[p][j] + c * im[q][j],
-                );
+                new_rp[j] = (c * re[p][j] - s * re[q][j], c * im[p][j] - s * im[q][j]);
+                new_rq[j] = (s * re[p][j] + c * re[q][j], s * im[p][j] + c * im[q][j]);
             }
             for j in 0..n {
                 re[p][j] = new_rp[j].0;
@@ -386,14 +386,8 @@ impl DensityMatrix {
             let mut new_cp = vec![(0.0f64, 0.0f64); n];
             let mut new_cq = vec![(0.0f64, 0.0f64); n];
             for i in 0..n {
-                new_cp[i] = (
-                    c * re[i][p] - s * re[i][q],
-                    c * im[i][p] - s * im[i][q],
-                );
-                new_cq[i] = (
-                    s * re[i][p] + c * re[i][q],
-                    s * im[i][p] + c * im[i][q],
-                );
+                new_cp[i] = (c * re[i][p] - s * re[i][q], c * im[i][p] - s * im[i][q]);
+                new_cq[i] = (s * re[i][p] + c * re[i][q], s * im[i][p] + c * im[i][q]);
             }
             for i in 0..n {
                 re[i][p] = new_cp[i].0;
@@ -475,7 +469,11 @@ impl DensityMatrix {
 
     /// Frobenius norm ||ρ||_F = √(Σᵢⱼ |ρᵢⱼ|²)
     pub fn frobenius_norm(&self) -> f64 {
-        self.elements.iter().map(|c| c.norm_sqr()).sum::<f64>().sqrt()
+        self.elements
+            .iter()
+            .map(|c| c.norm_sqr())
+            .sum::<f64>()
+            .sqrt()
     }
 
     /// Hermitian conjugate (dagger)
@@ -533,7 +531,12 @@ impl LindbladEvolution {
         let k3 = self.derivative(&rho3).scale(dt);
         let rho4 = rho.add(&k3);
         let k4 = self.derivative(&rho4).scale(dt);
-        rho.add(&k1.add(&k2.scale(2.0)).add(&k3.scale(2.0)).add(&k4).scale(1.0 / 6.0))
+        rho.add(
+            &k1.add(&k2.scale(2.0))
+                .add(&k3.scale(2.0))
+                .add(&k4)
+                .scale(1.0 / 6.0),
+        )
     }
 
     /// Compute dρ/dt from Lindblad equation
@@ -565,8 +568,7 @@ impl LindbladEvolution {
 
             for i in 0..dim {
                 for j in 0..dim {
-                    let dissipator = l_rho_l_dag.get(i, j)
-                        .sub(&anticomm.get(i, j).scale(0.5));
+                    let dissipator = l_rho_l_dag.get(i, j).sub(&anticomm.get(i, j).scale(0.5));
                     drho.set(i, j, drho.get(i, j).add(&dissipator.scale(gamma_k)));
                 }
             }
@@ -625,16 +627,35 @@ impl LindbladEvolution {
     ) -> Vec<DensityMatrix> {
         // Dormand-Prince coefficients (Butcher tableau)
         let a21 = 1.0 / 5.0;
-        let a31 = 3.0 / 40.0; let a32 = 9.0 / 40.0;
-        let a41 = 44.0 / 45.0; let a42 = -56.0 / 15.0; let a43 = 32.0 / 9.0;
-        let a51 = 19372.0 / 6561.0; let a52 = -25360.0 / 2187.0; let a53 = 64448.0 / 6561.0; let a54 = -212.0 / 729.0;
-        let a61 = 9017.0 / 3168.0; let a62 = -355.0 / 33.0; let a63 = 46732.0 / 5247.0; let a64 = 49.0 / 176.0; let a65 = -5103.0 / 18656.0;
+        let a31 = 3.0 / 40.0;
+        let a32 = 9.0 / 40.0;
+        let a41 = 44.0 / 45.0;
+        let a42 = -56.0 / 15.0;
+        let a43 = 32.0 / 9.0;
+        let a51 = 19372.0 / 6561.0;
+        let a52 = -25360.0 / 2187.0;
+        let a53 = 64448.0 / 6561.0;
+        let a54 = -212.0 / 729.0;
+        let a61 = 9017.0 / 3168.0;
+        let a62 = -355.0 / 33.0;
+        let a63 = 46732.0 / 5247.0;
+        let a64 = 49.0 / 176.0;
+        let a65 = -5103.0 / 18656.0;
 
         // 5th-order weights
-        let b1 = 35.0 / 384.0; let b3 = 500.0 / 1113.0; let b4 = 125.0 / 192.0; let b5 = -2187.0 / 6784.0; let b6 = 11.0 / 84.0;
+        let b1 = 35.0 / 384.0;
+        let b3 = 500.0 / 1113.0;
+        let b4 = 125.0 / 192.0;
+        let b5 = -2187.0 / 6784.0;
+        let b6 = 11.0 / 84.0;
 
         // 4th-order weights (for error estimate)
-        let e1 = 71.0 / 57600.0; let e3 = -71.0 / 16695.0; let e4 = 71.0 / 1920.0; let e5 = -17253.0 / 339200.0; let e6 = 22.0 / 525.0; let e7 = -1.0 / 40.0;
+        let e1 = 71.0 / 57600.0;
+        let e3 = -71.0 / 16695.0;
+        let e4 = 71.0 / 1920.0;
+        let e5 = -17253.0 / 339200.0;
+        let e6 = 22.0 / 525.0;
+        let e7 = -1.0 / 40.0;
 
         let mut trajectory = Vec::new();
         let mut current = rho.clone();
@@ -659,11 +680,23 @@ impl LindbladEvolution {
             let k2 = self.derivative(&s2);
             let s3 = current.add(&k1.scale(h * a31)).add(&k2.scale(h * a32));
             let k3 = self.derivative(&s3);
-            let s4 = current.add(&k1.scale(h * a41)).add(&k2.scale(h * a42)).add(&k3.scale(h * a43));
+            let s4 = current
+                .add(&k1.scale(h * a41))
+                .add(&k2.scale(h * a42))
+                .add(&k3.scale(h * a43));
             let k4 = self.derivative(&s4);
-            let s5 = current.add(&k1.scale(h * a51)).add(&k2.scale(h * a52)).add(&k3.scale(h * a53)).add(&k4.scale(h * a54));
+            let s5 = current
+                .add(&k1.scale(h * a51))
+                .add(&k2.scale(h * a52))
+                .add(&k3.scale(h * a53))
+                .add(&k4.scale(h * a54));
             let k5 = self.derivative(&s5);
-            let s6 = current.add(&k1.scale(h * a61)).add(&k2.scale(h * a62)).add(&k3.scale(h * a63)).add(&k4.scale(h * a64)).add(&k5.scale(h * a65));
+            let s6 = current
+                .add(&k1.scale(h * a61))
+                .add(&k2.scale(h * a62))
+                .add(&k3.scale(h * a63))
+                .add(&k4.scale(h * a64))
+                .add(&k5.scale(h * a65));
             let k6 = self.derivative(&s6);
 
             // 5th-order solution
@@ -677,7 +710,8 @@ impl LindbladEvolution {
 
             // Error estimate: difference between 5th and 4th order
             let k7 = self.derivative(&y5);
-            let err_mat = k1.scale(h * e1)
+            let err_mat = k1
+                .scale(h * e1)
                 .add(&k3.scale(h * e3))
                 .add(&k4.scale(h * e4))
                 .add(&k5.scale(h * e5))
@@ -696,11 +730,7 @@ impl LindbladEvolution {
             }
 
             // Adjust step size
-            let factor = if err > 0.0 {
-                0.9 * err.powf(-0.2)
-            } else {
-                5.0
-            };
+            let factor = if err > 0.0 { 0.9 * err.powf(-0.2) } else { 5.0 };
             h *= factor.clamp(0.2, 5.0);
             h = h.clamp(h_min, h_max);
         }
@@ -719,7 +749,12 @@ pub enum DecoherenceChannel {
     /// Depolarizing channel (uniform noise)
     Depolarizing { p: f64 },
     /// Thermal relaxation (T₁ and T₂ at temperature with explicit energy gap)
-    ThermalRelaxation { t1: f64, t2: f64, temperature: f64, energy_gap: f64 },
+    ThermalRelaxation {
+        t1: f64,
+        t2: f64,
+        temperature: f64,
+        energy_gap: f64,
+    },
 }
 
 impl DecoherenceChannel {
@@ -729,7 +764,11 @@ impl DecoherenceChannel {
             DecoherenceChannel::Dephasing { gamma } => 1.0 / gamma,
             DecoherenceChannel::AmplitudeDamping { gamma } => 1.0 / gamma,
             DecoherenceChannel::Depolarizing { p } => {
-                if *p > 0.0 { 1.0 / p } else { f64::INFINITY }
+                if *p > 0.0 {
+                    1.0 / p
+                } else {
+                    f64::INFINITY
+                }
             }
             DecoherenceChannel::ThermalRelaxation { t2, .. } => *t2,
         }
@@ -769,7 +808,12 @@ impl DecoherenceChannel {
 
                 vec![(sigma_x, gamma), (sigma_y, gamma), (sigma_z, gamma)]
             }
-            DecoherenceChannel::ThermalRelaxation { t1, t2, temperature, energy_gap } => {
+            DecoherenceChannel::ThermalRelaxation {
+                t1,
+                t2,
+                temperature,
+                energy_gap,
+            } => {
                 // Combine amplitude damping and dephasing
                 let gamma1 = 1.0 / t1;
                 let gamma_phi = 1.0 / t2 - 0.5 / t1; // Pure dephasing rate
@@ -832,10 +876,7 @@ impl DecoherenceEncoder {
     /// Encode purity as weighted superposition
     pub fn encode_purity(&self, purity: f64) -> ContinuousHV {
         let purity = purity.clamp(0.0, 1.0) as f32;
-        ContinuousHV::weighted_bundle(
-            &[&self.pure, &self.mixed],
-            &[purity, 1.0 - purity],
-        )
+        ContinuousHV::weighted_bundle(&[&self.pure, &self.mixed], &[purity, 1.0 - purity])
     }
 
     /// Encode decoherence progress (0 = fully coherent, 1 = fully decohered)
@@ -954,7 +995,11 @@ mod tests {
         let rho = DensityMatrix::pure_state(&psi);
 
         // Pure state should have purity = 1
-        assert!((rho.purity() - 1.0).abs() < 1e-10, "Pure state purity = {}", rho.purity());
+        assert!(
+            (rho.purity() - 1.0).abs() < 1e-10,
+            "Pure state purity = {}",
+            rho.purity()
+        );
 
         // Trace should be 1
         assert!((rho.trace().re - 1.0).abs() < 1e-10);
@@ -965,7 +1010,11 @@ mod tests {
         let rho = DensityMatrix::maximally_mixed(2);
 
         // Maximally mixed should have purity = 1/d = 0.5
-        assert!((rho.purity() - 0.5).abs() < 1e-10, "Mixed purity = {}", rho.purity());
+        assert!(
+            (rho.purity() - 0.5).abs() < 1e-10,
+            "Mixed purity = {}",
+            rho.purity()
+        );
 
         // Trace should be 1
         assert!((rho.trace().re - 1.0).abs() < 1e-10);
@@ -993,7 +1042,11 @@ mod tests {
 
         // Entropy should be positive for mixed state
         let s_mixed = mixed.von_neumann_entropy();
-        assert!(s_mixed > 0.0, "Mixed entropy should be positive: {}", s_mixed);
+        assert!(
+            s_mixed > 0.0,
+            "Mixed entropy should be positive: {}",
+            s_mixed
+        );
     }
 
     #[test]
@@ -1042,7 +1095,10 @@ mod tests {
         let result = simulate_decoherence(&initial, channel, 5.0, 50);
 
         assert_eq!(result.times.len(), 51);
-        assert!(result.purity[0] > result.purity[50] || (result.purity[0] - result.purity[50]).abs() < 0.1);
+        assert!(
+            result.purity[0] > result.purity[50]
+                || (result.purity[0] - result.purity[50]).abs() < 0.1
+        );
         assert!(result.coherence[0] >= result.coherence[50]);
     }
 

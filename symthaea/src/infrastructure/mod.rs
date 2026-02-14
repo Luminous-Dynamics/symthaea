@@ -12,24 +12,24 @@
 //! - K3: Dry-run sandbox
 //! - L1: Resilient lock guards (poison recovery)
 
+pub mod auth;
 pub mod cache;
 pub mod file_watcher;
-pub mod pagination;
-pub mod auth;
-pub mod metrics;
-pub mod git_tracking;
-pub mod sandbox;
 pub mod flake_updater;
+pub mod git_tracking;
 pub mod home_manager;
 pub mod lock_guard;
+pub mod metrics;
+pub mod pagination;
+pub mod sandbox;
 
-pub use cache::{LruCache, HdcCache, CacheStats};
+pub use auth::{AuthError, AuthProvider, AuthToken};
+pub use cache::{CacheStats, HdcCache, LruCache};
 pub use file_watcher::{ConfigWatcher, WatchEvent, WatchEventKind};
-pub use pagination::{Paginator, Page, PageRequest};
-pub use auth::{AuthToken, AuthProvider, AuthError};
-pub use metrics::{MetricsCollector, MetricValue};
-pub use git_tracking::{GitTracker, CommitInfo};
-pub use sandbox::{Sandbox, SandboxResult};
-pub use flake_updater::{FlakeUpdater, FlakeInput, UpdatePreview, UpdateResult};
-pub use home_manager::{HomeManagerBridge, HomeConfig, HomeGeneration, HomeResult};
+pub use flake_updater::{FlakeInput, FlakeUpdater, UpdatePreview, UpdateResult};
+pub use git_tracking::{CommitInfo, GitTracker};
+pub use home_manager::{HomeConfig, HomeGeneration, HomeManagerBridge, HomeResult};
 pub use lock_guard::{ResilientMutex, ResilientRwLock};
+pub use metrics::{MetricValue, MetricsCollector};
+pub use pagination::{Page, PageRequest, Paginator};
+pub use sandbox::{Sandbox, SandboxResult};

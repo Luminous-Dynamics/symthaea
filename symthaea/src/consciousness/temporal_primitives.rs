@@ -1391,10 +1391,7 @@ impl TemporalPrimitiveSystem {
 
         for (relation, grounding) in &all_groundings {
             // Combine domain rotation with NSM-grounded encoding
-            let encoding = BinaryHV::bundle(&[
-                domain_rotation,
-                grounding.primitive_encoding,
-            ]);
+            let encoding = BinaryHV::bundle(&[domain_rotation, grounding.primitive_encoding]);
 
             relation_primitives.insert(
                 *relation,

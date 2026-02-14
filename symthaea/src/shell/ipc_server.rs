@@ -30,18 +30,18 @@
 //! └──────────────────────────────────────────────────────────────────┘
 //! ```
 
-use std::path::{Path, PathBuf};
+use anyhow::{Context, Result};
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::net::{UnixListener, UnixStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::{broadcast, mpsc, RwLock};
-use anyhow::{Result, Context};
 
-use super::ipc_client::{IpcRequest, IpcResponse, MetricsSnapshot, CompletionItem};
 use super::context::{Completion, CompletionKind};
+use super::ipc_client::{CompletionItem, IpcRequest, IpcResponse, MetricsSnapshot};
 
 const IPC_PROTOCOL_VERSION: u32 = 1;
 
@@ -199,24 +199,27 @@ impl IpcServer {
     pub async fn run(&mut self) -> Result<()> {
         // Ensure parent directory exists
         if let Some(parent) = self.config.socket_path.parent() {
-            tokio::fs::create_dir_all(parent).await
+            tokio::fs::create_dir_all(parent)
+                .await
                 .context("Failed to create socket directory")?;
         }
 
         // Remove existing socket if present
         if self.config.socket_path.exists() {
-            tokio::fs::remove_file(&self.config.socket_path).await
+            tokio::fs::remove_file(&self.config.socket_path)
+                .await
                 .context("Failed to remove existing socket")?;
         }
 
         // Bind to socket
-        let listener = UnixListener::bind(&self.config.socket_path)
-            .context("Failed to bind to socket")?;
+        let listener =
+            UnixListener::bind(&self.config.socket_path).context("Failed to bind to socket")?;
 
         #[cfg(unix)]
         {
             let perms = std::fs::Permissions::from_mode(0o600);
-            tokio::fs::set_permissions(&self.config.socket_path, perms).await
+            tokio::fs::set_permissions(&self.config.socket_path, perms)
+                .await
                 .context("Failed to set socket permissions")?;
         }
 
@@ -337,7 +340,11 @@ async fn handle_client(
 
             if *subscribed_clone.read().await {
                 let metrics = metrics_provider_clone.get_metrics();
-                if response_tx_clone.send(IpcResponse::Metrics(metrics)).await.is_err() {
+                if response_tx_clone
+                    .send(IpcResponse::Metrics(metrics))
+                    .await
+                    .is_err()
+                {
                     break;
                 }
             }
@@ -458,15 +465,14 @@ async fn handle_request(
             IpcResponse::Subscribed
         }
 
-        IpcRequest::GetMetrics => {
-            IpcResponse::Metrics(metrics_provider.get_metrics())
-        }
+        IpcRequest::GetMetrics => IpcResponse::Metrics(metrics_provider.get_metrics()),
 
-        IpcRequest::Ping => {
-            IpcResponse::Pong
-        }
+        IpcRequest::Ping => IpcResponse::Pong,
 
-        IpcRequest::Execute { command, require_phi } => {
+        IpcRequest::Execute {
+            command,
+            require_phi,
+        } => {
             let result = executor.execute(&command, require_phi);
             IpcResponse::ExecutionResult {
                 success: result.success,
@@ -489,7 +495,8 @@ async fn handle_request(
 
         IpcRequest::GetCompletions { input, cursor_pos } => {
             let completions = executor.get_completions(&input, cursor_pos);
-            let items: Vec<CompletionItem> = completions.into_iter()
+            let items: Vec<CompletionItem> = completions
+                .into_iter()
                 .map(|c| CompletionItem {
                     text: c.text,
                     label: c.label,
@@ -505,7 +512,9 @@ async fn handle_request(
 
 #[cfg(unix)]
 fn authorize_peer(stream: &UnixStream, socket_path: &Path) -> Result<()> {
-    let creds = stream.peer_cred().context("Failed to read peer credentials")?;
+    let creds = stream
+        .peer_cred()
+        .context("Failed to read peer credentials")?;
     let socket_uid = std::fs::metadata(socket_path)
         .context("Failed to read socket metadata")?
         .uid();
@@ -513,7 +522,11 @@ fn authorize_peer(stream: &UnixStream, socket_path: &Path) -> Result<()> {
     if creds.uid() == socket_uid || creds.uid() == 0 {
         Ok(())
     } else {
-        anyhow::bail!("UID {} not authorized for socket owner {}", creds.uid(), socket_uid);
+        anyhow::bail!(
+            "UID {} not authorized for socket owner {}",
+            creds.uid(),
+            socket_uid
+        );
     }
 }
 
@@ -596,14 +609,30 @@ impl MetricsProvider for StubMetricsProvider {
         }
     }
 
-    fn phi(&self) -> f64 { self.phi }
-    fn coherence(&self) -> f64 { self.coherence }
-    fn is_conscious(&self) -> bool { self.phi > 0.3 }
-    fn cognitive_depth(&self) -> String { "Cortical".to_string() }
-    fn current_strategy(&self) -> String { "Supportive".to_string() }
-    fn in_flow(&self) -> bool { false }
-    fn uptime_secs(&self) -> u64 { self.start_time.elapsed().as_secs() }
-    fn total_cycles(&self) -> u64 { 0 }
+    fn phi(&self) -> f64 {
+        self.phi
+    }
+    fn coherence(&self) -> f64 {
+        self.coherence
+    }
+    fn is_conscious(&self) -> bool {
+        self.phi > 0.3
+    }
+    fn cognitive_depth(&self) -> String {
+        "Cortical".to_string()
+    }
+    fn current_strategy(&self) -> String {
+        "Supportive".to_string()
+    }
+    fn in_flow(&self) -> bool {
+        false
+    }
+    fn uptime_secs(&self) -> u64 {
+        self.start_time.elapsed().as_secs()
+    }
+    fn total_cycles(&self) -> u64 {
+        0
+    }
 }
 
 /// Stub command executor for testing
@@ -651,7 +680,12 @@ impl CommandExecutor for StubCommandExecutor {
 
         ValidationResult {
             valid: true,
-            safety_level: if is_destructive { "Destructive" } else { "Safe" }.to_string(),
+            safety_level: if is_destructive {
+                "Destructive"
+            } else {
+                "Safe"
+            }
+            .to_string(),
             preview: Some(format!("Would execute: {}", command)),
             warnings: if is_destructive {
                 vec!["This command may be destructive".to_string()]
@@ -664,7 +698,8 @@ impl CommandExecutor for StubCommandExecutor {
     fn get_completions(&self, input: &str, _cursor_pos: usize) -> Vec<Completion> {
         // Simple stub completions
         let commands = ["install", "remove", "search", "rebuild", "switch"];
-        commands.iter()
+        commands
+            .iter()
             .filter(|cmd| cmd.starts_with(input))
             .map(|cmd| Completion::new(*cmd, CompletionKind::Command))
             .collect()

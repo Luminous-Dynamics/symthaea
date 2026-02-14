@@ -7,10 +7,10 @@
 //! - **Multi-Scale Pyramid**: Compute Φ at multiple spatial scales to find optimal consciousness granularity
 //! - **Entropy Analysis**: Measure complexity, predictability, and information richness of consciousness states
 
+use super::core::{ApproximationTier, TieredPhi};
 use crate::hdc::binary_hv::BinaryHV;
-use super::core::{TieredPhi, ApproximationTier};
-use std::time::Instant;
 use rayon::prelude::*;
+use std::time::Instant;
 
 #[derive(Debug, Clone)]
 pub struct PhiPyramidConfig {
@@ -132,9 +132,7 @@ impl PhiPyramidResult {
             return vec![];
         }
 
-        self.phi_by_scale.windows(2)
-            .map(|w| w[1] - w[0])
-            .collect()
+        self.phi_by_scale.windows(2).map(|w| w[1] - w[0]).collect()
     }
 }
 
@@ -237,17 +235,20 @@ impl PhiPyramid {
         }
 
         // Step 2: Compute Φ at each scale
-        let scale_results: Vec<(f64, usize, usize)> = if self.config.parallel_scales && scales.len() > 2 {
-            // Parallel computation across scales
-            scales.par_iter()
-                .map(|&cluster_size| self.compute_scale(components, cluster_size))
-                .collect()
-        } else {
-            // Sequential for small scale count
-            scales.iter()
-                .map(|&cluster_size| self.compute_scale(components, cluster_size))
-                .collect()
-        };
+        let scale_results: Vec<(f64, usize, usize)> =
+            if self.config.parallel_scales && scales.len() > 2 {
+                // Parallel computation across scales
+                scales
+                    .par_iter()
+                    .map(|&cluster_size| self.compute_scale(components, cluster_size))
+                    .collect()
+            } else {
+                // Sequential for small scale count
+                scales
+                    .iter()
+                    .map(|&cluster_size| self.compute_scale(components, cluster_size))
+                    .collect()
+            };
 
         // Extract results
         let phi_by_scale: Vec<f64> = scale_results.iter().map(|r| r.0).collect();
@@ -255,7 +256,8 @@ impl PhiPyramid {
         let clusters_per_scale: Vec<usize> = scale_results.iter().map(|r| r.2).collect();
 
         // Step 3: Find peak
-        let (peak_scale, peak_phi) = phi_by_scale.iter()
+        let (peak_scale, peak_phi) = phi_by_scale
+            .iter()
             .enumerate()
             .max_by(|(_, a): &(usize, &f64), (_, b): &(usize, &f64)| a.total_cmp(b))
             .map(|(i, &phi)| (i, phi))
@@ -333,9 +335,8 @@ impl PhiPyramid {
         }
 
         let mean = values.iter().sum::<f64>() / values.len() as f64;
-        let variance = values.iter()
-            .map(|&v| (v - mean).powi(2))
-            .sum::<f64>() / values.len() as f64;
+        let variance =
+            values.iter().map(|&v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
 
         variance.sqrt() // Return std dev for interpretability
     }
@@ -385,7 +386,6 @@ pub fn optimal_scale(components: &[BinaryHV]) -> (usize, f64) {
     let result = PhiPyramid::new().compute(components);
     (result.peak_scale, result.peak_phi)
 }
-
 
 // ============================================================================
 // Revolutionary Improvement #95: Φ Entropy & Complexity Analysis
@@ -617,12 +617,11 @@ impl PhiEntropyAnalyzer {
 
         // 5. Complexity Index (geometric mean of entropy measures)
         let complexity_index = (normalized_shannon * sample_ent.max(0.01) * normalized_lz)
-            .powf(1.0 / 3.0).clamp(0.0, 1.0);
+            .powf(1.0 / 3.0)
+            .clamp(0.0, 1.0);
 
         // 6. Integrated Complexity (novel metric)
-        let phi_mean = mean_phi.unwrap_or_else(|| {
-            phi_values.iter().sum::<f64>() / n as f64
-        });
+        let phi_mean = mean_phi.unwrap_or_else(|| phi_values.iter().sum::<f64>() / n as f64);
         let integrated_complexity = phi_mean * complexity_index;
 
         // 7. Predictability
@@ -670,7 +669,8 @@ impl PhiEntropyAnalyzer {
 
         // Compute Shannon entropy: H = -Σ p_i × log2(p_i)
         let n_f64 = n as f64;
-        let entropy: f64 = counts.iter()
+        let entropy: f64 = counts
+            .iter()
             .filter(|&&c| c > 0)
             .map(|&c| {
                 let p = c as f64 / n_f64;
@@ -769,7 +769,8 @@ impl PhiEntropyAnalyzer {
 
         // Convert to binary string based on median
         let median = self.compute_median(values);
-        let binary: Vec<u8> = values.iter()
+        let binary: Vec<u8> = values
+            .iter()
             .map(|&v| if v >= median { 1 } else { 0 })
             .collect();
 

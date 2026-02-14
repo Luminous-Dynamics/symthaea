@@ -340,7 +340,12 @@ impl CausalSpace {
     /// # Pearl's do-calculus in HDC space
     /// In traditional causal graphs: P(Y | do(X = x))
     /// In HDC space: Find effects where X is a direct cause (high strength)
-    pub fn query_intervention(&self, cause: &BinaryHV, top_n: usize, min_strength: f64) -> Vec<CausalQueryResult> {
+    pub fn query_intervention(
+        &self,
+        cause: &BinaryHV,
+        top_n: usize,
+        min_strength: f64,
+    ) -> Vec<CausalQueryResult> {
         // Same as query_effects but filter by strength threshold
         let mut results = self.query_effects(cause, top_n * 2); // Get more candidates
 
@@ -359,7 +364,12 @@ impl CausalSpace {
     /// ```text
     /// rain → wet_ground → slippery → accident
     /// ```
-    pub fn find_causal_chain(&self, start: &BinaryHV, end: &BinaryHV, max_depth: usize) -> Option<CausalChain> {
+    pub fn find_causal_chain(
+        &self,
+        start: &BinaryHV,
+        end: &BinaryHV,
+        max_depth: usize,
+    ) -> Option<CausalChain> {
         if max_depth == 0 {
             return None;
         }
@@ -549,7 +559,11 @@ mod tests {
         assert!(chain.is_some(), "Should find causal chain");
 
         let chain = chain.unwrap();
-        assert_eq!(chain.events.len(), 3, "Chain should have 3 events: A → B → C");
+        assert_eq!(
+            chain.events.len(),
+            3,
+            "Chain should have 3 events: A → B → C"
+        );
         assert_eq!(chain.strengths.len(), 2, "Chain should have 2 links");
     }
 
@@ -567,7 +581,10 @@ mod tests {
 
         // Check that link was reinforced
         let effects = causal.query_effects(&action, 1);
-        assert!(effects[0].strength >= 0.8, "Strength should increase with reinforcement");
+        assert!(
+            effects[0].strength >= 0.8,
+            "Strength should increase with reinforcement"
+        );
     }
 
     #[test]
@@ -615,7 +632,10 @@ mod tests {
         let spurious = causal.query_intervention(&confound, 5, 0.5);
         println!("Spurious results: {} items", spurious.len());
         for (i, result) in spurious.iter().enumerate() {
-            println!("  [{}] similarity={:.3}, strength={:.3}", i, result.similarity, result.strength);
+            println!(
+                "  [{}] similarity={:.3}, strength={:.3}",
+                i, result.similarity, result.strength
+            );
         }
         assert!(
             spurious.is_empty(),
@@ -630,13 +650,7 @@ mod tests {
         let event1 = BinaryHV::random(1);
         let event2 = BinaryHV::random(2);
 
-        causal.add_causal_link_labeled(
-            event1,
-            event2,
-            0.8,
-            "temporal_test".to_string(),
-            Some(1.0),
-        );
+        causal.add_causal_link_labeled(event1, event2, 0.8, "temporal_test".to_string(), Some(1.0));
 
         assert_eq!(causal.temporal_order[0], Some(1.0));
     }
@@ -652,7 +666,10 @@ mod tests {
         causal.add_causal_link(smoking, cancer, 0.3); // 30% chance
 
         let effects = causal.query_effects(&smoking, 1);
-        assert!(effects[0].strength < 0.5, "Should reflect probabilistic nature");
+        assert!(
+            effects[0].strength < 0.5,
+            "Should reflect probabilistic nature"
+        );
     }
 
     #[test]

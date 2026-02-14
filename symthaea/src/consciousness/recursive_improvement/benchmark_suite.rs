@@ -20,13 +20,13 @@
 //! - Memory: Approximate memory footprint
 //! - Scalability: Performance degradation under load
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use super::world_model::LatentConsciousnessState;
 use super::routers::{
-    ConsciousnessRouter, RouterType, RoutingDecision,
-    DirectRouter, PhiMaximizingRouter, ExploratoryRouter, ConsolidatingRouter,
+    ConsciousnessRouter, ConsolidatingRouter, DirectRouter, ExploratoryRouter, PhiMaximizingRouter,
+    RouterType, RoutingDecision,
 };
+use super::world_model::LatentConsciousnessState;
 
 // Stub types for routers that don't exist yet
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -44,7 +44,9 @@ struct CausalValidatedConfig {
 
 impl Default for CausalValidatedConfig {
     fn default() -> Self {
-        Self { confidence_threshold: 0.7 }
+        Self {
+            confidence_threshold: 0.7,
+        }
     }
 }
 
@@ -55,7 +57,9 @@ struct GeometricRouterConfig {
 
 impl Default for GeometricRouterConfig {
     fn default() -> Self {
-        Self { curvature_scale: 1.0 }
+        Self {
+            curvature_scale: 1.0,
+        }
     }
 }
 
@@ -66,7 +70,9 @@ struct TopologicalRouterConfig {
 
 impl Default for TopologicalRouterConfig {
     fn default() -> Self {
-        Self { topology_threshold: 0.5 }
+        Self {
+            topology_threshold: 0.5,
+        }
     }
 }
 
@@ -77,7 +83,9 @@ struct QuantumRouterConfig {
 
 impl Default for QuantumRouterConfig {
     fn default() -> Self {
-        Self { decoherence_rate: 0.1 }
+        Self {
+            decoherence_rate: 0.1,
+        }
     }
 }
 
@@ -88,7 +96,9 @@ struct ActiveInferenceConfig {
 
 impl Default for ActiveInferenceConfig {
     fn default() -> Self {
-        Self { free_energy_threshold: 1.0 }
+        Self {
+            free_energy_threshold: 1.0,
+        }
     }
 }
 
@@ -99,7 +109,9 @@ struct PredictiveProcessingConfig {
 
 impl Default for PredictiveProcessingConfig {
     fn default() -> Self {
-        Self { prediction_horizon: 10 }
+        Self {
+            prediction_horizon: 10,
+        }
     }
 }
 
@@ -110,7 +122,9 @@ struct ASTRouterConfig {
 
 impl Default for ASTRouterConfig {
     fn default() -> Self {
-        Self { attention_threshold: 0.6 }
+        Self {
+            attention_threshold: 0.6,
+        }
     }
 }
 
@@ -122,7 +136,9 @@ struct CausalValidatedRouter {
 
 impl CausalValidatedRouter {
     fn new(_config: CausalValidatedConfig) -> Self {
-        Self { router: DirectRouter::new() }
+        Self {
+            router: DirectRouter::new(),
+        }
     }
 
     fn route_validated(&mut self, target: &LatentConsciousnessState) -> ValidatedDecision {
@@ -148,7 +164,9 @@ struct InformationGeometricRouter {
 
 impl InformationGeometricRouter {
     fn new(_config: GeometricRouterConfig) -> Self {
-        Self { router: PhiMaximizingRouter::new() }
+        Self {
+            router: PhiMaximizingRouter::new(),
+        }
     }
 
     fn observe_state(&mut self, _state: &LatentConsciousnessState) {}
@@ -176,7 +194,9 @@ struct TopologicalConsciousnessRouter {
 
 impl TopologicalConsciousnessRouter {
     fn new(_config: TopologicalRouterConfig) -> Self {
-        Self { router: ExploratoryRouter::new() }
+        Self {
+            router: ExploratoryRouter::new(),
+        }
     }
 
     fn observe_state(&mut self, _state: &LatentConsciousnessState) {}
@@ -204,7 +224,9 @@ struct QuantumCoherenceRouter {
 
 impl QuantumCoherenceRouter {
     fn new(_config: QuantumRouterConfig) -> Self {
-        Self { router: ConsolidatingRouter::new() }
+        Self {
+            router: ConsolidatingRouter::new(),
+        }
     }
 
     fn observe_state(&mut self, _state: &LatentConsciousnessState) {}
@@ -232,7 +254,9 @@ struct ActiveInferenceRouter {
 
 impl ActiveInferenceRouter {
     fn new(_config: ActiveInferenceConfig) -> Self {
-        Self { router: PhiMaximizingRouter::new() }
+        Self {
+            router: PhiMaximizingRouter::new(),
+        }
     }
 
     fn observe_state(&mut self, _state: &LatentConsciousnessState) {}
@@ -260,7 +284,9 @@ struct PredictiveProcessingRouter {
 
 impl PredictiveProcessingRouter {
     fn new(_config: PredictiveProcessingConfig) -> Self {
-        Self { router: ExploratoryRouter::new() }
+        Self {
+            router: ExploratoryRouter::new(),
+        }
     }
 
     fn route(&mut self, target: &LatentConsciousnessState) -> PredictiveDecision {
@@ -284,7 +310,9 @@ struct ASTRouter {
 
 impl ASTRouter {
     fn new(_config: ASTRouterConfig) -> Self {
-        Self { router: DirectRouter::new() }
+        Self {
+            router: DirectRouter::new(),
+        }
     }
 
     fn observe(&mut self, _state: &LatentConsciousnessState) {}
@@ -303,7 +331,6 @@ impl ASTRouter {
 struct ASTDecision {
     strategy: RoutingStrategy,
 }
-
 
 /// Individual benchmark result for a router
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -361,9 +388,11 @@ impl RouterBenchmark {
         let max = *timings.iter().max().unwrap_or(&0);
 
         // Standard deviation
-        let variance: f64 = timings.iter()
+        let variance: f64 = timings
+            .iter()
             .map(|t| (*t as f64 - avg).powi(2))
-            .sum::<f64>() / n as f64;
+            .sum::<f64>()
+            / n as f64;
         let std_dev = variance.sqrt();
 
         // Percentiles
@@ -432,24 +461,52 @@ impl ComparativeBenchmark {
     pub fn report(&self) -> String {
         let mut report = String::new();
         report.push_str("\n");
-        report.push_str("╔══════════════════════════════════════════════════════════════════════════════╗\n");
-        report.push_str("║           CONSCIOUSNESS ROUTING PARADIGM BENCHMARK RESULTS                  ║\n");
-        report.push_str("╠══════════════════════════════════════════════════════════════════════════════╣\n");
+        report.push_str(
+            "╔══════════════════════════════════════════════════════════════════════════════╗\n",
+        );
+        report.push_str(
+            "║           CONSCIOUSNESS ROUTING PARADIGM BENCHMARK RESULTS                  ║\n",
+        );
+        report.push_str(
+            "╠══════════════════════════════════════════════════════════════════════════════╣\n",
+        );
         report.push_str(&format!("║ Timestamp: {:<66} ║\n", self.timestamp));
-        report.push_str(&format!("║ Total Benchmark Time: {:>5}ms {:>51} ║\n", self.total_benchmark_time_ms, ""));
-        report.push_str("╠══════════════════════════════════════════════════════════════════════════════╣\n");
-        report.push_str("║ Router                    |   Avg    |   P50    |   P99    | Throughput | Cons ║\n");
-        report.push_str("╠══════════════════════════════════════════════════════════════════════════════╣\n");
+        report.push_str(&format!(
+            "║ Total Benchmark Time: {:>5}ms {:>51} ║\n",
+            self.total_benchmark_time_ms, ""
+        ));
+        report.push_str(
+            "╠══════════════════════════════════════════════════════════════════════════════╣\n",
+        );
+        report.push_str(
+            "║ Router                    |   Avg    |   P50    |   P99    | Throughput | Cons ║\n",
+        );
+        report.push_str(
+            "╠══════════════════════════════════════════════════════════════════════════════╣\n",
+        );
 
         for benchmark in &self.benchmarks {
             report.push_str(&format!("║ {} ║\n", benchmark.report_line()));
         }
 
-        report.push_str("╠══════════════════════════════════════════════════════════════════════════════╣\n");
-        report.push_str(&format!("║ 🏆 Fastest:         {:<56} ║\n", self.fastest_router));
-        report.push_str(&format!("║ 🚀 Highest Throughput: {:<53} ║\n", self.highest_throughput));
-        report.push_str(&format!("║ 🎯 Most Consistent: {:<56} ║\n", self.most_consistent));
-        report.push_str("╚══════════════════════════════════════════════════════════════════════════════╝\n");
+        report.push_str(
+            "╠══════════════════════════════════════════════════════════════════════════════╣\n",
+        );
+        report.push_str(&format!(
+            "║ 🏆 Fastest:         {:<56} ║\n",
+            self.fastest_router
+        ));
+        report.push_str(&format!(
+            "║ 🚀 Highest Throughput: {:<53} ║\n",
+            self.highest_throughput
+        ));
+        report.push_str(&format!(
+            "║ 🎯 Most Consistent: {:<56} ║\n",
+            self.most_consistent
+        ));
+        report.push_str(
+            "╚══════════════════════════════════════════════════════════════════════════════╝\n",
+        );
 
         report
     }
@@ -501,7 +558,10 @@ impl RouterBenchmarkSuite {
             let coherence = ((i as f64 * 0.12) + 0.3) % 1.0;
             let attention = ((i as f64 * 0.08) + 0.5) % 1.0;
             states.push(LatentConsciousnessState::from_observables(
-                phi, integration, coherence, attention
+                phi,
+                integration,
+                coherence,
+                attention,
             ));
         }
         states
@@ -513,7 +573,10 @@ impl RouterBenchmarkSuite {
         let states = self.generate_test_states(self.config.measured_iterations);
 
         // Warmup - causal router uses route_validated with state argument
-        for state in states.iter().take(self.config.warmup_iterations.min(states.len())) {
+        for state in states
+            .iter()
+            .take(self.config.warmup_iterations.min(states.len()))
+        {
             let _ = router.route_validated(state);
         }
 
@@ -559,7 +622,10 @@ impl RouterBenchmarkSuite {
         let states = self.generate_test_states(self.config.measured_iterations);
 
         // Warmup
-        for state in states.iter().take(self.config.warmup_iterations.min(states.len())) {
+        for state in states
+            .iter()
+            .take(self.config.warmup_iterations.min(states.len()))
+        {
             router.observe_state(state);
             let _ = router.route(state);
         }
@@ -606,7 +672,10 @@ impl RouterBenchmarkSuite {
         let states = self.generate_test_states(self.config.measured_iterations);
 
         // Warmup
-        for state in states.iter().take(self.config.warmup_iterations.min(states.len())) {
+        for state in states
+            .iter()
+            .take(self.config.warmup_iterations.min(states.len()))
+        {
             router.observe_state(state);
             let _ = router.route(state);
         }
@@ -653,7 +722,10 @@ impl RouterBenchmarkSuite {
         let states = self.generate_test_states(self.config.measured_iterations);
 
         // Warmup
-        for state in states.iter().take(self.config.warmup_iterations.min(states.len())) {
+        for state in states
+            .iter()
+            .take(self.config.warmup_iterations.min(states.len()))
+        {
             router.observe_state(state);
             let _ = router.route(state);
         }
@@ -700,7 +772,10 @@ impl RouterBenchmarkSuite {
         let states = self.generate_test_states(self.config.measured_iterations);
 
         // Warmup
-        for state in states.iter().take(self.config.warmup_iterations.min(states.len())) {
+        for state in states
+            .iter()
+            .take(self.config.warmup_iterations.min(states.len()))
+        {
             router.observe_state(state);
             let _ = router.route(state);
         }
@@ -747,7 +822,10 @@ impl RouterBenchmarkSuite {
         let states = self.generate_test_states(self.config.measured_iterations);
 
         // Warmup - PredictiveProcessingRouter does observation internally in route()
-        for state in states.iter().take(self.config.warmup_iterations.min(states.len())) {
+        for state in states
+            .iter()
+            .take(self.config.warmup_iterations.min(states.len()))
+        {
             let _ = router.route(state);
         }
 
@@ -790,7 +868,10 @@ impl RouterBenchmarkSuite {
         let states = self.generate_test_states(self.config.measured_iterations);
 
         // Warmup
-        for state in states.iter().take(self.config.warmup_iterations.min(states.len())) {
+        for state in states
+            .iter()
+            .take(self.config.warmup_iterations.min(states.len()))
+        {
             router.observe(state);
             let _ = router.route();
         }
@@ -848,26 +929,44 @@ impl RouterBenchmarkSuite {
         let total_time = start.elapsed().as_millis() as u64;
 
         // Find best performers
-        let fastest = benchmarks.iter()
-            .min_by(|a, b| a.avg_latency_us.partial_cmp(&b.avg_latency_us).unwrap_or(std::cmp::Ordering::Equal))
+        let fastest = benchmarks
+            .iter()
+            .min_by(|a, b| {
+                a.avg_latency_us
+                    .partial_cmp(&b.avg_latency_us)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|b| b.router_name.clone())
             .unwrap_or_default();
 
-        let highest_throughput = benchmarks.iter()
-            .max_by(|a, b| a.throughput.partial_cmp(&b.throughput).unwrap_or(std::cmp::Ordering::Equal))
+        let highest_throughput = benchmarks
+            .iter()
+            .max_by(|a, b| {
+                a.throughput
+                    .partial_cmp(&b.throughput)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|b| b.router_name.clone())
             .unwrap_or_default();
 
-        let most_consistent = benchmarks.iter()
-            .max_by(|a, b| a.consistency.partial_cmp(&b.consistency).unwrap_or(std::cmp::Ordering::Equal))
+        let most_consistent = benchmarks
+            .iter()
+            .max_by(|a, b| {
+                a.consistency
+                    .partial_cmp(&b.consistency)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|b| b.router_name.clone())
             .unwrap_or_default();
 
         // Timestamp
-        let timestamp = format!("{:?}", std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs());
+        let timestamp = format!(
+            "{:?}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+        );
 
         ComparativeBenchmark {
             benchmarks,

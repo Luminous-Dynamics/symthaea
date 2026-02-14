@@ -41,7 +41,7 @@
 use crate::hdc::integrated_information::IntegratedInformation;
 use crate::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// A reasoning task for validation experiments
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,28 +75,29 @@ impl ReasoningTask {
     /// Get a human-readable description
     pub fn description(&self) -> String {
         match self {
-            ReasoningTask::SetTheoryReasoning { problem, .. } =>
-                format!("Set Theory: {}", problem),
-            ReasoningTask::LogicalInference { premises, conclusion } =>
-                format!("Infer '{}' from {} premises", conclusion, premises.len()),
-            ReasoningTask::ArithmeticProof { statement, .. } =>
-                format!("Prove: {}", statement),
-            ReasoningTask::Custom { description, complexity } =>
-                format!("{} (complexity: {})", description, complexity),
+            ReasoningTask::SetTheoryReasoning { problem, .. } => format!("Set Theory: {}", problem),
+            ReasoningTask::LogicalInference {
+                premises,
+                conclusion,
+            } => format!("Infer '{}' from {} premises", conclusion, premises.len()),
+            ReasoningTask::ArithmeticProof { statement, .. } => format!("Prove: {}", statement),
+            ReasoningTask::Custom {
+                description,
+                complexity,
+            } => format!("{} (complexity: {})", description, complexity),
         }
     }
 
     /// Estimate cognitive complexity (for normalization)
     pub fn complexity(&self) -> f64 {
         match self {
-            ReasoningTask::SetTheoryReasoning { expected_primitives, .. } =>
-                expected_primitives.len() as f64 * 1.5,
-            ReasoningTask::LogicalInference { premises, .. } =>
-                premises.len() as f64 * 2.0,
-            ReasoningTask::ArithmeticProof { axioms, .. } =>
-                axioms.len() as f64 * 2.5,
-            ReasoningTask::Custom { complexity, .. } =>
-                *complexity as f64,
+            ReasoningTask::SetTheoryReasoning {
+                expected_primitives,
+                ..
+            } => expected_primitives.len() as f64 * 1.5,
+            ReasoningTask::LogicalInference { premises, .. } => premises.len() as f64 * 2.0,
+            ReasoningTask::ArithmeticProof { axioms, .. } => axioms.len() as f64 * 2.5,
+            ReasoningTask::Custom { complexity, .. } => *complexity as f64,
         }
     }
 }
@@ -199,31 +200,33 @@ impl StatisticalAnalysis {
         let n = results.len() as f64;
 
         // Mean Φ values
-        let mean_phi_without = results.iter()
+        let mean_phi_without = results
+            .iter()
             .map(|r| r.phi_without_primitives)
-            .sum::<f64>() / n;
+            .sum::<f64>()
+            / n;
 
-        let mean_phi_with = results.iter()
-            .map(|r| r.phi_with_primitives)
-            .sum::<f64>() / n;
+        let mean_phi_with = results.iter().map(|r| r.phi_with_primitives).sum::<f64>() / n;
 
         let mean_phi_gain = mean_phi_with - mean_phi_without;
 
         // Standard deviation of gains
-        let gains: Vec<f64> = results.iter()
-            .map(|r| r.phi_gain)
-            .collect();
+        let gains: Vec<f64> = results.iter().map(|r| r.phi_gain).collect();
 
-        let variance = gains.iter()
+        let variance = gains
+            .iter()
             .map(|g| (g - mean_phi_gain).powi(2))
-            .sum::<f64>() / (n - 1.0);
+            .sum::<f64>()
+            / (n - 1.0);
 
         let std_dev_phi_gain = variance.sqrt();
 
         // Mean improvement percentage
-        let mean_improvement_percent = results.iter()
+        let mean_improvement_percent = results
+            .iter()
             .map(|r| r.phi_improvement_percent)
-            .sum::<f64>() / n;
+            .sum::<f64>()
+            / n;
 
         // Cohen's d effect size
         let pooled_std = std_dev_phi_gain; // Simplified for paired samples
@@ -245,10 +248,7 @@ impl StatisticalAnalysis {
 
         // 95% confidence interval
         let margin = 1.96 * std_dev_phi_gain / n.sqrt(); // Using z-score approximation
-        let confidence_interval = (
-            mean_phi_gain - margin,
-            mean_phi_gain + margin,
-        );
+        let confidence_interval = (mean_phi_gain - margin, mean_phi_gain + margin);
 
         // Success rate
         let success_count = results.iter().filter(|r| r.success).count();
@@ -332,29 +332,57 @@ impl ExperimentResults {
     pub fn report(&self) -> String {
         let mut report = String::new();
 
-        report.push_str(&format!("# Primitive Validation Experiment: {}\n\n", self.name));
+        report.push_str(&format!(
+            "# Primitive Validation Experiment: {}\n\n",
+            self.name
+        ));
         report.push_str(&format!("**Tier**: {:?}\n", self.tier));
         report.push_str(&format!("**Tasks**: {}\n", self.statistics.n_tasks));
         report.push_str(&format!("**Timestamp**: {}\n", self.timestamp));
-        report.push_str(&format!("**Duration**: {:.2}s\n\n", self.total_duration_ms as f64 / 1000.0));
+        report.push_str(&format!(
+            "**Duration**: {:.2}s\n\n",
+            self.total_duration_ms as f64 / 1000.0
+        ));
 
         report.push_str("## Key Findings\n\n");
-        report.push_str(&format!("- **Mean Φ without primitives**: {:.4}\n", self.statistics.mean_phi_without));
-        report.push_str(&format!("- **Mean Φ with primitives**: {:.4}\n", self.statistics.mean_phi_with));
-        report.push_str(&format!("- **Mean Φ gain**: {:.4} ({:+.1}%)\n",
-            self.statistics.mean_phi_gain,
-            self.statistics.mean_improvement_percent));
-        report.push_str(&format!("- **Standard deviation**: {:.4}\n", self.statistics.std_dev_phi_gain));
-        report.push_str(&format!("- **Effect size (Cohen's d)**: {:.3} ({})\n",
+        report.push_str(&format!(
+            "- **Mean Φ without primitives**: {:.4}\n",
+            self.statistics.mean_phi_without
+        ));
+        report.push_str(&format!(
+            "- **Mean Φ with primitives**: {:.4}\n",
+            self.statistics.mean_phi_with
+        ));
+        report.push_str(&format!(
+            "- **Mean Φ gain**: {:.4} ({:+.1}%)\n",
+            self.statistics.mean_phi_gain, self.statistics.mean_improvement_percent
+        ));
+        report.push_str(&format!(
+            "- **Standard deviation**: {:.4}\n",
+            self.statistics.std_dev_phi_gain
+        ));
+        report.push_str(&format!(
+            "- **Effect size (Cohen's d)**: {:.3} ({})\n",
             self.statistics.effect_size,
-            self.statistics.effect_size_interpretation()));
-        report.push_str(&format!("- **Statistical significance**: p = {:.4} {}\n",
+            self.statistics.effect_size_interpretation()
+        ));
+        report.push_str(&format!(
+            "- **Statistical significance**: p = {:.4} {}\n",
             self.statistics.p_value,
-            if self.statistics.is_significant(0.05) { "✅ SIGNIFICANT" } else { "⚠️ NOT SIGNIFICANT" }));
-        report.push_str(&format!("- **95% CI**: [{:.4}, {:.4}]\n",
-            self.statistics.confidence_interval.0,
-            self.statistics.confidence_interval.1));
-        report.push_str(&format!("- **Success rate**: {:.1}%\n\n", self.statistics.success_rate));
+            if self.statistics.is_significant(0.05) {
+                "✅ SIGNIFICANT"
+            } else {
+                "⚠️ NOT SIGNIFICANT"
+            }
+        ));
+        report.push_str(&format!(
+            "- **95% CI**: [{:.4}, {:.4}]\n",
+            self.statistics.confidence_interval.0, self.statistics.confidence_interval.1
+        ));
+        report.push_str(&format!(
+            "- **Success rate**: {:.1}%\n\n",
+            self.statistics.success_rate
+        ));
 
         report.push_str("## Interpretation\n\n");
 
@@ -367,10 +395,12 @@ impl ExperimentResults {
                     self.statistics.mean_improvement_percent));
             }
 
-            report.push_str(&format!("With an effect size of {:.2} ({}), this represents a {} practical impact.\n\n",
+            report.push_str(&format!(
+                "With an effect size of {:.2} ({}), this represents a {} practical impact.\n\n",
                 self.statistics.effect_size,
                 self.statistics.effect_size_interpretation(),
-                self.statistics.effect_size_interpretation()));
+                self.statistics.effect_size_interpretation()
+            ));
         } else {
             report.push_str("⚠️  The results are not statistically significant. This suggests:\n");
             report.push_str("   - More tasks may be needed to detect an effect\n");
@@ -383,14 +413,16 @@ impl ExperimentResults {
         report.push_str("|------|-------|------|------|----------|-------|------|\n");
 
         for result in &self.task_results {
-            report.push_str(&format!("| {} | {:.3} | {:.3} | {:+.3} | {:+.1}% | {} | {}ms |\n",
+            report.push_str(&format!(
+                "| {} | {:.3} | {:.3} | {:+.3} | {:+.1}% | {} | {}ms |\n",
                 result.task.description(),
                 result.phi_without_primitives,
                 result.phi_with_primitives,
                 result.phi_gain,
                 result.phi_improvement_percent,
                 result.primitives_used,
-                result.execution_time_ms));
+                result.execution_time_ms
+            ));
         }
 
         report.push_str("\n## Conclusion\n\n");
@@ -408,8 +440,10 @@ impl ExperimentResults {
             report.push_str("While the primitive system shows promise, these results do not yet provide \
                 strong evidence for consciousness improvement. Additional experiments with different \
                 tasks or refined primitives may be necessary.\n\n");
-            report.push_str("**Recommendation**: Analyze task results to understand which primitives \
-                are most effective and design targeted experiments.\n");
+            report.push_str(
+                "**Recommendation**: Analyze task results to understand which primitives \
+                are most effective and design targeted experiments.\n",
+            );
         }
 
         report
@@ -464,9 +498,10 @@ impl PrimitiveValidationExperiment {
 
             let result = self.run_task(task)?;
 
-            println!("      Φ gain: {:+.4} ({:+.1}%)",
-                result.phi_gain,
-                result.phi_improvement_percent);
+            println!(
+                "      Φ gain: {:+.4} ({:+.1}%)",
+                result.phi_gain, result.phi_improvement_percent
+            );
 
             task_results.push(result);
         }
@@ -476,9 +511,10 @@ impl PrimitiveValidationExperiment {
 
         println!();
         println!("✅ Experiment complete!");
-        println!("   Mean Φ gain: {:+.4} (p = {:.4})",
-            statistics.mean_phi_gain,
-            statistics.p_value);
+        println!(
+            "   Mean Φ gain: {:+.4} (p = {:.4})",
+            statistics.mean_phi_gain, statistics.p_value
+        );
 
         Ok(ExperimentResults {
             name: self.name.clone(),
@@ -563,20 +599,19 @@ impl PrimitiveValidationExperiment {
 
         // Identify which primitives would be used for this task
         let primitives_used = match task {
-            ReasoningTask::SetTheoryReasoning { expected_primitives, .. } => {
-                expected_primitives.len()
-            },
+            ReasoningTask::SetTheoryReasoning {
+                expected_primitives,
+                ..
+            } => expected_primitives.len(),
             ReasoningTask::LogicalInference { premises, .. } => {
                 // Would use NOT, AND, OR, IMPLIES, etc.
                 (premises.len() * 2).min(6)
-            },
+            }
             ReasoningTask::ArithmeticProof { axioms, .. } => {
                 // Would use ZERO, SUCCESSOR, ADDITION, etc.
                 (axioms.len() * 2).min(5)
-            },
-            ReasoningTask::Custom { complexity, .. } => {
-                (*complexity / 2).min(8)
-            },
+            }
+            ReasoningTask::Custom { complexity, .. } => (*complexity / 2).min(8),
         };
 
         // 1. Create task representation (same seed as without primitives)
@@ -641,17 +676,11 @@ impl StandardExperiments {
                 expected_primitives: vec!["SET".into(), "INTERSECTION".into(), "EMPTY_SET".into()],
             },
             ReasoningTask::LogicalInference {
-                premises: vec![
-                    "If P then Q".into(),
-                    "P is true".into(),
-                ],
+                premises: vec!["If P then Q".into(), "P is true".into()],
                 conclusion: "Q is true".into(),
             },
             ReasoningTask::LogicalInference {
-                premises: vec![
-                    "P or Q".into(),
-                    "Not P".into(),
-                ],
+                premises: vec!["P or Q".into(), "Not P".into()],
                 conclusion: "Q".into(),
             },
             ReasoningTask::ArithmeticProof {
@@ -703,7 +732,10 @@ mod tests {
     fn test_statistical_analysis() {
         let results = vec![
             TaskResult {
-                task: ReasoningTask::Custom { description: "test".into(), complexity: 1 },
+                task: ReasoningTask::Custom {
+                    description: "test".into(),
+                    complexity: 1,
+                },
                 phi_without_primitives: 0.3,
                 phi_with_primitives: 0.5,
                 phi_gain: 0.2,
@@ -713,7 +745,10 @@ mod tests {
                 success: true,
             },
             TaskResult {
-                task: ReasoningTask::Custom { description: "test2".into(), complexity: 1 },
+                task: ReasoningTask::Custom {
+                    description: "test2".into(),
+                    complexity: 1,
+                },
                 phi_without_primitives: 0.35,
                 phi_with_primitives: 0.55,
                 phi_gain: 0.2,

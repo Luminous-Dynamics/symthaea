@@ -15,11 +15,11 @@
 //! - [`network`] - Multi-layer CfC network with BPTT and SPSA training
 //! - [`phi_gated`] - Phi-gated attention utilities for IIT integration
 
-mod types;
 mod cell;
 mod gradients;
 mod network;
 mod phi_gated;
+mod types;
 
 #[cfg(test)]
 #[path = "tests.rs"]
@@ -29,9 +29,8 @@ mod tests;
 
 // Types, config, and utilities
 pub use types::{
-    CfCConfig, ActivationType, OnlineLearningConfig,
-    OnlineLearningStats, NetworkOnlineLearningStats,
-    DynamicsDiagnostic,
+    ActivationType, CfCConfig, DynamicsDiagnostic, NetworkOnlineLearningStats,
+    OnlineLearningConfig, OnlineLearningStats,
 };
 
 // MIN_TAU, fast_sigmoid, sigmoid, mse_loss are pub(crate) in types.rs
@@ -41,12 +40,12 @@ pub use types::{
 pub use cell::CfCCell;
 
 // Gradients and optimizer state
-pub use gradients::{CfCGradients, CfCCellCache, AdamState, OutputAdamState};
+pub use gradients::{AdamState, CfCCellCache, CfCGradients, OutputAdamState};
 
 // Network
-pub use network::{CfCNetworkConfig, CfCNetwork};
+pub use network::{CfCNetwork, CfCNetworkConfig};
 
 // Phi-gated attention
-pub use phi_gated::{PhiGatedConfig, compute_phi_attention_weights};
+pub use phi_gated::{compute_phi_attention_weights, PhiGatedConfig};
 // weighted_array_bundle is pub(crate) in phi_gated.rs and accessed
 // by network.rs via `use super::phi_gated::weighted_array_bundle`.

@@ -1,9 +1,9 @@
 //! Integration tests for the Stability Regime system
 
-use symthaea::consciousness::stability_regime::{
-    StabilityRegimeType, StabilityRegimeConfig, CfCPrimitive, StabilityRegimeProcessor,
-};
 use symthaea::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor;
+use symthaea::consciousness::stability_regime::{
+    CfCPrimitive, StabilityRegimeConfig, StabilityRegimeProcessor, StabilityRegimeType,
+};
 use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveTier};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::BinaryHV;
@@ -24,7 +24,10 @@ fn make_prim(name: &str, tier: PrimitiveTier) -> Primitive {
 fn test_regime_assignment_all_tiers() {
     let mappings = [
         (PrimitiveTier::NSM, StabilityRegimeType::Crystallized),
-        (PrimitiveTier::Mathematical, StabilityRegimeType::Crystallized),
+        (
+            PrimitiveTier::Mathematical,
+            StabilityRegimeType::Crystallized,
+        ),
         (PrimitiveTier::Physical, StabilityRegimeType::Crystallized),
         (PrimitiveTier::Geometric, StabilityRegimeType::Crystallized),
         (PrimitiveTier::Strategic, StabilityRegimeType::Plastic),
@@ -221,7 +224,10 @@ fn test_decrystallize_after_idle() {
 
     // Activation count should be reset to fluid_to_plastic threshold
     // so it can re-crystallize naturally
-    assert_eq!(cfc.total_activation_count, config.fluid_to_plastic_activations);
+    assert_eq!(
+        cfc.total_activation_count,
+        config.fluid_to_plastic_activations
+    );
 }
 
 #[test]

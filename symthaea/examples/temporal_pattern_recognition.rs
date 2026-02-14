@@ -15,9 +15,7 @@
 //! cargo run --example temporal_pattern_recognition --release
 //! ```
 
-use symthaea::hdc::cincinnati_ltc::{
-    CincinnatiLtcEngine, BuddingEvent,
-};
+use symthaea::hdc::cincinnati_ltc::{BuddingEvent, CincinnatiLtcEngine};
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
 
@@ -67,12 +65,8 @@ impl PatternGenerator {
     /// Generate the next bit in the sequence
     pub fn next(&mut self) -> bool {
         let bit = match self.pattern_type {
-            PatternType::Periodic(period) => {
-                self.count % period < period / 2
-            }
-            PatternType::SquareWave(half_period) => {
-                (self.count / half_period) % 2 == 0
-            }
+            PatternType::Periodic(period) => self.count % period < period / 2,
+            PatternType::SquareWave(half_period) => (self.count / half_period) % 2 == 0,
             PatternType::XorPattern => {
                 if self.history.len() < 2 {
                     self.count % 2 == 0 // Bootstrap
@@ -82,9 +76,7 @@ impl PatternGenerator {
                     a ^ b
                 }
             }
-            PatternType::CountingMod(n) => {
-                (self.count % n) < n / 2
-            }
+            PatternType::CountingMod(n) => (self.count % n) < n / 2,
             PatternType::LogisticMap { r, threshold } => {
                 // x_{n+1} = r * x_n * (1 - x_n)
                 self.state = r * self.state * (1.0 - self.state);
@@ -163,8 +155,8 @@ impl TemporalPatternRecognizer {
 
         // Create engine with lower budding threshold and faster sustain
         let mut engine = CincinnatiLtcEngine::new(n_nodes);
-        engine.set_budding_threshold(0.5);  // Lower threshold for more budding
-        engine.set_sustain_steps(3);        // Only need 3 consecutive high errors (default is 10)
+        engine.set_budding_threshold(0.5); // Lower threshold for more budding
+        engine.set_sustain_steps(3); // Only need 3 consecutive high errors (default is 10)
 
         Self {
             engine,
@@ -197,7 +189,11 @@ impl TemporalPatternRecognizer {
 
         // Track accuracy and UPDATE PREDICTION ERROR FOR BUDDING
         if self.total > 0 {
-            let was_correct = self.predictions.back().map(|&p| p == observation).unwrap_or(false);
+            let was_correct = self
+                .predictions
+                .back()
+                .map(|&p| p == observation)
+                .unwrap_or(false);
             if was_correct {
                 self.correct += 1;
             }
@@ -217,7 +213,8 @@ impl TemporalPatternRecognizer {
                 let expected = self.create_bit_hv(prev_pred);
                 // Actual: what we observed
                 let actual = self.create_bit_hv(observation);
-                self.engine.update_prediction_error(node_id, &expected, &actual);
+                self.engine
+                    .update_prediction_error(node_id, &expected, &actual);
             }
         }
 
@@ -316,7 +313,9 @@ impl TemporalPatternRecognizer {
             }
         }
 
-        ContinuousHV { values: result_values }
+        ContinuousHV {
+            values: result_values,
+        }
     }
 
     /// Overall accuracy
@@ -333,7 +332,8 @@ impl TemporalPatternRecognizer {
         if self.recent_correct.is_empty() {
             0.5
         } else {
-            self.recent_correct.iter().filter(|&&c| c).count() as f32 / self.recent_correct.len() as f32
+            self.recent_correct.iter().filter(|&&c| c).count() as f32
+                / self.recent_correct.len() as f32
         }
     }
 
@@ -402,7 +402,12 @@ fn run_experiment(
         );
     }
 
-    (final_accuracy, recent_accuracy, final_nodes, total_budding_events)
+    (
+        final_accuracy,
+        recent_accuracy,
+        final_nodes,
+        total_budding_events,
+    )
 }
 
 fn main() {
@@ -418,12 +423,27 @@ fn main() {
         ("XOR Pattern", PatternType::XorPattern),
         ("Counting Mod 5", PatternType::CountingMod(5)),
         ("Fibonacci Mod 3", PatternType::FibonacciMod(3)),
-        ("Logistic Map (r=3.2, edge of chaos)", PatternType::LogisticMap { r: 3.2, threshold: 0.5 }),
-        ("Logistic Map (r=3.8, chaotic)", PatternType::LogisticMap { r: 3.8, threshold: 0.5 }),
+        (
+            "Logistic Map (r=3.2, edge of chaos)",
+            PatternType::LogisticMap {
+                r: 3.2,
+                threshold: 0.5,
+            },
+        ),
+        (
+            "Logistic Map (r=3.8, chaotic)",
+            PatternType::LogisticMap {
+                r: 3.8,
+                threshold: 0.5,
+            },
+        ),
         ("Rule 110 (complex)", PatternType::Rule110),
     ];
 
-    println!("Running {} pattern recognition experiments (2000 steps each)...\n", experiments.len());
+    println!(
+        "Running {} pattern recognition experiments (2000 steps each)...\n",
+        experiments.len()
+    );
     println!("Improvements: Better encoding + Lower budding threshold (0.5) + Longer training\n");
 
     let mut results: Vec<(&str, f32, f32, usize, usize)> = Vec::new();
@@ -475,12 +495,18 @@ fn main() {
     let learnable: Vec<_> = sorted_results.iter().filter(|r| r.2 > 0.6).collect();
     let difficult: Vec<_> = sorted_results.iter().filter(|r| r.2 <= 0.55).collect();
 
-    println!("  ✓ Learnable patterns (>60% accuracy): {}", learnable.len());
+    println!(
+        "  ✓ Learnable patterns (>60% accuracy): {}",
+        learnable.len()
+    );
     for (name, _, recent_acc, _, _) in &learnable {
         println!("    - {} ({:.1}%)", name, recent_acc * 100.0);
     }
 
-    println!("  ✗ Difficult patterns (≤55% accuracy): {}", difficult.len());
+    println!(
+        "  ✗ Difficult patterns (≤55% accuracy): {}",
+        difficult.len()
+    );
     for (name, _, recent_acc, _, _) in &difficult {
         println!("    - {} ({:.1}%)", name, recent_acc * 100.0);
     }
@@ -493,12 +519,20 @@ fn main() {
     println!("  • Budding correlates with pattern difficulty (more complex = more nodes)");
 
     // Calculate correlation between difficulty and budding
-    let avg_budding_learnable: f32 = learnable.iter().map(|r| r.4 as f32).sum::<f32>() / learnable.len().max(1) as f32;
-    let avg_budding_difficult: f32 = difficult.iter().map(|r| r.4 as f32).sum::<f32>() / difficult.len().max(1) as f32;
+    let avg_budding_learnable: f32 =
+        learnable.iter().map(|r| r.4 as f32).sum::<f32>() / learnable.len().max(1) as f32;
+    let avg_budding_difficult: f32 =
+        difficult.iter().map(|r| r.4 as f32).sum::<f32>() / difficult.len().max(1) as f32;
 
     println!("\n📈 Budding Correlation:");
-    println!("  • Learnable patterns avg budding: {:.1}", avg_budding_learnable);
-    println!("  • Difficult patterns avg budding: {:.1}", avg_budding_difficult);
+    println!(
+        "  • Learnable patterns avg budding: {:.1}",
+        avg_budding_learnable
+    );
+    println!(
+        "  • Difficult patterns avg budding: {:.1}",
+        avg_budding_difficult
+    );
     if avg_budding_difficult > avg_budding_learnable {
         println!("  → Network grows more for difficult patterns (autopoiesis working!) ✓");
     }

@@ -29,9 +29,9 @@
 //! - **Neutron escape fraction**: Lower = more shielding efficient
 //! - **Manufacturing complexity**: Lower = cheaper
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 use std::f64::consts::PI;
 
 /// Geometry type
@@ -74,7 +74,8 @@ impl EngineGeometry {
         shell_thickness: f64,
         shielding_thickness: f64,
     ) -> Self {
-        let outer_radius = core_radius + interface_thickness + shell_thickness + shielding_thickness;
+        let outer_radius =
+            core_radius + interface_thickness + shell_thickness + shielding_thickness;
         Self {
             geometry_type: GeometryType::Spherical,
             core_radius,
@@ -94,7 +95,8 @@ impl EngineGeometry {
         shielding_thickness: f64,
         aspect_ratio: f64,
     ) -> Self {
-        let outer_radius = core_radius + interface_thickness + shell_thickness + shielding_thickness;
+        let outer_radius =
+            core_radius + interface_thickness + shell_thickness + shielding_thickness;
         let length = 2.0 * outer_radius * aspect_ratio;
         Self {
             geometry_type: GeometryType::Cylindrical,
@@ -135,7 +137,8 @@ impl EngineGeometry {
             GeometryType::Cylindrical => {
                 let l = self.length.unwrap_or(2.0 * self.outer_radius);
                 // Subtract end caps thickness
-                let core_length = l - 2.0 * (self.interface_thickness + self.shell_thickness + self.shielding_thickness);
+                let core_length = l - 2.0
+                    * (self.interface_thickness + self.shell_thickness + self.shielding_thickness);
                 PI * self.core_radius.powi(2) * core_length.max(0.0)
             }
             _ => (4.0 / 3.0) * PI * self.core_radius.powi(3), // Approximate
@@ -148,9 +151,7 @@ impl EngineGeometry {
         let r_outer = r_inner + self.shell_thickness;
 
         match self.geometry_type {
-            GeometryType::Spherical => {
-                (4.0 / 3.0) * PI * (r_outer.powi(3) - r_inner.powi(3))
-            }
+            GeometryType::Spherical => (4.0 / 3.0) * PI * (r_outer.powi(3) - r_inner.powi(3)),
             GeometryType::Cylindrical => {
                 let l = self.length.unwrap_or(2.0 * self.outer_radius);
                 PI * (r_outer.powi(2) - r_inner.powi(2)) * l
@@ -173,9 +174,7 @@ impl EngineGeometry {
                 let r_major = 2.0 * r_minor;
                 4.0 * PI.powi(2) * r_major * r_minor
             }
-            GeometryType::Rectangular => {
-                6.0 * (2.0 * self.outer_radius).powi(2)
-            }
+            GeometryType::Rectangular => 6.0 * (2.0 * self.outer_radius).powi(2),
         }
     }
 
@@ -196,20 +195,20 @@ impl EngineGeometry {
     /// Structural factor (0-1, higher = better stress distribution)
     pub fn structural_factor(&self) -> f64 {
         match self.geometry_type {
-            GeometryType::Spherical => 1.0,      // Optimal stress distribution
-            GeometryType::Cylindrical => 0.85,    // Stress concentration at ends
-            GeometryType::Toroidal => 0.75,       // Complex stress state
-            GeometryType::Rectangular => 0.5,     // High corner stresses
+            GeometryType::Spherical => 1.0,    // Optimal stress distribution
+            GeometryType::Cylindrical => 0.85, // Stress concentration at ends
+            GeometryType::Toroidal => 0.75,    // Complex stress state
+            GeometryType::Rectangular => 0.5,  // High corner stresses
         }
     }
 
     /// Manufacturing complexity (0-1, lower = easier to manufacture)
     pub fn manufacturing_complexity(&self) -> f64 {
         match self.geometry_type {
-            GeometryType::Spherical => 0.7,       // Difficult to machine/weld
-            GeometryType::Cylindrical => 0.3,     // Standard fabrication
-            GeometryType::Toroidal => 0.9,        // Very difficult
-            GeometryType::Rectangular => 0.2,     // Easiest
+            GeometryType::Spherical => 0.7,   // Difficult to machine/weld
+            GeometryType::Cylindrical => 0.3, // Standard fabrication
+            GeometryType::Toroidal => 0.9,    // Very difficult
+            GeometryType::Rectangular => 0.2, // Easiest
         }
     }
 
@@ -319,9 +318,9 @@ impl GeometryOptimizer {
         let core_radius = (3.0 * core_volume / (4.0 * PI)).powf(1.0 / 3.0);
 
         // Standard layer thicknesses (scale with core radius)
-        let interface = 0.001 + core_radius * 0.01;  // 1mm + 1% of radius
-        let shell = 0.005 + core_radius * 0.05;      // 5mm + 5% of radius
-        let shielding = 0.1 + core_radius * 0.2;     // 10cm + 20% of radius
+        let interface = 0.001 + core_radius * 0.01; // 1mm + 1% of radius
+        let shell = 0.005 + core_radius * 0.05; // 5mm + 5% of radius
+        let shielding = 0.1 + core_radius * 0.2; // 10cm + 20% of radius
 
         // Evaluate all geometries
         let mut results = Vec::new();
@@ -343,9 +342,8 @@ impl GeometryOptimizer {
         let (best_type, best_score, best_geom) = results[0].clone();
 
         // Build alternatives list
-        let alternatives: Vec<(GeometryType, f64)> = results.iter()
-            .map(|(t, s, _)| (*t, *s))
-            .collect();
+        let alternatives: Vec<(GeometryType, f64)> =
+            results.iter().map(|(t, s, _)| (*t, *s)).collect();
 
         // Generate recommendations
         let mut recommendations = Vec::new();
@@ -374,11 +372,7 @@ impl GeometryOptimizer {
     }
 
     /// Scale geometry for different power levels
-    pub fn scale_geometry(
-        &self,
-        base: &EngineGeometry,
-        power_ratio: f64,
-    ) -> EngineGeometry {
+    pub fn scale_geometry(&self, base: &EngineGeometry, power_ratio: f64) -> EngineGeometry {
         // Volume scales with power, radius scales with cube root
         let scale = power_ratio.powf(1.0 / 3.0);
 
@@ -390,7 +384,8 @@ impl GeometryOptimizer {
                 base.shielding_thickness * scale,
             ),
             GeometryType::Cylindrical => {
-                let aspect = base.length.unwrap_or(2.0 * base.outer_radius) / (2.0 * base.outer_radius);
+                let aspect =
+                    base.length.unwrap_or(2.0 * base.outer_radius) / (2.0 * base.outer_radius);
                 EngineGeometry::cylindrical(
                     base.core_radius * scale,
                     base.interface_thickness * scale,
@@ -484,8 +479,8 @@ mod tests {
         let optimizer = GeometryOptimizer::from_genesis(&genesis);
 
         let result = optimizer.optimize(
-            5.0,    // 5 kW
-            100.0,  // 100 kW/m³ target
+            5.0,   // 5 kW
+            100.0, // 100 kW/m³ target
             &GeometryWeights::default(),
         );
 

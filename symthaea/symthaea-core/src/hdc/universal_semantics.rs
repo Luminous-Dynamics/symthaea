@@ -432,42 +432,70 @@ impl SemanticPrime {
     /// Get category
     pub fn category(&self) -> &'static str {
         match self {
-            SemanticPrime::I | SemanticPrime::You | SemanticPrime::Someone |
-            SemanticPrime::Something | SemanticPrime::People | SemanticPrime::Body => "Substantives",
+            SemanticPrime::I
+            | SemanticPrime::You
+            | SemanticPrime::Someone
+            | SemanticPrime::Something
+            | SemanticPrime::People
+            | SemanticPrime::Body => "Substantives",
 
             SemanticPrime::KindOf | SemanticPrime::PartOf => "Relational",
 
             SemanticPrime::This | SemanticPrime::Same | SemanticPrime::Other => "Determiners",
 
-            SemanticPrime::One | SemanticPrime::Two | SemanticPrime::Some |
-            SemanticPrime::All | SemanticPrime::Much | SemanticPrime::Little => "Quantifiers",
+            SemanticPrime::One
+            | SemanticPrime::Two
+            | SemanticPrime::Some
+            | SemanticPrime::All
+            | SemanticPrime::Much
+            | SemanticPrime::Little => "Quantifiers",
 
             SemanticPrime::Good | SemanticPrime::Bad => "Evaluators",
 
             SemanticPrime::Big | SemanticPrime::Small => "Descriptors",
 
-            SemanticPrime::Think | SemanticPrime::Know | SemanticPrime::Want |
-            SemanticPrime::Feel | SemanticPrime::See | SemanticPrime::Hear => "Mental Predicates",
+            SemanticPrime::Think
+            | SemanticPrime::Know
+            | SemanticPrime::Want
+            | SemanticPrime::Feel
+            | SemanticPrime::See
+            | SemanticPrime::Hear => "Mental Predicates",
 
             SemanticPrime::Say | SemanticPrime::Words | SemanticPrime::True => "Speech",
 
-            SemanticPrime::Do | SemanticPrime::Happen | SemanticPrime::Move |
-            SemanticPrime::Touch => "Actions/Events",
+            SemanticPrime::Do
+            | SemanticPrime::Happen
+            | SemanticPrime::Move
+            | SemanticPrime::Touch => "Actions/Events",
 
             SemanticPrime::Be | SemanticPrime::ThereIs | SemanticPrime::Have => "Existence",
 
             SemanticPrime::Live | SemanticPrime::Die => "Life/Death",
 
-            SemanticPrime::Not | SemanticPrime::Maybe | SemanticPrime::Can |
-            SemanticPrime::Because | SemanticPrime::If => "Logical",
+            SemanticPrime::Not
+            | SemanticPrime::Maybe
+            | SemanticPrime::Can
+            | SemanticPrime::Because
+            | SemanticPrime::If => "Logical",
 
-            SemanticPrime::When | SemanticPrime::Now | SemanticPrime::Before |
-            SemanticPrime::After | SemanticPrime::LongTime | SemanticPrime::ShortTime |
-            SemanticPrime::ForSomeTime | SemanticPrime::InOneMoment => "Time",
+            SemanticPrime::When
+            | SemanticPrime::Now
+            | SemanticPrime::Before
+            | SemanticPrime::After
+            | SemanticPrime::LongTime
+            | SemanticPrime::ShortTime
+            | SemanticPrime::ForSomeTime
+            | SemanticPrime::InOneMoment => "Time",
 
-            SemanticPrime::Where | SemanticPrime::Here | SemanticPrime::Above |
-            SemanticPrime::Below | SemanticPrime::Far | SemanticPrime::Near |
-            SemanticPrime::Side | SemanticPrime::Inside | SemanticPrime::On => "Space",
+            SemanticPrime::Where
+            | SemanticPrime::Here
+            | SemanticPrime::Above
+            | SemanticPrime::Below
+            | SemanticPrime::Far
+            | SemanticPrime::Near
+            | SemanticPrime::Side
+            | SemanticPrime::Inside
+            | SemanticPrime::On => "Space",
 
             SemanticPrime::Very | SemanticPrime::More => "Intensifiers",
 
@@ -481,62 +509,85 @@ impl SemanticPrime {
     pub fn all() -> Vec<Self> {
         vec![
             // Substantives
-            SemanticPrime::I, SemanticPrime::You, SemanticPrime::Someone,
-            SemanticPrime::Something, SemanticPrime::People, SemanticPrime::Body,
-
+            SemanticPrime::I,
+            SemanticPrime::You,
+            SemanticPrime::Someone,
+            SemanticPrime::Something,
+            SemanticPrime::People,
+            SemanticPrime::Body,
             // Relational
-            SemanticPrime::KindOf, SemanticPrime::PartOf,
-
+            SemanticPrime::KindOf,
+            SemanticPrime::PartOf,
             // Determiners
-            SemanticPrime::This, SemanticPrime::Same, SemanticPrime::Other,
-
+            SemanticPrime::This,
+            SemanticPrime::Same,
+            SemanticPrime::Other,
             // Quantifiers
-            SemanticPrime::One, SemanticPrime::Two, SemanticPrime::Some,
-            SemanticPrime::All, SemanticPrime::Much, SemanticPrime::Little,
-
+            SemanticPrime::One,
+            SemanticPrime::Two,
+            SemanticPrime::Some,
+            SemanticPrime::All,
+            SemanticPrime::Much,
+            SemanticPrime::Little,
             // Evaluators
-            SemanticPrime::Good, SemanticPrime::Bad,
-
+            SemanticPrime::Good,
+            SemanticPrime::Bad,
             // Descriptors
-            SemanticPrime::Big, SemanticPrime::Small,
-
+            SemanticPrime::Big,
+            SemanticPrime::Small,
             // Mental predicates
-            SemanticPrime::Think, SemanticPrime::Know, SemanticPrime::Want,
-            SemanticPrime::Feel, SemanticPrime::See, SemanticPrime::Hear,
-
+            SemanticPrime::Think,
+            SemanticPrime::Know,
+            SemanticPrime::Want,
+            SemanticPrime::Feel,
+            SemanticPrime::See,
+            SemanticPrime::Hear,
             // Speech
-            SemanticPrime::Say, SemanticPrime::Words, SemanticPrime::True,
-
+            SemanticPrime::Say,
+            SemanticPrime::Words,
+            SemanticPrime::True,
             // Actions
-            SemanticPrime::Do, SemanticPrime::Happen, SemanticPrime::Move,
+            SemanticPrime::Do,
+            SemanticPrime::Happen,
+            SemanticPrime::Move,
             SemanticPrime::Touch,
-
             // Existence
-            SemanticPrime::Be, SemanticPrime::ThereIs, SemanticPrime::Have,
-
+            SemanticPrime::Be,
+            SemanticPrime::ThereIs,
+            SemanticPrime::Have,
             // Life/Death
-            SemanticPrime::Live, SemanticPrime::Die,
-
+            SemanticPrime::Live,
+            SemanticPrime::Die,
             // Logical
-            SemanticPrime::Not, SemanticPrime::Maybe, SemanticPrime::Can,
-            SemanticPrime::Because, SemanticPrime::If,
-
+            SemanticPrime::Not,
+            SemanticPrime::Maybe,
+            SemanticPrime::Can,
+            SemanticPrime::Because,
+            SemanticPrime::If,
             // Time
-            SemanticPrime::When, SemanticPrime::Now, SemanticPrime::Before,
-            SemanticPrime::After, SemanticPrime::LongTime, SemanticPrime::ShortTime,
-            SemanticPrime::ForSomeTime, SemanticPrime::InOneMoment,
-
+            SemanticPrime::When,
+            SemanticPrime::Now,
+            SemanticPrime::Before,
+            SemanticPrime::After,
+            SemanticPrime::LongTime,
+            SemanticPrime::ShortTime,
+            SemanticPrime::ForSomeTime,
+            SemanticPrime::InOneMoment,
             // Space
-            SemanticPrime::Where, SemanticPrime::Here, SemanticPrime::Above,
-            SemanticPrime::Below, SemanticPrime::Far, SemanticPrime::Near,
-            SemanticPrime::Side, SemanticPrime::Inside, SemanticPrime::On,
-
+            SemanticPrime::Where,
+            SemanticPrime::Here,
+            SemanticPrime::Above,
+            SemanticPrime::Below,
+            SemanticPrime::Far,
+            SemanticPrime::Near,
+            SemanticPrime::Side,
+            SemanticPrime::Inside,
+            SemanticPrime::On,
             // Intensifiers
-            SemanticPrime::Very, SemanticPrime::More,
-
+            SemanticPrime::Very,
+            SemanticPrime::More,
             // Similarity
             SemanticPrime::Like,
-
             // Social/Relational
             SemanticPrime::With,
         ]
@@ -620,7 +671,8 @@ impl UniversalSemantics {
 
     /// Get primitive encoding
     pub fn get_prime(&self, prime: SemanticPrime) -> &BinaryHV {
-        self.primitives.get(&prime)
+        self.primitives
+            .get(&prime)
             .expect("All primes should be initialized")
     }
 
@@ -635,9 +687,7 @@ impl UniversalSemantics {
         let structure = structure.into();
 
         // Encode by bundling component primes
-        let vectors: Vec<BinaryHV> = components.iter()
-            .map(|p| *self.get_prime(*p))
-            .collect();
+        let vectors: Vec<BinaryHV> = components.iter().map(|p| *self.get_prime(*p)).collect();
 
         let encoding = if vectors.len() == 1 {
             vectors[0]
@@ -703,7 +753,7 @@ mod tests {
     #[test]
     fn test_semantic_prime_count() {
         let primes = SemanticPrime::all();
-        assert_eq!(primes.len(), 65);  // NSM theory: 65 universal primes
+        assert_eq!(primes.len(), 65); // NSM theory: 65 universal primes
     }
 
     #[test]
@@ -722,7 +772,7 @@ mod tests {
 
         // Different primes should have different encodings
         let similarity = semantics.similarity(good, bad);
-        assert!(similarity < 0.9);  // Should be different
+        assert!(similarity < 0.9); // Should be different
     }
 
     #[test]
@@ -732,7 +782,7 @@ mod tests {
         let concept = semantics.compose_concept(
             "good person",
             vec![SemanticPrime::Good, SemanticPrime::Someone],
-            "bind(GOOD, SOMEONE)"
+            "bind(GOOD, SOMEONE)",
         );
 
         assert_eq!(concept.name, "good person");
@@ -819,7 +869,7 @@ mod tests {
         semantics.compose_concept(
             "happiness",
             vec![SemanticPrime::Feel, SemanticPrime::Good],
-            "bind(FEEL, GOOD)"
+            "bind(FEEL, GOOD)",
         );
 
         let retrieved = semantics.get_concept("happiness");

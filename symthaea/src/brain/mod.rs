@@ -19,6 +19,10 @@ pub mod social_coherence;
 pub mod dark_spot_actor;
 
 // Re-export key types
-pub use prefrontal::{PrefrontalCortex, PrefrontalConfig, WorkingMemoryItem, PlannedAction, ExecutiveDecision};
-pub use actor_model::{ActorSystem, Actor, ActorId, ActorRole, ActorMessage, MessageType};
-pub use social_coherence::{SocialCoherence, SocialCoherenceConfig, MentalModel, Relationship, RelationshipType};
+pub use actor_model::{Actor, ActorId, ActorMessage, ActorRole, ActorSystem, MessageType};
+pub use prefrontal::{
+    ExecutiveDecision, PlannedAction, PrefrontalConfig, PrefrontalCortex, WorkingMemoryItem,
+};
+pub use social_coherence::{
+    MentalModel, Relationship, RelationshipType, SocialCoherence, SocialCoherenceConfig,
+};

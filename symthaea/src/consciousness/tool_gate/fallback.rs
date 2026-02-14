@@ -3,8 +3,8 @@
 //! When the tool gate blocks an action, this module selects the
 //! best alternative strategy based on the current state.
 
+use super::super::epistemic_conflict::{AnchorKind, ConflictMatrix, EpistemicAction};
 use super::types::*;
-use super::super::epistemic_conflict::{EpistemicAction, AnchorKind, ConflictMatrix};
 
 /// Select the best fallback strategy based on conflict state and gate result.
 pub fn select_contextual_fallback(
@@ -88,7 +88,7 @@ pub fn fallback_frustration_cost(consecutive_blocks: usize) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consciousness::epistemic_conflict::{ConflictScore, ConflictKind, TheoryId};
+    use crate::consciousness::epistemic_conflict::{ConflictKind, ConflictScore, TheoryId};
 
     fn empty_conflicts() -> ConflictMatrix {
         let conflicts: Vec<ConflictScore> = (0..15)
@@ -105,7 +105,10 @@ mod tests {
     fn test_contextual_fallback_with_conflicts() {
         let tool = ToolDescriptor::from_command("nixos-rebuild switch");
         let gate_result = GateResult {
-            decision: GateDecision::InsufficientPhi { current: 0.3, required: 0.7 },
+            decision: GateDecision::InsufficientPhi {
+                current: 0.3,
+                required: 0.7,
+            },
             required_phi: 0.7,
             required_confidence: 0.6,
             actual_phi_eff: 0.3,
@@ -122,9 +125,8 @@ mod tests {
             })
             .collect();
         // Make one conflict dominant with NoBroadcast (which recommends Verify)
-        conflicts_vec[1] = ConflictScore::new(
-            TheoryId::IIT, TheoryId::AST, 0.8, ConflictKind::NoBroadcast,
-        );
+        conflicts_vec[1] =
+            ConflictScore::new(TheoryId::IIT, TheoryId::AST, 0.8, ConflictKind::NoBroadcast);
         let conflicts = ConflictMatrix::new(conflicts_vec);
 
         let fallback = select_contextual_fallback(&tool, &gate_result, &conflicts);

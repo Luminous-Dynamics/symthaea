@@ -59,7 +59,7 @@ impl MetaCognitiveLayer {
             self_predictions: VecDeque::with_capacity(MAX_PREDICTIONS),
             error_model: ErrorModel::new(),
             harmonic_model: HarmonicTendencyModel::new(),
-            accuracy: 0.5, // Start uncertain
+            accuracy: 0.5,      // Start uncertain
             recursion_depth: 1, // Basic self-model
         }
     }
@@ -111,7 +111,7 @@ impl MetaCognitiveLayer {
         RecursiveModel {
             depth: self.recursion_depth,
             accuracy_at_depth: vec![self.accuracy], // For now, just one level
-            can_model_deeper: self.accuracy > 0.7, // Need good accuracy to go deeper
+            can_model_deeper: self.accuracy > 0.7,  // Need good accuracy to go deeper
         }
     }
 
@@ -127,7 +127,8 @@ impl MetaCognitiveLayer {
 
     /// Get self-model accuracy summary
     pub fn accuracy_summary(&self) -> SelfModelAccuracy {
-        let recent_meta_errors: Vec<f32> = self.self_predictions
+        let recent_meta_errors: Vec<f32> = self
+            .self_predictions
             .iter()
             .rev()
             .take(10)
@@ -135,8 +136,12 @@ impl MetaCognitiveLayer {
             .collect();
 
         let trend = if recent_meta_errors.len() >= 5 {
-            let first_half: f32 = recent_meta_errors[..recent_meta_errors.len()/2].iter().sum();
-            let second_half: f32 = recent_meta_errors[recent_meta_errors.len()/2..].iter().sum();
+            let first_half: f32 = recent_meta_errors[..recent_meta_errors.len() / 2]
+                .iter()
+                .sum();
+            let second_half: f32 = recent_meta_errors[recent_meta_errors.len() / 2..]
+                .iter()
+                .sum();
             if second_half < first_half * 0.9 {
                 AccuracyTrend::Improving
             } else if second_half > first_half * 1.1 {
@@ -162,10 +167,12 @@ impl MetaCognitiveLayer {
         }
 
         // Accuracy is inverse of average meta-error
-        let avg_meta_error: f32 = self.self_predictions
+        let avg_meta_error: f32 = self
+            .self_predictions
             .iter()
             .map(|p| p.meta_error)
-            .sum::<f32>() / self.self_predictions.len() as f32;
+            .sum::<f32>()
+            / self.self_predictions.len() as f32;
 
         self.accuracy = (1.0 - avg_meta_error).clamp(0.0, 1.0);
     }

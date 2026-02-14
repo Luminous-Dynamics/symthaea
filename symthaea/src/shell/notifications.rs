@@ -161,7 +161,8 @@ impl DesktopNotifier {
     /// Create a new notifier
     #[cfg(feature = "notifications")]
     pub async fn new() -> Result<Self, NotificationError> {
-        let connection = zbus::Connection::session().await
+        let connection = zbus::Connection::session()
+            .await
             .map_err(|e| NotificationError::ConnectionFailed(e.to_string()))?;
 
         Ok(Self {
@@ -215,17 +216,27 @@ impl DesktopNotifier {
             return Ok(0);
         }
 
-        let conn = self.connection.as_ref()
+        let conn = self
+            .connection
+            .as_ref()
             .ok_or(NotificationError::NotConnected)?;
 
         // Build hints
         let mut hints: std::collections::HashMap<&str, zbus::zvariant::Value> =
             std::collections::HashMap::new();
-        hints.insert("urgency", zbus::zvariant::Value::U8(notification.urgency as u8));
-        hints.insert("category", zbus::zvariant::Value::Str(notification.category.as_str().into()));
+        hints.insert(
+            "urgency",
+            zbus::zvariant::Value::U8(notification.urgency as u8),
+        );
+        hints.insert(
+            "category",
+            zbus::zvariant::Value::Str(notification.category.as_str().into()),
+        );
 
         // Flatten actions
-        let actions: Vec<&str> = notification.actions.iter()
+        let actions: Vec<&str> = notification
+            .actions
+            .iter()
             .flat_map(|(id, label)| vec![id.as_str(), label.as_str()])
             .collect();
 
@@ -235,21 +246,26 @@ impl DesktopNotifier {
             "org.freedesktop.Notifications",
             "/org/freedesktop/Notifications",
             "org.freedesktop.Notifications",
-        ).await.map_err(|e| NotificationError::ProxyFailed(e.to_string()))?;
+        )
+        .await
+        .map_err(|e| NotificationError::ProxyFailed(e.to_string()))?;
 
-        let notification_id: u32 = proxy.call(
-            "Notify",
-            &(
-                &self.config.app_name,
-                0u32, // replaces_id
-                &notification.icon,
-                &notification.summary,
-                &notification.body,
-                &actions,
-                &hints,
-                notification.timeout_ms,
-            ),
-        ).await.map_err(|e| NotificationError::SendFailed(e.to_string()))?;
+        let notification_id: u32 = proxy
+            .call(
+                "Notify",
+                &(
+                    &self.config.app_name,
+                    0u32, // replaces_id
+                    &notification.icon,
+                    &notification.summary,
+                    &notification.body,
+                    &actions,
+                    &hints,
+                    notification.timeout_ms,
+                ),
+            )
+            .await
+            .map_err(|e| NotificationError::SendFailed(e.to_string()))?;
 
         Ok(notification_id)
     }
@@ -291,7 +307,11 @@ impl DesktopNotifier {
     }
 
     /// Notify Phi threshold warning
-    pub async fn notify_phi_warning(&self, current_phi: f64, required_phi: f64) -> Result<u32, NotificationError> {
+    pub async fn notify_phi_warning(
+        &self,
+        current_phi: f64,
+        required_phi: f64,
+    ) -> Result<u32, NotificationError> {
         if current_phi >= self.config.phi_warning_threshold {
             return Ok(0); // No warning needed
         }
@@ -312,7 +332,11 @@ impl DesktopNotifier {
     }
 
     /// Notify safety veto
-    pub async fn notify_safety_veto(&self, command: &str, reason: &str) -> Result<u32, NotificationError> {
+    pub async fn notify_safety_veto(
+        &self,
+        command: &str,
+        reason: &str,
+    ) -> Result<u32, NotificationError> {
         let notification = Notification::new(
             "Command Vetoed",
             format!("Command: {}\nReason: {}", command, reason),
@@ -325,16 +349,27 @@ impl DesktopNotifier {
     }
 
     /// Notify connection status change
-    pub async fn notify_connection(&self, connected: bool, service_name: &str) -> Result<u32, NotificationError> {
+    pub async fn notify_connection(
+        &self,
+        connected: bool,
+        service_name: &str,
+    ) -> Result<u32, NotificationError> {
         let (summary, body) = if connected {
             ("Connected", format!("Connected to {}", service_name))
         } else {
-            ("Disconnected", format!("Lost connection to {}", service_name))
+            (
+                "Disconnected",
+                format!("Lost connection to {}", service_name),
+            )
         };
 
         let notification = Notification::new(summary, body)
             .category(NotificationCategory::ConnectionStatus)
-            .urgency(if connected { NotificationUrgency::Low } else { NotificationUrgency::Normal });
+            .urgency(if connected {
+                NotificationUrgency::Low
+            } else {
+                NotificationUrgency::Normal
+            });
 
         self.send(&notification).await
     }
@@ -352,11 +387,7 @@ impl DesktopNotifier {
             ("Consciousness Dormant", NotificationUrgency::Normal)
         };
 
-        let body = format!(
-            "Phi: {:.2}\nCoherence: {:.0}%",
-            phi,
-            coherence * 100.0
-        );
+        let body = format!("Phi: {:.2}\nCoherence: {:.0}%", phi, coherence * 100.0);
 
         let notification = Notification::new(summary, body)
             .category(NotificationCategory::Info)

@@ -64,7 +64,7 @@
 //! ```
 
 use super::binary_hv::BinaryHV;
-use super::sleep_and_altered_states::{DreamFragment, DreamScenario, DreamFragmentSource};
+use super::sleep_and_altered_states::{DreamFragment, DreamFragmentSource, DreamScenario};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -234,7 +234,12 @@ impl CounterfactualDreamEngine {
         self.next_id += 1;
 
         let memory = CounterfactualMemory::new(
-            id, label, actual, question, counterfactual, emotional_intensity
+            id,
+            label,
+            actual,
+            question,
+            counterfactual,
+            emotional_intensity,
         );
 
         self.memories.insert(id, memory);
@@ -255,8 +260,14 @@ impl CounterfactualDreamEngine {
         self.next_id += 1;
 
         let memory = CounterfactualMemory::new(
-            id, label, actual, question, counterfactual, emotional_intensity
-        ).with_valence(valence);
+            id,
+            label,
+            actual,
+            question,
+            counterfactual,
+            emotional_intensity,
+        )
+        .with_valence(valence);
 
         self.memories.insert(id, memory);
         id
@@ -268,7 +279,10 @@ impl CounterfactualDreamEngine {
     }
 
     /// Generate a counterfactual dream scenario
-    pub fn generate_counterfactual_dream(&mut self, duration_minutes: f64) -> CounterfactualDreamScenario {
+    pub fn generate_counterfactual_dream(
+        &mut self,
+        duration_minutes: f64,
+    ) -> CounterfactualDreamScenario {
         // Select memories to include based on dream weight
         let selected = self.select_dream_memories(3);
 
@@ -342,10 +356,7 @@ impl CounterfactualDreamEngine {
 
         // Build main counterfactual theme
         let main_memory = self.memories.get(&selected[0]).unwrap();
-        let theme = format!(
-            "Exploring: {}",
-            main_memory.counterfactual_question
-        );
+        let theme = format!("Exploring: {}", main_memory.counterfactual_question);
 
         // Update dream counts
         for id in &selected {
@@ -355,15 +366,17 @@ impl CounterfactualDreamEngine {
                     SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .map(|d| d.as_millis() as u64)
-                        .unwrap_or(0)
+                        .unwrap_or(0),
                 );
             }
         }
 
         // Compute overall valence and coherence
-        let emotional_valence = cf_fragments.iter()
+        let emotional_valence = cf_fragments
+            .iter()
             .map(|f| f.base_fragment.valence)
-            .sum::<f64>() / cf_fragments.len().max(1) as f64;
+            .sum::<f64>()
+            / cf_fragments.len().max(1) as f64;
 
         let narrative_coherence = 1.0 - self.bizarreness * 0.5;
 
@@ -413,10 +426,8 @@ impl CounterfactualDreamEngine {
         // If focused on specific memory, emphasize it
         if let Some(id) = focus_memory_id {
             if let Some(memory) = self.memories.get(&id) {
-                dream.counterfactual_theme = format!(
-                    "Lucid exploration: {}",
-                    memory.counterfactual_question
-                );
+                dream.counterfactual_theme =
+                    format!("Lucid exploration: {}", memory.counterfactual_question);
             }
         }
 
@@ -430,7 +441,9 @@ impl CounterfactualDreamEngine {
         duration_minutes: f64,
     ) -> CounterfactualDreamScenario {
         // Select only negative valence memories
-        let negative_ids: Vec<u64> = self.memories.iter()
+        let negative_ids: Vec<u64> = self
+            .memories
+            .iter()
             .filter(|(_, m)| m.valence < 0.0)
             .map(|(id, _)| *id)
             .collect();
@@ -459,16 +472,17 @@ impl CounterfactualDreamEngine {
 
     /// Select memories for dreaming based on weights
     fn select_dream_memories(&self, max_count: usize) -> Vec<u64> {
-        let mut weighted: Vec<_> = self.memories.iter()
+        let mut weighted: Vec<_> = self
+            .memories
+            .iter()
             .map(|(id, m)| (*id, m.dream_weight()))
             .collect();
 
         // Sort by weight
-        weighted.sort_by(|a, b|
-            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-        );
+        weighted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        weighted.into_iter()
+        weighted
+            .into_iter()
             .take(max_count)
             .map(|(id, _)| id)
             .collect()
@@ -527,10 +541,12 @@ impl CounterfactualDreamEngine {
         }
 
         // Analyze valences of involved memories
-        let avg_valence: f64 = memory_ids.iter()
+        let avg_valence: f64 = memory_ids
+            .iter()
             .filter_map(|id| self.memories.get(id))
             .map(|m| m.valence)
-            .sum::<f64>() / memory_ids.len() as f64;
+            .sum::<f64>()
+            / memory_ids.len() as f64;
 
         // Use seed for some randomness
         let roll = (self.seed % 100) as f64 / 100.0;
@@ -603,11 +619,11 @@ impl CounterfactualDreamEngine {
 
     /// Generate report of counterfactual dreaming activity
     pub fn report(&self) -> String {
-        let total_dreams: usize = self.memories.values()
-            .map(|m| m.dream_count)
-            .sum();
+        let total_dreams: usize = self.memories.values().map(|m| m.dream_count).sum();
 
-        let most_dreamed = self.memories.values()
+        let most_dreamed = self
+            .memories
+            .values()
             .max_by_key(|m| m.dream_count)
             .map(|m| format!("'{}' ({} times)", m.label, m.dream_count))
             .unwrap_or_else(|| "None".to_string());

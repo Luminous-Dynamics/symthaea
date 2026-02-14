@@ -7,9 +7,7 @@
 
 use ndarray::Array1;
 use std::time::Instant;
-use symthaea::dynamics::cfc::{
-    ActivationType, CfCConfig, CfCNetwork, CfCNetworkConfig,
-};
+use symthaea::dynamics::cfc::{ActivationType, CfCConfig, CfCNetwork, CfCNetworkConfig};
 use symthaea_core::genesis::GenesisSeed;
 
 fn make_config() -> CfCNetworkConfig {
@@ -39,13 +37,15 @@ fn make_config() -> CfCNetworkConfig {
 /// Generate random training samples (input, target, dt).
 fn generate_samples(n: usize) -> (Vec<Array1<f32>>, Vec<Array1<f32>>, Vec<f32>) {
     let inputs: Vec<Array1<f32>> = (0..n)
-        .map(|i| {
-            Array1::from_vec((0..32).map(|j| ((i * 7 + j) as f32 * 0.01).sin()).collect())
-        })
+        .map(|i| Array1::from_vec((0..32).map(|j| ((i * 7 + j) as f32 * 0.01).sin()).collect()))
         .collect();
     let targets: Vec<Array1<f32>> = (0..n)
         .map(|i| {
-            Array1::from_vec((0..16).map(|j| ((i * 3 + j + 1) as f32 * 0.02).cos()).collect())
+            Array1::from_vec(
+                (0..16)
+                    .map(|j| ((i * 3 + j + 1) as f32 * 0.02).cos())
+                    .collect(),
+            )
         })
         .collect();
     let dts: Vec<f32> = (0..n).map(|i| 0.01 + (i as f32 * 0.001)).collect();
@@ -178,8 +178,14 @@ fn bptt_throughput_optimized_vs_original() {
     println!("\n--- Comparison ---");
     println!("  Speedup: {:.2}x", speedup);
     println!("  Time savings: {:.1}%", savings_pct);
-    println!("  Original <1ms/step: {}", if orig_us < 1000.0 { "YES" } else { "NO" });
-    println!("  Optimized <1ms/step: {}", if opt_us < 1000.0 { "YES" } else { "NO" });
+    println!(
+        "  Original <1ms/step: {}",
+        if orig_us < 1000.0 { "YES" } else { "NO" }
+    );
+    println!(
+        "  Optimized <1ms/step: {}",
+        if opt_us < 1000.0 { "YES" } else { "NO" }
+    );
 
     // Loss should be similar (within tolerance)
     let loss_diff = (total_loss_orig - total_loss_opt).abs() / total_loss_orig;

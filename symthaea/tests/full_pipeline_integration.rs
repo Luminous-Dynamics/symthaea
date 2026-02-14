@@ -37,17 +37,17 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 // Dynamics
 use symthaea::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
+use symthaea::dynamics::cfc_gpu::{GpuBackend, GpuCfcConfig, GpuCfcNetwork};
 use symthaea::dynamics::hierarchical_cfc::{HierarchicalCfC, HierarchicalCfCConfig};
-use symthaea::dynamics::cfc_gpu::{GpuCfcConfig, GpuCfcNetwork, GpuBackend};
 
 // Bridges
 use symthaea::bridges::{HdcCfcBridge, HdcCfcBridgeConfig};
 
 // Attention
-use symthaea::attention::{PhiAttentionGate, PhiAttentionConfig};
+use symthaea::attention::{PhiAttentionConfig, PhiAttentionGate};
 
 // Memory
-use symthaea::memory::episodic_replay::{EpisodicMemory, EpisodicReplayConfig, Episode};
+use symthaea::memory::episodic_replay::{Episode, EpisodicMemory, EpisodicReplayConfig};
 
 // Exploration
 use symthaea::exploration::surprise_driven::{SurpriseTracker, SurpriseTrackerConfig};
@@ -56,7 +56,7 @@ use symthaea::exploration::surprise_driven::{SurpriseTracker, SurpriseTrackerCon
 use symthaea::causal::CausalLoopEnhancer;
 
 // Inference
-use symthaea::inference::{StreamingInference, StreamingConfig};
+use symthaea::inference::{StreamingConfig, StreamingInference};
 
 // Checkpoint
 use symthaea::swarm::FederatedCheckpoint;
@@ -126,7 +126,9 @@ fn assert_all_finite(values: &[f32], context: &str) {
         assert!(
             v.is_finite(),
             "{}: value at index {} is not finite: {}",
-            context, i, v
+            context,
+            i,
+            v
         );
     }
 }
@@ -210,7 +212,11 @@ fn test_full_pipeline_integration() {
 
     // SIMD bind (element-wise multiply)
     let bound = bind_simd(&hv_a.values, &hv_b.values);
-    assert_eq!(bound.len(), PIPELINE_HDC_DIM, "Bind output dimension mismatch");
+    assert_eq!(
+        bound.len(),
+        PIPELINE_HDC_DIM,
+        "Bind output dimension mismatch"
+    );
     assert_all_finite(&bound, "SIMD bind");
 
     // SIMD bundle (weighted average of multiple HVs)
@@ -227,7 +233,10 @@ fn test_full_pipeline_integration() {
 
     // SIMD norm
     let n = norm_simd(&hv_a.values);
-    assert!(n > 0.0 && n.is_finite(), "SIMD norm must be positive finite");
+    assert!(
+        n > 0.0 && n.is_finite(),
+        "SIMD norm must be positive finite"
+    );
 
     print_stage(
         2,
@@ -275,7 +284,12 @@ fn test_full_pipeline_integration() {
     for step in 0..20 {
         let output = hcfc.forward_hierarchical(&hcfc_input, 0.02);
 
-        assert_eq!(output.combined.len(), 32, "Combined output dim at step {}", step);
+        assert_eq!(
+            output.combined.len(),
+            32,
+            "Combined output dim at step {}",
+            step
+        );
         assert_eq!(output.scale_outputs.len(), 4, "Should have 4 scale outputs");
         assert!(
             output.combined.iter().all(|x| x.is_finite()),
@@ -287,7 +301,8 @@ fn test_full_pipeline_integration() {
             assert!(
                 so.iter().all(|x| x.is_finite()),
                 "Scale {} must be finite at step {}",
-                i, step
+                i,
+                step
             );
         }
         last_combined = Some(output.combined.clone());
@@ -500,7 +515,11 @@ fn test_full_pipeline_integration() {
 
         match cfc_net.train_step(&input, &target_arr, 0.02, 0.001) {
             Ok(loss) => {
-                assert!(loss.is_finite(), "Training loss must be finite at step {}", i);
+                assert!(
+                    loss.is_finite(),
+                    "Training loss must be finite at step {}",
+                    i
+                );
                 total_train_loss += loss;
                 train_count += 1;
             }
@@ -575,7 +594,9 @@ fn test_full_pipeline_integration() {
         t.elapsed(),
         &format!(
             "stored={}/{}, batch_size={}, above_threshold=all",
-            stored_count, 20, batch.len()
+            stored_count,
+            20,
+            batch.len()
         ),
     );
 
@@ -622,8 +643,7 @@ fn test_full_pipeline_integration() {
         }
     }
 
-    let mean_surprise: f64 =
-        surprise_values.iter().sum::<f64>() / surprise_values.len() as f64;
+    let mean_surprise: f64 = surprise_values.iter().sum::<f64>() / surprise_values.len() as f64;
 
     print_stage(
         8,
@@ -661,8 +681,12 @@ fn test_full_pipeline_integration() {
     } else {
         // Force discovery by feeding more data
         for i in 0..30 {
-            let fake_in: Vec<f32> = (0..INPUT_DIM).map(|d| (i as f32 * 0.1 + d as f32 * 0.01).sin()).collect();
-            let fake_out: Vec<f32> = (0..INPUT_DIM).map(|d| (i as f32 * 0.15 + d as f32 * 0.02).cos()).collect();
+            let fake_in: Vec<f32> = (0..INPUT_DIM)
+                .map(|d| (i as f32 * 0.1 + d as f32 * 0.01).sin())
+                .collect();
+            let fake_out: Vec<f32> = (0..INPUT_DIM)
+                .map(|d| (i as f32 * 0.15 + d as f32 * 0.02).cos())
+                .collect();
             causal_enhancer.record_cycle_from_f32(&fake_in, &fake_out);
         }
         if causal_enhancer.should_discover() {
@@ -756,9 +780,7 @@ fn test_full_pipeline_integration() {
         t.elapsed(),
         &format!(
             "inputs={}, outputs={}, avg_latency={:.1}us",
-            stream_stats.total_inputs,
-            outputs_received,
-            stream_stats.avg_latency_us
+            stream_stats.total_inputs, outputs_received, stream_stats.avg_latency_us
         ),
     );
 
@@ -773,11 +795,11 @@ fn test_full_pipeline_integration() {
 
     let checkpoint = FederatedCheckpoint::new(
         model_weights.clone(),
-        42,                     // round number
-        HashMap::new(),         // node states
-        Vec::new(),             // aggregation buffer
+        42,             // round number
+        HashMap::new(), // node states
+        Vec::new(),     // aggregation buffer
         &fed_config,
-        None,                   // coordinator id
+        None, // coordinator id
     );
 
     // Verify checksum
@@ -800,10 +822,7 @@ fn test_full_pipeline_integration() {
         loaded.global_weights, model_weights,
         "Loaded weights must match saved weights"
     );
-    assert_eq!(
-        loaded.round_number, 42,
-        "Loaded round number must match"
-    );
+    assert_eq!(loaded.round_number, 42, "Loaded round number must match");
     assert!(
         loaded.verify_checksum(),
         "Loaded checkpoint checksum must verify"
@@ -895,16 +914,23 @@ fn test_full_pipeline_integration() {
 
     // Forward pass
     let gpu_input = vec![0.5f32; 64];
-    let gpu_output = gpu_net.forward(&gpu_input, 0.1).expect("GPU forward must succeed");
+    let gpu_output = gpu_net
+        .forward(&gpu_input, 0.1)
+        .expect("GPU forward must succeed");
     assert_eq!(gpu_output.len(), 32, "GPU CfC output dim");
     assert_all_finite(&gpu_output, "GPU CfC output");
 
     // Batch forward
-    let batch_inputs: Vec<Vec<f32>> = (0..4).map(|i| {
-        (0..64).map(|d| ((i * 64 + d) as f32 * 0.01).sin()).collect()
-    }).collect();
+    let batch_inputs: Vec<Vec<f32>> = (0..4)
+        .map(|i| {
+            (0..64)
+                .map(|d| ((i * 64 + d) as f32 * 0.01).sin())
+                .collect()
+        })
+        .collect();
     let batch_dts = vec![0.1f32; 4];
-    let batch_outputs = gpu_net.forward_batch(&batch_inputs, &batch_dts)
+    let batch_outputs = gpu_net
+        .forward_batch(&batch_inputs, &batch_dts)
         .expect("GPU batch forward must succeed");
     assert_eq!(batch_outputs.len(), 4, "Batch output count");
     for (i, out) in batch_outputs.iter().enumerate() {
@@ -938,11 +964,7 @@ fn test_full_pipeline_integration() {
         1.0, // temperature
     );
 
-    assert_eq!(
-        snapshot.attention_weights.len(),
-        4,
-        "Snapshot weight count"
-    );
+    assert_eq!(snapshot.attention_weights.len(), 4, "Snapshot weight count");
     assert_eq!(snapshot.phi_values.len(), 4, "Snapshot phi count");
 
     attention_history.record(snapshot);
@@ -968,24 +990,22 @@ fn test_full_pipeline_integration() {
         "Should have 3 attention snapshots (1 initial + 2 trials)"
     );
 
-    let latest = attention_history.latest().expect("Should have a latest snapshot");
+    let latest = attention_history
+        .latest()
+        .expect("Should have a latest snapshot");
     assert!(latest.argmax().is_some(), "Should have an argmax");
 
     let top_k = attention_history.top_k_overall(2);
     assert!(!top_k.is_empty(), "Top-k overall should not be empty");
 
     let avg_entropy = attention_history.average_entropy();
-    assert!(
-        avg_entropy.is_finite(),
-        "Average entropy must be finite"
-    );
+    assert!(avg_entropy.is_finite(), "Average entropy must be finite");
 
     // Serialize/deserialize roundtrip
     let json = attention_history
         .to_json()
         .expect("JSON serialization must succeed");
-    let restored = AttentionHistory::from_json(&json)
-        .expect("JSON deserialization must succeed");
+    let restored = AttentionHistory::from_json(&json).expect("JSON deserialization must succeed");
     assert_eq!(
         restored.len(),
         attention_history.len(),
@@ -1390,8 +1410,12 @@ fn test_stage_09_causal_discovery() {
     let mut enhancer = CausalLoopEnhancer::new(42);
 
     for i in 0..15 {
-        let input: Vec<f32> = (0..256).map(|d| (i as f32 * 0.1 + d as f32 * 0.01).sin()).collect();
-        let output: Vec<f32> = (0..256).map(|d| (i as f32 * 0.15 + d as f32 * 0.02).cos()).collect();
+        let input: Vec<f32> = (0..256)
+            .map(|d| (i as f32 * 0.1 + d as f32 * 0.01).sin())
+            .collect();
+        let output: Vec<f32> = (0..256)
+            .map(|d| (i as f32 * 0.15 + d as f32 * 0.02).cos())
+            .collect();
         enhancer.record_cycle_from_f32(&input, &output);
     }
     assert!(enhancer.history_size() == 15);
@@ -1466,7 +1490,11 @@ fn test_stage_14_attention_visualization() {
     );
 
     assert_eq!(snapshot.argmax(), Some(0));
-    assert!(snapshot.is_focused(), "Concentrated weights should be focused (entropy={:.4})", snapshot.attention_entropy());
+    assert!(
+        snapshot.is_focused(),
+        "Concentrated weights should be focused (entropy={:.4})",
+        snapshot.attention_entropy()
+    );
 
     let json = snapshot.to_json().unwrap();
     let restored = AttentionSnapshot::from_json(&json).unwrap();

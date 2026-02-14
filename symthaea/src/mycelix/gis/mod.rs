@@ -38,25 +38,25 @@
 //! }
 //! ```
 
-pub mod ignorance_types;
-pub mod uncertainty;
-pub mod dht;
-pub mod rashomon;
-pub mod zk_proofs;
-pub mod persistence;
-pub mod socratic;
-pub mod epistemic_mirror;
 pub mod curiosity;
+pub mod dht;
+pub mod epistemic_mirror;
+pub mod ignorance_types;
+pub mod persistence;
+pub mod rashomon;
+pub mod socratic;
+pub mod uncertainty;
+pub mod zk_proofs;
 
-pub use ignorance_types::*;
-pub use uncertainty::*;
-pub use dht::*;
-pub use rashomon::*;
-pub use zk_proofs::*;
-pub use persistence::*;
-pub use socratic::*;
-pub use epistemic_mirror::*;
 pub use curiosity::*;
+pub use dht::*;
+pub use epistemic_mirror::*;
+pub use ignorance_types::*;
+pub use persistence::*;
+pub use rashomon::*;
+pub use socratic::*;
+pub use uncertainty::*;
+pub use zk_proofs::*;
 
 // EpistemicClassification is available via crate::mycelix::types if needed
 use std::collections::HashMap;
@@ -150,7 +150,10 @@ impl GracefulIgnoranceSystem {
     /// Publish ignorance to Dark Spot DHT
     ///
     /// Creates a privacy-preserving signature and publishes to the DHT.
-    pub fn publish_ignorance(&mut self, detection: &IgnoranceDetection) -> Result<ZKIgnoranceSignature, GISError> {
+    pub fn publish_ignorance(
+        &mut self,
+        detection: &IgnoranceDetection,
+    ) -> Result<ZKIgnoranceSignature, GISError> {
         // Only publish if EIG is above threshold
         if detection.eig < self.config.publish_eig_threshold {
             return Err(GISError::EIGBelowThreshold {
@@ -192,7 +195,8 @@ impl GracefulIgnoranceSystem {
             IgnoranceType::KnownUnknown => GracefulResponse::Uncertain {
                 confidence: 0.3,
                 uncertainty_breakdown: detection.uncertainty,
-                caveat: "This is a known unknown - the answer exists but I don't have it".to_string(),
+                caveat: "This is a known unknown - the answer exists but I don't have it"
+                    .to_string(),
             },
 
             IgnoranceType::Unknown => GracefulResponse::Unknown {
@@ -213,7 +217,9 @@ impl GracefulIgnoranceSystem {
 
     /// Request active resolution of ignorance
     pub fn request_resolution(&mut self, id: &str) -> Result<ResolutionRequest, GISError> {
-        let record = self.ignorance_records.get_mut(id)
+        let record = self
+            .ignorance_records
+            .get_mut(id)
             .ok_or_else(|| GISError::NotFound(id.to_string()))?;
 
         if record.status != IgnoranceStatus::Active {
@@ -252,9 +258,11 @@ impl GracefulIgnoranceSystem {
 
         stats.total_count = self.ignorance_records.len();
         stats.average_eig = if stats.total_count > 0 {
-            self.ignorance_records.values()
+            self.ignorance_records
+                .values()
                 .map(|r| r.detection.eig)
-                .sum::<f32>() / stats.total_count as f32
+                .sum::<f32>()
+                / stats.total_count as f32
         } else {
             0.0
         };
@@ -300,7 +308,12 @@ impl GracefulIgnoranceSystem {
         }
     }
 
-    fn calculate_eig(&self, _query: &str, ignorance_type: &IgnoranceType, uncertainty: &Uncertainty3D) -> f32 {
+    fn calculate_eig(
+        &self,
+        _query: &str,
+        ignorance_type: &IgnoranceType,
+        uncertainty: &Uncertainty3D,
+    ) -> f32 {
         // Expected Information Gain = Potential value × Likelihood of resolution
         let potential_value = match ignorance_type {
             IgnoranceType::None => 0.0,
@@ -433,8 +446,14 @@ pub enum GracefulResponse {
 #[derive(Debug)]
 pub enum GISError {
     NotFound(String),
-    EIGBelowThreshold { actual: f32, required: f32 },
-    InvalidStatus { current: IgnoranceStatus, required: IgnoranceStatus },
+    EIGBelowThreshold {
+        actual: f32,
+        required: f32,
+    },
+    InvalidStatus {
+        current: IgnoranceStatus,
+        required: IgnoranceStatus,
+    },
     DHTError(String),
     CryptoError(String),
 }
@@ -443,10 +462,12 @@ impl std::fmt::Display for GISError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NotFound(id) => write!(f, "Ignorance record not found: {}", id),
-            Self::EIGBelowThreshold { actual, required } =>
-                write!(f, "EIG {} below threshold {}", actual, required),
-            Self::InvalidStatus { current, required } =>
-                write!(f, "Invalid status: {:?}, required: {:?}", current, required),
+            Self::EIGBelowThreshold { actual, required } => {
+                write!(f, "EIG {} below threshold {}", actual, required)
+            }
+            Self::InvalidStatus { current, required } => {
+                write!(f, "Invalid status: {:?}, required: {:?}", current, required)
+            }
             Self::DHTError(msg) => write!(f, "DHT error: {}", msg),
             Self::CryptoError(msg) => write!(f, "Crypto error: {}", msg),
         }

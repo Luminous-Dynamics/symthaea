@@ -7,13 +7,13 @@
 //!
 //! Run with: cargo run --example voice_demo
 
-use symthaea::voice::{
-    ArticulatorySynthesizer, FormantVocoder, LTCPacing,
-    RapSynthesizer, RapConfig, FlowStyle, SimplePhonemeDict, PhonemeDict,
-};
 use std::fs::File;
-use std::io::{Write, BufWriter};
+use std::io::{BufWriter, Write};
 use std::path::Path;
+use symthaea::voice::{
+    ArticulatorySynthesizer, FlowStyle, FormantVocoder, LTCPacing, PhonemeDict, RapConfig,
+    RapSynthesizer, SimplePhonemeDict,
+};
 
 fn main() {
     println!("=== Symthaea Voice Synthesis Demo ===\n");
@@ -52,7 +52,12 @@ fn demo_basic_synthesis(output_dir: &Path) {
 
     let path = output_dir.join("hello_world.wav");
     write_wav(&path, &samples, 24000);
-    println!("  Written: {} ({:.2}s, {} samples)", path.display(), samples.len() as f32 / 24000.0, samples.len());
+    println!(
+        "  Written: {} ({:.2}s, {} samples)",
+        path.display(),
+        samples.len() as f32 / 24000.0,
+        samples.len()
+    );
 
     // Synthesize vowel sequence
     let vowels = "AA EH IY OW UW";
@@ -64,7 +69,11 @@ fn demo_basic_synthesis(output_dir: &Path) {
 
     let path = output_dir.join("vowels.wav");
     write_wav(&path, &samples, 24000);
-    println!("  Written: {} ({:.2}s)", path.display(), samples.len() as f32 / 24000.0);
+    println!(
+        "  Written: {} ({:.2}s)",
+        path.display(),
+        samples.len() as f32 / 24000.0
+    );
 }
 
 /// Demo different emotional pacing states
@@ -85,8 +94,10 @@ fn demo_emotional_pacing(output_dir: &Path) {
     ];
 
     for (name, pacing) in &emotions {
-        println!("  Synthesizing with {} pacing (rate={:.2}, tau={:.2})",
-                 name, pacing.rate, pacing.tau);
+        println!(
+            "  Synthesizing with {} pacing (rate={:.2}, tau={:.2})",
+            name, pacing.rate, pacing.tau
+        );
 
         synth.reset();
         let frames = synth.synthesize_arpabet(phrase, pacing);
@@ -94,7 +105,11 @@ fn demo_emotional_pacing(output_dir: &Path) {
 
         let path = output_dir.join(format!("emotion_{}.wav", name));
         write_wav(&path, &samples, 24000);
-        println!("  Written: {} ({:.2}s)", path.display(), samples.len() as f32 / 24000.0);
+        println!(
+            "  Written: {} ({:.2}s)",
+            path.display(),
+            samples.len() as f32 / 24000.0
+        );
     }
 }
 
@@ -127,16 +142,22 @@ fn demo_rap_synthesis(output_dir: &Path) {
         let mut verse = rap.parse_lyrics(lyrics, &dict);
         rap.analyze_rhymes(&mut verse);
 
-        println!("    Verse: {} lines, {} syllables, {} bars",
-                 verse.lines.len(), verse.total_syllables, verse.bar_count);
+        println!(
+            "    Verse: {} lines, {} syllables, {} bars",
+            verse.lines.len(),
+            verse.total_syllables,
+            verse.bar_count
+        );
 
         // Check rhyme detection
         for line in &verse.lines {
             if let Some(last_word) = line.words.last() {
                 if last_word.is_rhyme_word {
-                    println!("    Rhyme word: '{}' (score: {:.2})",
-                             last_word.text,
-                             last_word.rhyme_score.unwrap_or(0.0));
+                    println!(
+                        "    Rhyme word: '{}' (score: {:.2})",
+                        last_word.text,
+                        last_word.rhyme_score.unwrap_or(0.0)
+                    );
                 }
             }
         }
@@ -146,7 +167,11 @@ fn demo_rap_synthesis(output_dir: &Path) {
 
         let path = output_dir.join(format!("rap_{}.wav", name));
         write_wav(&path, &samples, 24000);
-        println!("    Written: {} ({:.2}s)", path.display(), samples.len() as f32 / 24000.0);
+        println!(
+            "    Written: {} ({:.2}s)",
+            path.display(),
+            samples.len() as f32 / 24000.0
+        );
     }
 
     // Demo beat timing
@@ -155,7 +180,10 @@ fn demo_rap_synthesis(output_dir: &Path) {
     println!("    BPM: {}", rap.config().bpm);
     println!("    Beat duration: {:.3}s", rap.beat_sync().beat_duration());
     println!("    Bar duration: {:.3}s", rap.beat_sync().bar_duration());
-    println!("    16th note: {:.3}s", rap.beat_sync().sixteenth_duration());
+    println!(
+        "    16th note: {:.3}s",
+        rap.beat_sync().sixteenth_duration()
+    );
 }
 
 /// Write samples to a WAV file
@@ -177,11 +205,11 @@ fn write_wav(path: &Path, samples: &[f32], sample_rate: u32) {
     // fmt chunk
     writer.write_all(b"fmt ").unwrap();
     writer.write_all(&16u32.to_le_bytes()).unwrap(); // chunk size
-    writer.write_all(&1u16.to_le_bytes()).unwrap();  // PCM format
-    writer.write_all(&1u16.to_le_bytes()).unwrap();  // mono
+    writer.write_all(&1u16.to_le_bytes()).unwrap(); // PCM format
+    writer.write_all(&1u16.to_le_bytes()).unwrap(); // mono
     writer.write_all(&sample_rate.to_le_bytes()).unwrap();
     writer.write_all(&byte_rate.to_le_bytes()).unwrap();
-    writer.write_all(&2u16.to_le_bytes()).unwrap();  // block align
+    writer.write_all(&2u16.to_le_bytes()).unwrap(); // block align
     writer.write_all(&16u16.to_le_bytes()).unwrap(); // bits per sample
 
     // data chunk

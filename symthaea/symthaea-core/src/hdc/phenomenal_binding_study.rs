@@ -314,9 +314,9 @@ impl PhenomenalBindingStudy {
         self.seed_counter += 1;
 
         // Use concept hash for additional determinism
-        let concept_hash: u64 = concept.bytes().fold(0u64, |acc, b| {
-            acc.wrapping_mul(31).wrapping_add(b as u64)
-        });
+        let concept_hash: u64 = concept
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
 
         let hv = BinaryHV::random(seed.wrapping_add(concept_hash));
         self.vocabulary.insert(concept.to_string(), hv);
@@ -381,8 +381,14 @@ impl PhenomenalBindingStudy {
     }
 
     /// Run the full experiment on all pairs
-    pub fn run_experiment(&self, pairs: &[ConceptPairWithVectors]) -> Vec<OperationComparisonResult> {
-        pairs.iter().map(|pair| self.compare_operations(pair)).collect()
+    pub fn run_experiment(
+        &self,
+        pairs: &[ConceptPairWithVectors],
+    ) -> Vec<OperationComparisonResult> {
+        pairs
+            .iter()
+            .map(|pair| self.compare_operations(pair))
+            .collect()
     }
 
     /// Perform 2x2 ANOVA analysis
@@ -499,7 +505,11 @@ impl PhenomenalBindingStudy {
     }
 
     /// Generate summary report of experiment results
-    pub fn generate_report(&self, results: &[OperationComparisonResult], anova: &AnovaResult) -> String {
+    pub fn generate_report(
+        &self,
+        results: &[OperationComparisonResult],
+        anova: &AnovaResult,
+    ) -> String {
         let mut report = String::new();
 
         report.push_str("=== Phenomenal Binding Study Report ===\n\n");
@@ -541,7 +551,11 @@ impl PhenomenalBindingStudy {
         report.push_str(&format!("  F-statistic: {:.4}\n", anova.f_interaction));
         report.push_str(&format!(
             "  Significant (p < 0.05): {}\n\n",
-            if anova.interaction_significant { "Yes" } else { "No" }
+            if anova.interaction_significant {
+                "Yes"
+            } else {
+                "No"
+            }
         ));
 
         // Effect sizes
@@ -562,29 +576,15 @@ impl PhenomenalBindingStudy {
         // Interpretation
         report.push_str("Interpretation:\n");
         if anova.interaction_significant && anova.interaction_effect > 0.0 {
-            report.push_str(
-                "  The interaction effect is SIGNIFICANT and POSITIVE.\n"
-            );
-            report.push_str(
-                "  Binding provides a larger unity advantage for unified pairs\n"
-            );
-            report.push_str(
-                "  than for separate pairs. This supports hypothesis H2.\n"
-            );
+            report.push_str("  The interaction effect is SIGNIFICANT and POSITIVE.\n");
+            report.push_str("  Binding provides a larger unity advantage for unified pairs\n");
+            report.push_str("  than for separate pairs. This supports hypothesis H2.\n");
         } else if anova.interaction_significant && anova.interaction_effect < 0.0 {
-            report.push_str(
-                "  The interaction effect is SIGNIFICANT but NEGATIVE.\n"
-            );
-            report.push_str(
-                "  Contrary to H2, binding provides more unity for separate pairs.\n"
-            );
+            report.push_str("  The interaction effect is SIGNIFICANT but NEGATIVE.\n");
+            report.push_str("  Contrary to H2, binding provides more unity for separate pairs.\n");
         } else {
-            report.push_str(
-                "  The interaction effect is NOT significant.\n"
-            );
-            report.push_str(
-                "  Binding's unity advantage does not depend on pair type.\n"
-            );
+            report.push_str("  The interaction effect is NOT significant.\n");
+            report.push_str("  Binding's unity advantage does not depend on pair type.\n");
         }
 
         report
@@ -736,19 +736,17 @@ mod tests {
     fn test_generate_report() {
         let study = PhenomenalBindingStudy::new();
 
-        let results = vec![
-            OperationComparisonResult {
-                pair_id: "1".to_string(),
-                pair_type: PairType::Unified,
-                bind_unity: 0.8,
-                bundle_unity: 0.5,
-                unity_advantage: 0.3,
-                bind_betti: BettiNumbers::new(1, 0, 0),
-                bundle_betti: BettiNumbers::new(2, 0, 0),
-                bind_quality: 0.8,
-                bundle_quality: 0.6,
-            },
-        ];
+        let results = vec![OperationComparisonResult {
+            pair_id: "1".to_string(),
+            pair_type: PairType::Unified,
+            bind_unity: 0.8,
+            bundle_unity: 0.5,
+            unity_advantage: 0.3,
+            bind_betti: BettiNumbers::new(1, 0, 0),
+            bundle_betti: BettiNumbers::new(2, 0, 0),
+            bind_quality: 0.8,
+            bundle_quality: 0.6,
+        }];
 
         let anova = study.analyze_anova(&results);
         let report = study.generate_report(&results, &anova);

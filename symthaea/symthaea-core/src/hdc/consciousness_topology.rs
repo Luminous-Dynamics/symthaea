@@ -281,7 +281,7 @@ impl BettiNumbers {
 
 impl Default for BettiNumbers {
     fn default() -> Self {
-        Self::new(1, 0, 0)  // Unified, no cycles, no voids
+        Self::new(1, 0, 0) // Unified, no cycles, no voids
     }
 }
 
@@ -423,12 +423,11 @@ impl ConsciousnessTopology {
         // Compute quality metrics
         let num_states = self.states.len();
         let unity_score = 1.0 / betti.beta_0 as f64;
-        let circularity = (betti.beta_1 as f64 / num_states as f64).min(1.0);  // Clamp to [0,1]
+        let circularity = (betti.beta_1 as f64 / num_states as f64).min(1.0); // Clamp to [0,1]
         let completeness = 1.0 - (betti.beta_2 as f64 / num_states as f64).min(1.0);
 
         // Overall quality (weighted average)
-        let quality = (unity_score * 0.5 + (1.0 - circularity) * 0.3 + completeness * 0.2)
-            .min(1.0);
+        let quality = (unity_score * 0.5 + (1.0 - circularity) * 0.3 + completeness * 0.2).min(1.0);
 
         // Generate explanation
         let explanation = self.generate_explanation(&betti, unity_score, circularity, completeness);
@@ -581,7 +580,7 @@ impl ConsciousnessTopology {
                         features.push(PersistentFeature::new(
                             TopologicalFeature::Component,
                             scale,
-                            self.config.max_scale,  // Assume persists to end
+                            self.config.max_scale, // Assume persists to end
                         ));
                     }
                 }
@@ -652,7 +651,9 @@ impl ConsciousnessTopology {
         } else {
             parts.push(format!(
                 "{} circular patterns (β₁={}, {:.1}% circularity)",
-                betti.beta_1, betti.beta_1, circularity * 100.0
+                betti.beta_1,
+                betti.beta_1,
+                circularity * 100.0
             ));
         }
 
@@ -662,7 +663,9 @@ impl ConsciousnessTopology {
         } else {
             parts.push(format!(
                 "{} conceptual voids (β₂={}, {:.1}% completeness)",
-                betti.beta_2, betti.beta_2, completeness * 100.0
+                betti.beta_2,
+                betti.beta_2,
+                completeness * 100.0
             ));
         }
 
@@ -724,7 +727,7 @@ mod tests {
     #[test]
     fn test_persistent_feature() {
         let feature = PersistentFeature::new(TopologicalFeature::Component, 0.2, 0.8);
-        assert!((feature.persistence - 0.6).abs() < 1e-10);  // Floating point tolerance
+        assert!((feature.persistence - 0.6).abs() < 1e-10); // Floating point tolerance
         assert!(feature.is_significant(0.5));
         assert!(!feature.is_significant(0.7));
     }
@@ -773,7 +776,7 @@ mod tests {
             topology.add_state(state);
         }
 
-        let assessment = topology.analyze(0.3);  // Low threshold = more connections
+        let assessment = topology.analyze(0.3); // Low threshold = more connections
 
         // Should be mostly unified
         assert!(assessment.betti.beta_0 <= topology.num_states());
@@ -786,11 +789,11 @@ mod tests {
 
         // Add very different states (should form multiple components)
         for i in 0..10 {
-            let state = BinaryHV::random((1000 + i * 1000) as u64);  // Very different seeds
+            let state = BinaryHV::random((1000 + i * 1000) as u64); // Very different seeds
             topology.add_state(state);
         }
 
-        let assessment = topology.analyze(0.9);  // High threshold = fewer connections
+        let assessment = topology.analyze(0.9); // High threshold = fewer connections
 
         // Should detect fragmentation
         assert!(assessment.betti.beta_0 >= 1);
@@ -865,8 +868,8 @@ mod tests {
     /// when analyzed with topological data analysis.
     #[test]
     fn test_phenomenal_vs_functional_topology() {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         // Helper to create deterministic HV from concept string
         fn concept_to_hv(concept: &str) -> BinaryHV {
@@ -1018,27 +1021,32 @@ mod tests {
 
         println!("PHENOMENAL CONCEPTS:");
         println!("  Unity score: {:.4}", phenomenal_assessment.unity_score);
-        println!("  Betti numbers: β₀={}, β₁={}, β₂={}",
-                 phenomenal_assessment.betti.beta_0,
-                 phenomenal_assessment.betti.beta_1,
-                 phenomenal_assessment.betti.beta_2);
+        println!(
+            "  Betti numbers: β₀={}, β₁={}, β₂={}",
+            phenomenal_assessment.betti.beta_0,
+            phenomenal_assessment.betti.beta_1,
+            phenomenal_assessment.betti.beta_2
+        );
         println!("  Circularity: {:.4}", phenomenal_assessment.circularity);
         println!("  Completeness: {:.4}", phenomenal_assessment.completeness);
         println!("  Quality: {:.4}", phenomenal_assessment.quality);
 
         println!("\nFUNCTIONAL CONCEPTS:");
         println!("  Unity score: {:.4}", functional_assessment.unity_score);
-        println!("  Betti numbers: β₀={}, β₁={}, β₂={}",
-                 functional_assessment.betti.beta_0,
-                 functional_assessment.betti.beta_1,
-                 functional_assessment.betti.beta_2);
+        println!(
+            "  Betti numbers: β₀={}, β₁={}, β₂={}",
+            functional_assessment.betti.beta_0,
+            functional_assessment.betti.beta_1,
+            functional_assessment.betti.beta_2
+        );
         println!("  Circularity: {:.4}", functional_assessment.circularity);
         println!("  Completeness: {:.4}", functional_assessment.completeness);
         println!("  Quality: {:.4}", functional_assessment.quality);
 
         // Calculate difference metrics
         let unity_diff = phenomenal_assessment.unity_score - functional_assessment.unity_score;
-        let beta0_diff = phenomenal_assessment.betti.beta_0 as i64 - functional_assessment.betti.beta_0 as i64;
+        let beta0_diff =
+            phenomenal_assessment.betti.beta_0 as i64 - functional_assessment.betti.beta_0 as i64;
 
         println!("\nDIFFERENCES:");
         println!("  Unity score diff: {:.4} (P - F)", unity_diff);
@@ -1064,8 +1072,8 @@ mod tests {
     /// humans report as phenomenally unified.
     #[test]
     fn test_phenomenal_binding_hypothesis() {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         // Helper to create deterministic HV from concept string
         fn concept_to_hv(concept: &str) -> BinaryHV {
@@ -1082,123 +1090,126 @@ mod tests {
         // Unified phenomenal pairs (humans report as single experience) - 50+ pairs
         let unified_pairs = vec![
             // Visual-object unity
-            ("red", "apple"),           // "red apple" - unified percept
-            ("blue", "sky"),            // "blue sky" - seamless unity
-            ("green", "leaf"),          // "green leaf" - natural unity
-            ("golden", "sunset"),       // "golden sunset" - merged
-            ("silver", "moonlight"),    // "silver moonlight" - unified
-            ("white", "snow"),          // "white snow" - inherent
-            ("black", "night"),         // "black night" - inseparable
-            ("orange", "flame"),        // "orange flame" - unified glow
-            ("pink", "blossom"),        // "pink blossom" - natural
-            ("purple", "grape"),        // "purple grape" - unified
+            ("red", "apple"),        // "red apple" - unified percept
+            ("blue", "sky"),         // "blue sky" - seamless unity
+            ("green", "leaf"),       // "green leaf" - natural unity
+            ("golden", "sunset"),    // "golden sunset" - merged
+            ("silver", "moonlight"), // "silver moonlight" - unified
+            ("white", "snow"),       // "white snow" - inherent
+            ("black", "night"),      // "black night" - inseparable
+            ("orange", "flame"),     // "orange flame" - unified glow
+            ("pink", "blossom"),     // "pink blossom" - natural
+            ("purple", "grape"),     // "purple grape" - unified
             // Sound-event unity
-            ("loud", "crash"),          // "loud crash" - unified event
-            ("soft", "whisper"),        // "soft whisper" - unified
-            ("sharp", "scream"),        // "sharp scream" - unified
-            ("deep", "rumble"),         // "deep rumble" - unified
-            ("high", "shriek"),         // "high shriek" - unified
-            ("gentle", "murmur"),       // "gentle murmur" - unified
-            ("rhythmic", "drumbeat"),   // "rhythmic drumbeat" - unified
-            ("melodic", "birdsong"),    // "melodic birdsong" - unified
-            ("crackling", "fire"),      // "crackling fire" - unified
-            ("rushing", "waterfall"),   // "rushing waterfall" - unified
+            ("loud", "crash"),        // "loud crash" - unified event
+            ("soft", "whisper"),      // "soft whisper" - unified
+            ("sharp", "scream"),      // "sharp scream" - unified
+            ("deep", "rumble"),       // "deep rumble" - unified
+            ("high", "shriek"),       // "high shriek" - unified
+            ("gentle", "murmur"),     // "gentle murmur" - unified
+            ("rhythmic", "drumbeat"), // "rhythmic drumbeat" - unified
+            ("melodic", "birdsong"),  // "melodic birdsong" - unified
+            ("crackling", "fire"),    // "crackling fire" - unified
+            ("rushing", "waterfall"), // "rushing waterfall" - unified
             // Touch-sensation unity
-            ("warm", "sunlight"),       // "warm sunlight" - unified sensation
-            ("soft", "fur"),            // "soft fur" - unified texture
-            ("cool", "breeze"),         // "cool breeze" - unified
-            ("smooth", "silk"),         // "smooth silk" - unified
-            ("rough", "bark"),          // "rough bark" - unified
-            ("wet", "rain"),            // "wet rain" - unified
-            ("cold", "ice"),            // "cold ice" - unified
-            ("hot", "sand"),            // "hot sand" - unified
-            ("prickly", "cactus"),      // "prickly cactus" - unified
-            ("velvety", "petal"),       // "velvety petal" - unified
+            ("warm", "sunlight"),  // "warm sunlight" - unified sensation
+            ("soft", "fur"),       // "soft fur" - unified texture
+            ("cool", "breeze"),    // "cool breeze" - unified
+            ("smooth", "silk"),    // "smooth silk" - unified
+            ("rough", "bark"),     // "rough bark" - unified
+            ("wet", "rain"),       // "wet rain" - unified
+            ("cold", "ice"),       // "cold ice" - unified
+            ("hot", "sand"),       // "hot sand" - unified
+            ("prickly", "cactus"), // "prickly cactus" - unified
+            ("velvety", "petal"),  // "velvety petal" - unified
             // Taste-substance unity
-            ("sweet", "honey"),         // "sweet honey" - unified taste
-            ("sour", "lemon"),          // "sour lemon" - unified
-            ("bitter", "coffee"),       // "bitter coffee" - unified
-            ("salty", "ocean"),         // "salty ocean" - unified
-            ("spicy", "chili"),         // "spicy chili" - unified
-            ("fresh", "mint"),          // "fresh mint" - unified
-            ("rich", "chocolate"),      // "rich chocolate" - unified
-            ("tangy", "citrus"),        // "tangy citrus" - unified
-            ("savory", "broth"),        // "savory broth" - unified
-            ("creamy", "butter"),       // "creamy butter" - unified
+            ("sweet", "honey"),    // "sweet honey" - unified taste
+            ("sour", "lemon"),     // "sour lemon" - unified
+            ("bitter", "coffee"),  // "bitter coffee" - unified
+            ("salty", "ocean"),    // "salty ocean" - unified
+            ("spicy", "chili"),    // "spicy chili" - unified
+            ("fresh", "mint"),     // "fresh mint" - unified
+            ("rich", "chocolate"), // "rich chocolate" - unified
+            ("tangy", "citrus"),   // "tangy citrus" - unified
+            ("savory", "broth"),   // "savory broth" - unified
+            ("creamy", "butter"),  // "creamy butter" - unified
             // Smell-source unity
-            ("fragrant", "rose"),       // "fragrant rose" - unified
-            ("pungent", "garlic"),      // "pungent garlic" - unified
-            ("smoky", "campfire"),      // "smoky campfire" - unified
-            ("earthy", "mushroom"),     // "earthy mushroom" - unified
-            ("floral", "jasmine"),      // "floral jasmine" - unified
-            ("woody", "cedar"),         // "woody cedar" - unified
-            ("fresh", "laundry"),       // "fresh laundry" - unified
-            ("musky", "forest"),        // "musky forest" - unified
-            ("citrus", "orange"),       // "citrus orange" - unified
-            ("herbal", "basil"),        // "herbal basil" - unified
+            ("fragrant", "rose"),   // "fragrant rose" - unified
+            ("pungent", "garlic"),  // "pungent garlic" - unified
+            ("smoky", "campfire"),  // "smoky campfire" - unified
+            ("earthy", "mushroom"), // "earthy mushroom" - unified
+            ("floral", "jasmine"),  // "floral jasmine" - unified
+            ("woody", "cedar"),     // "woody cedar" - unified
+            ("fresh", "laundry"),   // "fresh laundry" - unified
+            ("musky", "forest"),    // "musky forest" - unified
+            ("citrus", "orange"),   // "citrus orange" - unified
+            ("herbal", "basil"),    // "herbal basil" - unified
         ];
 
         // Co-occurring but separate pairs (two distinct experiences) - 50+ pairs
         let separate_pairs = vec![
             // Color and container/location
-            ("red", "mailbox"),         // Red mailbox - two separate things
-            ("blue", "building"),       // Blue building - separable
-            ("green", "fence"),         // Green fence - separable
-            ("yellow", "sign"),         // Yellow sign - separable
-            ("white", "wall"),          // White wall - separable
-            ("black", "car"),           // Black car - separable
-            ("orange", "cone"),         // Orange cone - separable
-            ("pink", "house"),          // Pink house - separable
-            ("gray", "pavement"),       // Gray pavement - separable
-            ("brown", "box"),           // Brown box - separable
+            ("red", "mailbox"),   // Red mailbox - two separate things
+            ("blue", "building"), // Blue building - separable
+            ("green", "fence"),   // Green fence - separable
+            ("yellow", "sign"),   // Yellow sign - separable
+            ("white", "wall"),    // White wall - separable
+            ("black", "car"),     // Black car - separable
+            ("orange", "cone"),   // Orange cone - separable
+            ("pink", "house"),    // Pink house - separable
+            ("gray", "pavement"), // Gray pavement - separable
+            ("brown", "box"),     // Brown box - separable
             // Sound and background
-            ("loud", "background"),     // Loud background - separable
-            ("soft", "environment"),    // Soft environment - separable
-            ("sharp", "setting"),       // Sharp setting - separable
-            ("deep", "context"),        // Deep context - separable
-            ("high", "atmosphere"),     // High atmosphere - separable
-            ("quiet", "office"),        // Quiet office - separable
-            ("noisy", "street"),        // Noisy street - separable
-            ("silent", "library"),      // Silent library - separable
-            ("echoing", "hall"),        // Echoing hall - separable
-            ("muffled", "room"),        // Muffled room - separable
+            ("loud", "background"),  // Loud background - separable
+            ("soft", "environment"), // Soft environment - separable
+            ("sharp", "setting"),    // Sharp setting - separable
+            ("deep", "context"),     // Deep context - separable
+            ("high", "atmosphere"),  // High atmosphere - separable
+            ("quiet", "office"),     // Quiet office - separable
+            ("noisy", "street"),     // Noisy street - separable
+            ("silent", "library"),   // Silent library - separable
+            ("echoing", "hall"),     // Echoing hall - separable
+            ("muffled", "room"),     // Muffled room - separable
             // Touch and space
-            ("warm", "room"),           // Warm room - object + property
-            ("soft", "carpet"),         // Soft carpet - less tightly bound
-            ("cool", "basement"),       // Cool basement - separable
-            ("smooth", "floor"),        // Smooth floor - separable
-            ("rough", "concrete"),      // Rough concrete - separable
-            ("wet", "bathroom"),        // Wet bathroom - separable
-            ("cold", "garage"),         // Cold garage - separable
-            ("hot", "attic"),           // Hot attic - separable
-            ("bumpy", "road"),          // Bumpy road - separable
-            ("slippery", "tile"),       // Slippery tile - separable
+            ("warm", "room"),      // Warm room - object + property
+            ("soft", "carpet"),    // Soft carpet - less tightly bound
+            ("cool", "basement"),  // Cool basement - separable
+            ("smooth", "floor"),   // Smooth floor - separable
+            ("rough", "concrete"), // Rough concrete - separable
+            ("wet", "bathroom"),   // Wet bathroom - separable
+            ("cold", "garage"),    // Cold garage - separable
+            ("hot", "attic"),      // Hot attic - separable
+            ("bumpy", "road"),     // Bumpy road - separable
+            ("slippery", "tile"),  // Slippery tile - separable
             // Taste and container
-            ("sweet", "jar"),           // Sweet jar - container vs contents
-            ("sour", "bottle"),         // Sour bottle - separable
-            ("bitter", "cup"),          // Bitter cup - separable
-            ("salty", "shaker"),        // Salty shaker - separable
-            ("spicy", "bowl"),          // Spicy bowl - separable
-            ("fresh", "container"),     // Fresh container - separable
-            ("rich", "plate"),          // Rich plate - separable
-            ("tangy", "package"),       // Tangy package - separable
-            ("savory", "pot"),          // Savory pot - separable
-            ("bland", "dish"),          // Bland dish - separable
+            ("sweet", "jar"),       // Sweet jar - container vs contents
+            ("sour", "bottle"),     // Sour bottle - separable
+            ("bitter", "cup"),      // Bitter cup - separable
+            ("salty", "shaker"),    // Salty shaker - separable
+            ("spicy", "bowl"),      // Spicy bowl - separable
+            ("fresh", "container"), // Fresh container - separable
+            ("rich", "plate"),      // Rich plate - separable
+            ("tangy", "package"),   // Tangy package - separable
+            ("savory", "pot"),      // Savory pot - separable
+            ("bland", "dish"),      // Bland dish - separable
             // Smell and location
-            ("fragrant", "shop"),       // Fragrant shop - separable
-            ("pungent", "kitchen"),     // Pungent kitchen - separable
-            ("smoky", "restaurant"),    // Smoky restaurant - separable
-            ("earthy", "garden"),       // Earthy garden - separable
-            ("floral", "store"),        // Floral store - separable
-            ("woody", "cabin"),         // Woody cabin - separable
-            ("fresh", "laundromat"),    // Fresh laundromat - separable
-            ("stale", "basement"),      // Stale basement - separable
-            ("musty", "attic"),         // Musty attic - separable
-            ("clean", "hospital"),      // Clean hospital - separable
+            ("fragrant", "shop"),    // Fragrant shop - separable
+            ("pungent", "kitchen"),  // Pungent kitchen - separable
+            ("smoky", "restaurant"), // Smoky restaurant - separable
+            ("earthy", "garden"),    // Earthy garden - separable
+            ("floral", "store"),     // Floral store - separable
+            ("woody", "cabin"),      // Woody cabin - separable
+            ("fresh", "laundromat"), // Fresh laundromat - separable
+            ("stale", "basement"),   // Stale basement - separable
+            ("musty", "attic"),      // Musty attic - separable
+            ("clean", "hospital"),   // Clean hospital - separable
         ];
 
-        println!("Testing {} unified pairs and {} separate pairs\n",
-                 unified_pairs.len(), separate_pairs.len());
+        println!(
+            "Testing {} unified pairs and {} separate pairs\n",
+            unified_pairs.len(),
+            separate_pairs.len()
+        );
 
         // Results containers
         let mut unified_bind_unity = Vec::new();
@@ -1235,8 +1246,10 @@ mod tests {
             unified_bind_unity.push(bind_assess.unity_score);
             unified_bundle_unity.push(bundle_assess.unity_score);
 
-            println!("  {} + {}: bind_unity={:.3}, bundle_unity={:.3}",
-                     a, b, bind_assess.unity_score, bundle_assess.unity_score);
+            println!(
+                "  {} + {}: bind_unity={:.3}, bundle_unity={:.3}",
+                a, b, bind_assess.unity_score, bundle_assess.unity_score
+            );
         }
 
         // Test separate pairs
@@ -1264,15 +1277,21 @@ mod tests {
             separate_bind_unity.push(bind_assess.unity_score);
             separate_bundle_unity.push(bundle_assess.unity_score);
 
-            println!("  {} + {}: bind_unity={:.3}, bundle_unity={:.3}",
-                     a, b, bind_assess.unity_score, bundle_assess.unity_score);
+            println!(
+                "  {} + {}: bind_unity={:.3}, bundle_unity={:.3}",
+                a, b, bind_assess.unity_score, bundle_assess.unity_score
+            );
         }
 
         // Calculate means
-        let mean_unified_bind: f64 = unified_bind_unity.iter().sum::<f64>() / unified_bind_unity.len() as f64;
-        let mean_unified_bundle: f64 = unified_bundle_unity.iter().sum::<f64>() / unified_bundle_unity.len() as f64;
-        let mean_separate_bind: f64 = separate_bind_unity.iter().sum::<f64>() / separate_bind_unity.len() as f64;
-        let mean_separate_bundle: f64 = separate_bundle_unity.iter().sum::<f64>() / separate_bundle_unity.len() as f64;
+        let mean_unified_bind: f64 =
+            unified_bind_unity.iter().sum::<f64>() / unified_bind_unity.len() as f64;
+        let mean_unified_bundle: f64 =
+            unified_bundle_unity.iter().sum::<f64>() / unified_bundle_unity.len() as f64;
+        let mean_separate_bind: f64 =
+            separate_bind_unity.iter().sum::<f64>() / separate_bind_unity.len() as f64;
+        let mean_separate_bundle: f64 =
+            separate_bundle_unity.iter().sum::<f64>() / separate_bundle_unity.len() as f64;
 
         println!("\n════════════════════════════════════════");
         println!("SUMMARY STATISTICS");
@@ -1281,20 +1300,37 @@ mod tests {
         println!("┌────────────┬────────────┬────────────┐");
         println!("│            │ BIND (⊗)   │ BUNDLE (⊕) │");
         println!("├────────────┼────────────┼────────────┤");
-        println!("│ UNIFIED    │   {:.4}   │   {:.4}   │", mean_unified_bind, mean_unified_bundle);
-        println!("│ SEPARATE   │   {:.4}   │   {:.4}   │", mean_separate_bind, mean_separate_bundle);
+        println!(
+            "│ UNIFIED    │   {:.4}   │   {:.4}   │",
+            mean_unified_bind, mean_unified_bundle
+        );
+        println!(
+            "│ SEPARATE   │   {:.4}   │   {:.4}   │",
+            mean_separate_bind, mean_separate_bundle
+        );
         println!("└────────────┴────────────┴────────────┘");
 
         // Interaction effect: Does binding specifically help unified pairs?
-        let bind_effect = (mean_unified_bind - mean_unified_bundle) - (mean_separate_bind - mean_separate_bundle);
+        let bind_effect =
+            (mean_unified_bind - mean_unified_bundle) - (mean_separate_bind - mean_separate_bundle);
 
         println!("\n2×2 ANOVA-style Analysis:");
-        println!("  Binding main effect: {:.4}", (mean_unified_bind + mean_separate_bind) / 2.0 - (mean_unified_bundle + mean_separate_bundle) / 2.0);
-        println!("  Pair type main effect: {:.4}", (mean_unified_bind + mean_unified_bundle) / 2.0 - (mean_separate_bind + mean_separate_bundle) / 2.0);
+        println!(
+            "  Binding main effect: {:.4}",
+            (mean_unified_bind + mean_separate_bind) / 2.0
+                - (mean_unified_bundle + mean_separate_bundle) / 2.0
+        );
+        println!(
+            "  Pair type main effect: {:.4}",
+            (mean_unified_bind + mean_unified_bundle) / 2.0
+                - (mean_separate_bind + mean_separate_bundle) / 2.0
+        );
         println!("  Interaction (H2 test): {:.4}", bind_effect);
 
         if bind_effect > 0.0 {
-            println!("\n✓ H2 SUPPORTED: Binding produces relatively higher unity for unified pairs");
+            println!(
+                "\n✓ H2 SUPPORTED: Binding produces relatively higher unity for unified pairs"
+            );
         } else {
             println!("\n✗ H2 NOT SUPPORTED: Interaction effect is negative or zero");
         }
@@ -1314,8 +1350,8 @@ mod tests {
     /// by splitting data into K folds and computing held-out metrics.
     #[test]
     fn test_h1_kfold_cross_validation() {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         const K: usize = 5; // 5-fold cross-validation
 
@@ -1331,43 +1367,109 @@ mod tests {
 
         // Full concept sets (same as H1 test)
         let phenomenal_concepts: Vec<&str> = vec![
-            "The redness of a sunset", "What it is like to see blue", "The vividness of green in spring",
-            "Brightness of morning light", "The experience of seeing yellow", "Perceiving depth in a landscape",
-            "The shimmer of moonlight on water", "Colors in a rainbow experience", "The quality of darkness in shadow",
-            "Visual experience of symmetry", "The qualia of sound", "Hearing a melody for the first time",
-            "The experience of silence", "Resonance of a bass note", "Sharpness of a high-pitched tone",
-            "The feeling of rhythm", "Experiencing dissonance vs harmony", "The subjective quality of thunder",
-            "Whispered voice heard close", "Experience of echoing sound", "The feeling of warmth",
-            "Subjective experience of pain", "The sensation of cold water", "Pressure on the skin",
-            "The tingle of a light touch", "Ache of muscle fatigue", "The feeling of wind on face",
-            "Proprioceptive awareness of limbs", "Sensation of breathing deeply", "The experience of itching",
-            "The taste of sweetness", "Experiencing bitterness", "The smell of rain on earth",
-            "Aroma of coffee experienced", "Sour taste experience", "Umami flavor sensation",
-            "The scent of a flower", "Metallic taste experience", "Experiencing minty freshness",
-            "The quality of smoky smell", "Phenomenal consciousness itself", "The experience of self-awareness",
-            "Unified field of awareness", "Inner subjective feeling", "The feeling of being present",
-            "Experiencing nostalgia", "The qualia of curiosity", "Feeling of anticipation",
-            "Subjective sense of time passing", "The experience of wonder",
+            "The redness of a sunset",
+            "What it is like to see blue",
+            "The vividness of green in spring",
+            "Brightness of morning light",
+            "The experience of seeing yellow",
+            "Perceiving depth in a landscape",
+            "The shimmer of moonlight on water",
+            "Colors in a rainbow experience",
+            "The quality of darkness in shadow",
+            "Visual experience of symmetry",
+            "The qualia of sound",
+            "Hearing a melody for the first time",
+            "The experience of silence",
+            "Resonance of a bass note",
+            "Sharpness of a high-pitched tone",
+            "The feeling of rhythm",
+            "Experiencing dissonance vs harmony",
+            "The subjective quality of thunder",
+            "Whispered voice heard close",
+            "Experience of echoing sound",
+            "The feeling of warmth",
+            "Subjective experience of pain",
+            "The sensation of cold water",
+            "Pressure on the skin",
+            "The tingle of a light touch",
+            "Ache of muscle fatigue",
+            "The feeling of wind on face",
+            "Proprioceptive awareness of limbs",
+            "Sensation of breathing deeply",
+            "The experience of itching",
+            "The taste of sweetness",
+            "Experiencing bitterness",
+            "The smell of rain on earth",
+            "Aroma of coffee experienced",
+            "Sour taste experience",
+            "Umami flavor sensation",
+            "The scent of a flower",
+            "Metallic taste experience",
+            "Experiencing minty freshness",
+            "The quality of smoky smell",
+            "Phenomenal consciousness itself",
+            "The experience of self-awareness",
+            "Unified field of awareness",
+            "Inner subjective feeling",
+            "The feeling of being present",
+            "Experiencing nostalgia",
+            "The qualia of curiosity",
+            "Feeling of anticipation",
+            "Subjective sense of time passing",
+            "The experience of wonder",
         ];
 
         let functional_concepts: Vec<&str> = vec![
-            "Recursive function evaluation", "Memory allocation algorithm", "Binary search implementation",
-            "Sorting algorithm complexity", "Hash table collision resolution", "Red-black tree balancing",
-            "Graph traversal algorithms", "Dynamic programming solution", "Greedy algorithm optimization",
-            "Divide and conquer strategy", "Database query optimization", "Network packet routing",
-            "Garbage collection cycles", "Thread synchronization primitive", "Memory management unit",
-            "File system indexing", "Process scheduling algorithm", "Virtual memory paging",
-            "Inter-process communication", "Socket connection handling", "Type inference in compilers",
-            "Compiler optimization passes", "Abstract syntax tree parsing", "Lexical analysis tokenization",
-            "Semantic analysis phase", "Register allocation algorithm", "Dead code elimination",
-            "Loop unrolling optimization", "Inline function expansion", "Constant folding transformation",
-            "Consensus protocol execution", "Leader election algorithm", "Distributed lock management",
-            "Message queue processing", "Load balancing strategy", "Cache invalidation protocol",
-            "Eventual consistency model", "Sharding strategy implementation", "Replication factor calculation",
-            "Partition tolerance handling", "Gradient descent optimization", "Backpropagation computation",
-            "Loss function minimization", "Weight matrix multiplication", "Activation function application",
-            "Batch normalization calculation", "Learning rate scheduling", "Regularization term computation",
-            "Cross-validation splitting", "Hyperparameter grid search",
+            "Recursive function evaluation",
+            "Memory allocation algorithm",
+            "Binary search implementation",
+            "Sorting algorithm complexity",
+            "Hash table collision resolution",
+            "Red-black tree balancing",
+            "Graph traversal algorithms",
+            "Dynamic programming solution",
+            "Greedy algorithm optimization",
+            "Divide and conquer strategy",
+            "Database query optimization",
+            "Network packet routing",
+            "Garbage collection cycles",
+            "Thread synchronization primitive",
+            "Memory management unit",
+            "File system indexing",
+            "Process scheduling algorithm",
+            "Virtual memory paging",
+            "Inter-process communication",
+            "Socket connection handling",
+            "Type inference in compilers",
+            "Compiler optimization passes",
+            "Abstract syntax tree parsing",
+            "Lexical analysis tokenization",
+            "Semantic analysis phase",
+            "Register allocation algorithm",
+            "Dead code elimination",
+            "Loop unrolling optimization",
+            "Inline function expansion",
+            "Constant folding transformation",
+            "Consensus protocol execution",
+            "Leader election algorithm",
+            "Distributed lock management",
+            "Message queue processing",
+            "Load balancing strategy",
+            "Cache invalidation protocol",
+            "Eventual consistency model",
+            "Sharding strategy implementation",
+            "Replication factor calculation",
+            "Partition tolerance handling",
+            "Gradient descent optimization",
+            "Backpropagation computation",
+            "Loss function minimization",
+            "Weight matrix multiplication",
+            "Activation function application",
+            "Batch normalization calculation",
+            "Learning rate scheduling",
+            "Regularization term computation",
+            "Cross-validation splitting",
+            "Hyperparameter grid search",
         ];
 
         let fold_size_p = phenomenal_concepts.len() / K;
@@ -1383,12 +1485,18 @@ mod tests {
             let test_end_f = test_start_f + fold_size_f;
 
             // Train sets (all but test fold)
-            let train_p: Vec<_> = phenomenal_concepts.iter().enumerate()
+            let train_p: Vec<_> = phenomenal_concepts
+                .iter()
+                .enumerate()
                 .filter(|(i, _)| *i < test_start_p || *i >= test_end_p)
-                .map(|(_, c)| *c).collect();
-            let train_f: Vec<_> = functional_concepts.iter().enumerate()
+                .map(|(_, c)| *c)
+                .collect();
+            let train_f: Vec<_> = functional_concepts
+                .iter()
+                .enumerate()
                 .filter(|(i, _)| *i < test_start_f || *i >= test_end_f)
-                .map(|(_, c)| *c).collect();
+                .map(|(_, c)| *c)
+                .collect();
 
             // Analyze train set topology
             let mut phenomenal_topology = ConsciousnessTopology::default();
@@ -1404,26 +1512,46 @@ mod tests {
             let functional_assessment = functional_topology.analyze(0.5);
 
             let diff = phenomenal_assessment.unity_score - functional_assessment.unity_score;
-            fold_results.push((phenomenal_assessment.unity_score, functional_assessment.unity_score, diff));
+            fold_results.push((
+                phenomenal_assessment.unity_score,
+                functional_assessment.unity_score,
+                diff,
+            ));
 
-            println!("Fold {}: P_unity={:.4}, F_unity={:.4}, diff={:.4}",
-                     fold + 1, phenomenal_assessment.unity_score, functional_assessment.unity_score, diff);
+            println!(
+                "Fold {}: P_unity={:.4}, F_unity={:.4}, diff={:.4}",
+                fold + 1,
+                phenomenal_assessment.unity_score,
+                functional_assessment.unity_score,
+                diff
+            );
         }
 
         // Compute cross-validated statistics
         let mean_diff: f64 = fold_results.iter().map(|(_, _, d)| d).sum::<f64>() / K as f64;
-        let variance: f64 = fold_results.iter()
+        let variance: f64 = fold_results
+            .iter()
             .map(|(_, _, d)| (d - mean_diff).powi(2))
-            .sum::<f64>() / (K - 1) as f64;
+            .sum::<f64>()
+            / (K - 1) as f64;
         let std_error = (variance / K as f64).sqrt();
 
         println!("\n┌────────────────────────────────────────────────┐");
         println!("│  K-FOLD CROSS-VALIDATION RESULTS               │");
         println!("├────────────────────────────────────────────────┤");
-        println!("│  Mean (P - F) difference: {:>8.4}             │", mean_diff);
-        println!("│  Standard error:          {:>8.4}             │", std_error);
-        println!("│  95% CI: [{:.4}, {:.4}]               │",
-                 mean_diff - 1.96 * std_error, mean_diff + 1.96 * std_error);
+        println!(
+            "│  Mean (P - F) difference: {:>8.4}             │",
+            mean_diff
+        );
+        println!(
+            "│  Standard error:          {:>8.4}             │",
+            std_error
+        );
+        println!(
+            "│  95% CI: [{:.4}, {:.4}]               │",
+            mean_diff - 1.96 * std_error,
+            mean_diff + 1.96 * std_error
+        );
         println!("└────────────────────────────────────────────────┘");
 
         // All fold results should be valid
@@ -1439,8 +1567,8 @@ mod tests {
     /// by splitting pairs into K folds and measuring interaction effects.
     #[test]
     fn test_h2_kfold_cross_validation() {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         const K: usize = 5; // 5-fold cross-validation
 
@@ -1478,7 +1606,8 @@ mod tests {
             }
 
             let mean_bind = bind_unity_scores.iter().sum::<f64>() / bind_unity_scores.len() as f64;
-            let mean_bundle = bundle_unity_scores.iter().sum::<f64>() / bundle_unity_scores.len() as f64;
+            let mean_bundle =
+                bundle_unity_scores.iter().sum::<f64>() / bundle_unity_scores.len() as f64;
             (mean_bind, mean_bundle)
         }
 
@@ -1488,35 +1617,109 @@ mod tests {
 
         // Full pair sets
         let unified_pairs: Vec<(&str, &str)> = vec![
-            ("red", "apple"), ("blue", "sky"), ("green", "leaf"), ("golden", "sunset"),
-            ("silver", "moonlight"), ("white", "snow"), ("black", "night"), ("orange", "flame"),
-            ("pink", "blossom"), ("purple", "grape"), ("loud", "crash"), ("soft", "whisper"),
-            ("sharp", "scream"), ("deep", "rumble"), ("high", "shriek"), ("gentle", "murmur"),
-            ("rhythmic", "drumbeat"), ("melodic", "birdsong"), ("crackling", "fire"), ("rushing", "waterfall"),
-            ("warm", "sunlight"), ("soft", "fur"), ("cool", "breeze"), ("smooth", "silk"),
-            ("rough", "bark"), ("wet", "rain"), ("cold", "ice"), ("hot", "sand"),
-            ("prickly", "cactus"), ("velvety", "petal"), ("sweet", "honey"), ("sour", "lemon"),
-            ("bitter", "coffee"), ("salty", "ocean"), ("spicy", "chili"), ("fresh", "mint"),
-            ("rich", "chocolate"), ("tangy", "citrus"), ("savory", "broth"), ("creamy", "butter"),
-            ("fragrant", "rose"), ("pungent", "garlic"), ("smoky", "campfire"), ("earthy", "mushroom"),
-            ("floral", "jasmine"), ("woody", "cedar"), ("fresh", "laundry"), ("musky", "forest"),
-            ("citrus", "orange"), ("herbal", "basil"),
+            ("red", "apple"),
+            ("blue", "sky"),
+            ("green", "leaf"),
+            ("golden", "sunset"),
+            ("silver", "moonlight"),
+            ("white", "snow"),
+            ("black", "night"),
+            ("orange", "flame"),
+            ("pink", "blossom"),
+            ("purple", "grape"),
+            ("loud", "crash"),
+            ("soft", "whisper"),
+            ("sharp", "scream"),
+            ("deep", "rumble"),
+            ("high", "shriek"),
+            ("gentle", "murmur"),
+            ("rhythmic", "drumbeat"),
+            ("melodic", "birdsong"),
+            ("crackling", "fire"),
+            ("rushing", "waterfall"),
+            ("warm", "sunlight"),
+            ("soft", "fur"),
+            ("cool", "breeze"),
+            ("smooth", "silk"),
+            ("rough", "bark"),
+            ("wet", "rain"),
+            ("cold", "ice"),
+            ("hot", "sand"),
+            ("prickly", "cactus"),
+            ("velvety", "petal"),
+            ("sweet", "honey"),
+            ("sour", "lemon"),
+            ("bitter", "coffee"),
+            ("salty", "ocean"),
+            ("spicy", "chili"),
+            ("fresh", "mint"),
+            ("rich", "chocolate"),
+            ("tangy", "citrus"),
+            ("savory", "broth"),
+            ("creamy", "butter"),
+            ("fragrant", "rose"),
+            ("pungent", "garlic"),
+            ("smoky", "campfire"),
+            ("earthy", "mushroom"),
+            ("floral", "jasmine"),
+            ("woody", "cedar"),
+            ("fresh", "laundry"),
+            ("musky", "forest"),
+            ("citrus", "orange"),
+            ("herbal", "basil"),
         ];
 
         let separate_pairs: Vec<(&str, &str)> = vec![
-            ("red", "mailbox"), ("blue", "building"), ("green", "fence"), ("yellow", "sign"),
-            ("white", "wall"), ("black", "car"), ("orange", "cone"), ("pink", "house"),
-            ("gray", "pavement"), ("brown", "box"), ("loud", "background"), ("soft", "environment"),
-            ("sharp", "setting"), ("deep", "context"), ("high", "atmosphere"), ("quiet", "office"),
-            ("noisy", "street"), ("silent", "library"), ("echoing", "hall"), ("muffled", "room"),
-            ("warm", "room"), ("soft", "carpet"), ("cool", "basement"), ("smooth", "floor"),
-            ("rough", "concrete"), ("wet", "bathroom"), ("cold", "garage"), ("hot", "attic"),
-            ("bumpy", "road"), ("slippery", "tile"), ("sweet", "jar"), ("sour", "bottle"),
-            ("bitter", "cup"), ("salty", "shaker"), ("spicy", "bowl"), ("fresh", "container"),
-            ("rich", "plate"), ("tangy", "package"), ("savory", "pot"), ("bland", "dish"),
-            ("fragrant", "shop"), ("pungent", "kitchen"), ("smoky", "restaurant"), ("earthy", "garden"),
-            ("floral", "store"), ("woody", "cabin"), ("fresh", "laundromat"), ("stale", "basement"),
-            ("musty", "attic"), ("clean", "hospital"),
+            ("red", "mailbox"),
+            ("blue", "building"),
+            ("green", "fence"),
+            ("yellow", "sign"),
+            ("white", "wall"),
+            ("black", "car"),
+            ("orange", "cone"),
+            ("pink", "house"),
+            ("gray", "pavement"),
+            ("brown", "box"),
+            ("loud", "background"),
+            ("soft", "environment"),
+            ("sharp", "setting"),
+            ("deep", "context"),
+            ("high", "atmosphere"),
+            ("quiet", "office"),
+            ("noisy", "street"),
+            ("silent", "library"),
+            ("echoing", "hall"),
+            ("muffled", "room"),
+            ("warm", "room"),
+            ("soft", "carpet"),
+            ("cool", "basement"),
+            ("smooth", "floor"),
+            ("rough", "concrete"),
+            ("wet", "bathroom"),
+            ("cold", "garage"),
+            ("hot", "attic"),
+            ("bumpy", "road"),
+            ("slippery", "tile"),
+            ("sweet", "jar"),
+            ("sour", "bottle"),
+            ("bitter", "cup"),
+            ("salty", "shaker"),
+            ("spicy", "bowl"),
+            ("fresh", "container"),
+            ("rich", "plate"),
+            ("tangy", "package"),
+            ("savory", "pot"),
+            ("bland", "dish"),
+            ("fragrant", "shop"),
+            ("pungent", "kitchen"),
+            ("smoky", "restaurant"),
+            ("earthy", "garden"),
+            ("floral", "store"),
+            ("woody", "cabin"),
+            ("fresh", "laundromat"),
+            ("stale", "basement"),
+            ("musty", "attic"),
+            ("clean", "hospital"),
         ];
 
         let fold_size_u = unified_pairs.len() / K;
@@ -1531,12 +1734,18 @@ mod tests {
             let test_start_s = fold * fold_size_s;
             let test_end_s = test_start_s + fold_size_s;
 
-            let train_u: Vec<_> = unified_pairs.iter().enumerate()
+            let train_u: Vec<_> = unified_pairs
+                .iter()
+                .enumerate()
                 .filter(|(i, _)| *i < test_start_u || *i >= test_end_u)
-                .map(|(_, p)| *p).collect();
-            let train_s: Vec<_> = separate_pairs.iter().enumerate()
+                .map(|(_, p)| *p)
+                .collect();
+            let train_s: Vec<_> = separate_pairs
+                .iter()
+                .enumerate()
                 .filter(|(i, _)| *i < test_start_s || *i >= test_end_s)
-                .map(|(_, p)| *p).collect();
+                .map(|(_, p)| *p)
+                .collect();
 
             let (u_bind, u_bundle) = compute_interaction(&train_u, "unified");
             let (s_bind, s_bundle) = compute_interaction(&train_s, "separate");
@@ -1551,9 +1760,11 @@ mod tests {
 
         // Compute cross-validated statistics
         let mean_interaction: f64 = interaction_effects.iter().sum::<f64>() / K as f64;
-        let variance: f64 = interaction_effects.iter()
+        let variance: f64 = interaction_effects
+            .iter()
             .map(|e| (e - mean_interaction).powi(2))
-            .sum::<f64>() / (K - 1) as f64;
+            .sum::<f64>()
+            / (K - 1) as f64;
         let std_error = (variance / K as f64).sqrt();
 
         // Count positive interaction effects across folds
@@ -1562,11 +1773,23 @@ mod tests {
         println!("\n┌────────────────────────────────────────────────┐");
         println!("│  K-FOLD CROSS-VALIDATION RESULTS               │");
         println!("├────────────────────────────────────────────────┤");
-        println!("│  Mean interaction effect: {:>8.4}             │", mean_interaction);
-        println!("│  Standard error:          {:>8.4}             │", std_error);
-        println!("│  95% CI: [{:.4}, {:.4}]               │",
-                 mean_interaction - 1.96 * std_error, mean_interaction + 1.96 * std_error);
-        println!("│  Positive folds:          {}/{}                    │", positive_folds, K);
+        println!(
+            "│  Mean interaction effect: {:>8.4}             │",
+            mean_interaction
+        );
+        println!(
+            "│  Standard error:          {:>8.4}             │",
+            std_error
+        );
+        println!(
+            "│  95% CI: [{:.4}, {:.4}]               │",
+            mean_interaction - 1.96 * std_error,
+            mean_interaction + 1.96 * std_error
+        );
+        println!(
+            "│  Positive folds:          {}/{}                    │",
+            positive_folds, K
+        );
         println!("├────────────────────────────────────────────────┤");
         if mean_interaction > 0.0 && positive_folds > K / 2 {
             println!("│  ✓ H2 SUPPORTED across folds                   │");

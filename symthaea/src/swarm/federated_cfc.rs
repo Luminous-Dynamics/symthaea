@@ -1104,9 +1104,7 @@ mod tests {
 
             // Simulate 3 clients each moving 20% toward target
             for client_id in 0..3 {
-                let delta: Vec<f32> = current.iter()
-                    .map(|&w| (target - w) * 0.2)
-                    .collect();
+                let delta: Vec<f32> = current.iter().map(|&w| (target - w) * 0.2).collect();
 
                 let mut source_id = [0u8; 32];
                 source_id[0] = client_id as u8;

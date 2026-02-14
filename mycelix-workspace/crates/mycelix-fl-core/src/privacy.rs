@@ -92,10 +92,9 @@ pub fn add_gaussian_noise(gradient: &mut [f32], sigma: f32) {
     let mut rng = {
         use rand::SeedableRng;
         // Derive seed from gradient content for reproducibility
-        let seed: u64 = gradient
-            .iter()
-            .enumerate()
-            .fold(0u64, |acc, (i, &v)| acc.wrapping_add((v.to_bits() as u64).wrapping_mul(i as u64 + 1)));
+        let seed: u64 = gradient.iter().enumerate().fold(0u64, |acc, (i, &v)| {
+            acc.wrapping_add((v.to_bits() as u64).wrapping_mul(i as u64 + 1))
+        });
         rand::rngs::SmallRng::seed_from_u64(seed)
     };
 
@@ -193,8 +192,7 @@ impl RdpBudgetTracker {
             if alpha_f64 <= 1.0 {
                 continue;
             }
-            let eps = rdp
-                + (self.target_delta.ln() + (alpha_f64 - 1.0).ln()) / (alpha_f64 - 1.0)
+            let eps = rdp + (self.target_delta.ln() + (alpha_f64 - 1.0).ln()) / (alpha_f64 - 1.0)
                 - (1.0 - 1.0 / alpha_f64).ln();
             // Note: when delta is very small, log(delta) is very negative,
             // which can make eps negative. Clamp to 0.

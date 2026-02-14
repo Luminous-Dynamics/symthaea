@@ -4,10 +4,10 @@
 //! [`TrainingSample`]s from the inference loop and periodically publishes
 //! updated weights back, ensuring inference never blocks on training.
 
-use std::sync::mpsc;
-use ndarray::Array1;
-use crate::dynamics::cfc::CfCNetwork;
 use super::TrainingMethod;
+use crate::dynamics::cfc::CfCNetwork;
+use ndarray::Array1;
+use std::sync::mpsc;
 
 /// A single training sample sent from the inference thread to the trainer.
 pub(super) struct TrainingSample {
@@ -42,20 +42,39 @@ impl AsyncTrainerHandle {
                 let mut steps_since_publish: u32 = 0;
                 while let Ok(sample) = sample_rx.recv() {
                     let result = match sample.method {
-                        TrainingMethod::Spsa => {
-                            network.train_step_spsa(&sample.input, &sample.target, sample.dt, sample.learning_rate)
-                        }
-                        TrainingMethod::Bptt => {
-                            network.train_step_bptt(&[sample.input], &[sample.target], &[sample.dt], sample.learning_rate)
-                        }
+                        TrainingMethod::Spsa => network.train_step_spsa(
+                            &sample.input,
+                            &sample.target,
+                            sample.dt,
+                            sample.learning_rate,
+                        ),
+                        TrainingMethod::Bptt => network.train_step_bptt(
+                            &[sample.input],
+                            &[sample.target],
+                            &[sample.dt],
+                            sample.learning_rate,
+                        ),
                         TrainingMethod::BpttWithSpsaFallback => {
                             let bptt = network.train_step_bptt(
-                                &[sample.input.clone()], &[sample.target.clone()],
-                                &[sample.dt], sample.learning_rate,
+                                &[sample.input.clone()],
+                                &[sample.target.clone()],
+                                &[sample.dt],
+                                sample.learning_rate,
                             );
                             match bptt {
-                                Ok(loss) if loss.is_finite() && (sample.avg_loss <= 0.0 || loss < sample.avg_loss * 2.0) => Ok(loss),
-                                _ => network.train_step_spsa(&sample.input, &sample.target, sample.dt, sample.learning_rate),
+                                Ok(loss)
+                                    if loss.is_finite()
+                                        && (sample.avg_loss <= 0.0
+                                            || loss < sample.avg_loss * 2.0) =>
+                                {
+                                    Ok(loss)
+                                }
+                                _ => network.train_step_spsa(
+                                    &sample.input,
+                                    &sample.target,
+                                    sample.dt,
+                                    sample.learning_rate,
+                                ),
                             }
                         }
                     };
@@ -68,12 +87,19 @@ impl AsyncTrainerHandle {
             })
             .expect("failed to spawn trainer thread");
 
-        Self { sample_tx, weights_rx: std::sync::Mutex::new(weights_rx), updates_applied: 0 }
+        Self {
+            sample_tx,
+            weights_rx: std::sync::Mutex::new(weights_rx),
+            updates_applied: 0,
+        }
     }
 
     pub fn apply_latest_weights(&mut self, network: &mut CfCNetwork) -> bool {
         let mut latest: Option<Vec<f32>> = None;
-        let rx = self.weights_rx.get_mut().expect("weights_rx mutex poisoned");
+        let rx = self
+            .weights_rx
+            .get_mut()
+            .expect("weights_rx mutex poisoned");
         while let Ok(w) = rx.try_recv() {
             latest = Some(w);
         }

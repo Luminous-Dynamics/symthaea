@@ -284,7 +284,10 @@ impl LLMOrgan {
     }
 
     /// Create a new LLM organ with a backend for real generation.
-    pub fn with_backend(config: LLMOrganConfig, backend: Box<dyn super::llm_backend::LLMBackend>) -> Self {
+    pub fn with_backend(
+        config: LLMOrganConfig,
+        backend: Box<dyn super::llm_backend::LLMBackend>,
+    ) -> Self {
         Self {
             config,
             conversation_history: VecDeque::new(),
@@ -306,10 +309,14 @@ impl LLMOrgan {
         if let Some(ref backend) = self.backend {
             let start = std::time::Instant::now();
             let params = GenerationParams {
-                temperature: query.params.as_ref()
+                temperature: query
+                    .params
+                    .as_ref()
                     .and_then(|p| p.temperature)
                     .unwrap_or(self.config.temperature),
-                max_tokens: query.params.as_ref()
+                max_tokens: query
+                    .params
+                    .as_ref()
                     .and_then(|p| p.max_length)
                     .unwrap_or(self.config.max_generation_length),
                 system_prompt: query.system_prompt.clone(),
@@ -330,8 +337,10 @@ impl LLMOrgan {
                     let embedding = self.text_to_embedding(&text);
 
                     if self.config.memory_enabled {
-                        self.conversation_history.push_back(ConversationMessage::user(&query.content));
-                        self.conversation_history.push_back(ConversationMessage::assistant(&text));
+                        self.conversation_history
+                            .push_back(ConversationMessage::user(&query.content));
+                        self.conversation_history
+                            .push_back(ConversationMessage::assistant(&text));
                         while self.conversation_history.len() > 100 {
                             self.conversation_history.pop_front();
                         }
@@ -372,16 +381,23 @@ impl LLMOrgan {
         if let Some(ref backend) = self.backend {
             let start = std::time::Instant::now();
             let params = GenerationParams {
-                temperature: query.params.as_ref()
+                temperature: query
+                    .params
+                    .as_ref()
                     .and_then(|p| p.temperature)
                     .unwrap_or(self.config.temperature),
-                max_tokens: query.params.as_ref()
+                max_tokens: query
+                    .params
+                    .as_ref()
                     .and_then(|p| p.max_length)
                     .unwrap_or(self.config.max_generation_length),
                 system_prompt: query.system_prompt.clone(),
             };
 
-            match backend.generate_streaming(&query.content, &params, on_token).await {
+            match backend
+                .generate_streaming(&query.content, &params, on_token)
+                .await
+            {
                 Ok(text) => {
                     let generation_time_ms = start.elapsed().as_secs_f64() * 1000.0;
                     self.stats.queries_processed += 1;
@@ -395,8 +411,10 @@ impl LLMOrgan {
                     let embedding = self.text_to_embedding(&text);
 
                     if self.config.memory_enabled {
-                        self.conversation_history.push_back(ConversationMessage::user(&query.content));
-                        self.conversation_history.push_back(ConversationMessage::assistant(&text));
+                        self.conversation_history
+                            .push_back(ConversationMessage::user(&query.content));
+                        self.conversation_history
+                            .push_back(ConversationMessage::assistant(&text));
                         while self.conversation_history.len() > 100 {
                             self.conversation_history.pop_front();
                         }
@@ -437,7 +455,9 @@ impl LLMOrgan {
             QueryType::Summarization => self.simulate_summarize(&query.content),
             QueryType::Analysis => self.simulate_analysis(&query.content),
             QueryType::Code => self.simulate_code(&query.content),
-            QueryType::Conversation | QueryType::Generation => self.simulate_generation(&query.content),
+            QueryType::Conversation | QueryType::Generation => {
+                self.simulate_generation(&query.content)
+            }
             QueryType::Translation => {
                 // For sync simulation, create a default thought and simulate
                 let thought = StructuredThought::default();
@@ -458,8 +478,10 @@ impl LLMOrgan {
 
         // Add to conversation history
         if self.config.memory_enabled {
-            self.conversation_history.push_back(ConversationMessage::user(&query.content));
-            self.conversation_history.push_back(ConversationMessage::assistant(&response));
+            self.conversation_history
+                .push_back(ConversationMessage::user(&query.content));
+            self.conversation_history
+                .push_back(ConversationMessage::assistant(&response));
 
             // Trim history if too long
             while self.conversation_history.len() > 100 {
@@ -532,7 +554,8 @@ impl LLMOrgan {
 
         // Cache
         if self.embedding_cache.len() < 1000 {
-            self.embedding_cache.insert(text.to_string(), embedding.clone());
+            self.embedding_cache
+                .insert(text.to_string(), embedding.clone());
         }
 
         embedding
@@ -695,7 +718,9 @@ impl LLMOrgan {
         // If domain entities are available, mention the domain
         if let Some(ref ctx) = thought.domain_context {
             if ctx.domain != "generic" && !ctx.entities.is_empty() {
-                let entity_names: Vec<&str> = ctx.entities.iter()
+                let entity_names: Vec<&str> = ctx
+                    .entities
+                    .iter()
                     .take(3)
                     .map(|(_, v, _)| v.as_str())
                     .collect();
@@ -754,7 +779,8 @@ impl LLMOrgan {
 
         // Add concept mentions if any
         if !thought.activated_concepts.is_empty() {
-            let concepts: Vec<&str> = thought.activated_concepts
+            let concepts: Vec<&str> = thought
+                .activated_concepts
                 .iter()
                 .take(3)
                 .map(|c| c.name.as_str())
@@ -872,7 +898,8 @@ mod tests {
     #[test]
     fn test_summarization() {
         let mut organ = LLMOrgan::default();
-        let result = organ.summarize("This is a long text that needs to be summarized into a shorter form.");
+        let result =
+            organ.summarize("This is a long text that needs to be summarized into a shorter form.");
 
         assert!(result.text.contains("Summary"));
     }
@@ -1229,8 +1256,7 @@ pub type LlmConfig = LLMOrganConfig;
 pub type LlmRequest = LLMQuery;
 
 /// Provider types for LLM backends
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LlmProvider {
     /// Local Ollama instance
     Ollama,
@@ -1242,7 +1268,6 @@ pub enum LlmProvider {
     #[default]
     Local,
 }
-
 
 /// Consciousness-aware LLM wrapper
 ///

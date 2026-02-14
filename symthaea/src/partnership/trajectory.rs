@@ -1,5 +1,5 @@
-use symthaea_core::hdc::relational_consciousness::RelationshipStage;
 use serde::{Deserialize, Serialize};
+use symthaea_core::hdc::relational_consciousness::RelationshipStage;
 
 /// A single observation along the relationship trajectory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,7 +90,10 @@ mod tests {
         traj.record(1.0, RelationshipStage::Awareness, 0.4);
 
         let trend = traj.trend().expect("Should have trend with 2 points");
-        assert!((trend.phi_delta - 0.3).abs() < 1e-10, "phi_delta should be 0.3");
+        assert!(
+            (trend.phi_delta - 0.3).abs() < 1e-10,
+            "phi_delta should be 0.3"
+        );
         assert_eq!(trend.stages_visited.len(), 2);
     }
 
@@ -114,7 +117,10 @@ mod tests {
         traj.record(1.0, RelationshipStage::Contact, 0.3);
 
         let trend = traj.trend().unwrap();
-        assert!(trend.phi_delta < 0.0, "Declining phi should give negative delta");
+        assert!(
+            trend.phi_delta < 0.0,
+            "Declining phi should give negative delta"
+        );
     }
 
     #[test]

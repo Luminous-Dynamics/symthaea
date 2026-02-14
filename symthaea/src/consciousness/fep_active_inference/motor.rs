@@ -40,7 +40,7 @@ impl Default for MotorSystem {
             command_history: VecDeque::with_capacity(100),
             max_history: 100,
             motor_prediction_errors: VecDeque::with_capacity(50),
-            proprioceptive_state: vec![0.5; 4],  // Default 4-dimensional state
+            proprioceptive_state: vec![0.5; 4], // Default 4-dimensional state
         }
     }
 }
@@ -67,7 +67,7 @@ impl MotorSystem {
         self.command_history.push_back(command.clone());
 
         // Simulate execution (in real system, this would actuate)
-        let executed_intensity = command.intensity * (0.9 + rand_f64() * 0.2);  // Add noise
+        let executed_intensity = command.intensity * (0.9 + rand_f64() * 0.2); // Add noise
         let execution_success = rand_f64() < (0.8 + command.confidence * 0.2);
 
         // Update proprioceptive state based on command
@@ -120,11 +120,13 @@ impl MotorSystem {
 
     /// Compute prediction error between predicted and actual outcome
     fn compute_prediction_error(&mut self, predicted: &[f64]) -> f64 {
-        let error: f64 = predicted.iter()
+        let error: f64 = predicted
+            .iter()
             .zip(self.proprioceptive_state.iter())
             .map(|(p, a)| (p - a).powi(2))
             .sum::<f64>()
-            .sqrt() / predicted.len().max(1) as f64;
+            .sqrt()
+            / predicted.len().max(1) as f64;
 
         if self.motor_prediction_errors.len() >= 50 {
             self.motor_prediction_errors.pop_front();
@@ -157,19 +159,27 @@ impl MotorSystem {
     /// Get command statistics
     pub fn command_stats(&self) -> MotorCommandStats {
         let total_commands = self.command_history.len();
-        let meaningful_commands = self.command_history.iter()
+        let meaningful_commands = self
+            .command_history
+            .iter()
             .filter(|c| c.is_meaningful())
             .count();
 
         let avg_intensity = if total_commands > 0 {
-            self.command_history.iter().map(|c| c.intensity).sum::<f64>()
+            self.command_history
+                .iter()
+                .map(|c| c.intensity)
+                .sum::<f64>()
                 / total_commands as f64
         } else {
             0.0
         };
 
         let avg_confidence = if total_commands > 0 {
-            self.command_history.iter().map(|c| c.confidence).sum::<f64>()
+            self.command_history
+                .iter()
+                .map(|c| c.confidence)
+                .sum::<f64>()
                 / total_commands as f64
         } else {
             0.0

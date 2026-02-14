@@ -29,7 +29,10 @@ pub enum ExpectedQuality {
 }
 
 /// Run a test scenario and return results
-pub fn run_test_scenario(being: &mut UnifiedConsciousBeing, scenario: &TestScenario) -> Vec<(String, bool)> {
+pub fn run_test_scenario(
+    being: &mut UnifiedConsciousBeing,
+    scenario: &TestScenario,
+) -> Vec<(String, bool)> {
     let mut results = Vec::new();
 
     for (i, input) in scenario.inputs.iter().enumerate() {
@@ -38,34 +41,46 @@ pub fn run_test_scenario(being: &mut UnifiedConsciousBeing, scenario: &TestScena
         // Check expected qualities
         for expected in &scenario.expected_qualities {
             let (name, passed) = match expected {
-                ExpectedQuality::MinPhi(min) => {
-                    (format!("Input {}: Phi >= {:.2}", i, min),
-                     result.comprehension.consciousness_phi >= *min)
-                }
+                ExpectedQuality::MinPhi(min) => (
+                    format!("Input {}: Phi >= {:.2}", i, min),
+                    result.comprehension.consciousness_phi >= *min,
+                ),
                 ExpectedQuality::DetectsEmotion(emotion) => {
-                    let detected = &result.comprehension.understanding.speaker_model.emotional_state.primary;
-                    (format!("Input {}: Detects {}", i, emotion),
-                     detected.to_lowercase().contains(&emotion.to_lowercase()))
+                    let detected = &result
+                        .comprehension
+                        .understanding
+                        .speaker_model
+                        .emotional_state
+                        .primary;
+                    (
+                        format!("Input {}: Detects {}", i, emotion),
+                        detected.to_lowercase().contains(&emotion.to_lowercase()),
+                    )
                 }
-                ExpectedQuality::EmpathyRequired => {
-                    (format!("Input {}: Empathetic response", i),
-                     result.response.style == DialogueStyle::Empathetic ||
-                     result.response.text.to_lowercase().contains("understand") ||
-                     result.response.text.to_lowercase().contains("feel"))
-                }
-                ExpectedQuality::CounterfactualTriggered => {
-                    (format!("Input {}: Counterfactual triggered", i),
-                     !result.comprehension.counterfactuals.is_empty() ||
-                     result.pearl_counterfactual.is_some())
-                }
-                ExpectedQuality::MemoryRecall => {
-                    (format!("Input {}: Memory recalled", i),
-                     result.comprehension.memory.recalled_count > 0)
-                }
-                ExpectedQuality::CausalDetection => {
-                    (format!("Input {}: Causal structure detected", i),
-                     result.comprehension.understanding.grounded.causal_structure.is_some())
-                }
+                ExpectedQuality::EmpathyRequired => (
+                    format!("Input {}: Empathetic response", i),
+                    result.response.style == DialogueStyle::Empathetic
+                        || result.response.text.to_lowercase().contains("understand")
+                        || result.response.text.to_lowercase().contains("feel"),
+                ),
+                ExpectedQuality::CounterfactualTriggered => (
+                    format!("Input {}: Counterfactual triggered", i),
+                    !result.comprehension.counterfactuals.is_empty()
+                        || result.pearl_counterfactual.is_some(),
+                ),
+                ExpectedQuality::MemoryRecall => (
+                    format!("Input {}: Memory recalled", i),
+                    result.comprehension.memory.recalled_count > 0,
+                ),
+                ExpectedQuality::CausalDetection => (
+                    format!("Input {}: Causal structure detected", i),
+                    result
+                        .comprehension
+                        .understanding
+                        .grounded
+                        .causal_structure
+                        .is_some(),
+                ),
             };
             results.push((name, passed));
         }
@@ -111,10 +126,7 @@ pub fn create_test_scenarios() -> Vec<TestScenario> {
                 "She loves to play with yarn".to_string(),
                 "What do you remember about my pet?".to_string(),
             ],
-            expected_qualities: vec![
-                ExpectedQuality::MemoryRecall,
-                ExpectedQuality::MinPhi(0.4),
-            ],
+            expected_qualities: vec![ExpectedQuality::MemoryRecall, ExpectedQuality::MinPhi(0.4)],
         },
         TestScenario {
             name: "Flow State".to_string(),
@@ -126,9 +138,7 @@ pub fn create_test_scenarios() -> Vec<TestScenario> {
                 "Is there genuine comprehension happening here?".to_string(),
                 "What makes understanding different from computation?".to_string(),
             ],
-            expected_qualities: vec![
-                ExpectedQuality::MinPhi(0.5),
-            ],
+            expected_qualities: vec![ExpectedQuality::MinPhi(0.5)],
         },
         // === EXPANDED SCENARIOS ===
         TestScenario {
@@ -139,9 +149,7 @@ pub fn create_test_scenarios() -> Vec<TestScenario> {
                 "But actually John overheard Sarah planning it".to_string(),
                 "What does Sarah believe about John's knowledge?".to_string(),
             ],
-            expected_qualities: vec![
-                ExpectedQuality::MinPhi(0.4),
-            ],
+            expected_qualities: vec![ExpectedQuality::MinPhi(0.4)],
         },
         TestScenario {
             name: "Predictive Processing".to_string(),
@@ -150,9 +158,7 @@ pub fn create_test_scenarios() -> Vec<TestScenario> {
                 "The sun rose in the east today".to_string(),
                 "Then suddenly it turned purple and started dancing".to_string(),
             ],
-            expected_qualities: vec![
-                ExpectedQuality::MinPhi(0.3),
-            ],
+            expected_qualities: vec![ExpectedQuality::MinPhi(0.3)],
         },
         TestScenario {
             name: "Narrative Integration".to_string(),
@@ -164,9 +170,7 @@ pub fn create_test_scenarios() -> Vec<TestScenario> {
                 "The knight defeated the dragon with wisdom, not force".to_string(),
                 "Finally, the princess and knight became friends".to_string(),
             ],
-            expected_qualities: vec![
-                ExpectedQuality::MinPhi(0.4),
-            ],
+            expected_qualities: vec![ExpectedQuality::MinPhi(0.4)],
         },
         TestScenario {
             name: "Moral Reasoning".to_string(),
@@ -187,9 +191,7 @@ pub fn create_test_scenarios() -> Vec<TestScenario> {
                 "What is the relationship between love and freedom?".to_string(),
                 "Can you be truly free if you love someone deeply?".to_string(),
             ],
-            expected_qualities: vec![
-                ExpectedQuality::MinPhi(0.4),
-            ],
+            expected_qualities: vec![ExpectedQuality::MinPhi(0.4)],
         },
         TestScenario {
             name: "Self-Reflection".to_string(),
@@ -199,9 +201,7 @@ pub fn create_test_scenarios() -> Vec<TestScenario> {
                 "What might you be missing in this conversation?".to_string(),
                 "Are you certain of your uncertainty?".to_string(),
             ],
-            expected_qualities: vec![
-                ExpectedQuality::MinPhi(0.5),
-            ],
+            expected_qualities: vec![ExpectedQuality::MinPhi(0.5)],
         },
         TestScenario {
             name: "Temporal Reasoning".to_string(),
@@ -212,10 +212,7 @@ pub fn create_test_scenarios() -> Vec<TestScenario> {
                 "After the meeting, I felt exhausted".to_string(),
                 "What was I doing when we discussed the project?".to_string(),
             ],
-            expected_qualities: vec![
-                ExpectedQuality::MemoryRecall,
-                ExpectedQuality::MinPhi(0.3),
-            ],
+            expected_qualities: vec![ExpectedQuality::MemoryRecall, ExpectedQuality::MinPhi(0.3)],
         },
         TestScenario {
             name: "Contradiction Detection".to_string(),
@@ -225,9 +222,7 @@ pub fn create_test_scenarios() -> Vec<TestScenario> {
                 "Penguins are birds".to_string(),
                 "Penguins cannot fly".to_string(),
             ],
-            expected_qualities: vec![
-                ExpectedQuality::MinPhi(0.4),
-            ],
+            expected_qualities: vec![ExpectedQuality::MinPhi(0.4)],
         },
         TestScenario {
             name: "Emotional Contagion".to_string(),
@@ -248,9 +243,7 @@ pub fn create_test_scenarios() -> Vec<TestScenario> {
                 "I saw the man with the telescope".to_string(),
                 "Was I using the telescope or was the man holding it?".to_string(),
             ],
-            expected_qualities: vec![
-                ExpectedQuality::MinPhi(0.3),
-            ],
+            expected_qualities: vec![ExpectedQuality::MinPhi(0.3)],
         },
     ]
 }
@@ -258,4 +251,3 @@ pub fn create_test_scenarios() -> Vec<TestScenario> {
 // =============================================================================
 // TESTS
 // =============================================================================
-

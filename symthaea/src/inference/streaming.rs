@@ -471,8 +471,10 @@ impl StreamingInference {
             }
         }
 
-        self.total_samples.fetch_add(count as u64, Ordering::Relaxed);
-        self.samples_since_inference.fetch_add(count as u64, Ordering::Relaxed);
+        self.total_samples
+            .fetch_add(count as u64, Ordering::Relaxed);
+        self.samples_since_inference
+            .fetch_add(count as u64, Ordering::Relaxed);
 
         // Check if we should trigger inference
         self.maybe_process();
@@ -515,7 +517,10 @@ impl StreamingInference {
             return;
         }
 
-        let batch_start = inputs.first().map(|(_, _, t)| *t).unwrap_or_else(Instant::now);
+        let batch_start = inputs
+            .first()
+            .map(|(_, _, t)| *t)
+            .unwrap_or_else(Instant::now);
         let input_count = inputs.len();
 
         // Process through network (incremental - network maintains state)
@@ -562,12 +567,11 @@ impl StreamingInference {
 
         // Handle backpressure
         let mut queue = self.output_queue.lock();
-        if queue.len() >= self.config.max_output_queue
-            && self.config.drop_on_backpressure {
-                queue.pop_front();
-                self.stats.write().outputs_dropped += 1;
-            }
-            // If not dropping, we still add (may exceed max temporarily)
+        if queue.len() >= self.config.max_output_queue && self.config.drop_on_backpressure {
+            queue.pop_front();
+            self.stats.write().outputs_dropped += 1;
+        }
+        // If not dropping, we still add (may exceed max temporarily)
         queue.push_back(streaming_output.clone());
 
         // Notify async subscribers
@@ -695,7 +699,11 @@ impl StreamingInference {
 
     /// Get available checkpoint sequences
     pub fn checkpoint_sequences(&self) -> Vec<u64> {
-        self.checkpoints.lock().iter().map(|(seq, _)| *seq).collect()
+        self.checkpoints
+            .lock()
+            .iter()
+            .map(|(seq, _)| *seq)
+            .collect()
     }
 
     /// Get current sequence number
@@ -778,18 +786,28 @@ mod async_support {
         }
 
         /// Push an input (async, with backpressure)
-        pub async fn push(&self, input: Array1<f32>) -> Result<(), mpsc::error::SendError<(Array1<f32>, f32)>> {
+        pub async fn push(
+            &self,
+            input: Array1<f32>,
+        ) -> Result<(), mpsc::error::SendError<(Array1<f32>, f32)>> {
             let dt = self.inner.config.default_dt;
             self.input_tx.send((input, dt)).await
         }
 
         /// Push an input with explicit dt (async)
-        pub async fn push_with_dt(&self, input: Array1<f32>, dt: f32) -> Result<(), mpsc::error::SendError<(Array1<f32>, f32)>> {
+        pub async fn push_with_dt(
+            &self,
+            input: Array1<f32>,
+            dt: f32,
+        ) -> Result<(), mpsc::error::SendError<(Array1<f32>, f32)>> {
             self.input_tx.send((input, dt)).await
         }
 
         /// Try to push without waiting (returns immediately if full)
-        pub fn try_push(&self, input: Array1<f32>) -> Result<(), mpsc::error::TrySendError<(Array1<f32>, f32)>> {
+        pub fn try_push(
+            &self,
+            input: Array1<f32>,
+        ) -> Result<(), mpsc::error::TrySendError<(Array1<f32>, f32)>> {
             let dt = self.inner.config.default_dt;
             self.input_tx.try_send((input, dt))
         }
@@ -936,14 +954,24 @@ mod tests {
         // Compare outputs - use relaxed tolerance because streaming and batch paths
         // may accumulate slightly different floating-point results due to state
         // management through mutex locks and intermediate processing.
-        assert_eq!(batch_outputs.len(), stream_outputs.len(),
+        assert_eq!(
+            batch_outputs.len(),
+            stream_outputs.len(),
             "Should produce same number of outputs: batch={} stream={}",
-            batch_outputs.len(), stream_outputs.len());
+            batch_outputs.len(),
+            stream_outputs.len()
+        );
         for (i, (batch, stream)) in batch_outputs.iter().zip(stream_outputs.iter()).enumerate() {
             for (j, (b, s)) in batch.iter().zip(stream.iter()).enumerate() {
-                assert!((b - s).abs() < 0.1,
+                assert!(
+                    (b - s).abs() < 0.1,
                     "Output[{}][{}] mismatch: {} vs {} (diff={})",
-                    i, j, b, s, (b - s).abs());
+                    i,
+                    j,
+                    b,
+                    s,
+                    (b - s).abs()
+                );
             }
         }
     }

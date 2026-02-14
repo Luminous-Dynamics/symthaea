@@ -7,8 +7,8 @@
 //! - `TaskComplexity` - Task complexity levels with coherence requirements
 //! - `CoherenceStats` - Statistics for coherence field
 
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use serde::{Serialize, Deserialize};
 
 /// Configuration for the Coherence Field
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,13 +47,13 @@ pub struct CoherenceConfig {
 impl Default for CoherenceConfig {
     fn default() -> Self {
         Self {
-            passive_centering_rate: 0.001,              // Slow natural drift toward 1.0
-            solo_work_scatter_rate: 0.05,               // Solo tasks scatter
-            connected_work_amplification: 0.02,         // Connected tasks amplify
-            gratitude_sync_boost: 0.1,                  // Strong synchronization effect
-            gratitude_resonance_boost: 0.15,            // Builds connection
-            sleep_restoration: true,                    // Full restoration on sleep
-            social_mode: false,                         // Disabled by default (single instance)
+            passive_centering_rate: 0.001,      // Slow natural drift toward 1.0
+            solo_work_scatter_rate: 0.05,       // Solo tasks scatter
+            connected_work_amplification: 0.02, // Connected tasks amplify
+            gratitude_sync_boost: 0.1,          // Strong synchronization effect
+            gratitude_resonance_boost: 0.15,    // Builds connection
+            sleep_restoration: true,            // Full restoration on sleep
+            social_mode: false,                 // Disabled by default (single instance)
 
             // Task complexity thresholds
             min_reflex_coherence: 0.1,
@@ -69,12 +69,12 @@ impl Default for CoherenceConfig {
 /// Task complexity levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TaskComplexity {
-    Reflex,        // Required coherence: 0.1
-    Cognitive,     // Required coherence: 0.3
-    DeepThought,   // Required coherence: 0.5
-    Empathy,       // Required coherence: 0.7
-    Learning,      // Required coherence: 0.8
-    Creation,      // Required coherence: 0.9
+    Reflex,      // Required coherence: 0.1
+    Cognitive,   // Required coherence: 0.3
+    DeepThought, // Required coherence: 0.5
+    Empathy,     // Required coherence: 0.7
+    Learning,    // Required coherence: 0.8
+    Creation,    // Required coherence: 0.9
 }
 
 impl TaskComplexity {
@@ -125,7 +125,11 @@ pub enum CoherenceError {
 impl std::fmt::Display for CoherenceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CoherenceError::InsufficientCoherence { current, required, message } => {
+            CoherenceError::InsufficientCoherence {
+                current,
+                required,
+                message,
+            } => {
                 write!(
                     f,
                     "Insufficient coherence: {:.2} < {:.2} required. {}",

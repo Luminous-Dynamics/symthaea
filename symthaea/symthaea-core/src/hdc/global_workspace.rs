@@ -153,12 +153,12 @@ pub struct WorkspaceConfig {
 impl Default for WorkspaceConfig {
     fn default() -> Self {
         Self {
-            max_capacity: 3,           // Typical: 3-4 items
-            entry_threshold: 0.5,      // Moderate threshold
-            decay_rate: 0.1,           // 10% per timestep
+            max_capacity: 3,      // Typical: 3-4 items
+            entry_threshold: 0.5, // Moderate threshold
+            decay_rate: 0.1,      // 10% per timestep
             enable_broadcasting: true,
-            winner_takes_all: false,   // Allow multiple contents
-            max_duration: 50,          // Auto-remove after 50 steps
+            winner_takes_all: false, // Allow multiple contents
+            max_duration: 50,        // Auto-remove after 50 steps
         }
     }
 }
@@ -245,9 +245,8 @@ impl GlobalWorkspace {
         }
 
         // 2. Remove stale or low-activation contents
-        self.workspace.retain(|c| {
-            c.activation > 0.1 && c.duration < self.config.max_duration
-        });
+        self.workspace
+            .retain(|c| c.activation > 0.1 && c.duration < self.config.max_duration);
 
         // 3. Competition for workspace access
         let (new_contents, ignition) = self.compete();
@@ -287,7 +286,8 @@ impl GlobalWorkspace {
 
         // Sort competitors by activation (strongest first)
         self.competitors.sort_by(|a, b| {
-            b.activation.partial_cmp(&a.activation)
+            b.activation
+                .partial_cmp(&a.activation)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -308,7 +308,10 @@ impl GlobalWorkspace {
             self.competitors.clear();
         } else {
             // Capacity-limited: fill up to max_capacity
-            let available_slots = self.config.max_capacity.saturating_sub(self.workspace.len());
+            let available_slots = self
+                .config
+                .max_capacity
+                .saturating_sub(self.workspace.len());
 
             let mut entered = 0;
             self.competitors.retain(|content| {
@@ -322,9 +325,9 @@ impl GlobalWorkspace {
                         ignition = true;
                     }
 
-                    false  // Remove from competitors
+                    false // Remove from competitors
                 } else {
-                    true   // Keep in competitors
+                    true // Keep in competitors
                 }
             });
         }
@@ -368,7 +371,11 @@ impl GlobalWorkspace {
         };
 
         let avg_duration = if num_contents > 0 {
-            self.workspace.iter().map(|c| c.duration as f64).sum::<f64>() / num_contents as f64
+            self.workspace
+                .iter()
+                .map(|c| c.duration as f64)
+                .sum::<f64>()
+                / num_contents as f64
         } else {
             0.0
         };
@@ -399,7 +406,10 @@ impl GlobalWorkspace {
 
         // Competition
         if capacity.competition > 1.0 {
-            parts.push(format!("High competition ({:.1}x capacity)", capacity.competition));
+            parts.push(format!(
+                "High competition ({:.1}x capacity)",
+                capacity.competition
+            ));
         } else if capacity.competition > 0.5 {
             parts.push("Moderate competition".to_string());
         }
@@ -411,7 +421,10 @@ impl GlobalWorkspace {
 
         // Duration
         if capacity.avg_duration > 30.0 {
-            parts.push(format!("Contents stable (avg {:.0} steps)", capacity.avg_duration));
+            parts.push(format!(
+                "Contents stable (avg {:.0} steps)",
+                capacity.avg_duration
+            ));
         }
 
         // Contents
@@ -429,9 +442,9 @@ impl GlobalWorkspace {
 
     /// Check if content is conscious
     pub fn is_conscious(&self, content: &[BinaryHV]) -> bool {
-        self.workspace.iter().any(|c| {
-            self.similarity(&c.representation, content) > 0.9
-        })
+        self.workspace
+            .iter()
+            .any(|c| self.similarity(&c.representation, content) > 0.9)
     }
 
     /// Compute similarity between HDC vectors using Hamming-based similarity
@@ -440,9 +453,12 @@ impl GlobalWorkspace {
             return 0.0;
         }
 
-        let avg_sim: f64 = a.iter().zip(b.iter())
+        let avg_sim: f64 = a
+            .iter()
+            .zip(b.iter())
             .map(|(x, y)| x.similarity(y) as f64)
-            .sum::<f64>() / a.len() as f64;
+            .sum::<f64>()
+            / a.len() as f64;
         avg_sim
     }
 
@@ -471,11 +487,8 @@ mod tests {
     #[test]
     fn test_submit_content() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig::default());
-        let content = WorkspaceContent::new(
-            vec![BinaryHV::ones(); 10],
-            0.8,
-            "perception".to_string(),
-        );
+        let content =
+            WorkspaceContent::new(vec![BinaryHV::ones(); 10], 0.8, "perception".to_string());
         ws.submit(content);
         assert!(ws.competitors.len() > 0);
     }
@@ -488,11 +501,8 @@ mod tests {
         });
 
         // High activation content should enter
-        let high_activation = WorkspaceContent::new(
-            vec![BinaryHV::ones(); 10],
-            0.9,
-            "perception".to_string(),
-        );
+        let high_activation =
+            WorkspaceContent::new(vec![BinaryHV::ones(); 10], 0.9, "perception".to_string());
         ws.submit(high_activation);
 
         let assessment = ws.process();
@@ -507,11 +517,8 @@ mod tests {
         });
 
         // Low activation content should not enter
-        let low_activation = WorkspaceContent::new(
-            vec![BinaryHV::zero(); 10],
-            0.3,
-            "perception".to_string(),
-        );
+        let low_activation =
+            WorkspaceContent::new(vec![BinaryHV::zero(); 10], 0.3, "perception".to_string());
         ws.submit(low_activation);
 
         let assessment = ws.process();
@@ -544,18 +551,15 @@ mod tests {
     #[test]
     fn test_decay() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig {
-            decay_rate: 0.3,  // Higher decay rate
+            decay_rate: 0.3, // Higher decay rate
             entry_threshold: 0.5,
             ..Default::default()
         });
 
-        let content = WorkspaceContent::new(
-            vec![BinaryHV::ones(); 10],
-            0.9,
-            "perception".to_string(),
-        );
+        let content =
+            WorkspaceContent::new(vec![BinaryHV::ones(); 10], 0.9, "perception".to_string());
         ws.submit(content);
-        ws.process();  // Enter workspace
+        ws.process(); // Enter workspace
 
         // Initial state: should be in workspace
         assert_eq!(ws.num_conscious(), 1);
@@ -577,11 +581,8 @@ mod tests {
             ..Default::default()
         });
 
-        let content = WorkspaceContent::new(
-            vec![BinaryHV::ones(); 10],
-            0.9,
-            "perception".to_string(),
-        );
+        let content =
+            WorkspaceContent::new(vec![BinaryHV::ones(); 10], 0.9, "perception".to_string());
         ws.submit(content);
 
         let assessment = ws.process();
@@ -593,11 +594,8 @@ mod tests {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig::default());
 
         // Very high activation should trigger ignition
-        let content = WorkspaceContent::new(
-            vec![BinaryHV::ones(); 10],
-            0.95,
-            "perception".to_string(),
-        );
+        let content =
+            WorkspaceContent::new(vec![BinaryHV::ones(); 10], 0.95, "perception".to_string());
         ws.submit(content);
 
         let assessment = ws.process();
@@ -637,11 +635,7 @@ mod tests {
         });
 
         let content_vec = vec![BinaryHV::ones(); 10];
-        let content = WorkspaceContent::new(
-            content_vec.clone(),
-            0.9,
-            "perception".to_string(),
-        );
+        let content = WorkspaceContent::new(content_vec.clone(), 0.9, "perception".to_string());
         ws.submit(content);
         ws.process();
 
@@ -657,11 +651,7 @@ mod tests {
 
         // Use the same BinaryHV vectors for content
         let shared_vec = vec![BinaryHV::ones(); 10];
-        let content = WorkspaceContent::new(
-            shared_vec.clone(),
-            0.9,
-            "perception".to_string(),
-        );
+        let content = WorkspaceContent::new(shared_vec.clone(), 0.9, "perception".to_string());
         ws.submit(content);
         ws.process();
 
@@ -676,11 +666,8 @@ mod tests {
     #[test]
     fn test_clear() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig::default());
-        let content = WorkspaceContent::new(
-            vec![BinaryHV::ones(); 10],
-            0.9,
-            "perception".to_string(),
-        );
+        let content =
+            WorkspaceContent::new(vec![BinaryHV::ones(); 10], 0.9, "perception".to_string());
         ws.submit(content);
         ws.process();
 

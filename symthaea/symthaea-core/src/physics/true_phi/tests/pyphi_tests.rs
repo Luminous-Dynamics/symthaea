@@ -21,10 +21,16 @@ fn test_pyphi_independent_elements_zero_phi() {
 
     // For truly independent elements, Φ should be very close to 0
     // We allow small positive values due to random correlations
-    assert!(result.phi < 0.05,
-        "Independent elements should have near-zero \u{03a6}: {:.6}", result.phi);
+    assert!(
+        result.phi < 0.05,
+        "Independent elements should have near-zero \u{03a6}: {:.6}",
+        result.phi
+    );
 
-    println!("PyPhi comparison - Independent 2-node: \u{03a6} = {:.6} (expected \u{2248} 0)", result.phi);
+    println!(
+        "PyPhi comparison - Independent 2-node: \u{03a6} = {:.6} (expected \u{2248} 0)",
+        result.phi
+    );
 }
 
 /// PyPhi Test Case 2: Maximally correlated system
@@ -39,25 +45,33 @@ fn test_pyphi_correlated_elements_positive_phi() {
     let base = ContinuousHV::random(HDC_DIMENSION, 42);
     let a = ContinuousHV::weighted_bundle(
         &[&base, &ContinuousHV::random(HDC_DIMENSION, 100)],
-        &[0.95, 0.05]
+        &[0.95, 0.05],
     );
     let b = ContinuousHV::weighted_bundle(
         &[&base, &ContinuousHV::random(HDC_DIMENSION, 101)],
-        &[0.95, 0.05]
+        &[0.95, 0.05],
     );
 
     let result = calc.compute_true_phi(&[a, b]);
 
     // Correlated elements should have positive Φ
-    assert!(result.phi > 0.0,
-        "Correlated elements should have positive \u{03a6}: {:.6}", result.phi);
+    assert!(
+        result.phi > 0.0,
+        "Correlated elements should have positive \u{03a6}: {:.6}",
+        result.phi
+    );
 
     // System EI should be positive (there's mutual information)
-    assert!(result.system_ei > 0.0,
-        "System EI should be positive: {:.6}", result.system_ei);
+    assert!(
+        result.system_ei > 0.0,
+        "System EI should be positive: {:.6}",
+        result.system_ei
+    );
 
-    println!("PyPhi comparison - Correlated 2-node: \u{03a6} = {:.6}, EI = {:.6}",
-        result.phi, result.system_ei);
+    println!(
+        "PyPhi comparison - Correlated 2-node: \u{03a6} = {:.6}, EI = {:.6}",
+        result.phi, result.system_ei
+    );
 }
 
 /// PyPhi Test Case 3: XOR-like structure
@@ -104,7 +118,7 @@ fn test_pyphi_copy_vs_xor() {
     // Copy-like (just a with noise)
     let copy = ContinuousHV::weighted_bundle(
         &[&a, &ContinuousHV::random(HDC_DIMENSION, 3)],
-        &[0.99, 0.01]
+        &[0.99, 0.01],
     );
 
     let phi_xor = calc.compute_true_phi(&[a.clone(), b, xor]);
@@ -132,7 +146,7 @@ fn test_pyphi_phi_scales_with_size() {
             .map(|i| {
                 ContinuousHV::weighted_bundle(
                     &[&base, &ContinuousHV::random(HDC_DIMENSION, 100 + i as u64)],
-                    &[0.8, 0.2]
+                    &[0.8, 0.2],
                 )
             })
             .collect()
@@ -143,11 +157,22 @@ fn test_pyphi_phi_scales_with_size() {
     let phi_4 = calc.compute_true_phi(&create_correlated(4));
 
     println!("PyPhi comparison - Size scaling:");
-    println!("  \u{03a6}(n=2) = {:.6}, EI = {:.6}", phi_2.phi, phi_2.system_ei);
-    println!("  \u{03a6}(n=3) = {:.6}, EI = {:.6}", phi_3.phi, phi_3.system_ei);
-    println!("  \u{03a6}(n=4) = {:.6}, EI = {:.6}", phi_4.phi, phi_4.system_ei);
+    println!(
+        "  \u{03a6}(n=2) = {:.6}, EI = {:.6}",
+        phi_2.phi, phi_2.system_ei
+    );
+    println!(
+        "  \u{03a6}(n=3) = {:.6}, EI = {:.6}",
+        phi_3.phi, phi_3.system_ei
+    );
+    println!(
+        "  \u{03a6}(n=4) = {:.6}, EI = {:.6}",
+        phi_4.phi, phi_4.system_ei
+    );
 
     // System EI should increase with size (more pairwise connections)
-    assert!(phi_4.system_ei > phi_2.system_ei,
-        "Larger systems should have more total information");
+    assert!(
+        phi_4.system_ei > phi_2.system_ei,
+        "Larger systems should have more total information"
+    );
 }

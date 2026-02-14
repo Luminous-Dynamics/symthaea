@@ -26,17 +26,17 @@ pub mod metrics;
 pub mod models;
 pub mod state;
 
+use crate::api::state::AppState;
 use axum::{
+    extract::Request,
+    http::{HeaderMap, Method, StatusCode},
+    middleware,
+    response::Response,
     routing::{get, post},
     Router,
-    middleware,
-    extract::Request,
-    http::{StatusCode, HeaderMap, Method},
-    response::Response,
 };
-use tower_http::cors::CorsLayer;
 use std::sync::Arc;
-use crate::api::state::AppState;
+use tower_http::cors::CorsLayer;
 
 /// API configuration for security settings
 #[derive(Debug, Clone)]
@@ -69,8 +69,7 @@ async fn auth_middleware(
     request: Request,
     next: middleware::Next,
 ) -> Result<Response, StatusCode> {
-    let state = request.extensions()
-        .get::<Arc<AppState>>();
+    let state = request.extensions().get::<Arc<AppState>>();
 
     // Extract configured token from app state
     let required_token = state.and_then(|s| s.bearer_token());
@@ -88,18 +87,16 @@ async fn auth_middleware(
 
     // Allow public GET endpoints without auth
     let method = request.method().clone();
-    if method == Method::GET && (
-        path.starts_with("/v1/leaderboard")
-        || path.starts_with("/v1/datasets")
-        || path.starts_with("/v1/results")
-    ) {
+    if method == Method::GET
+        && (path.starts_with("/v1/leaderboard")
+            || path.starts_with("/v1/datasets")
+            || path.starts_with("/v1/results"))
+    {
         return Ok(next.run(request).await);
     }
 
     // For all other endpoints, require Bearer token
-    let auth_header = headers
-        .get("authorization")
-        .and_then(|v| v.to_str().ok());
+    let auth_header = headers.get("authorization").and_then(|v| v.to_str().ok());
 
     match auth_header {
         Some(value) if value.starts_with("Bearer ") => {
@@ -130,7 +127,9 @@ fn build_cors_layer(config: &ApiConfig) -> CorsLayer {
             .allow_methods([Method::GET, Method::POST])
             .allow_headers(tower_http::cors::Any)
     } else {
-        let origins: Vec<_> = config.allowed_origins.iter()
+        let origins: Vec<_> = config
+            .allowed_origins
+            .iter()
             .filter_map(|o| o.parse().ok())
             .collect();
         CorsLayer::new()
@@ -155,14 +154,17 @@ pub fn create_router_with_config(config: ApiConfig) -> Router {
         .route("/v1/submit", post(handlers::submit_model))
         .route("/v1/results/:submission_id", get(handlers::get_results))
         .route("/v1/leaderboard", get(handlers::get_leaderboard))
-        .route("/v1/leaderboard/topologies", get(handlers::get_topology_rankings))
+        .route(
+            "/v1/leaderboard/topologies",
+            get(handlers::get_topology_rankings),
+        )
         .route("/v1/datasets", get(handlers::list_datasets))
         .route("/v1/datasets/:dataset_id", get(handlers::get_dataset))
         .route("/v1/compare", post(handlers::compare_models))
         .route("/v1/dimensional-sweep", post(handlers::dimensional_sweep))
         // Metrics endpoints
-        .route("/metrics", get(handlers::metrics_prometheus))       // Prometheus scrape endpoint
-        .route("/v1/metrics", get(handlers::metrics_json))          // JSON metrics
+        .route("/metrics", get(handlers::metrics_prometheus)) // Prometheus scrape endpoint
+        .route("/v1/metrics", get(handlers::metrics_json)) // JSON metrics
         // Health check
         .route("/health", get(handlers::health_check))
         .route("/v1/health", get(handlers::health_check))
@@ -183,7 +185,10 @@ pub async fn serve(addr: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Start the API server with custom config
-pub async fn serve_with_config(addr: &str, config: ApiConfig) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn serve_with_config(
+    addr: &str,
+    config: ApiConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
     let app = create_router_with_config(config);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("Symthaea API listening on http://{}", addr);

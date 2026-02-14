@@ -26,18 +26,78 @@ fn main() {
     let dim = 5;
     let updates: Vec<GradientUpdate> = vec![
         // 5 honest participants with consistent gradients
-        GradientUpdate::new("honest_0".into(), 1, vec![0.10, 0.20, 0.30, 0.40, 0.50], 100, 0.50),
-        GradientUpdate::new("honest_1".into(), 1, vec![0.12, 0.22, 0.28, 0.42, 0.48], 200, 0.45),
-        GradientUpdate::new("honest_2".into(), 1, vec![0.11, 0.19, 0.31, 0.39, 0.51], 150, 0.48),
-        GradientUpdate::new("honest_3".into(), 1, vec![0.09, 0.21, 0.29, 0.41, 0.49], 100, 0.52),
-        GradientUpdate::new("honest_4".into(), 1, vec![0.13, 0.18, 0.32, 0.38, 0.52], 120, 0.47),
+        GradientUpdate::new(
+            "honest_0".into(),
+            1,
+            vec![0.10, 0.20, 0.30, 0.40, 0.50],
+            100,
+            0.50,
+        ),
+        GradientUpdate::new(
+            "honest_1".into(),
+            1,
+            vec![0.12, 0.22, 0.28, 0.42, 0.48],
+            200,
+            0.45,
+        ),
+        GradientUpdate::new(
+            "honest_2".into(),
+            1,
+            vec![0.11, 0.19, 0.31, 0.39, 0.51],
+            150,
+            0.48,
+        ),
+        GradientUpdate::new(
+            "honest_3".into(),
+            1,
+            vec![0.09, 0.21, 0.29, 0.41, 0.49],
+            100,
+            0.52,
+        ),
+        GradientUpdate::new(
+            "honest_4".into(),
+            1,
+            vec![0.13, 0.18, 0.32, 0.38, 0.52],
+            120,
+            0.47,
+        ),
         // 3 Byzantine participants with extreme gradients
-        GradientUpdate::new("byz_0".into(), 1, vec![50.0, -30.0, 80.0, -60.0, 100.0], 100, 0.90),
-        GradientUpdate::new("byz_1".into(), 1, vec![-40.0, 70.0, -50.0, 90.0, -80.0], 100, 0.85),
-        GradientUpdate::new("byz_2".into(), 1, vec![30.0, 30.0, 30.0, 30.0, 30.0], 100, 0.88),
+        GradientUpdate::new(
+            "byz_0".into(),
+            1,
+            vec![50.0, -30.0, 80.0, -60.0, 100.0],
+            100,
+            0.90,
+        ),
+        GradientUpdate::new(
+            "byz_1".into(),
+            1,
+            vec![-40.0, 70.0, -50.0, 90.0, -80.0],
+            100,
+            0.85,
+        ),
+        GradientUpdate::new(
+            "byz_2".into(),
+            1,
+            vec![30.0, 30.0, 30.0, 30.0, 30.0],
+            100,
+            0.88,
+        ),
         // 2 low-reputation participants with mild gradients
-        GradientUpdate::new("lowrep_0".into(), 1, vec![0.50, 0.50, 0.50, 0.50, 0.50], 80, 0.60),
-        GradientUpdate::new("lowrep_1".into(), 1, vec![0.40, 0.60, 0.40, 0.60, 0.40], 80, 0.55),
+        GradientUpdate::new(
+            "lowrep_0".into(),
+            1,
+            vec![0.50, 0.50, 0.50, 0.50, 0.50],
+            80,
+            0.60,
+        ),
+        GradientUpdate::new(
+            "lowrep_1".into(),
+            1,
+            vec![0.40, 0.60, 0.40, 0.60, 0.40],
+            80,
+            0.55,
+        ),
     ];
 
     let mut reputations: HashMap<String, f32> = HashMap::new();
@@ -185,7 +245,11 @@ fn main() {
 
     // Print summary
     println!("\n=== Summary ===");
-    println!("Updates: {} ({} honest, 3 Byzantine, 2 low-rep)", updates.len(), 5);
+    println!(
+        "Updates: {} ({} honest, 3 Byzantine, 2 low-rep)",
+        updates.len(),
+        5
+    );
     println!("FedAvg: {:?}", round6_vec(&fedavg_result));
     println!("TrimmedMean: {:?}", round6_vec(&trimmed_result));
     println!("Median: {:?}", round6_vec(&median_result));

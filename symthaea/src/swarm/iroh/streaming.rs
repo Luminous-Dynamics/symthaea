@@ -3,10 +3,10 @@
 //! High-performance bi-directional streaming for neural state synchronization.
 //! Designed for <50ms latency tensor exchange between consciousness nodes.
 
-use crate::swarm::{SwarmResult, SwarmError, ConsciousnessVector, TensorPayload};
+use crate::swarm::{ConsciousnessVector, SwarmError, SwarmResult, TensorPayload};
+use parking_lot::Mutex;
 use std::sync::Arc;
 use std::time::Duration;
-use parking_lot::Mutex;
 
 /// Configuration for tensor streaming
 #[derive(Debug, Clone)]
@@ -182,13 +182,12 @@ impl TensorStream {
         }
 
         // Optionally compress large tensors
-        let final_bytes = if self.config.compression_enabled
-            && bytes.len() > self.config.compression_threshold
-        {
-            self.compress(&bytes)?
-        } else {
-            bytes
-        };
+        let final_bytes =
+            if self.config.compression_enabled && bytes.len() > self.config.compression_threshold {
+                self.compress(&bytes)?
+            } else {
+                bytes
+            };
 
         // Update stats
         let mut stats = self.stats.lock();

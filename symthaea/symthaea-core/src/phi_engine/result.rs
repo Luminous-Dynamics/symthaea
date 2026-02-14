@@ -2,8 +2,8 @@
 //!
 //! Standard result structures for Φ (integrated information) measurements.
 
-use std::time::Duration;
 use super::calculator::PartitionInfo;
+use std::time::Duration;
 
 /// Result of a Φ calculation
 ///
@@ -111,16 +111,17 @@ impl PhiUncertainty {
         if n < 2 {
             return Self {
                 std_dev: 0.0,
-                confidence_interval_95: (samples.first().copied().unwrap_or(0.0),
-                                         samples.first().copied().unwrap_or(0.0)),
+                confidence_interval_95: (
+                    samples.first().copied().unwrap_or(0.0),
+                    samples.first().copied().unwrap_or(0.0),
+                ),
                 n_samples: n,
             };
         }
 
         let mean: f64 = samples.iter().sum::<f64>() / n as f64;
-        let variance: f64 = samples.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / (n - 1) as f64;
+        let variance: f64 =
+            samples.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64;
         let std_dev = variance.sqrt();
 
         // 95% CI with t-distribution approximation
@@ -138,8 +139,8 @@ impl PhiUncertainty {
     ///
     /// Uses non-overlapping confidence intervals as criterion
     pub fn is_significantly_different(&self, other: &PhiUncertainty) -> bool {
-        self.confidence_interval_95.1 < other.confidence_interval_95.0 ||
-        other.confidence_interval_95.1 < self.confidence_interval_95.0
+        self.confidence_interval_95.1 < other.confidence_interval_95.0
+            || other.confidence_interval_95.1 < self.confidence_interval_95.0
     }
 
     /// Get coefficient of variation (relative uncertainty)
@@ -171,12 +172,7 @@ mod tests {
 
     #[test]
     fn test_phi_result_display() {
-        let result = PhiResult::with_timing(
-            0.4976,
-            "Continuous",
-            16,
-            Duration::from_millis(150),
-        );
+        let result = PhiResult::with_timing(0.4976, "Continuous", 16, Duration::from_millis(150));
 
         let display = format!("{}", result);
         assert!(display.contains("0.4976"));

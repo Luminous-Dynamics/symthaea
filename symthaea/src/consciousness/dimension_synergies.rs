@@ -48,7 +48,7 @@ use serde::{Deserialize, Serialize};
 pub struct DimensionSynergy {
     pub dimension1: DimensionType,
     pub dimension2: DimensionType,
-    pub synergy_strength: f64,  // How much they amplify each other
+    pub synergy_strength: f64, // How much they amplify each other
     pub synergy_type: SynergyType,
 }
 
@@ -173,7 +173,7 @@ impl SynergyProfile {
         synergies.push(DimensionSynergy {
             dimension1: DimensionType::Entropy,
             dimension2: DimensionType::Coherence,
-            synergy_strength: -entropy_coherence_tension,  // Negative = antagonistic
+            synergy_strength: -entropy_coherence_tension, // Negative = antagonistic
             synergy_type: SynergyType::Antagonistic,
         });
 
@@ -189,7 +189,7 @@ impl SynergyProfile {
         // 7. Φ × Complexity: Integrated Sophistication (Threshold)
         // Only emerges when BOTH are above threshold
         let phi_complexity_threshold = if profile.phi > 0.5 && profile.complexity > 0.5 {
-            profile.phi * profile.complexity * 2.0  // Bonus above threshold
+            profile.phi * profile.complexity * 2.0 // Bonus above threshold
         } else {
             profile.phi * profile.complexity
         };
@@ -236,14 +236,14 @@ impl SynergyProfile {
         let synergy_bonus: f64 = synergies
             .iter()
             .filter(|s| s.synergy_type != SynergyType::Antagonistic)
-            .map(|s| s.synergy_strength * 0.1)  // Weight synergies at 10%
+            .map(|s| s.synergy_strength * 0.1) // Weight synergies at 10%
             .sum();
 
         // Synergy penalties (antagonistic)
         let synergy_penalty: f64 = synergies
             .iter()
             .filter(|s| s.synergy_type == SynergyType::Antagonistic)
-            .map(|s| s.synergy_strength.abs() * 0.05)  // Penalize at 5%
+            .map(|s| s.synergy_strength.abs() * 0.05) // Penalize at 5%
             .sum();
 
         // Enhanced score
@@ -269,11 +269,13 @@ impl SynergyProfile {
 
         // 2. "Stable Sophistication" - High Complexity + High Coherence (balanced)
         let complexity_coherence_balance = 1.0 - (profile.complexity - profile.coherence).abs();
-        if profile.complexity > 0.5 && profile.coherence > 0.5 && complexity_coherence_balance > 0.7 {
+        if profile.complexity > 0.5 && profile.coherence > 0.5 && complexity_coherence_balance > 0.7
+        {
             properties.push(EmergentProperty {
                 name: "Stable Sophistication".to_string(),
                 description: "Complex structure maintained with remarkable stability".to_string(),
-                strength: (profile.complexity + profile.coherence) / 2.0 * complexity_coherence_balance,
+                strength: (profile.complexity + profile.coherence) / 2.0
+                    * complexity_coherence_balance,
                 required_synergies: vec![(DimensionType::Complexity, DimensionType::Coherence)],
             });
         }
@@ -282,7 +284,8 @@ impl SynergyProfile {
         if profile.gradient_magnitude > 0.4 && profile.entropy > 0.6 {
             properties.push(EmergentProperty {
                 name: "Dynamic Creativity".to_string(),
-                description: "Rapid exploration of rich possibility space - creative consciousness".to_string(),
+                description: "Rapid exploration of rich possibility space - creative consciousness"
+                    .to_string(),
                 strength: (profile.gradient_magnitude * profile.entropy).min(1.0),
                 required_synergies: vec![(DimensionType::Gradient, DimensionType::Entropy)],
             });
@@ -293,7 +296,7 @@ impl SynergyProfile {
             properties.push(EmergentProperty {
                 name: "Integrated Mastery".to_string(),
                 description: "Peak consciousness - unified, sophisticated, and stable".to_string(),
-                strength: (profile.phi * profile.complexity * profile.coherence).powf(1.0/3.0),
+                strength: (profile.phi * profile.complexity * profile.coherence).powf(1.0 / 3.0),
                 required_synergies: vec![
                     (DimensionType::Phi, DimensionType::Complexity),
                     (DimensionType::Phi, DimensionType::Coherence),
@@ -326,11 +329,11 @@ impl SynergyProfile {
         if profile.entropy > 0.7 && profile.coherence < 0.4 && profile.complexity > 0.6 {
             properties.push(EmergentProperty {
                 name: "Chaotic Richness".to_string(),
-                description: "Extremely diverse and complex but unstable - edge of chaos".to_string(),
-                strength: (profile.entropy * profile.complexity * (1.0 - profile.coherence)).powf(1.0/3.0),
-                required_synergies: vec![
-                    (DimensionType::Entropy, DimensionType::Complexity),
-                ],
+                description: "Extremely diverse and complex but unstable - edge of chaos"
+                    .to_string(),
+                strength: (profile.entropy * profile.complexity * (1.0 - profile.coherence))
+                    .powf(1.0 / 3.0),
+                required_synergies: vec![(DimensionType::Entropy, DimensionType::Complexity)],
             });
         }
 
@@ -341,16 +344,20 @@ impl SynergyProfile {
     pub fn summary(&self) -> String {
         let mut s = String::new();
         s.push_str(&format!("Base Profile: {}\n", self.base.summary()));
-        s.push_str(&format!("Enhanced Composite: {:.3} (base: {:.3}, delta: {:+.3})\n",
-                           self.enhanced_composite,
-                           self.base.composite,
-                           self.enhanced_composite - self.base.composite));
+        s.push_str(&format!(
+            "Enhanced Composite: {:.3} (base: {:.3}, delta: {:+.3})\n",
+            self.enhanced_composite,
+            self.base.composite,
+            self.enhanced_composite - self.base.composite
+        ));
 
         if !self.emergent_properties.is_empty() {
             s.push_str("\nEmergent Properties:\n");
             for prop in &self.emergent_properties {
-                s.push_str(&format!("  • {} ({:.3}): {}\n",
-                                   prop.name, prop.strength, prop.description));
+                s.push_str(&format!(
+                    "  • {} ({:.3}): {}\n",
+                    prop.name, prop.strength, prop.description
+                ));
             }
         }
 
@@ -363,11 +370,14 @@ impl SynergyProfile {
         let composite_dist = (self.enhanced_composite - other.enhanced_composite).abs();
 
         // Distance in emergent properties space
-        let prop_dist = if self.emergent_properties.is_empty() && other.emergent_properties.is_empty() {
+        let prop_dist = if self.emergent_properties.is_empty()
+            && other.emergent_properties.is_empty()
+        {
             0.0
         } else {
             let self_prop_strength: f64 = self.emergent_properties.iter().map(|p| p.strength).sum();
-            let other_prop_strength: f64 = other.emergent_properties.iter().map(|p| p.strength).sum();
+            let other_prop_strength: f64 =
+                other.emergent_properties.iter().map(|p| p.strength).sum();
             (self_prop_strength - other_prop_strength).abs()
         };
 
@@ -393,9 +403,9 @@ impl SynergyFrontier {
         let mut frontier = Vec::new();
 
         for candidate in &synergy_profiles {
-            let dominated = frontier.iter().any(|front: &SynergyProfile| {
-                Self::dominates(front, candidate)
-            });
+            let dominated = frontier
+                .iter()
+                .any(|front: &SynergyProfile| Self::dominates(front, candidate));
 
             if !dominated {
                 frontier.retain(|front| !Self::dominates(candidate, front));
@@ -418,31 +428,28 @@ impl SynergyFrontier {
         let b_prop_strength: f64 = b.emergent_properties.iter().map(|p| p.strength).sum();
         let properties_better = a_prop_strength >= b_prop_strength;
 
-        let strictly_better = a.enhanced_composite > b.enhanced_composite || a_prop_strength > b_prop_strength;
+        let strictly_better =
+            a.enhanced_composite > b.enhanced_composite || a_prop_strength > b_prop_strength;
 
         composite_better && properties_better && strictly_better
     }
 
     /// Find profile with most emergent properties
     pub fn most_emergent(&self) -> Option<&SynergyProfile> {
-        self.profiles
-            .iter()
-            .max_by(|a, b| {
-                let a_count = a.emergent_properties.len();
-                let b_count = b.emergent_properties.len();
-                a_count.cmp(&b_count)
-            })
+        self.profiles.iter().max_by(|a, b| {
+            let a_count = a.emergent_properties.len();
+            let b_count = b.emergent_properties.len();
+            a_count.cmp(&b_count)
+        })
     }
 
     /// Find profile with highest synergy enhancement
     pub fn highest_synergy_boost(&self) -> Option<&SynergyProfile> {
-        self.profiles
-            .iter()
-            .max_by(|a, b| {
-                let a_boost = a.enhanced_composite - a.base.composite;
-                let b_boost = b.enhanced_composite - b.base.composite;
-                a_boost.partial_cmp(&b_boost).unwrap()
-            })
+        self.profiles.iter().max_by(|a, b| {
+            let a_boost = a.enhanced_composite - a.base.composite;
+            let b_boost = b.enhanced_composite - b.base.composite;
+            a_boost.partial_cmp(&b_boost).unwrap()
+        })
     }
 }
 
@@ -454,7 +461,11 @@ mod tests {
     #[test]
     fn test_synergy_detection() {
         // Create profile with high Φ and high Entropy
-        let components = vec![BinaryHV::random(1), BinaryHV::random(2), BinaryHV::random(3)];
+        let components = vec![
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+            BinaryHV::random(3),
+        ];
         let base = ConsciousnessProfile::from_components(&components);
         let synergy = SynergyProfile::from_base(base);
 
@@ -463,9 +474,10 @@ mod tests {
 
         // Enhanced composite should differ from base
         // (either higher due to positive synergies or lower due to antagonistic)
-        println!("Base: {:.3}, Enhanced: {:.3}",
-                 synergy.base.composite,
-                 synergy.enhanced_composite);
+        println!(
+            "Base: {:.3}, Enhanced: {:.3}",
+            synergy.base.composite, synergy.enhanced_composite
+        );
     }
 
     #[test]

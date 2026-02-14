@@ -22,9 +22,9 @@
 //! - Rhyme detection uses suffix similarity
 //! - Compatible with LTC/CfC dynamics for trajectory generation
 
-use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
@@ -54,9 +54,9 @@ pub enum Place {
     Velar,       // K, G, NG
     Glottal,     // HH
     // Vowel positions
-    Front,       // IY, IH, EY, EH, AE
-    Central,     // AH, AX, ER
-    Back,        // UW, UH, OW, AA, AO
+    Front,   // IY, IH, EY, EH, AE
+    Central, // AH, AX, ER
+    Back,    // UW, UH, OW, AA, AO
 }
 
 /// Manner of articulation
@@ -221,20 +221,43 @@ impl PhonemeHdcCodec {
 
         // Initialize place vectors
         for (i, place) in [
-            Place::Bilabial, Place::Labiodental, Place::Dental,
-            Place::Alveolar, Place::Palatal, Place::Velar, Place::Glottal,
-            Place::Front, Place::Central, Place::Back,
-        ].iter().enumerate() {
-            codec.place_vectors.insert(*place, ContinuousHV::random(HDC_DIMENSION, 100 + i as u64));
+            Place::Bilabial,
+            Place::Labiodental,
+            Place::Dental,
+            Place::Alveolar,
+            Place::Palatal,
+            Place::Velar,
+            Place::Glottal,
+            Place::Front,
+            Place::Central,
+            Place::Back,
+        ]
+        .iter()
+        .enumerate()
+        {
+            codec
+                .place_vectors
+                .insert(*place, ContinuousHV::random(HDC_DIMENSION, 100 + i as u64));
         }
 
         // Initialize manner vectors
         for (i, manner) in [
-            Manner::Stop, Manner::Fricative, Manner::Affricate,
-            Manner::Nasal, Manner::Liquid, Manner::Glide,
-            Manner::High, Manner::Mid, Manner::Low,
-        ].iter().enumerate() {
-            codec.manner_vectors.insert(*manner, ContinuousHV::random(HDC_DIMENSION, 200 + i as u64));
+            Manner::Stop,
+            Manner::Fricative,
+            Manner::Affricate,
+            Manner::Nasal,
+            Manner::Liquid,
+            Manner::Glide,
+            Manner::High,
+            Manner::Mid,
+            Manner::Low,
+        ]
+        .iter()
+        .enumerate()
+        {
+            codec
+                .manner_vectors
+                .insert(*manner, ContinuousHV::random(HDC_DIMENSION, 200 + i as u64));
         }
 
         // Build phoneme database
@@ -253,79 +276,475 @@ impl PhonemeHdcCodec {
     /// Build the phoneme specification database
     fn build_phoneme_db(&mut self) {
         // Vowels - Front
-        self.add_spec_basic("IY", Place::Front, Manner::High, true, true, 270.0, 2290.0, 1.0);
-        self.add_spec_basic("IH", Place::Front, Manner::High, true, true, 390.0, 1990.0, 1.0);
-        self.add_spec_basic("EY", Place::Front, Manner::Mid, true, true, 476.0, 2089.0, 1.0);
-        self.add_spec_basic("EH", Place::Front, Manner::Mid, true, true, 550.0, 1770.0, 1.0);
-        self.add_spec_basic("AE", Place::Front, Manner::Low, true, true, 660.0, 1720.0, 1.0);
+        self.add_spec_basic(
+            "IY",
+            Place::Front,
+            Manner::High,
+            true,
+            true,
+            270.0,
+            2290.0,
+            1.0,
+        );
+        self.add_spec_basic(
+            "IH",
+            Place::Front,
+            Manner::High,
+            true,
+            true,
+            390.0,
+            1990.0,
+            1.0,
+        );
+        self.add_spec_basic(
+            "EY",
+            Place::Front,
+            Manner::Mid,
+            true,
+            true,
+            476.0,
+            2089.0,
+            1.0,
+        );
+        self.add_spec_basic(
+            "EH",
+            Place::Front,
+            Manner::Mid,
+            true,
+            true,
+            550.0,
+            1770.0,
+            1.0,
+        );
+        self.add_spec_basic(
+            "AE",
+            Place::Front,
+            Manner::Low,
+            true,
+            true,
+            660.0,
+            1720.0,
+            1.0,
+        );
 
         // Vowels - Central
-        self.add_spec_basic("AH", Place::Central, Manner::Mid, true, true, 640.0, 1190.0, 1.0);
-        self.add_spec_basic("AX", Place::Central, Manner::Mid, true, true, 600.0, 1200.0, 0.9);
-        self.add_spec_basic("ER", Place::Central, Manner::Mid, true, true, 490.0, 1350.0, 0.95);
+        self.add_spec_basic(
+            "AH",
+            Place::Central,
+            Manner::Mid,
+            true,
+            true,
+            640.0,
+            1190.0,
+            1.0,
+        );
+        self.add_spec_basic(
+            "AX",
+            Place::Central,
+            Manner::Mid,
+            true,
+            true,
+            600.0,
+            1200.0,
+            0.9,
+        );
+        self.add_spec_basic(
+            "ER",
+            Place::Central,
+            Manner::Mid,
+            true,
+            true,
+            490.0,
+            1350.0,
+            0.95,
+        );
 
         // Vowels - Back
-        self.add_spec_basic("UW", Place::Back, Manner::High, true, true, 300.0, 870.0, 1.0);
-        self.add_spec_basic("UH", Place::Back, Manner::High, true, true, 440.0, 1020.0, 1.0);
-        self.add_spec_basic("OW", Place::Back, Manner::Mid, true, true, 460.0, 1100.0, 1.0);
-        self.add_spec_basic("AO", Place::Back, Manner::Low, true, true, 570.0, 840.0, 1.0);
-        self.add_spec_basic("AA", Place::Back, Manner::Low, true, true, 710.0, 1100.0, 1.0);
+        self.add_spec_basic(
+            "UW",
+            Place::Back,
+            Manner::High,
+            true,
+            true,
+            300.0,
+            870.0,
+            1.0,
+        );
+        self.add_spec_basic(
+            "UH",
+            Place::Back,
+            Manner::High,
+            true,
+            true,
+            440.0,
+            1020.0,
+            1.0,
+        );
+        self.add_spec_basic(
+            "OW",
+            Place::Back,
+            Manner::Mid,
+            true,
+            true,
+            460.0,
+            1100.0,
+            1.0,
+        );
+        self.add_spec_basic(
+            "AO",
+            Place::Back,
+            Manner::Low,
+            true,
+            true,
+            570.0,
+            840.0,
+            1.0,
+        );
+        self.add_spec_basic(
+            "AA",
+            Place::Back,
+            Manner::Low,
+            true,
+            true,
+            710.0,
+            1100.0,
+            1.0,
+        );
 
         // Diphthongs
-        self.add_spec_basic("AY", Place::Central, Manner::Low, true, true, 700.0, 1200.0, 1.0);
-        self.add_spec_basic("AW", Place::Central, Manner::Low, true, true, 700.0, 1000.0, 1.0);
-        self.add_spec_basic("OY", Place::Back, Manner::Mid, true, true, 500.0, 900.0, 1.0);
+        self.add_spec_basic(
+            "AY",
+            Place::Central,
+            Manner::Low,
+            true,
+            true,
+            700.0,
+            1200.0,
+            1.0,
+        );
+        self.add_spec_basic(
+            "AW",
+            Place::Central,
+            Manner::Low,
+            true,
+            true,
+            700.0,
+            1000.0,
+            1.0,
+        );
+        self.add_spec_basic(
+            "OY",
+            Place::Back,
+            Manner::Mid,
+            true,
+            true,
+            500.0,
+            900.0,
+            1.0,
+        );
 
         // Stops - Voiceless
-        self.add_spec_basic("P", Place::Bilabial, Manner::Stop, false, false, 0.0, 0.0, 0.0);
-        self.add_spec_basic("T", Place::Alveolar, Manner::Stop, false, false, 0.0, 0.0, 0.0);
+        self.add_spec_basic(
+            "P",
+            Place::Bilabial,
+            Manner::Stop,
+            false,
+            false,
+            0.0,
+            0.0,
+            0.0,
+        );
+        self.add_spec_basic(
+            "T",
+            Place::Alveolar,
+            Manner::Stop,
+            false,
+            false,
+            0.0,
+            0.0,
+            0.0,
+        );
         self.add_spec_basic("K", Place::Velar, Manner::Stop, false, false, 0.0, 0.0, 0.0);
 
         // Stops - Voiced
-        self.add_spec_basic("B", Place::Bilabial, Manner::Stop, true, false, 0.0, 0.0, 0.1);
-        self.add_spec_basic("D", Place::Alveolar, Manner::Stop, true, false, 0.0, 0.0, 0.1);
+        self.add_spec_basic(
+            "B",
+            Place::Bilabial,
+            Manner::Stop,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.1,
+        );
+        self.add_spec_basic(
+            "D",
+            Place::Alveolar,
+            Manner::Stop,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.1,
+        );
         self.add_spec_basic("G", Place::Velar, Manner::Stop, true, false, 0.0, 0.0, 0.1);
 
         // Fricatives - Voiceless
-        self.add_spec_basic("F", Place::Labiodental, Manner::Fricative, false, false, 0.0, 0.0, 0.2);
-        self.add_spec_basic("TH", Place::Dental, Manner::Fricative, false, false, 0.0, 0.0, 0.2);
-        self.add_spec_basic("S", Place::Alveolar, Manner::Fricative, false, false, 0.0, 0.0, 0.2);
-        self.add_spec_basic("SH", Place::Palatal, Manner::Fricative, false, false, 0.0, 0.0, 0.2);
-        self.add_spec_basic("HH", Place::Glottal, Manner::Fricative, false, false, 0.0, 0.0, 0.3);
+        self.add_spec_basic(
+            "F",
+            Place::Labiodental,
+            Manner::Fricative,
+            false,
+            false,
+            0.0,
+            0.0,
+            0.2,
+        );
+        self.add_spec_basic(
+            "TH",
+            Place::Dental,
+            Manner::Fricative,
+            false,
+            false,
+            0.0,
+            0.0,
+            0.2,
+        );
+        self.add_spec_basic(
+            "S",
+            Place::Alveolar,
+            Manner::Fricative,
+            false,
+            false,
+            0.0,
+            0.0,
+            0.2,
+        );
+        self.add_spec_basic(
+            "SH",
+            Place::Palatal,
+            Manner::Fricative,
+            false,
+            false,
+            0.0,
+            0.0,
+            0.2,
+        );
+        self.add_spec_basic(
+            "HH",
+            Place::Glottal,
+            Manner::Fricative,
+            false,
+            false,
+            0.0,
+            0.0,
+            0.3,
+        );
 
         // Fricatives - Voiced
-        self.add_spec_basic("V", Place::Labiodental, Manner::Fricative, true, false, 0.0, 0.0, 0.3);
-        self.add_spec_basic("DH", Place::Dental, Manner::Fricative, true, false, 0.0, 0.0, 0.3);
-        self.add_spec_basic("Z", Place::Alveolar, Manner::Fricative, true, false, 0.0, 0.0, 0.3);
-        self.add_spec_basic("ZH", Place::Palatal, Manner::Fricative, true, false, 0.0, 0.0, 0.3);
+        self.add_spec_basic(
+            "V",
+            Place::Labiodental,
+            Manner::Fricative,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.3,
+        );
+        self.add_spec_basic(
+            "DH",
+            Place::Dental,
+            Manner::Fricative,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.3,
+        );
+        self.add_spec_basic(
+            "Z",
+            Place::Alveolar,
+            Manner::Fricative,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.3,
+        );
+        self.add_spec_basic(
+            "ZH",
+            Place::Palatal,
+            Manner::Fricative,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.3,
+        );
 
         // Affricates
-        self.add_spec_basic("CH", Place::Palatal, Manner::Affricate, false, false, 0.0, 0.0, 0.15);
-        self.add_spec_basic("JH", Place::Palatal, Manner::Affricate, true, false, 0.0, 0.0, 0.25);
+        self.add_spec_basic(
+            "CH",
+            Place::Palatal,
+            Manner::Affricate,
+            false,
+            false,
+            0.0,
+            0.0,
+            0.15,
+        );
+        self.add_spec_basic(
+            "JH",
+            Place::Palatal,
+            Manner::Affricate,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.25,
+        );
 
         // Nasals
-        self.add_spec_basic("M", Place::Bilabial, Manner::Nasal, true, false, 0.0, 0.0, 0.6);
-        self.add_spec_basic("N", Place::Alveolar, Manner::Nasal, true, false, 0.0, 0.0, 0.6);
-        self.add_spec_basic("NG", Place::Velar, Manner::Nasal, true, false, 0.0, 0.0, 0.6);
+        self.add_spec_basic(
+            "M",
+            Place::Bilabial,
+            Manner::Nasal,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.6,
+        );
+        self.add_spec_basic(
+            "N",
+            Place::Alveolar,
+            Manner::Nasal,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.6,
+        );
+        self.add_spec_basic(
+            "NG",
+            Place::Velar,
+            Manner::Nasal,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.6,
+        );
 
         // Liquids
-        self.add_spec_basic("L", Place::Alveolar, Manner::Liquid, true, false, 0.0, 0.0, 0.7);
-        self.add_spec_basic("R", Place::Alveolar, Manner::Liquid, true, false, 0.0, 0.0, 0.7);
+        self.add_spec_basic(
+            "L",
+            Place::Alveolar,
+            Manner::Liquid,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.7,
+        );
+        self.add_spec_basic(
+            "R",
+            Place::Alveolar,
+            Manner::Liquid,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.7,
+        );
 
         // Glides
-        self.add_spec_basic("W", Place::Bilabial, Manner::Glide, true, false, 0.0, 0.0, 0.8);
-        self.add_spec_basic("Y", Place::Palatal, Manner::Glide, true, false, 0.0, 0.0, 0.8);
+        self.add_spec_basic(
+            "W",
+            Place::Bilabial,
+            Manner::Glide,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.8,
+        );
+        self.add_spec_basic(
+            "Y",
+            Place::Palatal,
+            Manner::Glide,
+            true,
+            false,
+            0.0,
+            0.0,
+            0.8,
+        );
     }
 
-    fn add_spec(&mut self, arpabet: &str, place: Place, manner: Manner,
-                voiced: bool, is_vowel: bool, f1: f32, f2: f32, f3: f32,
-                sonority: f32, pitch_contour: f32, duration: f32, intensity: f32) {
+    fn add_spec(
+        &mut self,
+        arpabet: &str,
+        place: Place,
+        manner: Manner,
+        voiced: bool,
+        is_vowel: bool,
+        f1: f32,
+        f2: f32,
+        f3: f32,
+        sonority: f32,
+        pitch_contour: f32,
+        duration: f32,
+        intensity: f32,
+    ) {
         // Generate unique base vector for this phoneme
-        let seed = arpabet.bytes().fold(1000u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-        self.phoneme_bases.insert(arpabet.to_string(), ContinuousHV::random(HDC_DIMENSION, seed));
+        let seed = arpabet.bytes().fold(1000u64, |acc, b| {
+            acc.wrapping_mul(31).wrapping_add(b as u64)
+        });
+        self.phoneme_bases.insert(
+            arpabet.to_string(),
+            ContinuousHV::random(HDC_DIMENSION, seed),
+        );
 
-        self.specs.insert(arpabet.to_string(), PhonemeSpec {
-            arpabet: arpabet.to_string(),
+        self.specs.insert(
+            arpabet.to_string(),
+            PhonemeSpec {
+                arpabet: arpabet.to_string(),
+                place,
+                manner,
+                voiced,
+                is_vowel,
+                f1,
+                f2,
+                f3,
+                sonority,
+                pitch_contour,
+                duration,
+                intensity,
+            },
+        );
+    }
+
+    /// Legacy add_spec for backwards compatibility
+    fn add_spec_basic(
+        &mut self,
+        arpabet: &str,
+        place: Place,
+        manner: Manner,
+        voiced: bool,
+        is_vowel: bool,
+        f1: f32,
+        f2: f32,
+        sonority: f32,
+    ) {
+        // Estimate F3 from F2 (typical relationship)
+        let f3 = if is_vowel { f2 + 1000.0 } else { 0.0 };
+        // Default values for new fields
+        let pitch_contour = 0.0;
+        let duration = 1.0;
+        let intensity = if is_vowel { 0.8 } else { sonority * 0.6 };
+        self.add_spec(
+            arpabet,
             place,
             manner,
             voiced,
@@ -337,19 +756,7 @@ impl PhonemeHdcCodec {
             pitch_contour,
             duration,
             intensity,
-        });
-    }
-
-    /// Legacy add_spec for backwards compatibility
-    fn add_spec_basic(&mut self, arpabet: &str, place: Place, manner: Manner,
-                      voiced: bool, is_vowel: bool, f1: f32, f2: f32, sonority: f32) {
-        // Estimate F3 from F2 (typical relationship)
-        let f3 = if is_vowel { f2 + 1000.0 } else { 0.0 };
-        // Default values for new fields
-        let pitch_contour = 0.0;
-        let duration = 1.0;
-        let intensity = if is_vowel { 0.8 } else { sonority * 0.6 };
-        self.add_spec(arpabet, place, manner, voiced, is_vowel, f1, f2, f3, sonority, pitch_contour, duration, intensity);
+        );
     }
 
     /// Encode a phoneme (with caching)
@@ -367,7 +774,9 @@ impl PhonemeHdcCodec {
         };
 
         // Start with base vector
-        let mut hv = self.phoneme_bases.get(arpabet)
+        let mut hv = self
+            .phoneme_bases
+            .get(arpabet)
             .cloned()
             .unwrap_or_else(|| ContinuousHV::random(HDC_DIMENSION, 0));
 
@@ -382,11 +791,19 @@ impl PhonemeHdcCodec {
         }
 
         // Bind voicing
-        let voicing_hv = if spec.voiced { &self.voiced_vector } else { &self.unvoiced_vector };
+        let voicing_hv = if spec.voiced {
+            &self.voiced_vector
+        } else {
+            &self.unvoiced_vector
+        };
         hv = hv.bind(voicing_hv);
 
         // Bind vowel/consonant
-        let type_hv = if spec.is_vowel { &self.vowel_vector } else { &self.consonant_vector };
+        let type_hv = if spec.is_vowel {
+            &self.vowel_vector
+        } else {
+            &self.consonant_vector
+        };
         hv = hv.bind(type_hv);
 
         // For vowels, encode formant positions via weighted bundle
@@ -412,7 +829,7 @@ impl PhonemeHdcCodec {
 
         // Encode pitch contour (affects prosody)
         // Range: -1.0 (falling) to 1.0 (rising)
-        let pitch_t = (spec.pitch_contour + 1.0) / 2.0;  // Map to 0.0-1.0
+        let pitch_t = (spec.pitch_contour + 1.0) / 2.0; // Map to 0.0-1.0
         let pitch_hv = hv_lerp(&self.pitch_falling, &self.pitch_rising, pitch_t);
         hv = hv.bind(&pitch_hv);
 
@@ -433,12 +850,18 @@ impl PhonemeHdcCodec {
     ///
     /// This allows encoding with runtime-specified acoustic features for
     /// richer coarticulation modeling and cross-modal matching with STT.
-    pub fn encode_with_acoustics(&self, arpabet: &str, params: &AcousticParams) -> Option<ContinuousHV> {
+    pub fn encode_with_acoustics(
+        &self,
+        arpabet: &str,
+        params: &AcousticParams,
+    ) -> Option<ContinuousHV> {
         let clean = arpabet.trim_end_matches(|c: char| c.is_ascii_digit());
         let spec = self.specs.get(clean)?;
 
         // Start with base encoding
-        let mut hv = self.phoneme_bases.get(clean)
+        let mut hv = self
+            .phoneme_bases
+            .get(clean)
             .cloned()
             .unwrap_or_else(|| ContinuousHV::random(HDC_DIMENSION, 0));
 
@@ -449,9 +872,17 @@ impl PhonemeHdcCodec {
         if let Some(manner_hv) = self.manner_vectors.get(&spec.manner) {
             hv = hv.bind(manner_hv);
         }
-        let voicing_hv = if spec.voiced { &self.voiced_vector } else { &self.unvoiced_vector };
+        let voicing_hv = if spec.voiced {
+            &self.voiced_vector
+        } else {
+            &self.unvoiced_vector
+        };
         hv = hv.bind(voicing_hv);
-        let type_hv = if spec.is_vowel { &self.vowel_vector } else { &self.consonant_vector };
+        let type_hv = if spec.is_vowel {
+            &self.vowel_vector
+        } else {
+            &self.consonant_vector
+        };
         hv = hv.bind(type_hv);
 
         // Use custom acoustic parameters instead of defaults
@@ -654,8 +1085,12 @@ mod tests {
         let uw = codec.encode("UW").unwrap();
         let front_back_sim = iy.similarity(&uw);
 
-        assert!(front_sim > front_back_sim,
-                "Front vowels should be more similar: {} vs {}", front_sim, front_back_sim);
+        assert!(
+            front_sim > front_back_sim,
+            "Front vowels should be more similar: {} vs {}",
+            front_sim,
+            front_back_sim
+        );
     }
 
     #[test]
@@ -673,8 +1108,12 @@ mod tests {
         let cat_hat = cat.similarity(&hat);
         let cat_dog = cat.similarity(&dog);
 
-        assert!(cat_hat > cat_dog,
-                "Rhyming words should be more similar: {} vs {}", cat_hat, cat_dog);
+        assert!(
+            cat_hat > cat_dog,
+            "Rhyming words should be more similar: {} vs {}",
+            cat_hat,
+            cat_dog
+        );
     }
 
     #[test]
@@ -685,8 +1124,12 @@ mod tests {
         let iy_ih = codec.coarticulation_weight("IY", "IH");
         let iy_k = codec.coarticulation_weight("IY", "K");
 
-        assert!(iy_ih > iy_k,
-                "Similar phonemes should have higher coarticulation: {} vs {}", iy_ih, iy_k);
+        assert!(
+            iy_ih > iy_k,
+            "Similar phonemes should have higher coarticulation: {} vs {}",
+            iy_ih,
+            iy_k
+        );
     }
 
     #[test]
@@ -732,8 +1175,8 @@ mod tests {
             f1: 270.0,
             f2: 2290.0,
             f3: 3290.0,
-            pitch_contour: 0.5,  // Rising
-            duration: 1.5,       // Longer
+            pitch_contour: 0.5, // Rising
+            duration: 1.5,      // Longer
             intensity: 0.9,
             voice_quality: 0.5,
         };
@@ -751,15 +1194,19 @@ mod tests {
 
         // Two vowels with similar F2 (both front) should be more similar
         // than two vowels with different F2 (front vs back)
-        let iy = codec.encode("IY").unwrap();  // Front high (F2 ~2290)
-        let ih = codec.encode("IH").unwrap();  // Front high (F2 ~1990)
-        let uw = codec.encode("UW").unwrap();  // Back high (F2 ~870)
+        let iy = codec.encode("IY").unwrap(); // Front high (F2 ~2290)
+        let ih = codec.encode("IH").unwrap(); // Front high (F2 ~1990)
+        let uw = codec.encode("UW").unwrap(); // Back high (F2 ~870)
 
         let front_front = iy.similarity(&ih);
         let front_back = iy.similarity(&uw);
 
-        assert!(front_front > front_back,
-                "Similar F2 vowels should be more similar: {} vs {}", front_front, front_back);
+        assert!(
+            front_front > front_back,
+            "Similar F2 vowels should be more similar: {} vs {}",
+            front_front,
+            front_back
+        );
     }
 
     #[test]
@@ -768,14 +1215,22 @@ mod tests {
 
         // Encode same phoneme with different pitch contours
         let rising = AcousticParams {
-            f1: 270.0, f2: 2290.0, f3: 3290.0,
-            pitch_contour: 0.8,  // Rising
-            duration: 1.0, intensity: 0.8, voice_quality: 0.5,
+            f1: 270.0,
+            f2: 2290.0,
+            f3: 3290.0,
+            pitch_contour: 0.8, // Rising
+            duration: 1.0,
+            intensity: 0.8,
+            voice_quality: 0.5,
         };
         let falling = AcousticParams {
-            f1: 270.0, f2: 2290.0, f3: 3290.0,
-            pitch_contour: -0.8,  // Falling
-            duration: 1.0, intensity: 0.8, voice_quality: 0.5,
+            f1: 270.0,
+            f2: 2290.0,
+            f3: 3290.0,
+            pitch_contour: -0.8, // Falling
+            duration: 1.0,
+            intensity: 0.8,
+            voice_quality: 0.5,
         };
 
         let hv_rising = codec.encode_with_acoustics("IY", &rising).unwrap();
@@ -784,12 +1239,18 @@ mod tests {
         // The pitch contour contributes to the encoding
         // Similarity < 1.0 means pitch is being encoded
         let sim = hv_rising.similarity(&hv_falling);
-        assert!(sim < 1.0,
-                "Different pitch contours should affect encoding: {}", sim);
+        assert!(
+            sim < 1.0,
+            "Different pitch contours should affect encoding: {}",
+            sim
+        );
         // Still similar since it's the same phoneme with same formants
         // (threshold lowered: 8+ chained binds reduce cosine similarity significantly)
-        assert!(sim > 0.15,
-                "Same phoneme should still be recognizable: {}", sim);
+        assert!(
+            sim > 0.15,
+            "Same phoneme should still be recognizable: {}",
+            sim
+        );
     }
 
     #[test]
@@ -798,12 +1259,22 @@ mod tests {
 
         // Same phoneme, different durations
         let short = AcousticParams {
-            f1: 270.0, f2: 2290.0, f3: 3290.0,
-            pitch_contour: 0.0, duration: 0.5, intensity: 0.8, voice_quality: 0.5,
+            f1: 270.0,
+            f2: 2290.0,
+            f3: 3290.0,
+            pitch_contour: 0.0,
+            duration: 0.5,
+            intensity: 0.8,
+            voice_quality: 0.5,
         };
         let long = AcousticParams {
-            f1: 270.0, f2: 2290.0, f3: 3290.0,
-            pitch_contour: 0.0, duration: 2.0, intensity: 0.8, voice_quality: 0.5,
+            f1: 270.0,
+            f2: 2290.0,
+            f3: 3290.0,
+            pitch_contour: 0.0,
+            duration: 2.0,
+            intensity: 0.8,
+            voice_quality: 0.5,
         };
 
         let hv_short = codec.encode_with_acoustics("IY", &short).unwrap();
@@ -811,11 +1282,17 @@ mod tests {
 
         // Duration affects encoding
         let sim = hv_short.similarity(&hv_long);
-        assert!(sim < 1.0,
-                "Different durations should affect encoding: {}", sim);
+        assert!(
+            sim < 1.0,
+            "Different durations should affect encoding: {}",
+            sim
+        );
         // Still recognizable as the same phoneme
         // (threshold lowered: 8+ chained binds reduce cosine similarity)
-        assert!(sim > 0.3,
-                "Same phoneme should still be recognizable: {}", sim);
+        assert!(
+            sim > 0.3,
+            "Same phoneme should still be recognizable: {}",
+            sim
+        );
     }
 }

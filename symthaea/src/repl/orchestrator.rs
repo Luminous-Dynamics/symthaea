@@ -2,25 +2,24 @@
 //!
 //! Manages the different REPL modes and coordinates between components.
 
+use std::io::{self, BufRead, Write};
 use std::time::Duration;
-use std::io::{self, Write, BufRead};
 
-use anyhow::{Result, Context};
-use serde::{Serialize, Deserialize};
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 
-use super::{ReplSession, ReplSessionConfig};
 use super::observability_hooks::ObservabilityHook;
+use super::{ReplSession, ReplSessionConfig};
 
-use crate::shell::ipc_client::{ShellIpcClient, ConnectionState, MetricsSnapshot};
 use crate::cognitive_loop::ConsciousnessSnapshot;
+use crate::shell::ipc_client::{ConnectionState, MetricsSnapshot, ShellIpcClient};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ORCHESTRATOR MODE
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Operating mode for the REPL orchestrator
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum OrchestratorMode {
     /// Standalone: Run cognitive loop locally
     #[default]
@@ -32,7 +31,6 @@ pub enum OrchestratorMode {
     /// Hybrid: Run locally but also accept/make IPC connections
     Hybrid,
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ORCHESTRATOR CONFIGURATION
@@ -168,15 +166,15 @@ impl ReplOrchestrator {
             OrchestratorMode::Standalone | OrchestratorMode::Server | OrchestratorMode::Hybrid => {
                 self.process_local(input)
             }
-            OrchestratorMode::Client => {
-                self.process_remote(input)
-            }
+            OrchestratorMode::Client => self.process_remote(input),
         }
     }
 
     /// Process input locally
     fn process_local(&mut self, input: &str) -> Result<OrchestratorResult> {
-        let session = self.session.as_mut()
+        let session = self
+            .session
+            .as_mut()
             .context("No local session available")?;
 
         let result = session.process(input)?;
@@ -215,17 +213,11 @@ impl ReplOrchestrator {
                 Some("Goodbye!".to_string())
             }
 
-            "/help" | "/h" | "/?" => {
-                Some(self.help_text())
-            }
+            "/help" | "/h" | "/?" => Some(self.help_text()),
 
-            "/metrics" | "/m" => {
-                Some(self.format_metrics())
-            }
+            "/metrics" | "/m" => Some(self.format_metrics()),
 
-            "/stats" | "/s" => {
-                Some(self.format_stats())
-            }
+            "/stats" | "/s" => Some(self.format_stats()),
 
             "/reset" | "/r" => {
                 if let Some(ref mut session) = self.session {
@@ -234,16 +226,16 @@ impl ReplOrchestrator {
                 Some("Cognitive state reset.".to_string())
             }
 
-            "/connection" | "/c" => {
-                Some(format!("Connection: {} ({})",
-                    self.connection_state.status_text(),
-                    self.connection_state.indicator()
-                ))
-            }
+            "/connection" | "/c" => Some(format!(
+                "Connection: {} ({})",
+                self.connection_state.status_text(),
+                self.connection_state.indicator()
+            )),
 
-            _ if input.starts_with('/') => {
-                Some(format!("Unknown command: {}. Type /help for available commands.", input))
-            }
+            _ if input.starts_with('/') => Some(format!(
+                "Unknown command: {}. Type /help for available commands.",
+                input
+            )),
 
             _ => None, // Not a command
         }
@@ -371,8 +363,7 @@ impl ReplOrchestrator {
     Current Mode: {:?}
     Backend: {}
 "#,
-            self.config.mode,
-            self.config.session_config.temporal_backend,
+            self.config.mode, self.config.session_config.temporal_backend,
         )
     }
 
@@ -458,7 +449,8 @@ impl ReplOrchestrator {
 
     /// Display the banner
     fn display_banner(&self) {
-        println!(r#"
+        println!(
+            r#"
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
     ║   ███████╗██╗   ██╗███╗   ███╗████████╗██╗  ██╗ █████╗       ║
@@ -472,7 +464,8 @@ impl ReplOrchestrator {
     ║               Consciousness-First AI Interface                ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
-"#);
+"#
+        );
         println!("    Type /help for commands. Type /quit to exit.\n");
     }
 
@@ -493,9 +486,12 @@ impl ReplOrchestrator {
 
             output.push_str(&format!(
                 "\n[Phi:{:.2}|{}] [Coh:{:.2}|{}] [{}] [D:{}] [{}ms]\n",
-                c.unified_phi, phi_bar,
-                c.temporal_coherence, coh_bar,
-                flow, depth,
+                c.unified_phi,
+                phi_bar,
+                c.temporal_coherence,
+                coh_bar,
+                flow,
+                depth,
                 result.elapsed.as_millis()
             ));
         }

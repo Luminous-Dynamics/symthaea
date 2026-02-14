@@ -25,10 +25,8 @@
 //! - Balanced: Good across all dimensions
 
 use crate::consciousness::{
-    primitive_evolution::{
-        CandidatePrimitive, EvolutionConfig, PrimitiveEvolution
-    },
     consciousness_profile::{ConsciousnessProfile, ParetoFrontier},
+    primitive_evolution::{CandidatePrimitive, EvolutionConfig, PrimitiveEvolution},
 };
 use crate::hdc::primitive_system::PrimitiveTier;
 use anyhow::Result;
@@ -50,7 +48,7 @@ pub struct MultiObjectiveResult {
 
     /// Frontier statistics
     pub frontier_size: usize,
-    pub frontier_spread: f64,  // How diverse is the frontier?
+    pub frontier_spread: f64, // How diverse is the frontier?
 
     /// Best according to different criteria
     pub highest_phi: PrimitiveWithProfile,
@@ -110,12 +108,16 @@ impl MultiObjectiveEvolution {
         let initial_result = initial_evolution.evolve()?;
 
         // Convert to profiles
-        self.population = initial_result.final_primitives
+        self.population = initial_result
+            .final_primitives
             .into_iter()
             .map(PrimitiveWithProfile::from_primitive)
             .collect();
 
-        println!("   Initial population: {} primitives", self.population.len());
+        println!(
+            "   Initial population: {} primitives",
+            self.population.len()
+        );
 
         // Multi-objective evolution loop
         let mut converged = false;
@@ -124,13 +126,15 @@ impl MultiObjectiveEvolution {
         for gen in 0..self.config.num_generations {
             self.generation = gen;
 
-            println!("\n🧬 Multi-Objective Generation {}/{}...", gen + 1, self.config.num_generations);
+            println!(
+                "\n🧬 Multi-Objective Generation {}/{}...",
+                gen + 1,
+                self.config.num_generations
+            );
 
             // Compute Pareto frontier
-            let profiles: Vec<ConsciousnessProfile> = self.population
-                .iter()
-                .map(|p| p.profile.clone())
-                .collect();
+            let profiles: Vec<ConsciousnessProfile> =
+                self.population.iter().map(|p| p.profile.clone()).collect();
 
             let frontier = ParetoFrontier::from_population(profiles);
 
@@ -155,15 +159,14 @@ impl MultiObjectiveEvolution {
         let elapsed = start.elapsed();
 
         // Final Pareto frontier
-        let final_profiles: Vec<ConsciousnessProfile> = self.population
-            .iter()
-            .map(|p| p.profile.clone())
-            .collect();
+        let final_profiles: Vec<ConsciousnessProfile> =
+            self.population.iter().map(|p| p.profile.clone()).collect();
 
         let pareto_frontier_obj = ParetoFrontier::from_population(final_profiles.clone());
 
         // Extract frontier primitives
-        let pareto_frontier: Vec<PrimitiveWithProfile> = self.population
+        let pareto_frontier: Vec<PrimitiveWithProfile> = self
+            .population
             .iter()
             .filter(|p| p.profile.is_pareto_optimal(&final_profiles))
             .cloned()
@@ -173,9 +176,11 @@ impl MultiObjectiveEvolution {
         let highest_phi = self.find_highest_phi();
         let highest_entropy = self.find_highest_entropy();
         let highest_complexity = self.find_highest_complexity();
-        let highest_composite = pareto_frontier_obj.highest_composite()
+        let highest_composite = pareto_frontier_obj
+            .highest_composite()
             .and_then(|prof| {
-                self.population.iter()
+                self.population
+                    .iter()
                     .find(|p| (p.profile.composite - prof.composite).abs() < 0.0001)
                     .cloned()
             })
@@ -204,7 +209,8 @@ impl MultiObjectiveEvolution {
         let mut next_generation = Vec::new();
 
         // Elitism: keep all frontier members
-        let frontier_members: Vec<PrimitiveWithProfile> = self.population
+        let frontier_members: Vec<PrimitiveWithProfile> = self
+            .population
             .iter()
             .filter(|p| p.profile.is_pareto_optimal(&frontier.profiles))
             .cloned()
@@ -223,7 +229,7 @@ impl MultiObjectiveEvolution {
                     let child_primitive = CandidatePrimitive::recombine(
                         &p1.primitive,
                         &p2.primitive,
-                        self.generation + 1
+                        self.generation + 1,
                     );
                     let child = PrimitiveWithProfile::from_primitive(child_primitive);
                     next_generation.push(child);
@@ -231,10 +237,9 @@ impl MultiObjectiveEvolution {
             } else {
                 // Mutation
                 if let Some(parent) = self.select_from_frontier(frontier) {
-                    let child_primitive = parent.primitive.mutate(
-                        self.config.mutation_rate,
-                        self.generation + 1
-                    );
+                    let child_primitive = parent
+                        .primitive
+                        .mutate(self.config.mutation_rate, self.generation + 1);
                     let child = PrimitiveWithProfile::from_primitive(child_primitive);
                     next_generation.push(child);
                 }
@@ -260,9 +265,11 @@ impl MultiObjectiveEvolution {
             let profile = &frontier.profiles[idx];
 
             // Find corresponding primitive
-            if let Some(prim) = self.population.iter().find(|p| {
-                (p.profile.composite - profile.composite).abs() < 0.0001
-            }) {
+            if let Some(prim) = self
+                .population
+                .iter()
+                .find(|p| (p.profile.composite - profile.composite).abs() < 0.0001)
+            {
                 if profile.composite > best_composite {
                     best_composite = profile.composite;
                     best = Some(prim);
@@ -295,7 +302,12 @@ impl MultiObjectiveEvolution {
     fn find_highest_complexity(&self) -> PrimitiveWithProfile {
         self.population
             .iter()
-            .max_by(|a, b| a.profile.complexity.partial_cmp(&b.profile.complexity).unwrap())
+            .max_by(|a, b| {
+                a.profile
+                    .complexity
+                    .partial_cmp(&b.profile.complexity)
+                    .unwrap()
+            })
             .unwrap()
             .clone()
     }
@@ -310,7 +322,7 @@ impl MultiObjectiveEvolution {
         let mut distances = Vec::new();
 
         for i in 0..frontier.len() {
-            for j in (i+1)..frontier.len() {
+            for j in (i + 1)..frontier.len() {
                 let dist = frontier[i].profile.distance_to(&frontier[j].profile);
                 distances.push(dist);
             }
@@ -329,9 +341,12 @@ impl MultiObjectiveEvolution {
             return;
         }
 
-        let mean_phi = frontier.profiles.iter().map(|p| p.phi).sum::<f64>() / frontier.profiles.len() as f64;
-        let mean_entropy = frontier.profiles.iter().map(|p| p.entropy).sum::<f64>() / frontier.profiles.len() as f64;
-        let mean_complexity = frontier.profiles.iter().map(|p| p.complexity).sum::<f64>() / frontier.profiles.len() as f64;
+        let mean_phi =
+            frontier.profiles.iter().map(|p| p.phi).sum::<f64>() / frontier.profiles.len() as f64;
+        let mean_entropy = frontier.profiles.iter().map(|p| p.entropy).sum::<f64>()
+            / frontier.profiles.len() as f64;
+        let mean_complexity = frontier.profiles.iter().map(|p| p.complexity).sum::<f64>()
+            / frontier.profiles.len() as f64;
 
         println!("   Frontier stats:");
         println!("      Mean Φ: {:.4}", mean_phi);

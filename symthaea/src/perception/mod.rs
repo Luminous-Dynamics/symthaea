@@ -13,8 +13,8 @@
 //! we treat it as a "Semantic Sensor" (Activations -> Vectors).
 
 pub mod physio;
-pub mod video;
 pub mod social_trust;
+pub mod video;
 
 // Audio perception - Speech recognition via symthaea-stt
 pub mod audio;
@@ -28,7 +28,7 @@ pub use model_status::{ModelLoadError, ModelRegistry};
 
 // Semantic encoding - Text/embedding -> HDC projection
 pub mod semantic_encoder;
-pub use semantic_encoder::{SemanticEncoder, JLProjector, NGramEncoder};
+pub use semantic_encoder::{JLProjector, NGramEncoder, SemanticEncoder};
 
 // Neural Bridge - LLM activation -> HDC direct projection
 pub mod neural_bridge;
@@ -37,8 +37,8 @@ pub use neural_bridge::NeuralBridge;
 // Neural Bridge Consciousness Probe - Topological analysis of LLM representations
 pub mod neural_bridge_consciousness_probe;
 pub use neural_bridge_consciousness_probe::{
-    ConsciousnessProbe, ConceptCorpus, Concept, ConceptProbeResult,
-    ClassComparisonResult, ClassStatistics, ProbeConfig,
+    ClassComparisonResult, ClassStatistics, Concept, ConceptCorpus, ConceptProbeResult,
+    ConsciousnessProbe, ProbeConfig,
 };
 
 #[cfg(feature = "neural-bridge")]
@@ -49,7 +49,7 @@ pub use neural_bridge_consciousness_probe::ConsciousnessProbeV2;
 pub mod layer_extractor;
 
 #[cfg(feature = "neural-bridge")]
-pub use layer_extractor::{LayerExtractor, LayerActivation, AllLayerActivations, PoolingMethod};
+pub use layer_extractor::{AllLayerActivations, LayerActivation, LayerExtractor, PoolingMethod};
 
 // BERT-specific layer extraction (using candle-transformers native BERT)
 #[cfg(feature = "neural-bridge")]
@@ -57,8 +57,8 @@ pub mod bert_layer_extractor;
 
 #[cfg(feature = "neural-bridge")]
 pub use bert_layer_extractor::{
-    BertLayerExtractor, BertPreset, BertExtractorConfig,
-    bert_extraction_status, BertExtractionStatus, print_bert_status,
+    bert_extraction_status, print_bert_status, BertExtractionStatus, BertExtractorConfig,
+    BertLayerExtractor, BertPreset,
 };
 
 // Phenomenal Content Detector - Detect phenomenal vs functional content
@@ -67,28 +67,37 @@ pub mod phenomenal_detector;
 
 #[cfg(feature = "neural-bridge")]
 pub use phenomenal_detector::{
-    PhenomenalDetector, DetectorConfig, DetectionMethod,
-    PhenomenalClassification, PhenomenalAnalysis, ClassLabel,
-    ComparisonResult, DocumentAnalysis, CalibrationResult,
+    CalibrationResult,
+    ClassLabel,
+    ComparisonResult,
+    ContrastiveCalibrationResult,
+    ContrastiveEvaluation,
     // Contrastive training types
-    ContrastiveExample, ContrastiveExamples, ContrastiveCalibrationResult,
-    ContrastiveEvaluation, ExampleEvaluation,
+    ContrastiveExample,
+    ContrastiveExamples,
+    DetectionMethod,
+    DetectorConfig,
+    DocumentAnalysis,
+    ExampleEvaluation,
+    PhenomenalAnalysis,
+    PhenomenalClassification,
+    PhenomenalDetector,
 };
 
 // Scaling Findings - Research findings on phenomenal discrimination scaling
 // Documents optimal model sizes and angular separation mechanisms
 pub mod scaling_findings;
 pub use scaling_findings::{
-    Architecture, OptimalModelConfig, ScalingMetrics, ScalingFindings,
-    DiscriminationQuality, ModelRecommendation,
-    get_optimal_model, get_all_optimal_configs, get_scaling_findings, recommend_model,
+    get_all_optimal_configs, get_optimal_model, get_scaling_findings, recommend_model,
+    Architecture, DiscriminationQuality, ModelRecommendation, OptimalModelConfig, ScalingFindings,
+    ScalingMetrics,
 };
 
 // Multi-Model Extractor Framework - Cross-architecture support
 pub mod multi_model_extractor;
 pub use multi_model_extractor::{
-    ModelPreset, ModelConfig, ModelArchitecture, PoolingStrategy,
-    ValidationStatus, all_validation_status, print_support_summary,
+    all_validation_status, print_support_summary, ModelArchitecture, ModelConfig, ModelPreset,
+    PoolingStrategy, ValidationStatus,
 };
 
 // Epistemic Semantic Vectors - HDC with uncertainty metadata
@@ -114,35 +123,49 @@ pub mod modern_embeddings;
 
 #[cfg(feature = "neural-bridge")]
 pub use modern_embeddings::{
-    // Core trait and types
-    EmbeddingModel, LayerOutput,
+    activation_to_hv16,
+    all_model_info,
+    print_model_summary,
+    // HDC integration
+    project_to_hv16,
+    EmbedderStats,
     // Configuration - note: PoolingMethod conflicts with layer_extractor, use modern_embeddings::PoolingMethod
-    EmbeddingConfig, ModelBackend,
+    EmbeddingConfig,
+    // Core trait and types
+    EmbeddingModel,
+    LayerAnalysisResult,
+    LayerOutput,
+    LayerScore,
+    ModelBackend,
+    // Model info
+    ModelInfo,
+    ModelStatus,
+    PhenomenalCorridor,
+    // H2 hypothesis testing
+    PhenomenalLayerAnalyzer,
     // ModelArchitecture conflicts with multi_model_extractor, use modern_embeddings::ModelArchitecture
     // Main interface
-    UnifiedEmbedder, EmbedderStats,
-    // H2 hypothesis testing
-    PhenomenalLayerAnalyzer, LayerAnalysisResult, LayerScore, PhenomenalCorridor,
-    // Model info
-    ModelInfo, ModelStatus, all_model_info, print_model_summary,
-    // HDC integration
-    project_to_hv16, activation_to_hv16,
+    UnifiedEmbedder,
 };
 
 // Multi-modal integration (conditionally compiled)
 #[cfg(feature = "full_perception")]
-pub mod visual_cortex;
+pub mod multi_modal;
 #[cfg(feature = "full_perception")]
 pub mod semantic_vision;
 #[cfg(feature = "full_perception")]
-pub mod multi_modal;
+pub mod visual_cortex;
 
 #[cfg(feature = "full_perception")]
-pub use visual_cortex::{VisualCortex, VisualCortexConfig, FeatureExtractionResult};
+pub use multi_modal::{
+    ModalityType, MultiModalConfig, MultiModalIntegrator, MultiModalPerception, PerceptionInput,
+};
 #[cfg(feature = "full_perception")]
-pub use semantic_vision::{SemanticVision, VisionConfig, VisualFeatures, ImageEmbedding, ImageCaption, OcrSystem};
+pub use semantic_vision::{
+    ImageCaption, ImageEmbedding, OcrSystem, SemanticVision, VisionConfig, VisualFeatures,
+};
 #[cfg(feature = "full_perception")]
-pub use multi_modal::{MultiModalIntegrator, MultiModalPerception, MultiModalConfig, ModalityType, PerceptionInput};
+pub use visual_cortex::{FeatureExtractionResult, VisualCortex, VisualCortexConfig};
 
 #[cfg(feature = "full_perception")]
 pub mod conscious_perception;

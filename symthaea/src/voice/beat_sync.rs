@@ -132,10 +132,10 @@ impl FlowPattern {
     pub fn sixteenth_notes() -> Self {
         let positions: Vec<f32> = (0..16).map(|i| i as f32 / 16.0).collect();
         let stresses = vec![
-            1.0, 0.3, 0.5, 0.3,  // Beat 1
-            0.8, 0.3, 0.5, 0.3,  // Beat 2
-            1.0, 0.3, 0.5, 0.3,  // Beat 3
-            0.8, 0.3, 0.5, 0.3,  // Beat 4
+            1.0, 0.3, 0.5, 0.3, // Beat 1
+            0.8, 0.3, 0.5, 0.3, // Beat 2
+            1.0, 0.3, 0.5, 0.3, // Beat 3
+            0.8, 0.3, 0.5, 0.3, // Beat 4
         ];
         let durations = vec![1.0; 16];
 
@@ -186,10 +186,15 @@ impl FlowPattern {
         let positions: Vec<f32> = (0..32).map(|i| i as f32 / 32.0).collect();
         let stresses: Vec<f32> = (0..32)
             .map(|i| {
-                if i % 8 == 0 { 1.0 }
-                else if i % 4 == 0 { 0.7 }
-                else if i % 2 == 0 { 0.5 }
-                else { 0.3 }
+                if i % 8 == 0 {
+                    1.0
+                } else if i % 4 == 0 {
+                    0.7
+                } else if i % 2 == 0 {
+                    0.5
+                } else {
+                    0.3
+                }
             })
             .collect();
         let durations = vec![0.8; 32];
@@ -352,7 +357,8 @@ impl BeatSync {
             let next_time = if i + 1 < syllables.len() {
                 let next_pattern_idx = (i + 1) % pattern_len;
                 let next_bar_offset = (i + 1) / pattern_len;
-                let next_bar_start = (start_bar + next_bar_offset as u32) as f32 * self.bar_duration();
+                let next_bar_start =
+                    (start_bar + next_bar_offset as u32) as f32 * self.bar_duration();
                 let next_position = pattern.positions[next_pattern_idx] * self.bar_duration();
                 self.apply_swing(next_bar_start + next_position)
             } else {
@@ -730,7 +736,11 @@ mod tests {
         // First note of each beat triplet should have stress 1.0
         for beat in 0..4 {
             let idx = beat * 3;
-            assert_eq!(pattern.stresses[idx], 1.0, "Beat {} first triplet stress", beat);
+            assert_eq!(
+                pattern.stresses[idx], 1.0,
+                "Beat {} first triplet stress",
+                beat
+            );
         }
 
         // Other triplet notes should have stress 0.5
@@ -750,8 +760,8 @@ mod tests {
 
         // First beat triplets: 0.0, 1/12, 2/12
         assert!((pattern.positions[0] - 0.0).abs() < tolerance);
-        assert!((pattern.positions[1] - 1.0/12.0).abs() < tolerance);
-        assert!((pattern.positions[2] - 2.0/12.0).abs() < tolerance);
+        assert!((pattern.positions[1] - 1.0 / 12.0).abs() < tolerance);
+        assert!((pattern.positions[2] - 2.0 / 12.0).abs() < tolerance);
 
         // Second beat starts at 0.25
         assert!((pattern.positions[3] - 0.25).abs() < tolerance);
@@ -855,7 +865,11 @@ mod tests {
         let times = [0.0, 0.125, 0.25, 0.375, 0.5];
         for &time in &times {
             let swung = sync.apply_swing(time);
-            assert!((swung - time).abs() < 0.001, "Time {} should be unchanged with zero swing", time);
+            assert!(
+                (swung - time).abs() < 0.001,
+                "Time {} should be unchanged with zero swing",
+                time
+            );
         }
     }
 
@@ -886,7 +900,11 @@ mod tests {
         let on_beat_times = [0.0, 0.25, 0.5, 0.75]; // Subdivisions 0 and 2
         for &time in &on_beat_times {
             let swung = sync.apply_swing(time);
-            assert!((swung - time).abs() < 0.001, "On-beat time {} should not be swung", time);
+            assert!(
+                (swung - time).abs() < 0.001,
+                "On-beat time {} should not be swung",
+                time
+            );
         }
     }
 
@@ -910,10 +928,12 @@ mod tests {
         sync.swing = SwingConfig::hip_hop();
 
         let pattern = FlowPattern::boom_bap();
-        let syllables: Vec<String> = vec!["one", "two", "three", "four", "five", "six", "seven", "eight"]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let syllables: Vec<String> = vec![
+            "one", "two", "three", "four", "five", "six", "seven", "eight",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let timings = sync.map_syllables(&syllables, &pattern, 0);
 
@@ -927,11 +947,14 @@ mod tests {
         for (i, timing) in timings.iter().enumerate() {
             let pattern_idx = i % pattern.positions.len();
             let bar_offset = (i / pattern.positions.len()) as f32;
-            let straight = bar_offset * bar_duration + pattern.positions[pattern_idx] * bar_duration;
+            let straight =
+                bar_offset * bar_duration + pattern.positions[pattern_idx] * bar_duration;
             assert!(
                 (timing.start_time - straight).abs() < 1e-4,
                 "Position {} should not be swung, got {} vs straight {}",
-                i, timing.start_time, straight,
+                i,
+                timing.start_time,
+                straight,
             );
         }
     }
@@ -1047,10 +1070,12 @@ mod tests {
         let pattern = FlowPattern::laid_back(); // 4 syllables per bar
 
         // 8 syllables should span 2 bars
-        let syllables: Vec<String> = vec!["one", "two", "three", "four", "five", "six", "seven", "eight"]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let syllables: Vec<String> = vec![
+            "one", "two", "three", "four", "five", "six", "seven", "eight",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let timings = sync.map_syllables(&syllables, &pattern, 0);
 
@@ -1066,16 +1091,17 @@ mod tests {
         let sync = BeatSync::new(120.0);
         let pattern = FlowPattern::double_time(); // Fast pattern with short durations
 
-        let syllables: Vec<String> = vec!["a", "b"]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let syllables: Vec<String> = vec!["a", "b"].into_iter().map(String::from).collect();
 
         let timings = sync.map_syllables(&syllables, &pattern, 0);
 
         // All durations should be at least 0.05s
         for timing in &timings {
-            assert!(timing.duration >= 0.05, "Duration {} is below minimum", timing.duration);
+            assert!(
+                timing.duration >= 0.05,
+                "Duration {} is below minimum",
+                timing.duration
+            );
         }
     }
 

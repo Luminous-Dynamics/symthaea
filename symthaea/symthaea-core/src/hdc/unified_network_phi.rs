@@ -38,9 +38,9 @@
 //! println!("Network Phi: {:.4}", phi.phi);
 //! ```
 
+use crate::hdc::autodiff_phi::{AutodiffConfig, AutodiffPhiEngine, DiffNetwork, DiffNode};
 use crate::hdc::hdc_ltc_unified::{HdcLtcUnifiedNetwork, UnifiedNetworkConfig};
 use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::autodiff_phi::{AutodiffPhiEngine, AutodiffConfig, DiffNetwork, DiffNode};
 use crate::phi_engine::{PhiEngine, PhiMethod};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -214,7 +214,10 @@ impl NetworkStateExtractor {
     }
 
     /// Extract states for a specific layer
-    pub fn extract_layer_states(network: &HdcLtcUnifiedNetwork, layer_idx: usize) -> Vec<ContinuousHV> {
+    pub fn extract_layer_states(
+        network: &HdcLtcUnifiedNetwork,
+        layer_idx: usize,
+    ) -> Vec<ContinuousHV> {
         if let Some(layer) = network.layer(layer_idx) {
             layer.iter().map(|n| n.state().clone()).collect()
         } else {
@@ -241,7 +244,8 @@ impl NetworkStateExtractor {
 
         // If input is already small enough, use directly
         if input_dim <= output_dim {
-            return states.iter()
+            return states
+                .iter()
                 .map(|hv| {
                     let mut node = DiffNode {
                         values: hv.values.iter().map(|&x| x as f64).collect(),
@@ -257,7 +261,9 @@ impl NetworkStateExtractor {
         // Johnson-Lindenstrauss lemma guarantees approximate distance preservation
         let projection_scale = (output_dim as f64).sqrt();
 
-        states.iter().enumerate()
+        states
+            .iter()
+            .enumerate()
             .map(|(idx, hv)| {
                 let mut projected = vec![0.0f64; output_dim];
 
@@ -266,7 +272,11 @@ impl NetworkStateExtractor {
                     // Hash to select output index
                     let out_idx = (i * 31 + idx * 17) % output_dim;
                     // Hash to select sign
-                    let sign = if (i * 37 + idx * 23) % 2 == 0 { 1.0 } else { -1.0 };
+                    let sign = if (i * 37 + idx * 23) % 2 == 0 {
+                        1.0
+                    } else {
+                        -1.0
+                    };
                     projected[out_idx] += sign * val as f64;
                 }
 
@@ -348,7 +358,10 @@ impl UnifiedNetworkPhiMeasurer {
     pub fn with_config(config: UnifiedPhiConfig) -> Self {
         let phi_engine = PhiEngine::new(PhiMethod::SpectralConnectivity);
 
-        let autodiff_engine = if matches!(config.method, PhiCalculationMethod::Autodiff | PhiCalculationMethod::Combined) {
+        let autodiff_engine = if matches!(
+            config.method,
+            PhiCalculationMethod::Autodiff | PhiCalculationMethod::Combined
+        ) {
             Some(AutodiffPhiEngine::new(AutodiffConfig {
                 temperature: config.autodiff_temperature,
                 n_partition_samples: config.n_partition_samples,
@@ -402,13 +415,12 @@ impl UnifiedNetworkPhiMeasurer {
                 let result = self.phi_engine.compute(&processed_states);
                 (result.phi, None, None)
             }
-            PhiCalculationMethod::Autodiff => {
-                self.measure_autodiff(&processed_states)
-            }
+            PhiCalculationMethod::Autodiff => self.measure_autodiff(&processed_states),
             PhiCalculationMethod::Combined => {
                 // Use spectral as primary, autodiff for validation
                 let spectral_result = self.phi_engine.compute(&processed_states);
-                let (autodiff_phi, whole_int, sim_matrix) = self.measure_autodiff(&processed_states);
+                let (autodiff_phi, whole_int, sim_matrix) =
+                    self.measure_autodiff(&processed_states);
 
                 // Average the two methods
                 let combined_phi = (spectral_result.phi + autodiff_phi) / 2.0;
@@ -433,7 +445,10 @@ impl UnifiedNetworkPhiMeasurer {
     }
 
     /// Measure Phi using autodiff method
-    fn measure_autodiff(&mut self, states: &[ContinuousHV]) -> (f64, Option<f64>, Option<Vec<Vec<f64>>>) {
+    fn measure_autodiff(
+        &mut self,
+        states: &[ContinuousHV],
+    ) -> (f64, Option<f64>, Option<Vec<Vec<f64>>>) {
         if let Some(ref mut engine) = self.autodiff_engine {
             // Convert to DiffNode format
             let nodes = NetworkStateExtractor::to_diff_nodes(states);
@@ -445,14 +460,22 @@ impl UnifiedNetworkPhiMeasurer {
 
             let result = engine.forward(&diff_network);
 
-            (result.phi, Some(result.whole_integration), Some(result.similarity_matrix))
+            (
+                result.phi,
+                Some(result.whole_integration),
+                Some(result.similarity_matrix),
+            )
         } else {
             (0.0, None, None)
         }
     }
 
     /// Compute Phi for each layer separately
-    fn compute_layer_phi(&mut self, network: &HdcLtcUnifiedNetwork, _all_states: &[ContinuousHV]) -> Vec<f64> {
+    fn compute_layer_phi(
+        &mut self,
+        network: &HdcLtcUnifiedNetwork,
+        _all_states: &[ContinuousHV],
+    ) -> Vec<f64> {
         let mut layer_phis = Vec::new();
 
         for layer_idx in 0..network.n_layers() {
@@ -548,9 +571,7 @@ impl PhiEvolutionTracker {
 
         let phis = self.phi_values();
         let mean = phis.iter().sum::<f64>() / phis.len() as f64;
-        let variance = phis.iter()
-            .map(|p| (p - mean).powi(2))
-            .sum::<f64>() / phis.len() as f64;
+        let variance = phis.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / phis.len() as f64;
 
         PhiEvolutionSummary {
             n_measurements: self.history.len(),
@@ -560,7 +581,8 @@ impl PhiEvolutionTracker {
             max_phi: phis.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
             mean_phi: mean,
             std_phi: variance.sqrt(),
-            total_time: self.timestamps.last().copied().unwrap_or(0.0) - self.timestamps.first().copied().unwrap_or(0.0),
+            total_time: self.timestamps.last().copied().unwrap_or(0.0)
+                - self.timestamps.first().copied().unwrap_or(0.0),
         }
     }
 }
@@ -605,7 +627,11 @@ impl PhiComparator {
             phi_a: phi_a.phi,
             phi_b: phi_b.phi,
             difference: phi_b.phi - phi_a.phi,
-            ratio: if phi_a.phi > 0.0 { phi_b.phi / phi_a.phi } else { f64::INFINITY },
+            ratio: if phi_a.phi > 0.0 {
+                phi_b.phi / phi_a.phi
+            } else {
+                f64::INFINITY
+            },
             measurement_a: phi_a,
             measurement_b: phi_b,
         }
@@ -624,7 +650,9 @@ impl PhiComparator {
         for &factor in connectivity_factors {
             // Scale layer sizes by connectivity factor
             let scaled_config = UnifiedNetworkConfig {
-                layer_sizes: base_config.layer_sizes.iter()
+                layer_sizes: base_config
+                    .layer_sizes
+                    .iter()
                     .map(|&size| ((size as f32 * factor) as usize).max(2))
                     .collect(),
                 ..base_config.clone()
@@ -703,13 +731,23 @@ impl PhiValidator {
         ValidationResult {
             name: "Integration Increases Phi".to_string(),
             passed,
-            expected: format!("phi_large ({:.4}) >= phi_small ({:.4}) * 0.8", phi_large.phi, phi_small.phi),
-            actual: format!("phi_small={:.4}, phi_large={:.4}", phi_small.phi, phi_large.phi),
+            expected: format!(
+                "phi_large ({:.4}) >= phi_small ({:.4}) * 0.8",
+                phi_large.phi, phi_small.phi
+            ),
+            actual: format!(
+                "phi_small={:.4}, phi_large={:.4}",
+                phi_small.phi, phi_large.phi
+            ),
             details: Some(format!(
                 "Small network: {} neurons, {} layers, Phi={:.4}\n\
                  Large network: {} neurons, {} layers, Phi={:.4}",
-                phi_small.n_neurons, phi_small.n_layers, phi_small.phi,
-                phi_large.n_neurons, phi_large.n_layers, phi_large.phi
+                phi_small.n_neurons,
+                phi_small.n_layers,
+                phi_small.phi,
+                phi_large.n_neurons,
+                phi_large.n_layers,
+                phi_large.phi
             )),
         }
     }
@@ -779,8 +817,10 @@ impl PhiValidator {
             actual: format!(
                 "Correlated avg_sim={:.4}, Phi={:.4}\n\
                  Uncorrelated avg_sim={:.4}, Phi={:.4}",
-                phi_correlated.avg_similarity, phi_correlated.phi,
-                phi_uncorrelated.avg_similarity, phi_uncorrelated.phi
+                phi_correlated.avg_similarity,
+                phi_correlated.phi,
+                phi_uncorrelated.avg_similarity,
+                phi_uncorrelated.phi
             ),
             details: None,
         }
@@ -885,9 +925,7 @@ impl PhiDiagnosticAnalyzer {
         }
         let similarity_variance = if similarities.len() > 1 {
             let mean = avg_similarity;
-            similarities.iter()
-                .map(|s| (s - mean).powi(2))
-                .sum::<f64>() / similarities.len() as f64
+            similarities.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / similarities.len() as f64
         } else {
             0.0
         };
@@ -926,20 +964,27 @@ impl PhiDiagnosticAnalyzer {
         // Issue 3: Large gap between spectral and autodiff
         if (spectral_result.phi - autodiff_result.phi).abs() > 0.3 {
             issues.push("Large gap between spectral and autodiff Phi".to_string());
-            proposed_fixes.push("This is expected: spectral measures connectivity, autodiff measures IIT Phi".to_string());
+            proposed_fixes.push(
+                "This is expected: spectral measures connectivity, autodiff measures IIT Phi"
+                    .to_string(),
+            );
         }
 
         // Issue 4: Low autodiff Phi (common for HDC networks)
         if autodiff_result.phi < 0.1 && spectral_result.phi > 0.3 {
             issues.push("Low IIT Phi despite good network connectivity".to_string());
             proposed_fixes.push("This is expected for HDC: high-dimensional states are designed to be distinguishable".to_string());
-            proposed_fixes.push("For higher IIT Phi, reduce state dimensionality or increase state similarity".to_string());
+            proposed_fixes.push(
+                "For higher IIT Phi, reduce state dimensionality or increase state similarity"
+                    .to_string(),
+            );
         }
 
         // Issue 5: Small network
         if n_neurons < 5 {
             issues.push("Small network size limits integration potential".to_string());
-            proposed_fixes.push("Increase network size for more integration opportunities".to_string());
+            proposed_fixes
+                .push("Increase network size for more integration opportunities".to_string());
         }
 
         // Generate diagnosis
@@ -977,7 +1022,10 @@ impl PhiDiagnosticAnalyzer {
         println!("  Spectral Phi: {:.6}", diagnostic.spectral_phi);
         println!("  Autodiff Phi: {:.6}", diagnostic.autodiff_phi);
         println!("  Avg Similarity: {:.6}", diagnostic.avg_similarity);
-        println!("  Similarity Variance: {:.6}", diagnostic.similarity_variance);
+        println!(
+            "  Similarity Variance: {:.6}",
+            diagnostic.similarity_variance
+        );
         println!("  Network Size: {} neurons", diagnostic.n_neurons);
         println!();
 
@@ -1029,22 +1077,27 @@ pub fn demo_phi_evolution(seed: u64) -> PhiEvolutionTracker {
             network.evolve_closed_form(0.01, &random_input);
         }
         let measurement = measurer.measure(&network);
-        tracker.record(measurement, (i + 1) as f64 * 0.1, &format!("Random input {}", i));
+        tracker.record(
+            measurement,
+            (i + 1) as f64 * 0.1,
+            &format!("Random input {}", i),
+        );
     }
 
     // Correlated input phase (learning pattern)
     let target_pattern = ContinuousHV::random_default(seed + 1000);
     for i in 0..20 {
         let noise = ContinuousHV::random_default(seed + 2000 + i as u64);
-        let learning_input = ContinuousHV::weighted_bundle(
-            &[&target_pattern, &noise],
-            &[0.8, 0.2],
-        );
+        let learning_input = ContinuousHV::weighted_bundle(&[&target_pattern, &noise], &[0.8, 0.2]);
         for _ in 0..10 {
             network.evolve_closed_form(0.01, &learning_input);
         }
         let measurement = measurer.measure(&network);
-        tracker.record(measurement, 1.0 + (i + 1) as f64 * 0.1, &format!("Learning step {}", i));
+        tracker.record(
+            measurement,
+            1.0 + (i + 1) as f64 * 0.1,
+            &format!("Learning step {}", i),
+        );
     }
 
     // Equilibrium phase (stable input)
@@ -1053,7 +1106,11 @@ pub fn demo_phi_evolution(seed: u64) -> PhiEvolutionTracker {
             network.evolve_closed_form(0.1, &target_pattern); // Longer time steps
         }
         let measurement = measurer.measure(&network);
-        tracker.record(measurement, 3.0 + (i + 1) as f64 * 0.1, &format!("Equilibrium {}", i));
+        tracker.record(
+            measurement,
+            3.0 + (i + 1) as f64 * 0.1,
+            &format!("Equilibrium {}", i),
+        );
     }
 
     tracker
@@ -1068,7 +1125,6 @@ mod tests {
     use super::*;
 
     #[test]
-
 
     fn test_basic_phi_measurement() {
         let config = UnifiedNetworkConfig {
@@ -1086,13 +1142,16 @@ mod tests {
 
         let measurement = measurer.measure(&network);
 
-        assert!(measurement.is_valid(), "Phi should be in range [0, 1], got {}", measurement.phi);
+        assert!(
+            measurement.is_valid(),
+            "Phi should be in range [0, 1], got {}",
+            measurement.phi
+        );
         assert_eq!(measurement.n_neurons, 7); // 2 + 3 + 2
         assert_eq!(measurement.n_layers, 3);
     }
 
     #[test]
-
 
     fn test_phi_measurement_initial_state() {
         let config = UnifiedNetworkConfig::default();
@@ -1108,7 +1167,6 @@ mod tests {
     }
 
     #[test]
-
 
     fn test_phi_evolution_tracking() {
         let tracker = demo_phi_evolution(42);
@@ -1126,7 +1184,6 @@ mod tests {
 
     #[test]
 
-
     fn test_phi_range_validation() {
         let config = UnifiedNetworkConfig::default();
         let mut network = HdcLtcUnifiedNetwork::new(config, 42);
@@ -1140,11 +1197,14 @@ mod tests {
 
         let result = PhiValidator::validate_phi_range(&mut measurer, &network);
 
-        assert!(result.passed, "Phi range validation failed: {}", result.actual);
+        assert!(
+            result.passed,
+            "Phi range validation failed: {}",
+            result.actual
+        );
     }
 
     #[test]
-
 
     fn test_network_state_extraction() {
         let config = UnifiedNetworkConfig {
@@ -1161,7 +1221,6 @@ mod tests {
     }
 
     #[test]
-
 
     fn test_similarity_matrix_computation() {
         let config = UnifiedNetworkConfig {
@@ -1197,7 +1256,6 @@ mod tests {
 
     #[test]
 
-
     fn test_phi_comparison() {
         let config_small = UnifiedNetworkConfig {
             layer_sizes: vec![2, 2],
@@ -1228,7 +1286,6 @@ mod tests {
 
     #[test]
 
-
     fn test_layer_phi_computation() {
         let config = UnifiedNetworkConfig {
             layer_sizes: vec![3, 4, 3],
@@ -1257,7 +1314,6 @@ mod tests {
     }
 
     #[test]
-
 
     fn test_phi_with_different_methods() {
         let config = UnifiedNetworkConfig {
@@ -1295,7 +1351,6 @@ mod tests {
 
     #[test]
 
-
     fn test_validation_suite() {
         let config = UnifiedNetworkConfig::default();
         let mut network = HdcLtcUnifiedNetwork::new(config, 42);
@@ -1320,7 +1375,6 @@ mod tests {
 
     #[test]
 
-
     fn test_phi_increases_with_evolution() {
         let config = UnifiedNetworkConfig::default();
         let mut network = HdcLtcUnifiedNetwork::new(config, 42);
@@ -1344,6 +1398,9 @@ mod tests {
 
         // Evolved network should have non-trivial Phi
         // (not necessarily higher due to state normalization)
-        println!("Initial Phi: {:.4}, Evolved Phi: {:.4}", initial_phi, evolved_phi);
+        println!(
+            "Initial Phi: {:.4}, Evolved Phi: {:.4}",
+            initial_phi, evolved_phi
+        );
     }
 }

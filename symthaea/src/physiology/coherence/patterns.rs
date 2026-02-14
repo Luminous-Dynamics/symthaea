@@ -171,14 +171,13 @@ impl PatternLibrary {
     /// Remove least useful patterns when at capacity
     fn prune_patterns(&mut self) {
         // Sort by usefulness (success_rate * observation_count)
-        self.patterns
-            .sort_by(|a, b| {
-                let usefulness_a = a.success_rate * (a.observation_count as f32);
-                let usefulness_b = b.success_rate * (b.observation_count as f32);
-                usefulness_b
-                    .partial_cmp(&usefulness_a)
-                    .unwrap_or(Ordering::Equal)
-            });
+        self.patterns.sort_by(|a, b| {
+            let usefulness_a = a.success_rate * (a.observation_count as f32);
+            let usefulness_b = b.success_rate * (b.observation_count as f32);
+            usefulness_b
+                .partial_cmp(&usefulness_a)
+                .unwrap_or(Ordering::Equal)
+        });
 
         // Keep only the top capacity
         self.patterns.truncate(self.capacity);
@@ -251,8 +250,16 @@ mod tests {
         if let Some(suggested) = library.suggest_state("creative_work") {
             let (coh, res) = suggested;
             // Should be weighted toward the second recording (0.9, 0.85)
-            assert!(coh > 0.7 && coh < 0.9, "Coherence should be averaged: {}", coh);
-            assert!(res > 0.8 && res < 0.85, "Resonance should be averaged: {}", res);
+            assert!(
+                coh > 0.7 && coh < 0.9,
+                "Coherence should be averaged: {}",
+                coh
+            );
+            assert!(
+                res > 0.8 && res < 0.85,
+                "Resonance should be averaged: {}",
+                res
+            );
         } else {
             panic!("Should have a pattern for creative_work");
         }
@@ -268,7 +275,11 @@ mod tests {
         library.record_success(0.6, 0.7, hormones.clone(), "routine_work".to_string());
         library.record_success(0.9, 0.95, hormones.clone(), "creative_flow".to_string());
 
-        assert_eq!(library.pattern_count(), 3, "Should have 3 distinct patterns");
+        assert_eq!(
+            library.pattern_count(),
+            3,
+            "Should have 3 distinct patterns"
+        );
 
         // Get suggestions for each context
         let deep = library.suggest_state("deep_analysis");
@@ -281,11 +292,25 @@ mod tests {
 
         // Suggestions should match what we recorded
         let (deep_coh, deep_res) = deep.unwrap();
-        assert!((deep_coh - 0.8).abs() < 0.1, "Deep analysis coherence: {}", deep_coh);
-        assert!((deep_res - 0.9).abs() < 0.1, "Deep analysis resonance: {}", deep_res);
+        assert!(
+            (deep_coh - 0.8).abs() < 0.1,
+            "Deep analysis coherence: {}",
+            deep_coh
+        );
+        assert!(
+            (deep_res - 0.9).abs() < 0.1,
+            "Deep analysis resonance: {}",
+            deep_res
+        );
 
         let (creative_coh, creative_res) = creative.unwrap();
-        assert!(creative_coh > deep_coh, "Creative should need higher coherence");
-        assert!(creative_res > deep_res, "Creative should need higher resonance");
+        assert!(
+            creative_coh > deep_coh,
+            "Creative should need higher coherence"
+        );
+        assert!(
+            creative_res > deep_res,
+            "Creative should need higher resonance"
+        );
     }
 }

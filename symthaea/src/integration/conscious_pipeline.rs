@@ -26,27 +26,30 @@
 //! The LLM is NOT the brain - it's an optional organ for clarification when
 //! the system is Lost or Curious.
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use std::path::PathBuf;
 
+use crate::action::nixos_patterns::{NixOSCommand, SafetyLevel};
+use crate::consciousness::empathic_unification::{EmpathicUnification, ToneGuidance, UserNeed};
 use crate::consciousness::phi_attention::{
-    PhiAwareScoring, ConsciousnessThresholds, AdaptiveThresholds,
-    ActionType, ConfidenceLevel,
+    ActionType, AdaptiveThresholds, ConfidenceLevel, ConsciousnessThresholds, PhiAwareScoring,
+};
+use crate::language::llm_organ::{LlmConfig, LlmOrgan, LlmRequest};
+use crate::language::{
+    // Feedback loop types
+    ActionOutcomeFeedback,
+    ClarifyingQuestion,
+    ConsciousUnderstandingResult,
+    ConsciousnessLanguageConfig,
+    ConsciousnessLanguageCore,
+    ConsciousnessQuadrant,
+    ConsciousnessStateLevel,
+    ExecutionStrategy,
+    ExecutionStrategyType,
+    NixOSIntent,
+    NixOSUnderstanding,
 };
 use crate::memory::conversation_memory::ConversationMemory;
-use crate::language::llm_organ::{LlmOrgan, LlmConfig, LlmRequest};
-use crate::action::nixos_patterns::{NixOSCommand, SafetyLevel};
-use crate::language::{
-    ConsciousnessLanguageCore, ConsciousnessLanguageConfig,
-    ConsciousUnderstandingResult, ExecutionStrategy,
-    ClarifyingQuestion, NixOSUnderstanding, NixOSIntent,
-    ConsciousnessStateLevel, ConsciousnessQuadrant,
-    // Feedback loop types
-    ActionOutcomeFeedback, ExecutionStrategyType,
-};
-use crate::consciousness::empathic_unification::{
-    EmpathicUnification, ToneGuidance, UserNeed,
-};
 use crate::user_state_inference::ContextKind;
 
 // ============================================================================
@@ -76,7 +79,7 @@ impl Default for PipelineConfig {
     fn default() -> Self {
         Self {
             consciousness_language: ConsciousnessLanguageConfig::default(),
-            llm: None,  // LLM is OPTIONAL - HDC+LTC+Primitives is primary
+            llm: None, // LLM is OPTIONAL - HDC+LTC+Primitives is primary
             memory_path: PathBuf::from("conscious_memory.db"),
             thresholds: ConsciousnessThresholds::default(),
             require_confirmation_below_phi: 0.3,
@@ -260,9 +263,10 @@ impl ConsciousPipeline {
         let core = ConsciousnessLanguageCore::with_config(config.consciousness_language.clone());
 
         // Initialize OPTIONAL: LLM for clarification (only if configured)
-        let llm = config.llm.as_ref().map(|llm_config| {
-            LlmOrgan::with_config(llm_config.clone())
-        });
+        let llm = config
+            .llm
+            .as_ref()
+            .map(|llm_config| LlmOrgan::with_config(llm_config.clone()));
 
         // Initialize memory
         let memory = ConversationMemory::new(&config.memory_path)
@@ -301,7 +305,10 @@ impl ConsciousPipeline {
     }
 
     /// Resume an existing session
-    pub fn resume_session(&mut self, session_id: &str) -> Result<Vec<crate::memory::conversation_memory::ConversationTurn>> {
+    pub fn resume_session(
+        &mut self,
+        session_id: &str,
+    ) -> Result<Vec<crate::memory::conversation_memory::ConversationTurn>> {
         let turns = self.memory.resume_session(session_id)?;
         self.session_id = Some(session_id.to_string());
         Ok(turns)
@@ -358,7 +365,8 @@ impl ConsciousPipeline {
                 // Genuinely lost - try LLM for help if available
                 if let Some(ref mut llm) = self.llm {
                     let phi = self.current_phi;
-                    match Self::get_llm_clarification(llm, input, &clarifying_questions, phi).await {
+                    match Self::get_llm_clarification(llm, input, &clarifying_questions, phi).await
+                    {
                         Ok(response) => (Some(response), UnderstandingSource::LlmClarification),
                         Err(_) => (None, UnderstandingSource::HdcLtcPrimitives),
                     }
@@ -370,7 +378,8 @@ impl ConsciousPipeline {
                 // High Φ but uncertain - LLM can help with targeted exploration
                 if let Some(ref mut llm) = self.llm {
                     let phi = self.current_phi;
-                    match Self::get_llm_clarification(llm, input, &clarifying_questions, phi).await {
+                    match Self::get_llm_clarification(llm, input, &clarifying_questions, phi).await
+                    {
                         Ok(response) => (Some(response), UnderstandingSource::LlmClarification),
                         Err(_) => (None, UnderstandingSource::HdcLtcPrimitives),
                     }
@@ -395,15 +404,24 @@ impl ConsciousPipeline {
         let execution = if action_allowed {
             if let Some(ref intent) = intent {
                 match &execution_strategy {
-                    ExecutionStrategy::Confident { execute_immediately: true, .. } => {
+                    ExecutionStrategy::Confident {
+                        execute_immediately: true,
+                        ..
+                    } => {
                         // High Φ + High Confidence: Execute with full explanation
                         self.execute_action(intent).await.ok()
                     }
-                    ExecutionStrategy::Autopilot { execute_efficiently: true, .. } => {
+                    ExecutionStrategy::Autopilot {
+                        execute_efficiently: true,
+                        ..
+                    } => {
                         // Low Φ + High Confidence: Execute efficiently (pattern-matched)
                         self.execute_action(intent).await.ok()
                     }
-                    ExecutionStrategy::Curious { explore_first: true, .. } => {
+                    ExecutionStrategy::Curious {
+                        explore_first: true,
+                        ..
+                    } => {
                         // High Φ + Low Confidence: Dry run first (exploring)
                         self.dry_run_action(intent).await.ok()
                     }
@@ -422,7 +440,8 @@ impl ConsciousPipeline {
         // =========================================================
         // Step 7: Record to memory
         // =========================================================
-        let response_text = llm_response.as_deref()
+        let response_text = llm_response
+            .as_deref()
             .unwrap_or(&nix_understanding.description);
         self.record_to_memory(input, response_text, &execution)?;
 
@@ -492,31 +511,36 @@ impl ConsciousPipeline {
         let (command, safety_level) = match nix.intent {
             NixOSIntent::Install => (
                 Some(NixOSCommand::EnvInstall {
-                    packages: nix.parameters.get("package")
+                    packages: nix
+                        .parameters
+                        .get("package")
                         .map(|p| vec![p.clone()])
-                        .unwrap_or_default()
+                        .unwrap_or_default(),
                 }),
                 SafetyLevel::UserModify,
             ),
             NixOSIntent::Remove => (
                 Some(NixOSCommand::EnvRemove {
-                    packages: nix.parameters.get("package")
+                    packages: nix
+                        .parameters
+                        .get("package")
                         .map(|p| vec![p.clone()])
-                        .unwrap_or_default()
+                        .unwrap_or_default(),
                 }),
                 SafetyLevel::UserModify,
             ),
             NixOSIntent::Search => (
                 Some(NixOSCommand::Search {
-                    query: nix.parameters.get("query")
-                        .cloned()
-                        .unwrap_or_default(),
+                    query: nix.parameters.get("query").cloned().unwrap_or_default(),
                     json: false,
                 }),
                 SafetyLevel::ReadOnly,
             ),
             NixOSIntent::Upgrade => (
-                Some(NixOSCommand::RebuildSwitch { flake: None, extra_args: vec![] }),
+                Some(NixOSCommand::RebuildSwitch {
+                    flake: None,
+                    extra_args: vec![],
+                }),
                 SafetyLevel::SystemCritical,
             ),
             NixOSIntent::Configure => (
@@ -524,7 +548,10 @@ impl ConsciousPipeline {
                 SafetyLevel::SystemModify,
             ),
             NixOSIntent::GarbageCollect => (
-                Some(NixOSCommand::CollectGarbage { older_than_days: None, delete_all: false }),
+                Some(NixOSCommand::CollectGarbage {
+                    older_than_days: None,
+                    delete_all: false,
+                }),
                 SafetyLevel::Destructive,
             ),
             NixOSIntent::FlakeOp => (
@@ -532,7 +559,10 @@ impl ConsciousPipeline {
                 SafetyLevel::UserModify,
             ),
             NixOSIntent::Rollback => (
-                Some(NixOSCommand::RebuildSwitch { flake: None, extra_args: vec!["--rollback".to_string()] }),
+                Some(NixOSCommand::RebuildSwitch {
+                    flake: None,
+                    extra_args: vec!["--rollback".to_string()],
+                }),
                 SafetyLevel::SystemCritical,
             ),
             _ => return None, // List/Info intents don't execute commands
@@ -554,21 +584,13 @@ impl ConsciousPipeline {
             NixOSIntent::Install | NixOSIntent::Remove | NixOSIntent::Configure => {
                 ContextKind::DevWork
             }
-            NixOSIntent::Search | NixOSIntent::Info | NixOSIntent::List => {
-                ContextKind::Exploration
-            }
+            NixOSIntent::Search | NixOSIntent::Info | NixOSIntent::List => ContextKind::Exploration,
             NixOSIntent::Upgrade | NixOSIntent::Rollback | NixOSIntent::Switch => {
                 ContextKind::Upgrade
             }
-            NixOSIntent::GarbageCollect => {
-                ContextKind::DevWork
-            }
-            NixOSIntent::FlakeOp | NixOSIntent::Build => {
-                ContextKind::DevWork
-            }
-            NixOSIntent::Unknown => {
-                ContextKind::Exploration
-            }
+            NixOSIntent::GarbageCollect => ContextKind::DevWork,
+            NixOSIntent::FlakeOp | NixOSIntent::Build => ContextKind::DevWork,
+            NixOSIntent::Unknown => ContextKind::Exploration,
         }
     }
 
@@ -583,7 +605,10 @@ impl ConsciousPipeline {
         };
 
         match strategy {
-            ExecutionStrategy::Confident { execute_immediately, .. } => {
+            ExecutionStrategy::Confident {
+                execute_immediately,
+                ..
+            } => {
                 // High Φ + High Confidence: Deep understanding, execute with full trust
                 if *execute_immediately {
                     self.stats.actions_allowed += 1;
@@ -592,7 +617,10 @@ impl ConsciousPipeline {
                     false
                 }
             }
-            ExecutionStrategy::Autopilot { execute_efficiently, .. } => {
+            ExecutionStrategy::Autopilot {
+                execute_efficiently,
+                ..
+            } => {
                 // Low Φ + High Confidence: Pattern-matched routine, execute quickly
                 if *execute_efficiently {
                     self.stats.actions_allowed += 1;
@@ -629,7 +657,8 @@ impl ConsciousPipeline {
         questions: &[ClarifyingQuestion],
         _current_phi: f64,
     ) -> Result<String> {
-        let questions_text = questions.iter()
+        let questions_text = questions
+            .iter()
             .map(|q| format!("- {}", q.question))
             .collect::<Vec<_>>()
             .join("\n");
@@ -647,8 +676,11 @@ impl ConsciousPipeline {
             query_type: crate::language::llm_organ::QueryType::QA,
             content: prompt,
             context: Vec::new(),
-            system_prompt: Some("You are a helpful NixOS assistant. The HDC+LTC system \
-                          is uncertain about the user's intent. Help clarify.".to_string()),
+            system_prompt: Some(
+                "You are a helpful NixOS assistant. The HDC+LTC system \
+                          is uncertain about the user's intent. Help clarify."
+                    .to_string(),
+            ),
             params: None,
         };
 
@@ -689,9 +721,11 @@ impl ConsciousPipeline {
                 let cmd_str = format!("{:?}", cmd);
                 (true, format!("Would execute: {}", cmd_str), None)
             }
-            None => {
-                (false, String::new(), Some("No command to execute".to_string()))
-            }
+            None => (
+                false,
+                String::new(),
+                Some("No command to execute".to_string()),
+            ),
         };
 
         // Update statistics
@@ -731,14 +765,20 @@ impl ConsciousPipeline {
         }
 
         // Add user turn (convert f64 to f32 for memory API)
-        self.memory.add_turn("user", input, self.current_phi as f32, None)?;
+        self.memory
+            .add_turn("user", input, self.current_phi as f32, None)?;
 
         // Add assistant turn
-        self.memory.add_turn("assistant", response, self.current_phi as f32, None)?;
+        self.memory
+            .add_turn("assistant", response, self.current_phi as f32, None)?;
 
         // Record causal learning if action was taken
         if let Some(exec) = execution {
-            let action = if exec.success { "action_success" } else { "action_failure" };
+            let action = if exec.success {
+                "action_success"
+            } else {
+                "action_failure"
+            };
             self.memory.record_causal_learning(
                 action,
                 &exec.output,
@@ -767,7 +807,8 @@ impl ConsciousPipeline {
 
         // Update local adaptive thresholds
         if let (Some(intent), Some(exec)) = (intent, execution) {
-            self.adaptive.record_outcome(intent.action_type, exec.success);
+            self.adaptive
+                .record_outcome(intent.action_type, exec.success);
             self.adaptive.observe(self.current_phi as f32);
         }
 
@@ -775,7 +816,10 @@ impl ConsciousPipeline {
         if let Some(ref exec) = execution {
             let was_dry_run = matches!(
                 strategy,
-                ExecutionStrategy::Curious { explore_first: true, .. }
+                ExecutionStrategy::Curious {
+                    explore_first: true,
+                    ..
+                }
             );
 
             let feedback = ActionOutcomeFeedback {
@@ -876,18 +920,42 @@ mod tests {
 
     #[test]
     fn test_safety_level_to_action_type() {
-        assert_eq!(SafetyLevel::ReadOnly.to_action_type(), ActionType::BasicQuery);
-        assert_eq!(SafetyLevel::UserModify.to_action_type(), ActionType::StateModifying);
-        assert_eq!(SafetyLevel::SystemModify.to_action_type(), ActionType::SystemCritical);
-        assert_eq!(SafetyLevel::Destructive.to_action_type(), ActionType::Irreversible);
+        assert_eq!(
+            SafetyLevel::ReadOnly.to_action_type(),
+            ActionType::BasicQuery
+        );
+        assert_eq!(
+            SafetyLevel::UserModify.to_action_type(),
+            ActionType::StateModifying
+        );
+        assert_eq!(
+            SafetyLevel::SystemModify.to_action_type(),
+            ActionType::SystemCritical
+        );
+        assert_eq!(
+            SafetyLevel::Destructive.to_action_type(),
+            ActionType::Irreversible
+        );
     }
 
     #[test]
     fn test_confidence_from_phi() {
-        assert!(matches!(PhiAwareScoring::confidence_level(0.7), ConfidenceLevel::High { .. }));
-        assert!(matches!(PhiAwareScoring::confidence_level(0.5), ConfidenceLevel::Medium { .. }));
-        assert!(matches!(PhiAwareScoring::confidence_level(0.3), ConfidenceLevel::Low { .. }));
-        assert!(matches!(PhiAwareScoring::confidence_level(0.1), ConfidenceLevel::VeryLow { .. }));
+        assert!(matches!(
+            PhiAwareScoring::confidence_level(0.7),
+            ConfidenceLevel::High { .. }
+        ));
+        assert!(matches!(
+            PhiAwareScoring::confidence_level(0.5),
+            ConfidenceLevel::Medium { .. }
+        ));
+        assert!(matches!(
+            PhiAwareScoring::confidence_level(0.3),
+            ConfidenceLevel::Low { .. }
+        ));
+        assert!(matches!(
+            PhiAwareScoring::confidence_level(0.1),
+            ConfidenceLevel::VeryLow { .. }
+        ));
     }
 
     #[test]
@@ -905,7 +973,10 @@ mod tests {
         assert_ne!(active, dormant);
 
         // Default should be Active
-        assert_eq!(ConsciousnessStateLevel::default(), ConsciousnessStateLevel::Dormant);
+        assert_eq!(
+            ConsciousnessStateLevel::default(),
+            ConsciousnessStateLevel::Dormant
+        );
     }
 
     #[test]
@@ -919,7 +990,10 @@ mod tests {
             explain_reasoning: true,
         };
         match confident {
-            ExecutionStrategy::Confident { execute_immediately, .. } => {
+            ExecutionStrategy::Confident {
+                execute_immediately,
+                ..
+            } => {
                 assert!(execute_immediately);
             }
             other => unreachable!("Expected Confident strategy, got {:?}", other),
@@ -932,7 +1006,10 @@ mod tests {
             minimal_response: true,
         };
         match autopilot {
-            ExecutionStrategy::Autopilot { execute_efficiently, .. } => {
+            ExecutionStrategy::Autopilot {
+                execute_efficiently,
+                ..
+            } => {
                 assert!(execute_efficiently);
             }
             other => unreachable!("Expected Autopilot strategy, got {:?}", other),

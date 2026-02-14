@@ -484,19 +484,30 @@ fn test_model_improves_prediction_accuracy() {
     let final_error = final_result.free_energy.prediction_error;
 
     // Verify the system is functioning (errors are finite and positive)
-    assert!(initial_error.is_finite() && initial_error >= 0.0,
-        "Initial error should be finite and non-negative: {}", initial_error);
-    assert!(final_error.is_finite() && final_error >= 0.0,
-        "Final error should be finite and non-negative: {}", final_error);
+    assert!(
+        initial_error.is_finite() && initial_error >= 0.0,
+        "Initial error should be finite and non-negative: {}",
+        initial_error
+    );
+    assert!(
+        final_error.is_finite() && final_error >= 0.0,
+        "Final error should be finite and non-negative: {}",
+        final_error
+    );
 
     // Active inference dynamics are complex - verify the error is bounded
     // rather than requiring strict improvement
-    assert!(final_error < 10.0,
-        "Final error should be bounded: {}", final_error);
+    assert!(
+        final_error < 10.0,
+        "Final error should be bounded: {}",
+        final_error
+    );
 
     // Verify learning actually occurred (TD updates happened)
-    assert!(agent.stats.td_updates > 0,
-        "TD learning should have occurred");
+    assert!(
+        agent.stats.td_updates > 0,
+        "TD learning should have occurred"
+    );
 }
 
 #[test]
@@ -610,12 +621,22 @@ fn test_cognitive_loop_bridge_end_episode() {
         bridge.process(0.5, 0.5, 0.5, 0.5);
     }
 
-    let lr_before = bridge.agent.td_learner.as_ref().unwrap().current_learning_rate;
+    let lr_before = bridge
+        .agent
+        .td_learner
+        .as_ref()
+        .unwrap()
+        .current_learning_rate;
 
     // End episode
     bridge.end_episode();
 
-    let lr_after = bridge.agent.td_learner.as_ref().unwrap().current_learning_rate;
+    let lr_after = bridge
+        .agent
+        .td_learner
+        .as_ref()
+        .unwrap()
+        .current_learning_rate;
 
     // Learning rate should have decayed
     assert!(lr_after < lr_before);
@@ -638,10 +659,14 @@ fn test_generative_model_learn_transition() {
     model.learn_transition(&old_state, 0, &new_state, &observation);
 
     // Matrix should have changed
-    let changed = model.transition_matrices[0].iter()
+    let changed = model.transition_matrices[0]
+        .iter()
         .zip(original.iter())
         .any(|(new_row, old_row)| {
-            new_row.iter().zip(old_row.iter()).any(|(n, o)| (n - o).abs() > 0.0001)
+            new_row
+                .iter()
+                .zip(old_row.iter())
+                .any(|(n, o)| (n - o).abs() > 0.0001)
         });
     assert!(changed, "Transition matrix should have been updated");
 }

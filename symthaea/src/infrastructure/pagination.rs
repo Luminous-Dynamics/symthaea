@@ -155,7 +155,7 @@ pub struct Paginator<K, T> {
 #[derive(Clone)]
 struct CachedPage<T> {
     page: Page<T>,
-    #[allow(dead_code)]  // Reserved for cache TTL implementation
+    #[allow(dead_code)] // Reserved for cache TTL implementation
     cached_at: Instant,
 }
 
@@ -202,10 +202,13 @@ impl<K: Eq + Hash + Clone, T: Clone> Paginator<K, T> {
 
         self.access_order.retain(|k| k != &key);
         self.access_order.push(key.clone());
-        self.page_cache.insert(key, CachedPage {
-            page,
-            cached_at: Instant::now(),
-        });
+        self.page_cache.insert(
+            key,
+            CachedPage {
+                page,
+                cached_at: Instant::now(),
+            },
+        );
     }
 
     /// Invalidate all cached pages
@@ -288,10 +291,9 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         // If buffer is exhausted, fetch next page
-        if self.buffer_index >= self.buffer.len()
-            && !self.fetch_next_page() {
-                return None;
-            }
+        if self.buffer_index >= self.buffer.len() && !self.fetch_next_page() {
+            return None;
+        }
 
         if self.buffer_index < self.buffer.len() {
             let item = self.buffer[self.buffer_index].clone();
@@ -397,11 +399,7 @@ impl ModuleBrowser {
     }
 
     fn cache_key(&self, page: usize) -> String {
-        format!(
-            "{}:{}",
-            self.current_filter.as_deref().unwrap_or(""),
-            page
-        )
+        format!("{}:{}", self.current_filter.as_deref().unwrap_or(""), page)
     }
 
     /// Get total modules (if known from a previous fetch)
@@ -486,12 +484,7 @@ mod tests {
     fn test_lazy_iterator() {
         let data: Vec<i32> = (0..100).collect();
 
-        let mut iter = LazyPageIterator::new(
-            |req| {
-                Some(Page::from_slice(&data, &req))
-            },
-            10,
-        );
+        let mut iter = LazyPageIterator::new(|req| Some(Page::from_slice(&data, &req)), 10);
 
         let collected: Vec<i32> = iter.by_ref().take(25).collect();
         assert_eq!(collected.len(), 25);

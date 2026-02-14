@@ -11,7 +11,7 @@
 //! 3. Orient edges based on v-structures (X -> Z <- Y)
 //! 4. Propagate orientation using acyclicity constraints
 
-use super::causal_discovery::{CausalDiscoveryEngine, CausalDirection};
+use super::causal_discovery::{CausalDirection, CausalDiscoveryEngine};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// A variable in the causal graph
@@ -55,7 +55,8 @@ pub struct CausalDAG {
 impl CausalDAG {
     /// Get parents of a variable
     pub fn parents(&self, var_idx: usize) -> Vec<usize> {
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter(|e| e.to == var_idx)
             .map(|e| e.from)
             .collect()
@@ -63,7 +64,8 @@ impl CausalDAG {
 
     /// Get children of a variable
     pub fn children(&self, var_idx: usize) -> Vec<usize> {
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter(|e| e.from == var_idx)
             .map(|e| e.to)
             .collect()
@@ -124,8 +126,8 @@ impl CausalDAG {
 /// PC Algorithm for multivariate causal discovery
 pub struct PCAlgorithm {
     engine: CausalDiscoveryEngine,
-    alpha: f64,  // Significance level for independence tests
-    max_cond_size: usize,  // Maximum conditioning set size
+    alpha: f64,           // Significance level for independence tests
+    max_cond_size: usize, // Maximum conditioning set size
 }
 
 impl PCAlgorithm {
@@ -245,17 +247,21 @@ impl PCAlgorithm {
                 let neighbors: Vec<usize> = (0..n)
                     .filter(|&k| k != x && k != y)
                     .filter(|&k| {
-                        edges.contains(&SkeletonEdge { from: x.min(k), to: x.max(k) }) ||
-                        edges.contains(&SkeletonEdge { from: y.min(k), to: y.max(k) })
+                        edges.contains(&SkeletonEdge {
+                            from: x.min(k),
+                            to: x.max(k),
+                        }) || edges.contains(&SkeletonEdge {
+                            from: y.min(k),
+                            to: y.max(k),
+                        })
                     })
                     .collect();
 
                 // Test all conditioning sets of current size
                 if neighbors.len() >= cond_size {
                     for cond_set in combinations(&neighbors, cond_size) {
-                        let is_independent = self.test_conditional_independence(
-                            variables, x, y, &cond_set
-                        );
+                        let is_independent =
+                            self.test_conditional_independence(variables, x, y, &cond_set);
 
                         if is_independent {
                             edges.remove(&edge);
@@ -304,11 +310,7 @@ impl PCAlgorithm {
             })
             .collect();
 
-        let (is_indep, _) = self.engine.kcit(
-            &variables[x].data,
-            &variables[y].data,
-            &z,
-        );
+        let (is_indep, _) = self.engine.kcit(&variables[x].data, &variables[y].data, &z);
 
         is_indep
     }
@@ -372,7 +374,8 @@ impl PCAlgorithm {
 
     fn center_kernel(&self, k: &[Vec<f64>]) -> Vec<Vec<f64>> {
         let n = k.len();
-        let row_means: Vec<f64> = k.iter()
+        let row_means: Vec<f64> = k
+            .iter()
             .map(|row| row.iter().sum::<f64>() / n as f64)
             .collect();
         let total_mean: f64 = row_means.iter().sum::<f64>() / n as f64;
@@ -400,7 +403,10 @@ impl PCAlgorithm {
             let neighbors: Vec<usize> = (0..n)
                 .filter(|&k| k != z)
                 .filter(|&k| {
-                    skeleton.contains(&SkeletonEdge { from: z.min(k), to: z.max(k) })
+                    skeleton.contains(&SkeletonEdge {
+                        from: z.min(k),
+                        to: z.max(k),
+                    })
                 })
                 .collect();
 
@@ -460,7 +466,10 @@ impl PCAlgorithm {
                     }
 
                     if oriented.contains(&(a, c)) {
-                        let c_b_edge = SkeletonEdge { from: c.min(b), to: c.max(b) };
+                        let c_b_edge = SkeletonEdge {
+                            from: c.min(b),
+                            to: c.max(b),
+                        };
                         if skeleton.contains(&c_b_edge) && !oriented.contains(&(b, c)) {
                             oriented.insert((c, b));
                             changed = true;
@@ -485,10 +494,9 @@ impl PCAlgorithm {
 
     /// Compute confidence for an edge based on bivariate analysis
     fn compute_edge_confidence(&mut self, variables: &[Variable], from: usize, to: usize) -> f64 {
-        let (_, conf) = self.engine.predict_with_confidence(
-            &variables[from].data,
-            &variables[to].data,
-        );
+        let (_, conf) = self
+            .engine
+            .predict_with_confidence(&variables[from].data, &variables[to].data);
         conf
     }
 }
@@ -526,9 +534,18 @@ mod tests {
         let z: Vec<f64> = y.iter().map(|&yi| 0.5 * yi + 1.0).collect();
 
         let variables = vec![
-            Variable { name: "X".to_string(), data: x },
-            Variable { name: "Y".to_string(), data: y },
-            Variable { name: "Z".to_string(), data: z },
+            Variable {
+                name: "X".to_string(),
+                data: x,
+            },
+            Variable {
+                name: "Y".to_string(),
+                data: y,
+            },
+            Variable {
+                name: "Z".to_string(),
+                data: z,
+            },
         ];
 
         let mut pc = PCAlgorithm::new(42).with_alpha(0.1);
@@ -549,9 +566,18 @@ mod tests {
         let y: Vec<f64> = z.iter().map(|&zi| 0.5 * zi + 0.7).collect();
 
         let variables = vec![
-            Variable { name: "X".to_string(), data: x },
-            Variable { name: "Y".to_string(), data: y },
-            Variable { name: "Z".to_string(), data: z },
+            Variable {
+                name: "X".to_string(),
+                data: x,
+            },
+            Variable {
+                name: "Y".to_string(),
+                data: y,
+            },
+            Variable {
+                name: "Z".to_string(),
+                data: z,
+            },
         ];
 
         let mut pc = PCAlgorithm::new(42);
@@ -569,9 +595,9 @@ mod tests {
         let items = vec![1, 2, 3, 4];
 
         let c2 = combinations(&items, 2);
-        assert_eq!(c2.len(), 6);  // C(4,2) = 6
+        assert_eq!(c2.len(), 6); // C(4,2) = 6
 
         let c3 = combinations(&items, 3);
-        assert_eq!(c3.len(), 4);  // C(4,3) = 4
+        assert_eq!(c3.len(), 4); // C(4,3) = 4
     }
 }

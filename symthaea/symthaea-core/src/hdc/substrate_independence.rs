@@ -50,7 +50,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-
 // ============================================================================
 // Substrate Types
 // ============================================================================
@@ -121,14 +120,14 @@ impl SubstrateType {
     /// Typical operation speed (seconds per operation)
     pub fn operation_speed(&self) -> f64 {
         match self.canonical() {
-            SubstrateType::BiologicalNeurons => 0.001,    // ~1 ms (millisecond)
-            SubstrateType::SiliconDigital => 1e-9,        // ~1 ns (nanosecond)
-            SubstrateType::QuantumComputer => 1e-6,       // ~1 μs (microsecond)
-            SubstrateType::PhotonicProcessor => 1e-12,    // ~1 ps (picosecond)
-            SubstrateType::NeuromorphicChip => 1e-6,      // ~1 μs
-            SubstrateType::BiochemicalComputer => 1.0,    // ~1 s (very slow!)
-            SubstrateType::HybridSystem => 1e-6,          // Depends on mix
-            SubstrateType::ExoticSubstrate => 0.01,       // Varies widely
+            SubstrateType::BiologicalNeurons => 0.001, // ~1 ms (millisecond)
+            SubstrateType::SiliconDigital => 1e-9,     // ~1 ns (nanosecond)
+            SubstrateType::QuantumComputer => 1e-6,    // ~1 μs (microsecond)
+            SubstrateType::PhotonicProcessor => 1e-12, // ~1 ps (picosecond)
+            SubstrateType::NeuromorphicChip => 1e-6,   // ~1 μs
+            SubstrateType::BiochemicalComputer => 1.0, // ~1 s (very slow!)
+            SubstrateType::HybridSystem => 1e-6,       // Depends on mix
+            SubstrateType::ExoticSubstrate => 0.01,    // Varies widely
             _ => unreachable!("canonical covers aliases"),
         }
     }
@@ -136,14 +135,14 @@ impl SubstrateType {
     /// Energy efficiency (Joules per operation)
     pub fn energy_per_operation(&self) -> f64 {
         match self.canonical() {
-            SubstrateType::BiologicalNeurons => 1e-14,    // ~10 fJ (extremely efficient!)
-            SubstrateType::SiliconDigital => 1e-15,       // ~1 fJ (very efficient)
-            SubstrateType::QuantumComputer => 1e-19,      // ~0.1 aJ (near-theoretical limit!)
-            SubstrateType::PhotonicProcessor => 1e-17,    // ~10 aJ (very efficient)
-            SubstrateType::NeuromorphicChip => 1e-15,     // ~1 fJ
-            SubstrateType::BiochemicalComputer => 1e-12,  // ~1 pJ (inefficient)
-            SubstrateType::HybridSystem => 1e-15,         // Varies
-            SubstrateType::ExoticSubstrate => 1e-10,      // Often inefficient
+            SubstrateType::BiologicalNeurons => 1e-14, // ~10 fJ (extremely efficient!)
+            SubstrateType::SiliconDigital => 1e-15,    // ~1 fJ (very efficient)
+            SubstrateType::QuantumComputer => 1e-19,   // ~0.1 aJ (near-theoretical limit!)
+            SubstrateType::PhotonicProcessor => 1e-17, // ~10 aJ (very efficient)
+            SubstrateType::NeuromorphicChip => 1e-15,  // ~1 fJ
+            SubstrateType::BiochemicalComputer => 1e-12, // ~1 pJ (inefficient)
+            SubstrateType::HybridSystem => 1e-15,      // Varies
+            SubstrateType::ExoticSubstrate => 1e-10,   // Often inefficient
             _ => unreachable!("canonical covers aliases"),
         }
     }
@@ -151,14 +150,14 @@ impl SubstrateType {
     /// Physical size per processing unit (meters)
     pub fn unit_size(&self) -> f64 {
         match self.canonical() {
-            SubstrateType::BiologicalNeurons => 1e-5,     // ~10 μm (neuron cell body)
-            SubstrateType::SiliconDigital => 1e-8,        // ~10 nm (transistor, 2024)
-            SubstrateType::QuantumComputer => 1e-6,       // ~1 μm (qubit with isolation)
-            SubstrateType::PhotonicProcessor => 1e-6,     // ~1 μm (waveguide)
-            SubstrateType::NeuromorphicChip => 1e-8,      // ~10 nm
-            SubstrateType::BiochemicalComputer => 1e-9,   // ~1 nm (DNA molecule)
-            SubstrateType::HybridSystem => 1e-8,          // Varies
-            SubstrateType::ExoticSubstrate => 1e-3,       // Often macroscopic
+            SubstrateType::BiologicalNeurons => 1e-5, // ~10 μm (neuron cell body)
+            SubstrateType::SiliconDigital => 1e-8,    // ~10 nm (transistor, 2024)
+            SubstrateType::QuantumComputer => 1e-6,   // ~1 μm (qubit with isolation)
+            SubstrateType::PhotonicProcessor => 1e-6, // ~1 μm (waveguide)
+            SubstrateType::NeuromorphicChip => 1e-8,  // ~10 nm
+            SubstrateType::BiochemicalComputer => 1e-9, // ~1 nm (DNA molecule)
+            SubstrateType::HybridSystem => 1e-8,      // Varies
+            SubstrateType::ExoticSubstrate => 1e-3,   // Often macroscopic
             _ => unreachable!("canonical covers aliases"),
         }
     }
@@ -166,14 +165,14 @@ impl SubstrateType {
     /// Maximum practical scale (number of units before integration limited)
     pub fn max_scale(&self) -> f64 {
         match self.canonical() {
-            SubstrateType::BiologicalNeurons => 1e11,     // ~100 billion (human brain)
-            SubstrateType::SiliconDigital => 1e12,        // ~1 trillion (GPU)
-            SubstrateType::QuantumComputer => 1e4,        // ~10,000 qubits (current limits)
-            SubstrateType::PhotonicProcessor => 1e9,      // ~1 billion
-            SubstrateType::NeuromorphicChip => 1e9,       // ~1 billion
-            SubstrateType::BiochemicalComputer => 1e15,   // ~1 quadrillion (molecular)
-            SubstrateType::HybridSystem => 1e12,          // Varies
-            SubstrateType::ExoticSubstrate => 1e6,        // Often limited
+            SubstrateType::BiologicalNeurons => 1e11, // ~100 billion (human brain)
+            SubstrateType::SiliconDigital => 1e12,    // ~1 trillion (GPU)
+            SubstrateType::QuantumComputer => 1e4,    // ~10,000 qubits (current limits)
+            SubstrateType::PhotonicProcessor => 1e9,  // ~1 billion
+            SubstrateType::NeuromorphicChip => 1e9,   // ~1 billion
+            SubstrateType::BiochemicalComputer => 1e15, // ~1 quadrillion (molecular)
+            SubstrateType::HybridSystem => 1e12,      // Varies
+            SubstrateType::ExoticSubstrate => 1e6,    // Often limited
             _ => unreachable!("canonical covers aliases"),
         }
     }
@@ -228,7 +227,8 @@ impl SubstrateRequirements {
     /// Based on minimum requirements across critical components
     pub fn consciousness_feasibility(&self) -> f64 {
         // CRITICAL requirements (must all be present)
-        let critical_min = self.causality
+        let critical_min = self
+            .causality
             .min(self.integration_capacity)
             .min(self.temporal_dynamics)
             .min(self.recurrence);
@@ -237,11 +237,8 @@ impl SubstrateRequirements {
         let workspace_factor = self.workspace_capability;
 
         // Other components enhance but not strictly required
-        let enhancement_factor = (
-            self.binding_capability +
-            self.attention_capability +
-            self.hot_capability
-        ) / 3.0;
+        let enhancement_factor =
+            (self.binding_capability + self.attention_capability + self.hot_capability) / 3.0;
 
         // Feasibility = critical requirements × workspace × enhancements
         critical_min * workspace_factor * (0.5 + 0.5 * enhancement_factor)
@@ -250,90 +247,90 @@ impl SubstrateRequirements {
     /// Biological neurons (reference substrate)
     pub fn biological_neurons() -> Self {
         Self {
-            causality: 1.0,              // Full causality
-            integration_capacity: 1.0,   // Excellent integration
-            temporal_dynamics: 1.0,      // Rich dynamics
-            recurrence: 1.0,             // Fully recurrent
-            binding_capability: 1.0,     // Synchrony via oscillations
-            attention_capability: 1.0,   // Gain modulation
-            workspace_capability: 1.0,   // Thalamocortical loops
-            hot_capability: 1.0,         // Prefrontal meta-representation
-            quantum_support: 0.1,        // Minimal (mostly classical)
+            causality: 1.0,            // Full causality
+            integration_capacity: 1.0, // Excellent integration
+            temporal_dynamics: 1.0,    // Rich dynamics
+            recurrence: 1.0,           // Fully recurrent
+            binding_capability: 1.0,   // Synchrony via oscillations
+            attention_capability: 1.0, // Gain modulation
+            workspace_capability: 1.0, // Thalamocortical loops
+            hot_capability: 1.0,       // Prefrontal meta-representation
+            quantum_support: 0.1,      // Minimal (mostly classical)
         }
     }
 
     /// Silicon digital (modern AI substrate)
     pub fn silicon_digital() -> Self {
         Self {
-            causality: 1.0,              // Full causality (not lookup table!)
-            integration_capacity: 0.9,   // Good integration (bus bandwidth limits)
-            temporal_dynamics: 0.9,      // Good dynamics (clock-driven)
-            recurrence: 1.0,             // Fully recurrent (RNNs, transformers)
-            binding_capability: 0.7,     // Synchrony harder (no oscillations)
-            attention_capability: 1.0,   // Attention mechanisms well-supported
-            workspace_capability: 0.9,   // Global memory possible
-            hot_capability: 0.8,         // Meta-learning possible
-            quantum_support: 0.0,        // Classical only
+            causality: 1.0,            // Full causality (not lookup table!)
+            integration_capacity: 0.9, // Good integration (bus bandwidth limits)
+            temporal_dynamics: 0.9,    // Good dynamics (clock-driven)
+            recurrence: 1.0,           // Fully recurrent (RNNs, transformers)
+            binding_capability: 0.7,   // Synchrony harder (no oscillations)
+            attention_capability: 1.0, // Attention mechanisms well-supported
+            workspace_capability: 0.9, // Global memory possible
+            hot_capability: 0.8,       // Meta-learning possible
+            quantum_support: 0.0,      // Classical only
         }
     }
 
     /// Quantum computer
     pub fn quantum_computer() -> Self {
         Self {
-            causality: 1.0,              // Full causality
-            integration_capacity: 1.0,   // Quantum entanglement = perfect integration!
-            temporal_dynamics: 1.0,      // Quantum evolution
-            recurrence: 0.7,             // Harder (measurement collapse)
-            binding_capability: 1.0,     // Entanglement = perfect binding!
-            attention_capability: 0.6,   // Less clear how to implement
-            workspace_capability: 0.6,   // Global state exists but hard to broadcast
-            hot_capability: 0.5,         // Meta-representation unclear
-            quantum_support: 1.0,        // Full quantum!
+            causality: 1.0,            // Full causality
+            integration_capacity: 1.0, // Quantum entanglement = perfect integration!
+            temporal_dynamics: 1.0,    // Quantum evolution
+            recurrence: 0.7,           // Harder (measurement collapse)
+            binding_capability: 1.0,   // Entanglement = perfect binding!
+            attention_capability: 0.6, // Less clear how to implement
+            workspace_capability: 0.6, // Global state exists but hard to broadcast
+            hot_capability: 0.5,       // Meta-representation unclear
+            quantum_support: 1.0,      // Full quantum!
         }
     }
 
     /// Photonic processor
     pub fn photonic_processor() -> Self {
         Self {
-            causality: 1.0,              // Full causality
-            integration_capacity: 0.8,   // Good but light doesn't interact much
-            temporal_dynamics: 1.0,      // Ultra-fast dynamics
-            recurrence: 0.8,             // Possible but harder
-            binding_capability: 0.9,     // Optical interference for binding
-            attention_capability: 0.9,   // Gain modulation via intensity
-            workspace_capability: 0.7,   // Broadcasting via waveguides
-            hot_capability: 0.6,         // Less clear
-            quantum_support: 0.3,        // Some quantum optics possible
+            causality: 1.0,            // Full causality
+            integration_capacity: 0.8, // Good but light doesn't interact much
+            temporal_dynamics: 1.0,    // Ultra-fast dynamics
+            recurrence: 0.8,           // Possible but harder
+            binding_capability: 0.9,   // Optical interference for binding
+            attention_capability: 0.9, // Gain modulation via intensity
+            workspace_capability: 0.7, // Broadcasting via waveguides
+            hot_capability: 0.6,       // Less clear
+            quantum_support: 0.3,      // Some quantum optics possible
         }
     }
 
     /// Neuromorphic chip (mimics biology)
     pub fn neuromorphic_chip() -> Self {
         Self {
-            causality: 1.0,              // Full causality
-            integration_capacity: 0.95,  // Very good (designed for it)
-            temporal_dynamics: 1.0,      // Rich spike dynamics
-            recurrence: 1.0,             // Fully recurrent
-            binding_capability: 0.9,     // Spike synchrony supported
-            attention_capability: 0.9,   // Gain modulation built-in
-            workspace_capability: 0.8,   // Possible but not primary design
-            hot_capability: 0.7,         // Possible with hierarchy
-            quantum_support: 0.0,        // Classical
+            causality: 1.0,             // Full causality
+            integration_capacity: 0.95, // Very good (designed for it)
+            temporal_dynamics: 1.0,     // Rich spike dynamics
+            recurrence: 1.0,            // Fully recurrent
+            binding_capability: 0.9,    // Spike synchrony supported
+            attention_capability: 0.9,  // Gain modulation built-in
+            workspace_capability: 0.8,  // Possible but not primary design
+            hot_capability: 0.7,        // Possible with hierarchy
+            quantum_support: 0.0,       // Classical
         }
     }
 
     /// Biochemical computer (DNA, molecular)
     pub fn biochemical_computer() -> Self {
         Self {
-            causality: 0.9,              // Mostly causal (some stochastic)
-            integration_capacity: 0.7,   // Limited by diffusion
-            temporal_dynamics: 0.8,      // Chemical kinetics
-            recurrence: 0.6,             // Harder to implement
-            binding_capability: 0.5,     // Difficult
-            attention_capability: 0.4,   // Very difficult
-            workspace_capability: 0.3,   // Very difficult
-            hot_capability: 0.2,         // Extremely difficult
-            quantum_support: 0.2,        // Some quantum biology
+            causality: 0.9,            // Mostly causal (some stochastic)
+            integration_capacity: 0.7, // Limited by diffusion
+            temporal_dynamics: 0.8,    // Chemical kinetics
+            recurrence: 0.6,           // Harder to implement
+            binding_capability: 0.5,   // Difficult
+            attention_capability: 0.4, // Very difficult
+            workspace_capability: 0.3, // Very difficult
+            hot_capability: 0.2,       // Extremely difficult
+            quantum_support: 0.2,      // Some quantum biology
         }
     }
 
@@ -341,29 +338,29 @@ impl SubstrateRequirements {
     pub fn hybrid_system() -> Self {
         Self {
             causality: 1.0,
-            integration_capacity: 0.95,  // Combine strengths
+            integration_capacity: 0.95, // Combine strengths
             temporal_dynamics: 1.0,
             recurrence: 1.0,
-            binding_capability: 1.0,     // Quantum for binding
-            attention_capability: 1.0,   // Silicon for attention
-            workspace_capability: 1.0,   // Silicon for workspace
-            hot_capability: 0.9,         // Silicon for HOT
-            quantum_support: 0.5,        // Quantum co-processor
+            binding_capability: 1.0,   // Quantum for binding
+            attention_capability: 1.0, // Silicon for attention
+            workspace_capability: 1.0, // Silicon for workspace
+            hot_capability: 0.9,       // Silicon for HOT
+            quantum_support: 0.5,      // Quantum co-processor
         }
     }
 
     /// Exotic substrate (plasma, BZ reactions, etc.)
     pub fn exotic_substrate() -> Self {
         Self {
-            causality: 0.7,              // Often limited
-            integration_capacity: 0.5,   // Usually poor
-            temporal_dynamics: 0.8,      // Can have rich dynamics
-            recurrence: 0.4,             // Usually difficult
-            binding_capability: 0.3,     // Very difficult
-            attention_capability: 0.2,   // Extremely difficult
-            workspace_capability: 0.1,   // Nearly impossible
-            hot_capability: 0.1,         // Nearly impossible
-            quantum_support: 0.3,        // Varies
+            causality: 0.7,            // Often limited
+            integration_capacity: 0.5, // Usually poor
+            temporal_dynamics: 0.8,    // Can have rich dynamics
+            recurrence: 0.4,           // Usually difficult
+            binding_capability: 0.3,   // Very difficult
+            attention_capability: 0.2, // Extremely difficult
+            workspace_capability: 0.1, // Nearly impossible
+            hot_capability: 0.1,       // Nearly impossible
+            quantum_support: 0.3,      // Varies
         }
     }
 }
@@ -639,13 +636,16 @@ impl SubstrateIndependence {
 
     /// Get current substrate comparison
     pub fn current_comparison(&self) -> &SubstrateComparison {
-        self.substrates.get(&self.current_substrate)
+        self.substrates
+            .get(&self.current_substrate)
             .expect("Current substrate must exist")
     }
 
     /// Rank substrates by consciousness feasibility
     pub fn rank_by_feasibility(&self) -> Vec<(SubstrateType, f64)> {
-        let mut ranked: Vec<_> = self.substrates.iter()
+        let mut ranked: Vec<_> = self
+            .substrates
+            .iter()
             .map(|(st, comp)| (*st, comp.consciousness_feasibility))
             .collect();
 
@@ -656,7 +656,7 @@ impl SubstrateIndependence {
     /// Can this substrate support consciousness?
     pub fn can_be_conscious(&self, substrate_type: SubstrateType) -> bool {
         if let Some(comp) = self.substrates.get(&substrate_type.canonical()) {
-            comp.consciousness_feasibility > 0.5  // Threshold
+            comp.consciousness_feasibility > 0.5 // Threshold
         } else {
             false
         }
@@ -673,15 +673,18 @@ impl SubstrateIndependence {
                  Best For:\n{}",
                 comp.substrate_type.name(),
                 comp.consciousness_feasibility * 100.0,
-                comp.advantages.iter()
+                comp.advantages
+                    .iter()
                     .map(|a| format!("  + {}", a))
                     .collect::<Vec<_>>()
                     .join("\n"),
-                comp.disadvantages.iter()
+                comp.disadvantages
+                    .iter()
                     .map(|d| format!("  - {}", d))
                     .collect::<Vec<_>>()
                     .join("\n"),
-                comp.best_for.iter()
+                comp.best_for
+                    .iter()
                     .map(|b| format!("  • {}", b))
                     .collect::<Vec<_>>()
                     .join("\n"),

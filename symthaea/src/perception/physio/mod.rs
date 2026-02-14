@@ -25,24 +25,23 @@
 
 pub mod edf_loader;
 pub mod emotion_detector;
+pub mod entropy; // Permutation Entropy for consciousness detection
 pub mod meditation_detector;
-pub mod entropy;  // Permutation Entropy for consciousness detection
 pub mod sleep_sentinel;
 
 pub use edf_loader::{EdfFile, EdfSignal, SleepAnnotation, SleepStage};
 pub use emotion_detector::{
-    EmotionSentinel, EmotionalState, EmotionCategory, EmotionChannel,
-    EmotionEEG, FrontalAsymmetry, ArousalDetector, EmotionSimulator,
-    FrequencyBand,
+    ArousalDetector, EmotionCategory, EmotionChannel, EmotionEEG, EmotionSentinel,
+    EmotionSimulator, EmotionalState, FrequencyBand, FrontalAsymmetry,
+};
+pub use entropy::{
+    permutation_entropy_order3, permutation_entropy_order4, weighted_permutation_entropy,
 };
 pub use meditation_detector::{
-    MeditationSentinel, MeditationState, MeditationCategory, MeditationChannel,
-    MeditationEEG, FrontalMidlineTheta, AlphaCoherence, GammaSynchrony,
-    MeditationSimulator,
+    AlphaCoherence, FrontalMidlineTheta, GammaSynchrony, MeditationCategory, MeditationChannel,
+    MeditationEEG, MeditationSentinel, MeditationSimulator, MeditationState,
 };
-pub use entropy::{permutation_entropy_order3, permutation_entropy_order4, weighted_permutation_entropy};
 pub use sleep_sentinel::{
-    SleepSentinel, ConsciousnessState, SleepSentinelConfig,
-    IntegrationMetrics, SleepSentinelStats, CalibrationState,
-    AdaptiveThresholdConfig, CalibrationData,
+    AdaptiveThresholdConfig, CalibrationData, CalibrationState, ConsciousnessState,
+    IntegrationMetrics, SleepSentinel, SleepSentinelConfig, SleepSentinelStats,
 };

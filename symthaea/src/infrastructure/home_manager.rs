@@ -110,9 +110,7 @@ impl HomeManagerBridge {
     /// Detect home-manager installation
     pub fn detect(&mut self) -> bool {
         // Check for home-manager command
-        let output = Command::new("which")
-            .arg("home-manager")
-            .output();
+        let output = Command::new("which").arg("home-manager").output();
 
         if let Ok(out) = output {
             if out.status.success() {
@@ -122,9 +120,7 @@ impl HomeManagerBridge {
         }
 
         // Check for nix profile home-manager
-        let nix_output = Command::new("nix")
-            .args(["profile", "list"])
-            .output();
+        let nix_output = Command::new("nix").args(["profile", "list"]).output();
 
         if let Ok(out) = nix_output {
             let stdout = String::from_utf8_lossy(&out.stdout);
@@ -179,22 +175,19 @@ impl HomeManagerBridge {
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         // Parse first line for current generation
-        stdout.lines().next()
-            .and_then(|line| {
-                // Format: "2024-01-15 10:30 : id 123 -> /nix/store/..."
-                line.split_whitespace()
-                    .find(|s| s.parse::<u32>().is_ok())
-                    .and_then(|s| s.parse().ok())
-            })
+        stdout.lines().next().and_then(|line| {
+            // Format: "2024-01-15 10:30 : id 123 -> /nix/store/..."
+            line.split_whitespace()
+                .find(|s| s.parse::<u32>().is_ok())
+                .and_then(|s| s.parse().ok())
+        })
     }
 
     /// Refresh generation history
     fn refresh_generations(&mut self) {
         self.generations.clear();
 
-        let output = Command::new("home-manager")
-            .arg("generations")
-            .output();
+        let output = Command::new("home-manager").arg("generations").output();
 
         if let Ok(out) = output {
             let stdout = String::from_utf8_lossy(&out.stdout);
@@ -217,11 +210,13 @@ impl HomeManagerBridge {
 
         let timestamp = format!("{} {}", parts[0], parts[1]);
 
-        let id: u32 = parts.iter()
+        let id: u32 = parts
+            .iter()
             .find(|s| s.parse::<u32>().is_ok())
             .and_then(|s| s.parse().ok())?;
 
-        let path = parts.iter()
+        let path = parts
+            .iter()
             .find(|s| s.starts_with("/nix/store"))
             .map(|s| PathBuf::from(*s))
             .unwrap_or_default();
@@ -236,9 +231,7 @@ impl HomeManagerBridge {
 
     /// Build home-manager configuration
     pub fn build(&self) -> HomeResult {
-        let output = Command::new("home-manager")
-            .arg("build")
-            .output();
+        let output = Command::new("home-manager").arg("build").output();
 
         match output {
             Ok(out) => {
@@ -269,9 +262,7 @@ impl HomeManagerBridge {
 
     /// Switch to new home-manager configuration
     pub fn switch(&mut self) -> HomeResult {
-        let output = Command::new("home-manager")
-            .arg("switch")
-            .output();
+        let output = Command::new("home-manager").arg("switch").output();
 
         match output {
             Ok(out) => {
@@ -441,17 +432,13 @@ impl HomeManagerBridge {
 
     /// List installed packages via home-manager
     pub fn list_packages(&self) -> Vec<String> {
-        let output = Command::new("home-manager")
-            .arg("packages")
-            .output();
+        let output = Command::new("home-manager").arg("packages").output();
 
         match output {
-            Ok(out) if out.status.success() => {
-                String::from_utf8_lossy(&out.stdout)
-                    .lines()
-                    .map(|s| s.to_string())
-                    .collect()
-            }
+            Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .map(|s| s.to_string())
+                .collect(),
             _ => Vec::new(),
         }
     }
@@ -471,12 +458,7 @@ impl HomeManagerBridge {
             output.push_str(&format!("\nGenerations ({}):\n", self.generations.len()));
             for (i, gen) in self.generations.iter().take(5).enumerate() {
                 let marker = if i == 0 { "→" } else { " " };
-                output.push_str(&format!(
-                    "  {} {} - {}\n",
-                    marker,
-                    gen.id,
-                    gen.timestamp
-                ));
+                output.push_str(&format!("  {} {} - {}\n", marker, gen.id, gen.timestamp));
             }
         } else {
             output.push_str("Home-manager not configured for current user.\n");

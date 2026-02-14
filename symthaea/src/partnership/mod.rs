@@ -15,4 +15,3 @@ pub mod trajectory;
 pub use partner_model::{HumanPartnerModel, InteractionEvent};
 pub use phi_dyad::{DyadInput, DyadWeights, PhiDyadCalculator, PhiDyadResult};
 pub use trajectory::{RelationshipTrajectory, TrajectoryPoint, TrendSummary};
-

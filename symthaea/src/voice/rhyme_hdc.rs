@@ -29,8 +29,8 @@
 //! - **Alliteration**: "big bad" (shared initial consonants)
 
 use crate::voice::phoneme_hdc::PhonemeHdcCodec;
-use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use std::sync::Arc;
+use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RHYME TYPES
@@ -98,7 +98,8 @@ impl RhymeScheme {
     /// Create from a pattern string like "AABB" or "ABAB"
     pub fn from_pattern(pattern: &str) -> Self {
         let mut groups: Vec<Vec<usize>> = Vec::new();
-        let mut label_map: std::collections::HashMap<char, usize> = std::collections::HashMap::new();
+        let mut label_map: std::collections::HashMap<char, usize> =
+            std::collections::HashMap::new();
 
         for (i, c) in pattern.chars().enumerate() {
             if let Some(&group_idx) = label_map.get(&c) {
@@ -113,7 +114,7 @@ impl RhymeScheme {
         Self {
             pattern: pattern.to_string(),
             groups,
-            strength: 1.0,  // Assume full strength for explicit patterns
+            strength: 1.0, // Assume full strength for explicit patterns
         }
     }
 }
@@ -167,7 +168,7 @@ impl RhymeEncoder {
     /// Encode a word's ending for rhyme detection
     pub fn encode_ending(&self, phonemes: &[String]) -> ContinuousHV {
         let refs: Vec<&str> = phonemes.iter().map(|s| s.as_str()).collect();
-        self.codec.encode_word_ending(&refs, 1)  // Last syllable
+        self.codec.encode_word_ending(&refs, 1) // Last syllable
     }
 
     /// Encode a word's beginning for alliteration detection
@@ -187,7 +188,10 @@ impl RhymeEncoder {
 
         // If no initial consonants, use first phoneme
         if initial_consonants.is_empty() {
-            return self.codec.encode(&phonemes[0]).unwrap_or_else(|| ContinuousHV::zero(HDC_DIMENSION));
+            return self
+                .codec
+                .encode(&phonemes[0])
+                .unwrap_or_else(|| ContinuousHV::zero(HDC_DIMENSION));
         }
 
         // Bundle initial consonants without positional encoding
@@ -203,7 +207,8 @@ impl RhymeEncoder {
     /// Encode vowel pattern (for assonance)
     pub fn encode_vowels(&self, phonemes: &[String]) -> ContinuousHV {
         // Extract only vowels
-        let vowels: Vec<&str> = phonemes.iter()
+        let vowels: Vec<&str> = phonemes
+            .iter()
             .filter(|p| self.codec.is_vowel(p))
             .map(|s| s.as_str())
             .collect();
@@ -318,9 +323,7 @@ impl RhymeEncoder {
             groups.push(group);
         }
 
-        let pattern: String = assignments.iter()
-            .map(|a| a.unwrap_or('X'))
-            .collect();
+        let pattern: String = assignments.iter().map(|a| a.unwrap_or('X')).collect();
 
         let strength = if comparisons > 0 {
             total_strength / comparisons as f32
@@ -341,10 +344,15 @@ impl RhymeEncoder {
         target: &[String],
         candidates: &[(&'a str, &[String])],
     ) -> Option<(&'a str, RhymeScore)> {
-        candidates.iter()
+        candidates
+            .iter()
             .map(|(word, phonemes)| (*word, self.rhyme_score(target, phonemes)))
             .filter(|(_, score)| score.rhyme_type != RhymeType::None)
-            .max_by(|a, b| a.1.score.partial_cmp(&b.1.score).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.1.score
+                    .partial_cmp(&b.1.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
     }
 }
 
@@ -375,8 +383,11 @@ mod tests {
         let hat = to_phonemes(&["HH", "AE", "T"]);
 
         let score = encoder.rhyme_score(&cat, &hat);
-        assert!(score.ending_similarity > 0.5,
-                "cat/hat should have high ending similarity: {}", score.ending_similarity);
+        assert!(
+            score.ending_similarity > 0.5,
+            "cat/hat should have high ending similarity: {}",
+            score.ending_similarity
+        );
     }
 
     #[test]
@@ -389,8 +400,11 @@ mod tests {
 
         let score = encoder.rhyme_score(&cat, &dog);
         // HDC similarity can be higher due to shared phoneme features; use relaxed threshold
-        assert!(score.ending_similarity < 0.7,
-                "cat/dog should have low ending similarity: {}", score.ending_similarity);
+        assert!(
+            score.ending_similarity < 0.7,
+            "cat/dog should have low ending similarity: {}",
+            score.ending_similarity
+        );
     }
 
     #[test]
@@ -402,8 +416,11 @@ mod tests {
         let bad = to_phonemes(&["B", "AE", "D"]);
 
         let score = encoder.rhyme_score(&big, &bad);
-        assert!(score.initial_similarity > 0.5,
-                "big/bad should have high initial similarity: {}", score.initial_similarity);
+        assert!(
+            score.initial_similarity > 0.5,
+            "big/bad should have high initial similarity: {}",
+            score.initial_similarity
+        );
     }
 
     #[test]
@@ -415,8 +432,11 @@ mod tests {
         let fate = to_phonemes(&["F", "EY", "T"]);
 
         let score = encoder.rhyme_score(&lake, &fate);
-        assert!(score.vowel_similarity > 0.5,
-                "lake/fate should have high vowel similarity: {}", score.vowel_similarity);
+        assert!(
+            score.vowel_similarity > 0.5,
+            "lake/fate should have high vowel similarity: {}",
+            score.vowel_similarity
+        );
     }
 
     #[test]
@@ -425,10 +445,10 @@ mod tests {
 
         // Simple AABB scheme
         let endings = vec![
-            to_phonemes(&["K", "AE", "T"]),   // cat
-            to_phonemes(&["HH", "AE", "T"]),  // hat (rhymes with cat)
-            to_phonemes(&["D", "AO", "G"]),   // dog
-            to_phonemes(&["F", "AO", "G"]),   // fog (rhymes with dog)
+            to_phonemes(&["K", "AE", "T"]),  // cat
+            to_phonemes(&["HH", "AE", "T"]), // hat (rhymes with cat)
+            to_phonemes(&["D", "AO", "G"]),  // dog
+            to_phonemes(&["F", "AO", "G"]),  // fog (rhymes with dog)
         ];
 
         let scheme = encoder.detect_scheme(&endings);

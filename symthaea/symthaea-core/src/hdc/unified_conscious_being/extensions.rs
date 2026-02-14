@@ -3,17 +3,24 @@
 //! Delegation methods for emotional depth, cross-modal attention routing,
 //! self-improvement, counterfactual dreams, feedback dynamics, and metacognition.
 
-use super::being::UnifiedConsciousBeing;
+use super::super::adaptive_topology::CognitiveMode;
 use super::super::binary_hv::BinaryHV;
-use super::super::full_stack_consciousness::ConsciousComprehension;
-use super::super::emotional_depth::{EmotionalBlend, CompoundEmotion, WeightedComponent};
+use super::super::consciousness_feedback_dynamics::{
+    AttentionHint, CausalDiscovery, DreamInsight, DreamType, EmotionalPrediction,
+    ProactiveIntervention,
+};
+use super::super::consciousness_metacognition::{
+    ConsciousnessState, Goal, MetacognitiveCycleResult, QualityTrend,
+};
+use super::super::counterfactual_dreams::{CounterfactualDreamScenario, DreamResolution};
 use super::super::cross_modal_attention_router::{ModalityInput, RoutingResult};
 use super::super::cross_modal_binding::Modality;
-use super::super::self_improvement_integration::{CognitiveSnapshot, ImprovementRecommendation, ImprovementType};
-use super::super::adaptive_topology::CognitiveMode;
-use super::super::counterfactual_dreams::{CounterfactualDreamScenario, DreamResolution};
-use super::super::consciousness_feedback_dynamics::{DreamInsight, EmotionalPrediction, CausalDiscovery, DreamType, ProactiveIntervention, AttentionHint};
-use super::super::consciousness_metacognition::{MetacognitiveCycleResult, ConsciousnessState, QualityTrend, Goal};
+use super::super::emotional_depth::{CompoundEmotion, EmotionalBlend, WeightedComponent};
+use super::super::full_stack_consciousness::ConsciousComprehension;
+use super::super::self_improvement_integration::{
+    CognitiveSnapshot, ImprovementRecommendation, ImprovementType,
+};
+use super::being::UnifiedConsciousBeing;
 
 impl UnifiedConsciousBeing {
     // =========================================================================
@@ -28,7 +35,8 @@ impl UnifiedConsciousBeing {
     /// being.feel_compound(CompoundEmotion::Awe, Some("Witnessing the stars"));
     /// ```
     pub fn feel_compound(&mut self, compound: CompoundEmotion, trigger: Option<&str>) {
-        self.emotional_depth.feel_compound(compound, trigger.map(String::from));
+        self.emotional_depth
+            .feel_compound(compound, trigger.map(String::from));
     }
 
     /// Feel a custom emotional blend
@@ -50,7 +58,8 @@ impl UnifiedConsciousBeing {
         components: Vec<WeightedComponent>,
         trigger: Option<&str>,
     ) {
-        self.emotional_depth.feel_blend(name, components, trigger.map(String::from));
+        self.emotional_depth
+            .feel_blend(name, components, trigger.map(String::from));
     }
 
     /// Blend current emotional state with new emotions
@@ -110,7 +119,11 @@ impl UnifiedConsciousBeing {
     /// Based on the comprehension result, infer an appropriate emotional response.
     pub fn emotional_response_to(&mut self, comprehension: &ConsciousComprehension) {
         // Use valence from understanding to guide emotional response
-        let valence = comprehension.understanding.speaker_model.emotional_state.valence;
+        let valence = comprehension
+            .understanding
+            .speaker_model
+            .emotional_state
+            .valence;
         let confidence = comprehension.consciousness_phi;
 
         // High phi + positive valence = awe/joy
@@ -157,7 +170,11 @@ impl UnifiedConsciousBeing {
     /// Route attention with explicit Φ level
     ///
     /// Use this when you want to override the internal Φ measurement.
-    pub fn route_attention_with_phi(&mut self, inputs: &[ModalityInput], phi: f64) -> RoutingResult {
+    pub fn route_attention_with_phi(
+        &mut self,
+        inputs: &[ModalityInput],
+        phi: f64,
+    ) -> RoutingResult {
         self.attention_router.route(inputs, phi)
     }
 
@@ -194,21 +211,17 @@ impl UnifiedConsciousBeing {
         emotional_hv: Option<BinaryHV>,
         temporal_hv: Option<BinaryHV>,
     ) -> RoutingResult {
-        let mut inputs = vec![
-            ModalityInput::new(Modality::Semantic, semantic_hv, 0.8),
-        ];
+        let mut inputs = vec![ModalityInput::new(Modality::Semantic, semantic_hv, 0.8)];
 
         if let Some(emo) = emotional_hv {
             inputs.push(
-                ModalityInput::new(Modality::Emotional, emo, 0.6)
-                    .with_label("emotional_context")
+                ModalityInput::new(Modality::Emotional, emo, 0.6).with_label("emotional_context"),
             );
         }
 
         if let Some(temp) = temporal_hv {
             inputs.push(
-                ModalityInput::new(Modality::Temporal, temp, 0.5)
-                    .with_label("temporal_context")
+                ModalityInput::new(Modality::Temporal, temp, 0.5).with_label("temporal_context"),
             );
         }
 
@@ -229,11 +242,8 @@ impl UnifiedConsciousBeing {
     /// Call this periodically (e.g., after each interaction) to enable
     /// the self-improvement system to track and optimize performance.
     pub fn observe_self(&mut self) {
-        let snapshot = CognitiveSnapshot::now(
-            self.stats.avg_phi,
-            self.current_mode,
-            self.flow_state,
-        );
+        let snapshot =
+            CognitiveSnapshot::now(self.stats.avg_phi, self.current_mode, self.flow_state);
         self.self_improvement.observe(snapshot);
     }
 
@@ -281,7 +291,8 @@ impl UnifiedConsciousBeing {
             ImprovementType::None => {}
         }
 
-        self.self_improvement.record_improvement(recommendation.improvement_type);
+        self.self_improvement
+            .record_improvement(recommendation.improvement_type);
     }
 
     /// Auto-improve: automatically apply top recommendation if priority > threshold
@@ -351,7 +362,11 @@ impl UnifiedConsciousBeing {
         intensity: f64,
     ) -> u64 {
         self.counterfactual_dreams.add_memory_with_counterfactual(
-            label, actual, question, counterfactual, intensity
+            label,
+            actual,
+            question,
+            counterfactual,
+            intensity,
         )
     }
 
@@ -370,7 +385,12 @@ impl UnifiedConsciousBeing {
         valence: f64,
     ) -> u64 {
         self.counterfactual_dreams.add_memory_with_valence(
-            label, actual, question, counterfactual, intensity, valence
+            label,
+            actual,
+            question,
+            counterfactual,
+            intensity,
+            valence,
         )
     }
 
@@ -378,7 +398,8 @@ impl UnifiedConsciousBeing {
     ///
     /// Creates a dream scenario that explores "what-if" possibilities.
     pub fn dream_counterfactually(&mut self, duration_minutes: f64) -> CounterfactualDreamScenario {
-        self.counterfactual_dreams.generate_counterfactual_dream(duration_minutes)
+        self.counterfactual_dreams
+            .generate_counterfactual_dream(duration_minutes)
     }
 
     /// Generate a lucid counterfactual dream
@@ -390,16 +411,16 @@ impl UnifiedConsciousBeing {
         duration_minutes: f64,
         focus_memory_id: Option<u64>,
     ) -> CounterfactualDreamScenario {
-        self.counterfactual_dreams.generate_lucid_counterfactual_dream(
-            duration_minutes, focus_memory_id
-        )
+        self.counterfactual_dreams
+            .generate_lucid_counterfactual_dream(duration_minutes, focus_memory_id)
     }
 
     /// Generate a nightmare based on negative counterfactuals
     ///
     /// Explores worst-case scenarios - can be cathartic for processing fears.
     pub fn dream_nightmare(&mut self, duration_minutes: f64) -> CounterfactualDreamScenario {
-        self.counterfactual_dreams.generate_counterfactual_nightmare(duration_minutes)
+        self.counterfactual_dreams
+            .generate_counterfactual_nightmare(duration_minutes)
     }
 
     /// Set dream bizarreness factor
@@ -487,23 +508,35 @@ impl UnifiedConsciousBeing {
     /// 1. Adjust emotional state based on dream content
     /// 2. Queue memory consolidation for dream-highlighted memories
     /// 3. Generate attention hints for waking cognition
-    pub fn process_dream_feedback(&mut self, dream: &super::super::sleep_and_altered_states::DreamScenario) -> Option<DreamInsight> {
+    pub fn process_dream_feedback(
+        &mut self,
+        dream: &super::super::sleep_and_altered_states::DreamScenario,
+    ) -> Option<DreamInsight> {
         let insight = self.feedback_dynamics.feedback.process_dream(dream)?;
 
         // Apply emotional feedback
-        self.feedback_dynamics.feedback.apply_emotional_feedback(&mut self.emotional_depth);
+        self.feedback_dynamics
+            .feedback
+            .apply_emotional_feedback(&mut self.emotional_depth);
 
         Some(insight)
     }
 
     /// Process counterfactual dream feedback
-    pub fn process_counterfactual_dream_feedback(&mut self, dream: &CounterfactualDreamScenario) -> Option<DreamInsight> {
-        self.feedback_dynamics.feedback.process_counterfactual_dream(dream)
+    pub fn process_counterfactual_dream_feedback(
+        &mut self,
+        dream: &CounterfactualDreamScenario,
+    ) -> Option<DreamInsight> {
+        self.feedback_dynamics
+            .feedback
+            .process_counterfactual_dream(dream)
     }
 
     /// Get dream insights extracted from recent dreams
     pub fn dream_insights(&self, count: usize) -> Vec<DreamInsight> {
-        self.feedback_dynamics.feedback.recent_insights(count)
+        self.feedback_dynamics
+            .feedback
+            .recent_insights(count)
             .into_iter()
             .cloned()
             .collect()
@@ -555,12 +588,17 @@ impl UnifiedConsciousBeing {
     /// Dreams can explore hypotheses that are too uncertain for
     /// waking cognition to commit to.
     pub fn queue_causal_hypothesis_for_dream(&mut self, cause: &str, effect: &str, prior: f64) {
-        self.feedback_dynamics.causal_dreams.add_hypothesis(cause, effect, prior);
+        self.feedback_dynamics
+            .causal_dreams
+            .add_hypothesis(cause, effect, prior);
     }
 
     /// Get causal discoveries from dream exploration
     pub fn causal_discoveries_from_dreams(&self, count: usize) -> Vec<CausalDiscovery> {
-        self.feedback_dynamics.causal_dreams.recent_discoveries(count).to_vec()
+        self.feedback_dynamics
+            .causal_dreams
+            .recent_discoveries(count)
+            .to_vec()
     }
 
     /// Integrate dream discoveries back into CausalMind
@@ -589,17 +627,23 @@ impl UnifiedConsciousBeing {
 
     /// Receive insights from collective consciousness
     pub fn receive_collective_insights(&mut self, insights: Vec<DreamInsight>) {
-        self.feedback_dynamics.collective.receive_collective_insights(insights);
+        self.feedback_dynamics
+            .collective
+            .receive_collective_insights(insights);
     }
 
     /// Calculate resonance with collective themes
     pub fn calculate_collective_resonance(&mut self, themes: &[String]) -> f64 {
-        self.feedback_dynamics.collective.calculate_resonance(themes)
+        self.feedback_dynamics
+            .collective
+            .calculate_resonance(themes)
     }
 
     /// Get themes resonating in the collective
     pub fn resonant_collective_themes(&self, threshold: f64) -> Vec<String> {
-        self.feedback_dynamics.collective.get_resonant_themes(threshold)
+        self.feedback_dynamics
+            .collective
+            .get_resonant_themes(threshold)
     }
 
     /// Get collective dream report
@@ -613,7 +657,9 @@ impl UnifiedConsciousBeing {
 
     /// Record that a dream of a specific type occurred
     pub fn record_dream_occurrence(&mut self, dream_type: DreamType) {
-        self.feedback_dynamics.scheduler.record_dream_occurrence(dream_type);
+        self.feedback_dynamics
+            .scheduler
+            .record_dream_occurrence(dream_type);
     }
 
     /// Get recommended dream type for current state
@@ -683,9 +729,19 @@ impl UnifiedConsciousBeing {
     /// * `current_phi` - Current integrated information level
     /// * `attention_efficiency` - How efficiently attention is being used
     /// * `minutes_elapsed` - Time elapsed since last cycle
-    pub fn metacognitive_cycle(&mut self, current_phi: f64, attention_efficiency: f64, minutes_elapsed: f64) -> MetacognitiveCycleResult {
+    pub fn metacognitive_cycle(
+        &mut self,
+        current_phi: f64,
+        attention_efficiency: f64,
+        minutes_elapsed: f64,
+    ) -> MetacognitiveCycleResult {
         let blend = self.emotional_depth.current().clone();
-        self.metacognition.metacognitive_cycle(current_phi, &blend, attention_efficiency, minutes_elapsed)
+        self.metacognition.metacognitive_cycle(
+            current_phi,
+            &blend,
+            attention_efficiency,
+            minutes_elapsed,
+        )
     }
 
     /// Get current consciousness state from state machine
@@ -703,14 +759,24 @@ impl UnifiedConsciousBeing {
     /// * `focus` - Focus/phi level (0.0-1.0)
     /// * `stress` - Stress level (0.0-1.0)
     /// * `relaxation` - Relaxation level (0.0-1.0)
-    pub fn transition_consciousness_state(&mut self, fatigue: f64, focus: f64, stress: f64, relaxation: f64) {
-        self.metacognition.state_machine.evaluate_transition(fatigue, focus, stress, relaxation);
+    pub fn transition_consciousness_state(
+        &mut self,
+        fatigue: f64,
+        focus: f64,
+        stress: f64,
+        relaxation: f64,
+    ) {
+        self.metacognition
+            .state_machine
+            .evaluate_transition(fatigue, focus, stress, relaxation);
     }
 
     /// Get state-specific cognitive parameters
     ///
     /// Different consciousness states have different processing characteristics
-    pub fn state_cognitive_params(&self) -> super::super::consciousness_metacognition::StateParameters {
+    pub fn state_cognitive_params(
+        &self,
+    ) -> super::super::consciousness_metacognition::StateParameters {
         self.metacognition.state_machine.current_params().clone()
     }
 
@@ -730,8 +796,17 @@ impl UnifiedConsciousBeing {
     }
 
     /// Queue a memory for consolidation during sleep
-    pub fn queue_memory_consolidation(&mut self, memory_id: u64, content_hv: BinaryHV, emotional_salience: f64) {
-        self.metacognition.temporal.queue_for_consolidation(memory_id, content_hv, emotional_salience);
+    pub fn queue_memory_consolidation(
+        &mut self,
+        memory_id: u64,
+        content_hv: BinaryHV,
+        emotional_salience: f64,
+    ) {
+        self.metacognition.temporal.queue_for_consolidation(
+            memory_id,
+            content_hv,
+            emotional_salience,
+        );
     }
 
     /// Get consolidated memories after sleep
@@ -741,7 +816,9 @@ impl UnifiedConsciousBeing {
 
     /// Reset sleep pressure after sleep period
     pub fn reset_after_sleep(&mut self, sleep_duration_hours: f64) {
-        self.metacognition.temporal.sleep_reset(sleep_duration_hours);
+        self.metacognition
+            .temporal
+            .sleep_reset(sleep_duration_hours);
     }
 
     /// Get time of day description
@@ -760,13 +837,23 @@ impl UnifiedConsciousBeing {
     }
 
     /// Record a significant life event
-    pub fn record_narrative_event(&mut self, description: &str, impact: f64, emotional_valence: f64, lessons: Vec<String>) {
-        self.metacognition.narrative.record_event(description, impact, emotional_valence, lessons);
+    pub fn record_narrative_event(
+        &mut self,
+        description: &str,
+        impact: f64,
+        emotional_valence: f64,
+        lessons: Vec<String>,
+    ) {
+        self.metacognition
+            .narrative
+            .record_event(description, impact, emotional_valence, lessons);
     }
 
     /// Integrate dream insights into narrative identity
     pub fn integrate_dream_narrative(&mut self, dream_summary: &str, insights: &[DreamInsight]) {
-        self.metacognition.narrative.integrate_dream(dream_summary, insights);
+        self.metacognition
+            .narrative
+            .integrate_dream(dream_summary, insights);
     }
 
     /// Get life story summary
@@ -777,13 +864,23 @@ impl UnifiedConsciousBeing {
     /// Interpret a dream symbolically
     ///
     /// Extracts symbols, archetypes, and personal meanings from dream content.
-    pub fn interpret_dream(&mut self, dream: &super::super::sleep_and_altered_states::DreamScenario) -> super::super::consciousness_metacognition::DreamInterpretation {
+    pub fn interpret_dream(
+        &mut self,
+        dream: &super::super::sleep_and_altered_states::DreamScenario,
+    ) -> super::super::consciousness_metacognition::DreamInterpretation {
         self.metacognition.symbols.interpret(dream)
     }
 
     /// Learn a personal symbol meaning from experience
-    pub fn learn_symbol(&mut self, symbol: &str, personal_meaning: &str, emotional_association: f64) {
-        self.metacognition.symbols.learn_symbol(symbol, personal_meaning, emotional_association);
+    pub fn learn_symbol(
+        &mut self,
+        symbol: &str,
+        personal_meaning: &str,
+        emotional_association: f64,
+    ) {
+        self.metacognition
+            .symbols
+            .learn_symbol(symbol, personal_meaning, emotional_association);
     }
 
     /// Get recurring symbols and their frequencies
@@ -793,18 +890,24 @@ impl UnifiedConsciousBeing {
 
     /// Add an explicit goal
     pub fn add_goal(&mut self, description: &str, priority: f64) -> u64 {
-        self.metacognition.motivation.add_goal(description, priority)
+        self.metacognition
+            .motivation
+            .add_goal(description, priority)
     }
 
     /// Generate a goal from emotional state
     pub fn generate_goal_from_emotion(&mut self) -> Option<Goal> {
         let blend = self.emotional_depth.current().clone();
-        self.metacognition.motivation.generate_goal_from_emotion(&blend)
+        self.metacognition
+            .motivation
+            .generate_goal_from_emotion(&blend)
     }
 
     /// Generate a goal from dream insight
     pub fn generate_goal_from_dream(&mut self, insight: &DreamInsight) -> Option<Goal> {
-        self.metacognition.motivation.generate_goal_from_dream(insight)
+        self.metacognition
+            .motivation
+            .generate_goal_from_dream(insight)
     }
 
     /// Get active goals
@@ -814,7 +917,9 @@ impl UnifiedConsciousBeing {
 
     /// Update goal progress
     pub fn update_goal_progress(&mut self, goal_id: u64, progress: f64) {
-        self.metacognition.motivation.update_goal_progress(goal_id, progress);
+        self.metacognition
+            .motivation
+            .update_goal_progress(goal_id, progress);
     }
 
     /// Complete a goal
@@ -824,16 +929,22 @@ impl UnifiedConsciousBeing {
 
     /// Reinforce a learned value based on outcome
     pub fn reinforce_value(&mut self, value_name: &str, outcome: f64) {
-        self.metacognition.motivation.reinforce_value(value_name, outcome);
+        self.metacognition
+            .motivation
+            .reinforce_value(value_name, outcome);
     }
 
     /// Update emotional salience for a topic
     pub fn update_salience(&mut self, topic: &str, emotional_response: f64) {
-        self.metacognition.motivation.update_salience(topic, emotional_response);
+        self.metacognition
+            .motivation
+            .update_salience(topic, emotional_response);
     }
 
     /// Get motivational state
-    pub fn motivational_state(&self) -> &super::super::consciousness_metacognition::MotivationalState {
+    pub fn motivational_state(
+        &self,
+    ) -> &super::super::consciousness_metacognition::MotivationalState {
         self.metacognition.motivation.motivational_state()
     }
 
@@ -843,7 +954,9 @@ impl UnifiedConsciousBeing {
     }
 
     /// Get auto-tuning parameters
-    pub fn auto_tuning_params(&self) -> &super::super::consciousness_metacognition::AutoTuningParams {
+    pub fn auto_tuning_params(
+        &self,
+    ) -> &super::super::consciousness_metacognition::AutoTuningParams {
         self.metacognition.monitor.tuning_params()
     }
 
@@ -853,13 +966,17 @@ impl UnifiedConsciousBeing {
     }
 
     /// Assess current cognitive quality
-    pub fn assess_quality(&mut self) -> super::super::consciousness_metacognition::QualityAssessment {
+    pub fn assess_quality(
+        &mut self,
+    ) -> super::super::consciousness_metacognition::QualityAssessment {
         self.metacognition.monitor.assess_quality()
     }
 
     /// Update self-model based on experience
     pub fn update_self_model(&mut self, experience: &str, outcome: f64) {
-        self.metacognition.monitor.update_self_model(experience, outcome);
+        self.metacognition
+            .monitor
+            .update_self_model(experience, outcome);
     }
 
     /// Get self-model
@@ -887,7 +1004,10 @@ impl UnifiedConsciousBeing {
     }
 
     /// Get recent state transitions
-    pub fn recent_state_transitions(&self, count: usize) -> Vec<&super::super::consciousness_metacognition::StateTransition> {
+    pub fn recent_state_transitions(
+        &self,
+        count: usize,
+    ) -> Vec<&super::super::consciousness_metacognition::StateTransition> {
         self.metacognition.state_machine.recent_transitions(count)
     }
 
@@ -916,43 +1036,63 @@ impl UnifiedConsciousBeing {
     }
 
     /// Run integrated metacognitive step with explicit time
-    pub fn metacognitive_step_with_time(&mut self, minutes_elapsed: f64) -> MetacognitiveCycleResult {
+    pub fn metacognitive_step_with_time(
+        &mut self,
+        minutes_elapsed: f64,
+    ) -> MetacognitiveCycleResult {
         // Get current metrics
         let phi = self.stats.avg_phi;
         let attention_efficiency = self.flow_state as f64;
         let blend = self.emotional_depth.current().clone();
 
         // Run metacognitive cycle
-        let result = self.metacognition.metacognitive_cycle(phi, &blend, attention_efficiency, minutes_elapsed);
+        let result = self.metacognition.metacognitive_cycle(
+            phi,
+            &blend,
+            attention_efficiency,
+            minutes_elapsed,
+        );
 
         // Update consciousness state
         // Map to evaluate_transition(fatigue, focus, stress, relaxation)
         let arousal = blend.arousal;
         let fatigue = self.metacognition.temporal.get_sleep_pressure();
-        let focus = phi;  // Higher phi = better focus
-        let stress = arousal.max(0.0);  // Use positive arousal as stress indicator
-        let relaxation = (1.0 - arousal).max(0.0);  // Inverse of arousal
-        self.metacognition.state_machine.evaluate_transition(fatigue, focus, stress, relaxation);
+        let focus = phi; // Higher phi = better focus
+        let stress = arousal.max(0.0); // Use positive arousal as stress indicator
+        let relaxation = (1.0 - arousal).max(0.0); // Inverse of arousal
+        self.metacognition
+            .state_machine
+            .evaluate_transition(fatigue, focus, stress, relaxation);
 
         // Queue memory consolidation if important interaction
         if phi > 0.6 {
             let emotional_weight = blend.valence.abs();
             let memory_hv = BinaryHV::random((phi * 1000.0) as u64);
             let memory_id = (phi * 10000.0) as u64;
-            self.metacognition.temporal.queue_for_consolidation(memory_id, memory_hv, emotional_weight);
+            self.metacognition.temporal.queue_for_consolidation(
+                memory_id,
+                memory_hv,
+                emotional_weight,
+            );
         }
 
         // Generate goal from current emotional state if strong emotion
         if blend.valence.abs() > 0.5 {
-            let _ = self.metacognition.motivation.generate_goal_from_emotion(&blend);
+            let _ = self
+                .metacognition
+                .motivation
+                .generate_goal_from_emotion(&blend);
         }
 
         result
     }
 
     /// Process a dream through all metacognition systems
-    pub fn process_dream_metacognitively(&mut self, dream: &super::super::sleep_and_altered_states::DreamScenario, insights: &[DreamInsight]) {
+    pub fn process_dream_metacognitively(
+        &mut self,
+        dream: &super::super::sleep_and_altered_states::DreamScenario,
+        insights: &[DreamInsight],
+    ) {
         self.metacognition.process_dream(dream, insights);
     }
-
 }

@@ -211,8 +211,7 @@ impl PrefrontalCortex {
         for item in self.working_memory.drain(..) {
             if item.activation > 0.01 {
                 kept.push_back(item);
-            } else if item.activation >= GRADUATION_ACTIVATION_THRESHOLD
-                || item.rehearsal_count > 0
+            } else if item.activation >= GRADUATION_ACTIVATION_THRESHOLD || item.rehearsal_count > 0
             {
                 // High enough residual activation or rehearsed → graduate
                 self.stats.graduations += 1;
@@ -224,7 +223,8 @@ impl PrefrontalCortex {
         self.working_memory = kept;
 
         // Update average memory utilization
-        let utilization = self.working_memory.len() as f32 / self.config.working_memory_capacity as f32;
+        let utilization =
+            self.working_memory.len() as f32 / self.config.working_memory_capacity as f32;
         let n = (self.time_step as f32).max(1.0);
         self.stats.avg_memory_utilization =
             (self.stats.avg_memory_utilization * (n - 1.0) + utilization) / n;
@@ -248,7 +248,9 @@ impl PrefrontalCortex {
         // Check capacity
         if self.working_memory.len() >= self.config.working_memory_capacity {
             // Remove lowest activation item
-            if let Some(min_idx) = self.working_memory.iter()
+            if let Some(min_idx) = self
+                .working_memory
+                .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.activation.total_cmp(&b.activation))
                 .map(|(i, _)| i)
@@ -298,14 +300,18 @@ impl PrefrontalCortex {
         let mut inhibited = Vec::new();
 
         // Update action statuses based on dependencies
-        let completed_ids: Vec<_> = self.action_stack.iter()
+        let completed_ids: Vec<_> = self
+            .action_stack
+            .iter()
             .filter(|a| a.status == ActionStatus::Completed)
             .map(|a| a.id.clone())
             .collect();
 
         for action in self.action_stack.iter_mut() {
             if action.status == ActionStatus::Pending {
-                let deps_met = action.dependencies.iter()
+                let deps_met = action
+                    .dependencies
+                    .iter()
                     .all(|d| completed_ids.contains(d));
                 if deps_met {
                     action.status = ActionStatus::Ready;
@@ -314,14 +320,20 @@ impl PrefrontalCortex {
         }
 
         // Get ready actions
-        let ready_actions: Vec<_> = self.action_stack.iter()
+        let ready_actions: Vec<_> = self
+            .action_stack
+            .iter()
             .filter(|a| a.status == ActionStatus::Ready)
             .collect();
 
-        reasoning.push(format!("{} actions ready for execution", ready_actions.len()));
+        reasoning.push(format!(
+            "{} actions ready for execution",
+            ready_actions.len()
+        ));
 
         // Apply inhibition to low-priority actions when capacity is limited
-        let memory_utilization = self.working_memory.len() as f32 / self.config.working_memory_capacity as f32;
+        let memory_utilization =
+            self.working_memory.len() as f32 / self.config.working_memory_capacity as f32;
 
         if memory_utilization > self.config.inhibition_threshold {
             reasoning.push("Memory utilization high, applying inhibition".to_string());
@@ -336,7 +348,9 @@ impl PrefrontalCortex {
         }
 
         // Select highest priority ready action
-        let selected = self.action_stack.iter_mut()
+        let selected = self
+            .action_stack
+            .iter_mut()
             .filter(|a| a.status == ActionStatus::Ready)
             .max_by(|a, b| a.priority.total_cmp(&b.priority))
             .map(|a| {
@@ -345,7 +359,11 @@ impl PrefrontalCortex {
             });
 
         let confidence = if selected.is_some() {
-            let action = self.action_stack.iter().find(|a| Some(&a.id) == selected.as_ref()).unwrap();
+            let action = self
+                .action_stack
+                .iter()
+                .find(|a| Some(&a.id) == selected.as_ref())
+                .unwrap();
             action.priority
         } else {
             0.0
@@ -407,7 +425,8 @@ impl PrefrontalCortex {
             }
 
             // Find action whose expected outcome is most similar to goal
-            let best_idx = remaining_actions.iter()
+            let best_idx = remaining_actions
+                .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| {
                     let sim_a = a.expected_outcome.similarity(&current_state);
@@ -460,7 +479,10 @@ mod tests {
         let mut pfc = PrefrontalCortex::new(config);
 
         for i in 0..5 {
-            let item = WorkingMemoryItem::new(format!("item{}", i), ContinuousHV::random(512, 0xCAFE_0002 + i as u64));
+            let item = WorkingMemoryItem::new(
+                format!("item{}", i),
+                ContinuousHV::random(512, 0xCAFE_0002 + i as u64),
+            );
             pfc.add_to_memory(item);
         }
 
@@ -523,7 +545,10 @@ mod tests {
         pfc.add_to_memory(item3);
 
         let graduates = pfc.drain_graduates();
-        assert!(graduates.is_empty(), "Low-activation items should not graduate");
+        assert!(
+            graduates.is_empty(),
+            "Low-activation items should not graduate"
+        );
         assert_eq!(pfc.stats.evictions_dropped, 1);
     }
 

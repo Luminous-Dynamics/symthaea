@@ -133,15 +133,19 @@ mod tests {
         let cv1 = cause1.bind(&treatment);
         let cv2 = cause2.bind(&other);
 
-        let result = GraphSurgery::do_surgery(
-            &[cv1, cv2],
-            &[cause1, cause2],
-            &treatment,
-        );
+        let result = GraphSurgery::do_surgery(&[cv1, cv2], &[cause1, cause2], &treatment);
 
         // First edge (into treatment) should be removed (zero vector)
-        assert_eq!(result[0], BinaryHV::zero(), "Edge into treatment should be removed");
+        assert_eq!(
+            result[0],
+            BinaryHV::zero(),
+            "Edge into treatment should be removed"
+        );
         // Second edge (not into treatment) should be kept
-        assert_ne!(result[1], BinaryHV::zero(), "Edge not into treatment should be kept");
+        assert_ne!(
+            result[1],
+            BinaryHV::zero(),
+            "Edge not into treatment should be kept"
+        );
     }
 }

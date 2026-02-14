@@ -57,17 +57,17 @@
 //! coordinator.run_sync_round().await?;
 //! ```
 
-mod types;
+mod coordinator;
 mod local_backend;
 mod tcp_backend;
-mod coordinator;
+mod types;
 
 #[cfg(test)]
 mod tests;
 
 pub use types::{
-    FederatedNetworkConfig, FederatedMessage, FederatedNode, NodeAddress,
-    NetworkBackend, NetworkResult, NetworkError,
+    FederatedMessage, FederatedNetworkConfig, FederatedNode, NetworkBackend, NetworkError,
+    NetworkResult, NodeAddress,
 };
 
 pub use local_backend::LocalChannelBackend;
@@ -75,6 +75,5 @@ pub use local_backend::LocalChannelBackend;
 pub use tcp_backend::TcpBackend;
 
 pub use coordinator::{
-    FederatedCoordinator, CoordinatorStats, CoordinatorEvent,
-    create_test_network,
+    create_test_network, CoordinatorEvent, CoordinatorStats, FederatedCoordinator,
 };

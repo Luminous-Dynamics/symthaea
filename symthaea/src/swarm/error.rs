@@ -18,67 +18,40 @@ pub enum SwarmError {
     },
 
     /// Connection to peer failed
-    ConnectionFailed {
-        peer_id: String,
-        reason: String,
-    },
+    ConnectionFailed { peer_id: String, reason: String },
 
     /// Connection timed out
-    ConnectionTimeout {
-        peer_id: String,
-        timeout_ms: u64,
-    },
+    ConnectionTimeout { peer_id: String, timeout_ms: u64 },
 
     /// Peer not found in network
-    PeerNotFound {
-        peer_id: String,
-    },
+    PeerNotFound { peer_id: String },
 
     /// Invalid connection ticket
-    InvalidTicket {
-        reason: String,
-    },
+    InvalidTicket { reason: String },
 
     /// Channel closed unexpectedly
-    ChannelClosed {
-        peer_id: String,
-    },
+    ChannelClosed { peer_id: String },
 
     /// Failed to send message
-    SendFailed {
-        peer_id: String,
-        reason: String,
-    },
+    SendFailed { peer_id: String, reason: String },
 
     /// Failed to receive message
-    ReceiveFailed {
-        peer_id: String,
-        reason: String,
-    },
+    ReceiveFailed { peer_id: String, reason: String },
 
     /// Tensor streaming error
-    TensorStreamError {
-        reason: String,
-    },
+    TensorStreamError { reason: String },
 
     /// Holochain trust verification error
-    TrustVerificationError {
-        reason: String,
-    },
+    TrustVerificationError { reason: String },
 
     /// Node not initialized
     NotInitialized,
 
     /// Maximum peers reached
-    MaxPeersReached {
-        current: usize,
-        max: usize,
-    },
+    MaxPeersReached { current: usize, max: usize },
 
     /// Feature not enabled
-    FeatureNotEnabled {
-        feature: String,
-    },
+    FeatureNotEnabled { feature: String },
 
     /// Generic IO error
     IoError(std::io::Error),
@@ -93,15 +66,29 @@ pub enum SwarmError {
 impl fmt::Display for SwarmError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UntrustedPeer { peer_id, trust_level, required } => {
-                write!(f, "Peer {} is not trusted (level: {:.2}, required: {:.2})",
-                       peer_id, trust_level, required)
+            Self::UntrustedPeer {
+                peer_id,
+                trust_level,
+                required,
+            } => {
+                write!(
+                    f,
+                    "Peer {} is not trusted (level: {:.2}, required: {:.2})",
+                    peer_id, trust_level, required
+                )
             }
             Self::ConnectionFailed { peer_id, reason } => {
                 write!(f, "Connection to {} failed: {}", peer_id, reason)
             }
-            Self::ConnectionTimeout { peer_id, timeout_ms } => {
-                write!(f, "Connection to {} timed out after {}ms", peer_id, timeout_ms)
+            Self::ConnectionTimeout {
+                peer_id,
+                timeout_ms,
+            } => {
+                write!(
+                    f,
+                    "Connection to {} timed out after {}ms",
+                    peer_id, timeout_ms
+                )
             }
             Self::PeerNotFound { peer_id } => {
                 write!(f, "Peer {} not found in network", peer_id)

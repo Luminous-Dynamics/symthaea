@@ -4,17 +4,17 @@
 //! or an HdcLtc bridge, allowing runtime selection of the temporal prediction
 //! backend. All methods delegate to the active backend transparently.
 
-use anyhow::Result;
-use ndarray::Array1;
+use super::TemporalBackend;
 use crate::dynamics::cfc::CfCNetwork;
 use crate::hdc_ltc_bridge::HdcLtcBridge;
-use super::TemporalBackend;
+use anyhow::Result;
+use ndarray::Array1;
 
 /// Wrapper enum for temporal network backends.
 ///
 /// This allows the CognitiveLoopService to use either CfC or HdcLtcUnified
 /// as the temporal prediction backend, selected at runtime.
-#[allow(dead_code)]  // Some methods are provided for API completeness
+#[allow(dead_code)] // Some methods are provided for API completeness
 pub(super) enum TemporalNetwork {
     /// CfC (Closed-form Continuous-time) network
     CfC(CfCNetwork),
@@ -22,7 +22,7 @@ pub(super) enum TemporalNetwork {
     HdcLtc(HdcLtcBridge),
 }
 
-#[allow(dead_code)]  // Methods provided for API completeness and future use
+#[allow(dead_code)] // Methods provided for API completeness and future use
 impl TemporalNetwork {
     /// Step the network forward
     pub fn step(&mut self, input: &Array1<f32>, dt: f32) -> Result<()> {
@@ -72,9 +72,9 @@ impl TemporalNetwork {
         learning_rate: f32,
     ) -> Result<f32> {
         match self {
-            Self::CfC(cfc) => cfc.train_step_bptt(
-                &[input.clone()], &[target.clone()], &[dt], learning_rate,
-            ),
+            Self::CfC(cfc) => {
+                cfc.train_step_bptt(&[input.clone()], &[target.clone()], &[dt], learning_rate)
+            }
             Self::HdcLtc(bridge) => bridge.train_step(input, target, dt, learning_rate),
         }
     }

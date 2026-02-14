@@ -19,10 +19,10 @@
 //!
 //! 64 codons encode 20 amino acids + 3 stop codons
 
+use super::chemistry::Chemistry;
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::chemistry::Chemistry;
 use serde::{Deserialize, Serialize};
 
 /// DNA base
@@ -157,10 +157,8 @@ impl MolBioEncoder {
     pub fn from_chemistry(chemistry: &Chemistry, genesis: &GenesisSeed) -> Self {
         // Nucleobases are composed of rings with amino/carbonyl groups
         // Adenine: purine + amino
-        let adenine = ContinuousHV::bundle(&[
-            &genesis.hv("purine::ring", PHYSICS_DIM),
-            &chemistry.amino,
-        ]);
+        let adenine =
+            ContinuousHV::bundle(&[&genesis.hv("purine::ring", PHYSICS_DIM), &chemistry.amino]);
 
         // Thymine: pyrimidine + carbonyl + methyl
         let thymine = ContinuousHV::bundle(&[
@@ -264,9 +262,9 @@ impl MolBioEncoder {
         // Check if valid Watson-Crick pair
         let is_valid = base1.complement() == base2;
         let bond_count = if base1 == DNABase::Guanine || base1 == DNABase::Cytosine {
-            3.0  // G-C has 3 H-bonds
+            3.0 // G-C has 3 H-bonds
         } else {
-            2.0  // A-T has 2 H-bonds
+            2.0 // A-T has 2 H-bonds
         };
 
         if is_valid {
@@ -274,7 +272,7 @@ impl MolBioEncoder {
                 .bind(&self.watson_crick)
                 .bind(&self.hydrogen_bond.scale(bond_count))
         } else {
-            v1.bind(v2)  // Mismatched pair, no WC binding
+            v1.bind(v2) // Mismatched pair, no WC binding
         }
     }
 }
@@ -300,11 +298,12 @@ pub struct RNASequence {
 impl MolBioEncoder {
     /// Encode DNA sequence with position information
     pub fn dna_sequence(&self, bases: &[DNABase]) -> DNASequence {
-        let nucleotides: Vec<ContinuousHV> = bases.iter()
+        let nucleotides: Vec<ContinuousHV> = bases
+            .iter()
             .enumerate()
             .map(|(pos, base)| {
                 let nuc = self.dna_nucleotide(*base);
-                nuc.vector.permute(pos * 100)  // Position encoding
+                nuc.vector.permute(pos * 100) // Position encoding
             })
             .collect();
 
@@ -323,12 +322,12 @@ impl MolBioEncoder {
 
     /// Encode RNA sequence
     pub fn rna_sequence(&self, bases: &[RNABase]) -> RNASequence {
-        let nucleotides: Vec<ContinuousHV> = bases.iter()
+        let nucleotides: Vec<ContinuousHV> = bases
+            .iter()
             .enumerate()
             .map(|(pos, base)| {
                 let base_vec = self.rna_base_vector(*base);
-                ContinuousHV::bundle(&[base_vec, &self.ribose, &self.phosphate])
-                    .permute(pos * 100)
+                ContinuousHV::bundle(&[base_vec, &self.ribose, &self.phosphate]).permute(pos * 100)
             })
             .collect();
 
@@ -347,7 +346,9 @@ impl MolBioEncoder {
 
     /// Transcription: DNA → mRNA
     pub fn transcribe(&self, dna: &DNASequence) -> RNASequence {
-        let rna_bases: Vec<RNABase> = dna.sequence.iter()
+        let rna_bases: Vec<RNABase> = dna
+            .sequence
+            .iter()
             .map(|b| RNABase::from_dna_template(*b))
             .collect();
         self.rna_sequence(&rna_bases)
@@ -355,9 +356,7 @@ impl MolBioEncoder {
 
     /// Complementary DNA strand
     pub fn complement(&self, dna: &DNASequence) -> DNASequence {
-        let comp_bases: Vec<DNABase> = dna.sequence.iter()
-            .map(|b| b.complement())
-            .collect();
+        let comp_bases: Vec<DNABase> = dna.sequence.iter().map(|b| b.complement()).collect();
         self.dna_sequence(&comp_bases)
     }
 }
@@ -544,7 +543,10 @@ impl AminoAcidEncoder {
 
     /// Get vector for amino acid
     pub fn get(&self, aa: AminoAcid) -> Option<&ContinuousHV> {
-        self.amino_acids.iter().find(|(a, _)| *a == aa).map(|(_, v)| v)
+        self.amino_acids
+            .iter()
+            .find(|(a, _)| *a == aa)
+            .map(|(_, v)| v)
     }
 
     /// Translate codon (3 RNA bases) to amino acid
@@ -555,58 +557,89 @@ impl AminoAcidEncoder {
             // Phenylalanine
             [Uracil, Uracil, Uracil] | [Uracil, Uracil, Cytosine] => Some(AminoAcid::Phenylalanine),
             // Leucine
-            [Uracil, Uracil, Adenine] | [Uracil, Uracil, Guanine] |
-            [Cytosine, Uracil, Uracil] | [Cytosine, Uracil, Cytosine] |
-            [Cytosine, Uracil, Adenine] | [Cytosine, Uracil, Guanine] => Some(AminoAcid::Leucine),
+            [Uracil, Uracil, Adenine]
+            | [Uracil, Uracil, Guanine]
+            | [Cytosine, Uracil, Uracil]
+            | [Cytosine, Uracil, Cytosine]
+            | [Cytosine, Uracil, Adenine]
+            | [Cytosine, Uracil, Guanine] => Some(AminoAcid::Leucine),
             // Isoleucine
-            [Adenine, Uracil, Uracil] | [Adenine, Uracil, Cytosine] |
-            [Adenine, Uracil, Adenine] => Some(AminoAcid::Isoleucine),
+            [Adenine, Uracil, Uracil]
+            | [Adenine, Uracil, Cytosine]
+            | [Adenine, Uracil, Adenine] => Some(AminoAcid::Isoleucine),
             // Methionine (START)
             [Adenine, Uracil, Guanine] => Some(AminoAcid::Methionine),
             // Valine
-            [Guanine, Uracil, Uracil] | [Guanine, Uracil, Cytosine] |
-            [Guanine, Uracil, Adenine] | [Guanine, Uracil, Guanine] => Some(AminoAcid::Valine),
+            [Guanine, Uracil, Uracil]
+            | [Guanine, Uracil, Cytosine]
+            | [Guanine, Uracil, Adenine]
+            | [Guanine, Uracil, Guanine] => Some(AminoAcid::Valine),
             // Serine
-            [Uracil, Cytosine, Uracil] | [Uracil, Cytosine, Cytosine] |
-            [Uracil, Cytosine, Adenine] | [Uracil, Cytosine, Guanine] |
-            [Adenine, Guanine, Uracil] | [Adenine, Guanine, Cytosine] => Some(AminoAcid::Serine),
+            [Uracil, Cytosine, Uracil]
+            | [Uracil, Cytosine, Cytosine]
+            | [Uracil, Cytosine, Adenine]
+            | [Uracil, Cytosine, Guanine]
+            | [Adenine, Guanine, Uracil]
+            | [Adenine, Guanine, Cytosine] => Some(AminoAcid::Serine),
             // Proline
-            [Cytosine, Cytosine, Uracil] | [Cytosine, Cytosine, Cytosine] |
-            [Cytosine, Cytosine, Adenine] | [Cytosine, Cytosine, Guanine] => Some(AminoAcid::Proline),
+            [Cytosine, Cytosine, Uracil]
+            | [Cytosine, Cytosine, Cytosine]
+            | [Cytosine, Cytosine, Adenine]
+            | [Cytosine, Cytosine, Guanine] => Some(AminoAcid::Proline),
             // Threonine
-            [Adenine, Cytosine, Uracil] | [Adenine, Cytosine, Cytosine] |
-            [Adenine, Cytosine, Adenine] | [Adenine, Cytosine, Guanine] => Some(AminoAcid::Threonine),
+            [Adenine, Cytosine, Uracil]
+            | [Adenine, Cytosine, Cytosine]
+            | [Adenine, Cytosine, Adenine]
+            | [Adenine, Cytosine, Guanine] => Some(AminoAcid::Threonine),
             // Alanine
-            [Guanine, Cytosine, Uracil] | [Guanine, Cytosine, Cytosine] |
-            [Guanine, Cytosine, Adenine] | [Guanine, Cytosine, Guanine] => Some(AminoAcid::Alanine),
+            [Guanine, Cytosine, Uracil]
+            | [Guanine, Cytosine, Cytosine]
+            | [Guanine, Cytosine, Adenine]
+            | [Guanine, Cytosine, Guanine] => Some(AminoAcid::Alanine),
             // Tyrosine
             [Uracil, Adenine, Uracil] | [Uracil, Adenine, Cytosine] => Some(AminoAcid::Tyrosine),
             // Stop codons
-            [Uracil, Adenine, Adenine] | [Uracil, Adenine, Guanine] |
-            [Uracil, Guanine, Adenine] => None,
+            [Uracil, Adenine, Adenine]
+            | [Uracil, Adenine, Guanine]
+            | [Uracil, Guanine, Adenine] => None,
             // Histidine
-            [Cytosine, Adenine, Uracil] | [Cytosine, Adenine, Cytosine] => Some(AminoAcid::Histidine),
+            [Cytosine, Adenine, Uracil] | [Cytosine, Adenine, Cytosine] => {
+                Some(AminoAcid::Histidine)
+            }
             // Glutamine
-            [Cytosine, Adenine, Adenine] | [Cytosine, Adenine, Guanine] => Some(AminoAcid::Glutamine),
+            [Cytosine, Adenine, Adenine] | [Cytosine, Adenine, Guanine] => {
+                Some(AminoAcid::Glutamine)
+            }
             // Asparagine
-            [Adenine, Adenine, Uracil] | [Adenine, Adenine, Cytosine] => Some(AminoAcid::Asparagine),
+            [Adenine, Adenine, Uracil] | [Adenine, Adenine, Cytosine] => {
+                Some(AminoAcid::Asparagine)
+            }
             // Lysine
             [Adenine, Adenine, Adenine] | [Adenine, Adenine, Guanine] => Some(AminoAcid::Lysine),
             // Aspartic acid
-            [Guanine, Adenine, Uracil] | [Guanine, Adenine, Cytosine] => Some(AminoAcid::AsparticAcid),
+            [Guanine, Adenine, Uracil] | [Guanine, Adenine, Cytosine] => {
+                Some(AminoAcid::AsparticAcid)
+            }
             // Glutamic acid
-            [Guanine, Adenine, Adenine] | [Guanine, Adenine, Guanine] => Some(AminoAcid::GlutamicAcid),
+            [Guanine, Adenine, Adenine] | [Guanine, Adenine, Guanine] => {
+                Some(AminoAcid::GlutamicAcid)
+            }
             // Cysteine
             [Uracil, Guanine, Uracil] | [Uracil, Guanine, Cytosine] => Some(AminoAcid::Cysteine),
             // Tryptophan
             [Uracil, Guanine, Guanine] => Some(AminoAcid::Tryptophan),
             // Arginine
-            [Cytosine, Guanine, Uracil] | [Cytosine, Guanine, Cytosine] |
-            [Cytosine, Guanine, Adenine] | [Cytosine, Guanine, Guanine] |
-            [Adenine, Guanine, Adenine] | [Adenine, Guanine, Guanine] => Some(AminoAcid::Arginine),
+            [Cytosine, Guanine, Uracil]
+            | [Cytosine, Guanine, Cytosine]
+            | [Cytosine, Guanine, Adenine]
+            | [Cytosine, Guanine, Guanine]
+            | [Adenine, Guanine, Adenine]
+            | [Adenine, Guanine, Guanine] => Some(AminoAcid::Arginine),
             // Glycine
-            [Guanine, Guanine, Uracil] | [Guanine, Guanine, Cytosine] |
-            [Guanine, Guanine, Adenine] | [Guanine, Guanine, Guanine] => Some(AminoAcid::Glycine),
+            [Guanine, Guanine, Uracil]
+            | [Guanine, Guanine, Cytosine]
+            | [Guanine, Guanine, Adenine]
+            | [Guanine, Guanine, Guanine] => Some(AminoAcid::Glycine),
         }
     }
 }
@@ -651,12 +684,12 @@ pub struct Protein {
 impl AminoAcidEncoder {
     /// Encode protein from amino acid sequence
     pub fn encode_protein(&self, name: &str, sequence: &[AminoAcid]) -> Protein {
-        let aa_vectors: Vec<ContinuousHV> = sequence.iter()
+        let aa_vectors: Vec<ContinuousHV> = sequence
+            .iter()
             .enumerate()
             .filter_map(|(pos, aa)| {
-                self.get(*aa).map(|aa_vec| {
-                    aa_vec.permute(pos * 50).bind(&self.peptide_bond)
-                })
+                self.get(*aa)
+                    .map(|aa_vec| aa_vec.permute(pos * 50).bind(&self.peptide_bond))
             })
             .collect();
 
@@ -667,9 +700,7 @@ impl AminoAcidEncoder {
             ContinuousHV::bundle(&refs)
         };
 
-        let molecular_weight_da: f64 = sequence.iter()
-            .map(|aa| aa.molecular_weight())
-            .sum();
+        let molecular_weight_da: f64 = sequence.iter().map(|aa| aa.molecular_weight()).sum();
 
         Protein {
             name: name.to_string(),
@@ -702,7 +733,7 @@ impl AminoAcidEncoder {
                 let codon = [mrna.sequence[i], mrna.sequence[i + 1], mrna.sequence[i + 2]];
                 match self.translate_codon(&codon) {
                     Some(aa) => amino_acids.push(aa),
-                    None => break,  // Stop codon
+                    None => break, // Stop codon
                 }
                 i += 3;
             }
@@ -737,9 +768,7 @@ impl MolBioEncoder {
         let protein = aa_encoder.translate(&mrna);
 
         // Information flow: bind all three levels
-        let vector = gene.vector
-            .bind(&mrna.vector)
-            .bind(&protein.vector);
+        let vector = gene.vector.bind(&mrna.vector).bind(&protein.vector);
 
         CentralDogma {
             dna: gene.clone(),
@@ -777,9 +806,12 @@ mod tests {
         let at_gc_sim = at_pair.similarity(&gc_pair);
         let at_invalid_sim = at_pair.similarity(&invalid);
 
-        assert!(at_gc_sim > at_invalid_sim,
+        assert!(
+            at_gc_sim > at_invalid_sim,
             "Valid WC pairs should cluster: AT-GC={}, AT-invalid={}",
-            at_gc_sim, at_invalid_sim);
+            at_gc_sim,
+            at_invalid_sim
+        );
 
         // Both valid pairs should have non-trivial vectors
         assert!(at_pair.norm() > 0.0);
@@ -791,8 +823,12 @@ mod tests {
         let (encoder, _, _) = setup();
 
         let dna = encoder.dna_sequence(&[
-            DNABase::Adenine, DNABase::Thymine, DNABase::Guanine,
-            DNABase::Guanine, DNABase::Cytosine, DNABase::Adenine,
+            DNABase::Adenine,
+            DNABase::Thymine,
+            DNABase::Guanine,
+            DNABase::Guanine,
+            DNABase::Cytosine,
+            DNABase::Adenine,
         ]);
 
         let mrna = encoder.transcribe(&dna);
@@ -801,9 +837,9 @@ mod tests {
         assert_eq!(mrna.sequence.len(), dna.sequence.len());
 
         // Check transcription rules
-        assert_eq!(mrna.sequence[0], RNABase::Uracil);  // A → U
-        assert_eq!(mrna.sequence[1], RNABase::Adenine);  // T → A
-        assert_eq!(mrna.sequence[2], RNABase::Cytosine);  // G → C
+        assert_eq!(mrna.sequence[0], RNABase::Uracil); // A → U
+        assert_eq!(mrna.sequence[1], RNABase::Adenine); // T → A
+        assert_eq!(mrna.sequence[2], RNABase::Cytosine); // G → C
     }
 
     #[test]
@@ -812,10 +848,18 @@ mod tests {
 
         // Create mRNA with AUG start codon
         let mrna = molbio.rna_sequence(&[
-            RNABase::Adenine, RNABase::Uracil, RNABase::Guanine,  // Met (start)
-            RNABase::Guanine, RNABase::Cytosine, RNABase::Uracil,  // Ala
-            RNABase::Guanine, RNABase::Cytosine, RNABase::Uracil,  // Ala
-            RNABase::Uracil, RNABase::Adenine, RNABase::Adenine,  // Stop
+            RNABase::Adenine,
+            RNABase::Uracil,
+            RNABase::Guanine, // Met (start)
+            RNABase::Guanine,
+            RNABase::Cytosine,
+            RNABase::Uracil, // Ala
+            RNABase::Guanine,
+            RNABase::Cytosine,
+            RNABase::Uracil, // Ala
+            RNABase::Uracil,
+            RNABase::Adenine,
+            RNABase::Adenine, // Stop
         ]);
 
         let protein = aa.translate(&mrna);
@@ -853,9 +897,18 @@ mod tests {
         let (_, aa, _) = setup();
 
         // Test some key codons
-        assert_eq!(aa.translate_codon(&[RNABase::Adenine, RNABase::Uracil, RNABase::Guanine]), Some(AminoAcid::Methionine));
-        assert_eq!(aa.translate_codon(&[RNABase::Uracil, RNABase::Adenine, RNABase::Adenine]), None);  // Stop
-        assert_eq!(aa.translate_codon(&[RNABase::Uracil, RNABase::Guanine, RNABase::Guanine]), Some(AminoAcid::Tryptophan));
+        assert_eq!(
+            aa.translate_codon(&[RNABase::Adenine, RNABase::Uracil, RNABase::Guanine]),
+            Some(AminoAcid::Methionine)
+        );
+        assert_eq!(
+            aa.translate_codon(&[RNABase::Uracil, RNABase::Adenine, RNABase::Adenine]),
+            None
+        ); // Stop
+        assert_eq!(
+            aa.translate_codon(&[RNABase::Uracil, RNABase::Guanine, RNABase::Guanine]),
+            Some(AminoAcid::Tryptophan)
+        );
     }
 
     #[test]
@@ -864,9 +917,15 @@ mod tests {
 
         // Create a gene
         let gene = molbio.dna_sequence(&[
-            DNABase::Thymine, DNABase::Adenine, DNABase::Cytosine,  // Will become AUG
-            DNABase::Cytosine, DNABase::Guanine, DNABase::Adenine,  // Will become GCU (Ala)
-            DNABase::Adenine, DNABase::Thymine, DNABase::Thymine,   // Will become UAA (Stop)
+            DNABase::Thymine,
+            DNABase::Adenine,
+            DNABase::Cytosine, // Will become AUG
+            DNABase::Cytosine,
+            DNABase::Guanine,
+            DNABase::Adenine, // Will become GCU (Ala)
+            DNABase::Adenine,
+            DNABase::Thymine,
+            DNABase::Thymine, // Will become UAA (Stop)
         ]);
 
         let dogma = molbio.central_dogma(&gene, &aa);

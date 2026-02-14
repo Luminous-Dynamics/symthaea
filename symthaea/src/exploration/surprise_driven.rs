@@ -337,9 +337,9 @@ impl SurpriseTracker {
             if pending.successful == Some(true) {
                 self.stats.successful_explorations += 1;
                 // Decay noise on success
-                self.current_noise_scale =
-                    (self.current_noise_scale * self.config.exploration_decay)
-                        .max(self.config.min_exploration_noise);
+                self.current_noise_scale = (self.current_noise_scale
+                    * self.config.exploration_decay)
+                    .max(self.config.min_exploration_noise);
             }
 
             // Move to history
@@ -402,9 +402,9 @@ impl SurpriseTracker {
         }
 
         // Compute adaptive threshold
-        self.stats.adaptive_threshold =
-            (self.stats.mean + self.config.threshold_sigma * self.stats.std_dev)
-                .clamp(self.config.min_threshold, self.config.max_threshold);
+        self.stats.adaptive_threshold = (self.stats.mean
+            + self.config.threshold_sigma * self.stats.std_dev)
+            .clamp(self.config.min_threshold, self.config.max_threshold);
     }
 
     /// Determine if exploration should be triggered based on surprise level
@@ -475,8 +475,8 @@ impl SurpriseTracker {
 
         // Increase noise for next time if this exploration was triggered
         // (will be decayed if successful)
-        self.current_noise_scale = (self.current_noise_scale * 1.1)
-            .min(self.config.exploration_noise_scale * 2.0);
+        self.current_noise_scale =
+            (self.current_noise_scale * 1.1).min(self.config.exploration_noise_scale * 2.0);
 
         action
     }
@@ -710,7 +710,10 @@ mod tests {
         let actual = vec![1.0, 2.0, 3.0];
 
         let surprise = tracker.compute_surprise(&predicted, &actual);
-        assert!(surprise < 0.001, "Same vectors should have near-zero surprise");
+        assert!(
+            surprise < 0.001,
+            "Same vectors should have near-zero surprise"
+        );
 
         let actual_diff = vec![2.0, 3.0, 4.0];
         let surprise_diff = tracker.compute_surprise(&predicted, &actual_diff);
@@ -780,7 +783,8 @@ mod tests {
         assert!(
             final_threshold < initial_threshold,
             "Threshold should decrease when surprise drops: final={:.4} vs initial={:.4}",
-            final_threshold, initial_threshold
+            final_threshold,
+            initial_threshold
         );
     }
 
@@ -830,7 +834,8 @@ mod tests {
 
         // Check success was recorded
         assert_eq!(
-            tracker.stats().successful_explorations, 1,
+            tracker.stats().successful_explorations,
+            1,
             "Should track successful exploration"
         );
     }

@@ -137,7 +137,8 @@ pub struct TcpBackend {
     local_addr: SocketAddr,
 
     /// Active outgoing TCP connections to peers, keyed by remote address.
-    connections: Arc<RwLock<HashMap<SocketAddr, Arc<tokio::sync::Mutex<tokio::net::tcp::OwnedWriteHalf>>>>>,
+    connections:
+        Arc<RwLock<HashMap<SocketAddr, Arc<tokio::sync::Mutex<tokio::net::tcp::OwnedWriteHalf>>>>>,
 
     /// Sender side of the incoming message channel.
     incoming_tx: mpsc::Sender<(NodeAddress, FederatedMessage)>,
@@ -168,12 +169,11 @@ impl TcpBackend {
     ///
     /// Returns `NetworkError::Internal` if the bind fails.
     pub async fn new(bind_addr: SocketAddr) -> NetworkResult<Self> {
-        let listener =
-            tokio::net::TcpListener::bind(bind_addr)
-                .await
-                .map_err(|e| NetworkError::Internal {
-                    reason: format!("Failed to bind TCP listener on {}: {}", bind_addr, e),
-                })?;
+        let listener = tokio::net::TcpListener::bind(bind_addr)
+            .await
+            .map_err(|e| NetworkError::Internal {
+                reason: format!("Failed to bind TCP listener on {}: {}", bind_addr, e),
+            })?;
 
         let local_addr = listener.local_addr().map_err(|e| NetworkError::Internal {
             reason: format!("Failed to get local address: {}", e),
@@ -182,9 +182,7 @@ impl TcpBackend {
         let (incoming_tx, incoming_rx) = mpsc::channel(4096);
 
         let connections: Arc<
-            RwLock<
-                HashMap<SocketAddr, Arc<tokio::sync::Mutex<tokio::net::tcp::OwnedWriteHalf>>>,
-            >,
+            RwLock<HashMap<SocketAddr, Arc<tokio::sync::Mutex<tokio::net::tcp::OwnedWriteHalf>>>>,
         > = Arc::new(RwLock::new(HashMap::new()));
 
         let ready = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -206,10 +204,9 @@ impl TcpBackend {
                         let (read_half, write_half) = stream.into_split();
 
                         // Cache the write half so we can send back to this peer
-                        accept_connections.write().insert(
-                            peer_addr,
-                            Arc::new(tokio::sync::Mutex::new(write_half)),
-                        );
+                        accept_connections
+                            .write()
+                            .insert(peer_addr, Arc::new(tokio::sync::Mutex::new(write_half)));
 
                         // Spawn a reader task for this connection
                         let reader_tx = accept_tx.clone();
@@ -247,22 +244,19 @@ impl TcpBackend {
         peer_addr: SocketAddr,
         incoming_tx: mpsc::Sender<(NodeAddress, FederatedMessage)>,
         connections: Arc<
-            RwLock<
-                HashMap<SocketAddr, Arc<tokio::sync::Mutex<tokio::net::tcp::OwnedWriteHalf>>>,
-            >,
+            RwLock<HashMap<SocketAddr, Arc<tokio::sync::Mutex<tokio::net::tcp::OwnedWriteHalf>>>>,
         >,
     ) {
         loop {
             match read_framed(&mut read_half).await {
                 Ok(msg) => {
-                    debug!(
-                        "TCP: received {} from {}",
-                        msg.message_type(),
-                        peer_addr
-                    );
+                    debug!("TCP: received {} from {}", msg.message_type(), peer_addr);
                     let source = NodeAddress::Socket(peer_addr);
                     if incoming_tx.send((source, msg)).await.is_err() {
-                        debug!("TCP: incoming channel closed, stopping reader for {}", peer_addr);
+                        debug!(
+                            "TCP: incoming channel closed, stopping reader for {}",
+                            peer_addr
+                        );
                         break;
                     }
                 }
@@ -290,20 +284,18 @@ impl TcpBackend {
 
         // Slow path: establish a new connection
         debug!("TCP: connecting to {}", addr);
-        let stream = tokio::net::TcpStream::connect(addr)
-            .await
-            .map_err(|e| NetworkError::ConnectionFailed {
+        let stream = tokio::net::TcpStream::connect(addr).await.map_err(|e| {
+            NetworkError::ConnectionFailed {
                 target: addr.to_string(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
         let (read_half, write_half) = stream.into_split();
         let writer = Arc::new(tokio::sync::Mutex::new(write_half));
 
         // Cache the write half
-        self.connections
-            .write()
-            .insert(addr, Arc::clone(&writer));
+        self.connections.write().insert(addr, Arc::clone(&writer));
 
         // Spawn a reader task for replies on this connection
         let reader_tx = self.incoming_tx.clone();
@@ -323,10 +315,7 @@ impl TcpBackend {
         match target {
             NodeAddress::Socket(addr) => Ok(*addr),
             other => Err(NetworkError::SendFailed {
-                reason: format!(
-                    "TcpBackend requires Socket addresses, got {}",
-                    other
-                ),
+                reason: format!("TcpBackend requires Socket addresses, got {}", other),
             }),
         }
     }

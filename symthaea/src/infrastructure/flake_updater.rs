@@ -116,8 +116,8 @@ impl FlakeUpdater {
             return Err(FlakeError::NoLockFile);
         }
 
-        let lock_content = std::fs::read_to_string(&lock_path)
-            .map_err(|e| FlakeError::IoError(e.to_string()))?;
+        let lock_content =
+            std::fs::read_to_string(&lock_path).map_err(|e| FlakeError::IoError(e.to_string()))?;
 
         // Parse flake.lock (JSON format)
         let lock: serde_json::Value = serde_json::from_str(&lock_content)
@@ -134,10 +134,20 @@ impl FlakeUpdater {
 
                 let url = original
                     .and_then(|o| o.get("url"))
-                    .or_else(|| original.and_then(|o| o.get("owner")).map(|_| original.unwrap()))
+                    .or_else(|| {
+                        original
+                            .and_then(|o| o.get("owner"))
+                            .map(|_| original.unwrap())
+                    })
                     .map(|v| {
-                        if let Some(owner) = original.and_then(|o| o.get("owner")).and_then(|o| o.as_str()) {
-                            let repo = original.and_then(|o| o.get("repo")).and_then(|r| r.as_str()).unwrap_or("");
+                        if let Some(owner) = original
+                            .and_then(|o| o.get("owner"))
+                            .and_then(|o| o.as_str())
+                        {
+                            let repo = original
+                                .and_then(|o| o.get("repo"))
+                                .and_then(|r| r.as_str())
+                                .unwrap_or("");
                             format!("github:{}/{}", owner, repo)
                         } else {
                             v.as_str().unwrap_or("").to_string()
@@ -228,14 +238,20 @@ impl FlakeUpdater {
 
     /// Get update preview for an input
     pub fn preview_update(&self, input_name: &str) -> Result<UpdatePreview, FlakeError> {
-        let input = self.inputs.get(input_name)
+        let input = self
+            .inputs
+            .get(input_name)
             .ok_or_else(|| FlakeError::InputNotFound(input_name.to_string()))?;
 
-        let from_rev = input.locked_rev.clone()
+        let from_rev = input
+            .locked_rev
+            .clone()
             .map(|r| r.chars().take(7).collect())
             .unwrap_or_else(|| "unknown".to_string());
 
-        let to_rev = input.new_rev.clone()
+        let to_rev = input
+            .new_rev
+            .clone()
             .unwrap_or_else(|| "latest".to_string());
 
         // Estimate impact based on rev difference
@@ -262,7 +278,9 @@ impl FlakeUpdater {
     pub fn update_input(&mut self, input_name: &str) -> Result<UpdateResult, FlakeError> {
         let start = std::time::Instant::now();
 
-        let old_rev = self.inputs.get(input_name)
+        let old_rev = self
+            .inputs
+            .get(input_name)
             .and_then(|i| i.locked_rev.clone());
 
         let output = Command::new("nix")
@@ -277,7 +295,9 @@ impl FlakeUpdater {
             // Refresh to get new revision
             self.refresh_inputs()?;
 
-            let new_rev = self.inputs.get(input_name)
+            let new_rev = self
+                .inputs
+                .get(input_name)
                 .and_then(|i| i.locked_rev.clone());
 
             UpdateResult {
@@ -308,7 +328,8 @@ impl FlakeUpdater {
         let start = std::time::Instant::now();
 
         // Store old revisions
-        let old_revs: HashMap<String, Option<String>> = self.inputs
+        let old_revs: HashMap<String, Option<String>> = self
+            .inputs
             .iter()
             .map(|(k, v)| (k.clone(), v.locked_rev.clone()))
             .collect();
@@ -325,7 +346,8 @@ impl FlakeUpdater {
             // Refresh to get new revisions
             self.refresh_inputs()?;
 
-            let results: Vec<UpdateResult> = self.inputs
+            let results: Vec<UpdateResult> = self
+                .inputs
                 .iter()
                 .map(|(name, input)| {
                     let old_rev = old_revs.get(name).cloned().flatten();
@@ -350,7 +372,7 @@ impl FlakeUpdater {
             Ok(results)
         } else {
             Err(FlakeError::CommandFailed(
-                String::from_utf8_lossy(&output.stderr).to_string()
+                String::from_utf8_lossy(&output.stderr).to_string(),
             ))
         }
     }
@@ -377,7 +399,9 @@ impl FlakeUpdater {
         inputs.sort_by(|a, b| a.name.cmp(&b.name));
 
         for input in inputs {
-            let rev = input.locked_rev.as_deref()
+            let rev = input
+                .locked_rev
+                .as_deref()
                 .map(|r| &r[..7.min(r.len())])
                 .unwrap_or("???");
 
@@ -391,10 +415,7 @@ impl FlakeUpdater {
 
             output.push_str(&format!(
                 "{} {} ({}) - {}\n",
-                status,
-                input.name,
-                rev,
-                input.url
+                status, input.name, rev, input.url
             ));
         }
 

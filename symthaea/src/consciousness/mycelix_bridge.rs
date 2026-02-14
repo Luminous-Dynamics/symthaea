@@ -43,12 +43,12 @@
 //!
 //! Without the feature, fallback implementations maintain API compatibility.
 
-use super::unified_value_evaluator::{
-    UnifiedValueEvaluator, EvaluationContext, EvaluationResult,
-    ActionType, Decision, AffectiveSystemsState,
-};
-use super::seven_harmonies::Harmony;
 use super::affective_consciousness::CoreAffect;
+use super::seven_harmonies::Harmony;
+use super::unified_value_evaluator::{
+    ActionType, AffectiveSystemsState, Decision, EvaluationContext, EvaluationResult,
+    UnifiedValueEvaluator,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -59,10 +59,10 @@ use std::time::{Duration, Instant};
 
 #[cfg(feature = "mycelix")]
 use mycelix_sdk::{
-    bridge::{LocalBridge, BridgeMessage, CrossHappReputation, HappReputationScore, BridgeEvent},
-    hyperfeel::{HyperFeelEncoder, EncodingConfig, HyperGradient},
+    bridge::{BridgeEvent, BridgeMessage, CrossHappReputation, HappReputationScore, LocalBridge},
+    epistemic::{EmpiricalLevel, EpistemicClaim, MaterialityLevel, NormativeLevel},
+    hyperfeel::{EncodingConfig, HyperFeelEncoder, HyperGradient},
     matl::ProofOfGradientQuality,
-    epistemic::{EpistemicClaim, EmpiricalLevel, NormativeLevel, MaterialityLevel},
 };
 
 #[cfg(feature = "mycelix")]
@@ -133,7 +133,8 @@ impl ConsciousnessSnapshot {
         (self.phi * 0.4
             + self.meta_awareness * 0.2
             + self.self_model_accuracy * 0.2
-            + self.coherence * 0.2).clamp(0.0, 1.0)
+            + self.coherence * 0.2)
+            .clamp(0.0, 1.0)
     }
 }
 
@@ -400,7 +401,7 @@ impl MycelixBridge {
             affective_state: CoreAffect::neutral(), // Use snapshot valence
             affective_systems: affective_state.clone(),
             action_type,
-            action_domain: None, // Auto-detect from proposal description
+            action_domain: None,   // Auto-detect from proposal description
             involves_others: true, // Proposals always affect others
         };
 
@@ -474,10 +475,8 @@ impl MycelixBridge {
         let alignment = self.create_alignment_result(&eval);
 
         // Cache result
-        self.proposal_cache.insert(
-            proposal.id.clone(),
-            (alignment.clone(), Instant::now()),
-        );
+        self.proposal_cache
+            .insert(proposal.id.clone(), (alignment.clone(), Instant::now()));
 
         Ok(alignment)
     }
@@ -590,7 +589,7 @@ impl MycelixBridge {
         // 3. Return compressed form
 
         CompressedValueGradient {
-            harmony_encoding: vec![0u8; 256], // Placeholder
+            harmony_encoding: vec![0u8; 256],    // Placeholder
             importance_gradient: vec![0u8; 256], // Placeholder
             round,
             agent_id: self.agent_id.clone(),
@@ -604,12 +603,12 @@ impl MycelixBridge {
 
     /// Create alignment result from evaluation
     fn create_alignment_result(&self, eval: &EvaluationResult) -> ValueAlignmentResult {
-        let harmony_scores: HashMap<String, f64> = eval.breakdown.harmony_scores
-            .iter()
-            .cloned()
-            .collect();
+        let harmony_scores: HashMap<String, f64> =
+            eval.breakdown.harmony_scores.iter().cloned().collect();
 
-        let violations: Vec<String> = eval.harmony_alignment.alignments
+        let violations: Vec<String> = eval
+            .harmony_alignment
+            .alignments
             .iter()
             .filter(|(_, a)| a.score < -0.2)
             .map(|(h, _)| h.name().to_string())
@@ -708,8 +707,16 @@ pub enum BridgeError {
 impl std::fmt::Display for BridgeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InsufficientConsciousness { current, required, action } => {
-                write!(f, "Insufficient consciousness for {}: {} < {}", action, current, required)
+            Self::InsufficientConsciousness {
+                current,
+                required,
+                action,
+            } => {
+                write!(
+                    f,
+                    "Insufficient consciousness for {}: {} < {}",
+                    action, current, required
+                )
             }
             Self::ValueViolation { reason } => write!(f, "Value violation: {}", reason),
             Self::CannotEvaluate => write!(f, "Cannot evaluate proposal"),
@@ -786,15 +793,13 @@ impl EnhancedMycelixBridge {
         affective_state: AffectiveSystemsState,
     ) -> Result<(SubmissionResult, BridgeEvent), BridgeError> {
         // Validate and submit through base bridge
-        let result = self.base.submit_proposal(proposal, consciousness.clone(), affective_state)?;
+        let result = self
+            .base
+            .submit_proposal(proposal, consciousness.clone(), affective_state)?;
 
         // Broadcast to network
         let event_payload = serde_json::to_vec(&result).unwrap_or_default();
-        let event = BridgeEvent::new(
-            "proposal_submitted",
-            "symthaea",
-            event_payload,
-        );
+        let event = BridgeEvent::new("proposal_submitted", "symthaea", event_payload);
         self.local_bridge.broadcast(event.clone());
 
         info!(
@@ -812,15 +817,13 @@ impl EnhancedMycelixBridge {
         consciousness: ConsciousnessSnapshot,
         affective_state: AffectiveSystemsState,
     ) -> Result<(Vote, BridgeEvent), BridgeError> {
-        let vote = self.base.cast_vote(proposal, consciousness.clone(), affective_state)?;
+        let vote = self
+            .base
+            .cast_vote(proposal, consciousness.clone(), affective_state)?;
 
         // Broadcast vote event
         let event_payload = serde_json::to_vec(&vote).unwrap_or_default();
-        let event = BridgeEvent::new(
-            "vote_cast",
-            "symthaea",
-            event_payload,
-        );
+        let event = BridgeEvent::new("vote_cast", "symthaea", event_payload);
         self.local_bridge.broadcast(event.clone());
 
         info!(
@@ -865,11 +868,9 @@ impl EnhancedMycelixBridge {
 
         // Encode using HyperFeel (2000x compression)
         self.round += 1;
-        let hyper_gradient = self.hyperfeel.encode_gradient(
-            &gradient,
-            self.round,
-            &self.base.agent_id,
-        );
+        let hyper_gradient =
+            self.hyperfeel
+                .encode_gradient(&gradient, self.round, &self.base.agent_id);
 
         info!(
             "🧠 Encoded {} value updates to HyperGradient (round {})",
@@ -884,7 +885,7 @@ impl EnhancedMycelixBridge {
     pub fn create_gradient_proof(&self, hyper_gradient: &HyperGradient) -> ProofOfGradientQuality {
         ProofOfGradientQuality::new(
             hyper_gradient.quality_score as f64,
-            0.9, // Agreement threshold
+            0.9,  // Agreement threshold
             0.05, // Noise estimate
         )
     }
@@ -1109,6 +1110,9 @@ mod tests {
         let affective = AffectiveSystemsState::default();
 
         let result = bridge.submit_proposal(&proposal, consciousness, affective);
-        assert!(matches!(result, Err(BridgeError::InsufficientConsciousness { .. })));
+        assert!(matches!(
+            result,
+            Err(BridgeError::InsufficientConsciousness { .. })
+        ));
     }
 }

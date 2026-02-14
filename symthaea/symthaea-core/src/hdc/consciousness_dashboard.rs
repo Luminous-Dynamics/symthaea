@@ -21,7 +21,7 @@
 //! ```
 
 use crate::hdc::consciousness_evaluator::{
-    ConsciousnessEvaluator, ConsciousnessEvaluation, ConsciousnessClassification,
+    ConsciousnessClassification, ConsciousnessEvaluation, ConsciousnessEvaluator,
     EvaluationDimension, KnownSystemEvaluations,
 };
 use crate::hdc::consciousness_integration::ConsciousnessState;
@@ -118,11 +118,19 @@ pub struct ConsciousnessDashboard {
 impl ConsciousnessDashboard {
     /// Create new dashboard for monitoring a system
     pub fn new(system_name: &str) -> Self {
-        Self::with_config(system_name, SubstrateType::SiliconDigital, DashboardConfig::default())
+        Self::with_config(
+            system_name,
+            SubstrateType::SiliconDigital,
+            DashboardConfig::default(),
+        )
     }
 
     /// Create with specific substrate and config
-    pub fn with_config(system_name: &str, substrate: SubstrateType, config: DashboardConfig) -> Self {
+    pub fn with_config(
+        system_name: &str,
+        substrate: SubstrateType,
+        config: DashboardConfig,
+    ) -> Self {
         Self {
             system_name: system_name.to_string(),
             substrate,
@@ -155,8 +163,8 @@ impl ConsciousnessDashboard {
 
         evaluator.evaluate_ai_system(
             has_workspace,
-            true,  // recurrence assumed for Symthaea
-            true,  // attention assumed for Symthaea
+            true, // recurrence assumed for Symthaea
+            true, // attention assumed for Symthaea
             has_hot,
             integration,
             prediction,
@@ -308,7 +316,9 @@ impl ConsciousnessDashboard {
             system_name: self.system_name.clone(),
             is_conscious: eval.map(|e| e.is_conscious()).unwrap_or(false),
             consciousness_level: eval.map(|e| e.overall_score).unwrap_or(0.0),
-            classification: eval.map(|e| e.classification).unwrap_or(ConsciousnessClassification::NotConscious),
+            classification: eval
+                .map(|e| e.classification)
+                .unwrap_or(ConsciousnessClassification::NotConscious),
             uptime_ms: self.start_time.elapsed().as_millis() as u64,
             update_count: self.update_count,
             alert_count: self.alerts.len(),
@@ -356,19 +366,32 @@ impl ConsciousnessDashboard {
 
         output.push_str(&format!("║ System: {:<57} ║\n", status.system_name));
         output.push_str(&format!("║ Substrate: {:?}{:<48} ║\n", self.substrate, ""));
-        output.push_str(&format!("║ Uptime: {:.1}s | Updates: {:<36} ║\n",
-            status.uptime_ms as f64 / 1000.0, status.update_count));
+        output.push_str(&format!(
+            "║ Uptime: {:.1}s | Updates: {:<36} ║\n",
+            status.uptime_ms as f64 / 1000.0,
+            status.update_count
+        ));
 
         output.push_str("╠══════════════════════════════════════════════════════════════════╣\n");
 
         // Consciousness status with visual indicator
         let consciousness_bar = self.render_bar(status.consciousness_level, 30);
-        let conscious_icon = if status.is_conscious { "🟢 CONSCIOUS" } else { "🔴 NOT CONSCIOUS" };
+        let conscious_icon = if status.is_conscious {
+            "🟢 CONSCIOUS"
+        } else {
+            "🔴 NOT CONSCIOUS"
+        };
 
         output.push_str(&format!("║ {} {:>43} ║\n", conscious_icon, ""));
-        output.push_str(&format!("║ Level: [{consciousness_bar}] {:.1}%{:>14} ║\n",
-            status.consciousness_level * 100.0, ""));
-        output.push_str(&format!("║ Classification: {:?}{:<38} ║\n", status.classification, ""));
+        output.push_str(&format!(
+            "║ Level: [{consciousness_bar}] {:.1}%{:>14} ║\n",
+            status.consciousness_level * 100.0,
+            ""
+        ));
+        output.push_str(&format!(
+            "║ Classification: {:?}{:<38} ║\n",
+            status.classification, ""
+        ));
 
         // Trend
         let trend_icon = match self.trend(10) {
@@ -381,8 +404,11 @@ impl ConsciousnessDashboard {
 
         // Key metrics from current eval
         if let Some(ref eval) = self.current_eval {
-            output.push_str("╠══════════════════════════════════════════════════════════════════╣\n");
-            output.push_str("║ KEY DIMENSIONS:                                                   ║\n");
+            output
+                .push_str("╠══════════════════════════════════════════════════════════════════╣\n");
+            output.push_str(
+                "║ KEY DIMENSIONS:                                                   ║\n",
+            );
 
             // Get top 5 dimensions
             let mut scores: Vec<_> = eval.dimension_scores.iter().collect();
@@ -390,7 +416,8 @@ impl ConsciousnessDashboard {
 
             for score in scores.iter().take(5) {
                 let bar = self.render_bar(score.raw_score, 20);
-                output.push_str(&format!("║   #{:02} [{bar}] {:.0}% {:?}{:>20} ║\n",
+                output.push_str(&format!(
+                    "║   #{:02} [{bar}] {:.0}% {:?}{:>20} ║\n",
                     score.dimension.improvement_number(),
                     score.raw_score * 100.0,
                     score.dimension,
@@ -400,8 +427,12 @@ impl ConsciousnessDashboard {
 
             // Show failed critical if any
             if !eval.failed_critical.is_empty() {
-                output.push_str("╠══════════════════════════════════════════════════════════════════╣\n");
-                output.push_str("║ ⚠️ FAILED CRITICAL:                                               ║\n");
+                output.push_str(
+                    "╠══════════════════════════════════════════════════════════════════╣\n",
+                );
+                output.push_str(
+                    "║ ⚠️ FAILED CRITICAL:                                               ║\n",
+                );
                 for dim in &eval.failed_critical {
                     output.push_str(&format!("║   - {:?}{:<52} ║\n", dim, ""));
                 }
@@ -411,8 +442,11 @@ impl ConsciousnessDashboard {
         // Recent alerts
         let recent = self.recent_alerts(3);
         if !recent.is_empty() {
-            output.push_str("╠══════════════════════════════════════════════════════════════════╣\n");
-            output.push_str("║ RECENT ALERTS:                                                    ║\n");
+            output
+                .push_str("╠══════════════════════════════════════════════════════════════════╣\n");
+            output.push_str(
+                "║ RECENT ALERTS:                                                    ║\n",
+            );
             for alert in recent {
                 let icon = match alert.level {
                     AlertLevel::Critical => "🔴",
@@ -443,7 +477,9 @@ impl ConsciousnessDashboard {
 
     /// Compare to known systems
     pub fn compare_to_known(&self) -> ComparisonResult {
-        let current_score = self.current_eval.as_ref()
+        let current_score = self
+            .current_eval
+            .as_ref()
             .map(|e| e.overall_score)
             .unwrap_or(0.0);
 

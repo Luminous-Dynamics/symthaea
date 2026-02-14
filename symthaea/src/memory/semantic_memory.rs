@@ -331,8 +331,10 @@ impl SemanticMemory {
             return None;
         }
 
-        let entries: Vec<&SemanticEntry> =
-            similar.iter().filter_map(|(idx, _)| self.entries.get(*idx)).collect();
+        let entries: Vec<&SemanticEntry> = similar
+            .iter()
+            .filter_map(|(idx, _)| self.entries.get(*idx))
+            .collect();
 
         if entries.is_empty() {
             return None;

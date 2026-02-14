@@ -62,11 +62,7 @@ pub enum LearningAlgorithm {
         weight_decay: f32,
     },
     /// RMSprop optimizer
-    RMSprop {
-        lr: f32,
-        rho: f32,
-        epsilon: f32,
-    },
+    RMSprop { lr: f32, rho: f32, epsilon: f32 },
 }
 
 impl Default for LearningAlgorithm {
@@ -82,8 +78,7 @@ impl Default for LearningAlgorithm {
 }
 
 /// Connectivity mode for network weights
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum Connectivity {
     /// Fully connected (all-to-all)
     #[default]
@@ -96,10 +91,8 @@ pub enum Connectivity {
     },
 }
 
-
 /// Activation function for neurons
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum Activation {
     #[default]
     Tanh,
@@ -109,7 +102,6 @@ pub enum Activation {
     Identity,
 }
 
-
 impl Activation {
     /// Apply activation to scalar
     #[inline]
@@ -118,7 +110,13 @@ impl Activation {
             Activation::Tanh => x.tanh(),
             Activation::Sigmoid => 1.0 / (1.0 + (-x).exp()),
             Activation::Softplus => (1.0 + x.exp()).ln(),
-            Activation::LeakyRelu => if x > 0.0 { x } else { 0.01 * x },
+            Activation::LeakyRelu => {
+                if x > 0.0 {
+                    x
+                } else {
+                    0.01 * x
+                }
+            }
             Activation::Identity => x,
         }
     }
@@ -136,23 +134,26 @@ impl Activation {
                 s * (1.0 - s)
             }
             Activation::Softplus => 1.0 / (1.0 + (-x).exp()),
-            Activation::LeakyRelu => if x > 0.0 { 1.0 } else { 0.01 },
+            Activation::LeakyRelu => {
+                if x > 0.0 {
+                    1.0
+                } else {
+                    0.01
+                }
+            }
             Activation::Identity => 1.0,
         }
     }
 
     /// Apply activation to HDC vector
     pub fn apply_hdc(&self, hv: &ContinuousHV) -> ContinuousHV {
-        let values: Vec<f32> = hv.values.iter()
-            .map(|&x| self.apply_scalar(x))
-            .collect();
+        let values: Vec<f32> = hv.values.iter().map(|&x| self.apply_scalar(x)).collect();
         ContinuousHV::from_vec(values)
     }
 }
 
 /// State type for unified LTC
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum StateType {
     /// Scalar state per neuron (traditional LTC)
     #[default]
@@ -161,10 +162,8 @@ pub enum StateType {
     HDC { dimension: usize },
 }
 
-
 /// Integration method for ODE solving
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum IntegrationMethod {
     /// First-order Euler (fast, O(dt) error)
     #[default]
@@ -172,7 +171,6 @@ pub enum IntegrationMethod {
     /// Fourth-order Runge-Kutta (accurate, O(dt^4) error)
     RK4,
 }
-
 
 /// Unified LTC configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -248,7 +246,12 @@ impl UnifiedLTCConfig {
     }
 
     /// Create sparse scalar configuration
-    pub fn scalar_sparse(num_neurons: usize, input_dim: usize, output_dim: usize, sparsity: f32) -> Self {
+    pub fn scalar_sparse(
+        num_neurons: usize,
+        input_dim: usize,
+        output_dim: usize,
+        sparsity: f32,
+    ) -> Self {
         let mut config = Self::scalar(num_neurons, input_dim, output_dim);
         let mask_row_len = num_neurons.div_ceil(64);
         config.connectivity = Connectivity::Sparse {
@@ -360,30 +363,28 @@ impl UnifiedLTC {
         let output_dim = config.output_dim;
 
         // Initialize based on state type
-        let (scalar_states, hdc_states, hdc_weights, hdc_input_masks, hdc_weight_momentum, hdc_weight_velocity) =
-            match &config.state_type {
-                StateType::Scalar => {
-                    (vec![0.0f32; n], vec![], vec![], vec![], vec![], vec![])
-                }
-                StateType::HDC { dimension } => {
-                    let states: Vec<_> = (0..n)
-                        .map(|_| ContinuousHV::zero(*dimension))
-                        .collect();
-                    let weights: Vec<_> = (0..n)
-                        .map(|i| ContinuousHV::random(*dimension, i as u64))
-                        .collect();
-                    let masks: Vec<_> = (0..n)
-                        .map(|i| ContinuousHV::random(*dimension, (i + 1000) as u64))
-                        .collect();
-                    let momentum: Vec<_> = (0..n)
-                        .map(|_| ContinuousHV::zero(*dimension))
-                        .collect();
-                    let velocity: Vec<_> = (0..n)
-                        .map(|_| ContinuousHV::zero(*dimension))
-                        .collect();
-                    (vec![], states, weights, masks, momentum, velocity)
-                }
-            };
+        let (
+            scalar_states,
+            hdc_states,
+            hdc_weights,
+            hdc_input_masks,
+            hdc_weight_momentum,
+            hdc_weight_velocity,
+        ) = match &config.state_type {
+            StateType::Scalar => (vec![0.0f32; n], vec![], vec![], vec![], vec![], vec![]),
+            StateType::HDC { dimension } => {
+                let states: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                let weights: Vec<_> = (0..n)
+                    .map(|i| ContinuousHV::random(*dimension, i as u64))
+                    .collect();
+                let masks: Vec<_> = (0..n)
+                    .map(|i| ContinuousHV::random(*dimension, (i + 1000) as u64))
+                    .collect();
+                let momentum: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                let velocity: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                (vec![], states, weights, masks, momentum, velocity)
+            }
+        };
 
         // Initialize time constants
         let tau: Vec<f32> = (0..n)
@@ -393,12 +394,14 @@ impl UnifiedLTC {
         // Initialize weights based on connectivity
         let (w_rec, mask) = match &config.connectivity {
             Connectivity::Dense => {
-                let w: Vec<f32> = (0..n * n)
-                    .map(|_| rng.gen_range(-0.1..0.1))
-                    .collect();
+                let w: Vec<f32> = (0..n * n).map(|_| rng.gen_range(-0.1..0.1)).collect();
                 (w, None)
             }
-            Connectivity::Sparse { sparsity, mask_row_len, .. } => {
+            Connectivity::Sparse {
+                sparsity,
+                mask_row_len,
+                ..
+            } => {
                 let mut w = vec![0.0f32; n * n];
                 let mut m = vec![0u64; n * *mask_row_len];
 
@@ -439,9 +442,7 @@ impl UnifiedLTC {
             .map(|_| rng.gen_range(-0.1..0.1))
             .collect();
 
-        let bias: Vec<f32> = (0..n)
-            .map(|_| rng.gen_range(-0.1..0.1))
-            .collect();
+        let bias: Vec<f32> = (0..n).map(|_| rng.gen_range(-0.1..0.1)).collect();
 
         // Initialize optimizer state
         let m_w_rec = vec![0.0f32; n * n];
@@ -486,21 +487,33 @@ impl UnifiedLTC {
         let input_dim = config.input_dim;
         let output_dim = config.output_dim;
 
-        let (scalar_states, hdc_states, hdc_weights, hdc_input_masks, hdc_weight_momentum, hdc_weight_velocity) =
-            match &config.state_type {
-                StateType::Scalar => (vec![0.0f32; n], vec![], vec![], vec![], vec![], vec![]),
-                StateType::HDC { dimension } => {
-                    let states: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
-                    let weights: Vec<_> = (0..n).map(|i| genesis.hv(&format!("{label}::hdc_weight::{i}"), *dimension)).collect();
-                    let masks: Vec<_> = (0..n).map(|i| genesis.hv(&format!("{label}::hdc_mask::{i}"), *dimension)).collect();
-                    let momentum: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
-                    let velocity: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
-                    (vec![], states, weights, masks, momentum, velocity)
-                }
-            };
+        let (
+            scalar_states,
+            hdc_states,
+            hdc_weights,
+            hdc_input_masks,
+            hdc_weight_momentum,
+            hdc_weight_velocity,
+        ) = match &config.state_type {
+            StateType::Scalar => (vec![0.0f32; n], vec![], vec![], vec![], vec![], vec![]),
+            StateType::HDC { dimension } => {
+                let states: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                let weights: Vec<_> = (0..n)
+                    .map(|i| genesis.hv(&format!("{label}::hdc_weight::{i}"), *dimension))
+                    .collect();
+                let masks: Vec<_> = (0..n)
+                    .map(|i| genesis.hv(&format!("{label}::hdc_mask::{i}"), *dimension))
+                    .collect();
+                let momentum: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                let velocity: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                (vec![], states, weights, masks, momentum, velocity)
+            }
+        };
 
         let mut rng = genesis.domain(&format!("{label}::tau"));
-        let tau: Vec<f32> = (0..n).map(|_| rng.gen_range(config.tau_min..config.tau_max)).collect();
+        let tau: Vec<f32> = (0..n)
+            .map(|_| rng.gen_range(config.tau_min..config.tau_max))
+            .collect();
 
         let mut w_rng = genesis.domain(&format!("{label}::w_rec"));
         let (w_rec, mask) = match &config.connectivity {
@@ -508,7 +521,11 @@ impl UnifiedLTC {
                 let w: Vec<f32> = (0..n * n).map(|_| w_rng.gen_range(-0.1..0.1)).collect();
                 (w, None)
             }
-            Connectivity::Sparse { sparsity, mask_row_len, .. } => {
+            Connectivity::Sparse {
+                sparsity,
+                mask_row_len,
+                ..
+            } => {
                 let mut w = vec![0.0f32; n * n];
                 let mut m = vec![0u64; n * *mask_row_len];
                 for i in 0..n {
@@ -539,8 +556,12 @@ impl UnifiedLTC {
         };
 
         let mut io_rng = genesis.domain(&format!("{label}::io_weights"));
-        let w_in: Vec<f32> = (0..n * input_dim).map(|_| io_rng.gen_range(-0.1..0.1)).collect();
-        let w_out: Vec<f32> = (0..output_dim * n).map(|_| io_rng.gen_range(-0.1..0.1)).collect();
+        let w_in: Vec<f32> = (0..n * input_dim)
+            .map(|_| io_rng.gen_range(-0.1..0.1))
+            .collect();
+        let w_out: Vec<f32> = (0..output_dim * n)
+            .map(|_| io_rng.gen_range(-0.1..0.1))
+            .collect();
         let bias: Vec<f32> = (0..n).map(|_| io_rng.gen_range(-0.1..0.1)).collect();
 
         let mut new_config = config;
@@ -548,12 +569,24 @@ impl UnifiedLTC {
 
         Ok(Self {
             config: new_config,
-            scalar_states, tau, w_rec, w_in, w_out, bias,
-            hdc_states, hdc_weights, hdc_input_masks,
-            m_w_rec: vec![0.0f32; n * n], v_w_rec: vec![0.0f32; n * n],
-            m_tau: vec![0.0f32; n], v_tau: vec![0.0f32; n],
-            hdc_weight_momentum, hdc_weight_velocity,
-            step: 0, total_time: 0.0, update_count: 0,
+            scalar_states,
+            tau,
+            w_rec,
+            w_in,
+            w_out,
+            bias,
+            hdc_states,
+            hdc_weights,
+            hdc_input_masks,
+            m_w_rec: vec![0.0f32; n * n],
+            v_w_rec: vec![0.0f32; n * n],
+            m_tau: vec![0.0f32; n],
+            v_tau: vec![0.0f32; n],
+            hdc_weight_momentum,
+            hdc_weight_velocity,
+            step: 0,
+            total_time: 0.0,
+            update_count: 0,
         })
     }
 
@@ -562,7 +595,9 @@ impl UnifiedLTC {
     fn mask_get(&self, i: usize, j: usize) -> bool {
         match &self.config.connectivity {
             Connectivity::Dense => true,
-            Connectivity::Sparse { mask, mask_row_len, .. } => {
+            Connectivity::Sparse {
+                mask, mask_row_len, ..
+            } => {
                 let idx = i * mask_row_len + j / 64;
                 (mask[idx] & (1u64 << (j % 64))) != 0
             }
@@ -651,8 +686,13 @@ impl UnifiedLTC {
         hidden_states: &[Vec<f32>],
         output_grad: &[f32],
     ) -> Result<f32> {
-        let LearningAlgorithm::BPTT { lr_weights, lr_tau, lr_bias, grad_clip, l2_reg } =
-            self.config.learning
+        let LearningAlgorithm::BPTT {
+            lr_weights,
+            lr_tau,
+            lr_bias,
+            grad_clip,
+            l2_reg,
+        } = self.config.learning
         else {
             anyhow::bail!("backward() requires BPTT learning algorithm");
         };
@@ -663,7 +703,9 @@ impl UnifiedLTC {
         let dt = self.config.dt;
 
         // Gradient for output weights
-        let final_state = hidden_states.last().ok_or_else(|| anyhow::anyhow!("hidden_states is empty; cannot compute output gradient"))?;
+        let final_state = hidden_states.last().ok_or_else(|| {
+            anyhow::anyhow!("hidden_states is empty; cannot compute output gradient")
+        })?;
         let mut grad_w_out = vec![0.0f32; output_dim * n];
         for i in 0..output_dim {
             for j in 0..n {
@@ -688,7 +730,11 @@ impl UnifiedLTC {
         // BPTT through time
         for t in (0..self.config.num_steps).rev() {
             let state = &hidden_states[t];
-            let prev_state = if t > 0 { &hidden_states[t - 1] } else { &vec![0.0f32; n] };
+            let prev_state = if t > 0 {
+                &hidden_states[t - 1]
+            } else {
+                &vec![0.0f32; n]
+            };
 
             for i in 0..n {
                 // Compute z at this timestep
@@ -891,7 +937,12 @@ impl UnifiedLTC {
         self.update_count += 1;
     }
 
-    fn compute_hdc_derivative(&self, i: usize, input: &ContinuousHV, state: &ContinuousHV) -> ContinuousHV {
+    fn compute_hdc_derivative(
+        &self,
+        i: usize,
+        input: &ContinuousHV,
+        state: &ContinuousHV,
+    ) -> ContinuousHV {
         let weight = &self.hdc_weights[i];
         let input_mask = &self.hdc_input_masks[i];
 
@@ -918,7 +969,8 @@ impl UnifiedLTC {
             let correlation = input.bind(&self.hdc_states[i]);
 
             // Apply with momentum
-            self.hdc_weight_momentum[i] = self.hdc_weight_momentum[i].scale(momentum)
+            self.hdc_weight_momentum[i] = self.hdc_weight_momentum[i]
+                .scale(momentum)
                 .add(&correlation.scale(lr));
 
             self.hdc_weights[i] = self.hdc_weights[i].add(&self.hdc_weight_momentum[i]);
@@ -933,9 +985,13 @@ impl UnifiedLTC {
     /// Adam weight update (HDC mode)
     pub fn adam_update(&mut self, input: &ContinuousHV) {
         let (lr, beta1, beta2, epsilon, weight_decay) = match self.config.learning {
-            LearningAlgorithm::Adam { lr, beta1, beta2, epsilon, weight_decay } => {
-                (lr, beta1, beta2, epsilon, weight_decay)
-            }
+            LearningAlgorithm::Adam {
+                lr,
+                beta1,
+                beta2,
+                epsilon,
+                weight_decay,
+            } => (lr, beta1, beta2, epsilon, weight_decay),
             _ => return,
         };
 
@@ -947,12 +1003,14 @@ impl UnifiedLTC {
             let gradient = input.bind(&self.hdc_states[i]);
 
             // Update biased first moment
-            self.hdc_weight_momentum[i] = self.hdc_weight_momentum[i].scale(beta1)
+            self.hdc_weight_momentum[i] = self.hdc_weight_momentum[i]
+                .scale(beta1)
                 .add(&gradient.scale(1.0 - beta1));
 
             // Update biased second moment
             let gradient_squared = gradient.hadamard_product(&gradient);
-            self.hdc_weight_velocity[i] = self.hdc_weight_velocity[i].scale(beta2)
+            self.hdc_weight_velocity[i] = self.hdc_weight_velocity[i]
+                .scale(beta2)
                 .add(&gradient_squared.scale(1.0 - beta2));
 
             // Bias correction
@@ -965,7 +1023,8 @@ impl UnifiedLTC {
             let update = m_hat.hadamard_product(&v_sqrt_inv).scale(lr);
 
             // Weight decay
-            self.hdc_weights[i] = self.hdc_weights[i].scale(1.0 - weight_decay * lr)
+            self.hdc_weights[i] = self.hdc_weights[i]
+                .scale(1.0 - weight_decay * lr)
                 .add(&update);
 
             if self.hdc_weights[i].norm() > 2.0 {
@@ -996,7 +1055,11 @@ impl UnifiedLTC {
         let modulation = vitality.clamp(0.1, 2.0);
 
         match &mut self.config.learning {
-            LearningAlgorithm::BPTT { lr_weights, lr_bias, .. } => {
+            LearningAlgorithm::BPTT {
+                lr_weights,
+                lr_bias,
+                ..
+            } => {
                 *lr_weights *= modulation;
                 *lr_bias *= modulation;
             }
@@ -1047,7 +1110,8 @@ impl UnifiedLTC {
             let mut prediction = vec![0.0f32; self.config.output_dim];
             for i in 0..self.config.output_dim {
                 for j in 0..self.config.num_neurons {
-                    prediction[i] += self.w_out[i * self.config.num_neurons + j] * self.scalar_states[j];
+                    prediction[i] +=
+                        self.w_out[i * self.config.num_neurons + j] * self.scalar_states[j];
                 }
             }
             prediction
@@ -1154,7 +1218,10 @@ mod tests {
     #[test]
     fn test_hdc_hebbian_learning() {
         let mut config = UnifiedLTCConfig::hdc(512);
-        config.learning = LearningAlgorithm::Hebbian { lr: 0.01, momentum: 0.9 };
+        config.learning = LearningAlgorithm::Hebbian {
+            lr: 0.01,
+            momentum: 0.9,
+        };
         let mut ltc = UnifiedLTC::new(config).unwrap();
 
         let input = ContinuousHV::random(512, 123);
@@ -1327,7 +1394,11 @@ mod tests {
         // Evolving with dt=0 should not change state
         ltc.evolve(0.0, &input);
 
-        for (i, (orig, after)) in initial_states.iter().zip(ltc.hdc_states().iter()).enumerate() {
+        for (i, (orig, after)) in initial_states
+            .iter()
+            .zip(ltc.hdc_states().iter())
+            .enumerate()
+        {
             assert_eq!(
                 orig.values, after.values,
                 "HDC state[{}] changed with dt=0",
@@ -1350,12 +1421,7 @@ mod tests {
 
         for (i, state) in ltc.hdc_states().iter().enumerate() {
             let norm = state.norm();
-            assert!(
-                norm <= 5.5,
-                "HDC state[{}] norm={} exceeds bound",
-                i,
-                norm
-            );
+            assert!(norm <= 5.5, "HDC state[{}] norm={} exceeds bound", i, norm);
             for (j, v) in state.values.iter().enumerate() {
                 assert!(
                     v.is_finite(),

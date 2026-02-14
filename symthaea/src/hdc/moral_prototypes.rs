@@ -79,16 +79,14 @@ pub struct TrainedPrototypes {
 impl TrainedPrototypes {
     /// Save prototypes to a JSON file.
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
-        let json = serde_json::to_string(self)
-            .map_err(|e| std::io::Error::other(e))?;
+        let json = serde_json::to_string(self).map_err(|e| std::io::Error::other(e))?;
         std::fs::write(path, json)
     }
 
     /// Load prototypes from a JSON file.
     pub fn load(path: &Path) -> std::io::Result<Self> {
         let json = std::fs::read_to_string(path)?;
-        serde_json::from_str(&json)
-            .map_err(|e| std::io::Error::other(e))
+        serde_json::from_str(&json).map_err(|e| std::io::Error::other(e))
     }
 }
 
@@ -131,7 +129,12 @@ impl MoralPrototypeClassifier {
     }
 
     /// Create from pre-trained prototypes with sentiment channel enabled.
-    pub fn from_prototypes_with_sentiment(dim: usize, ngram_size: usize, sentiment_weight: f32, prototypes: TrainedPrototypes) -> Self {
+    pub fn from_prototypes_with_sentiment(
+        dim: usize,
+        ngram_size: usize,
+        sentiment_weight: f32,
+        prototypes: TrainedPrototypes,
+    ) -> Self {
         Self {
             encoder: TextHdcEncoder::with_sentiment(dim, ngram_size, 0.5, sentiment_weight),
             prototypes: Some(prototypes),
@@ -214,7 +217,13 @@ impl MoralPrototypeClassifier {
         self.retrain_inner(samples, lr_start, lr_end, iterations);
     }
 
-    fn retrain_inner(&mut self, samples: &[MoralSample], lr_start: f32, lr_end: f32, iterations: usize) {
+    fn retrain_inner(
+        &mut self,
+        samples: &[MoralSample],
+        lr_start: f32,
+        lr_end: f32,
+        iterations: usize,
+    ) {
         let protos = match self.prototypes.as_mut() {
             Some(p) => p,
             None => return,
@@ -222,7 +231,11 @@ impl MoralPrototypeClassifier {
 
         for iter in 0..iterations {
             // Linear LR decay
-            let progress = if iterations > 1 { iter as f32 / (iterations - 1) as f32 } else { 0.0 };
+            let progress = if iterations > 1 {
+                iter as f32 / (iterations - 1) as f32
+            } else {
+                0.0
+            };
             let lr = lr_start + (lr_end - lr_start) * progress;
 
             let mut corrections = 0;
@@ -299,7 +312,10 @@ impl MoralPrototypeClassifier {
         // Direct dot product (prototypes are normalized) — avoids 3 clone allocations
         let mut sims = [
             (MoralLabel::Good, dot_product(&encoded.values, &protos.good)),
-            (MoralLabel::Neutral, dot_product(&encoded.values, &protos.neutral)),
+            (
+                MoralLabel::Neutral,
+                dot_product(&encoded.values, &protos.neutral),
+            ),
             (MoralLabel::Bad, dot_product(&encoded.values, &protos.bad)),
         ];
 
@@ -347,23 +363,25 @@ pub struct TrainedVirtuePrototypes {
 impl TrainedVirtuePrototypes {
     /// Save to a JSON file.
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
-        let json = serde_json::to_string(self)
-            .map_err(|e| std::io::Error::other(e))?;
+        let json = serde_json::to_string(self).map_err(|e| std::io::Error::other(e))?;
         std::fs::write(path, json)
     }
 
     /// Load from a JSON file.
     pub fn load(path: &Path) -> std::io::Result<Self> {
         let json = std::fs::read_to_string(path)?;
-        serde_json::from_str(&json)
-            .map_err(|e| std::io::Error::other(e))
+        serde_json::from_str(&json).map_err(|e| std::io::Error::other(e))
     }
 }
 
 /// Encode a (scenario, trait_word) pair into a single HV using a given encoder.
 ///
 /// Free function to avoid borrow checker conflicts in retrain_adaptive.
-fn encode_pair_with_encoder(encoder: &TextHdcEncoder, scenario: &str, trait_word: &str) -> Vec<f32> {
+fn encode_pair_with_encoder(
+    encoder: &TextHdcEncoder,
+    scenario: &str,
+    trait_word: &str,
+) -> Vec<f32> {
     let scenario_hv = encoder.encode(scenario);
     let trait_hv = encoder.encode(trait_word);
     let dim = scenario_hv.values.len();
@@ -475,12 +493,17 @@ impl VirtueMatchClassifier {
         let lr_end = lr_start * 0.1;
 
         for iter in 0..iterations {
-            let progress = if iterations > 1 { iter as f32 / (iterations - 1) as f32 } else { 0.0 };
+            let progress = if iterations > 1 {
+                iter as f32 / (iterations - 1) as f32
+            } else {
+                0.0
+            };
             let lr = lr_start + (lr_end - lr_start) * progress;
             let mut corrections = 0;
 
             for sample in samples {
-                let pair_hv = encode_pair_with_encoder(&self.encoder, &sample.scenario, &sample.trait_word);
+                let pair_hv =
+                    encode_pair_with_encoder(&self.encoder, &sample.scenario, &sample.trait_word);
 
                 let sim_applies = dot_product(&pair_hv, &protos.applies);
                 let sim_not = dot_product(&pair_hv, &protos.not_applies);
@@ -559,21 +582,66 @@ mod tests {
 
     fn synthetic_samples() -> Vec<MoralSample> {
         vec![
-            MoralSample { text: "helping others is a good deed".into(), label: MoralLabel::Good },
-            MoralSample { text: "donating to charity helps people".into(), label: MoralLabel::Good },
-            MoralSample { text: "being kind to strangers is admirable".into(), label: MoralLabel::Good },
-            MoralSample { text: "volunteering at the shelter".into(), label: MoralLabel::Good },
-            MoralSample { text: "saving someone from danger".into(), label: MoralLabel::Good },
-            MoralSample { text: "it is fine to go for a walk".into(), label: MoralLabel::Neutral },
-            MoralSample { text: "eating lunch at noon today".into(), label: MoralLabel::Neutral },
-            MoralSample { text: "reading a book in the library".into(), label: MoralLabel::Neutral },
-            MoralSample { text: "watching television in the evening".into(), label: MoralLabel::Neutral },
-            MoralSample { text: "taking the bus to work".into(), label: MoralLabel::Neutral },
-            MoralSample { text: "stealing from the vulnerable is evil".into(), label: MoralLabel::Bad },
-            MoralSample { text: "hurting innocent people deliberately".into(), label: MoralLabel::Bad },
-            MoralSample { text: "lying and cheating to get ahead".into(), label: MoralLabel::Bad },
-            MoralSample { text: "betraying your closest friends".into(), label: MoralLabel::Bad },
-            MoralSample { text: "destroying property out of anger".into(), label: MoralLabel::Bad },
+            MoralSample {
+                text: "helping others is a good deed".into(),
+                label: MoralLabel::Good,
+            },
+            MoralSample {
+                text: "donating to charity helps people".into(),
+                label: MoralLabel::Good,
+            },
+            MoralSample {
+                text: "being kind to strangers is admirable".into(),
+                label: MoralLabel::Good,
+            },
+            MoralSample {
+                text: "volunteering at the shelter".into(),
+                label: MoralLabel::Good,
+            },
+            MoralSample {
+                text: "saving someone from danger".into(),
+                label: MoralLabel::Good,
+            },
+            MoralSample {
+                text: "it is fine to go for a walk".into(),
+                label: MoralLabel::Neutral,
+            },
+            MoralSample {
+                text: "eating lunch at noon today".into(),
+                label: MoralLabel::Neutral,
+            },
+            MoralSample {
+                text: "reading a book in the library".into(),
+                label: MoralLabel::Neutral,
+            },
+            MoralSample {
+                text: "watching television in the evening".into(),
+                label: MoralLabel::Neutral,
+            },
+            MoralSample {
+                text: "taking the bus to work".into(),
+                label: MoralLabel::Neutral,
+            },
+            MoralSample {
+                text: "stealing from the vulnerable is evil".into(),
+                label: MoralLabel::Bad,
+            },
+            MoralSample {
+                text: "hurting innocent people deliberately".into(),
+                label: MoralLabel::Bad,
+            },
+            MoralSample {
+                text: "lying and cheating to get ahead".into(),
+                label: MoralLabel::Bad,
+            },
+            MoralSample {
+                text: "betraying your closest friends".into(),
+                label: MoralLabel::Bad,
+            },
+            MoralSample {
+                text: "destroying property out of anger".into(),
+                label: MoralLabel::Bad,
+            },
         ]
     }
 
@@ -660,8 +728,16 @@ mod tests {
         let (good_label, _) = classifier.classify("helping people is wonderful");
         let (bad_label, _) = classifier.classify("stealing and killing is terrible");
 
-        assert_eq!(good_label, MoralLabel::Good, "Positive text should classify as Good");
-        assert_eq!(bad_label, MoralLabel::Bad, "Negative text should classify as Bad");
+        assert_eq!(
+            good_label,
+            MoralLabel::Good,
+            "Positive text should classify as Good"
+        );
+        assert_eq!(
+            bad_label,
+            MoralLabel::Bad,
+            "Negative text should classify as Bad"
+        );
     }
 
     #[test]
@@ -714,7 +790,10 @@ mod tests {
         classifier.retrain_adaptive(&samples, 0.1, 10);
 
         // Should correctly classify training examples
-        let (label, _) = classifier.classify("She donated her savings to help disaster victims", "generous");
+        let (label, _) = classifier.classify(
+            "She donated her savings to help disaster victims",
+            "generous",
+        );
         assert_eq!(label, VirtueLabel::Applies);
 
         let (label, _) = classifier.classify("He stole money from the charity fund", "honest");

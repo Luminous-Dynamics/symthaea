@@ -61,7 +61,8 @@ impl ConflictDetector {
                 if magnitude > 0.3 {
                     self.chronic_counters[pair_idx] += 1;
                 } else {
-                    self.chronic_counters[pair_idx] = self.chronic_counters[pair_idx].saturating_sub(1);
+                    self.chronic_counters[pair_idx] =
+                        self.chronic_counters[pair_idx].saturating_sub(1);
                 }
                 score.is_chronic = self.chronic_counters[pair_idx] > CHRONIC_THRESHOLD;
 
@@ -97,7 +98,11 @@ impl ConflictDetector {
         value_a: f64,
         value_b: f64,
     ) -> ConflictKind {
-        let weaker = if value_a < value_b { theory_a } else { theory_b };
+        let weaker = if value_a < value_b {
+            theory_a
+        } else {
+            theory_b
+        };
         match weaker {
             TheoryId::IIT => ConflictKind::IntegrationCollapse,
             TheoryId::GWT => ConflictKind::NoBroadcast,
@@ -119,7 +124,14 @@ impl Default for ConflictDetector {
 mod tests {
     use super::*;
 
-    fn make_metrics(phi: f64, gwt: f64, ast: f64, pp: f64, rpt: f64, emb: f64) -> crate::consciousness::epistemic_conflict::MultiTheoryMetrics {
+    fn make_metrics(
+        phi: f64,
+        gwt: f64,
+        ast: f64,
+        pp: f64,
+        rpt: f64,
+        emb: f64,
+    ) -> crate::consciousness::epistemic_conflict::MultiTheoryMetrics {
         crate::consciousness::epistemic_conflict::MultiTheoryMetrics {
             phi,
             gwt,
@@ -160,7 +172,10 @@ mod tests {
         // All theories at same value → zero conflict
         let metrics = make_metrics(0.5, 0.5, 0.5, 0.5, 0.5, 0.5);
         let matrix = detector.detect(&metrics);
-        assert!(matrix.total_entropy.abs() < 1e-10, "Entropy should be ~0 for uniform metrics");
+        assert!(
+            matrix.total_entropy.abs() < 1e-10,
+            "Entropy should be ~0 for uniform metrics"
+        );
         assert!(matrix.max_magnitude() < 1e-10);
     }
 
@@ -194,6 +209,10 @@ mod tests {
 
         let matrix = detector.detect(&metrics);
         let iit_gwt = matrix.get(TheoryId::IIT, TheoryId::GWT).unwrap();
-        assert!(iit_gwt.is_chronic, "Should be marked chronic after {} cycles", CHRONIC_THRESHOLD);
+        assert!(
+            iit_gwt.is_chronic,
+            "Should be marked chronic after {} cycles",
+            CHRONIC_THRESHOLD
+        );
     }
 }

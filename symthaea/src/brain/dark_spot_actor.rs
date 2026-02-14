@@ -32,8 +32,8 @@ use std::sync::Arc;
 use tokio::sync::{oneshot, RwLock};
 use tracing::{debug, info, warn};
 
-use super::actor_model::{ActorTrait as Actor, ActorPriority, OrganMessage, Response};
-use crate::mycelix::gis::dht::{DarkSpotDHT, BlindSpot, KnowledgeMatch, ZKIgnoranceSignature};
+use super::actor_model::{ActorPriority, ActorTrait as Actor, OrganMessage, Response};
+use crate::mycelix::gis::dht::{BlindSpot, DarkSpotDHT, KnowledgeMatch, ZKIgnoranceSignature};
 
 // ============================================================================
 // Dark Spot Actor Messages
@@ -106,24 +106,16 @@ pub enum ActorError {
 #[derive(Debug, Clone)]
 pub enum DarkSpotResponse {
     /// Ignorance published successfully
-    Published {
-        signature_id: String,
-    },
+    Published { signature_id: String },
 
     /// Blind spots detected
-    BlindSpots {
-        spots: Vec<CollectiveBlindSpot>,
-    },
+    BlindSpots { spots: Vec<CollectiveBlindSpot> },
 
     /// Knowledge matches found
-    Matches {
-        matches: Vec<MatchResult>,
-    },
+    Matches { matches: Vec<MatchResult> },
 
     /// Knowledge added
-    KnowledgeAdded {
-        id: String,
-    },
+    KnowledgeAdded { id: String },
 
     /// Blind spot revealed
     BlindSpotRevealed {
@@ -140,9 +132,7 @@ pub enum DarkSpotResponse {
     },
 
     /// Error response
-    Error {
-        message: String,
-    },
+    Error { message: String },
 }
 
 /// Simplified blind spot for actor responses
@@ -241,7 +231,12 @@ impl DarkSpotDHTActor {
     /// Handle a Dark Spot specific message
     pub fn handle_dark_spot_message(&mut self, msg: DarkSpotMessage) {
         match msg {
-            DarkSpotMessage::PublishIgnorance { topic, category, eig, reply } => {
+            DarkSpotMessage::PublishIgnorance {
+                topic,
+                category,
+                eig,
+                reply,
+            } => {
                 let response = self.publish_ignorance(&topic, &category, eig);
                 let _ = reply.send(response);
             }
@@ -251,17 +246,30 @@ impl DarkSpotDHTActor {
                 let _ = reply.send(response);
             }
 
-            DarkSpotMessage::FindKnowledge { signature_id, reply } => {
+            DarkSpotMessage::FindKnowledge {
+                signature_id,
+                reply,
+            } => {
                 let response = self.find_knowledge(&signature_id);
                 let _ = reply.send(response);
             }
 
-            DarkSpotMessage::AddKnowledge { id, content, category, reputation, reply } => {
+            DarkSpotMessage::AddKnowledge {
+                id,
+                content,
+                category,
+                reputation,
+                reply,
+            } => {
                 let response = self.add_knowledge(id, content, category, reputation);
                 let _ = reply.send(response);
             }
 
-            DarkSpotMessage::RevealBlindSpot { blind_spot_id, participants, reply } => {
+            DarkSpotMessage::RevealBlindSpot {
+                blind_spot_id,
+                participants,
+                reply,
+            } => {
                 let response = self.reveal_blind_spot(&blind_spot_id, participants);
                 let _ = reply.send(response);
             }
@@ -292,17 +300,23 @@ impl DarkSpotDHTActor {
                             "Published ignorance signature"
                         );
 
-                        DarkSpotResponse::Published { signature_id: sig_id }
+                        DarkSpotResponse::Published {
+                            signature_id: sig_id,
+                        }
                     }
                     Err(e) => {
                         warn!(actor = %self.name, error = %e, "Failed to publish signature");
-                        DarkSpotResponse::Error { message: e.to_string() }
+                        DarkSpotResponse::Error {
+                            message: e.to_string(),
+                        }
                     }
                 }
             }
             Err(e) => {
                 warn!(actor = %self.name, error = %e, "Failed to create signature");
-                DarkSpotResponse::Error { message: e.to_string() }
+                DarkSpotResponse::Error {
+                    message: e.to_string(),
+                }
             }
         }
     }
@@ -333,10 +347,8 @@ impl DarkSpotDHTActor {
                 let matches = self.dht.find_matches(signature);
                 self.stats.matches_found += matches.len();
 
-                let results: Vec<MatchResult> = matches
-                    .into_iter()
-                    .map(MatchResult::from)
-                    .collect();
+                let results: Vec<MatchResult> =
+                    matches.into_iter().map(MatchResult::from).collect();
 
                 debug!(
                     actor = %self.name,
@@ -347,17 +359,22 @@ impl DarkSpotDHTActor {
 
                 DarkSpotResponse::Matches { matches: results }
             }
-            None => {
-                DarkSpotResponse::Error {
-                    message: format!("Signature {} not found in cache", signature_id),
-                }
-            }
+            None => DarkSpotResponse::Error {
+                message: format!("Signature {} not found in cache", signature_id),
+            },
         }
     }
 
     /// Add knowledge to help others
-    fn add_knowledge(&mut self, id: String, content: String, category: String, reputation: f32) -> DarkSpotResponse {
-        self.dht.add_knowledge(id.clone(), content, category, reputation);
+    fn add_knowledge(
+        &mut self,
+        id: String,
+        content: String,
+        category: String,
+        reputation: f32,
+    ) -> DarkSpotResponse {
+        self.dht
+            .add_knowledge(id.clone(), content, category, reputation);
         self.stats.knowledge_added += 1;
 
         info!(
@@ -385,11 +402,9 @@ impl DarkSpotDHTActor {
                     revealed_topic: revealed.revealed_topic,
                 }
             }
-            None => {
-                DarkSpotResponse::Error {
-                    message: format!("Blind spot {} not found", blind_spot_id),
-                }
-            }
+            None => DarkSpotResponse::Error {
+                message: format!("Blind spot {} not found", blind_spot_id),
+            },
         }
     }
 
@@ -413,11 +428,15 @@ impl DarkSpotDHTActor {
         if lower.contains("don't know") || lower.contains("ignorance:") {
             // Extract topic - everything after "about" or "ignorance:"
             let topic = if lower.contains("about ") {
-                lower.split("about ").nth(1)
+                lower
+                    .split("about ")
+                    .nth(1)
                     .map(|s| s.split(" in ").next().unwrap_or(s))
                     .map(|s| s.trim().to_string())
             } else if lower.contains("ignorance:") {
-                lower.split("ignorance:").nth(1)
+                lower
+                    .split("ignorance:")
+                    .nth(1)
                     .map(|s| s.split("category=").next().unwrap_or(s))
                     .map(|s| s.trim().to_string())
             } else {
@@ -426,10 +445,11 @@ impl DarkSpotDHTActor {
 
             // Extract category
             let category = if lower.contains(" in ") {
-                lower.split(" in ").last()
-                    .map(|s| s.trim().to_string())
+                lower.split(" in ").last().map(|s| s.trim().to_string())
             } else if lower.contains("category=") {
-                lower.split("category=").nth(1)
+                lower
+                    .split("category=")
+                    .nth(1)
                     .map(|s| s.split_whitespace().next().unwrap_or(s))
                     .map(|s| s.trim().to_string())
             } else {
@@ -438,7 +458,9 @@ impl DarkSpotDHTActor {
 
             // Extract EIG (default 0.5)
             let eig = if lower.contains("eig=") {
-                lower.split("eig=").nth(1)
+                lower
+                    .split("eig=")
+                    .nth(1)
                     .and_then(|s| s.split_whitespace().next())
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(0.5)
@@ -465,17 +487,23 @@ impl Default for DarkSpotDHTActor {
 impl Actor for DarkSpotDHTActor {
     async fn handle_message(&mut self, msg: OrganMessage) -> Result<()> {
         match msg {
-            OrganMessage::Query { question, reply, hdc_semantic: _ } => {
+            OrganMessage::Query {
+                question,
+                reply,
+                hdc_semantic: _,
+            } => {
                 let response = if question.to_lowercase().contains("blind spot") {
                     // Query blind spots
                     match self.query_blind_spots() {
                         DarkSpotResponse::BlindSpots { spots } => {
                             let spot_info: Vec<String> = spots
                                 .iter()
-                                .map(|s| format!(
-                                    "- {}: {} signatures, avg EIG {:.2}",
-                                    s.category, s.signature_count, s.average_eig
-                                ))
+                                .map(|s| {
+                                    format!(
+                                        "- {}: {} signatures, avg EIG {:.2}",
+                                        s.category, s.signature_count, s.average_eig
+                                    )
+                                })
                                 .collect();
 
                             if spot_info.is_empty() {
@@ -490,7 +518,11 @@ impl Actor for DarkSpotDHTActor {
                 } else if question.to_lowercase().contains("stats") {
                     // Get statistics
                     match self.get_stats() {
-                        DarkSpotResponse::Stats { signature_count, knowledge_count, blind_spot_count } => {
+                        DarkSpotResponse::Stats {
+                            signature_count,
+                            knowledge_count,
+                            blind_spot_count,
+                        } => {
                             format!(
                                 "Dark Spot DHT Stats:\n\
                                  - Ignorance signatures: {}\n\
@@ -525,7 +557,11 @@ impl Actor for DarkSpotDHTActor {
                 let _ = reply.send(response);
             }
 
-            OrganMessage::Input { data: _, reply, hdc_semantic: _ } => {
+            OrganMessage::Input {
+                data: _,
+                reply,
+                hdc_semantic: _,
+            } => {
                 // Input messages could carry structured ignorance data
                 let _ = reply.send(Response::Ok);
             }
@@ -566,7 +602,12 @@ impl SharedDarkSpotDHT {
     }
 
     /// Publish ignorance (async)
-    pub async fn publish_ignorance(&self, topic: &str, category: &str, eig: f32) -> DarkSpotResponse {
+    pub async fn publish_ignorance(
+        &self,
+        topic: &str,
+        category: &str,
+        eig: f32,
+    ) -> DarkSpotResponse {
         let mut actor = self.inner.write().await;
         actor.publish_ignorance(topic, category, eig)
     }
@@ -578,7 +619,13 @@ impl SharedDarkSpotDHT {
     }
 
     /// Add knowledge (async)
-    pub async fn add_knowledge(&self, id: String, content: String, category: String, reputation: f32) -> DarkSpotResponse {
+    pub async fn add_knowledge(
+        &self,
+        id: String,
+        content: String,
+        category: String,
+        reputation: f32,
+    ) -> DarkSpotResponse {
         let mut actor = self.inner.write().await;
         actor.add_knowledge(id, content, category, reputation)
     }
@@ -645,7 +692,9 @@ mod tests {
         }
     }
 
-    fn expect_blind_spots(response: DarkSpotResponse) -> Result<Vec<CollectiveBlindSpot>, ActorError> {
+    fn expect_blind_spots(
+        response: DarkSpotResponse,
+    ) -> Result<Vec<CollectiveBlindSpot>, ActorError> {
         match response {
             DarkSpotResponse::BlindSpots { spots } => Ok(spots),
             other => {
@@ -660,9 +709,11 @@ mod tests {
 
     fn expect_stats(response: DarkSpotResponse) -> Result<(usize, usize, usize), ActorError> {
         match response {
-            DarkSpotResponse::Stats { signature_count, knowledge_count, blind_spot_count } => {
-                Ok((signature_count, knowledge_count, blind_spot_count))
-            }
+            DarkSpotResponse::Stats {
+                signature_count,
+                knowledge_count,
+                blind_spot_count,
+            } => Ok((signature_count, knowledge_count, blind_spot_count)),
             other => {
                 log::warn!("Received unexpected response: {:?}", other);
                 Err(ActorError::UnexpectedResponse {
@@ -720,7 +771,12 @@ mod tests {
 
         // Add some data
         actor.publish_ignorance("topic1", "cat1", 0.5);
-        actor.add_knowledge("k1".to_string(), "content".to_string(), "cat1".to_string(), 0.8);
+        actor.add_knowledge(
+            "k1".to_string(),
+            "content".to_string(),
+            "cat1".to_string(),
+            0.8,
+        );
 
         let response = actor.get_stats();
 

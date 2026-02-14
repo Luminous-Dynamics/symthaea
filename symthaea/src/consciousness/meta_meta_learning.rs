@@ -24,8 +24,7 @@
 //! 4. **RecursiveTower** - The full recursive improvement stack
 
 use crate::consciousness::consciousness_guided_discovery::{
-    EmergentDiscovery, DiscoveryConfig, DiscoveryStats,
-    PhiGradientConfig, PhiOptimizedDiscovery,
+    DiscoveryConfig, DiscoveryStats, EmergentDiscovery, PhiGradientConfig, PhiOptimizedDiscovery,
 };
 use crate::hdc::primitive_system::PrimitiveSystem;
 use anyhow::Result;
@@ -164,7 +163,11 @@ impl MetaOptimizer {
     }
 
     /// Run one meta-optimization cycle
-    pub fn meta_optimize_cycle(&mut self, base_system: Arc<PrimitiveSystem>, cycles: usize) -> Result<OptimizationRun> {
+    pub fn meta_optimize_cycle(
+        &mut self,
+        base_system: Arc<PrimitiveSystem>,
+        cycles: usize,
+    ) -> Result<OptimizationRun> {
         // Select hyperparameters to try (tournament selection)
         let idx1 = self.random_index(self.population.len());
         let idx2 = self.random_index(self.population.len());
@@ -232,11 +235,8 @@ impl MetaOptimizer {
         };
 
         // Run optimization
-        let mut discovery = PhiOptimizedDiscovery::new(
-            base_system,
-            discovery_config,
-            gradient_config,
-        );
+        let mut discovery =
+            PhiOptimizedDiscovery::new(base_system, discovery_config, gradient_config);
 
         let results = discovery.discover_and_optimize(cycles)?;
         let elapsed = start.elapsed().as_secs_f64();
@@ -257,14 +257,18 @@ impl MetaOptimizer {
     fn evolve_population(&mut self, run: &OptimizationRun) {
         if run.efficiency > 0.0 {
             // Replace worst member with mutated version of good hyperparameters
-            let worst_idx = self.history.iter()
+            let worst_idx = self
+                .history
+                .iter()
                 .enumerate()
                 .filter(|(i, _)| *i < self.population.len())
                 .min_by(|a, b| a.1.efficiency.partial_cmp(&b.1.efficiency).unwrap())
                 .map(|(i, _)| i)
                 .unwrap_or(self.random_index(self.population.len()));
 
-            let mutated = run.hyperparameters.mutate(self.mutation_rate, &mut self.rng_state);
+            let mutated = run
+                .hyperparameters
+                .mutate(self.mutation_rate, &mut self.rng_state);
             if worst_idx < self.population.len() {
                 self.population[worst_idx] = mutated;
             }
@@ -398,9 +402,19 @@ impl StrategyEvolver {
         for i in 0..population_size {
             let schedule = match i % 4 {
                 0 => ExplorationSchedule::Constant(0.3),
-                1 => ExplorationSchedule::LinearDecay { start: 0.5, end: 0.1 },
-                2 => ExplorationSchedule::ExponentialDecay { start: 0.5, decay_rate: 0.1 },
-                _ => ExplorationSchedule::Cyclic { min: 0.1, max: 0.5, period: 10 },
+                1 => ExplorationSchedule::LinearDecay {
+                    start: 0.5,
+                    end: 0.1,
+                },
+                2 => ExplorationSchedule::ExponentialDecay {
+                    start: 0.5,
+                    decay_rate: 0.1,
+                },
+                _ => ExplorationSchedule::Cyclic {
+                    min: 0.1,
+                    max: 0.5,
+                    period: 10,
+                },
             };
 
             let preference = match i % 5 {
@@ -444,11 +458,17 @@ impl StrategyEvolver {
         }
 
         // Sort by fitness
-        self.strategies.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
+        self.strategies
+            .sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap());
 
         // Update best
         if let Some(best) = self.strategies.first() {
-            if self.best_strategy.as_ref().map(|b| best.fitness > b.fitness).unwrap_or(true) {
+            if self
+                .best_strategy
+                .as_ref()
+                .map(|b| best.fitness > b.fitness)
+                .unwrap_or(true)
+            {
                 self.best_strategy = Some(best.clone());
             }
         }
@@ -481,7 +501,11 @@ impl StrategyEvolver {
     }
 
     /// Crossover two strategies
-    fn crossover(&mut self, parent1: &DiscoveryStrategy, parent2: &DiscoveryStrategy) -> DiscoveryStrategy {
+    fn crossover(
+        &mut self,
+        parent1: &DiscoveryStrategy,
+        parent2: &DiscoveryStrategy,
+    ) -> DiscoveryStrategy {
         self.rng_state = self.rng_state.wrapping_mul(1103515245).wrapping_add(12345);
         let use_first = (self.rng_state & 1) == 0;
 
@@ -515,9 +539,19 @@ impl StrategyEvolver {
             self.rng_state = self.rng_state.wrapping_mul(1103515245).wrapping_add(12345);
             strategy.exploration_schedule = match self.rng_state % 4 {
                 0 => ExplorationSchedule::Constant(0.3),
-                1 => ExplorationSchedule::LinearDecay { start: 0.5, end: 0.1 },
-                2 => ExplorationSchedule::ExponentialDecay { start: 0.5, decay_rate: 0.1 },
-                _ => ExplorationSchedule::Cyclic { min: 0.1, max: 0.5, period: 10 },
+                1 => ExplorationSchedule::LinearDecay {
+                    start: 0.5,
+                    end: 0.1,
+                },
+                2 => ExplorationSchedule::ExponentialDecay {
+                    start: 0.5,
+                    decay_rate: 0.1,
+                },
+                _ => ExplorationSchedule::Cyclic {
+                    min: 0.1,
+                    max: 0.5,
+                    period: 10,
+                },
             };
         }
 
@@ -612,14 +646,18 @@ impl RecursiveImprovementTower {
         }
 
         // Level 2: Run meta-optimization
-        let l2_result = self.meta_optimizer.meta_optimize_cycle(self.base_system.clone(), 2)?;
+        let l2_result = self
+            .meta_optimizer
+            .meta_optimize_cycle(self.base_system.clone(), 2)?;
         if l2_result.efficiency > self.stats.best_efficiency {
             self.stats.best_efficiency = l2_result.efficiency;
             self.stats.level2_improvements += 1;
         }
 
         // Level 3: Evolve strategies based on L2 results
-        let fitness_scores: Vec<f64> = self.strategy_evolver.strategies()
+        let fitness_scores: Vec<f64> = self
+            .strategy_evolver
+            .strategies()
             .iter()
             .map(|_| l2_result.efficiency) // In practice, each strategy would be evaluated
             .collect();
@@ -709,7 +747,10 @@ mod tests {
 
     #[test]
     fn test_exploration_schedule_linear_decay() {
-        let schedule = ExplorationSchedule::LinearDecay { start: 1.0, end: 0.0 };
+        let schedule = ExplorationSchedule::LinearDecay {
+            start: 1.0,
+            end: 0.0,
+        };
         assert!((schedule.rate_at(0, 100) - 1.0).abs() < 0.01);
         assert!((schedule.rate_at(50, 100) - 0.5).abs() < 0.01);
         assert!((schedule.rate_at(100, 100) - 0.0).abs() < 0.01);

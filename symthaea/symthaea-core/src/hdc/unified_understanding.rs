@@ -56,12 +56,11 @@
 //! └────────────────────────────────────────────────────────────────────────┘
 //! ```
 
+use super::binary_hv::BinaryHV;
 use super::grounded_understanding::{
-    GroundedUnderstanding, UnderstoodMeaning,
-    EmbodiedGrounding, CausalRelation,
+    CausalRelation, EmbodiedGrounding, GroundedUnderstanding, UnderstoodMeaning,
 };
 use super::predictive_coding::PredictiveCoding;
-use super::binary_hv::BinaryHV;
 use super::universal_semantics::SemanticPrime;
 use std::collections::{HashMap, VecDeque};
 
@@ -172,12 +171,12 @@ pub struct TrackedEntity {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EntityRole {
-    Agent,      // Does actions
-    Patient,    // Receives actions
+    Agent,       // Does actions
+    Patient,     // Receives actions
     Experiencer, // Feels/perceives
-    Location,   // Where things happen
-    Instrument, // How things are done
-    Topic,      // What is being discussed
+    Location,    // Where things happen
+    Instrument,  // How things are done
+    Topic,       // What is being discussed
 }
 
 /// Causal link between narrative elements
@@ -195,10 +194,10 @@ pub struct CausalLink {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CausalLinkType {
-    Physical,     // Physical causation
+    Physical,      // Physical causation
     Psychological, // Mental causation (beliefs, desires)
-    Social,       // Social causation (norms, expectations)
-    Temporal,     // Temporal sequence (before/after)
+    Social,        // Social causation (norms, expectations)
+    Temporal,      // Temporal sequence (before/after)
 }
 
 /// Temporal position in narrative
@@ -254,12 +253,12 @@ pub struct InferredIntention {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SpeechAct {
-    Assert,     // Stating a fact
-    Question,   // Seeking information
-    Command,    // Requesting action
-    Promise,    // Committing to action
-    Express,    // Expressing emotion
-    Declare,    // Making something the case
+    Assert,   // Stating a fact
+    Question, // Seeking information
+    Command,  // Requesting action
+    Promise,  // Committing to action
+    Express,  // Expressing emotion
+    Declare,  // Making something the case
 }
 
 /// Inferred emotional state of speaker
@@ -301,10 +300,10 @@ pub struct LearnedWordInfo {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LearningMethod {
-    Context,    // Inferred from surrounding words
-    Internet,   // Looked up online
-    User,       // User provided definition
-    Analogy,    // Inferred by analogy
+    Context,  // Inferred from surrounding words
+    Internet, // Looked up online
+    User,     // User provided definition
+    Analogy,  // Inferred by analogy
 }
 
 // =============================================================================
@@ -444,7 +443,9 @@ impl UnifiedUnderstandingPipeline {
 
         // Look at 2 words before and after
         for offset in -2i32..=2 {
-            if offset == 0 { continue; }
+            if offset == 0 {
+                continue;
+            }
             let idx = word_idx as i32 + offset;
             if idx >= 0 && (idx as usize) < words.len() {
                 if let Some(primes) = self.grounded.lexicon().decompose(words[idx as usize]) {
@@ -486,10 +487,14 @@ impl UnifiedUnderstandingPipeline {
             (0.5, 0.5) // Neutral for first input
         } else {
             // Count overlap between predicted and actual
-            let overlap: usize = actual_primes.iter()
+            let overlap: usize = actual_primes
+                .iter()
                 .filter(|p| self.previous_predictions.contains(p))
                 .count();
-            let max_len = actual_primes.len().max(self.previous_predictions.len()).max(1);
+            let max_len = actual_primes
+                .len()
+                .max(self.previous_predictions.len())
+                .max(1);
             let similarity = overlap as f32 / max_len as f32;
 
             let surprise = 1.0 - similarity;
@@ -516,7 +521,11 @@ impl UnifiedUnderstandingPipeline {
     }
 
     /// Integrate with narrative history
-    fn integrate_narrative(&mut self, text: &str, grounded: &UnderstoodMeaning) -> NarrativeContext {
+    fn integrate_narrative(
+        &mut self,
+        text: &str,
+        grounded: &UnderstoodMeaning,
+    ) -> NarrativeContext {
         // Determine story role based on content
         let story_role = self.determine_story_role(text, grounded);
 
@@ -545,9 +554,13 @@ impl UnifiedUnderstandingPipeline {
         let text_lower = text.to_lowercase();
 
         // Check for question markers
-        if text_lower.contains('?') || text_lower.starts_with("what")
-            || text_lower.starts_with("why") || text_lower.starts_with("how")
-            || text_lower.starts_with("when") || text_lower.starts_with("where") {
+        if text_lower.contains('?')
+            || text_lower.starts_with("what")
+            || text_lower.starts_with("why")
+            || text_lower.starts_with("how")
+            || text_lower.starts_with("when")
+            || text_lower.starts_with("where")
+        {
             return StoryRole::Query;
         }
 
@@ -562,8 +575,11 @@ impl UnifiedUnderstandingPipeline {
         }
 
         // Check for contradiction markers
-        if text_lower.contains("but") || text_lower.contains("however")
-            || text_lower.contains("actually") || text_lower.contains("no,") {
+        if text_lower.contains("but")
+            || text_lower.contains("however")
+            || text_lower.contains("actually")
+            || text_lower.contains("no,")
+        {
             return StoryRole::Correction;
         }
 
@@ -573,7 +589,9 @@ impl UnifiedUnderstandingPipeline {
             let current_words: std::collections::HashSet<_> =
                 text_lower.split_whitespace().collect();
             if let Some(last) = self.narrative_history.back() {
-                let shared = last.entities.iter()
+                let shared = last
+                    .entities
+                    .iter()
                     .any(|e| current_words.contains(e.as_str()));
                 if shared {
                     return StoryRole::Continuation;
@@ -585,7 +603,11 @@ impl UnifiedUnderstandingPipeline {
         StoryRole::Introduction
     }
 
-    fn extract_and_track_entities(&mut self, text: &str, grounded: &UnderstoodMeaning) -> Vec<TrackedEntity> {
+    fn extract_and_track_entities(
+        &mut self,
+        text: &str,
+        grounded: &UnderstoodMeaning,
+    ) -> Vec<TrackedEntity> {
         let mut entities = Vec::new();
 
         // Simple entity extraction based on primes
@@ -596,10 +618,13 @@ impl UnifiedUnderstandingPipeline {
 
             // Check if it's a person/entity reference
             if let Some(primes) = self.grounded.lexicon().decompose(&word_lower) {
-                if primes.contains(&SemanticPrime::Someone) || primes.contains(&SemanticPrime::I)
-                    || primes.contains(&SemanticPrime::You) {
+                if primes.contains(&SemanticPrime::Someone)
+                    || primes.contains(&SemanticPrime::I)
+                    || primes.contains(&SemanticPrime::You)
+                {
                     // It's an entity reference
-                    let entity = if let Some(existing) = self.tracked_entities.get_mut(&word_lower) {
+                    let entity = if let Some(existing) = self.tracked_entities.get_mut(&word_lower)
+                    {
                         existing.mention_count += 1;
                         existing.clone()
                     } else {
@@ -650,7 +675,9 @@ impl UnifiedUnderstandingPipeline {
             TemporalPosition::Past
         } else if grounded.primes.contains(&SemanticPrime::After) {
             TemporalPosition::Future
-        } else if grounded.primes.contains(&SemanticPrime::If) || grounded.primes.contains(&SemanticPrime::Maybe) {
+        } else if grounded.primes.contains(&SemanticPrime::If)
+            || grounded.primes.contains(&SemanticPrime::Maybe)
+        {
             TemporalPosition::Hypothetical
         } else {
             TemporalPosition::Atemporal
@@ -663,7 +690,9 @@ impl UnifiedUnderstandingPipeline {
             return 1.0;
         }
 
-        let total_mentions: u32 = self.tracked_entities.values()
+        let total_mentions: u32 = self
+            .tracked_entities
+            .values()
             .map(|e| e.mention_count)
             .sum();
         let unique_entities = self.tracked_entities.len();
@@ -674,7 +703,11 @@ impl UnifiedUnderstandingPipeline {
     }
 
     /// Infer speaker's mental state (Theory of Mind)
-    fn infer_speaker_model(&self, grounded: &UnderstoodMeaning, narrative: &NarrativeContext) -> SpeakerModel {
+    fn infer_speaker_model(
+        &self,
+        grounded: &UnderstoodMeaning,
+        narrative: &NarrativeContext,
+    ) -> SpeakerModel {
         // Infer beliefs from content
         let beliefs = self.infer_beliefs(grounded);
 
@@ -716,7 +749,9 @@ impl UnifiedUnderstandingPipeline {
         let mut beliefs = Vec::new();
 
         // If speaker uses KNOW or THINK primes, they're expressing a belief
-        if grounded.primes.contains(&SemanticPrime::Know) || grounded.primes.contains(&SemanticPrime::Think) {
+        if grounded.primes.contains(&SemanticPrime::Know)
+            || grounded.primes.contains(&SemanticPrime::Think)
+        {
             beliefs.push(InferredBelief {
                 content: grounded.text.clone(),
                 confidence: 0.8,
@@ -727,11 +762,17 @@ impl UnifiedUnderstandingPipeline {
         beliefs
     }
 
-    fn infer_intentions(&self, grounded: &UnderstoodMeaning, narrative: &NarrativeContext) -> Vec<InferredIntention> {
+    fn infer_intentions(
+        &self,
+        grounded: &UnderstoodMeaning,
+        narrative: &NarrativeContext,
+    ) -> Vec<InferredIntention> {
         let speech_act = match narrative.story_role {
             StoryRole::Query => SpeechAct::Question,
             StoryRole::Reaction => SpeechAct::Express,
-            StoryRole::Introduction | StoryRole::Continuation | StoryRole::Explanation => SpeechAct::Assert,
+            StoryRole::Introduction | StoryRole::Continuation | StoryRole::Explanation => {
+                SpeechAct::Assert
+            }
             StoryRole::Correction => SpeechAct::Assert,
             StoryRole::Resolution => SpeechAct::Declare,
         };
@@ -768,7 +809,12 @@ impl UnifiedUnderstandingPipeline {
         }
     }
 
-    fn compute_confidence(&self, grounded: &UnderstoodMeaning, predictive: &PredictiveResult, narrative: &NarrativeContext) -> f64 {
+    fn compute_confidence(
+        &self,
+        grounded: &UnderstoodMeaning,
+        predictive: &PredictiveResult,
+        narrative: &NarrativeContext,
+    ) -> f64 {
         // Weighted combination of different confidence sources
         let grounded_conf = grounded.confidence;
         let predictive_conf = 1.0 - predictive.surprise as f64;
@@ -777,7 +823,11 @@ impl UnifiedUnderstandingPipeline {
         (grounded_conf * 0.4 + predictive_conf * 0.3 + narrative_conf * 0.3).min(1.0)
     }
 
-    fn compute_integration_phi(&self, grounded: &UnderstoodMeaning, predictive: &PredictiveResult) -> f64 {
+    fn compute_integration_phi(
+        &self,
+        grounded: &UnderstoodMeaning,
+        predictive: &PredictiveResult,
+    ) -> f64 {
         // Integration = grounded Φ adjusted by prediction quality
         let base_phi = grounded.integration_phi;
         let prediction_factor = 1.0 - (predictive.free_energy / 10.0).min(0.5);
@@ -789,7 +839,9 @@ impl UnifiedUnderstandingPipeline {
         let frame_id = self.narrative_history.len() as u64;
 
         // Extract entity names from tracked entities
-        let entity_names: Vec<String> = self.tracked_entities.keys()
+        let entity_names: Vec<String> = self
+            .tracked_entities
+            .keys()
             .filter(|name| text.to_lowercase().contains(name.as_str()))
             .cloned()
             .collect();
@@ -870,7 +922,9 @@ mod tests {
 
         let u2 = pipeline.understand("My friend was happy");
         // Should continue the narrative about "friend"
-        assert!(pipeline.entities().contains_key("friend") || pipeline.entities().contains_key("my"));
+        assert!(
+            pipeline.entities().contains_key("friend") || pipeline.entities().contains_key("my")
+        );
     }
 
     #[test]
@@ -899,6 +953,9 @@ mod tests {
         // Should detect as question
         assert_eq!(understanding.narrative.story_role, StoryRole::Query);
         assert!(!understanding.speaker_model.intentions.is_empty());
-        assert_eq!(understanding.speaker_model.intentions[0].speech_act, SpeechAct::Question);
+        assert_eq!(
+            understanding.speaker_model.intentions[0].speech_act,
+            SpeechAct::Question
+        );
     }
 }

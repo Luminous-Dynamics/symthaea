@@ -187,13 +187,7 @@ mod tests {
 
     #[test]
     fn test_gradient_update() {
-        let update = GradientUpdate::new(
-            "p1".to_string(),
-            1,
-            vec![0.1, 0.2, 0.3],
-            100,
-            0.5,
-        );
+        let update = GradientUpdate::new("p1".to_string(), 1, vec![0.1, 0.2, 0.3], 100, 0.5);
         assert_eq!(update.dimension(), 3);
         assert!(update.is_valid());
         assert!(update.l2_norm() > 0.0);

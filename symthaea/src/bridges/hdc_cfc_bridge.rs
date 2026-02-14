@@ -28,12 +28,12 @@
 
 use ndarray::{Array1, Array2};
 use rand::Rng;
-use rand_chacha::ChaCha8Rng;
 use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 
-use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use symthaea_core::genesis::GenesisSeed;
+use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -190,7 +190,13 @@ impl BridgeAttention {
     }
 
     /// Create from genesis seed for deterministic initialization
-    pub fn from_genesis(input_dim: usize, output_dim: usize, num_heads: usize, genesis: &GenesisSeed, label: &str) -> Self {
+    pub fn from_genesis(
+        input_dim: usize,
+        output_dim: usize,
+        num_heads: usize,
+        genesis: &GenesisSeed,
+        label: &str,
+    ) -> Self {
         let head_dim = output_dim / num_heads;
         let mut rng = genesis.domain(label);
 
@@ -249,17 +255,18 @@ impl BridgeAttention {
 
             // Self-attention score (single vector case: dot product with self)
             // For a more general case, this would be over a sequence
-            let score: f32 = query.iter().zip(key.iter())
+            let score: f32 = query
+                .iter()
+                .zip(key.iter())
                 .map(|(q, k)| q * k)
-                .sum::<f32>() / self.scale;
+                .sum::<f32>()
+                / self.scale;
 
             // Softmax (trivial for single element, but keeps structure)
             let attention_weight = 1.0; // softmax of single element is 1.0
 
             // Weighted value
-            let weighted_value: Vec<f32> = value.iter()
-                .map(|v| v * attention_weight)
-                .collect();
+            let weighted_value: Vec<f32> = value.iter().map(|v| v * attention_weight).collect();
 
             all_head_outputs.extend(weighted_value);
             all_attention_weights.push(vec![score, attention_weight]);
@@ -297,12 +304,18 @@ impl BridgeAttention {
             let value_context = self.w_value[h].dot(&context_array);
 
             // Attention scores
-            let score_input: f32 = query.iter().zip(key_input.iter())
+            let score_input: f32 = query
+                .iter()
+                .zip(key_input.iter())
                 .map(|(q, k)| q * k)
-                .sum::<f32>() / self.scale;
-            let score_context: f32 = query.iter().zip(key_context.iter())
+                .sum::<f32>()
+                / self.scale;
+            let score_context: f32 = query
+                .iter()
+                .zip(key_context.iter())
                 .map(|(q, k)| q * k)
-                .sum::<f32>() / self.scale;
+                .sum::<f32>()
+                / self.scale;
 
             // Softmax over [input, context]
             let max_score = score_input.max(score_context);
@@ -313,7 +326,8 @@ impl BridgeAttention {
             let weight_context = exp_context / sum_exp;
 
             // Weighted combination of values
-            let weighted_value: Vec<f32> = value_input.iter()
+            let weighted_value: Vec<f32> = value_input
+                .iter()
                 .zip(value_context.iter())
                 .map(|(vi, vc)| vi * weight_input + vc * weight_context)
                 .collect();
@@ -378,7 +392,8 @@ impl ProjectionAdamState {
         let bc1 = 1.0 - self.beta1.powf(t);
         let bc2 = 1.0 - self.beta2.powf(t);
 
-        for ((w, g), (m, v)) in weights.iter_mut()
+        for ((w, g), (m, v)) in weights
+            .iter_mut()
             .zip(grads.iter())
             .zip(self.m.iter_mut().zip(self.v.iter_mut()))
         {
@@ -472,31 +487,32 @@ impl HdcCfcBridge {
     pub fn new(config: HdcCfcBridgeConfig) -> Self {
         let mut rng = ChaCha8Rng::seed_from_u64(config.seed);
 
-        let genesis = config.genesis_phrase.as_ref().map(|p| GenesisSeed::from_phrase(p));
+        let genesis = config
+            .genesis_phrase
+            .as_ref()
+            .map(|p| GenesisSeed::from_phrase(p));
 
         // Initialize encoding projection matrices
         let scale_1 = (2.0 / (config.hdc_dim + config.intermediate_dim) as f32).sqrt();
-        let w_encode_1 = Array2::from_shape_fn(
-            (config.intermediate_dim, config.hdc_dim),
-            |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale_1
-        );
+        let w_encode_1 = Array2::from_shape_fn((config.intermediate_dim, config.hdc_dim), |_| {
+            (rng.gen::<f32>() - 0.5) * 2.0 * scale_1
+        });
 
         let scale_2 = (2.0 / (config.intermediate_dim + config.cfc_hidden_dim) as f32).sqrt();
-        let w_encode_2 = Array2::from_shape_fn(
-            (config.cfc_hidden_dim, config.intermediate_dim),
-            |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale_2
-        );
+        let w_encode_2 =
+            Array2::from_shape_fn((config.cfc_hidden_dim, config.intermediate_dim), |_| {
+                (rng.gen::<f32>() - 0.5) * 2.0 * scale_2
+            });
 
         // Initialize decoding projection matrices (reverse dimensions)
-        let w_decode_1 = Array2::from_shape_fn(
-            (config.intermediate_dim, config.cfc_hidden_dim),
-            |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale_2
-        );
+        let w_decode_1 =
+            Array2::from_shape_fn((config.intermediate_dim, config.cfc_hidden_dim), |_| {
+                (rng.gen::<f32>() - 0.5) * 2.0 * scale_2
+            });
 
-        let w_decode_2 = Array2::from_shape_fn(
-            (config.hdc_dim, config.intermediate_dim),
-            |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale_1
-        );
+        let w_decode_2 = Array2::from_shape_fn((config.hdc_dim, config.intermediate_dim), |_| {
+            (rng.gen::<f32>() - 0.5) * 2.0 * scale_1
+        });
 
         // Initialize attention
         let attention = if let Some(ref g) = genesis {
@@ -524,8 +540,10 @@ impl HdcCfcBridge {
 
         // Adam optimizer states
         let adam_encode_1 = ProjectionAdamState::new(config.intermediate_dim, config.hdc_dim);
-        let adam_encode_2 = ProjectionAdamState::new(config.cfc_hidden_dim, config.intermediate_dim);
-        let adam_decode_1 = ProjectionAdamState::new(config.intermediate_dim, config.cfc_hidden_dim);
+        let adam_encode_2 =
+            ProjectionAdamState::new(config.cfc_hidden_dim, config.intermediate_dim);
+        let adam_decode_1 =
+            ProjectionAdamState::new(config.intermediate_dim, config.cfc_hidden_dim);
         let adam_decode_2 = ProjectionAdamState::new(config.hdc_dim, config.intermediate_dim);
 
         Self {
@@ -555,27 +573,25 @@ impl HdcCfcBridge {
 
         // Initialize encoding projection matrices
         let scale_1 = (2.0 / (config.hdc_dim + config.intermediate_dim) as f32).sqrt();
-        let w_encode_1 = Array2::from_shape_fn(
-            (config.intermediate_dim, config.hdc_dim),
-            |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale_1
-        );
+        let w_encode_1 = Array2::from_shape_fn((config.intermediate_dim, config.hdc_dim), |_| {
+            (rng.gen::<f32>() - 0.5) * 2.0 * scale_1
+        });
 
         let scale_2 = (2.0 / (config.intermediate_dim + config.cfc_hidden_dim) as f32).sqrt();
-        let w_encode_2 = Array2::from_shape_fn(
-            (config.cfc_hidden_dim, config.intermediate_dim),
-            |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale_2
-        );
+        let w_encode_2 =
+            Array2::from_shape_fn((config.cfc_hidden_dim, config.intermediate_dim), |_| {
+                (rng.gen::<f32>() - 0.5) * 2.0 * scale_2
+            });
 
         // Initialize decoding projection matrices
-        let w_decode_1 = Array2::from_shape_fn(
-            (config.intermediate_dim, config.cfc_hidden_dim),
-            |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale_2
-        );
+        let w_decode_1 =
+            Array2::from_shape_fn((config.intermediate_dim, config.cfc_hidden_dim), |_| {
+                (rng.gen::<f32>() - 0.5) * 2.0 * scale_2
+            });
 
-        let w_decode_2 = Array2::from_shape_fn(
-            (config.hdc_dim, config.intermediate_dim),
-            |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale_1
-        );
+        let w_decode_2 = Array2::from_shape_fn((config.hdc_dim, config.intermediate_dim), |_| {
+            (rng.gen::<f32>() - 0.5) * 2.0 * scale_1
+        });
 
         // Initialize attention from genesis
         let attention = BridgeAttention::from_genesis(
@@ -594,8 +610,10 @@ impl HdcCfcBridge {
 
         // Adam optimizer states
         let adam_encode_1 = ProjectionAdamState::new(config.intermediate_dim, config.hdc_dim);
-        let adam_encode_2 = ProjectionAdamState::new(config.cfc_hidden_dim, config.intermediate_dim);
-        let adam_decode_1 = ProjectionAdamState::new(config.intermediate_dim, config.cfc_hidden_dim);
+        let adam_encode_2 =
+            ProjectionAdamState::new(config.cfc_hidden_dim, config.intermediate_dim);
+        let adam_decode_1 =
+            ProjectionAdamState::new(config.intermediate_dim, config.cfc_hidden_dim);
         let adam_decode_2 = ProjectionAdamState::new(config.hdc_dim, config.intermediate_dim);
 
         Self {
@@ -644,7 +662,7 @@ impl HdcCfcBridge {
         };
 
         // Step 3: Attention-based refinement
-        let attended = self.attention.forward(normalized.as_slice().unwrap());
+        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
         let attended_array = Array1::from_vec(attended.values);
 
         // Step 4: Second projection to CfC dimension
@@ -675,7 +693,7 @@ impl HdcCfcBridge {
         };
 
         // Step 3: Attention-based refinement
-        let attended = self.attention.forward(normalized.as_slice().unwrap());
+        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
         let attended_array = Array1::from_vec(attended.values);
 
         // Step 4: Second projection to HDC dimension
@@ -691,7 +709,11 @@ impl HdcCfcBridge {
     ///
     /// This allows the temporal context to influence how the semantic
     /// vector is projected, creating a context-aware encoding.
-    pub fn encode_with_temporal_context(&self, hv: &ContinuousHV, temporal_context: &[f32]) -> Vec<f32> {
+    pub fn encode_with_temporal_context(
+        &self,
+        hv: &ContinuousHV,
+        temporal_context: &[f32],
+    ) -> Vec<f32> {
         // Step 1: First projection
         let input = Array1::from_vec(hv.values.clone());
         let intermediate = self.w_encode_1.dot(&input);
@@ -709,8 +731,8 @@ impl HdcCfcBridge {
 
         // Step 3: Context-aware attention
         let attended = self.attention.forward_with_context(
-            normalized.as_slice().unwrap(),
-            context_intermediate.as_slice().unwrap(),
+            normalized.as_slice().expect("array must be contiguous"),
+            context_intermediate.as_slice().expect("array must be contiguous"),
         );
         let attended_array = Array1::from_vec(attended.values);
 
@@ -725,7 +747,11 @@ impl HdcCfcBridge {
     ///
     /// This allows a reference semantic vector to guide the decoding,
     /// useful for reconstruction with semantic priors.
-    pub fn decode_with_semantic_context(&self, state: &[f32], semantic_context: &ContinuousHV) -> ContinuousHV {
+    pub fn decode_with_semantic_context(
+        &self,
+        state: &[f32],
+        semantic_context: &ContinuousHV,
+    ) -> ContinuousHV {
         // Step 1: First projection
         let input = Array1::from_vec(state.to_vec());
         let intermediate = self.w_decode_1.dot(&input);
@@ -743,8 +769,8 @@ impl HdcCfcBridge {
 
         // Step 3: Context-aware attention
         let attended = self.attention.forward_with_context(
-            normalized.as_slice().unwrap(),
-            context_intermediate.as_slice().unwrap(),
+            normalized.as_slice().expect("array must be contiguous"),
+            context_intermediate.as_slice().expect("array must be contiguous"),
         );
         let attended_array = Array1::from_vec(attended.values);
 
@@ -771,10 +797,13 @@ impl HdcCfcBridge {
         let decoded = self.decode_temporal_to_semantic(&encoded);
 
         // Compute loss: mean squared error
-        let loss: f32 = hv.values.iter()
+        let loss: f32 = hv
+            .values
+            .iter()
             .zip(decoded.values.iter())
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / hv.values.len() as f32;
+            .sum::<f32>()
+            / hv.values.len() as f32;
 
         // Compute gradients via finite differences (simple but effective)
         // In production, analytical gradients would be preferred
@@ -782,19 +811,35 @@ impl HdcCfcBridge {
 
         // Update encode_1
         let grad_encode_1 = self.numerical_gradient_encode_1(hv, eps);
-        self.adam_encode_1.update(&mut self.w_encode_1, &grad_encode_1, self.config.learning_rate);
+        self.adam_encode_1.update(
+            &mut self.w_encode_1,
+            &grad_encode_1,
+            self.config.learning_rate,
+        );
 
         // Update encode_2
         let grad_encode_2 = self.numerical_gradient_encode_2(hv, eps);
-        self.adam_encode_2.update(&mut self.w_encode_2, &grad_encode_2, self.config.learning_rate);
+        self.adam_encode_2.update(
+            &mut self.w_encode_2,
+            &grad_encode_2,
+            self.config.learning_rate,
+        );
 
         // Update decode_1
         let grad_decode_1 = self.numerical_gradient_decode_1(hv, eps);
-        self.adam_decode_1.update(&mut self.w_decode_1, &grad_decode_1, self.config.learning_rate);
+        self.adam_decode_1.update(
+            &mut self.w_decode_1,
+            &grad_decode_1,
+            self.config.learning_rate,
+        );
 
         // Update decode_2
         let grad_decode_2 = self.numerical_gradient_decode_2(hv, eps);
-        self.adam_decode_2.update(&mut self.w_decode_2, &grad_decode_2, self.config.learning_rate);
+        self.adam_decode_2.update(
+            &mut self.w_decode_2,
+            &grad_decode_2,
+            self.config.learning_rate,
+        );
 
         // Update EMA
         let alpha = 0.1;
@@ -814,11 +859,13 @@ impl HdcCfcBridge {
 
         // Compute loss: MSE between encoded and target temporal
         let min_len = encoded.len().min(target_temporal.len());
-        let loss: f32 = encoded.iter()
+        let loss: f32 = encoded
+            .iter()
             .zip(target_temporal.iter())
             .take(min_len)
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / min_len as f32;
+            .sum::<f32>()
+            / min_len as f32;
 
         // Simplified gradient descent (in production, use analytical gradients)
         let lr = self.config.learning_rate;
@@ -872,7 +919,13 @@ impl HdcCfcBridge {
         grad
     }
 
-    fn compute_loss_with_perturbation_e1(&self, hv: &ContinuousHV, i: usize, j: usize, delta: f32) -> f32 {
+    fn compute_loss_with_perturbation_e1(
+        &self,
+        hv: &ContinuousHV,
+        i: usize,
+        j: usize,
+        delta: f32,
+    ) -> f32 {
         let mut w = self.w_encode_1.clone();
         w[[i, j]] += delta;
 
@@ -884,7 +937,7 @@ impl HdcCfcBridge {
         } else {
             intermediate
         };
-        let attended = self.attention.forward(normalized.as_slice().unwrap());
+        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
         let output = self.w_encode_2.dot(&Array1::from_vec(attended.values));
         let encoded: Vec<f32> = output.iter().map(|x| x.tanh()).collect();
 
@@ -892,10 +945,12 @@ impl HdcCfcBridge {
         let decoded = self.decode_temporal_to_semantic(&encoded);
 
         // Loss
-        hv.values.iter()
+        hv.values
+            .iter()
             .zip(decoded.values.iter())
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / hv.values.len() as f32
+            .sum::<f32>()
+            / hv.values.len() as f32
     }
 
     /// Numerical gradient for w_encode_2
@@ -918,7 +973,13 @@ impl HdcCfcBridge {
         grad
     }
 
-    fn compute_loss_with_perturbation_e2(&self, hv: &ContinuousHV, i: usize, j: usize, delta: f32) -> f32 {
+    fn compute_loss_with_perturbation_e2(
+        &self,
+        hv: &ContinuousHV,
+        i: usize,
+        j: usize,
+        delta: f32,
+    ) -> f32 {
         let mut w = self.w_encode_2.clone();
         w[[i, j]] += delta;
 
@@ -929,16 +990,18 @@ impl HdcCfcBridge {
         } else {
             intermediate
         };
-        let attended = self.attention.forward(normalized.as_slice().unwrap());
+        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
         let output = w.dot(&Array1::from_vec(attended.values));
         let encoded: Vec<f32> = output.iter().map(|x| x.tanh()).collect();
 
         let decoded = self.decode_temporal_to_semantic(&encoded);
 
-        hv.values.iter()
+        hv.values
+            .iter()
             .zip(decoded.values.iter())
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / hv.values.len() as f32
+            .sum::<f32>()
+            / hv.values.len() as f32
     }
 
     /// Numerical gradient for w_decode_1
@@ -961,7 +1024,13 @@ impl HdcCfcBridge {
         grad
     }
 
-    fn compute_loss_with_perturbation_d1(&self, hv: &ContinuousHV, i: usize, j: usize, delta: f32) -> f32 {
+    fn compute_loss_with_perturbation_d1(
+        &self,
+        hv: &ContinuousHV,
+        i: usize,
+        j: usize,
+        delta: f32,
+    ) -> f32 {
         let encoded = self.encode_semantic_to_temporal(hv);
 
         let mut w = self.w_decode_1.clone();
@@ -974,16 +1043,18 @@ impl HdcCfcBridge {
         } else {
             intermediate
         };
-        let attended = self.attention.forward(normalized.as_slice().unwrap());
+        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
         let output = self.w_decode_2.dot(&Array1::from_vec(attended.values));
 
         let values: Vec<f32> = output.iter().cloned().collect();
         let decoded = ContinuousHV::from_vec(values).normalize();
 
-        hv.values.iter()
+        hv.values
+            .iter()
             .zip(decoded.values.iter())
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / hv.values.len() as f32
+            .sum::<f32>()
+            / hv.values.len() as f32
     }
 
     /// Numerical gradient for w_decode_2
@@ -1006,7 +1077,13 @@ impl HdcCfcBridge {
         grad
     }
 
-    fn compute_loss_with_perturbation_d2(&self, hv: &ContinuousHV, i: usize, j: usize, delta: f32) -> f32 {
+    fn compute_loss_with_perturbation_d2(
+        &self,
+        hv: &ContinuousHV,
+        i: usize,
+        j: usize,
+        delta: f32,
+    ) -> f32 {
         let encoded = self.encode_semantic_to_temporal(hv);
 
         let input = Array1::from_vec(encoded);
@@ -1016,7 +1093,7 @@ impl HdcCfcBridge {
         } else {
             intermediate
         };
-        let attended = self.attention.forward(normalized.as_slice().unwrap());
+        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
 
         let mut w = self.w_decode_2.clone();
         w[[i, j]] += delta;
@@ -1025,14 +1102,21 @@ impl HdcCfcBridge {
         let values: Vec<f32> = output.iter().cloned().collect();
         let decoded = ContinuousHV::from_vec(values).normalize();
 
-        hv.values.iter()
+        hv.values
+            .iter()
             .zip(decoded.values.iter())
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / hv.values.len() as f32
+            .sum::<f32>()
+            / hv.values.len() as f32
     }
 
     /// Numerical gradient for encode with target temporal
-    fn numerical_gradient_encode_target(&self, hv: &ContinuousHV, target: &[f32], eps: f32) -> Array2<f32> {
+    fn numerical_gradient_encode_target(
+        &self,
+        hv: &ContinuousHV,
+        target: &[f32],
+        eps: f32,
+    ) -> Array2<f32> {
         let (rows, cols) = self.w_encode_2.dim();
         let mut grad = Array2::zeros((rows, cols));
 
@@ -1069,15 +1153,22 @@ impl HdcCfcBridge {
         } else {
             intermediate
         };
-        let attended = self.attention.forward(normalized.as_slice().unwrap());
+        let attended = self.attention.forward(normalized.as_slice().expect("array must be contiguous"));
         let output = w_encode_2.dot(&Array1::from_vec(attended.values));
         output.iter().map(|x| x.tanh()).collect()
     }
 
     fn mse(a: &[f32], b: &[f32]) -> f32 {
         let n = a.len().min(b.len());
-        if n == 0 { return 0.0; }
-        a.iter().zip(b.iter()).take(n).map(|(x, y)| (x - y).powi(2)).sum::<f32>() / n as f32
+        if n == 0 {
+            return 0.0;
+        }
+        a.iter()
+            .zip(b.iter())
+            .take(n)
+            .map(|(x, y)| (x - y).powi(2))
+            .sum::<f32>()
+            / n as f32
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1110,22 +1201,14 @@ impl HdcCfcBridge {
 
     /// Reset training state (keeps learned weights)
     pub fn reset_training_state(&mut self) {
-        self.adam_encode_1 = ProjectionAdamState::new(
-            self.config.intermediate_dim,
-            self.config.hdc_dim,
-        );
-        self.adam_encode_2 = ProjectionAdamState::new(
-            self.config.cfc_hidden_dim,
-            self.config.intermediate_dim,
-        );
-        self.adam_decode_1 = ProjectionAdamState::new(
-            self.config.intermediate_dim,
-            self.config.cfc_hidden_dim,
-        );
-        self.adam_decode_2 = ProjectionAdamState::new(
-            self.config.hdc_dim,
-            self.config.intermediate_dim,
-        );
+        self.adam_encode_1 =
+            ProjectionAdamState::new(self.config.intermediate_dim, self.config.hdc_dim);
+        self.adam_encode_2 =
+            ProjectionAdamState::new(self.config.cfc_hidden_dim, self.config.intermediate_dim);
+        self.adam_decode_1 =
+            ProjectionAdamState::new(self.config.intermediate_dim, self.config.cfc_hidden_dim);
+        self.adam_decode_2 =
+            ProjectionAdamState::new(self.config.hdc_dim, self.config.intermediate_dim);
         self.reconstruction_loss_ema = 1.0;
         self.total_steps = 0;
     }
@@ -1161,7 +1244,11 @@ mod tests {
 
         // Check values are bounded (tanh output)
         for &v in &encoded {
-            assert!((-1.0..=1.0).contains(&v), "Encoded value {} out of bounds", v);
+            assert!(
+                (-1.0..=1.0).contains(&v),
+                "Encoded value {} out of bounds",
+                v
+            );
         }
     }
 
@@ -1186,7 +1273,11 @@ mod tests {
         let similarity = bridge.measure_roundtrip_similarity(&hv);
 
         // Initial random projections should give similarity > -1 (not anti-correlated)
-        assert!(similarity > -1.0, "Roundtrip similarity {} is too low", similarity);
+        assert!(
+            similarity > -1.0,
+            "Roundtrip similarity {} is too low",
+            similarity
+        );
     }
 
     #[test]
@@ -1194,7 +1285,7 @@ mod tests {
         // Train the bridge and verify roundtrip similarity improves.
         // Use small dimensions for fast test execution in debug mode.
         let config = HdcCfcBridgeConfig {
-            hdc_dim: 256,    // Small for fast test
+            hdc_dim: 256, // Small for fast test
             cfc_hidden_dim: 64,
             intermediate_dim: 128,
             num_attention_heads: 2,
@@ -1235,7 +1326,10 @@ mod tests {
         // Test roundtrip on a held-out vector
         let similarity = bridge.measure_roundtrip_similarity(&test_hv);
 
-        eprintln!("Pre-training similarity: {:.4}, Post-training similarity: {:.4}", pre_training_similarity, similarity);
+        eprintln!(
+            "Pre-training similarity: {:.4}, Post-training similarity: {:.4}",
+            pre_training_similarity, similarity
+        );
 
         // The 256D->128D->64D->128D->256D roundtrip is lossy due to the
         // information bottleneck. We only require that training produces a
@@ -1243,7 +1337,9 @@ mod tests {
         assert!(
             similarity > -0.1 || similarity > pre_training_similarity,
             "Roundtrip similarity {} is too low after training (loss: {:.4}, pre-training: {:.4})",
-            similarity, avg_loss, pre_training_similarity
+            similarity,
+            avg_loss,
+            pre_training_similarity
         );
     }
 
@@ -1262,13 +1358,18 @@ mod tests {
         let encoded_with_context = bridge.encode_with_temporal_context(&hv, &temporal_context);
 
         // They should be different due to context influence
-        let diff: f32 = encoded_no_context.iter()
+        let diff: f32 = encoded_no_context
+            .iter()
             .zip(encoded_with_context.iter())
             .map(|(a, b)| (a - b).powi(2))
             .sum::<f32>()
             .sqrt();
 
-        assert!(diff > 0.01, "Context should influence encoding, but diff was only {}", diff);
+        assert!(
+            diff > 0.01,
+            "Context should influence encoding, but diff was only {}",
+            diff
+        );
     }
 
     #[test]
@@ -1324,14 +1425,18 @@ mod tests {
         // Create two similar HVs
         let hv1 = ContinuousHV::random_default(42);
         let mut hv2_values = hv1.values.clone();
-        hv2_values[0] += 0.01;  // Tiny perturbation
+        hv2_values[0] += 0.01; // Tiny perturbation
         let hv2 = ContinuousHV::from_vec(hv2_values);
 
         let encoded1 = bridge.encode_semantic_to_temporal(&hv1);
         let encoded2 = bridge.encode_semantic_to_temporal(&hv2);
 
         // Encoded vectors should be similar
-        let dot: f32 = encoded1.iter().zip(encoded2.iter()).map(|(a, b)| a * b).sum();
+        let dot: f32 = encoded1
+            .iter()
+            .zip(encoded2.iter())
+            .map(|(a, b)| a * b)
+            .sum();
         let norm1: f32 = encoded1.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm2: f32 = encoded2.iter().map(|x| x * x).sum::<f32>().sqrt();
         let cosine_sim = dot / (norm1 * norm2);
@@ -1356,7 +1461,11 @@ mod tests {
         let encoded2 = bridge.encode_semantic_to_temporal(&hv2);
 
         // Encoded vectors should differ
-        let dot: f32 = encoded1.iter().zip(encoded2.iter()).map(|(a, b)| a * b).sum();
+        let dot: f32 = encoded1
+            .iter()
+            .zip(encoded2.iter())
+            .map(|(a, b)| a * b)
+            .sum();
         let norm1: f32 = encoded1.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm2: f32 = encoded2.iter().map(|x| x * x).sum::<f32>().sqrt();
         let cosine_sim = if norm1 > 0.0 && norm2 > 0.0 {

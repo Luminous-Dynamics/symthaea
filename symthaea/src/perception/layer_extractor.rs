@@ -202,12 +202,20 @@ impl LayerExtractor {
             vocab_size: model_config["vocab_size"].as_u64().unwrap_or(250002) as usize,
             hidden_size: model_config["hidden_size"].as_u64().unwrap_or(1024) as usize,
             num_hidden_layers: model_config["num_hidden_layers"].as_u64().unwrap_or(24) as usize,
-            num_attention_heads: model_config["num_attention_heads"].as_u64().unwrap_or(16) as usize,
+            num_attention_heads: model_config["num_attention_heads"].as_u64().unwrap_or(16)
+                as usize,
             intermediate_size: model_config["intermediate_size"].as_u64().unwrap_or(4096) as usize,
-            hidden_act: model_config["hidden_act"].as_str().unwrap_or("gelu").to_string(),
+            hidden_act: model_config["hidden_act"]
+                .as_str()
+                .unwrap_or("gelu")
+                .to_string(),
             hidden_dropout_prob: model_config["hidden_dropout_prob"].as_f64().unwrap_or(0.1),
-            attention_probs_dropout_prob: model_config["attention_probs_dropout_prob"].as_f64().unwrap_or(0.1),
-            max_position_embeddings: model_config["max_position_embeddings"].as_u64().unwrap_or(8194) as usize,
+            attention_probs_dropout_prob: model_config["attention_probs_dropout_prob"]
+                .as_f64()
+                .unwrap_or(0.1),
+            max_position_embeddings: model_config["max_position_embeddings"]
+                .as_u64()
+                .unwrap_or(8194) as usize,
             type_vocab_size: model_config["type_vocab_size"].as_u64().unwrap_or(1) as usize,
             layer_norm_eps: model_config["layer_norm_eps"].as_f64().unwrap_or(1e-5),
             pad_token_id: model_config["pad_token_id"].as_u64().unwrap_or(1) as usize,
@@ -215,7 +223,8 @@ impl LayerExtractor {
 
         // Build model components with layer access
         // Note: BGE-M3 uses flat tensor names without "roberta" prefix
-        let embeddings = super::bge_m3::XlmRobertaEmbeddings::new(&xlm_config, vb.pp("embeddings"))?;
+        let embeddings =
+            super::bge_m3::XlmRobertaEmbeddings::new(&xlm_config, vb.pp("embeddings"))?;
 
         let mut layers = Vec::with_capacity(xlm_config.num_hidden_layers);
         for i in 0..xlm_config.num_hidden_layers {
@@ -239,7 +248,11 @@ impl LayerExtractor {
     fn get_weights_path(repo: &hf_hub::api::sync::ApiRepo) -> Result<PathBuf> {
         // Try safetensors first
         if let Ok(path) = repo.get("model.safetensors") {
-            if path.extension().map(|e| e == "safetensors").unwrap_or(false) {
+            if path
+                .extension()
+                .map(|e| e == "safetensors")
+                .unwrap_or(false)
+            {
                 return Ok(path);
             }
         }
@@ -352,7 +365,11 @@ impl LayerExtractor {
     }
 
     /// Extract activations from specific layers only
-    pub fn extract_layers(&self, text: &str, layer_indices: &[usize]) -> Result<Vec<LayerActivation>> {
+    pub fn extract_layers(
+        &self,
+        text: &str,
+        layer_indices: &[usize],
+    ) -> Result<Vec<LayerActivation>> {
         let max_layer = layer_indices.iter().max().copied().unwrap_or(0);
         if max_layer >= self.model.layers.len() {
             anyhow::bail!(
@@ -386,7 +403,8 @@ impl LayerExtractor {
     }
 
     fn tokenize(&self, text: &str) -> Result<(Tensor, Tensor)> {
-        let encoding = self.tokenizer
+        let encoding = self
+            .tokenizer
             .encode(text, true)
             .map_err(|e| anyhow::anyhow!("Tokenization failed: {}", e))?;
 
@@ -600,10 +618,7 @@ mod tests {
         let activation = LayerActivation {
             layer_idx: 10,
             activation: vec![0.5; 1024],
-            sequence_activations: Some(vec![
-                vec![0.1; 1024],
-                vec![0.2; 1024],
-            ]),
+            sequence_activations: Some(vec![vec![0.1; 1024], vec![0.2; 1024]]),
         };
         assert!(activation.sequence_activations.is_some());
         assert_eq!(activation.sequence_activations.as_ref().unwrap().len(), 2);

@@ -5,13 +5,13 @@
 //! These tests verify the research-consciousness connection without
 //! requiring actual web requests.
 
-use symthaea::continuous_mind::{ContinuousMind, MindConfig};
-use symthaea::web_research::{
-    KnowledgeIntegrator, ResearchResult,
-    EpistemicStatus, Source, VerificationLevel, Verification, Claim,
-};
-use symthaea::hdc::binary_hv::BinaryHV;
 use std::time::SystemTime;
+use symthaea::continuous_mind::{ContinuousMind, MindConfig};
+use symthaea::hdc::binary_hv::BinaryHV;
+use symthaea::web_research::{
+    Claim, EpistemicStatus, KnowledgeIntegrator, ResearchResult, Source, Verification,
+    VerificationLevel,
+};
 
 // ============================================================================
 // CONTINUOUS MIND WEB RESEARCH INTERFACE TESTS
@@ -23,7 +23,10 @@ async fn test_continuous_mind_has_web_researcher() {
     let mind = ContinuousMind::new(config);
 
     // Web researcher should be available by default
-    assert!(mind.has_web_researcher(), "Web researcher should be initialized");
+    assert!(
+        mind.has_web_researcher(),
+        "Web researcher should be initialized"
+    );
 }
 
 #[tokio::test]
@@ -35,8 +38,7 @@ async fn test_knowledge_integrator_creation() {
 
 #[tokio::test]
 async fn test_knowledge_integrator_with_confidence() {
-    let _integrator = KnowledgeIntegrator::new()
-        .with_min_confidence(0.7);
+    let _integrator = KnowledgeIntegrator::new().with_min_confidence(0.7);
     // Should create with custom confidence
     assert!(true);
 }
@@ -171,18 +173,16 @@ fn test_claim_creation() {
 fn test_research_result_creation() {
     let result = ResearchResult {
         query: "What is consciousness?".to_string(),
-        sources: vec![
-            Source {
-                url: "https://example.com/consciousness".to_string(),
-                title: "Understanding Consciousness".to_string(),
-                content: "Consciousness is...".to_string(),
-                published_date: None,
-                author: None,
-                credibility: 0.85,
-                encoding: BinaryHV::random(1),
-                fetch_timestamp: SystemTime::now(),
-            },
-        ],
+        sources: vec![Source {
+            url: "https://example.com/consciousness".to_string(),
+            title: "Understanding Consciousness".to_string(),
+            content: "Consciousness is...".to_string(),
+            published_date: None,
+            author: None,
+            credibility: 0.85,
+            encoding: BinaryHV::random(1),
+            fetch_timestamp: SystemTime::now(),
+        }],
         verifications: vec![],
         confidence: 0.75,
         summary: "Consciousness is a complex phenomenon".to_string(),
@@ -227,18 +227,16 @@ async fn test_integrate_mock_research_result() {
 
     let result = ResearchResult {
         query: "Test query".to_string(),
-        sources: vec![
-            Source {
-                url: "https://test.com".to_string(),
-                title: "Test Source".to_string(),
-                content: "Full test content here".to_string(),
-                published_date: None,
-                author: None,
-                credibility: 0.8,
-                encoding: BinaryHV::random(200),
-                fetch_timestamp: SystemTime::now(),
-            },
-        ],
+        sources: vec![Source {
+            url: "https://test.com".to_string(),
+            title: "Test Source".to_string(),
+            content: "Full test content here".to_string(),
+            published_date: None,
+            author: None,
+            credibility: 0.8,
+            encoding: BinaryHV::random(200),
+            fetch_timestamp: SystemTime::now(),
+        }],
         verifications: vec![verification],
         confidence: 0.85,
         summary: "Test summary".to_string(),
@@ -274,6 +272,12 @@ async fn test_integration_tracks_phi() {
     let integration = integrator.integrate(result).await.unwrap();
 
     // Should track Φ before and after
-    assert!(integration.phi_before >= 0.0, "Phi before should be non-negative");
-    assert!(integration.phi_after >= 0.0, "Phi after should be non-negative");
+    assert!(
+        integration.phi_before >= 0.0,
+        "Phi before should be non-negative"
+    );
+    assert!(
+        integration.phi_after >= 0.0,
+        "Phi after should be non-negative"
+    );
 }

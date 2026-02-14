@@ -7,10 +7,8 @@ use ndarray::{Array1, Array2};
 use rand::Rng;
 use symthaea_core::genesis::GenesisSeed;
 
-use super::types::{
-    CfCConfig, OnlineLearningStats, MIN_TAU, sigmoid,
-};
-use super::gradients::{CfCGradients, CfCCellCache, AdamState};
+use super::gradients::{AdamState, CfCCellCache, CfCGradients};
+use super::types::{sigmoid, CfCConfig, OnlineLearningStats, MIN_TAU};
 
 /// A single Closed-form Continuous-time cell
 #[derive(Debug, Clone)]
@@ -18,8 +16,8 @@ pub struct CfCCell {
     pub(crate) config: CfCConfig,
 
     // Weights for state transition
-    pub(crate) w_in: Array2<f32>,     // Input to hidden
-    pub(crate) w_h: Array2<f32>,      // Hidden to hidden
+    pub(crate) w_in: Array2<f32>, // Input to hidden
+    pub(crate) w_h: Array2<f32>,  // Hidden to hidden
 
     // Reserved for future output projection (e.g., separate output dim)
     #[allow(dead_code)]
@@ -99,16 +97,18 @@ impl CfCCell {
             let mut biases = Vec::new();
 
             // First layer: input_dim -> backbone_dim
-            weights.push(Array2::from_shape_fn((config.backbone_dim, config.input_dim), |_| {
-                (rand::random::<f32>() - 0.5) * 2.0 * scale
-            }));
+            weights.push(Array2::from_shape_fn(
+                (config.backbone_dim, config.input_dim),
+                |_| (rand::random::<f32>() - 0.5) * 2.0 * scale,
+            ));
             biases.push(Array1::zeros(config.backbone_dim));
 
             // Hidden layers
             for _ in 1..config.backbone_layers {
-                weights.push(Array2::from_shape_fn((config.backbone_dim, config.backbone_dim), |_| {
-                    (rand::random::<f32>() - 0.5) * 2.0 * scale
-                }));
+                weights.push(Array2::from_shape_fn(
+                    (config.backbone_dim, config.backbone_dim),
+                    |_| (rand::random::<f32>() - 0.5) * 2.0 * scale,
+                ));
                 biases.push(Array1::zeros(config.backbone_dim));
             }
 
@@ -182,15 +182,17 @@ impl CfCCell {
             let mut weights = Vec::new();
             let mut biases = Vec::new();
 
-            weights.push(Array2::from_shape_fn((config.backbone_dim, config.input_dim), |_| {
-                (rng.gen::<f32>() - 0.5) * 2.0 * scale
-            }));
+            weights.push(Array2::from_shape_fn(
+                (config.backbone_dim, config.input_dim),
+                |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale,
+            ));
             biases.push(Array1::zeros(config.backbone_dim));
 
             for _ in 1..config.backbone_layers {
-                weights.push(Array2::from_shape_fn((config.backbone_dim, config.backbone_dim), |_| {
-                    (rng.gen::<f32>() - 0.5) * 2.0 * scale
-                }));
+                weights.push(Array2::from_shape_fn(
+                    (config.backbone_dim, config.backbone_dim),
+                    |_| (rng.gen::<f32>() - 0.5) * 2.0 * scale,
+                ));
                 biases.push(Array1::zeros(config.backbone_dim));
             }
 
@@ -256,7 +258,10 @@ impl CfCCell {
         // Compute target/equilibrium state (using fast activation for 2-3x speedup)
         let x_contrib = self.w_in.dot(&processed_input);
         let h_contrib = self.w_h.dot(&self.state);
-        let h_inf = self.config.activation.apply_array_fast(&(x_contrib + h_contrib + &self.b_h));
+        let h_inf = self
+            .config
+            .activation
+            .apply_array_fast(&(x_contrib + h_contrib + &self.b_h));
 
         // Compute decay factor based on time constants
         // Clamp tau to MIN_TAU to prevent division by zero / NaN
@@ -266,7 +271,13 @@ impl CfCCell {
         let mut new_state = &h_inf + &((&self.state - &h_inf) * &decay);
 
         // Clamp hidden state to prevent accumulation-driven divergence
-        new_state.mapv_inplace(|x| if x.is_finite() { x.clamp(-10.0, 10.0) } else { 0.0 });
+        new_state.mapv_inplace(|x| {
+            if x.is_finite() {
+                x.clamp(-10.0, 10.0)
+            } else {
+                0.0
+            }
+        });
 
         self.state = new_state.clone();
         self.steps += 1;
@@ -285,7 +296,11 @@ impl CfCCell {
     /// # Returns
     /// (new_hidden_state, cache) - The hidden state and cached intermediate values
     #[inline]
-    pub fn forward_with_cache(&mut self, input: &Array1<f32>, dt: f32) -> (Array1<f32>, CfCCellCache) {
+    pub fn forward_with_cache(
+        &mut self,
+        input: &Array1<f32>,
+        dt: f32,
+    ) -> (Array1<f32>, CfCCellCache) {
         // Process through backbone if enabled
         let processed_input = if self.config.use_backbone {
             self.backbone_forward(input)
@@ -309,7 +324,13 @@ impl CfCCell {
         let mut new_state = &h_inf + &((&state_at_forward - &h_inf) * &decay);
 
         // Clamp hidden state to prevent accumulation-driven divergence
-        new_state.mapv_inplace(|x| if x.is_finite() { x.clamp(-10.0, 10.0) } else { 0.0 });
+        new_state.mapv_inplace(|x| {
+            if x.is_finite() {
+                x.clamp(-10.0, 10.0)
+            } else {
+                0.0
+            }
+        });
 
         self.state = new_state.clone();
         self.steps += 1;
@@ -330,7 +351,11 @@ impl CfCCell {
     pub(crate) fn backbone_forward(&self, input: &Array1<f32>) -> Array1<f32> {
         let mut x = input.clone();
 
-        for (w, b) in self.backbone_weights.iter().zip(self.backbone_biases.iter()) {
+        for (w, b) in self
+            .backbone_weights
+            .iter()
+            .zip(self.backbone_biases.iter())
+        {
             x = self.config.activation.apply_array_fast(&(w.dot(&x) + b));
         }
 
@@ -345,7 +370,12 @@ impl CfCCell {
     ///
     /// Returns gradients for W_in, W_h, b_h, and tau based on the
     /// closed-form CfC dynamics: h(t) = h_inf + (h_0 - h_inf) * exp(-dt/tau)
-    pub fn backward_from_grad(&self, input: &Array1<f32>, dh: &Array1<f32>, dt: f32) -> CfCGradients {
+    pub fn backward_from_grad(
+        &self,
+        input: &Array1<f32>,
+        dh: &Array1<f32>,
+        dt: f32,
+    ) -> CfCGradients {
         let processed_input = if self.config.use_backbone {
             self.backbone_forward(input)
         } else {
@@ -400,7 +430,12 @@ impl CfCCell {
             dtau[i] = dh[i] * diff * (dt / (self.tau[i] * self.tau[i])) * decay[i];
         }
 
-        CfCGradients { dw_in, dw_h, db_h, dtau }
+        CfCGradients {
+            dw_in,
+            dw_h,
+            db_h,
+            dtau,
+        }
     }
 
     /// Compute analytical gradients using cached forward pass values.
@@ -415,7 +450,12 @@ impl CfCCell {
     /// # Returns
     /// Gradients for W_in, W_h, b_h, and tau
     #[inline]
-    pub fn backward_from_cache(&self, cache: &CfCCellCache, dh: &Array1<f32>, dt: f32) -> CfCGradients {
+    pub fn backward_from_cache(
+        &self,
+        cache: &CfCCellCache,
+        dh: &Array1<f32>,
+        dt: f32,
+    ) -> CfCGradients {
         let hidden_dim = self.config.hidden_dim;
         let effective_input_dim = cache.processed_input.len();
 
@@ -435,7 +475,10 @@ impl CfCCell {
         // dL/dW_in = dz (x) input (outer product via vectorized row-wise broadcast)
         // Optimized: use slice views to avoid bounds checking overhead
         let dz_slice = dz.as_slice().expect("dz array not contiguous");
-        let input_slice = cache.processed_input.as_slice().expect("processed_input array not contiguous");
+        let input_slice = cache
+            .processed_input
+            .as_slice()
+            .expect("processed_input array not contiguous");
         let mut dw_in = Array2::zeros((hidden_dim, effective_input_dim));
         {
             let dw_in_slice = dw_in.as_slice_mut().expect("dw_in array not contiguous");
@@ -449,7 +492,10 @@ impl CfCCell {
         }
 
         // dL/dW_h = dz (x) state (outer product)
-        let state_slice = cache.state_at_forward.as_slice().expect("state_at_forward array not contiguous");
+        let state_slice = cache
+            .state_at_forward
+            .as_slice()
+            .expect("state_at_forward array not contiguous");
         let mut dw_h = Array2::zeros((hidden_dim, hidden_dim));
         {
             let dw_h_slice = dw_h.as_slice_mut().expect("dw_h array not contiguous");
@@ -481,7 +527,12 @@ impl CfCCell {
             }
         }
 
-        CfCGradients { dw_in, dw_h, db_h, dtau }
+        CfCGradients {
+            dw_in,
+            dw_h,
+            db_h,
+            dtau,
+        }
     }
 
     /// Compute analytical gradients for BPTT (legacy API targeting hidden state directly).
@@ -599,9 +650,18 @@ impl CfCCell {
         // Update W_in (vectorized via slice iteration)
         {
             let w_slice = self.w_in.as_slice_mut().expect("w_in array not contiguous");
-            let g_slice = grads.dw_in.as_slice().expect("dw_in grad array not contiguous");
-            let m_slice = adam.m_w_in.as_slice_mut().expect("m_w_in array not contiguous");
-            let v_slice = adam.v_w_in.as_slice_mut().expect("v_w_in array not contiguous");
+            let g_slice = grads
+                .dw_in
+                .as_slice()
+                .expect("dw_in grad array not contiguous");
+            let m_slice = adam
+                .m_w_in
+                .as_slice_mut()
+                .expect("m_w_in array not contiguous");
+            let v_slice = adam
+                .v_w_in
+                .as_slice_mut()
+                .expect("v_w_in array not contiguous");
 
             for i in 0..w_slice.len() {
                 let g = g_slice[i].clamp(-0.5, 0.5);
@@ -616,9 +676,18 @@ impl CfCCell {
         // Update W_h (vectorized via slice iteration)
         {
             let w_slice = self.w_h.as_slice_mut().expect("w_h array not contiguous");
-            let g_slice = grads.dw_h.as_slice().expect("dw_h grad array not contiguous");
-            let m_slice = adam.m_w_h.as_slice_mut().expect("m_w_h array not contiguous");
-            let v_slice = adam.v_w_h.as_slice_mut().expect("v_w_h array not contiguous");
+            let g_slice = grads
+                .dw_h
+                .as_slice()
+                .expect("dw_h grad array not contiguous");
+            let m_slice = adam
+                .m_w_h
+                .as_slice_mut()
+                .expect("m_w_h array not contiguous");
+            let v_slice = adam
+                .v_w_h
+                .as_slice_mut()
+                .expect("v_w_h array not contiguous");
 
             for i in 0..w_slice.len() {
                 let g = g_slice[i].clamp(-0.5, 0.5);
@@ -633,9 +702,18 @@ impl CfCCell {
         // Update bias (1D vectorized)
         {
             let b_slice = self.b_h.as_slice_mut().expect("b_h array not contiguous");
-            let g_slice = grads.db_h.as_slice().expect("db_h grad array not contiguous");
-            let m_slice = adam.m_b_h.as_slice_mut().expect("m_b_h array not contiguous");
-            let v_slice = adam.v_b_h.as_slice_mut().expect("v_b_h array not contiguous");
+            let g_slice = grads
+                .db_h
+                .as_slice()
+                .expect("db_h grad array not contiguous");
+            let m_slice = adam
+                .m_b_h
+                .as_slice_mut()
+                .expect("m_b_h array not contiguous");
+            let v_slice = adam
+                .v_b_h
+                .as_slice_mut()
+                .expect("v_b_h array not contiguous");
 
             for i in 0..b_slice.len() {
                 let g = g_slice[i].clamp(-0.5, 0.5);
@@ -650,9 +728,18 @@ impl CfCCell {
         // Update tau with 0.1x learning rate and clamping (1D vectorized)
         {
             let tau_slice = self.tau.as_slice_mut().expect("tau array not contiguous");
-            let g_slice = grads.dtau.as_slice().expect("dtau grad array not contiguous");
-            let m_slice = adam.m_tau.as_slice_mut().expect("m_tau array not contiguous");
-            let v_slice = adam.v_tau.as_slice_mut().expect("v_tau array not contiguous");
+            let g_slice = grads
+                .dtau
+                .as_slice()
+                .expect("dtau grad array not contiguous");
+            let m_slice = adam
+                .m_tau
+                .as_slice_mut()
+                .expect("m_tau array not contiguous");
+            let v_slice = adam
+                .v_tau
+                .as_slice_mut()
+                .expect("v_tau array not contiguous");
             let tau_lr = lr * 0.1;
 
             for i in 0..tau_slice.len() {
@@ -732,7 +819,9 @@ impl CfCCell {
 
         // Error-gated learning: only adapt if error exceeds threshold
         // Use adaptive threshold based on recent error history
-        let adaptive_threshold = config.error_threshold.max(self.online_stats.ema_error * 0.5);
+        let adaptive_threshold = config
+            .error_threshold
+            .max(self.online_stats.ema_error * 0.5);
         if prediction_error < adaptive_threshold {
             self.online_stats.adaptations_skipped += 1;
             return false;

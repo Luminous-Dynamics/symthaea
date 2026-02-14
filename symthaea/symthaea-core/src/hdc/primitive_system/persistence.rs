@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
-use super::{PrimitiveSystem, CompositionAlgebra, CompositionExport, PrimitiveGraph};
+use super::{CompositionAlgebra, CompositionExport, PrimitiveGraph, PrimitiveSystem};
+use serde::{Deserialize, Serialize};
 
 /// Persistence manager for saving/loading primitive compositions and session data.
 ///
@@ -84,8 +84,7 @@ impl PrimitivePersistence {
         let json = serde_json::to_string_pretty(&session)
             .map_err(|e| PersistenceError::SerializationError(e.to_string()))?;
 
-        let mut file = File::create(path)
-            .map_err(|e| PersistenceError::IoError(e.to_string()))?;
+        let mut file = File::create(path).map_err(|e| PersistenceError::IoError(e.to_string()))?;
 
         file.write_all(json.as_bytes())
             .map_err(|e| PersistenceError::IoError(e.to_string()))?;
@@ -102,8 +101,7 @@ impl PrimitivePersistence {
         use std::fs::File;
         use std::io::Read;
 
-        let mut file = File::open(path)
-            .map_err(|e| PersistenceError::IoError(e.to_string()))?;
+        let mut file = File::open(path).map_err(|e| PersistenceError::IoError(e.to_string()))?;
 
         let mut json = String::new();
         file.read_to_string(&mut json)
@@ -114,7 +112,8 @@ impl PrimitivePersistence {
 
         // Rebuild algebra
         let mut algebra = CompositionAlgebra::new();
-        algebra.import(&session.compositions, system)
+        algebra
+            .import(&session.compositions, system)
             .map_err(|e| PersistenceError::CompositionError(e.to_string()))?;
 
         Ok((algebra, session.history))
@@ -133,8 +132,7 @@ impl PrimitivePersistence {
         let json = serde_json::to_string_pretty(&exports)
             .map_err(|e| PersistenceError::SerializationError(e.to_string()))?;
 
-        let mut file = File::create(path)
-            .map_err(|e| PersistenceError::IoError(e.to_string()))?;
+        let mut file = File::create(path).map_err(|e| PersistenceError::IoError(e.to_string()))?;
 
         file.write_all(json.as_bytes())
             .map_err(|e| PersistenceError::IoError(e.to_string()))?;
@@ -151,8 +149,7 @@ impl PrimitivePersistence {
         use std::fs::File;
         use std::io::Read;
 
-        let mut file = File::open(path)
-            .map_err(|e| PersistenceError::IoError(e.to_string()))?;
+        let mut file = File::open(path).map_err(|e| PersistenceError::IoError(e.to_string()))?;
 
         let mut json = String::new();
         file.read_to_string(&mut json)
@@ -162,7 +159,8 @@ impl PrimitivePersistence {
             .map_err(|e| PersistenceError::DeserializationError(e.to_string()))?;
 
         let mut algebra = CompositionAlgebra::new();
-        algebra.import(&exports, system)
+        algebra
+            .import(&exports, system)
             .map_err(|e| PersistenceError::CompositionError(e.to_string()))?;
 
         Ok(algebra)
@@ -179,8 +177,7 @@ impl PrimitivePersistence {
 
         let dot = graph.to_dot();
 
-        let mut file = File::create(path)
-            .map_err(|e| PersistenceError::IoError(e.to_string()))?;
+        let mut file = File::create(path).map_err(|e| PersistenceError::IoError(e.to_string()))?;
 
         file.write_all(dot.as_bytes())
             .map_err(|e| PersistenceError::IoError(e.to_string()))?;
@@ -200,14 +197,12 @@ impl PrimitivePersistence {
 
         let matrix = system.similarity_matrix(names);
 
-        let mut file = File::create(path)
-            .map_err(|e| PersistenceError::IoError(e.to_string()))?;
+        let mut file = File::create(path).map_err(|e| PersistenceError::IoError(e.to_string()))?;
 
         // Header
         let mut header = String::from(",");
         header.push_str(&names.join(","));
-        writeln!(file, "{}", header)
-            .map_err(|e| PersistenceError::IoError(e.to_string()))?;
+        writeln!(file, "{}", header).map_err(|e| PersistenceError::IoError(e.to_string()))?;
 
         // Rows
         for (i, row) in matrix.iter().enumerate() {
@@ -238,7 +233,9 @@ impl std::fmt::Display for PersistenceError {
         match self {
             PersistenceError::IoError(msg) => write!(f, "IO error: {}", msg),
             PersistenceError::SerializationError(msg) => write!(f, "serialization error: {}", msg),
-            PersistenceError::DeserializationError(msg) => write!(f, "deserialization error: {}", msg),
+            PersistenceError::DeserializationError(msg) => {
+                write!(f, "deserialization error: {}", msg)
+            }
             PersistenceError::CompositionError(msg) => write!(f, "composition error: {}", msg),
         }
     }

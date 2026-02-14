@@ -26,8 +26,8 @@ use std::time::Instant;
 
 use super::types::instant_now;
 // Use types from core for compatibility
-use super::core::{Bottleneck, BottleneckType, ComponentId, ImprovementType};
 use super::architectural_graph::CausalChain;
+use super::core::{Bottleneck, BottleneckType, ComponentId, ImprovementType};
 use super::safe_experiment::ArchitecturalImprovement;
 
 /// ImprovementGenerator: The Revolutionary Heart of Self-Improvement
@@ -198,8 +198,7 @@ impl ImprovementGenerator {
         // Process each bottleneck with its causal chain
         for bottleneck in bottlenecks.iter().take(self.config.max_proposals) {
             // Find the causal chain for this bottleneck
-            let chain = causal_chains.iter()
-                .find(|c| c.symptom.id == bottleneck.id);
+            let chain = causal_chains.iter().find(|c| c.symptom.id == bottleneck.id);
 
             // Generate improvement based on analysis
             if let Some(improvement) = self.propose_improvement(bottleneck, chain, current_phi) {
@@ -244,10 +243,16 @@ impl ImprovementGenerator {
     ) -> Option<&CausalPattern> {
         let root_cause = causal_chain.map(|c| c.root_cause.clone());
 
-        self.patterns.effective_causal_patterns.iter()
+        self.patterns
+            .effective_causal_patterns
+            .iter()
             .filter(|p| p.bottleneck_type == bottleneck.bottleneck_type)
             .filter(|p| root_cause.as_ref().map_or(true, |rc| &p.root_cause == rc))
-            .max_by(|a, b| a.success_rate.partial_cmp(&b.success_rate).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.success_rate
+                    .partial_cmp(&b.success_rate)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
     }
 
     /// Create improvement from learned pattern
@@ -259,7 +264,8 @@ impl ImprovementGenerator {
         let improvement_type = self.parse_improvement_type(&pattern.recommended_improvement)?;
 
         Some(ArchitecturalImprovement {
-            id: format!("pattern_{}_{}",
+            id: format!(
+                "pattern_{}_{}",
                 pattern.recommended_improvement,
                 instant_now().elapsed().as_millis()
             ),
@@ -284,110 +290,134 @@ impl ImprovementGenerator {
         causal_chain: Option<&CausalChain>,
         _current_phi: f64,
     ) -> Option<ArchitecturalImprovement> {
-        let (improvement_type, description, expected_phi, expected_latency) = match bottleneck.bottleneck_type {
-            BottleneckType::Latency => {
-                if bottleneck.component.as_str() == "Cache" {
+        let (improvement_type, description, expected_phi, expected_latency) =
+            match bottleneck.bottleneck_type {
+                BottleneckType::Latency => {
+                    if bottleneck.component.as_str() == "Cache" {
+                        (
+                            ImprovementType::IncreaseCacheSize {
+                                from: 1000,
+                                to: 5000,
+                            },
+                            "Increase cache size to reduce lookups".to_string(),
+                            Some(0.02),
+                            Some(0.3),
+                        )
+                    } else {
+                        let comp = bottleneck.component.clone();
+                        (
+                            ImprovementType::Parallelize {
+                                component: comp.clone(),
+                                threads: 4,
+                            },
+                            format!("Parallelize {:?} to reduce latency", comp),
+                            Some(0.01),
+                            Some(0.4),
+                        )
+                    }
+                }
+                BottleneckType::LowPhi => (
+                    ImprovementType::IncreaseEvolutionRate,
+                    "Increase evolution rate to improve Phi".to_string(),
+                    Some(0.08),
+                    Some(-0.1),
+                ),
+                BottleneckType::LowAccuracy => (
+                    ImprovementType::AddSyntheticData { count: 1000 },
+                    "Add synthetic training data to improve accuracy".to_string(),
+                    Some(0.05),
+                    None,
+                ),
+                BottleneckType::ResourceExhaustion => {
+                    let root = causal_chain
+                        .map(|c| c.root_cause.clone())
+                        .unwrap_or(bottleneck.component.clone());
+                    let description = format!("Optimize {:?} for memory efficiency", root);
                     (
-                        ImprovementType::IncreaseCacheSize { from: 1000, to: 5000 },
-                        "Increase cache size to reduce lookups".to_string(),
-                        Some(0.02),
-                        Some(0.3),
-                    )
-                } else {
-                    let comp = bottleneck.component.clone();
-                    (
-                        ImprovementType::Parallelize { component: comp.clone(), threads: 4 },
-                        format!("Parallelize {:?} to reduce latency", comp),
+                        ImprovementType::OptimizeAlgorithm {
+                            component: root,
+                            optimization: "memory-efficient implementation".to_string(),
+                        },
+                        description,
                         Some(0.01),
-                        Some(0.4),
+                        Some(0.2),
                     )
                 }
-            }
-            BottleneckType::LowPhi => (
-                ImprovementType::IncreaseEvolutionRate,
-                "Increase evolution rate to improve Phi".to_string(),
-                Some(0.08),
-                Some(-0.1),
-            ),
-            BottleneckType::LowAccuracy => (
-                ImprovementType::AddSyntheticData { count: 1000 },
-                "Add synthetic training data to improve accuracy".to_string(),
-                Some(0.05),
-                None,
-            ),
-            BottleneckType::ResourceExhaustion => {
-                let root = causal_chain.map(|c| c.root_cause.clone()).unwrap_or(bottleneck.component.clone());
-                let description = format!("Optimize {:?} for memory efficiency", root);
-                (
-                    ImprovementType::OptimizeAlgorithm {
-                        component: root,
-                        optimization: "memory-efficient implementation".to_string(),
+                BottleneckType::Oscillation => (
+                    ImprovementType::TuneHyperparameter {
+                        name: "learning_rate".to_string(),
+                        old_value: 0.1,
+                        new_value: 0.05,
                     },
-                    description,
-                    Some(0.01),
-                    Some(0.2),
-                )
-            }
-            BottleneckType::Oscillation => (
-                ImprovementType::TuneHyperparameter {
-                    name: "learning_rate".to_string(),
-                    old_value: 0.1,
-                    new_value: 0.05,
-                },
-                "Reduce learning rate for stability".to_string(),
-                Some(0.03),
-                Some(0.1),
-            ),
-            BottleneckType::Accuracy => (
-                ImprovementType::AddSyntheticData { count: 500 },
-                "Add training examples to improve accuracy".to_string(),
-                Some(0.04),
-                None,
-            ),
-            BottleneckType::PhiStagnation => (
-                ImprovementType::IncreaseEvolutionRate,
-                "Increase evolution rate to escape Phi stagnation".to_string(),
-                Some(0.10),
-                Some(-0.05),
-            ),
-            BottleneckType::Memory => {
-                let root = causal_chain.map(|c| c.root_cause.clone()).unwrap_or(bottleneck.component.clone());
-                let description = format!("Optimize {:?} memory usage", root);
-                (
-                    ImprovementType::OptimizeAlgorithm {
-                        component: root,
-                        optimization: "memory-pool allocation".to_string(),
+                    "Reduce learning rate for stability".to_string(),
+                    Some(0.03),
+                    Some(0.1),
+                ),
+                BottleneckType::Accuracy => (
+                    ImprovementType::AddSyntheticData { count: 500 },
+                    "Add training examples to improve accuracy".to_string(),
+                    Some(0.04),
+                    None,
+                ),
+                BottleneckType::PhiStagnation => (
+                    ImprovementType::IncreaseEvolutionRate,
+                    "Increase evolution rate to escape Phi stagnation".to_string(),
+                    Some(0.10),
+                    Some(-0.05),
+                ),
+                BottleneckType::Memory => {
+                    let root = causal_chain
+                        .map(|c| c.root_cause.clone())
+                        .unwrap_or(bottleneck.component.clone());
+                    let description = format!("Optimize {:?} memory usage", root);
+                    (
+                        ImprovementType::OptimizeAlgorithm {
+                            component: root,
+                            optimization: "memory-pool allocation".to_string(),
+                        },
+                        description,
+                        Some(0.01),
+                        Some(0.15),
+                    )
+                }
+                BottleneckType::Computation => (
+                    ImprovementType::Parallelize {
+                        component: bottleneck.component.clone(),
+                        threads: 8,
                     },
-                    description,
+                    format!(
+                        "Parallelize {:?} for better throughput",
+                        bottleneck.component
+                    ),
+                    Some(0.02),
+                    Some(0.5),
+                ),
+                BottleneckType::IO => (
+                    ImprovementType::IncreaseCacheSize {
+                        from: 500,
+                        to: 2000,
+                    },
+                    "Increase buffer sizes to reduce I/O waits".to_string(),
                     Some(0.01),
-                    Some(0.15),
-                )
-            }
-            BottleneckType::Computation => (
-                ImprovementType::Parallelize { component: bottleneck.component.clone(), threads: 8 },
-                format!("Parallelize {:?} for better throughput", bottleneck.component),
-                Some(0.02),
-                Some(0.5),
-            ),
-            BottleneckType::IO => (
-                ImprovementType::IncreaseCacheSize { from: 500, to: 2000 },
-                "Increase buffer sizes to reduce I/O waits".to_string(),
-                Some(0.01),
-                Some(0.25),
-            ),
-            // Catch-all for newer bottleneck types (Throughput, Energy, Integration, Contention)
-            _ => (
-                ImprovementType::Optimization,
-                format!("General optimization for {:?} bottleneck", bottleneck.bottleneck_type),
-                Some(0.01),
-                None,
-            ),
-        };
+                    Some(0.25),
+                ),
+                // Catch-all for newer bottleneck types (Throughput, Energy, Integration, Contention)
+                _ => (
+                    ImprovementType::Optimization,
+                    format!(
+                        "General optimization for {:?} bottleneck",
+                        bottleneck.bottleneck_type
+                    ),
+                    Some(0.01),
+                    None,
+                ),
+            };
 
         let confidence = bottleneck.severity * 0.7 + 0.2;
 
         Some(ArchitecturalImprovement {
-            id: format!("rule_{}_{}",
+            id: format!(
+                "rule_{}_{}",
                 bottleneck_type_to_string(bottleneck.bottleneck_type),
                 instant_now().elapsed().as_millis()
             ),
@@ -436,7 +466,10 @@ impl ImprovementGenerator {
     /// Parse improvement type from string (for pattern matching)
     fn parse_improvement_type(&self, s: &str) -> Option<ImprovementType> {
         match s {
-            s if s.starts_with("cache") => Some(ImprovementType::IncreaseCacheSize { from: 1000, to: 5000 }),
+            s if s.starts_with("cache") => Some(ImprovementType::IncreaseCacheSize {
+                from: 1000,
+                to: 5000,
+            }),
             s if s.starts_with("parallel") => Some(ImprovementType::Parallelize {
                 component: ComponentId::HRM(),
                 threads: 4,
@@ -472,16 +505,20 @@ impl ImprovementGenerator {
         }
 
         if self.stats.total_proposed > 0 {
-            self.stats.success_rate = self.stats.total_succeeded as f64 / self.stats.total_proposed as f64;
+            self.stats.success_rate =
+                self.stats.total_succeeded as f64 / self.stats.total_proposed as f64;
         }
 
-        let successful_gains: Vec<f64> = self.improvement_history.iter()
+        let successful_gains: Vec<f64> = self
+            .improvement_history
+            .iter()
             .filter(|r| r.outcome == ImprovementOutcome::Success)
             .map(|r| r.phi_change)
             .collect();
 
         if !successful_gains.is_empty() {
-            self.stats.avg_phi_gain = successful_gains.iter().sum::<f64>() / successful_gains.len() as f64;
+            self.stats.avg_phi_gain =
+                successful_gains.iter().sum::<f64>() / successful_gains.len() as f64;
         }
 
         self.learn_from_outcome(improvement, outcome, phi_change);
@@ -494,9 +531,18 @@ impl ImprovementGenerator {
         outcome: ImprovementOutcome,
         _phi_change: f64,
     ) {
-        let type_key = format!("{:?}", improvement.improvement_type).split('{').next().unwrap_or("unknown").to_string();
+        let type_key = format!("{:?}", improvement.improvement_type)
+            .split('{')
+            .next()
+            .unwrap_or("unknown")
+            .to_string();
 
-        let current_rate = self.patterns.type_success_rates.get(&type_key).copied().unwrap_or(0.5);
+        let current_rate = self
+            .patterns
+            .type_success_rates
+            .get(&type_key)
+            .copied()
+            .unwrap_or(0.5);
         let new_rate = if outcome == ImprovementOutcome::Success {
             current_rate * 0.9 + 0.1
         } else {

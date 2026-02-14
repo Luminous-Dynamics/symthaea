@@ -28,8 +28,12 @@ fn test_simd_histogram_entropy() {
 
     // Should be identical (same algorithm)
     let diff = (simd_h - serial_h).abs();
-    assert!(diff < 1e-10,
-        "SIMD entropy should match serial: {:.6} vs {:.6}", simd_h, serial_h);
+    assert!(
+        diff < 1e-10,
+        "SIMD entropy should match serial: {:.6} vs {:.6}",
+        simd_h,
+        serial_h
+    );
 
     println!("SIMD entropy: {:.6}", simd_h);
 }
@@ -47,7 +51,10 @@ fn test_simd_joint_histogram() {
     assert_eq!(joint[0].len(), 16);
 
     let total: usize = joint.iter().flat_map(|row| row.iter()).sum();
-    assert_eq!(total, HDC_DIMENSION, "Joint histogram should have all values");
+    assert_eq!(
+        total, HDC_DIMENSION,
+        "Joint histogram should have all values"
+    );
 
     println!("SIMD joint histogram: 16x16 computed");
 }
@@ -72,8 +79,12 @@ fn test_simd_mutual_information() {
     let est_mi = est.mutual_information_fast(&a, &b);
 
     let diff = (mi - est_mi).abs();
-    assert!(diff < 1e-6,
-        "SIMD MI should match estimator: {:.6} vs {:.6}", mi, est_mi);
+    assert!(
+        diff < 1e-6,
+        "SIMD MI should match estimator: {:.6} vs {:.6}",
+        mi,
+        est_mi
+    );
 
     println!("SIMD MI: {:.6}", mi);
 }

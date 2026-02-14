@@ -23,18 +23,40 @@ impl ComponentId {
     }
 
     // Well-known component identifiers used across the system
-    pub const fn _const(_s: &'static str) -> Self { Self(String::new()) } // placeholder for const context
+    pub const fn _const(_s: &'static str) -> Self {
+        Self(String::new())
+    } // placeholder for const context
 
-    pub fn PrimitiveEvolution() -> Self { Self("PrimitiveEvolution".into()) }
-    pub fn HRM() -> Self { Self("HRM".into()) }
-    pub fn MetaCognition() -> Self { Self("MetaCognition".into()) }
-    pub fn ByzantineCollective() -> Self { Self("ByzantineCollective".into()) }
-    pub fn MetaLearning() -> Self { Self("MetaLearning".into()) }
-    pub fn CausalDefense() -> Self { Self("CausalDefense".into()) }
-    pub fn UnifiedIntelligence() -> Self { Self("UnifiedIntelligence".into()) }
-    pub fn CollectiveSharing() -> Self { Self("CollectiveSharing".into()) }
-    pub fn Cache() -> Self { Self("Cache".into()) }
-    pub fn Integration() -> Self { Self("Integration".into()) }
+    pub fn PrimitiveEvolution() -> Self {
+        Self("PrimitiveEvolution".into())
+    }
+    pub fn HRM() -> Self {
+        Self("HRM".into())
+    }
+    pub fn MetaCognition() -> Self {
+        Self("MetaCognition".into())
+    }
+    pub fn ByzantineCollective() -> Self {
+        Self("ByzantineCollective".into())
+    }
+    pub fn MetaLearning() -> Self {
+        Self("MetaLearning".into())
+    }
+    pub fn CausalDefense() -> Self {
+        Self("CausalDefense".into())
+    }
+    pub fn UnifiedIntelligence() -> Self {
+        Self("UnifiedIntelligence".into())
+    }
+    pub fn CollectiveSharing() -> Self {
+        Self("CollectiveSharing".into())
+    }
+    pub fn Cache() -> Self {
+        Self("Cache".into())
+    }
+    pub fn Integration() -> Self {
+        Self("Integration".into())
+    }
 }
 
 impl From<&str> for ComponentId {
@@ -182,15 +204,25 @@ pub enum ImprovementType {
     /// Increase cache size
     IncreaseCacheSize { from: usize, to: usize },
     /// Parallelize (alias for Parallelization used in some modules)
-    Parallelize { component: ComponentId, threads: usize },
+    Parallelize {
+        component: ComponentId,
+        threads: usize,
+    },
     /// Increase evolution rate for adaptive systems
     IncreaseEvolutionRate,
     /// Add synthetic training data
     AddSyntheticData { count: usize },
     /// Optimize specific algorithm
-    OptimizeAlgorithm { component: ComponentId, optimization: String },
+    OptimizeAlgorithm {
+        component: ComponentId,
+        optimization: String,
+    },
     /// Tune a specific hyperparameter
-    TuneHyperparameter { name: String, old_value: f64, new_value: f64 },
+    TuneHyperparameter {
+        name: String,
+        old_value: f64,
+        new_value: f64,
+    },
 }
 
 /// Configuration for the performance monitor
@@ -392,19 +424,21 @@ impl PerformanceMonitor {
             // Check latency
             if let Some(avg_latency) = metrics.avg_latency() {
                 if avg_latency > self.config.latency_threshold_ms {
-                    let severity = ((avg_latency / self.config.latency_threshold_ms) - 1.0)
-                        .min(1.0) as f32;
+                    let severity =
+                        ((avg_latency / self.config.latency_threshold_ms) - 1.0).min(1.0) as f32;
                     new_bottlenecks.push(
                         Bottleneck::new(
                             id.clone(),
                             BottleneckType::Latency,
                             severity,
-                            format!("Average latency {:.2}ms exceeds threshold {:.2}ms",
-                                avg_latency, self.config.latency_threshold_ms)
+                            format!(
+                                "Average latency {:.2}ms exceeds threshold {:.2}ms",
+                                avg_latency, self.config.latency_threshold_ms
+                            ),
                         )
                         .with_evidence("avg_latency_ms", avg_latency)
                         .with_suggestion("Consider caching frequent operations")
-                        .with_suggestion("Review algorithm complexity")
+                        .with_suggestion("Review algorithm complexity"),
                     );
                 }
             }
@@ -419,12 +453,15 @@ impl PerformanceMonitor {
                             id.clone(),
                             BottleneckType::Accuracy,
                             severity,
-                            format!("Average accuracy {:.2}% below threshold {:.2}%",
-                                avg_accuracy * 100.0, self.config.accuracy_threshold * 100.0)
+                            format!(
+                                "Average accuracy {:.2}% below threshold {:.2}%",
+                                avg_accuracy * 100.0,
+                                self.config.accuracy_threshold * 100.0
+                            ),
                         )
                         .with_evidence("avg_accuracy", avg_accuracy as f64)
                         .with_suggestion("Review training data quality")
-                        .with_suggestion("Consider model architecture changes")
+                        .with_suggestion("Consider model architecture changes"),
                     );
                 }
             }
@@ -438,11 +475,14 @@ impl PerformanceMonitor {
                         id.clone(),
                         BottleneckType::Integration,
                         severity,
-                        format!("Error rate {:.2}% exceeds acceptable threshold", error_rate * 100.0)
+                        format!(
+                            "Error rate {:.2}% exceeds acceptable threshold",
+                            error_rate * 100.0
+                        ),
                     )
                     .with_evidence("error_rate", error_rate)
                     .with_suggestion("Add error handling and retry logic")
-                    .with_suggestion("Review component interface contracts")
+                    .with_suggestion("Review component interface contracts"),
                 );
             }
         }
@@ -507,12 +547,7 @@ mod tests {
 
     #[test]
     fn test_bottleneck_creation() {
-        let bottleneck = Bottleneck::new(
-            "test",
-            BottleneckType::Latency,
-            0.8,
-            "Test bottleneck"
-        );
+        let bottleneck = Bottleneck::new("test", BottleneckType::Latency, 0.8, "Test bottleneck");
         assert_eq!(bottleneck.severity, 0.8);
     }
 

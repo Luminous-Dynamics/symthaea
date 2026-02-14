@@ -36,11 +36,11 @@
 //! └─────────────────────────────────────────────────────────────────────┘
 //! ```
 
+use symthaea_core::hdc::cincinnati_ltc::{BuddingEvent, CincinnatiLtcEngine, PoGMetrics};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::cincinnati_ltc::{CincinnatiLtcEngine, PoGMetrics, BuddingEvent};
 use symthaea_core::hdc::HDC_DIMENSION;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// A conscious node representation for Cincinnati-Consciousness integration
 ///
@@ -77,7 +77,12 @@ impl CincinnatiConsciousNode {
     }
 
     /// Create from a hypervector, splitting into semantic and dynamic halves
-    pub fn from_hypervector(hv: &ContinuousHV, consciousness: f32, timestamp: f64, importance: f32) -> Self {
+    pub fn from_hypervector(
+        hv: &ContinuousHV,
+        consciousness: f32,
+        timestamp: f64,
+        importance: f32,
+    ) -> Self {
         let half = hv.dim() / 2;
         Self {
             semantic: hv.values[..half].to_vec(),
@@ -121,7 +126,7 @@ pub struct CincinnatiConsciousnessConfig {
 impl Default for CincinnatiConsciousnessConfig {
     fn default() -> Self {
         Self {
-            initial_nodes: 7,  // Seven Harmonies alignment
+            initial_nodes: 7, // Seven Harmonies alignment
             ethical_learning_rate: 0.05,
             consciousness_budding_threshold: 0.6,
             enable_ethical_learning: true,
@@ -264,11 +269,15 @@ impl CincinnatiConsciousnessBridge {
         consciousness_level: f32,
     ) -> ContinuousHV {
         // Higher consciousness = sharper distinctions (scale up high values, suppress low)
-        let values: Vec<f32> = output.values.iter().map(|&x| {
-            // Sigmoid sharpening based on consciousness level
-            let sharpness = 1.0 + consciousness_level * 2.0;
-            x.signum() * (x.abs() * sharpness).tanh()
-        }).collect();
+        let values: Vec<f32> = output
+            .values
+            .iter()
+            .map(|&x| {
+                // Sigmoid sharpening based on consciousness level
+                let sharpness = 1.0 + consciousness_level * 2.0;
+                x.signum() * (x.abs() * sharpness).tanh()
+            })
+            .collect();
 
         ContinuousHV::from_values(values)
     }
@@ -281,8 +290,8 @@ impl CincinnatiConsciousnessBridge {
         let reason = if consciousness_level < 0.3 {
             Some(BuddingReason::LowConsciousness)
         } else if ethical_alignment < 0.3 && self.ethical_history.len() > 10 {
-            let avg_ethical: f32 = self.ethical_history.iter().sum::<f32>()
-                / self.ethical_history.len() as f32;
+            let avg_ethical: f32 =
+                self.ethical_history.iter().sum::<f32>() / self.ethical_history.len() as f32;
             if avg_ethical < 0.4 {
                 Some(BuddingReason::EthicalTension)
             } else {
@@ -301,9 +310,8 @@ impl CincinnatiConsciousnessBridge {
 
             // Use engine's budding system
             if let Some(budding_event) = self.engine.budding.create_budding_event(
-                0,  // Primary node
-                timestamp,
-                &state,
+                0, // Primary node
+                timestamp, &state,
             ) {
                 let event = ConsciousnessBuddingEvent {
                     budding_event,
@@ -366,9 +374,11 @@ impl CincinnatiConsciousnessBridge {
 
         let ethical_variance = if self.ethical_history.len() > 1 {
             let mean = avg_ethical;
-            self.ethical_history.iter()
+            self.ethical_history
+                .iter()
                 .map(|x| (x - mean).powi(2))
-                .sum::<f32>() / self.ethical_history.len() as f32
+                .sum::<f32>()
+                / self.ethical_history.len() as f32
         } else {
             0.0
         };
@@ -522,12 +532,16 @@ impl HarmonyFeedback {
             ("Pan-Sentient Flourishing", self.pan_sentient_flourishing),
             ("Integral Wisdom", self.integral_wisdom),
             ("Infinite Play", self.infinite_play),
-            ("Universal Interconnectedness", self.universal_interconnectedness),
+            (
+                "Universal Interconnectedness",
+                self.universal_interconnectedness,
+            ),
             ("Sacred Reciprocity", self.sacred_reciprocity),
             ("Evolutionary Progression", self.evolutionary_progression),
         ];
 
-        harmonies.iter()
+        harmonies
+            .iter()
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|&(name, score)| (name, score))
             .unwrap_or(("Unknown", 0.0))
@@ -560,7 +574,7 @@ mod tests {
         let config = CincinnatiConsciousnessConfig::default();
         let bridge = CincinnatiConsciousnessBridge::new(config);
 
-        assert_eq!(bridge.node_count(), 7);  // Seven Harmonies alignment
+        assert_eq!(bridge.node_count(), 7); // Seven Harmonies alignment
         assert_eq!(bridge.timestep, 0);
     }
 
@@ -572,7 +586,7 @@ mod tests {
         let input = ContinuousHV::random_default(42);
 
         for i in 0..20 {
-            let ethical = 0.3 + 0.4 * (i as f32 / 20.0);  // Improving
+            let ethical = 0.3 + 0.4 * (i as f32 / 20.0); // Improving
             let consciousness = 0.5 + 0.2 * (i as f32 / 20.0).sin();
 
             let result = bridge.process(&input, ethical, consciousness);
@@ -607,7 +621,7 @@ mod tests {
     fn test_harmony_tension() {
         let feedback = HarmonyFeedback {
             resonant_coherence: 0.8,
-            pan_sentient_flourishing: -0.3,  // Tension!
+            pan_sentient_flourishing: -0.3, // Tension!
             integral_wisdom: 0.6,
             infinite_play: 0.9,
             universal_interconnectedness: 0.5,
@@ -640,7 +654,7 @@ mod tests {
         let high_var: f32 = high_mod.values.iter().map(|x| x.abs()).sum::<f32>() / 1024.0;
 
         // High consciousness should have larger absolute values on average
-        assert!(high_var >= low_var * 0.9);  // Allow some tolerance
+        assert!(high_var >= low_var * 0.9); // Allow some tolerance
     }
 
     #[test]

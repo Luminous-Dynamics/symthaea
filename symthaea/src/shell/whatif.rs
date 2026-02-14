@@ -110,11 +110,29 @@ impl WhatIfSimulator {
 
     fn common_services() -> HashSet<String> {
         [
-            "nginx", "postgresql", "mysql", "redis", "docker",
-            "sshd", "openssh", "firewall", "fail2ban", "wireguard",
-            "xserver", "pipewire", "pulseaudio", "networkmanager",
-            "bluetooth", "printing", "cups", "avahi", "tailscale",
-        ].iter().map(|s| s.to_string()).collect()
+            "nginx",
+            "postgresql",
+            "mysql",
+            "redis",
+            "docker",
+            "sshd",
+            "openssh",
+            "firewall",
+            "fail2ban",
+            "wireguard",
+            "xserver",
+            "pipewire",
+            "pulseaudio",
+            "networkmanager",
+            "bluetooth",
+            "printing",
+            "cups",
+            "avahi",
+            "tailscale",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
     }
 
     /// Simulate a command and return what would happen
@@ -135,7 +153,8 @@ impl WhatIfSimulator {
     }
 
     fn simulate_install(&self, command: &str, args: &[&str]) -> WhatIfResult {
-        let packages: Vec<String> = args.iter()
+        let packages: Vec<String> = args
+            .iter()
             .filter(|a| !a.starts_with('-'))
             .map(|s| s.to_string())
             .collect();
@@ -155,7 +174,10 @@ impl WhatIfSimulator {
             packages_added: packages.clone(),
             estimated_time: Some(self.estimate_install_time(packages.len())),
             warnings,
-            dry_run_command: Some(format!("nix-env -iA nixpkgs.{} --dry-run", packages.join(" nixpkgs."))),
+            dry_run_command: Some(format!(
+                "nix-env -iA nixpkgs.{} --dry-run",
+                packages.join(" nixpkgs.")
+            )),
             confidence: 0.9,
             reversible: true,
             rollback_command: Some(format!("nix-env -e {}", packages.join(" "))),
@@ -165,7 +187,8 @@ impl WhatIfSimulator {
     }
 
     fn simulate_remove(&self, command: &str, args: &[&str]) -> WhatIfResult {
-        let packages: Vec<String> = args.iter()
+        let packages: Vec<String> = args
+            .iter()
             .filter(|a| !a.starts_with('-'))
             .map(|s| s.to_string())
             .collect();
@@ -196,14 +219,18 @@ impl WhatIfSimulator {
             dry_run_command: Some(format!("nix-env -e {} --dry-run", packages.join(" "))),
             confidence: 0.85,
             reversible: true,
-            rollback_command: Some(format!("nix-env -iA nixpkgs.{}", packages.join(" nixpkgs."))),
+            rollback_command: Some(format!(
+                "nix-env -iA nixpkgs.{}",
+                packages.join(" nixpkgs.")
+            )),
             files_modified: vec!["/etc/nixos/configuration.nix".to_string()],
             ..Default::default()
         }
     }
 
     fn simulate_enable(&self, command: &str, args: &[&str]) -> WhatIfResult {
-        let services: Vec<String> = args.iter()
+        let services: Vec<String> = args
+            .iter()
             .filter(|a| !a.starts_with('-'))
             .map(|s| s.to_string())
             .collect();
@@ -233,7 +260,8 @@ impl WhatIfSimulator {
     }
 
     fn simulate_disable(&self, command: &str, args: &[&str]) -> WhatIfResult {
-        let services: Vec<String> = args.iter()
+        let services: Vec<String> = args
+            .iter()
             .filter(|a| !a.starts_with('-'))
             .map(|s| s.to_string())
             .collect();
@@ -244,7 +272,10 @@ impl WhatIfSimulator {
         let critical = ["sshd", "networking", "systemd", "nix-daemon"];
         for svc in &services {
             if critical.iter().any(|c| svc.contains(c)) {
-                warnings.push(format!("WARNING: Disabling {} may affect system accessibility!", svc));
+                warnings.push(format!(
+                    "WARNING: Disabling {} may affect system accessibility!",
+                    svc
+                ));
             }
         }
 
@@ -267,9 +298,21 @@ impl WhatIfSimulator {
         let action = args.first().copied().unwrap_or("switch");
 
         let (summary, reboot_required, time_estimate) = match action {
-            "switch" => ("Rebuild and switch to new configuration", false, "~2-10 min"),
-            "boot" => ("Rebuild and set as boot default (needs reboot)", true, "~2-10 min"),
-            "test" => ("Rebuild and activate temporarily (no boot entry)", false, "~2-10 min"),
+            "switch" => (
+                "Rebuild and switch to new configuration",
+                false,
+                "~2-10 min",
+            ),
+            "boot" => (
+                "Rebuild and set as boot default (needs reboot)",
+                true,
+                "~2-10 min",
+            ),
+            "test" => (
+                "Rebuild and activate temporarily (no boot entry)",
+                false,
+                "~2-10 min",
+            ),
             "dry-run" | "dry-activate" => ("Simulate rebuild (no changes)", false, "~30 sec"),
             _ => ("Rebuild configuration", false, "~2-10 min"),
         };
@@ -277,11 +320,16 @@ impl WhatIfSimulator {
         let mut warnings = Vec::new();
 
         if action == "switch" {
-            warnings.push("Running services will be restarted if their configuration changed".to_string());
+            warnings.push(
+                "Running services will be restarted if their configuration changed".to_string(),
+            );
         }
 
         if args.contains(&"--upgrade") {
-            warnings.push("Channels will be updated first, which may bring in new package versions".to_string());
+            warnings.push(
+                "Channels will be updated first, which may bring in new package versions"
+                    .to_string(),
+            );
         }
 
         WhatIfResult {
@@ -308,7 +356,9 @@ impl WhatIfSimulator {
         let mut warnings = Vec::new();
 
         if delete_old {
-            warnings.push("This will delete ALL old generations - you won't be able to rollback!".to_string());
+            warnings.push(
+                "This will delete ALL old generations - you won't be able to rollback!".to_string(),
+            );
             warnings.push("Consider using --delete-older-than 30d instead".to_string());
         }
 
@@ -404,23 +454,38 @@ impl WhatIfSimulator {
 
         // Packages
         if !result.packages_added.is_empty() {
-            lines.push(format!("+ Packages to add: {}", result.packages_added.join(", ")));
+            lines.push(format!(
+                "+ Packages to add: {}",
+                result.packages_added.join(", ")
+            ));
         }
         if !result.packages_removed.is_empty() {
-            lines.push(format!("- Packages to remove: {}", result.packages_removed.join(", ")));
+            lines.push(format!(
+                "- Packages to remove: {}",
+                result.packages_removed.join(", ")
+            ));
         }
 
         // Services
         if !result.services_enabled.is_empty() {
-            lines.push(format!("▶ Services to enable: {}", result.services_enabled.join(", ")));
+            lines.push(format!(
+                "▶ Services to enable: {}",
+                result.services_enabled.join(", ")
+            ));
         }
         if !result.services_disabled.is_empty() {
-            lines.push(format!("■ Services to disable: {}", result.services_disabled.join(", ")));
+            lines.push(format!(
+                "■ Services to disable: {}",
+                result.services_disabled.join(", ")
+            ));
         }
 
         // Files
         if !result.files_modified.is_empty() {
-            lines.push(format!("📄 Files affected: {}", result.files_modified.join(", ")));
+            lines.push(format!(
+                "📄 Files affected: {}",
+                result.files_modified.join(", ")
+            ));
         }
 
         // Time estimate

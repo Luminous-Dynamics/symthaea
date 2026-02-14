@@ -281,7 +281,8 @@ impl AssessmentTracker {
         successful: bool,
     ) {
         // Get or create progress record
-        let progress = self.objective_progress
+        let progress = self
+            .objective_progress
             .entry(objective_id.to_string())
             .or_insert_with(|| ObjectiveProgress::new(objective_id));
 
@@ -312,12 +313,9 @@ impl AssessmentTracker {
         let phi_factor = (progress.total_phi_gained * 10.0).min(1.0);
         let session_factor = (progress.session_count as f32 / 10.0).min(1.0);
 
-        progress.mastery_score = (
-            success_factor * 0.3 +
-            error_factor * 0.3 +
-            phi_factor * 0.2 +
-            session_factor * 0.2
-        ).clamp(0.0, 1.0);
+        progress.mastery_score =
+            (success_factor * 0.3 + error_factor * 0.3 + phi_factor * 0.2 + session_factor * 0.2)
+                .clamp(0.0, 1.0);
 
         // Check for completion
         if progress.mastery_score >= self.completion_threshold {
@@ -337,7 +335,8 @@ impl AssessmentTracker {
         total_objectives: usize,
     ) {
         // Get or create curriculum progress
-        let curriculum = self.curriculum_progress
+        let curriculum = self
+            .curriculum_progress
             .entry(curriculum_id.to_string())
             .or_insert_with(|| CurriculumProgress::new(curriculum_id));
 
@@ -347,9 +346,16 @@ impl AssessmentTracker {
         }
 
         // Remove from in-progress, add to completed
-        curriculum.in_progress_objectives.retain(|id| id != objective_id);
-        if !curriculum.completed_objectives.contains(&objective_id.to_string()) {
-            curriculum.completed_objectives.push(objective_id.to_string());
+        curriculum
+            .in_progress_objectives
+            .retain(|id| id != objective_id);
+        if !curriculum
+            .completed_objectives
+            .contains(&objective_id.to_string())
+        {
+            curriculum
+                .completed_objectives
+                .push(objective_id.to_string());
         }
 
         // Update completion percentage
@@ -364,12 +370,18 @@ impl AssessmentTracker {
 
     /// Mark an objective as in-progress
     pub fn mark_in_progress(&mut self, curriculum_id: &str, objective_id: &str) {
-        let curriculum = self.curriculum_progress
+        let curriculum = self
+            .curriculum_progress
             .entry(curriculum_id.to_string())
             .or_insert_with(|| CurriculumProgress::new(curriculum_id));
 
-        if !curriculum.in_progress_objectives.contains(&objective_id.to_string()) {
-            curriculum.in_progress_objectives.push(objective_id.to_string());
+        if !curriculum
+            .in_progress_objectives
+            .contains(&objective_id.to_string())
+        {
+            curriculum
+                .in_progress_objectives
+                .push(objective_id.to_string());
         }
 
         if curriculum.started_at.is_none() {
@@ -427,30 +439,35 @@ impl AssessmentTracker {
 
     /// Get objectives that need review (mastery decaying)
     pub fn get_review_needed(&self, threshold: f32) -> Vec<&ObjectiveProgress> {
-        self.objective_progress.values()
-            .filter(|p| {
-                p.completed && p.mastery_score < self.completion_threshold - threshold
-            })
+        self.objective_progress
+            .values()
+            .filter(|p| p.completed && p.mastery_score < self.completion_threshold - threshold)
             .collect()
     }
 
     /// Get overall statistics
     pub fn stats(&self) -> AssessmentStats {
         let total_objectives = self.objective_progress.len();
-        let completed_objectives = self.objective_progress.values()
+        let completed_objectives = self
+            .objective_progress
+            .values()
             .filter(|p| p.completed)
             .count();
 
         let avg_mastery = if total_objectives > 0 {
-            self.objective_progress.values()
+            self.objective_progress
+                .values()
                 .map(|p| p.mastery_score)
-                .sum::<f32>() / total_objectives as f32
+                .sum::<f32>()
+                / total_objectives as f32
         } else {
             0.0
         };
 
         let total_curricula = self.curriculum_progress.len();
-        let completed_curricula = self.curriculum_progress.values()
+        let completed_curricula = self
+            .curriculum_progress
+            .values()
             .filter(|p| p.is_complete())
             .count();
 
@@ -492,19 +509,25 @@ impl AssessmentTracker {
     }
 
     /// Record a learning event (simplified interface for School)
-    pub fn record_learning(&mut self, objective_id: &str, phi_gained: f32, was_hallucination: bool) {
+    pub fn record_learning(
+        &mut self,
+        objective_id: &str,
+        phi_gained: f32,
+        was_hallucination: bool,
+    ) {
         self.record_session(
             objective_id,
             phi_gained,
-            if was_hallucination { 0.1 } else { 0.01 },  // Error based on hallucination
-            std::time::Duration::from_secs(60),  // Default 1 minute session
-            !was_hallucination,  // Success if not hallucination
+            if was_hallucination { 0.1 } else { 0.01 }, // Error based on hallucination
+            std::time::Duration::from_secs(60),         // Default 1 minute session
+            !was_hallucination,                         // Success if not hallucination
         );
     }
 
     /// Get count of mastered objectives
     pub fn mastered_count(&self) -> usize {
-        self.objective_progress.values()
+        self.objective_progress
+            .values()
             .filter(|p| p.completed)
             .count()
     }
@@ -520,7 +543,7 @@ impl AssessmentTracker {
 
 impl Default for AssessmentTracker {
     fn default() -> Self {
-        Self::new(0.1, 0.7)  // Decay 10% per day, complete at 70% mastery
+        Self::new(0.1, 0.7) // Decay 10% per day, complete at 70% mastery
     }
 }
 
@@ -570,8 +593,12 @@ pub struct MasteryDistribution {
 impl MasteryDistribution {
     /// Get total count
     pub fn total(&self) -> usize {
-        self.untouched + self.novice + self.beginner +
-        self.intermediate + self.proficient + self.expert
+        self.untouched
+            + self.novice
+            + self.beginner
+            + self.intermediate
+            + self.proficient
+            + self.expert
     }
 
     /// Get percentage at each level
@@ -633,10 +660,10 @@ mod tests {
 
         tracker.record_session(
             "test-obj",
-            0.01,   // phi gained
-            0.001,  // error
-            Duration::from_secs(60),  // duration
-            true,   // successful
+            0.01,                    // phi gained
+            0.001,                   // error
+            Duration::from_secs(60), // duration
+            true,                    // successful
         );
 
         let progress = tracker.get_objective_progress("test-obj").unwrap();
@@ -651,13 +678,7 @@ mod tests {
 
         // Many successful sessions should lead to high mastery
         for _ in 0..15 {
-            tracker.record_session(
-                "test-obj",
-                0.01,
-                0.001,
-                Duration::from_secs(60),
-                true,
-            );
+            tracker.record_session("test-obj", 0.01, 0.001, Duration::from_secs(60), true);
         }
 
         let progress = tracker.get_objective_progress("test-obj").unwrap();
@@ -718,7 +739,7 @@ mod tests {
 
         // Force decay by directly modifying (simulating time passage)
         if let Some(progress) = tracker.objective_progress.get_mut("decaying") {
-            progress.mastery_score = 0.55;  // Decayed below threshold
+            progress.mastery_score = 0.55; // Decayed below threshold
         }
 
         let needs_review = tracker.get_review_needed(0.0);

@@ -4,11 +4,11 @@
 //! This is not a security boundary; real command execution is opt-in.
 
 use std::collections::HashMap;
+use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::fs;
 use std::time::{Duration, Instant};
-use std::io::Read;
 use wait_timeout::ChildExt;
 
 /// Sandbox for isolated command execution
@@ -97,8 +97,7 @@ impl Sandbox {
         }
 
         // Create sandbox directory structure
-        fs::create_dir_all(&self.root)
-            .map_err(|e| SandboxError::InitFailed(e.to_string()))?;
+        fs::create_dir_all(&self.root).map_err(|e| SandboxError::InitFailed(e.to_string()))?;
 
         fs::create_dir_all(self.root.join("etc"))
             .map_err(|e| SandboxError::InitFailed(e.to_string()))?;
@@ -111,8 +110,7 @@ impl Sandbox {
 
         // Create minimal /etc/nixos for dry-run
         let nixos_dir = self.root.join("etc/nixos");
-        fs::create_dir_all(&nixos_dir)
-            .map_err(|e| SandboxError::InitFailed(e.to_string()))?;
+        fs::create_dir_all(&nixos_dir).map_err(|e| SandboxError::InitFailed(e.to_string()))?;
 
         self.initialized = true;
         Ok(())
@@ -181,7 +179,11 @@ impl Sandbox {
 
         self.run_command_with_timeout(
             "nixos-rebuild",
-            &["dry-build", "-I", &format!("nixos-config={}", sandbox_config.display())],
+            &[
+                "dry-build",
+                "-I",
+                &format!("nixos-config={}", sandbox_config.display()),
+            ],
             start,
         )
     }
@@ -235,12 +237,17 @@ impl Sandbox {
             .spawn()
             .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
 
-        let mut stdout = child.stdout.take()
+        let mut stdout = child
+            .stdout
+            .take()
             .ok_or_else(|| SandboxError::ExecutionFailed("Missing stdout pipe".to_string()))?;
-        let mut stderr = child.stderr.take()
+        let mut stderr = child
+            .stderr
+            .take()
             .ok_or_else(|| SandboxError::ExecutionFailed("Missing stderr pipe".to_string()))?;
 
-        let status = match child.wait_timeout(self.timeout)
+        let status = match child
+            .wait_timeout(self.timeout)
             .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?
         {
             Some(status) => status,
@@ -253,9 +260,11 @@ impl Sandbox {
 
         let mut stdout_buf = Vec::new();
         let mut stderr_buf = Vec::new();
-        stdout.read_to_end(&mut stdout_buf)
+        stdout
+            .read_to_end(&mut stdout_buf)
             .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
-        stderr.read_to_end(&mut stderr_buf)
+        stderr
+            .read_to_end(&mut stderr_buf)
             .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
 
         Ok(SandboxResult {
@@ -300,9 +309,9 @@ impl Sandbox {
             .map(|s| s.to_string_lossy())
             .unwrap_or_default();
 
-        self.allowed_commands.iter().any(|c| {
-            c == command || c == base.as_ref()
-        })
+        self.allowed_commands
+            .iter()
+            .any(|c| c == command || c == base.as_ref())
     }
 
     fn simulate_command(&self, command: &str, args: &[&str]) -> SandboxResult {
@@ -310,14 +319,25 @@ impl Sandbox {
 
         // Simulate common commands
         let (exit_code, stdout, stderr) = match command {
-            "nix" | "nix-build" | "nix-shell" | "nix-env" => {
-                (0, format!("[Simulated] {} would execute successfully", full_cmd), String::new())
-            }
+            "nix" | "nix-build" | "nix-shell" | "nix-env" => (
+                0,
+                format!("[Simulated] {} would execute successfully", full_cmd),
+                String::new(),
+            ),
             "nixos-rebuild" => {
                 if args.contains(&"dry-build") || args.contains(&"dry-run") {
-                    (0, "[Simulated] Dry run successful\n  - Configuration valid\n  - No errors".to_string(), String::new())
+                    (
+                        0,
+                        "[Simulated] Dry run successful\n  - Configuration valid\n  - No errors"
+                            .to_string(),
+                        String::new(),
+                    )
                 } else {
-                    (0, "[Simulated] Build would succeed".to_string(), String::new())
+                    (
+                        0,
+                        "[Simulated] Build would succeed".to_string(),
+                        String::new(),
+                    )
                 }
             }
             "nix-instantiate" => {
@@ -329,9 +349,11 @@ impl Sandbox {
                     (0, format!("[Simulated] {}", full_cmd), String::new())
                 }
             }
-            _ => {
-                (0, format!("[Simulated] {} completed", full_cmd), String::new())
-            }
+            _ => (
+                0,
+                format!("[Simulated] {} completed", full_cmd),
+                String::new(),
+            ),
         };
 
         SandboxResult {
@@ -705,7 +727,11 @@ mod tests {
         for (i, a) in messages.iter().enumerate() {
             for (j, b) in messages.iter().enumerate() {
                 if i != j {
-                    assert_ne!(a, b, "Error messages for variants {} and {} should differ", i, j);
+                    assert_ne!(
+                        a, b,
+                        "Error messages for variants {} and {} should differ",
+                        i, j
+                    );
                 }
             }
         }
@@ -740,9 +766,16 @@ mod tests {
 
         for err in &variants {
             let msg = format!("{}", err);
-            assert!(!msg.is_empty(), "Display should be non-empty even with empty inner string");
+            assert!(
+                !msg.is_empty(),
+                "Display should be non-empty even with empty inner string"
+            );
             // The prefix part of the message should still be present
-            assert!(msg.len() > 5, "Display should contain a meaningful prefix: got '{}'", msg);
+            assert!(
+                msg.len() > 5,
+                "Display should contain a meaningful prefix: got '{}'",
+                msg
+            );
         }
     }
 }

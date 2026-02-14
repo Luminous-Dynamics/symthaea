@@ -1,5 +1,5 @@
-use crate::hdc::binary_hv::BinaryHV;
 use super::{PrimitiveSystem, PrimitiveTier};
+use crate::hdc::binary_hv::BinaryHV;
 
 /// Graph visualization of primitive relationships.
 ///
@@ -66,11 +66,7 @@ impl PrimitiveGraph {
     }
 
     /// Create a graph from all primitives in a domain.
-    pub fn from_domain(
-        system: &PrimitiveSystem,
-        domain: &str,
-        similarity_threshold: f32,
-    ) -> Self {
+    pub fn from_domain(system: &PrimitiveSystem, domain: &str, similarity_threshold: f32) -> Self {
         let all_names = system.all_primitive_names();
         let mut nodes = Vec::new();
         let mut encodings = Vec::new();
@@ -202,7 +198,10 @@ impl PrimitiveGraph {
 
         out.push_str(&format!("=== {} ===\n\n", self.title));
         out.push_str(&format!("Nodes: {}\n", self.nodes.len()));
-        out.push_str(&format!("Edges: {} (above threshold)\n\n", self.edges.len()));
+        out.push_str(&format!(
+            "Edges: {} (above threshold)\n\n",
+            self.edges.len()
+        ));
 
         out.push_str("Nodes:\n");
         for (name, tier, is_base) in &self.nodes {
@@ -219,7 +218,10 @@ impl PrimitiveGraph {
             let to_name = &self.nodes[*to].0;
             let bar_len = ((sim - 0.5) * 40.0) as usize;
             let bar: String = "\u{2588}".repeat(bar_len.min(20));
-            out.push_str(&format!("  {} \u{2194} {} : {:.3} {}\n", from_name, to_name, sim, bar));
+            out.push_str(&format!(
+                "  {} \u{2194} {} : {:.3} {}\n",
+                from_name, to_name, sim, bar
+            ));
         }
 
         if self.edges.len() > 20 {
@@ -255,13 +257,13 @@ impl PrimitiveGraph {
 
 pub(crate) fn tier_color(tier: PrimitiveTier) -> &'static str {
     match tier {
-        PrimitiveTier::NSM => "#E8F5E9",          // Light green
-        PrimitiveTier::Mathematical => "#E3F2FD", // Light blue
-        PrimitiveTier::Physical => "#FFF3E0",     // Light orange
-        PrimitiveTier::Geometric => "#F3E5F5",    // Light purple
-        PrimitiveTier::Strategic => "#FFEBEE",    // Light red
+        PrimitiveTier::NSM => "#E8F5E9",           // Light green
+        PrimitiveTier::Mathematical => "#E3F2FD",  // Light blue
+        PrimitiveTier::Physical => "#FFF3E0",      // Light orange
+        PrimitiveTier::Geometric => "#F3E5F5",     // Light purple
+        PrimitiveTier::Strategic => "#FFEBEE",     // Light red
         PrimitiveTier::MetaCognitive => "#E0F7FA", // Light cyan
-        PrimitiveTier::Temporal => "#FFF8E1",     // Light amber
+        PrimitiveTier::Temporal => "#FFF8E1",      // Light amber
         PrimitiveTier::Compositional => "#F1F8E9", // Light lime
         PrimitiveTier::Consciousness => "#FCE4EC", // Light pink
         PrimitiveTier::Code => "#E3F2FD",          // Light blue

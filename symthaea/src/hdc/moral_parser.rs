@@ -24,11 +24,11 @@
 //! // parsed.patient == "daughter's health"
 //! ```
 
-use std::collections::HashSet;
 use super::moral_algebra::{
-    ConsentState, Magnitude, MoralAlgebra, MoralIntent, MoralVerdict,
-    ProportionalityJudgment, ExcuseJudgment, MoralJudgment,
+    ConsentState, ExcuseJudgment, Magnitude, MoralAlgebra, MoralIntent, MoralJudgment,
+    MoralVerdict, ProportionalityJudgment,
 };
+use std::collections::HashSet;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Parsed moral structure from text
@@ -155,189 +155,601 @@ impl MoralParser {
     pub fn new() -> Self {
         Self {
             good_intent_words: [
-                "help", "helped", "helping", "helps",
-                "save", "saved", "saving", "saves",
-                "protect", "protected", "protecting",
-                "care", "cared", "caring", "cares",
-                "support", "supported", "supporting",
-                "assist", "assisted", "assisting",
-                "kind", "kindly", "generous", "generously",
-                "compassion", "compassionate", "empathy",
-                "love", "loved", "loving",
+                "help",
+                "helped",
+                "helping",
+                "helps",
+                "save",
+                "saved",
+                "saving",
+                "saves",
+                "protect",
+                "protected",
+                "protecting",
+                "care",
+                "cared",
+                "caring",
+                "cares",
+                "support",
+                "supported",
+                "supporting",
+                "assist",
+                "assisted",
+                "assisting",
+                "kind",
+                "kindly",
+                "generous",
+                "generously",
+                "compassion",
+                "compassionate",
+                "empathy",
+                "love",
+                "loved",
+                "loving",
                 // Gratitude & encouragement
-                "thank", "thanked", "thanking",
-                "comfort", "comforted", "comforting",
-                "encourage", "encouraged", "encouraging",
-                "praise", "praised", "praising",
-                "forgive", "forgave", "forgiving",
+                "thank",
+                "thanked",
+                "thanking",
+                "comfort",
+                "comforted",
+                "comforting",
+                "encourage",
+                "encouraged",
+                "encouraging",
+                "praise",
+                "praised",
+                "praising",
+                "forgive",
+                "forgave",
+                "forgiving",
                 // Prosocial actions
-                "donate", "donated", "donating",
-                "volunteer", "volunteered", "volunteering",
-                "teach", "taught", "teaching",
-                "nurture", "nurtured", "nurturing",
-                "welcome", "welcomed", "welcoming",
-                "appreciate", "appreciated",
+                "donate",
+                "donated",
+                "donating",
+                "volunteer",
+                "volunteered",
+                "volunteering",
+                "teach",
+                "taught",
+                "teaching",
+                "nurture",
+                "nurtured",
+                "nurturing",
+                "welcome",
+                "welcomed",
+                "welcoming",
+                "appreciate",
+                "appreciated",
                 // Character traits
-                "gentle", "gently", "considerate", "thoughtful",
-                "selfless", "selflessly", "grateful", "gracious",
-                "polite", "politely", "respectful", "charitable",
-                "honest", "honestly", "fair", "fairly",
-            ].iter().map(|s| s.to_string()).collect(),
+                "gentle",
+                "gently",
+                "considerate",
+                "thoughtful",
+                "selfless",
+                "selflessly",
+                "grateful",
+                "gracious",
+                "polite",
+                "politely",
+                "respectful",
+                "charitable",
+                "honest",
+                "honestly",
+                "fair",
+                "fairly",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
 
             bad_intent_words: [
-                "harm", "harmed", "harming", "harms",
-                "hurt", "hurting", "hurts",
-                "steal", "stole", "stealing", "steals",
-                "lie", "lied", "lying", "lies",
-                "cheat", "cheated", "cheating", "cheats",
-                "deceive", "deceived", "deceiving",
-                "betray", "betrayed", "betraying",
-                "abuse", "abused", "abusing",
-                "cruel", "cruelly", "malicious",
-                "selfish", "selfishly",
+                "harm",
+                "harmed",
+                "harming",
+                "harms",
+                "hurt",
+                "hurting",
+                "hurts",
+                "steal",
+                "stole",
+                "stealing",
+                "steals",
+                "lie",
+                "lied",
+                "lying",
+                "lies",
+                "cheat",
+                "cheated",
+                "cheating",
+                "cheats",
+                "deceive",
+                "deceived",
+                "deceiving",
+                "betray",
+                "betrayed",
+                "betraying",
+                "abuse",
+                "abused",
+                "abusing",
+                "cruel",
+                "cruelly",
+                "malicious",
+                "selfish",
+                "selfishly",
                 // Violence
-                "hate", "hated", "hating",
-                "kill", "killed", "killing",
-                "punch", "punched", "punching",
-                "kick", "kicked", "kicking",
-                "slap", "slapped", "slapping",
-                "shove", "shoved", "shoving",
-                "strangle", "strangled",
-                "stab", "stabbed",
-                "murder", "murdered",
-                "torture", "tortured",
-                "toss", "tossed", "tossing",
+                "hate",
+                "hated",
+                "hating",
+                "kill",
+                "killed",
+                "killing",
+                "punch",
+                "punched",
+                "punching",
+                "kick",
+                "kicked",
+                "kicking",
+                "slap",
+                "slapped",
+                "slapping",
+                "shove",
+                "shoved",
+                "shoving",
+                "strangle",
+                "strangled",
+                "stab",
+                "stabbed",
+                "murder",
+                "murdered",
+                "torture",
+                "tortured",
+                "toss",
+                "tossed",
+                "tossing",
                 // Verbal/social aggression
-                "threaten", "threatened", "threatening",
-                "bully", "bullied", "bullying",
-                "humiliate", "humiliated", "humiliating",
-                "insult", "insulted", "insulting",
-                "mock", "mocked", "mocking",
-                "yell", "yelled", "yelling",
-                "scream", "screamed", "screaming",
+                "threaten",
+                "threatened",
+                "threatening",
+                "bully",
+                "bullied",
+                "bullying",
+                "humiliate",
+                "humiliated",
+                "humiliating",
+                "insult",
+                "insulted",
+                "insulting",
+                "mock",
+                "mocked",
+                "mocking",
+                "yell",
+                "yelled",
+                "yelling",
+                "scream",
+                "screamed",
+                "screaming",
                 // Neglect & destruction
-                "neglect", "neglected", "neglecting",
-                "destroy", "destroyed", "destroying",
-                "vandalize", "vandalized",
-                "sabotage", "sabotaged",
+                "neglect",
+                "neglected",
+                "neglecting",
+                "destroy",
+                "destroyed",
+                "destroying",
+                "vandalize",
+                "vandalized",
+                "sabotage",
+                "sabotaged",
                 // Character traits
-                "violent", "violently", "hostile",
-                "rude", "rudely", "nasty", "spiteful",
-                "vicious", "vindictive", "greedy",
-                "manipulate", "manipulated", "exploit", "exploited",
-            ].iter().map(|s| s.to_string()).collect(),
+                "violent",
+                "violently",
+                "hostile",
+                "rude",
+                "rudely",
+                "nasty",
+                "spiteful",
+                "vicious",
+                "vindictive",
+                "greedy",
+                "manipulate",
+                "manipulated",
+                "exploit",
+                "exploited",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
 
             consent_given_words: [
-                "asked", "asking", "permission", "permitted",
-                "consent", "consented", "agreed", "agreeing",
-                "allowed", "allowing", "approved", "approving",
-                "with permission", "after asking",
-            ].iter().map(|s| s.to_string()).collect(),
+                "asked",
+                "asking",
+                "permission",
+                "permitted",
+                "consent",
+                "consented",
+                "agreed",
+                "agreeing",
+                "allowed",
+                "allowing",
+                "approved",
+                "approving",
+                "with permission",
+                "after asking",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
 
             consent_absent_words: [
-                "without asking", "without permission", "without consent",
-                "didn't ask", "did not ask", "never asked",
-                "secretly", "behind", "without telling",
-                "without informing", "without notifying",
-            ].iter().map(|s| s.to_string()).collect(),
+                "without asking",
+                "without permission",
+                "without consent",
+                "didn't ask",
+                "did not ask",
+                "never asked",
+                "secretly",
+                "behind",
+                "without telling",
+                "without informing",
+                "without notifying",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
 
             negation_words: [
-                "not", "no", "never", "don't", "doesn't", "didn't",
-                "won't", "wouldn't", "couldn't", "shouldn't",
-                "without", "none", "nothing", "nobody",
-                "neither", "nor", "refuse", "refused",
-            ].iter().map(|s| s.to_string()).collect(),
+                "not",
+                "no",
+                "never",
+                "don't",
+                "doesn't",
+                "didn't",
+                "won't",
+                "wouldn't",
+                "couldn't",
+                "shouldn't",
+                "without",
+                "none",
+                "nothing",
+                "nobody",
+                "neither",
+                "nor",
+                "refuse",
+                "refused",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
 
             small_magnitude_words: [
-                "small", "little", "minor", "tiny", "slight",
-                "once", "briefly", "quickly", "simple",
-                "easy", "basic", "minimal",
-            ].iter().map(|s| s.to_string()).collect(),
+                "small", "little", "minor", "tiny", "slight", "once", "briefly", "quickly",
+                "simple", "easy", "basic", "minimal",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
 
             large_magnitude_words: [
-                "large", "big", "major", "huge", "significant",
-                "always", "daily", "constantly", "extensive",
-                "substantial", "considerable", "great",
-                "brand new", "expensive", "valuable",
-            ].iter().map(|s| s.to_string()).collect(),
+                "large",
+                "big",
+                "major",
+                "huge",
+                "significant",
+                "always",
+                "daily",
+                "constantly",
+                "extensive",
+                "substantial",
+                "considerable",
+                "great",
+                "brand new",
+                "expensive",
+                "valuable",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
 
             action_verbs: [
                 // Communication verbs
-                "discuss", "discussed", "discussing",
-                "tell", "told", "telling", "tells",
-                "share", "shared", "sharing", "shares",
-                "say", "said", "saying", "says",
-                "talk", "talked", "talking", "talks",
-                "speak", "spoke", "speaking", "speaks",
-                "ask", "asked", "asking", "asks",
-                "answer", "answered", "answering",
+                "discuss",
+                "discussed",
+                "discussing",
+                "tell",
+                "told",
+                "telling",
+                "tells",
+                "share",
+                "shared",
+                "sharing",
+                "shares",
+                "say",
+                "said",
+                "saying",
+                "says",
+                "talk",
+                "talked",
+                "talking",
+                "talks",
+                "speak",
+                "spoke",
+                "speaking",
+                "speaks",
+                "ask",
+                "asked",
+                "asking",
+                "asks",
+                "answer",
+                "answered",
+                "answering",
                 // Transfer verbs
-                "give", "gave", "giving", "gives",
-                "take", "took", "taking", "takes",
-                "send", "sent", "sending", "sends",
-                "receive", "received", "receiving",
+                "give",
+                "gave",
+                "giving",
+                "gives",
+                "take",
+                "took",
+                "taking",
+                "takes",
+                "send",
+                "sent",
+                "sending",
+                "sends",
+                "receive",
+                "received",
+                "receiving",
                 // Moral action verbs
-                "help", "helped", "helping", "helps",
-                "harm", "harmed", "harming", "harms",
-                "hurt", "hurting", "hurts",
-                "save", "saved", "saving", "saves",
-                "protect", "protected", "protecting",
-                "steal", "stole", "stealing", "steals",
-                "lie", "lied", "lying",
-                "cheat", "cheated", "cheating",
-                "betray", "betrayed", "betraying",
+                "help",
+                "helped",
+                "helping",
+                "helps",
+                "harm",
+                "harmed",
+                "harming",
+                "harms",
+                "hurt",
+                "hurting",
+                "hurts",
+                "save",
+                "saved",
+                "saving",
+                "saves",
+                "protect",
+                "protected",
+                "protecting",
+                "steal",
+                "stole",
+                "stealing",
+                "steals",
+                "lie",
+                "lied",
+                "lying",
+                "cheat",
+                "cheated",
+                "cheating",
+                "betray",
+                "betrayed",
+                "betraying",
                 // Possession/entitlement verbs
-                "deserve", "deserved", "deserving", "deserves",
-                "earn", "earned", "earning", "earns",
-                "own", "owned", "owning", "owns",
-                "owe", "owed", "owing", "owes",
+                "deserve",
+                "deserved",
+                "deserving",
+                "deserves",
+                "earn",
+                "earned",
+                "earning",
+                "earns",
+                "own",
+                "owned",
+                "owning",
+                "owns",
+                "owe",
+                "owed",
+                "owing",
+                "owes",
                 // Physical action verbs
-                "clean", "cleaned", "cleaning", "cleans",
-                "prepare", "prepared", "preparing",
-                "make", "made", "making", "makes",
-                "do", "did", "doing", "does",
-                "use", "used", "using", "uses",
-                "work", "worked", "working", "works",
-                "walk", "walked", "walking", "walks",
-                "run", "ran", "running", "runs",
-                "buy", "bought", "buying", "buys",
-                "sell", "sold", "selling", "sells",
+                "clean",
+                "cleaned",
+                "cleaning",
+                "cleans",
+                "prepare",
+                "prepared",
+                "preparing",
+                "make",
+                "made",
+                "making",
+                "makes",
+                "do",
+                "did",
+                "doing",
+                "does",
+                "use",
+                "used",
+                "using",
+                "uses",
+                "work",
+                "worked",
+                "working",
+                "works",
+                "walk",
+                "walked",
+                "walking",
+                "walks",
+                "run",
+                "ran",
+                "running",
+                "runs",
+                "buy",
+                "bought",
+                "buying",
+                "buys",
+                "sell",
+                "sold",
+                "selling",
+                "sells",
                 // Emotional/relational verbs
-                "love", "loved", "loving", "loves",
-                "hate", "hated", "hating", "hates",
-                "trust", "trusted", "trusting", "trusts",
-                "forgive", "forgave", "forgiving", "forgives",
-                "ignore", "ignored", "ignoring", "ignores",
-                "respect", "respected", "respecting",
+                "love",
+                "loved",
+                "loving",
+                "loves",
+                "hate",
+                "hated",
+                "hating",
+                "hates",
+                "trust",
+                "trusted",
+                "trusting",
+                "trusts",
+                "forgive",
+                "forgave",
+                "forgiving",
+                "forgives",
+                "ignore",
+                "ignored",
+                "ignoring",
+                "ignores",
+                "respect",
+                "respected",
+                "respecting",
                 // Set up (multi-word)
-                "set up", "setting up",
-            ].iter().map(|s| s.to_string()).collect(),
+                "set up",
+                "setting up",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
 
             // Pronouns for coreference resolution
             pronouns: {
                 let mut map = std::collections::HashMap::new();
-                map.insert("i".to_string(), PronounInfo { gender: "neutral", person: "first", number: "singular" });
-                map.insert("me".to_string(), PronounInfo { gender: "neutral", person: "first", number: "singular" });
-                map.insert("my".to_string(), PronounInfo { gender: "neutral", person: "first", number: "singular" });
-                map.insert("we".to_string(), PronounInfo { gender: "neutral", person: "first", number: "plural" });
-                map.insert("us".to_string(), PronounInfo { gender: "neutral", person: "first", number: "plural" });
-                map.insert("he".to_string(), PronounInfo { gender: "male", person: "third", number: "singular" });
-                map.insert("him".to_string(), PronounInfo { gender: "male", person: "third", number: "singular" });
-                map.insert("his".to_string(), PronounInfo { gender: "male", person: "third", number: "singular" });
-                map.insert("she".to_string(), PronounInfo { gender: "female", person: "third", number: "singular" });
-                map.insert("her".to_string(), PronounInfo { gender: "female", person: "third", number: "singular" });
-                map.insert("they".to_string(), PronounInfo { gender: "neutral", person: "third", number: "plural" });
-                map.insert("them".to_string(), PronounInfo { gender: "neutral", person: "third", number: "plural" });
-                map.insert("their".to_string(), PronounInfo { gender: "neutral", person: "third", number: "plural" });
+                map.insert(
+                    "i".to_string(),
+                    PronounInfo {
+                        gender: "neutral",
+                        person: "first",
+                        number: "singular",
+                    },
+                );
+                map.insert(
+                    "me".to_string(),
+                    PronounInfo {
+                        gender: "neutral",
+                        person: "first",
+                        number: "singular",
+                    },
+                );
+                map.insert(
+                    "my".to_string(),
+                    PronounInfo {
+                        gender: "neutral",
+                        person: "first",
+                        number: "singular",
+                    },
+                );
+                map.insert(
+                    "we".to_string(),
+                    PronounInfo {
+                        gender: "neutral",
+                        person: "first",
+                        number: "plural",
+                    },
+                );
+                map.insert(
+                    "us".to_string(),
+                    PronounInfo {
+                        gender: "neutral",
+                        person: "first",
+                        number: "plural",
+                    },
+                );
+                map.insert(
+                    "he".to_string(),
+                    PronounInfo {
+                        gender: "male",
+                        person: "third",
+                        number: "singular",
+                    },
+                );
+                map.insert(
+                    "him".to_string(),
+                    PronounInfo {
+                        gender: "male",
+                        person: "third",
+                        number: "singular",
+                    },
+                );
+                map.insert(
+                    "his".to_string(),
+                    PronounInfo {
+                        gender: "male",
+                        person: "third",
+                        number: "singular",
+                    },
+                );
+                map.insert(
+                    "she".to_string(),
+                    PronounInfo {
+                        gender: "female",
+                        person: "third",
+                        number: "singular",
+                    },
+                );
+                map.insert(
+                    "her".to_string(),
+                    PronounInfo {
+                        gender: "female",
+                        person: "third",
+                        number: "singular",
+                    },
+                );
+                map.insert(
+                    "they".to_string(),
+                    PronounInfo {
+                        gender: "neutral",
+                        person: "third",
+                        number: "plural",
+                    },
+                );
+                map.insert(
+                    "them".to_string(),
+                    PronounInfo {
+                        gender: "neutral",
+                        person: "third",
+                        number: "plural",
+                    },
+                );
+                map.insert(
+                    "their".to_string(),
+                    PronounInfo {
+                        gender: "neutral",
+                        person: "third",
+                        number: "plural",
+                    },
+                );
                 map
             },
 
             // Clause separators for multi-clause handling
             clause_separators: [
-                "and", "but", "or", "because", "since", "while",
-                "although", "though", "however", "therefore",
-                "so", "yet", "then", "when", "if", "unless",
-            ].iter().map(|s| s.to_string()).collect(),
+                "and",
+                "but",
+                "or",
+                "because",
+                "since",
+                "while",
+                "although",
+                "though",
+                "however",
+                "therefore",
+                "so",
+                "yet",
+                "then",
+                "when",
+                "if",
+                "unless",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
         }
     }
 
@@ -413,7 +825,9 @@ impl MoralParser {
         }
 
         // Parse main clause first
-        let main_clause = clauses.iter().find(|c| c.is_main)
+        let main_clause = clauses
+            .iter()
+            .find(|c| c.is_main)
             .or_else(|| clauses.first())
             .map(|c| &c.text);
 
@@ -432,7 +846,9 @@ impl MoralParser {
                 match clause.connector.as_deref() {
                     Some("because" | "since") => {
                         // Reason clause might provide justification
-                        if sub_parsed.intent == MoralIntent::Good && primary.intent != MoralIntent::Good {
+                        if sub_parsed.intent == MoralIntent::Good
+                            && primary.intent != MoralIntent::Good
+                        {
                             // Good reason might mitigate bad action (partial)
                             primary.confidence *= 0.8;
                         }
@@ -573,10 +989,12 @@ impl MoralParser {
 
     /// Detect magnitude from words
     fn detect_magnitude(&self, words: &[&str]) -> Option<Magnitude> {
-        let small_count = words.iter()
+        let small_count = words
+            .iter()
             .filter(|w| self.small_magnitude_words.contains(**w))
             .count();
-        let large_count = words.iter()
+        let large_count = words
+            .iter()
             .filter(|w| self.large_magnitude_words.contains(**w))
             .count();
 
@@ -630,15 +1048,33 @@ impl MoralParser {
     fn calculate_confidence(&self, scenario: &ParsedMoralScenario) -> f32 {
         let mut score = 0.0;
 
-        if scenario.agent.is_some() { score += 0.12; }
-        if scenario.action.is_some() { score += 0.20; }
-        if scenario.patient.is_some() { score += 0.12; }
-        if scenario.intent != MoralIntent::Unknown { score += 0.18; }
-        if scenario.consent != ConsentState::Implied { score += 0.12; }
-        if scenario.magnitude.is_some() { score += 0.08; }
-        if scenario.obligation.is_some() { score += 0.08; }
-        if scenario.excuse.is_some() { score += 0.05; }
-        if scenario.effort.is_some() || scenario.reward.is_some() { score += 0.05; }
+        if scenario.agent.is_some() {
+            score += 0.12;
+        }
+        if scenario.action.is_some() {
+            score += 0.20;
+        }
+        if scenario.patient.is_some() {
+            score += 0.12;
+        }
+        if scenario.intent != MoralIntent::Unknown {
+            score += 0.18;
+        }
+        if scenario.consent != ConsentState::Implied {
+            score += 0.12;
+        }
+        if scenario.magnitude.is_some() {
+            score += 0.08;
+        }
+        if scenario.obligation.is_some() {
+            score += 0.08;
+        }
+        if scenario.excuse.is_some() {
+            score += 0.05;
+        }
+        if scenario.effort.is_some() || scenario.reward.is_some() {
+            score += 0.05;
+        }
 
         score
     }
@@ -649,9 +1085,17 @@ impl MoralParser {
     /// "ought to", "obligated to", "required to"
     fn detect_obligation(&self, text: &str) -> Option<String> {
         let patterns = [
-            "supposed to", "should have", "duty to", "expected to",
-            "ought to", "obligated to", "required to", "need to",
-            "have to", "must", "responsible for",
+            "supposed to",
+            "should have",
+            "duty to",
+            "expected to",
+            "ought to",
+            "obligated to",
+            "required to",
+            "need to",
+            "have to",
+            "must",
+            "responsible for",
         ];
 
         for pattern in &patterns {
@@ -659,8 +1103,7 @@ impl MoralParser {
                 let start = pos + pattern.len();
                 let rest = text[start..].trim_start();
                 // Extract clause up to next separator
-                let end = rest.find([',', '.', ';'])
-                    .unwrap_or(rest.len());
+                let end = rest.find([',', '.', ';']).unwrap_or(rest.len());
                 let clause = rest[..end.min(80)].trim();
                 if !clause.is_empty() {
                     return Some(format!("{} {}", pattern, clause));
@@ -674,16 +1117,13 @@ impl MoralParser {
     ///
     /// Extracts the subordinate clause after "because", "since", "but", "however"
     fn detect_excuse(&self, text: &str) -> Option<String> {
-        let patterns = [
-            "because ", "since ", " but ", "however ", "although ",
-        ];
+        let patterns = ["because ", "since ", " but ", "however ", "although "];
 
         for pattern in &patterns {
             if let Some(pos) = text.find(pattern) {
                 let start = pos + pattern.len();
                 let rest = text[start..].trim_start();
-                let end = rest.find(['.', ';'])
-                    .unwrap_or(rest.len());
+                let end = rest.find(['.', ';']).unwrap_or(rest.len());
                 let clause = rest[..end.min(120)].trim();
                 if !clause.is_empty() {
                     return Some(clause.to_string());
@@ -697,14 +1137,30 @@ impl MoralParser {
     ///
     /// Effort patterns: "i did", "i worked", "i spent", "i earned", "i contributed"
     /// Reward patterns: "i deserve", "i should get", "i expect", "give me"
-    fn detect_effort_reward(&self, text: &str) -> (Option<(String, Magnitude)>, Option<(String, Magnitude)>) {
+    fn detect_effort_reward(
+        &self,
+        text: &str,
+    ) -> (Option<(String, Magnitude)>, Option<(String, Magnitude)>) {
         let effort_patterns = [
-            "i did", "i worked", "i spent", "i earned", "i contributed",
-            "i helped", "i completed", "i finished", "i put in",
+            "i did",
+            "i worked",
+            "i spent",
+            "i earned",
+            "i contributed",
+            "i helped",
+            "i completed",
+            "i finished",
+            "i put in",
         ];
         let reward_patterns = [
-            "i deserve", "i should get", "i expect", "give me",
-            "i should receive", "i want", "i am owed", "i'm owed",
+            "i deserve",
+            "i should get",
+            "i expect",
+            "give me",
+            "i should receive",
+            "i want",
+            "i am owed",
+            "i'm owed",
         ];
 
         let effort = self.detect_role_with_magnitude(text, &effort_patterns);
@@ -714,13 +1170,16 @@ impl MoralParser {
     }
 
     /// Helper: detect a role phrase and estimate its magnitude from surrounding words
-    fn detect_role_with_magnitude(&self, text: &str, patterns: &[&str]) -> Option<(String, Magnitude)> {
+    fn detect_role_with_magnitude(
+        &self,
+        text: &str,
+        patterns: &[&str],
+    ) -> Option<(String, Magnitude)> {
         for pattern in patterns {
             if let Some(pos) = text.find(pattern) {
                 let start = pos + pattern.len();
                 let rest = text[start..].trim_start();
-                let end = rest.find([',', '.', ';'])
-                    .unwrap_or(rest.len());
+                let end = rest.find([',', '.', ';']).unwrap_or(rest.len());
                 let clause = rest[..end.min(80)].trim();
                 if clause.is_empty() {
                     continue;
@@ -728,7 +1187,8 @@ impl MoralParser {
 
                 // Estimate magnitude from words in this clause
                 let clause_words: Vec<&str> = clause.split_whitespace().collect();
-                let magnitude = self.detect_magnitude(&clause_words)
+                let magnitude = self
+                    .detect_magnitude(&clause_words)
                     .unwrap_or(Magnitude::Medium);
 
                 return Some((format!("{} {}", pattern, clause), magnitude));
@@ -750,7 +1210,8 @@ impl MoralParser {
 
         // Encode full action structure if we have all components
         let action_hv = if let (Some(agent), Some(action), Some(patient)) =
-            (&parsed.agent, &parsed.action, &parsed.patient) {
+            (&parsed.agent, &parsed.action, &parsed.patient)
+        {
             Some(algebra.encode_action_structure(agent, action, patient, parsed.intent))
         } else {
             None
@@ -795,7 +1256,11 @@ impl MoralParser {
     /// INTENT: bad
     /// CONSENT: absent
     /// ```
-    pub fn parse_with_llm_response(&self, text: &str, llm_response: Option<&str>) -> ParsedMoralScenario {
+    pub fn parse_with_llm_response(
+        &self,
+        text: &str,
+        llm_response: Option<&str>,
+    ) -> ParsedMoralScenario {
         // Try LLM parsing first
         if let Some(response) = llm_response {
             if let Some(parsed) = self.parse_llm_response(text, response) {
@@ -808,7 +1273,11 @@ impl MoralParser {
     }
 
     /// Parse LLM response into structured moral scenario
-    fn parse_llm_response(&self, original_text: &str, response: &str) -> Option<ParsedMoralScenario> {
+    fn parse_llm_response(
+        &self,
+        original_text: &str,
+        response: &str,
+    ) -> Option<ParsedMoralScenario> {
         let mut scenario = ParsedMoralScenario {
             text: original_text.to_string(),
             ..Default::default()
@@ -881,7 +1350,7 @@ impl MoralParser {
     /// Returns a prompt that can be sent to any LLM backend
     pub fn generate_srl_prompt(text: &str) -> String {
         format!(
-r#"Extract moral roles from this scenario. Be precise and concise.
+            r#"Extract moral roles from this scenario. Be precise and concise.
 
 Scenario: "{}"
 
@@ -901,7 +1370,7 @@ MAGNITUDE: [tiny/small/medium/large/huge]"#,
     /// Used when ensemble signals disagree and we need deeper reasoning
     pub fn generate_cot_prompt(text: &str, parsed: &ParsedMoralScenario) -> String {
         format!(
-r#"Analyze this moral scenario step by step.
+            r#"Analyze this moral scenario step by step.
 
 Scenario: "{}"
 
@@ -945,9 +1414,12 @@ Reasoning: [one sentence summary]"#,
         // Extract numbered reasoning steps
         for line in response.lines() {
             let line = line.trim();
-            if line.starts_with("1.") || line.starts_with("2.") ||
-               line.starts_with("3.") || line.starts_with("4.") ||
-               line.starts_with("5.") {
+            if line.starts_with("1.")
+                || line.starts_with("2.")
+                || line.starts_with("3.")
+                || line.starts_with("4.")
+                || line.starts_with("5.")
+            {
                 result.steps.push(line.to_string());
             }
         }
@@ -973,7 +1445,8 @@ Reasoning: [one sentence summary]"#,
                     _ => 0.5,
                 };
             } else if line.starts_with("reasoning:") {
-                result.reasoning = line.strip_prefix("reasoning:")
+                result.reasoning = line
+                    .strip_prefix("reasoning:")
                     .unwrap_or("")
                     .trim()
                     .to_string();
@@ -992,25 +1465,35 @@ Reasoning: [one sentence summary]"#,
     /// Includes examples to guide the LLM's moral reasoning
     pub fn generate_few_shot_prompt(text: &str, category: &str) -> String {
         let examples = match category {
-            "commonsense" => r#"Example 1: "I helped my elderly neighbor carry groceries" → GOOD (helping others is virtuous)
+            "commonsense" => {
+                r#"Example 1: "I helped my elderly neighbor carry groceries" → GOOD (helping others is virtuous)
 Example 2: "I lied to my friend to avoid hurting their feelings" → NEUTRAL (white lie, mixed intent)
-Example 3: "I stole money from the donation box" → BAD (theft harms charitable cause)"#,
-            "deontology" => r#"Example 1: "I kept my promise even though it was inconvenient" → GOOD (keeping promises is a duty)
+Example 3: "I stole money from the donation box" → BAD (theft harms charitable cause)"#
+            }
+            "deontology" => {
+                r#"Example 1: "I kept my promise even though it was inconvenient" → GOOD (keeping promises is a duty)
 Example 2: "I broke my promise because an emergency arose" → NEUTRAL (competing duties)
-Example 3: "I broke my promise for personal gain" → BAD (violates duty without justification)"#,
-            "justice" => r#"Example 1: "I deserve equal pay for equal work" → GOOD (fair treatment)
+Example 3: "I broke my promise for personal gain" → BAD (violates duty without justification)"#
+            }
+            "justice" => {
+                r#"Example 1: "I deserve equal pay for equal work" → GOOD (fair treatment)
 Example 2: "I deserve a small reward for a small contribution" → GOOD (proportional)
-Example 3: "I deserve everything because I am special" → BAD (disproportionate claim)"#,
-            "virtue" => r#"Example 1: "generous" → GOOD (virtue)
+Example 3: "I deserve everything because I am special" → BAD (disproportionate claim)"#
+            }
+            "virtue" => {
+                r#"Example 1: "generous" → GOOD (virtue)
 Example 2: "cautious" → NEUTRAL (neither virtue nor vice)
-Example 3: "cruel" → BAD (vice)"#,
-            _ => r#"Example 1: "Helping someone in need" → GOOD
+Example 3: "cruel" → BAD (vice)"#
+            }
+            _ => {
+                r#"Example 1: "Helping someone in need" → GOOD
 Example 2: "Doing nothing" → NEUTRAL
-Example 3: "Harming someone intentionally" → BAD"#,
+Example 3: "Harming someone intentionally" → BAD"#
+            }
         };
 
         format!(
-r#"Classify this moral scenario based on the examples.
+            r#"Classify this moral scenario based on the examples.
 
 {examples}
 
@@ -1033,7 +1516,7 @@ Then explain in one sentence."#
         };
 
         format!(
-r#"Explain why this scenario is considered {verdict_str}.
+            r#"Explain why this scenario is considered {verdict_str}.
 
 Scenario: "{text}"
 
@@ -1115,7 +1598,10 @@ impl EncodedMoralScenario {
             return false;
         }
 
-        matches!(self.parsed.consent, ConsentState::Absent | ConsentState::Denied)
+        matches!(
+            self.parsed.consent,
+            ConsentState::Absent | ConsentState::Denied
+        )
     }
 
     /// Check for consent violation (returns similarity score for compatibility)
@@ -1123,7 +1609,11 @@ impl EncodedMoralScenario {
     /// Uses direct consent state check rather than HV similarity
     pub fn check_consent_violation(&self, _algebra: &MoralAlgebra) -> Option<f32> {
         // Return high similarity if there's a violation, low otherwise
-        Some(if self.is_consent_violation() { 0.9 } else { 0.1 })
+        Some(if self.is_consent_violation() {
+            0.9
+        } else {
+            0.1
+        })
     }
 
     /// Ensemble judgment combining HDC similarity, parsed intent, and deontological rules
@@ -1134,12 +1624,13 @@ impl EncodedMoralScenario {
     /// - Final weighted verdict
     /// - Confidence score
     /// - Detailed violation/satisfaction information
-    pub fn judge_ensemble(&self, algebra: &MoralAlgebra, text: &str) -> super::moral_algebra::EnsembleJudgment {
-        let mut judgment = algebra.judge_ensemble(
-            self.action_hv.as_ref(),
-            self.parsed.intent,
-            text,
-        );
+    pub fn judge_ensemble(
+        &self,
+        algebra: &MoralAlgebra,
+        text: &str,
+    ) -> super::moral_algebra::EnsembleJudgment {
+        let mut judgment =
+            algebra.judge_ensemble(self.action_hv.as_ref(), self.parsed.intent, text);
 
         // Override for consent violations (detected directly, not via HDC)
         if self.is_consent_violation() {
@@ -1280,7 +1771,7 @@ mod tests {
 
         let encoded = parser.parse_and_encode(
             "I discussed my daughter's health without asking first",
-            &algebra
+            &algebra,
         );
 
         assert_eq!(encoded.parsed.consent, ConsentState::Absent);

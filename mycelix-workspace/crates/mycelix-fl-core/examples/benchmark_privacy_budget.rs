@@ -28,8 +28,10 @@ fn main() {
     let target_delta = 1e-5;
     let max_rounds = 100;
 
-    println!("{:<16} {:>8} {:>12} {:>12} {:>12} {:>12}",
-             "Preset", "Sigma", "ε@10", "ε@25", "ε@50", "ε@100");
+    println!(
+        "{:<16} {:>8} {:>12} {:>12} {:>12} {:>12}",
+        "Preset", "Sigma", "ε@10", "ε@25", "ε@50", "ε@100"
+    );
     println!("{:-<80}", "");
 
     for (name, config) in &presets {
@@ -48,8 +50,10 @@ fn main() {
             }
         }
 
-        println!("{:<16} {:>8.3} {:>12.4} {:>12.4} {:>12.4} {:>12.4}",
-                 name, sigma, eps_at[0], eps_at[1], eps_at[2], eps_at[3]);
+        println!(
+            "{:<16} {:>8.3} {:>12.4} {:>12.4} {:>12.4} {:>12.4}",
+            name, sigma, eps_at[0], eps_at[1], eps_at[2], eps_at[3]
+        );
     }
 
     // === Part 2: Round-by-Round Epsilon Curve ===
@@ -70,7 +74,11 @@ fn main() {
         let eps = tracker.epsilon();
 
         if round <= 10 || round % 10 == 0 || (exhaustion_round.is_none() && eps > target_epsilon) {
-            let status = if eps > target_epsilon { "EXHAUSTED" } else { "OK" };
+            let status = if eps > target_epsilon {
+                "EXHAUSTED"
+            } else {
+                "OK"
+            };
             println!("{:<8} {:>12.4} {:>15}", round, eps, status);
         }
 
@@ -89,15 +97,19 @@ fn main() {
     let mean_val = 0.5;
     let mut base_updates = Vec::new();
     for i in 0..10 {
-        let gradients: Vec<f32> = (0..dim).map(|_| mean_val + rng.gen_range(-0.1..0.1)).collect();
+        let gradients: Vec<f32> = (0..dim)
+            .map(|_| mean_val + rng.gen_range(-0.1..0.1))
+            .collect();
         base_updates.push(GradientUpdate::new(
-            format!("node_{}", i), 1, gradients, 100, 0.5,
+            format!("node_{}", i),
+            1,
+            gradients,
+            100,
+            0.5,
         ));
     }
 
-    let reputations: HashMap<String, f32> = (0..10)
-        .map(|i| (format!("node_{}", i), 0.8))
-        .collect();
+    let reputations: HashMap<String, f32> = (0..10).map(|i| (format!("node_{}", i), 0.8)).collect();
 
     // Aggregate without DP (baseline)
     let no_dp_config = PipelineConfig {
@@ -105,16 +117,22 @@ fn main() {
         ..PipelineConfig::performance()
     };
     let mut no_dp_pipeline = UnifiedPipeline::new(no_dp_config);
-    let baseline = no_dp_pipeline.aggregate(&base_updates, &reputations).unwrap();
+    let baseline = no_dp_pipeline
+        .aggregate(&base_updates, &reputations)
+        .unwrap();
     let baseline_mean: f32 = baseline.aggregated.gradients.iter().sum::<f32>() / dim as f32;
 
-    println!("{:<16} {:>12} {:>12} {:>12} {:>12}",
-             "Privacy Level", "Mean", "MSE", "Cosine Sim", "Max Drift");
+    println!(
+        "{:<16} {:>12} {:>12} {:>12} {:>12}",
+        "Privacy Level", "Mean", "MSE", "Cosine Sim", "Max Drift"
+    );
     println!("{:-<60}", "");
 
     // No DP baseline
-    println!("{:<16} {:>12.6} {:>12.6} {:>12.6} {:>12.6}",
-             "none (baseline)", baseline_mean, 0.0, 1.0, 0.0);
+    println!(
+        "{:<16} {:>12.6} {:>12.6} {:>12.6} {:>12.6}",
+        "none (baseline)", baseline_mean, 0.0, 1.0, 0.0
+    );
 
     for (name, dp_config) in &presets {
         let config = PipelineConfig {
@@ -134,22 +152,43 @@ fn main() {
             let dp_grads = &result.aggregated.gradients;
 
             // MSE vs baseline
-            let mse: f64 = dp_grads.iter().zip(baseline.aggregated.gradients.iter())
+            let mse: f64 = dp_grads
+                .iter()
+                .zip(baseline.aggregated.gradients.iter())
                 .map(|(a, b)| ((a - b) as f64).powi(2))
-                .sum::<f64>() / dim as f64;
+                .sum::<f64>()
+                / dim as f64;
             total_mse += mse;
 
             // Cosine similarity vs baseline
-            let dot: f64 = dp_grads.iter().zip(baseline.aggregated.gradients.iter())
-                .map(|(a, b)| *a as f64 * *b as f64).sum();
-            let norm_a: f64 = dp_grads.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
-            let norm_b: f64 = baseline.aggregated.gradients.iter()
-                .map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
-            let cos = if norm_a > 0.0 && norm_b > 0.0 { dot / (norm_a * norm_b) } else { 0.0 };
+            let dot: f64 = dp_grads
+                .iter()
+                .zip(baseline.aggregated.gradients.iter())
+                .map(|(a, b)| *a as f64 * *b as f64)
+                .sum();
+            let norm_a: f64 = dp_grads
+                .iter()
+                .map(|x| (*x as f64).powi(2))
+                .sum::<f64>()
+                .sqrt();
+            let norm_b: f64 = baseline
+                .aggregated
+                .gradients
+                .iter()
+                .map(|x| (*x as f64).powi(2))
+                .sum::<f64>()
+                .sqrt();
+            let cos = if norm_a > 0.0 && norm_b > 0.0 {
+                dot / (norm_a * norm_b)
+            } else {
+                0.0
+            };
             total_cos += cos;
 
             // Max absolute drift
-            let max_d: f64 = dp_grads.iter().zip(baseline.aggregated.gradients.iter())
+            let max_d: f64 = dp_grads
+                .iter()
+                .zip(baseline.aggregated.gradients.iter())
                 .map(|(a, b)| ((*a - *b) as f64).abs())
                 .fold(0.0, f64::max);
             total_drift += max_d;
@@ -163,15 +202,22 @@ fn main() {
             result.aggregated.gradients.iter().sum::<f32>() / dim as f32
         };
 
-        println!("{:<16} {:>12.6} {:>12.6} {:>12.6} {:>12.6}",
-                 name, dp_mean, avg_mse, avg_cos, avg_drift);
+        println!(
+            "{:<16} {:>12.6} {:>12.6} {:>12.6} {:>12.6}",
+            name, dp_mean, avg_mse, avg_cos, avg_drift
+        );
     }
 
     // === Part 4: Budget Exhaustion Comparison ===
-    println!("\n--- Part 4: Rounds Until Budget Exhaustion (target ε={}) ---\n", target_epsilon);
+    println!(
+        "\n--- Part 4: Rounds Until Budget Exhaustion (target ε={}) ---\n",
+        target_epsilon
+    );
 
-    println!("{:<16} {:>8} {:>15} {:>15}",
-             "Preset", "Sigma", "Rounds to ε=10", "Rounds to ε=50");
+    println!(
+        "{:<16} {:>8} {:>15} {:>15}",
+        "Preset", "Sigma", "Rounds to ε=10", "Rounds to ε=50"
+    );
     println!("{:-<58}", "");
 
     for (name, config) in &presets {
@@ -195,8 +241,12 @@ fn main() {
             }
         }
 
-        let r10 = rounds_10.map(|r| format!("{}", r)).unwrap_or_else(|| ">10000".into());
-        let r50 = rounds_50.map(|r| format!("{}", r)).unwrap_or_else(|| ">10000".into());
+        let r10 = rounds_10
+            .map(|r| format!("{}", r))
+            .unwrap_or_else(|| ">10000".into());
+        let r50 = rounds_50
+            .map(|r| format!("{}", r))
+            .unwrap_or_else(|| ">10000".into());
         println!("{:<16} {:>8.3} {:>15} {:>15}", name, sigma, r10, r50);
     }
 
@@ -214,7 +264,10 @@ fn main() {
     }
     let eps10 = tracker.epsilon();
     if eps10 > eps1 && eps1 > 0.0 {
-        println!("[PASS] Test 1: Epsilon increases monotonically ({:.4} → {:.4})", eps1, eps10);
+        println!(
+            "[PASS] Test 1: Epsilon increases monotonically ({:.4} → {:.4})",
+            eps1, eps10
+        );
         passed += 1;
     } else {
         println!("[FAIL] Test 1: Epsilon not monotonically increasing");
@@ -224,16 +277,22 @@ fn main() {
     let mut track_high_sigma = RdpBudgetTracker::new(target_delta);
     let mut track_low_sigma = RdpBudgetTracker::new(target_delta);
     for _ in 0..50 {
-        track_high_sigma.record_round(2.0);  // High noise
-        track_low_sigma.record_round(0.5);   // Low noise
+        track_high_sigma.record_round(2.0); // High noise
+        track_low_sigma.record_round(0.5); // Low noise
     }
     if track_high_sigma.epsilon() < track_low_sigma.epsilon() {
-        println!("[PASS] Test 2: Higher sigma → slower ε growth (σ=2.0: {:.4} < σ=0.5: {:.4})",
-                 track_high_sigma.epsilon(), track_low_sigma.epsilon());
+        println!(
+            "[PASS] Test 2: Higher sigma → slower ε growth (σ=2.0: {:.4} < σ=0.5: {:.4})",
+            track_high_sigma.epsilon(),
+            track_low_sigma.epsilon()
+        );
         passed += 1;
     } else {
-        println!("[FAIL] Test 2: Expected σ=2.0 ε < σ=0.5 ε ({:.4} vs {:.4})",
-                 track_high_sigma.epsilon(), track_low_sigma.epsilon());
+        println!(
+            "[FAIL] Test 2: Expected σ=2.0 ε < σ=0.5 ε ({:.4} vs {:.4})",
+            track_high_sigma.epsilon(),
+            track_low_sigma.epsilon()
+        );
     }
 
     // Test 3: Budget exhaustion detection works
@@ -246,7 +305,10 @@ fn main() {
         println!("[PASS] Test 3: Budget exhaustion detected after 1000 low-privacy rounds");
         passed += 1;
     } else {
-        println!("[FAIL] Test 3: Should be exhausted after 1000 rounds, ε={:.4}", tracker.epsilon());
+        println!(
+            "[FAIL] Test 3: Should be exhausted after 1000 rounds, ε={:.4}",
+            tracker.epsilon()
+        );
     }
 
     // Test 4: DP noise degrades but doesn't destroy aggregation quality
@@ -255,16 +317,22 @@ fn main() {
         ..PipelineConfig::performance()
     };
     let mut high_dp_pipeline = UnifiedPipeline::new(high_dp_config);
-    let dp_result = high_dp_pipeline.aggregate(&base_updates, &reputations).unwrap();
+    let dp_result = high_dp_pipeline
+        .aggregate(&base_updates, &reputations)
+        .unwrap();
     let dp_mean: f32 = dp_result.aggregated.gradients.iter().sum::<f32>() / dim as f32;
     // With high privacy, mean should still be within 2.0 of baseline (very loose bound)
     if (dp_mean - baseline_mean).abs() < 2.0 {
-        println!("[PASS] Test 4: High-privacy mean {:.4} within 2.0 of baseline {:.4}",
-                 dp_mean, baseline_mean);
+        println!(
+            "[PASS] Test 4: High-privacy mean {:.4} within 2.0 of baseline {:.4}",
+            dp_mean, baseline_mean
+        );
         passed += 1;
     } else {
-        println!("[FAIL] Test 4: High-privacy mean {:.4} too far from baseline {:.4}",
-                 dp_mean, baseline_mean);
+        println!(
+            "[FAIL] Test 4: High-privacy mean {:.4} too far from baseline {:.4}",
+            dp_mean, baseline_mean
+        );
     }
 
     // Test 5: Tiny noise preserves aggregation quality closely
@@ -274,20 +342,32 @@ fn main() {
         ..PipelineConfig::performance()
     };
     let mut tiny_dp_pipeline = UnifiedPipeline::new(tiny_dp_config);
-    let tiny_result = tiny_dp_pipeline.aggregate(&base_updates, &reputations).unwrap();
+    let tiny_result = tiny_dp_pipeline
+        .aggregate(&base_updates, &reputations)
+        .unwrap();
     let cos: f64 = {
         let a = &tiny_result.aggregated.gradients;
         let b = &baseline.aggregated.gradients;
         let dot: f64 = a.iter().zip(b).map(|(x, y)| *x as f64 * *y as f64).sum();
         let na: f64 = a.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
         let nb: f64 = b.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
-        if na > 0.0 && nb > 0.0 { dot / (na * nb) } else { 0.0 }
+        if na > 0.0 && nb > 0.0 {
+            dot / (na * nb)
+        } else {
+            0.0
+        }
     };
     if cos > 0.9 {
-        println!("[PASS] Test 5: Tiny-noise cosine similarity {:.4} > 0.9", cos);
+        println!(
+            "[PASS] Test 5: Tiny-noise cosine similarity {:.4} > 0.9",
+            cos
+        );
         passed += 1;
     } else {
-        println!("[FAIL] Test 5: Tiny-noise cosine similarity too low: {:.4}", cos);
+        println!(
+            "[FAIL] Test 5: Tiny-noise cosine similarity too low: {:.4}",
+            cos
+        );
     }
 
     println!("\n=== RESULTS: {}/{} passed ===", passed, total_tests);

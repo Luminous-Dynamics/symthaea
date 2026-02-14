@@ -20,13 +20,13 @@
 //! | HEA healing rate | ±50% | Limited experimental data |
 //! | Dose conversion factor | ±30% | Energy spectrum uncertainty |
 
-use std::collections::HashMap;
-use rand::{Rng, SeedableRng};
-use rand::rngs::StdRng;
 use rand::distributions::{Distribution, Uniform};
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+use std::collections::HashMap;
 
-use crate::genesis::GenesisSeed;
 use super::coupled_physics::{CoupledPhysicsEngine, OperatingConditions};
+use crate::genesis::GenesisSeed;
 
 /// Parameter uncertainty distribution type
 #[derive(Debug, Clone, Copy)]
@@ -62,7 +62,8 @@ impl UncertainParameter {
         match self.distribution {
             UncertaintyDistribution::Normal { std_fraction } => {
                 let std = self.nominal * std_fraction;
-                let normal = rand_distr::Normal::new(self.nominal, std).expect("Normal requires finite mean and std >= 0");
+                let normal = rand_distr::Normal::new(self.nominal, std)
+                    .expect("Normal requires finite mean and std >= 0");
                 normal.sample(rng).max(self.nominal * 0.1) // Floor at 10% of nominal
             }
             UncertaintyDistribution::Uniform { range_fraction } => {
@@ -72,14 +73,16 @@ impl UncertainParameter {
             }
             UncertaintyDistribution::LogNormal { sigma } => {
                 let mu = self.nominal.ln();
-                let lognormal = rand_distr::LogNormal::new(mu, sigma).expect("LogNormal requires finite mu and sigma >= 0");
+                let lognormal = rand_distr::LogNormal::new(mu, sigma)
+                    .expect("LogNormal requires finite mu and sigma >= 0");
                 lognormal.sample(rng)
             }
             UncertaintyDistribution::Triangular { range_fraction } => {
                 let range = self.nominal * range_fraction;
                 let min = self.nominal - range;
                 let max = self.nominal + range;
-                let triangular = rand_distr::Triangular::new(min, max, self.nominal).expect("Triangular requires min <= mode <= max");
+                let triangular = rand_distr::Triangular::new(min, max, self.nominal)
+                    .expect("Triangular requires min <= mode <= max");
                 triangular.sample(rng)
             }
         }
@@ -134,12 +137,13 @@ impl ParameterUncertainties {
                 units: "".to_string(),
                 source: "ICRP 116, energy spectrum uncertainty".to_string(),
             },
-
             // Thermal properties (material variability)
             UncertainParameter {
                 name: "hea_thermal_conductivity".to_string(),
                 nominal: 15.0,
-                distribution: UncertaintyDistribution::Uniform { range_fraction: 0.15 },
+                distribution: UncertaintyDistribution::Uniform {
+                    range_fraction: 0.15,
+                },
                 units: "W/m·K".to_string(),
                 source: "Miracle & Senkov 2017, HEA variability".to_string(),
             },
@@ -153,11 +157,12 @@ impl ParameterUncertainties {
             UncertainParameter {
                 name: "convection_coefficient".to_string(),
                 nominal: 5000.0,
-                distribution: UncertaintyDistribution::Uniform { range_fraction: 0.25 },
+                distribution: UncertaintyDistribution::Uniform {
+                    range_fraction: 0.25,
+                },
                 units: "W/m²·K".to_string(),
                 source: "Flow regime and geometry dependent".to_string(),
             },
-
             // Radiation damage (large uncertainty - limited data)
             UncertainParameter {
                 name: "hea_healing_factor".to_string(),
@@ -169,11 +174,12 @@ impl ParameterUncertainties {
             UncertainParameter {
                 name: "critical_dpa".to_string(),
                 nominal: 100.0,
-                distribution: UncertaintyDistribution::Triangular { range_fraction: 0.30 },
+                distribution: UncertaintyDistribution::Triangular {
+                    range_fraction: 0.30,
+                },
                 units: "DPA".to_string(),
                 source: "Zinkle & Snead 2014, material dependent".to_string(),
             },
-
             // Mechanical properties
             UncertainParameter {
                 name: "hea_yield_strength".to_string(),
@@ -189,7 +195,6 @@ impl ParameterUncertainties {
                 units: "cycles".to_string(),
                 source: "S-N curve scatter, typically 2-3x".to_string(),
             },
-
             // Geometry tolerances
             UncertainParameter {
                 name: "shell_thickness_factor".to_string(),
@@ -379,7 +384,10 @@ impl MonteCarloResults {
         println!("\n");
         println!("┌────────────────────────────────────────────────────────────────────┐");
         println!("│              UNCERTAINTY QUANTIFICATION RESULTS                    │");
-        println!("│              Monte Carlo Analysis (N = {})                       │", self.n_samples);
+        println!(
+            "│              Monte Carlo Analysis (N = {})                       │",
+            self.n_samples
+        );
         println!("├────────────────────────────────────────────────────────────────────┤");
         println!("│                                                                    │");
 
@@ -392,16 +400,23 @@ impl MonteCarloResults {
         self.print_stat_line(&self.mass_stats);
 
         println!("│                                                                    │");
-        println!("│  Feasibility Rate: {:.1}%                                          │",
-                 self.feasibility_rate * 100.0);
+        println!(
+            "│  Feasibility Rate: {:.1}%                                          │",
+            self.feasibility_rate * 100.0
+        );
         println!("│                                                                    │");
 
         // Sensitivity analysis
         println!("│  PARAMETER SENSITIVITY (ranked by importance)                     │");
         println!("│  ─────────────────────────────────────────────────────────────    │");
         for (i, sens) in self.sensitivities.iter().take(5).enumerate() {
-            println!("│  {}. {:30} (dose: {:.2}, temp: {:.2})    │",
-                     i + 1, sens.parameter, sens.dose_sensitivity, sens.temp_sensitivity);
+            println!(
+                "│  {}. {:30} (dose: {:.2}, temp: {:.2})    │",
+                i + 1,
+                sens.parameter,
+                sens.dose_sensitivity,
+                sens.temp_sensitivity
+            );
         }
 
         println!("│                                                                    │");
@@ -409,9 +424,15 @@ impl MonteCarloResults {
     }
 
     fn print_stat_line(&self, stat: &OutputStatistics) {
-        println!("│  {:20}: {:8.2} / {:8.2} / {:8.2} {} (CV={:.0}%)│",
-                 stat.name, stat.p5, stat.p50, stat.p95, stat.units,
-                 stat.cv * 100.0);
+        println!(
+            "│  {:20}: {:8.2} / {:8.2} / {:8.2} {} (CV={:.0}%)│",
+            stat.name,
+            stat.p5,
+            stat.p50,
+            stat.p95,
+            stat.units,
+            stat.cv * 100.0
+        );
     }
 }
 
@@ -451,9 +472,15 @@ impl UncertaintyEngine {
             let result = engine.simulate(conditions);
 
             // Apply parameter scaling to outputs
-            let dose_factor = param_values.get("neutron_cross_section_factor").unwrap_or(&1.0)
+            let dose_factor = param_values
+                .get("neutron_cross_section_factor")
+                .unwrap_or(&1.0)
                 * param_values.get("dose_conversion_factor").unwrap_or(&1.0);
-            let temp_factor = 1.0 / param_values.get("hea_thermal_conductivity").unwrap_or(&15.0) * 15.0;
+            let temp_factor = 1.0
+                / param_values
+                    .get("hea_thermal_conductivity")
+                    .unwrap_or(&15.0)
+                * 15.0;
             let lifetime_factor = param_values.get("hea_healing_factor").unwrap_or(&1.0)
                 * (param_values.get("fatigue_coefficient").unwrap_or(&1e10) / 1e10);
 
@@ -494,29 +521,33 @@ impl UncertaintyEngine {
         let lifetime_stats = OutputStatistics::from_samples("Lifetime", "years", &mut lifetimes);
         let mass_stats = OutputStatistics::from_samples("Total Mass", "kg", &mut masses);
 
-        let feasibility_rate = samples.iter().filter(|s| s.is_feasible).count() as f64 / n_samples as f64;
+        let feasibility_rate =
+            samples.iter().filter(|s| s.is_feasible).count() as f64 / n_samples as f64;
 
         // Calculate sensitivities
         let sensitivities = self.calculate_sensitivities(&samples);
 
         // Compute feasibility probability decomposition
         let n = n_samples as f64;
-        let p_dose_safe = samples.iter()
+        let p_dose_safe = samples
+            .iter()
             .filter(|s| s.dose_rate < conditions.max_dose_rate * 1.1)
-            .count() as f64 / n;
-        let p_temp_safe = samples.iter()
+            .count() as f64
+            / n;
+        let p_temp_safe = samples
+            .iter()
             .filter(|s| s.max_temperature < 1200.0)
-            .count() as f64 / n;
-        let p_lifetime_met = samples.iter()
-            .filter(|s| s.lifetime_years > 10.0)
-            .count() as f64 / n;
+            .count() as f64
+            / n;
+        let p_lifetime_met = samples.iter().filter(|s| s.lifetime_years > 10.0).count() as f64 / n;
 
         let failure_rates = [
             (1.0 - p_dose_safe, "Dose rate exceeds limit"),
             (1.0 - p_temp_safe, "Temperature exceeds limit"),
             (1.0 - p_lifetime_met, "Lifetime below minimum"),
         ];
-        let primary_failure_mode = failure_rates.iter()
+        let primary_failure_mode = failure_rates
+            .iter()
             .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(_, mode)| mode.to_string())
             .unwrap_or_else(|| "None".to_string());
@@ -547,7 +578,8 @@ impl UncertaintyEngine {
         let mut sensitivities = Vec::new();
 
         for param in &self.parameters.parameters {
-            let param_values: Vec<f64> = samples.iter()
+            let param_values: Vec<f64> = samples
+                .iter()
                 .map(|s| *s.parameters.get(&param.name).unwrap_or(&param.nominal))
                 .collect();
 
@@ -572,7 +604,9 @@ impl UncertaintyEngine {
         sensitivities.sort_by(|a, b| {
             let a_total = a.dose_sensitivity + a.temp_sensitivity + a.lifetime_sensitivity;
             let b_total = b.dose_sensitivity + b.temp_sensitivity + b.lifetime_sensitivity;
-            b_total.partial_cmp(&a_total).unwrap_or(std::cmp::Ordering::Equal)
+            b_total
+                .partial_cmp(&a_total)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         for (i, sens) in sensitivities.iter_mut().enumerate() {
@@ -603,7 +637,7 @@ impl UncertaintyEngine {
         let mut sensitivities = Vec::new();
 
         // For each parameter, perturb and measure effect
-        let perturbations: [(& str, f64, f64); 6] = [
+        let perturbations: [(&str, f64, f64); 6] = [
             ("neutron_cross_section_factor", base_dose, 1.0),
             ("dose_conversion_factor", base_dose, 1.0),
             ("hea_thermal_conductivity", base_temp, -0.5), // Inverse effect
@@ -623,12 +657,16 @@ impl UncertaintyEngine {
                 } else {
                     0.0
                 },
-                temp_sensitivity: if param_name.contains("thermal") || param_name.contains("convection") {
+                temp_sensitivity: if param_name.contains("thermal")
+                    || param_name.contains("convection")
+                {
                     sensitivity
                 } else {
                     0.0
                 },
-                lifetime_sensitivity: if param_name.contains("healing") || param_name.contains("fatigue") {
+                lifetime_sensitivity: if param_name.contains("healing")
+                    || param_name.contains("fatigue")
+                {
                     sensitivity
                 } else {
                     0.0
@@ -639,9 +677,17 @@ impl UncertaintyEngine {
 
         // Rank by maximum sensitivity
         sensitivities.sort_by(|a, b| {
-            let a_max = a.dose_sensitivity.max(a.temp_sensitivity).max(a.lifetime_sensitivity);
-            let b_max = b.dose_sensitivity.max(b.temp_sensitivity).max(b.lifetime_sensitivity);
-            b_max.partial_cmp(&a_max).unwrap_or(std::cmp::Ordering::Equal)
+            let a_max = a
+                .dose_sensitivity
+                .max(a.temp_sensitivity)
+                .max(a.lifetime_sensitivity);
+            let b_max = b
+                .dose_sensitivity
+                .max(b.temp_sensitivity)
+                .max(b.lifetime_sensitivity);
+            b_max
+                .partial_cmp(&a_max)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         for (i, sens) in sensitivities.iter_mut().enumerate() {
@@ -718,29 +764,37 @@ impl UncertaintyEngine {
         }
 
         // Compute Morris statistics
-        let mut morris: Vec<MorrisEffect> = effects.iter().enumerate().map(|(i, ees)| {
-            let n = ees.len() as f64;
-            if n == 0.0 {
-                return MorrisEffect {
+        let mut morris: Vec<MorrisEffect> = effects
+            .iter()
+            .enumerate()
+            .map(|(i, ees)| {
+                let n = ees.len() as f64;
+                if n == 0.0 {
+                    return MorrisEffect {
+                        parameter: self.parameters.parameters[i].name.clone(),
+                        mu_star: 0.0,
+                        sigma: 0.0,
+                        rank: 0,
+                    };
+                }
+                let mu_star = ees.iter().map(|e| e.abs()).sum::<f64>() / n;
+                let mean = ees.iter().sum::<f64>() / n;
+                let sigma = (ees.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / n).sqrt();
+                MorrisEffect {
                     parameter: self.parameters.parameters[i].name.clone(),
-                    mu_star: 0.0,
-                    sigma: 0.0,
+                    mu_star,
+                    sigma,
                     rank: 0,
-                };
-            }
-            let mu_star = ees.iter().map(|e| e.abs()).sum::<f64>() / n;
-            let mean = ees.iter().sum::<f64>() / n;
-            let sigma = (ees.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / n).sqrt();
-            MorrisEffect {
-                parameter: self.parameters.parameters[i].name.clone(),
-                mu_star,
-                sigma,
-                rank: 0,
-            }
-        }).collect();
+                }
+            })
+            .collect();
 
         // Rank by μ*
-        morris.sort_by(|a, b| b.mu_star.partial_cmp(&a.mu_star).unwrap_or(std::cmp::Ordering::Equal));
+        morris.sort_by(|a, b| {
+            b.mu_star
+                .partial_cmp(&a.mu_star)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         for (i, m) in morris.iter_mut().enumerate() {
             m.rank = i + 1;
         }
@@ -762,40 +816,52 @@ impl UncertaintyEngine {
         F: Fn(&MonteCarloSample) -> f64,
     {
         // Baseline: all parameters at nominal
-        let nominal_params: HashMap<String, f64> = self.parameters.parameters.iter()
+        let nominal_params: HashMap<String, f64> = self
+            .parameters
+            .parameters
+            .iter()
             .map(|p| (p.name.clone(), p.nominal))
             .collect();
         let baseline_sample = self.evaluate_at_params(conditions, &nominal_params, 0);
         let _baseline_output = output_selector(&baseline_sample);
 
-        let mut entries: Vec<TornadoEntry> = self.parameters.parameters.iter().map(|param| {
-            let (low_bound, high_bound) = param.confidence_interval_95();
+        let mut entries: Vec<TornadoEntry> = self
+            .parameters
+            .parameters
+            .iter()
+            .map(|param| {
+                let (low_bound, high_bound) = param.confidence_interval_95();
 
-            // Evaluate at low bound
-            let mut low_params = nominal_params.clone();
-            low_params.insert(param.name.clone(), low_bound);
-            let low_sample = self.evaluate_at_params(conditions, &low_params, 0);
-            let output_low = output_selector(&low_sample);
+                // Evaluate at low bound
+                let mut low_params = nominal_params.clone();
+                low_params.insert(param.name.clone(), low_bound);
+                let low_sample = self.evaluate_at_params(conditions, &low_params, 0);
+                let output_low = output_selector(&low_sample);
 
-            // Evaluate at high bound
-            let mut high_params = nominal_params.clone();
-            high_params.insert(param.name.clone(), high_bound);
-            let high_sample = self.evaluate_at_params(conditions, &high_params, 0);
-            let output_high = output_selector(&high_sample);
+                // Evaluate at high bound
+                let mut high_params = nominal_params.clone();
+                high_params.insert(param.name.clone(), high_bound);
+                let high_sample = self.evaluate_at_params(conditions, &high_params, 0);
+                let output_high = output_selector(&high_sample);
 
-            let swing = (output_high - output_low).abs();
+                let swing = (output_high - output_low).abs();
 
-            TornadoEntry {
-                parameter: param.name.clone(),
-                output_low,
-                output_high,
-                swing,
-                rank: 0,
-            }
-        }).collect();
+                TornadoEntry {
+                    parameter: param.name.clone(),
+                    output_low,
+                    output_high,
+                    swing,
+                    rank: 0,
+                }
+            })
+            .collect();
 
         // Sort by swing (descending)
-        entries.sort_by(|a, b| b.swing.partial_cmp(&a.swing).unwrap_or(std::cmp::Ordering::Equal));
+        entries.sort_by(|a, b| {
+            b.swing
+                .partial_cmp(&a.swing)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         for (i, entry) in entries.iter_mut().enumerate() {
             entry.rank = i + 1;
         }
@@ -805,11 +871,16 @@ impl UncertaintyEngine {
 
     /// Convert normalized [0,1]^k vector to actual parameter values.
     fn normalized_to_actual(&self, normalized: &[f64]) -> HashMap<String, f64> {
-        self.parameters.parameters.iter().enumerate().map(|(i, param)| {
-            let (low, high) = param.confidence_interval_95();
-            let value = low + normalized[i] * (high - low);
-            (param.name.clone(), value)
-        }).collect()
+        self.parameters
+            .parameters
+            .iter()
+            .enumerate()
+            .map(|(i, param)| {
+                let (low, high) = param.confidence_interval_95();
+                let value = low + normalized[i] * (high - low);
+                (param.name.clone(), value)
+            })
+            .collect()
     }
 
     /// Evaluate the model at specific parameter values, returning a MonteCarloSample.
@@ -859,9 +930,12 @@ fn correlation(x: &[f64], y: &[f64]) -> f64 {
     let mean_x = x.iter().sum::<f64>() / n;
     let mean_y = y.iter().sum::<f64>() / n;
 
-    let cov: f64 = x.iter().zip(y.iter())
+    let cov: f64 = x
+        .iter()
+        .zip(y.iter())
         .map(|(xi, yi)| (xi - mean_x) * (yi - mean_y))
-        .sum::<f64>() / n;
+        .sum::<f64>()
+        / n;
 
     let std_x = (x.iter().map(|xi| (xi - mean_x).powi(2)).sum::<f64>() / n).sqrt();
     let std_y = (y.iter().map(|yi| (yi - mean_y).powi(2)).sum::<f64>() / n).sqrt();
@@ -929,7 +1003,10 @@ mod tests {
 
         let y_neg = vec![5.0, 4.0, 3.0, 2.0, 1.0];
         let corr_neg = correlation(&x, &y_neg);
-        assert!((corr_neg + 1.0).abs() < 0.01, "Perfect negative correlation expected");
+        assert!(
+            (corr_neg + 1.0).abs() < 0.01,
+            "Perfect negative correlation expected"
+        );
     }
 
     #[test]
@@ -956,7 +1033,9 @@ mod tests {
 
         let results = engine.monte_carlo(&conditions, 20, 42);
 
-        let fp = results.feasibility.expect("Should have feasibility probability");
+        let fp = results
+            .feasibility
+            .expect("Should have feasibility probability");
         assert!(fp.p_dose_safe >= 0.0 && fp.p_dose_safe <= 1.0);
         assert!(fp.p_temp_safe >= 0.0 && fp.p_temp_safe <= 1.0);
         assert!(fp.p_lifetime_met >= 0.0 && fp.p_lifetime_met <= 1.0);
@@ -970,10 +1049,7 @@ mod tests {
         let engine = UncertaintyEngine::new(&genesis);
         let conditions = OperatingConditions::consumer();
 
-        let morris = engine.morris_sensitivity(
-            &conditions, 5, 42,
-            |s| s.dose_rate,
-        );
+        let morris = engine.morris_sensitivity(&conditions, 5, 42, |s| s.dose_rate);
 
         // Should have one entry per parameter
         assert_eq!(morris.len(), engine.parameters.parameters.len());
@@ -994,10 +1070,7 @@ mod tests {
         let engine = UncertaintyEngine::new(&genesis);
         let conditions = OperatingConditions::consumer();
 
-        let tornado = engine.tornado_diagram(
-            &conditions,
-            |s| s.dose_rate,
-        );
+        let tornado = engine.tornado_diagram(&conditions, |s| s.dose_rate);
 
         assert!(!tornado.is_empty());
         // Should be sorted by swing descending
@@ -1005,7 +1078,8 @@ mod tests {
             assert!(
                 tornado[i - 1].swing >= tornado[i].swing,
                 "Tornado should be sorted by swing: {:.4} >= {:.4}",
-                tornado[i - 1].swing, tornado[i].swing
+                tornado[i - 1].swing,
+                tornado[i].swing
             );
         }
         // Ranks should be sequential

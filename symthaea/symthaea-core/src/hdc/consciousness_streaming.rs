@@ -118,10 +118,7 @@ pub enum EventPayload {
         strength: f64,
     },
     /// Agent event payload
-    Agent {
-        agent_id: String,
-        phi: f64,
-    },
+    Agent { agent_id: String, phi: f64 },
     /// Sleep state payload
     Sleep {
         state: String,
@@ -259,7 +256,8 @@ pub struct SubscriptionId(u64);
 #[allow(clippy::type_complexity)]
 pub struct ConsciousnessEventEmitter {
     /// Subscribers by event type
-    subscribers: Arc<RwLock<HashMap<ConsciousnessEventType, Vec<(SubscriptionId, SubscriberCallback)>>>>,
+    subscribers:
+        Arc<RwLock<HashMap<ConsciousnessEventType, Vec<(SubscriptionId, SubscriberCallback)>>>>,
     /// Global subscribers (receive all events)
     global_subscribers: Arc<RwLock<Vec<(SubscriptionId, SubscriberCallback)>>>,
     /// Next subscription ID
@@ -277,7 +275,9 @@ impl ConsciousnessEventEmitter {
             subscribers: Arc::new(RwLock::new(HashMap::new())),
             global_subscribers: Arc::new(RwLock::new(Vec::new())),
             next_sub_id: Arc::new(std::sync::atomic::AtomicU64::new(1)),
-            history: Arc::new(RwLock::new(std::collections::VecDeque::with_capacity(max_history))),
+            history: Arc::new(RwLock::new(std::collections::VecDeque::with_capacity(
+                max_history,
+            ))),
             max_history,
         }
     }
@@ -288,10 +288,14 @@ impl ConsciousnessEventEmitter {
         F: Fn(&ConsciousnessEvent) + Send + Sync + 'static,
     {
         let sub_id = SubscriptionId(
-            self.next_sub_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+            self.next_sub_id
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         );
 
-        let mut subs = self.subscribers.write().expect("subscribers RwLock poisoned");
+        let mut subs = self
+            .subscribers
+            .write()
+            .expect("subscribers RwLock poisoned");
         subs.entry(event_type)
             .or_default()
             .push((sub_id, Box::new(callback)));
@@ -305,10 +309,14 @@ impl ConsciousnessEventEmitter {
         F: Fn(&ConsciousnessEvent) + Send + Sync + 'static,
     {
         let sub_id = SubscriptionId(
-            self.next_sub_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+            self.next_sub_id
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         );
 
-        let mut subs = self.global_subscribers.write().expect("global_subscribers RwLock poisoned");
+        let mut subs = self
+            .global_subscribers
+            .write()
+            .expect("global_subscribers RwLock poisoned");
         subs.push((sub_id, Box::new(callback)));
 
         sub_id
@@ -317,13 +325,19 @@ impl ConsciousnessEventEmitter {
     /// Unsubscribe by ID
     pub fn unsubscribe(&self, sub_id: SubscriptionId) {
         // Remove from typed subscribers
-        let mut subs = self.subscribers.write().expect("subscribers RwLock poisoned");
+        let mut subs = self
+            .subscribers
+            .write()
+            .expect("subscribers RwLock poisoned");
         for (_, vec) in subs.iter_mut() {
             vec.retain(|(id, _)| *id != sub_id);
         }
 
         // Remove from global subscribers
-        let mut global = self.global_subscribers.write().expect("global_subscribers RwLock poisoned");
+        let mut global = self
+            .global_subscribers
+            .write()
+            .expect("global_subscribers RwLock poisoned");
         global.retain(|(id, _)| *id != sub_id);
     }
 
@@ -340,7 +354,10 @@ impl ConsciousnessEventEmitter {
 
         // Notify typed subscribers
         {
-            let subs = self.subscribers.read().expect("subscribers RwLock poisoned");
+            let subs = self
+                .subscribers
+                .read()
+                .expect("subscribers RwLock poisoned");
             if let Some(callbacks) = subs.get(&event.event_type) {
                 for (_, callback) in callbacks {
                     callback(&event);
@@ -350,7 +367,10 @@ impl ConsciousnessEventEmitter {
 
         // Notify global subscribers
         {
-            let global = self.global_subscribers.read().expect("global_subscribers RwLock poisoned");
+            let global = self
+                .global_subscribers
+                .read()
+                .expect("global_subscribers RwLock poisoned");
             for (_, callback) in global.iter() {
                 callback(&event);
             }
@@ -489,17 +509,11 @@ impl Default for SseFormatter {
 #[serde(tag = "type", content = "data")]
 pub enum WebSocketMessage {
     /// Subscribe to specific event types
-    Subscribe {
-        event_types: Vec<String>,
-    },
+    Subscribe { event_types: Vec<String> },
     /// Unsubscribe from event types
-    Unsubscribe {
-        event_types: Vec<String>,
-    },
+    Unsubscribe { event_types: Vec<String> },
     /// Send input to consciousness system
-    Input {
-        text: String,
-    },
+    Input { text: String },
     /// Request consciousness state snapshot
     GetState,
     /// Consciousness event (server → client)
@@ -513,13 +527,9 @@ pub enum WebSocketMessage {
         causal_edges: usize,
     },
     /// Error message
-    Error {
-        message: String,
-    },
+    Error { message: String },
     /// Acknowledge message
-    Ack {
-        message_id: u64,
-    },
+    Ack { message_id: u64 },
 }
 
 impl WebSocketMessage {

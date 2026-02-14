@@ -96,10 +96,7 @@ fn performance_comparison_cfc_vs_hdc_ltc() {
         "  Input dim: {}, Hidden dim: {}, Output dim: {}",
         INPUT_DIM, HIDDEN_DIM, OUTPUT_DIM
     );
-    println!(
-        "  CfC steps: {}, HDC-LTC steps: {}",
-        CFC_STEPS, HDC_STEPS
-    );
+    println!("  CfC steps: {}, HDC-LTC steps: {}", CFC_STEPS, HDC_STEPS);
     println!();
 
     // ---- CfC ----
@@ -115,26 +112,50 @@ fn performance_comparison_cfc_vs_hdc_ltc() {
 
     // ---- HDC-LTC ----
     let mut hdc_rand = HdcLtcBridge::new(hdc_config());
-    let hdc_rand_dur = bench_forward("HDC-LTC Bridge (random init)", HDC_STEPS, 2, &input, |inp| {
-        let _ = hdc_rand.forward(inp, DT);
-    });
+    let hdc_rand_dur = bench_forward(
+        "HDC-LTC Bridge (random init)",
+        HDC_STEPS,
+        2,
+        &input,
+        |inp| {
+            let _ = hdc_rand.forward(inp, DT);
+        },
+    );
 
     let mut hdc_gen = HdcLtcBridge::from_genesis(hdc_config(), &genesis);
-    let hdc_gen_dur = bench_forward("HDC-LTC Bridge (genesis init)", HDC_STEPS, 2, &input, |inp| {
-        let _ = hdc_gen.forward(inp, DT);
-    });
+    let hdc_gen_dur = bench_forward(
+        "HDC-LTC Bridge (genesis init)",
+        HDC_STEPS,
+        2,
+        &input,
+        |inp| {
+            let _ = hdc_gen.forward(inp, DT);
+        },
+    );
 
     // ---- HDC-LTC with reduced dimension (2048) ----
     let hdc_fast_steps = 500;
     let mut hdc_fast = HdcLtcBridge::new(hdc_config_fast());
-    let hdc_fast_dur = bench_forward("HDC-LTC Bridge (dim=2048)", hdc_fast_steps, 10, &input, |inp| {
-        let _ = hdc_fast.forward(inp, DT);
-    });
+    let hdc_fast_dur = bench_forward(
+        "HDC-LTC Bridge (dim=2048)",
+        hdc_fast_steps,
+        10,
+        &input,
+        |inp| {
+            let _ = hdc_fast.forward(inp, DT);
+        },
+    );
 
     let mut hdc_fast_gen = HdcLtcBridge::from_genesis(hdc_config_fast(), &genesis);
-    let hdc_fast_gen_dur = bench_forward("HDC-LTC Bridge (dim=2048, genesis)", hdc_fast_steps, 10, &input, |inp| {
-        let _ = hdc_fast_gen.forward(inp, DT);
-    });
+    let hdc_fast_gen_dur = bench_forward(
+        "HDC-LTC Bridge (dim=2048, genesis)",
+        hdc_fast_steps,
+        10,
+        &input,
+        |inp| {
+            let _ = hdc_fast_gen.forward(inp, DT);
+        },
+    );
 
     // ---- Genesis initialization overhead ----
     println!();

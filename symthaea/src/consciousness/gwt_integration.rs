@@ -33,10 +33,10 @@
 //! 3. **Coherent ignition**: Threshold crossings synchronized
 //! 4. **Reduced duplication**: Single source of truth for workspace state
 
-use crate::hdc::global_workspace::{
-    GlobalWorkspace, WorkspaceConfig, WorkspaceContent, WorkspaceAssessment
-};
 use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::global_workspace::{
+    GlobalWorkspace, WorkspaceAssessment, WorkspaceConfig, WorkspaceContent,
+};
 #[cfg(feature = "observability_module")]
 use crate::observability::{SharedObserver, SymthaeaObserver, WorkspaceIgnitionEvent};
 use serde::{Deserialize, Serialize};
@@ -63,7 +63,6 @@ pub struct UnifiedGlobalWorkspace {
     // ═══════════════════════════════════════════════════════════════════
     // REVOLUTIONARY STATE - Advanced Consciousness Dynamics
     // ═══════════════════════════════════════════════════════════════════
-
     /// Timesteps since last ignition (for attentional blink)
     timesteps_since_ignition: usize,
 
@@ -163,7 +162,6 @@ pub struct UnifiedGWTConfig {
     // ═══════════════════════════════════════════════════════════════════
     // REVOLUTIONARY IMPROVEMENTS - Advanced Consciousness Dynamics
     // ═══════════════════════════════════════════════════════════════════
-
     /// Enable Φ (phi) weighted competition (IIT integration)
     /// When true, strategy activation is weighted by integrated information
     pub enable_phi_weighting: bool,
@@ -285,7 +283,10 @@ impl UnifiedGlobalWorkspace {
 
     /// Create new unified workspace with observer
     #[cfg(feature = "observability_module")]
-    pub fn with_observer(config: UnifiedGWTConfig, observer: Option<SharedObserver<dyn SymthaeaObserver>>) -> Self {
+    pub fn with_observer(
+        config: UnifiedGWTConfig,
+        observer: Option<SharedObserver<dyn SymthaeaObserver>>,
+    ) -> Self {
         Self {
             hdc_workspace: GlobalWorkspace::new(config.workspace_config.clone()),
             strategy_activations: HashMap::new(),
@@ -311,10 +312,15 @@ impl UnifiedGlobalWorkspace {
     /// - Coalition size (more integration = higher Φ)
     /// - Cross-module connectivity
     /// - Information distinctiveness
-    fn estimate_phi(&self, strategy_name: &str, coalition_size: usize, representation: &[BinaryHV]) -> f64 {
+    fn estimate_phi(
+        &self,
+        strategy_name: &str,
+        coalition_size: usize,
+        representation: &[BinaryHV],
+    ) -> f64 {
         // Base Φ from coalition size (logarithmic scaling)
         let coalition_phi = if coalition_size > 1 {
-            (coalition_size as f64).ln() / 3.0_f64.ln()  // Normalized to ~1 for size 3
+            (coalition_size as f64).ln() / 3.0_f64.ln() // Normalized to ~1 for size 3
         } else {
             0.1
         };
@@ -327,11 +333,11 @@ impl UnifiedGlobalWorkspace {
             // Closer to 50% bit balance = higher Φ (more information content)
             let first = &representation[0];
             let popcount = first.popcount() as f64;
-            let dimension = 16384.0;  // BinaryHV dimension
-            let ratio = popcount / dimension;  // 0.0 to 1.0
-            let distance_from_half = (ratio - 0.5).abs();  // 0.0 to 0.5
-            let balance = 1.0 - distance_from_half * 2.0;  // 1.0 for 50%, 0.0 for 0%/100%
-            balance.max(0.1)  // Ensure minimum info_phi of 0.1
+            let dimension = 16384.0; // BinaryHV dimension
+            let ratio = popcount / dimension; // 0.0 to 1.0
+            let distance_from_half = (ratio - 0.5).abs(); // 0.0 to 0.5
+            let balance = 1.0 - distance_from_half * 2.0; // 1.0 for 50%, 0.0 for 0%/100%
+            balance.max(0.1) // Ensure minimum info_phi of 0.1
         };
 
         // Integration from strategy complexity
@@ -375,14 +381,18 @@ impl UnifiedGlobalWorkspace {
     }
 
     /// Perform metacognitive assessment
-    fn metacognitive_assess(&mut self, assessment: &WorkspaceAssessment) -> MetacognitiveAssessment {
+    fn metacognitive_assess(
+        &mut self,
+        assessment: &WorkspaceAssessment,
+    ) -> MetacognitiveAssessment {
         let timestep = self.stats.total_decisions;
 
         // Calculate stability from occupancy history
         let stability = if self.stats.occupancy_history.len() >= 5 {
             let recent: Vec<_> = self.stats.occupancy_history.iter().rev().take(5).collect();
             let mean = recent.iter().copied().sum::<f64>() / recent.len() as f64;
-            let variance = recent.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / recent.len() as f64;
+            let variance =
+                recent.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / recent.len() as f64;
             1.0 - variance.sqrt().clamp(0.0, 1.0)
         } else {
             1.0
@@ -391,7 +401,9 @@ impl UnifiedGlobalWorkspace {
 
         // Calculate coherence from content similarity
         let coherence: f64 = if assessment.conscious_contents.len() >= 2 {
-            let contents: Vec<_> = assessment.conscious_contents.iter()
+            let contents: Vec<_> = assessment
+                .conscious_contents
+                .iter()
                 .filter(|c| !c.representation.is_empty())
                 .collect();
             if contents.len() >= 2 {
@@ -462,7 +474,7 @@ impl UnifiedGlobalWorkspace {
         // REVOLUTIONARY: Check attentional blink
         // During blink period, submissions are attenuated (not blocked)
         let blink_factor = if self.in_attentional_blink {
-            0.3  // Significantly reduce activation during blink
+            0.3 // Significantly reduce activation during blink
         } else {
             1.0
         };
@@ -484,7 +496,8 @@ impl UnifiedGlobalWorkspace {
         };
 
         // Track strategy activation locally
-        self.strategy_activations.insert(strategy_name.to_string(), final_activation);
+        self.strategy_activations
+            .insert(strategy_name.to_string(), final_activation);
 
         // Create HDC workspace content with enhanced activation
         let content = WorkspaceContent::new(
@@ -526,7 +539,9 @@ impl UnifiedGlobalWorkspace {
         self.update_attentional_blink(assessment.ignition_detected);
 
         // Track occupancy
-        self.stats.occupancy_history.push(assessment.capacity.occupancy);
+        self.stats
+            .occupancy_history
+            .push(assessment.capacity.occupancy);
         if self.stats.occupancy_history.len() > 1000 {
             self.stats.occupancy_history.remove(0);
         }
@@ -543,13 +558,16 @@ impl UnifiedGlobalWorkspace {
         }
 
         // Find winning strategy from workspace
-        let winning_strategy = assessment.winner.as_ref()
+        let winning_strategy = assessment
+            .winner
+            .as_ref()
             .and_then(|w| w.strip_prefix("strategy:"))
             .map(|s| s.to_string());
 
         // Find winning coalition
         let winning_coalition = if let Some(ref strategy) = winning_strategy {
-            self.coalitions.iter_mut()
+            self.coalitions
+                .iter_mut()
                 .find(|c| c.strategy_name == *strategy)
                 .map(|c| {
                     if assessment.ignition_detected {
@@ -566,8 +584,10 @@ impl UnifiedGlobalWorkspace {
         if let Some(ref coalition) = winning_coalition {
             let n = self.stats.ignitions as f64;
             if n > 0.0 {
-                self.stats.avg_coalition_size =
-                    (self.stats.avg_coalition_size * (n - 1.0).max(0.0) + coalition.members.len() as f64) / n;
+                self.stats.avg_coalition_size = (self.stats.avg_coalition_size
+                    * (n - 1.0).max(0.0)
+                    + coalition.members.len() as f64)
+                    / n;
             }
         }
 
@@ -589,8 +609,7 @@ impl UnifiedGlobalWorkspace {
             if meta.needs_intervention {
                 cross_effects.push(format!(
                     "Metacognitive: stability={:.2}, action={:?}",
-                    meta.stability,
-                    meta.suggested_action
+                    meta.stability, meta.suggested_action
                 ));
             }
         }
@@ -601,7 +620,8 @@ impl UnifiedGlobalWorkspace {
             if let Some(ref observer) = self.observer {
                 use crate::observability::EventMetadata;
 
-                let components = winning_coalition.as_ref()
+                let components = winning_coalition
+                    .as_ref()
                     .map(|c| c.members.clone())
                     .unwrap_or_default();
 
@@ -629,7 +649,10 @@ impl UnifiedGlobalWorkspace {
 
                 if let Ok(mut obs) = observer.try_write() {
                     if let Err(e) = obs.record_workspace_ignition(event) {
-                        eprintln!("[OBSERVER ERROR] Failed to record workspace ignition: {}", e);
+                        eprintln!(
+                            "[OBSERVER ERROR] Failed to record workspace ignition: {}",
+                            e
+                        );
                     }
                 }
             }
@@ -646,13 +669,15 @@ impl UnifiedGlobalWorkspace {
 
     /// Get current workspace occupancy
     pub fn occupancy(&self) -> f64 {
-        self.hdc_workspace.get_conscious_contents().len() as f64 /
-            self.config.workspace_config.max_capacity as f64
+        self.hdc_workspace.get_conscious_contents().len() as f64
+            / self.config.workspace_config.max_capacity as f64
     }
 
     /// Check if a strategy is currently conscious
     pub fn is_conscious(&self, strategy_name: &str) -> bool {
-        self.hdc_workspace.get_conscious_contents().iter()
+        self.hdc_workspace
+            .get_conscious_contents()
+            .iter()
             .any(|c| c.source == format!("strategy:{}", strategy_name))
     }
 
@@ -701,7 +726,11 @@ impl UnifiedGlobalWorkspace {
             self.occupancy() * 100.0,
             self.strategy_activations.len(),
             self.coalitions.len(),
-            if self.config.enable_cross_broadcast { "✅ Enabled" } else { "❌ Disabled" }
+            if self.config.enable_cross_broadcast {
+                "✅ Enabled"
+            } else {
+                "❌ Disabled"
+            }
         )
     }
 }
@@ -725,7 +754,11 @@ mod tests {
             "FullDeliberation",
             0.9,
             vec![BinaryHV::ones()],
-            vec!["Perception".to_string(), "Memory".to_string(), "Attention".to_string()],
+            vec![
+                "Perception".to_string(),
+                "Memory".to_string(),
+                "Attention".to_string(),
+            ],
         );
 
         assert_eq!(ws.strategy_activations.len(), 1);

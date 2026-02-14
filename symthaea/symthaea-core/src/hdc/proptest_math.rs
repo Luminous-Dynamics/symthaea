@@ -22,10 +22,10 @@ and number theory modules hold across randomly generated inputs.
 #![cfg(test)]
 #![allow(dead_code)]
 
-use proptest::prelude::*;
 use crate::hdc::integer::IntegerArithmeticEngine;
-use crate::hdc::rational::RationalArithmeticEngine;
 use crate::hdc::number_theory::NumberTheoryEngine;
+use crate::hdc::rational::RationalArithmeticEngine;
+use proptest::prelude::*;
 
 /// Strategy for "small" integers that won't overflow under multiplication
 fn small_integer() -> impl Strategy<Value = i64> {
@@ -39,10 +39,12 @@ fn medium_integer() -> impl Strategy<Value = i64> {
 
 /// Strategy for nonzero integers (for division)
 fn nonzero_integer() -> impl Strategy<Value = i64> {
-    prop::num::i64::ANY.prop_filter("nonzero", |&x| x != 0).prop_map(|x| {
-        // Clamp to avoid overflow issues
-        x.max(-10000).min(10000)
-    })
+    prop::num::i64::ANY
+        .prop_filter("nonzero", |&x| x != 0)
+        .prop_map(|x| {
+            // Clamp to avoid overflow issues
+            x.max(-10000).min(10000)
+        })
 }
 
 /// Strategy for positive integers (for number theory)

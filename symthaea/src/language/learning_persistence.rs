@@ -111,7 +111,8 @@ impl LearningPersistenceConfig {
 
     /// Get path for a versioned backup
     pub fn backup_path(&self, version: usize) -> PathBuf {
-        self.data_dir.join(format!("{}.{}.bak", self.filename, version))
+        self.data_dir
+            .join(format!("{}.{}.bak", self.filename, version))
     }
 }
 
@@ -180,8 +181,8 @@ impl LearningPersistence {
             return Err(LearningPersistenceError::NotFound);
         }
 
-        let mut file = fs::File::open(&path)
-            .map_err(|e| LearningPersistenceError::Io(e.to_string()))?;
+        let mut file =
+            fs::File::open(&path).map_err(|e| LearningPersistenceError::Io(e.to_string()))?;
 
         let mut contents = String::new();
         file.read_to_string(&mut contents)
@@ -218,8 +219,8 @@ impl LearningPersistence {
 
         // Write to file
         let path = self.config.state_path();
-        let mut file = fs::File::create(&path)
-            .map_err(|e| LearningPersistenceError::Io(e.to_string()))?;
+        let mut file =
+            fs::File::create(&path).map_err(|e| LearningPersistenceError::Io(e.to_string()))?;
 
         file.write_all(json.as_bytes())
             .map_err(|e| LearningPersistenceError::Io(e.to_string()))?;
@@ -263,7 +264,7 @@ impl LearningPersistence {
         match (self.config.auto_save_interval, self.last_save) {
             (Some(interval), Some(last)) => last.elapsed() >= interval,
             (Some(_), None) => true, // Never saved, should save
-            (None, _) => false, // Auto-save disabled
+            (None, _) => false,      // Auto-save disabled
         }
     }
 
@@ -458,8 +459,15 @@ impl std::fmt::Display for LearningPersistenceError {
             Self::Io(e) => write!(f, "I/O error: {}", e),
             Self::Serialize(e) => write!(f, "Serialization error: {}", e),
             Self::Deserialize(e) => write!(f, "Deserialization error: {}", e),
-            Self::VersionMismatch { file_version, current_version } => {
-                write!(f, "Version mismatch: file v{} > current v{}", file_version, current_version)
+            Self::VersionMismatch {
+                file_version,
+                current_version,
+            } => {
+                write!(
+                    f,
+                    "Version mismatch: file v{} > current v{}",
+                    file_version, current_version
+                )
             }
             Self::InvalidVersion(v) => write!(f, "Invalid rollback version: {}", v),
         }
@@ -487,8 +495,7 @@ mod tests {
     #[test]
     fn test_save_and_load() {
         let dir = tempdir().unwrap();
-        let config = LearningPersistenceConfig::default()
-            .with_dir(dir.path().to_path_buf());
+        let config = LearningPersistenceConfig::default().with_dir(dir.path().to_path_buf());
 
         let mut persist = LearningPersistence::with_config(config);
         persist.initialize().unwrap();
@@ -503,8 +510,7 @@ mod tests {
         persist.save().unwrap();
 
         // Load in new instance
-        let config2 = LearningPersistenceConfig::default()
-            .with_dir(dir.path().to_path_buf());
+        let config2 = LearningPersistenceConfig::default().with_dir(dir.path().to_path_buf());
         let mut persist2 = LearningPersistence::with_config(config2);
         persist2.initialize().unwrap();
 
@@ -541,8 +547,7 @@ mod tests {
     #[test]
     fn test_rollback() {
         let dir = tempdir().unwrap();
-        let config = LearningPersistenceConfig::default()
-            .with_dir(dir.path().to_path_buf());
+        let config = LearningPersistenceConfig::default().with_dir(dir.path().to_path_buf());
 
         let mut persist = LearningPersistence::with_config(config.clone());
         persist.initialize().unwrap();

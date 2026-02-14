@@ -33,17 +33,15 @@
 //! - Predictive Processing (Friston)
 //! - Metacognitive Accuracy Research (Dunning-Kruger, calibration studies)
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
-use serde::{Serialize, Deserialize};
 
-use crate::consciousness::recursive_improvement::types::instant_now;
-use crate::consciousness::recursive_improvement::core::{
-    BottleneckType, Bottleneck, ComponentId,
-};
+use crate::consciousness::recursive_improvement::core::{Bottleneck, BottleneckType, ComponentId};
 use crate::consciousness::recursive_improvement::intrinsic_motivation::{
-    IntrinsicMotivationSystem, DriveType, MotivationConfig,
+    DriveType, IntrinsicMotivationSystem, MotivationConfig,
 };
+use crate::consciousness::recursive_improvement::types::instant_now;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CAPABILITY DOMAIN
@@ -127,8 +125,8 @@ impl CapabilityEstimate {
     pub fn new(domain: CapabilityDomain) -> Self {
         Self {
             domain,
-            level: 0.5,         // Start at 50% - neither confident nor unconfident
-            uncertainty: 0.3,   // High initial uncertainty
+            level: 0.5,       // Start at 50% - neither confident nor unconfident
+            uncertainty: 0.3, // High initial uncertainty
             trend: 0.0,
             last_updated: Instant::now(),
             evidence_count: 0,
@@ -147,8 +145,8 @@ impl CapabilityEstimate {
         let old_level = self.level;
 
         // Updated level is weighted average
-        self.level = (self.level * prior_weight + observed_performance * observation_weight)
-            / total_weight;
+        self.level =
+            (self.level * prior_weight + observed_performance * observation_weight) / total_weight;
 
         // Clamp to valid range
         self.level = self.level.clamp(0.0, 1.0);
@@ -175,7 +173,10 @@ impl CapabilityEstimate {
             _ => 1.0,
         };
         let margin = z * self.uncertainty;
-        ((self.level - margin).max(0.0), (self.level + margin).min(1.0))
+        (
+            (self.level - margin).max(0.0),
+            (self.level + margin).min(1.0),
+        )
     }
 }
 
@@ -237,7 +238,8 @@ impl PredictionRecord {
             return 0.0;
         }
         ((self.predicted_latency_ms as f64 - self.actual_latency_ms as f64)
-            / self.actual_latency_ms as f64).abs()
+            / self.actual_latency_ms as f64)
+            .abs()
     }
 }
 
@@ -338,10 +340,8 @@ impl SelfModel {
                     if let Some(related_estimate) = self.capabilities.get_mut(&related) {
                         // Small update to related domains
                         let propagated = observed_performance * interaction * 0.1;
-                        related_estimate.update(
-                            related_estimate.level + propagated,
-                            reliability * 0.5,
-                        );
+                        related_estimate
+                            .update(related_estimate.level + propagated, reliability * 0.5);
                     }
                 }
             }
@@ -362,20 +362,31 @@ impl SelfModel {
     /// Add known limitation
     pub fn add_limitation(&mut self, limitation: KnownLimitation) {
         // Check for duplicates
-        if !self.limitations.iter().any(|l| l.description == limitation.description) {
+        if !self
+            .limitations
+            .iter()
+            .any(|l| l.description == limitation.description)
+        {
             self.limitations.push(limitation);
         }
     }
 
     /// Get limitations for domain
     pub fn get_limitations(&self, domain: CapabilityDomain) -> Vec<&KnownLimitation> {
-        self.limitations.iter().filter(|l| l.domain == domain).collect()
+        self.limitations
+            .iter()
+            .filter(|l| l.domain == domain)
+            .collect()
     }
 
     /// Get most severe limitations
     pub fn most_severe_limitations(&self, n: usize) -> Vec<&KnownLimitation> {
         let mut sorted: Vec<_> = self.limitations.iter().collect();
-        sorted.sort_by(|a, b| b.severity.partial_cmp(&a.severity).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|a, b| {
+            b.severity
+                .partial_cmp(&a.severity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         sorted.into_iter().take(n).collect()
     }
 
@@ -399,10 +410,12 @@ impl SelfModel {
         }
 
         // Calculate average prediction error
-        let avg_error: f64 = self.prediction_history
+        let avg_error: f64 = self
+            .prediction_history
             .iter()
             .map(|r| r.phi_error())
-            .sum::<f64>() / self.prediction_history.len() as f64;
+            .sum::<f64>()
+            / self.prediction_history.len() as f64;
 
         // Convert error to confidence (inverse relationship)
         // Error of 0 -> confidence 1.0
@@ -419,12 +432,14 @@ impl SelfModel {
             return CalibrationStats::default();
         }
 
-        let phi_errors: Vec<f64> = self.prediction_history
+        let phi_errors: Vec<f64> = self
+            .prediction_history
             .iter()
             .map(|r| r.phi_error())
             .collect();
 
-        let latency_errors: Vec<f64> = self.prediction_history
+        let latency_errors: Vec<f64> = self
+            .prediction_history
             .iter()
             .map(|r| r.latency_error())
             .collect();
@@ -456,7 +471,8 @@ impl SelfModel {
         };
 
         // Φ prediction: capability scaled by integration ability
-        let integration = self.capabilities
+        let integration = self
+            .capabilities
             .get(&CapabilityDomain::Integration)
             .map(|e| e.level)
             .unwrap_or(0.5);
@@ -468,7 +484,8 @@ impl SelfModel {
             .iter()
             .filter_map(|d| self.capabilities.get(d))
             .map(|e| e.uncertainty)
-            .sum::<f64>() / task_domains.len().max(1) as f64;
+            .sum::<f64>()
+            / task_domains.len().max(1) as f64;
 
         // Latency prediction (placeholder - would need actual timing data)
         let complexity_factor = task_domains.len() as f64;
@@ -484,7 +501,10 @@ impl SelfModel {
     }
 
     /// Identify the limiting factor for a task
-    fn identify_limiting_factor(&self, task_domains: &[CapabilityDomain]) -> Option<(CapabilityDomain, f64)> {
+    fn identify_limiting_factor(
+        &self,
+        task_domains: &[CapabilityDomain],
+    ) -> Option<(CapabilityDomain, f64)> {
         task_domains
             .iter()
             .filter_map(|d| self.capabilities.get(d).map(|e| (*d, e.level)))
@@ -495,8 +515,14 @@ impl SelfModel {
     pub fn summary(&self) -> String {
         let mut s = String::from("=== Self-Model Summary ===\n\n");
 
-        s.push_str(&format!("Model Confidence: {:.1}%\n", self.model_confidence * 100.0));
-        s.push_str(&format!("Overall Capability: {:.1}%\n\n", self.overall_capability() * 100.0));
+        s.push_str(&format!(
+            "Model Confidence: {:.1}%\n",
+            self.model_confidence * 100.0
+        ));
+        s.push_str(&format!(
+            "Overall Capability: {:.1}%\n\n",
+            self.overall_capability() * 100.0
+        ));
 
         s.push_str("Capability Estimates:\n");
         for domain in CapabilityDomain::all() {
@@ -830,41 +856,28 @@ impl UnifiedImprovementController {
     /// Update self-model from observations
     fn update_self_model(&mut self, current_phi: f64, bottlenecks: &[Bottleneck]) {
         // Update Integration capability based on Φ
-        self.self_model.update_capability(
-            CapabilityDomain::Integration,
-            current_phi,
-            0.8,
-        );
+        self.self_model
+            .update_capability(CapabilityDomain::Integration, current_phi, 0.8);
 
         // Update capabilities based on bottlenecks
         for bottleneck in bottlenecks {
             let sev_f64 = bottleneck.severity as f64;
             let (domain, severity) = match bottleneck.bottleneck_type {
-                BottleneckType::Latency => {
-                    (CapabilityDomain::Reasoning, 1.0 - sev_f64)
-                }
+                BottleneckType::Latency => (CapabilityDomain::Reasoning, 1.0 - sev_f64),
                 BottleneckType::LowPhi | BottleneckType::PhiStagnation => {
                     (CapabilityDomain::Integration, 1.0 - sev_f64)
                 }
-                BottleneckType::Memory => {
-                    (CapabilityDomain::Memory, 1.0 - sev_f64)
-                }
+                BottleneckType::Memory => (CapabilityDomain::Memory, 1.0 - sev_f64),
                 BottleneckType::Accuracy | BottleneckType::LowAccuracy => {
                     (CapabilityDomain::Learning, 1.0 - sev_f64)
                 }
                 BottleneckType::ResourceExhaustion | BottleneckType::Computation => {
                     (CapabilityDomain::Metacognition, 1.0 - sev_f64)
                 }
-                BottleneckType::IO => {
-                    (CapabilityDomain::Perception, 1.0 - sev_f64)
-                }
-                BottleneckType::Oscillation => {
-                    (CapabilityDomain::Integration, 1.0 - sev_f64)
-                }
+                BottleneckType::IO => (CapabilityDomain::Perception, 1.0 - sev_f64),
+                BottleneckType::Oscillation => (CapabilityDomain::Integration, 1.0 - sev_f64),
                 // Remaining variants: Throughput, Energy, Integration, Contention
-                _ => {
-                    (CapabilityDomain::Integration, 1.0 - sev_f64)
-                }
+                _ => (CapabilityDomain::Integration, 1.0 - sev_f64),
             };
 
             self.self_model.update_capability(domain, severity, 0.6);
@@ -887,8 +900,12 @@ impl UnifiedImprovementController {
     }
 
     /// Convert motivation goals to desired states
-    fn goals_to_desired_states(&self, motivation: &IntrinsicMotivationSystem) -> Vec<DesiredSelfState> {
-        motivation.active_goals
+    fn goals_to_desired_states(
+        &self,
+        motivation: &IntrinsicMotivationSystem,
+    ) -> Vec<DesiredSelfState> {
+        motivation
+            .active_goals
             .iter()
             .map(|goal| {
                 let mut target_capabilities = HashMap::new();
@@ -934,9 +951,10 @@ impl UnifiedImprovementController {
 
         for desired in desired_states {
             // Check if we already have a trajectory for this goal
-            let already_planned = self.active_trajectories.iter().any(|t| {
-                t.goal_state.motivation_source == desired.motivation_source
-            });
+            let already_planned = self
+                .active_trajectories
+                .iter()
+                .any(|t| t.goal_state.motivation_source == desired.motivation_source);
 
             if already_planned {
                 continue;
@@ -973,7 +991,8 @@ impl UnifiedImprovementController {
 
         // Create steps for each target capability
         for (domain, target) in &goal_state.target_capabilities {
-            let current = self.self_model
+            let current = self
+                .self_model
                 .get_capability(*domain)
                 .map(|e| e.level)
                 .unwrap_or(0.5);
@@ -989,7 +1008,9 @@ impl UnifiedImprovementController {
                         }
                     }
                     CapabilityDomain::Learning | CapabilityDomain::Memory => {
-                        ImprovementMethod::Learning { samples_needed: 100 }
+                        ImprovementMethod::Learning {
+                            samples_needed: 100,
+                        }
                     }
                     _ => ImprovementMethod::ArchitecturalChange {
                         change_description: format!("Improve {:?}", domain),
@@ -997,7 +1018,12 @@ impl UnifiedImprovementController {
                 };
 
                 steps.push(ImprovementStep {
-                    description: format!("Improve {:?} from {:.0}% to {:.0}%", domain, current * 100.0, target * 100.0),
+                    description: format!(
+                        "Improve {:?} from {:.0}% to {:.0}%",
+                        domain,
+                        current * 100.0,
+                        target * 100.0
+                    ),
                     target_domain: *domain,
                     method,
                     prerequisites: Vec::new(),
@@ -1011,7 +1037,10 @@ impl UnifiedImprovementController {
         let risk = (steps.len() as f64 * 0.1).min(0.8);
 
         ImprovementTrajectory {
-            id: format!("traj_{:?}_{}", goal_state.motivation_source, self.stats.trajectories_created),
+            id: format!(
+                "traj_{:?}_{}",
+                goal_state.motivation_source, self.stats.trajectories_created
+            ),
             goal_state,
             estimated_duration_ms: steps.iter().map(|s| s.estimated_effort_ms).sum(),
             estimated_phi_gain: steps.iter().map(|s| s.estimated_effect).sum::<f64>() * 0.5,
@@ -1030,7 +1059,9 @@ impl UnifiedImprovementController {
 
         // Sort by effective priority
         self.active_trajectories.sort_by(|a, b| {
-            b.effective_priority().partial_cmp(&a.effective_priority()).unwrap()
+            b.effective_priority()
+                .partial_cmp(&a.effective_priority())
+                .unwrap()
         });
 
         // Get actions from highest priority trajectory
@@ -1065,7 +1096,8 @@ impl UnifiedImprovementController {
         }
 
         // Move completed trajectories
-        let (completed, active): (Vec<_>, Vec<_>) = self.active_trajectories
+        let (completed, active): (Vec<_>, Vec<_>) = self
+            .active_trajectories
             .drain(..)
             .partition(|t| t.is_complete());
 
@@ -1102,22 +1134,43 @@ impl UnifiedImprovementController {
         let mut s = String::from("=== Unified Improvement Controller ===\n\n");
 
         s.push_str(&format!("State: {:?}\n", self.state));
-        s.push_str(&format!("Active Trajectories: {}\n", self.active_trajectories.len()));
+        s.push_str(&format!(
+            "Active Trajectories: {}\n",
+            self.active_trajectories.len()
+        ));
         s.push_str(&format!("Cycles Run: {}\n\n", self.stats.cycles_run));
 
         s.push_str("Statistics:\n");
-        s.push_str(&format!("  Trajectories Created: {}\n", self.stats.trajectories_created));
-        s.push_str(&format!("  Trajectories Completed: {}\n", self.stats.trajectories_completed));
-        s.push_str(&format!("  Trajectories Abandoned: {}\n", self.stats.trajectories_abandoned));
-        s.push_str(&format!("  Total Φ Gained: {:.3}\n", self.stats.total_phi_gained));
-        s.push_str(&format!("  Success Rate: {:.1}%\n\n", self.stats.average_trajectory_success * 100.0));
+        s.push_str(&format!(
+            "  Trajectories Created: {}\n",
+            self.stats.trajectories_created
+        ));
+        s.push_str(&format!(
+            "  Trajectories Completed: {}\n",
+            self.stats.trajectories_completed
+        ));
+        s.push_str(&format!(
+            "  Trajectories Abandoned: {}\n",
+            self.stats.trajectories_abandoned
+        ));
+        s.push_str(&format!(
+            "  Total Φ Gained: {:.3}\n",
+            self.stats.total_phi_gained
+        ));
+        s.push_str(&format!(
+            "  Success Rate: {:.1}%\n\n",
+            self.stats.average_trajectory_success * 100.0
+        ));
 
         if !self.active_trajectories.is_empty() {
             s.push_str("Active Trajectories:\n");
             for t in &self.active_trajectories {
                 s.push_str(&format!(
                     "  {} ({:?}): {:.0}% complete, priority {:.2}\n",
-                    t.id, t.goal_state.motivation_source, t.progress * 100.0, t.priority
+                    t.id,
+                    t.goal_state.motivation_source,
+                    t.progress * 100.0,
+                    t.priority
                 ));
             }
             s.push_str("\n");
@@ -1241,10 +1294,8 @@ mod tests {
     fn test_self_model_behavior_prediction() {
         let model = SelfModel::new(SelfModelConfig::default());
 
-        let prediction = model.predict_behavior(&[
-            CapabilityDomain::Reasoning,
-            CapabilityDomain::Memory,
-        ]);
+        let prediction =
+            model.predict_behavior(&[CapabilityDomain::Reasoning, CapabilityDomain::Memory]);
 
         assert!(prediction.predicted_phi >= 0.0 && prediction.predicted_phi <= 1.0);
         assert!(prediction.confidence >= 0.0);
@@ -1287,18 +1338,16 @@ mod tests {
         let trajectory = ImprovementTrajectory {
             id: "test_traj".to_string(),
             goal_state,
-            steps: vec![
-                ImprovementStep {
-                    description: "Test step".to_string(),
-                    target_domain: CapabilityDomain::Reasoning,
-                    method: ImprovementMethod::GradientOptimization {
-                        target_objective: "Reasoning".to_string(),
-                    },
-                    prerequisites: Vec::new(),
-                    estimated_effect: 0.2,
-                    estimated_effort_ms: 5000,
-                }
-            ],
+            steps: vec![ImprovementStep {
+                description: "Test step".to_string(),
+                target_domain: CapabilityDomain::Reasoning,
+                method: ImprovementMethod::GradientOptimization {
+                    target_objective: "Reasoning".to_string(),
+                },
+                prerequisites: Vec::new(),
+                estimated_effect: 0.2,
+                estimated_effort_ms: 5000,
+            }],
             estimated_duration_ms: 5000,
             estimated_phi_gain: 0.1,
             risk_assessment: 0.3,
@@ -1359,7 +1408,9 @@ mod tests {
 
         // Should have planned trajectories if motivation has goals
         if !motivation.active_goals.is_empty() {
-            assert!(output.new_trajectories_planned > 0 || controller.active_trajectories.len() > 0);
+            assert!(
+                output.new_trajectories_planned > 0 || controller.active_trajectories.len() > 0
+            );
         }
     }
 
@@ -1380,7 +1431,9 @@ mod tests {
         controller.cycle(0.5, &motivation, &[bottleneck]);
 
         // Should have added limitation
-        let limitations = controller.self_model.get_limitations(CapabilityDomain::Integration);
+        let limitations = controller
+            .self_model
+            .get_limitations(CapabilityDomain::Integration);
         assert!(!limitations.is_empty());
     }
 

@@ -13,12 +13,11 @@
 //! 7. **Full Cognitive Cycle** - End-to-end unified cycle timing
 
 use crate::cognitive_loop::{
-    ThalamicRouter, ClosedLearningLoop, ActiveInferenceBridge,
-    EpisodicMemoryBridge, GoalSystemBridge, WorldModelBridge,
-    CognitiveLoopService, CognitiveLoopConfig, CognitiveGoal,
-    ResponseStrategy, CycleLearningResult,
+    ActiveInferenceBridge, ClosedLearningLoop, CognitiveGoal, CognitiveLoopConfig,
+    CognitiveLoopService, CycleLearningResult, EpisodicMemoryBridge, GoalSystemBridge,
+    ResponseStrategy, ThalamicRouter, WorldModelBridge,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
 /// Configuration for unified architecture benchmarks
@@ -81,9 +80,11 @@ impl BenchmarkResult {
         let min_time_us = *times_us.first().unwrap_or(&0);
         let max_time_us = *times_us.last().unwrap_or(&0);
 
-        let variance: f64 = times_us.iter()
+        let variance: f64 = times_us
+            .iter()
             .map(|&t| (t as f64 - mean_time_us).powi(2))
-            .sum::<f64>() / iterations as f64;
+            .sum::<f64>()
+            / iterations as f64;
         let std_dev_us = variance.sqrt();
 
         let throughput_ops_per_sec = if mean_time_us > 0.0 {
@@ -142,7 +143,10 @@ impl UnifiedArchitectureBenchmarkResults {
             "═══════════════════════════════════════════════════════════════".to_string(),
             "UNIFIED ARCHITECTURE BENCHMARK RESULTS".to_string(),
             "═══════════════════════════════════════════════════════════════".to_string(),
-            format!("Iterations: {}, Warmup: {}", self.config.iterations, self.config.warmup),
+            format!(
+                "Iterations: {}, Warmup: {}",
+                self.config.iterations, self.config.warmup
+            ),
             "".to_string(),
             "Component Performance:".to_string(),
             format!("  {}", self.thalamic_router.summary()),
@@ -158,7 +162,10 @@ impl UnifiedArchitectureBenchmarkResults {
             "Full Cycle:".to_string(),
             format!("  {}", self.full_cycle.summary()),
             "".to_string(),
-            format!("Total benchmark time: {:.2}s", self.total_benchmark_time_secs),
+            format!(
+                "Total benchmark time: {:.2}s",
+                self.total_benchmark_time_secs
+            ),
             "═══════════════════════════════════════════════════════════════".to_string(),
         ];
         lines.join("\n")
@@ -166,7 +173,9 @@ impl UnifiedArchitectureBenchmarkResults {
 }
 
 /// Run the unified architecture benchmark suite
-pub fn run_unified_architecture_benchmark(config: UnifiedArchitectureBenchmarkConfig) -> UnifiedArchitectureBenchmarkResults {
+pub fn run_unified_architecture_benchmark(
+    config: UnifiedArchitectureBenchmarkConfig,
+) -> UnifiedArchitectureBenchmarkResults {
     let start = Instant::now();
 
     // Benchmark ThalamicRouter
@@ -181,8 +190,7 @@ pub fn run_unified_architecture_benchmark(config: UnifiedArchitectureBenchmarkCo
         benchmark_active_inference(&config);
 
     // Benchmark EpisodicMemoryBridge
-    let (episodic_memory_encode, episodic_memory_recall) =
-        benchmark_episodic_memory(&config);
+    let (episodic_memory_encode, episodic_memory_recall) = benchmark_episodic_memory(&config);
 
     // Benchmark GoalSystemBridge
     let goal_system_attention = benchmark_goal_system(&config);
@@ -322,8 +330,14 @@ fn benchmark_active_inference(
     }
 
     (
-        BenchmarkResult::from_timings("ActiveInferenceBridge.observe_resolution()", &observe_timings),
-        BenchmarkResult::from_timings("ActiveInferenceBridge.modulation_index()", &modulation_timings),
+        BenchmarkResult::from_timings(
+            "ActiveInferenceBridge.observe_resolution()",
+            &observe_timings,
+        ),
+        BenchmarkResult::from_timings(
+            "ActiveInferenceBridge.modulation_index()",
+            &modulation_timings,
+        ),
     )
 }
 

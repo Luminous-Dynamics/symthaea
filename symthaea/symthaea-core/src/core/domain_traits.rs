@@ -445,11 +445,17 @@ mod tests {
 
     impl Goal<TestState> for TestGoal {
         fn is_satisfied(&self, state: &TestState) -> bool {
-            state.values.first().map(|v| *v >= self.target).unwrap_or(false)
+            state
+                .values
+                .first()
+                .map(|v| *v >= self.target)
+                .unwrap_or(false)
         }
 
         fn distance_to_goal(&self, state: &TestState) -> f64 {
-            state.values.first()
+            state
+                .values
+                .first()
                 .map(|v| (self.target - v).max(0.0))
                 .unwrap_or(f64::MAX)
         }
@@ -457,8 +463,12 @@ mod tests {
 
     #[test]
     fn test_state_trait() {
-        let s1 = TestState { values: vec![1.0, 2.0, 3.0] };
-        let s2 = TestState { values: vec![1.0, 2.0, 4.0] };
+        let s1 = TestState {
+            values: vec![1.0, 2.0, 3.0],
+        };
+        let s2 = TestState {
+            values: vec![1.0, 2.0, 4.0],
+        };
 
         assert_eq!(s1.feature_dim(), 3);
         assert!((s1.distance(&s2) - 1.0).abs() < 1e-10);

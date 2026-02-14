@@ -145,11 +145,11 @@ impl HiddenMarkovModel {
         // Rows: from-state, Columns: to-state
         //              Wake    N1      N2      N3      REM
         let transition = vec![
-            vec![0.85,  0.10,   0.03,   0.00,   0.02],  // Wake
-            vec![0.10,  0.50,   0.35,   0.00,   0.05],  // N1
-            vec![0.02,  0.05,   0.75,   0.13,   0.05],  // N2
-            vec![0.00,  0.00,   0.10,   0.85,   0.05],  // N3
-            vec![0.05,  0.05,   0.15,   0.00,   0.75],  // REM
+            vec![0.85, 0.10, 0.03, 0.00, 0.02], // Wake
+            vec![0.10, 0.50, 0.35, 0.00, 0.05], // N1
+            vec![0.02, 0.05, 0.75, 0.13, 0.05], // N2
+            vec![0.00, 0.00, 0.10, 0.85, 0.05], // N3
+            vec![0.05, 0.05, 0.15, 0.00, 0.75], // REM
         ];
 
         let initial = vec![0.60, 0.20, 0.10, 0.05, 0.05];
@@ -170,12 +170,12 @@ impl HiddenMarkovModel {
     /// States: Alert(0), Light(1), Moderate(2), Deep(3), Surgical(4), Burst-Suppression(5)
     pub fn anesthesia() -> Self {
         let transition = vec![
-            vec![0.80, 0.15, 0.04, 0.01, 0.00, 0.00],  // Alert
-            vec![0.10, 0.65, 0.20, 0.05, 0.00, 0.00],  // Light
-            vec![0.02, 0.08, 0.70, 0.15, 0.05, 0.00],  // Moderate
-            vec![0.00, 0.02, 0.10, 0.70, 0.15, 0.03],  // Deep
-            vec![0.00, 0.00, 0.03, 0.12, 0.75, 0.10],  // Surgical
-            vec![0.00, 0.00, 0.00, 0.05, 0.15, 0.80],  // Burst-Suppression
+            vec![0.80, 0.15, 0.04, 0.01, 0.00, 0.00], // Alert
+            vec![0.10, 0.65, 0.20, 0.05, 0.00, 0.00], // Light
+            vec![0.02, 0.08, 0.70, 0.15, 0.05, 0.00], // Moderate
+            vec![0.00, 0.02, 0.10, 0.70, 0.15, 0.03], // Deep
+            vec![0.00, 0.00, 0.03, 0.12, 0.75, 0.10], // Surgical
+            vec![0.00, 0.00, 0.00, 0.05, 0.15, 0.80], // Burst-Suppression
         ];
 
         let initial = vec![0.90, 0.05, 0.03, 0.01, 0.005, 0.005];
@@ -259,11 +259,7 @@ impl HiddenMarkovModel {
     /// Backward algorithm: compute P(O_{t+1}..O_T | state_t = i, model).
     ///
     /// Uses the same scaling factors from the forward pass to prevent underflow.
-    pub fn backward(
-        &self,
-        observations: &[Vec<f64>],
-        scaling: &[f64],
-    ) -> Vec<Vec<f64>> {
+    pub fn backward(&self, observations: &[Vec<f64>], scaling: &[f64]) -> Vec<Vec<f64>> {
         let n = self.config.n_states;
         let t_len = observations.len();
 
@@ -689,11 +685,7 @@ mod tests {
     #[test]
     fn test_posterior_sums_to_one() {
         let hmm = two_state_hmm();
-        let obs = vec![
-            vec![0.9, 0.2],
-            vec![0.5, 0.5],
-            vec![0.2, 0.8],
-        ];
+        let obs = vec![vec![0.9, 0.2], vec![0.5, 0.5], vec![0.2, 0.8]];
 
         let gamma = hmm.posterior(&obs);
         assert_eq!(gamma.len(), 3);
@@ -712,11 +704,7 @@ mod tests {
     #[test]
     fn test_smooth_classify() {
         let hmm = two_state_hmm();
-        let obs = vec![
-            vec![0.9, 0.1],
-            vec![0.8, 0.2],
-            vec![0.1, 0.9],
-        ];
+        let obs = vec![vec![0.9, 0.1], vec![0.8, 0.2], vec![0.1, 0.9]];
 
         let states = hmm.smooth_classify(&obs);
         assert_eq!(states.len(), 3);
@@ -829,10 +817,7 @@ mod tests {
 
     #[test]
     fn test_normalize_observations() {
-        let raw = vec![
-            vec![0.0, 0.0, 1.0],
-            vec![5.0, 3.0, 2.0],
-        ];
+        let raw = vec![vec![0.0, 0.0, 1.0], vec![5.0, 3.0, 2.0]];
 
         let normalized = HiddenMarkovModel::normalize_observations(&raw);
 

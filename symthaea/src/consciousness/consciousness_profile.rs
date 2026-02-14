@@ -30,9 +30,9 @@
 //! - Provides richer understanding
 //! - Finds primitives that excel in different dimensions
 
-use crate::hdc::{BinaryHV, integrated_information::IntegratedInformation};
-use serde::{Deserialize, Serialize};
+use crate::hdc::{integrated_information::IntegratedInformation, BinaryHV};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 /// Complete consciousness profile across multiple dimensions
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,7 +68,8 @@ impl ConsciousnessProfile {
         let coherence = Self::compute_coherence(components);
 
         // Weighted composite score
-        let composite = Self::compute_composite(phi, gradient_magnitude, entropy, complexity, coherence);
+        let composite =
+            Self::compute_composite(phi, gradient_magnitude, entropy, complexity, coherence);
 
         Self {
             phi,
@@ -118,7 +119,7 @@ impl ConsciousnessProfile {
         }
 
         // Count active bits across all components
-        let total_bits = components.len() * 16384;  // BinaryHV dimensionality
+        let total_bits = components.len() * 16384; // BinaryHV dimensionality
         let mut active_bits = 0;
 
         for hv in components {
@@ -129,14 +130,13 @@ impl ConsciousnessProfile {
         let p = active_bits as f64 / total_bits as f64;
 
         if p == 0.0 || p == 1.0 {
-            return 0.0;  // No entropy - all same
+            return 0.0; // No entropy - all same
         }
 
         // Shannon entropy: H = -p*log(p) - (1-p)*log(1-p)
-        
 
         // Normalize to [0, 1]
-        -(p * p.log2() + (1.0 - p) * (1.0 - p).log2())  // Already in [0, 1] range
+        -(p * p.log2() + (1.0 - p) * (1.0 - p).log2()) // Already in [0, 1] range
     }
 
     /// Compute complexity - structural sophistication
@@ -154,7 +154,7 @@ impl ConsciousnessProfile {
         let n = components.len() as f64;
 
         // Component count complexity (logarithmic scaling)
-        let count_complexity = (n.ln() + 1.0) / 6.0;  // Normalized
+        let count_complexity = (n.ln() + 1.0) / 6.0; // Normalized
 
         // Diversity complexity - how different are components?
         let diversity = Self::compute_component_diversity(components);
@@ -173,7 +173,7 @@ impl ConsciousnessProfile {
         let mut distances = Vec::new();
 
         for i in 0..components.len() {
-            for j in (i+1)..components.len() {
+            for j in (i + 1)..components.len() {
                 let dist = components[i].hamming_distance(&components[j]);
                 // Normalize by dimensionality
                 distances.push(dist as f64 / 16384.0);
@@ -197,11 +197,11 @@ impl ConsciousnessProfile {
     /// In absence of temporal data, we measure internal consistency.
     fn compute_coherence(components: &[BinaryHV]) -> f64 {
         if components.is_empty() {
-            return 1.0;  // Perfect coherence (trivial)
+            return 1.0; // Perfect coherence (trivial)
         }
 
         if components.len() == 1 {
-            return 1.0;  // Single component - perfectly coherent
+            return 1.0; // Single component - perfectly coherent
         }
 
         // Coherence as inverse of diversity
@@ -225,11 +225,11 @@ impl ConsciousnessProfile {
         coherence: f64,
     ) -> f64 {
         // Default weights (can be made configurable)
-        const W_PHI: f64 = 0.35;        // Φ is most important (IIT core)
-        const W_GRADIENT: f64 = 0.15;   // Flow dynamics
-        const W_ENTROPY: f64 = 0.20;    // Richness/diversity
+        const W_PHI: f64 = 0.35; // Φ is most important (IIT core)
+        const W_GRADIENT: f64 = 0.15; // Flow dynamics
+        const W_ENTROPY: f64 = 0.20; // Richness/diversity
         const W_COMPLEXITY: f64 = 0.15; // Sophistication
-        const W_COHERENCE: f64 = 0.15;  // Stability
+        const W_COHERENCE: f64 = 0.15; // Stability
 
         W_PHI * phi
             + W_GRADIENT * gradient
@@ -244,19 +244,17 @@ impl ConsciousnessProfile {
     /// - A is >= B in all dimensions
     /// - A is > B in at least one dimension
     pub fn dominates(&self, other: &Self) -> bool {
-        let better_or_equal =
-            self.phi >= other.phi &&
-            self.gradient_magnitude >= other.gradient_magnitude &&
-            self.entropy >= other.entropy &&
-            self.complexity >= other.complexity &&
-            self.coherence >= other.coherence;
+        let better_or_equal = self.phi >= other.phi
+            && self.gradient_magnitude >= other.gradient_magnitude
+            && self.entropy >= other.entropy
+            && self.complexity >= other.complexity
+            && self.coherence >= other.coherence;
 
-        let strictly_better =
-            self.phi > other.phi ||
-            self.gradient_magnitude > other.gradient_magnitude ||
-            self.entropy > other.entropy ||
-            self.complexity > other.complexity ||
-            self.coherence > other.coherence;
+        let strictly_better = self.phi > other.phi
+            || self.gradient_magnitude > other.gradient_magnitude
+            || self.entropy > other.entropy
+            || self.complexity > other.complexity
+            || self.coherence > other.coherence;
 
         better_or_equal && strictly_better
     }
@@ -321,10 +319,7 @@ impl ProfileWeights {
         let sum = self.phi + self.gradient + self.entropy + self.complexity + self.coherence;
 
         if (sum - 1.0).abs() > 0.001 {
-            anyhow::bail!(
-                "Profile weights must sum to 1.0, got {:.3}",
-                sum
-            );
+            anyhow::bail!("Profile weights must sum to 1.0, got {:.3}", sum);
         }
 
         Ok(())
@@ -356,9 +351,9 @@ impl ParetoFrontier {
 
         for candidate in &population {
             // Check if any existing frontier member dominates this candidate
-            let dominated = frontier.iter().any(|front: &ConsciousnessProfile| {
-                front.dominates(candidate)
-            });
+            let dominated = frontier
+                .iter()
+                .any(|front: &ConsciousnessProfile| front.dominates(candidate));
 
             if !dominated {
                 // Remove any frontier members dominated by this candidate
@@ -388,13 +383,11 @@ impl ParetoFrontier {
             composite: 1.0,
         };
 
-        self.profiles
-            .iter()
-            .min_by(|a, b| {
-                let dist_a = a.distance_to(&ideal);
-                let dist_b = b.distance_to(&ideal);
-                dist_a.partial_cmp(&dist_b).unwrap()
-            })
+        self.profiles.iter().min_by(|a, b| {
+            let dist_a = a.distance_to(&ideal);
+            let dist_b = b.distance_to(&ideal);
+            dist_a.partial_cmp(&dist_b).unwrap()
+        })
     }
 
     /// Get frontier member with highest composite score
@@ -462,17 +455,29 @@ mod tests {
     fn test_pareto_frontier() {
         let profiles = vec![
             ConsciousnessProfile {
-                phi: 0.8, gradient_magnitude: 0.3, entropy: 0.5,
-                complexity: 0.4, coherence: 0.6, composite: 0.6,
+                phi: 0.8,
+                gradient_magnitude: 0.3,
+                entropy: 0.5,
+                complexity: 0.4,
+                coherence: 0.6,
+                composite: 0.6,
             },
             ConsciousnessProfile {
-                phi: 0.5, gradient_magnitude: 0.4, entropy: 0.9,
-                complexity: 0.5, coherence: 0.5, composite: 0.6,
+                phi: 0.5,
+                gradient_magnitude: 0.4,
+                entropy: 0.9,
+                complexity: 0.5,
+                coherence: 0.5,
+                composite: 0.6,
             },
             ConsciousnessProfile {
-                phi: 0.4, gradient_magnitude: 0.2, entropy: 0.4,
-                complexity: 0.3, coherence: 0.3, composite: 0.4,
-            },  // Dominated - should be excluded
+                phi: 0.4,
+                gradient_magnitude: 0.2,
+                entropy: 0.4,
+                complexity: 0.3,
+                coherence: 0.3,
+                composite: 0.4,
+            }, // Dominated - should be excluded
         ];
 
         let frontier = ParetoFrontier::from_population(profiles);

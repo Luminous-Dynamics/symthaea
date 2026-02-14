@@ -3,12 +3,13 @@
 //! Each test compares module output against a known analytical value or textbook result.
 //! This catches formula transcription errors and numerical issues that range-only tests miss.
 
+use super::acoustics::AcousticsEncoder;
 use super::astrophysics::StellarEncoder;
 use super::chaos_dynamics::{systems, AttractorAnalyzer, LyapunovCalculator};
 use super::condensed_matter::CMEncoder;
-use super::constants::{C, E_CHARGE, EPSILON_0, G, H, HBAR, K_BOLTZMANN, M_ELECTRON};
+use super::constants::{C, EPSILON_0, E_CHARGE, G, H, HBAR, K_BOLTZMANN, M_ELECTRON};
 use super::cosmology::CosmologyEncoder;
-use super::decoherence::{Complex64, DecoherenceChannel, DensityMatrix, simulate_decoherence};
+use super::decoherence::{simulate_decoherence, Complex64, DecoherenceChannel, DensityMatrix};
 use super::electromagnetism::{EMEncoder, Polarization, SpectrumRegion};
 use super::fluid_dynamics::FluidEncoder;
 use super::general_relativity::GREncoder;
@@ -16,19 +17,18 @@ use super::hadrons::Hadrons;
 use super::nonequilibrium::{FluctuationDissipation, JarzynskiEstimator, OnsagerCoefficients};
 use super::optics::{OpticsEncoder, PhotonStatistics};
 use super::periodic_table::PeriodicTable;
+use super::physics_test_helpers::assert_relative_eq;
 use super::plasma_physics::PlasmaEncoder;
 use super::quantum_information::QIEncoder;
 use super::quantum_tunneling::TunnelingCalculator;
 use super::standard_model::StandardModel;
-use super::thermal_transport::{ThermalProperties, LayerGeometry, ThermalTransport};
-use super::acoustics::AcousticsEncoder;
-use super::tensor_algebra::{MetricTensor, ChristoffelSymbols};
+use super::tensor_algebra::{ChristoffelSymbols, MetricTensor};
+use super::thermal_transport::{LayerGeometry, ThermalProperties, ThermalTransport};
 use super::thermodynamics::ThermoEncoder;
 use super::trigger_systems::LcfPhysicsConstants;
-use super::true_phi::{TruePhiCalculator, QuantumEntropyCalculator};
-use crate::hdc::unified_hv::ContinuousHV;
+use super::true_phi::{QuantumEntropyCalculator, TruePhiCalculator};
 use crate::genesis::GenesisSeed;
-use super::physics_test_helpers::assert_relative_eq;
+use crate::hdc::unified_hv::ContinuousHV;
 
 // =========================================================================
 // Section 1: Quantum Tunneling
@@ -64,9 +64,9 @@ fn rectangular_barrier_unitarity() {
     // T + R = 1 must hold for any parameters
     let calc = TunnelingCalculator::electron();
     let params: [(f64, f64, f64); 4] = [
-        (1.0, 5.0, 1e-10), // below barrier
-        (4.0, 5.0, 1e-10), // just below
-        (6.0, 5.0, 1e-10), // above barrier
+        (1.0, 5.0, 1e-10),  // below barrier
+        (4.0, 5.0, 1e-10),  // just below
+        (6.0, 5.0, 1e-10),  // above barrier
         (2.0, 10.0, 5e-10), // thick barrier
     ];
     for &(e_ev, v_ev, width) in &params {
@@ -292,7 +292,12 @@ fn kaplan_yorke_from_spectrum() {
     let d_ky = analyzer.kaplan_yorke_dimension(&spectrum);
     let expected = 2.0 + 0.906 / 14.572;
 
-    assert_relative_eq(d_ky, expected, 1e-10, "Kaplan-Yorke dimension (pure arithmetic)");
+    assert_relative_eq(
+        d_ky,
+        expected,
+        1e-10,
+        "Kaplan-Yorke dimension (pure arithmetic)",
+    );
 }
 
 #[test]
@@ -300,8 +305,7 @@ fn lorenz_exponent_sum() {
     // Σλᵢ = -(σ + 1 + β) = -(10 + 1 + 8/3) = -13.6667
     let calc = LyapunovCalculator::new(0.01, 5000, 50000);
     let lorenz = |state: &[f64]| systems::lorenz(state, 10.0, 28.0, 8.0 / 3.0);
-    let jacobian =
-        |state: &[f64]| systems::lorenz_jacobian(state, 10.0, 28.0, 8.0 / 3.0);
+    let jacobian = |state: &[f64]| systems::lorenz_jacobian(state, 10.0, 28.0, 8.0 / 3.0);
     let initial = vec![1.0, 1.0, 1.0];
 
     let spectrum = calc.lyapunov_spectrum(lorenz, jacobian, &initial);
@@ -422,8 +426,7 @@ fn debye_length_value() {
     let lambda_d = encoder.debye_length_m(temp_ev, density);
 
     let t_k: f64 = temp_ev * 11604.0;
-    let expected: f64 =
-        (EPSILON_0 * K_BOLTZMANN * t_k / (density * E_CHARGE * E_CHARGE)).sqrt();
+    let expected: f64 = (EPSILON_0 * K_BOLTZMANN * t_k / (density * E_CHARGE * E_CHARGE)).sqrt();
 
     assert_relative_eq(lambda_d, expected, 1e-6, "Debye length");
 }
@@ -436,8 +439,7 @@ fn plasma_frequency_value() {
 
     let density: f64 = 1e18;
     let omega_p = encoder.plasma_frequency_rad_s(density);
-    let expected: f64 =
-        (density * E_CHARGE * E_CHARGE / (EPSILON_0 * M_ELECTRON)).sqrt();
+    let expected: f64 = (density * E_CHARGE * E_CHARGE / (EPSILON_0 * M_ELECTRON)).sqrt();
 
     assert_relative_eq(omega_p, expected, 1e-6, "Plasma frequency");
 }
@@ -530,8 +532,8 @@ fn depolarizing_converges_to_maximally_mixed() {
 fn eckart_barrier_unitarity() {
     // T + R = 1 for Eckart barrier at various energies
     let calc = TunnelingCalculator::electron();
-    let v0: f64 = 1.0e-19;   // barrier height ~0.6 eV
-    let a: f64 = 1.0e-10;    // barrier width ~1 Å
+    let v0: f64 = 1.0e-19; // barrier height ~0.6 eV
+    let a: f64 = 1.0e-10; // barrier width ~1 Å
 
     let energies = [0.1e-19, 0.3e-19, 0.5e-19, 0.8e-19, 1.2e-19, 2.0e-19];
     for &e in &energies {
@@ -558,7 +560,9 @@ fn eckart_barrier_transmission_increases_with_energy() {
         assert!(
             result.transmission >= prev_t,
             "Eckart T should increase with E: T({:.2e})={} < T_prev={}",
-            e, result.transmission, prev_t
+            e,
+            result.transmission,
+            prev_t
         );
         prev_t = result.transmission;
     }
@@ -667,11 +671,7 @@ fn onsager_entropy_production_quadratic_form() {
     let sigma = onsager.entropy_production(&forces);
 
     // Cross-check via manual double sum
-    let l = [
-        [2.0, 0.5, 0.3],
-        [0.5, 3.0, 0.4],
-        [0.3, 0.4, 1.0],
-    ];
+    let l = [[2.0, 0.5, 0.3], [0.5, 3.0, 0.4], [0.3, 0.4, 1.0]];
     let x = [1.0, -0.5, 2.0];
     let mut manual_sigma = 0.0;
     for i in 0..3 {
@@ -749,8 +749,12 @@ fn thermal_relaxation_low_temp() {
 
 /// Inverse normal CDF (Abramowitz & Stegun 26.2.23 rational approximation)
 fn inverse_normal_cdf(p: f64) -> f64 {
-    if p <= 0.0 { return -6.0; }
-    if p >= 1.0 { return 6.0; }
+    if p <= 0.0 {
+        return -6.0;
+    }
+    if p >= 1.0 {
+        return 6.0;
+    }
 
     let t = if p < 0.5 {
         (-2.0 * p.ln()).sqrt()
@@ -768,15 +772,19 @@ fn inverse_normal_cdf(p: f64) -> f64 {
 
     let approx = t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t * t * t);
 
-    if p < 0.5 { -approx } else { approx }
+    if p < 0.5 {
+        -approx
+    } else {
+        approx
+    }
 }
 
 #[test]
 fn jarzynski_gaussian_work() {
     // For Gaussian-distributed work W ~ N(W₀, σ²),
     // Jarzynski equality gives: ΔF = W₀ - β·σ²/2
-    let w0: f64 = 5e-21;     // Mean work (J)
-    let sigma: f64 = 1e-21;  // Std dev (J)
+    let w0: f64 = 5e-21; // Mean work (J)
+    let sigma: f64 = 1e-21; // Std dev (J)
     let temp: f64 = 300.0;
     let beta: f64 = 1.0 / (K_BOLTZMANN * temp);
 
@@ -795,7 +803,12 @@ fn jarzynski_gaussian_work() {
     let estimator = JarzynskiEstimator::new();
     let delta_f = estimator.free_energy_difference(&samples, temp);
 
-    assert_relative_eq(delta_f, expected_delta_f, 0.01, "Jarzynski Gaussian work ΔF");
+    assert_relative_eq(
+        delta_f,
+        expected_delta_f,
+        0.01,
+        "Jarzynski Gaussian work ΔF",
+    );
 }
 
 // =========================================================================
@@ -852,9 +865,8 @@ fn hermitian_eigenvalues_known_spectrum() {
 
     // Entropy: S = -(0.6 log₂ 0.6 + 0.3 log₂ 0.3 + 0.1 log₂ 0.1)
     let s = rho.von_neumann_entropy();
-    let expected_s = -(0.6_f64 * 0.6_f64.log2()
-        + 0.3_f64 * 0.3_f64.log2()
-        + 0.1_f64 * 0.1_f64.log2());
+    let expected_s =
+        -(0.6_f64 * 0.6_f64.log2() + 0.3_f64 * 0.3_f64.log2() + 0.1_f64 * 0.1_f64.log2());
     assert_relative_eq(s, expected_s, 1e-10, "Entropy of diag(0.6,0.3,0.1)");
 }
 
@@ -875,8 +887,18 @@ fn hermitian_eigenvalues_off_diagonal() {
     let lambda1 = 0.5 + disc;
     let lambda2 = 0.5 - disc;
 
-    assert_relative_eq(eigenvalues[0], lambda1, 1e-10, "λ₁ of [[0.7,0.1],[0.1,0.3]]");
-    assert_relative_eq(eigenvalues[1], lambda2, 1e-10, "λ₂ of [[0.7,0.1],[0.1,0.3]]");
+    assert_relative_eq(
+        eigenvalues[0],
+        lambda1,
+        1e-10,
+        "λ₁ of [[0.7,0.1],[0.1,0.3]]",
+    );
+    assert_relative_eq(
+        eigenvalues[1],
+        lambda2,
+        1e-10,
+        "λ₂ of [[0.7,0.1],[0.1,0.3]]",
+    );
 }
 
 // =========================================================================
@@ -898,8 +920,12 @@ fn photon_energy_ev_formula() {
     for (wavelength, expected) in &test_cases {
         let beam = encoder.create_beam(*wavelength, 1.0, 100.0, PhotonStatistics::Coherent);
         let actual = beam.photon_energy_ev();
-        assert_relative_eq(actual, *expected, 1e-10,
-            &format!("Photon energy at {}nm", wavelength));
+        assert_relative_eq(
+            actual,
+            *expected,
+            1e-10,
+            &format!("Photon energy at {}nm", wavelength),
+        );
     }
 }
 
@@ -936,7 +962,12 @@ fn rayleigh_range_formula() {
     let lambda_mm = wavelength_nm * 1e-6;
     let expected = std::f64::consts::PI * w0_mm * w0_mm / lambda_mm;
 
-    assert_relative_eq(actual, expected, 1e-10, "Rayleigh range for 100μm waist at 532nm");
+    assert_relative_eq(
+        actual,
+        expected,
+        1e-10,
+        "Rayleigh range for 100μm waist at 532nm",
+    );
 }
 
 // =========================================================================
@@ -970,7 +1001,11 @@ fn em_spectrum_frequency_ranges() {
                 region
             );
         } else {
-            assert!(hi.is_infinite(), "{:?} upper bound should be infinity", region);
+            assert!(
+                hi.is_infinite(),
+                "{:?} upper bound should be infinity",
+                region
+            );
         }
     }
 }
@@ -982,12 +1017,12 @@ fn em_spectrum_classification() {
     let encoder = EMEncoder::from_genesis(&genesis);
 
     let test_cases: [(f64, SpectrumRegion); 6] = [
-        (1e6, SpectrumRegion::Radio),           // 1 MHz
-        (10e9, SpectrumRegion::Microwave),       // 10 GHz
-        (1e13, SpectrumRegion::Infrared),        // 10 THz
-        (6e14, SpectrumRegion::Visible),         // 600 THz (green light)
-        (1e15, SpectrumRegion::Ultraviolet),     // 1 PHz
-        (1e18, SpectrumRegion::XRay),            // 1 EHz
+        (1e6, SpectrumRegion::Radio),        // 1 MHz
+        (10e9, SpectrumRegion::Microwave),   // 10 GHz
+        (1e13, SpectrumRegion::Infrared),    // 10 THz
+        (6e14, SpectrumRegion::Visible),     // 600 THz (green light)
+        (1e15, SpectrumRegion::Ultraviolet), // 1 PHz
+        (1e18, SpectrumRegion::XRay),        // 1 EHz
     ];
 
     for (freq, expected_region) in &test_cases {
@@ -1035,13 +1070,12 @@ fn thermal_diffusivity_formula() {
 #[test]
 fn spherical_layer_volume() {
     // V = (4/3)π(R_outer³ - R_inner³)
-    let r_inner: f64 = 0.05;  // 5 cm
-    let r_outer: f64 = 0.10;  // 10 cm
+    let r_inner: f64 = 0.05; // 5 cm
+    let r_outer: f64 = 0.10; // 10 cm
     let geom = LayerGeometry::sphere(r_inner, r_outer);
     let vol = geom.volume();
 
-    let expected = (4.0 / 3.0) * std::f64::consts::PI
-        * (r_outer.powi(3) - r_inner.powi(3));
+    let expected = (4.0 / 3.0) * std::f64::consts::PI * (r_outer.powi(3) - r_inner.powi(3));
     assert_relative_eq(vol, expected, 1e-10, "Spherical shell volume");
 }
 
@@ -1052,8 +1086,8 @@ fn coolant_flow_rate_formula() {
     let thermal = ThermalTransport::from_genesis(&genesis);
 
     let power_w: f64 = 5000.0;
-    let cp: f64 = 4186.0;   // Water Cₚ (J/kg·K)
-    let dt: f64 = 10.0;     // 10 K rise
+    let cp: f64 = 4186.0; // Water Cₚ (J/kg·K)
+    let dt: f64 = 10.0; // 10 K rise
 
     let actual = thermal.coolant_flow_rate(power_w, cp, dt);
     let expected = power_w / (cp * dt);
@@ -1081,15 +1115,15 @@ fn thermal_stress_hoop() {
     let shell_geom = LayerGeometry::sphere(0.04, 0.06);
 
     let profile = thermal.steady_state_profile(
-        1000.0,     // 1 kW
+        1000.0, // 1 kW
         &shell,
         &shell_geom,
         &interface,
         &iface_geom,
         &core,
         &core_geom,
-        300.0,      // coolant at 300 K
-        5000.0,     // h = 5000 W/m²K
+        300.0,  // coolant at 300 K
+        5000.0, // h = 5000 W/m²K
     );
 
     let alpha_coeff = hea.expansion_coeff; // 10e-6
@@ -1097,14 +1131,7 @@ fn thermal_stress_hoop() {
     let poisson = 0.33;
     let yield_stress = 800e6;
 
-    let stress = thermal.thermal_stress(
-        &profile,
-        &hea,
-        &shell_geom,
-        youngs,
-        poisson,
-        yield_stress,
-    );
+    let stress = thermal.thermal_stress(&profile, &hea, &shell_geom, youngs, poisson, yield_stress);
 
     // Expected hoop stress: σ_θ = α·E·ΔT / (2·(1-ν))
     let dt = profile.t_max - profile.t_shell_outer;
@@ -1135,7 +1162,12 @@ fn kinetic_energy_half_mv2() {
     let ke_1 = encoder.kinetic_energy(1.0, 1.0); // T = 0.5
     let ratio = ke.norm() / ke_1.norm();
     // T(2,3)/T(1,1) = 9.0 / 0.5 = 18.0
-    assert_relative_eq(ratio as f64, 18.0, 1e-6, "Kinetic energy ratio m=2,v=3 vs m=1,v=1");
+    assert_relative_eq(
+        ratio as f64,
+        18.0,
+        1e-6,
+        "Kinetic energy ratio m=2,v=3 vs m=1,v=1",
+    );
 }
 
 #[test]
@@ -1147,7 +1179,12 @@ fn ising_2d_critical_temperature() {
     let ising = encoder.ising_model(2, j, 0.0);
 
     let expected_tc = 2.0 * j / (1.0 + 2.0_f64.sqrt()).ln();
-    assert_relative_eq(ising.critical_temp, expected_tc, 1e-10, "Ising 2D Tc = 2J/ln(1+√2)");
+    assert_relative_eq(
+        ising.critical_temp,
+        expected_tc,
+        1e-10,
+        "Ising 2D Tc = 2J/ln(1+√2)",
+    );
 }
 
 // =========================================================================
@@ -1201,10 +1238,30 @@ fn nernst_potentials() {
     use super::neuroscience::IonType;
 
     // Standard textbook Nernst potentials
-    assert_relative_eq(IonType::Sodium.nernst_potential(), 60.0, 1e-10, "Na+ Nernst");
-    assert_relative_eq(IonType::Potassium.nernst_potential(), -90.0, 1e-10, "K+ Nernst");
-    assert_relative_eq(IonType::Calcium.nernst_potential(), 120.0, 1e-10, "Ca2+ Nernst");
-    assert_relative_eq(IonType::Chloride.nernst_potential(), -80.0, 1e-10, "Cl- Nernst");
+    assert_relative_eq(
+        IonType::Sodium.nernst_potential(),
+        60.0,
+        1e-10,
+        "Na+ Nernst",
+    );
+    assert_relative_eq(
+        IonType::Potassium.nernst_potential(),
+        -90.0,
+        1e-10,
+        "K+ Nernst",
+    );
+    assert_relative_eq(
+        IonType::Calcium.nernst_potential(),
+        120.0,
+        1e-10,
+        "Ca2+ Nernst",
+    );
+    assert_relative_eq(
+        IonType::Chloride.nernst_potential(),
+        -80.0,
+        1e-10,
+        "Cl- Nernst",
+    );
 }
 
 #[test]
@@ -1239,12 +1296,7 @@ fn stdp_ltp_exponential() {
     // dt = 5ms > 0, so LTP: strength *= 1 + 0.1 * exp(-5/10) * ltp_factor
     let factor = (-5.0_f64 / 10.0).exp();
     let expected = initial_strength * (1.0 + 0.1 * factor * 1.0); // ltp_factor=1.0
-    assert_relative_eq(
-        synapse.strength,
-        expected,
-        1e-10,
-        "STDP LTP at dt=5ms",
-    );
+    assert_relative_eq(synapse.strength, expected, 1e-10, "STDP LTP at dt=5ms");
 }
 
 // =========================================================================
@@ -1276,13 +1328,22 @@ fn antiatom_charge_neutrality() {
     let antimatter = super::antimatter::Antimatter::from_model(&model, &hadrons, &genesis);
 
     let anti_h = antimatter.antihydrogen();
-    assert_eq!(anti_h.positrons, anti_h.antiprotons, "Anti-H: positrons == antiprotons");
+    assert_eq!(
+        anti_h.positrons, anti_h.antiprotons,
+        "Anti-H: positrons == antiprotons"
+    );
 
     let anti_he3 = antimatter.antihelium3();
-    assert_eq!(anti_he3.positrons, anti_he3.antiprotons, "Anti-He3: positrons == antiprotons");
+    assert_eq!(
+        anti_he3.positrons, anti_he3.antiprotons,
+        "Anti-He3: positrons == antiprotons"
+    );
 
     let anti_he4 = antimatter.antihelium4();
-    assert_eq!(anti_he4.positrons, anti_he4.antiprotons, "Anti-He4: positrons == antiprotons");
+    assert_eq!(
+        anti_he4.positrons, anti_he4.antiprotons,
+        "Anti-He4: positrons == antiprotons"
+    );
 }
 
 // =========================================================================
@@ -1295,9 +1356,9 @@ fn law_composition_confidence() {
     let genesis = GenesisSeed::from_phrase("laws_validation");
     let engine = super::derived_laws::LawsDerivationEngine::from_genesis(&genesis);
 
-    let energy = engine.derive_energy_conservation();   // confidence = 1.0
+    let energy = engine.derive_energy_conservation(); // confidence = 1.0
     let momentum = engine.derive_momentum_conservation(); // confidence = 1.0
-    let ohm = engine.derive_ohms_law();                   // confidence < 1.0
+    let ohm = engine.derive_ohms_law(); // confidence < 1.0
 
     // 1.0 * 1.0 = 1.0
     let composed_fund = engine.compose_laws(&energy, &momentum);
@@ -1328,8 +1389,8 @@ fn eckart_kemble_analytical() {
     // T = sinh²(πka) / (sinh²(πka) + cosh²(π√(2mV₀a²/ℏ² - 1/4)))
     // where k = √(2mE)/ℏ
     let calc = TunnelingCalculator::electron();
-    let v0: f64 = 1.0e-19;   // ~0.6 eV
-    let a: f64 = 1.0e-10;    // 1 Å
+    let v0: f64 = 1.0e-19; // ~0.6 eV
+    let a: f64 = 1.0e-10; // 1 Å
 
     let energies = [0.2e-19, 0.4e-19, 0.6e-19, 0.8e-19, 1.5e-19];
     for &e in &energies {
@@ -1427,8 +1488,17 @@ fn schwarzschild_radius_solar_mass() {
 
     // Expected: 2 * 6.67430e-11 * 1.989e30 / (299792458)^2 ≈ 2953 m
     let expected_rs = 2.0 * G * m_sun / (C * C);
-    assert_relative_eq(bh.length_scale_m, expected_rs, 1e-6, "Schwarzschild radius for solar mass");
-    assert!((bh.length_scale_m - 2953.0).abs() < 10.0, "Schwarzschild radius ~2953m, got {}", bh.length_scale_m);
+    assert_relative_eq(
+        bh.length_scale_m,
+        expected_rs,
+        1e-6,
+        "Schwarzschild radius for solar mass",
+    );
+    assert!(
+        (bh.length_scale_m - 2953.0).abs() < 10.0,
+        "Schwarzschild radius ~2953m, got {}",
+        bh.length_scale_m
+    );
 }
 
 #[test]
@@ -1437,10 +1507,18 @@ fn gravitational_redshift_factor() {
     let encoder = GREncoder::from_genesis(&genesis);
     // At r = 2*rs, redshift factor = 1/sqrt(1 - rs/r) = 1/sqrt(1/2) = sqrt(2)
     let z = encoder.redshift_factor(6000.0, 3000.0);
-    assert_relative_eq(z, std::f64::consts::SQRT_2, 1e-10, "Gravitational redshift at r=2rs");
+    assert_relative_eq(
+        z,
+        std::f64::consts::SQRT_2,
+        1e-10,
+        "Gravitational redshift at r=2rs",
+    );
     // At horizon: infinite
     let z_horizon = encoder.redshift_factor(3000.0, 3000.0);
-    assert!(z_horizon.is_infinite(), "Redshift at horizon should be infinite");
+    assert!(
+        z_horizon.is_infinite(),
+        "Redshift at horizon should be infinite"
+    );
 }
 
 #[test]
@@ -1449,10 +1527,18 @@ fn gravitational_time_dilation() {
     let encoder = GREncoder::from_genesis(&genesis);
     // At r = 2*rs: sqrt(1 - rs/r) = sqrt(1/2) = 1/sqrt(2)
     let td = encoder.gravitational_time_dilation(6000.0, 3000.0);
-    assert_relative_eq(td, 1.0 / std::f64::consts::SQRT_2, 1e-10, "Time dilation at r=2rs");
+    assert_relative_eq(
+        td,
+        1.0 / std::f64::consts::SQRT_2,
+        1e-10,
+        "Time dilation at r=2rs",
+    );
     // At horizon: 0
     let td_horizon = encoder.gravitational_time_dilation(3000.0, 3000.0);
-    assert!((td_horizon).abs() < 1e-15, "Time dilation at horizon should be 0");
+    assert!(
+        (td_horizon).abs() < 1e-15,
+        "Time dilation at horizon should be 0"
+    );
 }
 
 // =========================================================================
@@ -1480,7 +1566,10 @@ fn von_neumann_entropy_pure() {
     let genesis = GenesisSeed::from_phrase("qi entropy");
     let encoder = QIEncoder::from_genesis(&genesis);
     let s = encoder.von_neumann_entropy(1.0);
-    assert!(s.abs() < 1e-10, "von Neumann entropy of pure state should be 0, got {s}");
+    assert!(
+        s.abs() < 1e-10,
+        "von Neumann entropy of pure state should be 0, got {s}"
+    );
 }
 
 #[test]
@@ -1488,7 +1577,12 @@ fn von_neumann_entropy_mixed() {
     let genesis = GenesisSeed::from_phrase("qi entropy mixed");
     let encoder = QIEncoder::from_genesis(&genesis);
     let s = encoder.von_neumann_entropy(0.5);
-    assert_relative_eq(s, 1.0, 1e-10, "von Neumann entropy of maximally mixed 2-state");
+    assert_relative_eq(
+        s,
+        1.0,
+        1e-10,
+        "von Neumann entropy of maximally mixed 2-state",
+    );
 }
 
 // =========================================================================
@@ -1519,7 +1613,10 @@ fn carnot_efficiency_bounds() {
     let encoder = ThermoEncoder::from_genesis(&genesis);
     // η(T, T) = 0 (no temperature difference)
     let eta_same = encoder.carnot_efficiency(300.0, 300.0);
-    assert!(eta_same.abs() < 1e-10, "Carnot η(T,T) should be 0, got {eta_same}");
+    assert!(
+        eta_same.abs() < 1e-10,
+        "Carnot η(T,T) should be 0, got {eta_same}"
+    );
     // η(T, 0) = 1 - 0/T = 1
     let eta_max = encoder.carnot_efficiency(300.0, 0.0);
     assert_relative_eq(eta_max, 1.0, 1e-10, "Carnot η(T,0) should be 1");
@@ -1621,7 +1718,12 @@ fn black_hole_hawking_temperature() {
     let encoder = StellarEncoder::from_genesis(&genesis);
     // T_H = 6.17e-8 / M_solar
     let bh = encoder.encode_black_hole("test", 1.0, 0.0);
-    assert_relative_eq(bh.hawking_temperature_k, 6.17e-8, 0.01, "Hawking temperature for 1 solar mass");
+    assert_relative_eq(
+        bh.hawking_temperature_k,
+        6.17e-8,
+        0.01,
+        "Hawking temperature for 1 solar mass",
+    );
 }
 
 // =========================================================================
@@ -1763,8 +1865,14 @@ fn edge_landauer_negative_temp() {
     let genesis = GenesisSeed::from_phrase("edge landauer neg");
     let encoder = ThermoEncoder::from_genesis(&genesis);
     let result = encoder.landauer_limit(-100.0);
-    assert!(result.is_finite(), "Landauer at T=-100 should be finite, got {result}");
-    assert!(result < 0.0, "Landauer at T<0 should be negative, got {result}");
+    assert!(
+        result.is_finite(),
+        "Landauer at T=-100 should be finite, got {result}"
+    );
+    assert!(
+        result < 0.0,
+        "Landauer at T<0 should be negative, got {result}"
+    );
 }
 
 #[test]
@@ -1772,7 +1880,10 @@ fn edge_landauer_zero_temp() {
     let genesis = GenesisSeed::from_phrase("edge landauer zero");
     let encoder = ThermoEncoder::from_genesis(&genesis);
     let result = encoder.landauer_limit(0.0);
-    assert!((result).abs() < 1e-30, "Landauer at T=0 should be 0.0, got {result}");
+    assert!(
+        (result).abs() < 1e-30,
+        "Landauer at T=0 should be 0.0, got {result}"
+    );
 }
 
 #[test]
@@ -1781,7 +1892,10 @@ fn edge_fermi_dirac_zero_temp_below() {
     let encoder = CMEncoder::from_genesis(&genesis);
     // E < E_F at T=0 → f = 1.0
     let f = encoder.fermi_dirac(4.0, 5.0, 0.0);
-    assert!((f - 1.0).abs() < 1e-10, "Fermi-Dirac below E_F at T=0 should be 1.0, got {f}");
+    assert!(
+        (f - 1.0).abs() < 1e-10,
+        "Fermi-Dirac below E_F at T=0 should be 1.0, got {f}"
+    );
 }
 
 #[test]
@@ -1790,7 +1904,10 @@ fn edge_fermi_dirac_zero_temp_above() {
     let encoder = CMEncoder::from_genesis(&genesis);
     // E > E_F at T=0 → f = 0.0
     let f = encoder.fermi_dirac(6.0, 5.0, 0.0);
-    assert!(f.abs() < 1e-10, "Fermi-Dirac above E_F at T=0 should be 0.0, got {f}");
+    assert!(
+        f.abs() < 1e-10,
+        "Fermi-Dirac above E_F at T=0 should be 0.0, got {f}"
+    );
 }
 
 #[test]
@@ -1799,7 +1916,10 @@ fn edge_fermi_dirac_zero_temp_at_fermi() {
     let encoder = CMEncoder::from_genesis(&genesis);
     // E = E_F at T=0 → f = 1.0 (convention: <=)
     let f = encoder.fermi_dirac(5.0, 5.0, 0.0);
-    assert!((f - 1.0).abs() < 1e-10, "Fermi-Dirac at E=E_F, T=0 should be 1.0, got {f}");
+    assert!(
+        (f - 1.0).abs() < 1e-10,
+        "Fermi-Dirac at E=E_F, T=0 should be 1.0, got {f}"
+    );
 }
 
 #[test]
@@ -1808,7 +1928,10 @@ fn edge_kolmogorov_zero_dissipation() {
     let encoder = FluidEncoder::from_genesis(&genesis);
     // η = (ν³/ε)^(1/4), ε=0 → Inf
     let eta = encoder.kolmogorov_scale(1e-6, 0.0);
-    assert!(eta.is_infinite(), "Kolmogorov scale at ε=0 should be Inf, got {eta}");
+    assert!(
+        eta.is_infinite(),
+        "Kolmogorov scale at ε=0 should be Inf, got {eta}"
+    );
 }
 
 #[test]
@@ -1817,7 +1940,10 @@ fn edge_reynolds_zero_viscosity() {
     let encoder = FluidEncoder::from_genesis(&genesis);
     // Re = ρvL/μ, μ=0 → Inf
     let re = encoder.reynolds_number(1000.0, 1.0, 0.01, 0.0);
-    assert!(re.is_infinite(), "Reynolds number at μ=0 should be Inf, got {re}");
+    assert!(
+        re.is_infinite(),
+        "Reynolds number at μ=0 should be Inf, got {re}"
+    );
 }
 
 #[test]
@@ -1826,7 +1952,10 @@ fn edge_mach_zero_sound_speed() {
     let encoder = FluidEncoder::from_genesis(&genesis);
     // Ma = v/cs, cs=0 → Inf
     let ma = encoder.mach_number(340.0, 0.0);
-    assert!(ma.is_infinite(), "Mach number at cs=0 should be Inf, got {ma}");
+    assert!(
+        ma.is_infinite(),
+        "Mach number at cs=0 should be Inf, got {ma}"
+    );
 }
 
 #[test]
@@ -1835,7 +1964,10 @@ fn edge_scale_factor_z_neg1() {
     let encoder = CosmologyEncoder::from_genesis(&genesis);
     // a(z) = 1/(1+z), z=-1 → 1/0 = Inf
     let a = encoder.scale_factor(-1.0);
-    assert!(a.is_infinite(), "Scale factor at z=-1 should be Inf, got {a}");
+    assert!(
+        a.is_infinite(),
+        "Scale factor at z=-1 should be Inf, got {a}"
+    );
 }
 
 #[test]
@@ -1843,7 +1975,10 @@ fn edge_von_neumann_entropy_zero_purity() {
     let genesis = GenesisSeed::from_phrase("edge vn zero");
     let encoder = QIEncoder::from_genesis(&genesis);
     let s = encoder.von_neumann_entropy(0.0);
-    assert!((s).abs() < 1e-10, "VN entropy at purity=0 should be 0.0 (guarded), got {s}");
+    assert!(
+        (s).abs() < 1e-10,
+        "VN entropy at purity=0 should be 0.0 (guarded), got {s}"
+    );
 }
 
 #[test]
@@ -1851,7 +1986,10 @@ fn edge_von_neumann_entropy_negative_purity() {
     let genesis = GenesisSeed::from_phrase("edge vn neg");
     let encoder = QIEncoder::from_genesis(&genesis);
     let s = encoder.von_neumann_entropy(-0.5);
-    assert!((s).abs() < 1e-10, "VN entropy at purity=-0.5 should be 0.0 (guarded), got {s}");
+    assert!(
+        (s).abs() < 1e-10,
+        "VN entropy at purity=-0.5 should be 0.0 (guarded), got {s}"
+    );
 }
 
 #[test]
@@ -1860,7 +1998,10 @@ fn edge_boundary_layer_zero_re() {
     let encoder = FluidEncoder::from_genesis(&genesis);
     // δ = L/√Re, Re=0 → Inf
     let delta = encoder.boundary_layer_thickness(1.0, 0.0);
-    assert!(delta.is_infinite(), "BL thickness at Re=0 should be Inf, got {delta}");
+    assert!(
+        delta.is_infinite(),
+        "BL thickness at Re=0 should be Inf, got {delta}"
+    );
 }
 
 #[test]
@@ -1868,7 +2009,11 @@ fn edge_eckart_exact_zero_width() {
     let _genesis = GenesisSeed::from_phrase("edge eckart zero w");
     let calc = TunnelingCalculator::electron();
     let result = calc.eckart_barrier_exact(0.5e-19, 1.0e-19, 0.0);
-    assert!(result.transmission.is_finite(), "Eckart exact at a=0 should be finite, got {}", result.transmission);
+    assert!(
+        result.transmission.is_finite(),
+        "Eckart exact at a=0 should be finite, got {}",
+        result.transmission
+    );
 }
 
 #[test]
@@ -1876,9 +2021,16 @@ fn edge_eckart_exact_zero_energy() {
     let _genesis = GenesisSeed::from_phrase("edge eckart zero e");
     let calc = TunnelingCalculator::electron();
     let result = calc.eckart_barrier_exact(0.0, 1.0e-19, 1.0e-10);
-    assert!(result.transmission.is_finite(), "Eckart exact at E=0 should be finite, got {}", result.transmission);
-    assert!(result.transmission >= 0.0 && result.transmission <= 1.0,
-        "Transmission should be in [0,1], got {}", result.transmission);
+    assert!(
+        result.transmission.is_finite(),
+        "Eckart exact at E=0 should be finite, got {}",
+        result.transmission
+    );
+    assert!(
+        result.transmission >= 0.0 && result.transmission <= 1.0,
+        "Transmission should be in [0,1], got {}",
+        result.transmission
+    );
 }
 
 #[test]
@@ -1887,7 +2039,10 @@ fn edge_redshift_factor_negative_r() {
     let encoder = GREncoder::from_genesis(&genesis);
     // r < 0 → r <= rs (since rs > 0), so should return Inf per existing guard
     let z = encoder.redshift_factor(-1.0, 3000.0);
-    assert!(z.is_infinite(), "Redshift factor at r<0 should be Inf, got {z}");
+    assert!(
+        z.is_infinite(),
+        "Redshift factor at r<0 should be Inf, got {z}"
+    );
 }
 
 #[test]
@@ -1896,7 +2051,10 @@ fn edge_gravitational_time_dilation_negative_r() {
     let encoder = GREncoder::from_genesis(&genesis);
     // r < 0 → r <= rs, returns 0.0 per existing guard
     let td = encoder.gravitational_time_dilation(-1.0, 3000.0);
-    assert!((td).abs() < 1e-15, "Time dilation at r<0 should be 0.0, got {td}");
+    assert!(
+        (td).abs() < 1e-15,
+        "Time dilation at r<0 should be 0.0, got {td}"
+    );
 }
 
 #[test]
@@ -1905,7 +2063,10 @@ fn edge_carnot_negative_t_hot() {
     let encoder = ThermoEncoder::from_genesis(&genesis);
     // T_hot < 0 → 0.0 per existing guard (t_hot <= 0.0)
     let eta = encoder.carnot_efficiency(-100.0, 300.0);
-    assert!((eta).abs() < 1e-10, "Carnot at T_hot<0 should be 0.0, got {eta}");
+    assert!(
+        (eta).abs() < 1e-10,
+        "Carnot at T_hot<0 should be 0.0, got {eta}"
+    );
 }
 
 #[test]
@@ -1914,7 +2075,10 @@ fn edge_carnot_equal_temps() {
     let encoder = ThermoEncoder::from_genesis(&genesis);
     // T_hot = T_cold → 0.0 per existing guard (t_hot <= t_cold)
     let eta = encoder.carnot_efficiency(300.0, 300.0);
-    assert!((eta).abs() < 1e-10, "Carnot at T_hot=T_cold should be 0.0, got {eta}");
+    assert!(
+        (eta).abs() < 1e-10,
+        "Carnot at T_hot=T_cold should be 0.0, got {eta}"
+    );
 }
 
 #[test]
@@ -1923,7 +2087,10 @@ fn edge_mach_zero_velocity() {
     let encoder = FluidEncoder::from_genesis(&genesis);
     // Ma = 0/cs = 0
     let ma = encoder.mach_number(0.0, 340.0);
-    assert!((ma).abs() < 1e-15, "Mach number at v=0 should be 0.0, got {ma}");
+    assert!(
+        (ma).abs() < 1e-15,
+        "Mach number at v=0 should be 0.0, got {ma}"
+    );
 }
 
 #[test]
@@ -1932,7 +2099,10 @@ fn edge_reynolds_zero_velocity() {
     let encoder = FluidEncoder::from_genesis(&genesis);
     // Re = ρ*0*L/μ = 0
     let re = encoder.reynolds_number(1000.0, 0.0, 0.01, 0.001);
-    assert!((re).abs() < 1e-15, "Reynolds number at v=0 should be 0.0, got {re}");
+    assert!(
+        (re).abs() < 1e-15,
+        "Reynolds number at v=0 should be 0.0, got {re}"
+    );
 }
 
 // =========================================================================
@@ -1949,7 +2119,12 @@ fn schwarzschild_feeds_redshift() {
     let rs = st.length_scale_m;
     // At r = 2*rs: z = 1/sqrt(1 - rs/r) = 1/sqrt(1/2) = sqrt(2)
     let z = encoder.redshift_factor(2.0 * rs, rs);
-    assert_relative_eq(z, std::f64::consts::SQRT_2, 1e-10, "Redshift at r=2rs should be √2");
+    assert_relative_eq(
+        z,
+        std::f64::consts::SQRT_2,
+        1e-10,
+        "Redshift at r=2rs should be √2",
+    );
 }
 
 #[test]
@@ -1962,9 +2137,15 @@ fn fermi_dirac_step_function_at_zero_temp() {
     for &e in &energies {
         let f = encoder.fermi_dirac(e, fermi_ev, 0.0);
         if e <= fermi_ev {
-            assert!((f - 1.0).abs() < 1e-10, "Step function: f({e}) should be 1.0, got {f}");
+            assert!(
+                (f - 1.0).abs() < 1e-10,
+                "Step function: f({e}) should be 1.0, got {f}"
+            );
         } else {
-            assert!(f.abs() < 1e-10, "Step function: f({e}) should be 0.0, got {f}");
+            assert!(
+                f.abs() < 1e-10,
+                "Step function: f({e}) should be 0.0, got {f}"
+            );
         }
     }
 }
@@ -1981,8 +2162,14 @@ fn carnot_bounds_landauer() {
     for &t in &temps {
         let landauer = encoder.landauer_limit(t);
         let carnot = encoder.carnot_efficiency(t, t_cold);
-        assert!(landauer > prev_landauer, "Landauer should increase: {landauer} > {prev_landauer} at T={t}");
-        assert!(carnot > prev_carnot, "Carnot should increase: {carnot} > {prev_carnot} at T={t}");
+        assert!(
+            landauer > prev_landauer,
+            "Landauer should increase: {landauer} > {prev_landauer} at T={t}"
+        );
+        assert!(
+            carnot > prev_carnot,
+            "Carnot should increase: {carnot} > {prev_carnot} at T={t}"
+        );
         prev_landauer = landauer;
         prev_carnot = carnot;
     }
@@ -2000,7 +2187,12 @@ fn reynolds_boundary_consistency() {
     let re = encoder.reynolds_number(density, velocity, length, viscosity);
     let delta = encoder.boundary_layer_thickness(length, re);
     let expected_delta = length / re.sqrt();
-    assert_relative_eq(delta, expected_delta, 1e-10, "BL thickness should equal L/√Re");
+    assert_relative_eq(
+        delta,
+        expected_delta,
+        1e-10,
+        "BL thickness should equal L/√Re",
+    );
 }
 
 #[test]
@@ -2012,9 +2204,15 @@ fn tunneling_exact_vs_wkb_ordering() {
     let energies = [0.1e-19, 0.3e-19, 0.5e-19, 0.7e-19, 0.9e-19];
     for &e in &energies {
         let exact = calc.eckart_barrier_exact(e, v0, a);
-        assert!(exact.transmission.is_finite(), "Exact should be finite at E={e:.2e}");
-        assert!(exact.transmission >= 0.0 && exact.transmission <= 1.0,
-            "Exact T should be in [0,1], got {} at E={e:.2e}", exact.transmission);
+        assert!(
+            exact.transmission.is_finite(),
+            "Exact should be finite at E={e:.2e}"
+        );
+        assert!(
+            exact.transmission >= 0.0 && exact.transmission <= 1.0,
+            "Exact T should be in [0,1], got {} at E={e:.2e}",
+            exact.transmission
+        );
     }
 }
 
@@ -2065,7 +2263,10 @@ fn acoustics_reflection_matched() {
     let encoder = AcousticsEncoder::from_genesis(&genesis);
     // R(Z,Z) = (Z-Z)/(Z+Z) = 0
     let r = encoder.reflection_coefficient(411.6, 411.6);
-    assert!(r.abs() < 1e-15, "Matched impedance reflection should be 0, got {r}");
+    assert!(
+        r.abs() < 1e-15,
+        "Matched impedance reflection should be 0, got {r}"
+    );
 }
 
 #[test]
@@ -2090,7 +2291,10 @@ fn acoustics_spl_reference() {
     let encoder = AcousticsEncoder::from_genesis(&genesis);
     // SPL(2e-5 Pa) = 20 log₁₀(2e-5/2e-5) = 0 dB
     let spl = encoder.spl_db(2e-5);
-    assert!(spl.abs() < 1e-10, "SPL at reference pressure should be 0 dB, got {spl}");
+    assert!(
+        spl.abs() < 1e-10,
+        "SPL at reference pressure should be 0 dB, got {spl}"
+    );
 }
 
 #[test]
@@ -2099,7 +2303,10 @@ fn acoustics_sil_reference() {
     let encoder = AcousticsEncoder::from_genesis(&genesis);
     // SIL(1e-12 W/m²) = 10 log₁₀(1e-12/1e-12) = 0 dB
     let sil = encoder.sil_db(1e-12);
-    assert!(sil.abs() < 1e-10, "SIL at reference intensity should be 0 dB, got {sil}");
+    assert!(
+        sil.abs() < 1e-10,
+        "SIL at reference intensity should be 0 dB, got {sil}"
+    );
 }
 
 #[test]
@@ -2143,7 +2350,10 @@ fn true_phi_entropy_upper_bound() {
     let calc = TruePhiCalculator::new();
     let hv = ContinuousHV::random(4096, 42);
     let h = calc.entropy(&hv);
-    assert!(h <= 4.0 + 0.01, "Entropy should be ≤ log₂(16) ≈ 4.0, got {h}");
+    assert!(
+        h <= 4.0 + 0.01,
+        "Entropy should be ≤ log₂(16) ≈ 4.0, got {h}"
+    );
 }
 
 #[test]
@@ -2152,7 +2362,10 @@ fn true_phi_constant_entropy_zero() {
     // Constant vector: all components = 0.5
     let hv = ContinuousHV::from_vec(vec![0.5; 1024]);
     let h = calc.entropy(&hv);
-    assert!(h.abs() < 0.01, "Entropy of constant vector should be ~0, got {h}");
+    assert!(
+        h.abs() < 0.01,
+        "Entropy of constant vector should be ~0, got {h}"
+    );
 }
 
 #[test]
@@ -2198,7 +2411,8 @@ fn true_phi_joint_entropy_subadditive() {
     let h_joint = calc.joint_entropy(&hv1, &hv2);
     assert!(
         h_joint <= h1 + h2 + 0.01,
-        "Joint entropy should be subadditive: H(X,Y)={h_joint} ≤ H(X)+H(Y)={}", h1 + h2
+        "Joint entropy should be subadditive: H(X,Y)={h_joint} ≤ H(X)+H(Y)={}",
+        h1 + h2
     );
 }
 
@@ -2208,7 +2422,10 @@ fn true_phi_intrinsic_info_nonneg() {
     // Use 3 random components to get effective_information (≥ 0)
     let components: Vec<ContinuousHV> = (0..3).map(|i| ContinuousHV::random(256, 42 + i)).collect();
     let ei = calc.effective_information(&components);
-    assert!(ei >= -1e-10, "Effective information should be non-negative, got {ei}");
+    assert!(
+        ei >= -1e-10,
+        "Effective information should be non-negative, got {ei}"
+    );
 }
 
 // =========================================================================
@@ -2230,7 +2447,10 @@ fn tensor_minkowski_null_geodesic() {
     // Light-like: ds² = -dt² + dr² = 0 when dr = dt
     let dx = [1.0, 1.0, 0.0, 0.0];
     let ds2 = eta.line_element(&dx);
-    assert!(ds2.abs() < 1e-10, "Null geodesic should have ds²=0, got {ds2}");
+    assert!(
+        ds2.abs() < 1e-10,
+        "Null geodesic should have ds²=0, got {ds2}"
+    );
 }
 
 #[test]
@@ -2253,14 +2473,18 @@ fn tensor_schwarzschild_vacuum_ricci() {
     let f = 1.0 - r_s / r;
     let expected_gamma_t_tr = r_s * C * C / (2.0 * r * r * f);
     assert_relative_eq(
-        gamma.get(0, 0, 1), expected_gamma_t_tr, 1e-10,
+        gamma.get(0, 0, 1),
+        expected_gamma_t_tr,
+        1e-10,
         "Γ^t_tr analytical check",
     );
 
     // Γ^r_tt should equal r_s c² f / (2r²)
     let expected_gamma_r_tt = r_s * C * C * f / (2.0 * r * r);
     assert_relative_eq(
-        gamma.get(1, 0, 0), expected_gamma_r_tt, 1e-10,
+        gamma.get(1, 0, 0),
+        expected_gamma_r_tt,
+        1e-10,
         "Γ^r_tt analytical check",
     );
 
@@ -2283,7 +2507,8 @@ fn tensor_christoffel_symmetry() {
                 assert!(
                     diff < 1e-10,
                     "Christoffel not symmetric: Γ^{lambda}_{mu}{nu}={} vs Γ^{lambda}_{nu}{mu}={}",
-                    gamma.get(lambda, mu, nu), gamma.get(lambda, nu, mu)
+                    gamma.get(lambda, mu, nu),
+                    gamma.get(lambda, nu, mu)
                 );
             }
         }
@@ -2299,7 +2524,10 @@ fn tensor_schwarzschild_det_sign() {
     let theta = std::f64::consts::FRAC_PI_2;
     let g = MetricTensor::schwarzschild(m_sun, r, theta);
     let det = g.determinant();
-    assert!(det < 0.0, "Schwarzschild det(g) should be negative outside horizon, got {det}");
+    assert!(
+        det < 0.0,
+        "Schwarzschild det(g) should be negative outside horizon, got {det}"
+    );
 }
 
 #[test]
@@ -2352,7 +2580,10 @@ fn tensor_timelike_ds2_negative() {
     // dt = 1, dr = 100 m (slow particle: v << c)
     let dx = [1.0, 100.0, 0.0, 0.0];
     let ds2 = g.line_element(&dx);
-    assert!(ds2 < 0.0, "Timelike interval should have ds² < 0, got {ds2}");
+    assert!(
+        ds2 < 0.0,
+        "Timelike interval should have ds² < 0, got {ds2}"
+    );
 }
 
 // =========================================================================
@@ -2364,8 +2595,10 @@ fn trigger_cross_section_10kev() {
     // σ(10 keV) via S-factor/Gamow: S/(E exp(B_G/√E))
     let sigma = LcfPhysicsConstants::dd_cross_section_barn(10.0);
     // At 10 keV, σ ~ order of 1e-4 barn (Gamow suppression)
-    assert!(sigma > 1e-8 && sigma < 1.0,
-        "Cross section at 10 keV should be between 1e-8 and 1 barn, got {sigma}");
+    assert!(
+        sigma > 1e-8 && sigma < 1.0,
+        "Cross section at 10 keV should be between 1e-8 and 1 barn, got {sigma}"
+    );
     assert!(sigma.is_finite(), "Cross section should be finite");
 }
 
@@ -2383,7 +2616,10 @@ fn trigger_cross_section_monotone() {
 fn trigger_tunneling_gamow_form() {
     // Tunneling probability at 10 keV center-of-mass energy
     let t = LcfPhysicsConstants::dd_tunneling_probability(10000.0); // eV
-    assert!(t > 0.0 && t < 1.0, "Tunneling probability should be in (0,1), got {t}");
+    assert!(
+        t > 0.0 && t < 1.0,
+        "Tunneling probability should be in (0,1), got {t}"
+    );
     assert!(t.is_finite(), "Tunneling probability should be finite");
 }
 
@@ -2391,15 +2627,20 @@ fn trigger_tunneling_gamow_form() {
 fn trigger_screening_low_energy() {
     // At low energy (1 keV = 1000 eV), screening factor >> 1
     let f = LcfPhysicsConstants::screening_enhancement_at_energy(309.0, 1000.0);
-    assert!(f > 1.0, "Screening enhancement at 1 keV should be > 1, got {f}");
+    assert!(
+        f > 1.0,
+        "Screening enhancement at 1 keV should be > 1, got {f}"
+    );
 }
 
 #[test]
 fn trigger_screening_high_energy() {
     // At high energy (100 keV = 100000 eV), screening negligible: f ~ 1
     let f = LcfPhysicsConstants::screening_enhancement_at_energy(309.0, 100000.0);
-    assert!(f >= 1.0 && f < 1.1,
-        "Screening enhancement at 100 keV should be ~1, got {f}");
+    assert!(
+        f >= 1.0 && f < 1.1,
+        "Screening enhancement at 100 keV should be ~1, got {f}"
+    );
 }
 
 #[test]
@@ -2430,10 +2671,12 @@ fn trigger_cross_section_screened_gte_bare() {
 #[test]
 fn trigger_tunneling_decreases_with_energy_barrier() {
     // Lower energy → lower tunneling probability (harder to tunnel)
-    let t_low = LcfPhysicsConstants::dd_tunneling_probability(1000.0);  // 1 keV
+    let t_low = LcfPhysicsConstants::dd_tunneling_probability(1000.0); // 1 keV
     let t_high = LcfPhysicsConstants::dd_tunneling_probability(10000.0); // 10 keV
-    assert!(t_high > t_low,
-        "Tunneling at 10 keV should exceed 1 keV: {t_high} > {t_low}");
+    assert!(
+        t_high > t_low,
+        "Tunneling at 10 keV should exceed 1 keV: {t_high} > {t_low}"
+    );
 }
 
 // =========================================================================
@@ -2503,12 +2746,17 @@ fn jarzynski_dissipated_work_nonneg() {
     // W_diss = ⟨W⟩ - ΔF ≥ 0 (second law)
     let jarzynski = JarzynskiEstimator::new();
     // Biased work distribution: some higher, some lower
-    let work_samples: Vec<f64> = (0..500).map(|i| {
-        let base = 4.14e-21; // ~kT at 300K
-        base * (1.0 + 0.5 * (i as f64 / 500.0))
-    }).collect();
+    let work_samples: Vec<f64> = (0..500)
+        .map(|i| {
+            let base = 4.14e-21; // ~kT at 300K
+            base * (1.0 + 0.5 * (i as f64 / 500.0))
+        })
+        .collect();
     let w_diss = jarzynski.dissipated_work(&work_samples, 300.0);
-    assert!(w_diss >= -1e-30, "Dissipated work should be ≥ 0, got {w_diss}");
+    assert!(
+        w_diss >= -1e-30,
+        "Dissipated work should be ≥ 0, got {w_diss}"
+    );
 }
 
 #[test]
@@ -2518,8 +2766,10 @@ fn jarzynski_equilibrium_zero_dissipation() {
     let w = 4.14e-21;
     let work_samples: Vec<f64> = vec![w; 1000];
     let w_diss = jarzynski.dissipated_work(&work_samples, 300.0);
-    assert!(w_diss.abs() < 1e-30,
-        "Zero-variance work should give zero dissipation, got {w_diss}");
+    assert!(
+        w_diss.abs() < 1e-30,
+        "Zero-variance work should give zero dissipation, got {w_diss}"
+    );
 }
 
 #[test]

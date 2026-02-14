@@ -53,9 +53,9 @@
 //! - Which processing paths maximize consciousness
 //! - Optimal resource allocation for consciousness
 
-use std::collections::{HashMap, VecDeque};
-use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, VecDeque};
 
 // ============================================================================
 // CORE TYPES
@@ -303,8 +303,7 @@ impl MetaCognitiveOptimizer {
 
         // Update running averages
         let n = self.stats.snapshots_processed as f64;
-        self.stats.avg_phi_before =
-            (self.stats.avg_phi_before * (n - 1.0) + snapshot.phi) / n;
+        self.stats.avg_phi_before = (self.stats.avg_phi_before * (n - 1.0) + snapshot.phi) / n;
 
         // Update beliefs based on observation
         self.update_beliefs(&snapshot);
@@ -340,8 +339,7 @@ impl MetaCognitiveOptimizer {
 
         // Update running post-optimization average
         let n = self.stats.recommendations_made as f64;
-        self.stats.avg_phi_after =
-            (self.stats.avg_phi_after * (n - 1.0) + actual_phi) / n;
+        self.stats.avg_phi_after = (self.stats.avg_phi_after * (n - 1.0) + actual_phi) / n;
 
         // Calculate improvement
         if self.stats.avg_phi_before > 0.0 {
@@ -351,7 +349,11 @@ impl MetaCognitiveOptimizer {
 
         // Update path expectations based on actual outcome
         let prediction_error = actual_phi - recommendation.expected_phi;
-        if let Some(exp) = self.beliefs.path_expectations.get_mut(&recommendation.recommended_path) {
+        if let Some(exp) = self
+            .beliefs
+            .path_expectations
+            .get_mut(&recommendation.recommended_path)
+        {
             *exp += self.policy.learning_rate * prediction_error;
             *exp = exp.clamp(0.0, 1.0);
         }
@@ -368,7 +370,11 @@ impl MetaCognitiveOptimizer {
             (1.0 - alpha) * self.beliefs.prior_high_phi + alpha * observed;
 
         // Update path expectation
-        if let Some(exp) = self.beliefs.path_expectations.get_mut(&snapshot.processing_path) {
+        if let Some(exp) = self
+            .beliefs
+            .path_expectations
+            .get_mut(&snapshot.processing_path)
+        {
             *exp = (1.0 - alpha) * *exp + alpha * snapshot.phi;
         }
 
@@ -382,7 +388,9 @@ impl MetaCognitiveOptimizer {
         // Free Energy = Surprise (negative log likelihood of observation)
         // Approximated as: divergence from expected Φ
 
-        let expected_phi = self.beliefs.path_expectations
+        let expected_phi = self
+            .beliefs
+            .path_expectations
             .get(&snapshot.processing_path)
             .copied()
             .unwrap_or(0.5);
@@ -438,18 +446,22 @@ impl MetaCognitiveOptimizer {
     /// Find pattern similar to given features
     fn find_similar_pattern(&self, features: &InputFeatures) -> Option<usize> {
         self.patterns.iter().position(|p| {
-            self.feature_similarity(&p.feature_centroid, features) >= self.config.similarity_threshold
+            self.feature_similarity(&p.feature_centroid, features)
+                >= self.config.similarity_threshold
         })
     }
 
     /// Find matching pattern for recommendation
     fn find_matching_pattern(&self, features: &InputFeatures) -> Option<&ConsciousnessPattern> {
-        self.patterns.iter()
+        self.patterns
+            .iter()
             .filter(|p| p.observation_count >= self.config.min_observations)
             .max_by(|a, b| {
                 let sim_a = self.feature_similarity(&a.feature_centroid, features);
                 let sim_b = self.feature_similarity(&b.feature_centroid, features);
-                sim_a.partial_cmp(&sim_b).unwrap_or(std::cmp::Ordering::Equal)
+                sim_a
+                    .partial_cmp(&sim_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
     }
 
@@ -461,8 +473,8 @@ impl MetaCognitiveOptimizer {
         let diff_domain = (a.domain_match - b.domain_match).abs();
         let diff_length = (a.length_norm - b.length_norm).abs();
 
-        let total_diff = diff_complexity + diff_novelty + diff_uncertainty +
-                         diff_domain + diff_length;
+        let total_diff =
+            diff_complexity + diff_novelty + diff_uncertainty + diff_domain + diff_length;
 
         1.0 - (total_diff / 5.0)
     }
@@ -474,7 +486,13 @@ impl MetaCognitiveOptimizer {
         matching_pattern: Option<&ConsciousnessPattern>,
     ) -> OptimizationRecommendation {
         // Calculate expected free energy for each path
-        let paths = ["full_deliberation", "standard", "heuristic", "fast_pattern", "reflex"];
+        let paths = [
+            "full_deliberation",
+            "standard",
+            "heuristic",
+            "fast_pattern",
+            "reflex",
+        ];
         let mut path_efes: Vec<(String, f64, f64)> = Vec::new();
 
         for path in &paths {
@@ -485,8 +503,14 @@ impl MetaCognitiveOptimizer {
             let risk = (self.policy.phi_threshold - expected_phi).max(0.0);
 
             // Ambiguity: Uncertainty about this path
-            let ambiguity = self.beliefs.belief_uncertainty *
-                            (1.0 - self.beliefs.path_expectations.get(*path).copied().unwrap_or(0.5));
+            let ambiguity = self.beliefs.belief_uncertainty
+                * (1.0
+                    - self
+                        .beliefs
+                        .path_expectations
+                        .get(*path)
+                        .copied()
+                        .unwrap_or(0.5));
 
             let efe = risk + ambiguity;
             path_efes.push((path.to_string(), efe, expected_phi));
@@ -499,7 +523,10 @@ impl MetaCognitiveOptimizer {
         let recommended = if rand::random::<f64>() < self.policy.exploration_rate {
             // Explore: Pick randomly weighted by expected Φ
             let random_idx = (rand::random::<f64>() * paths.len() as f64) as usize;
-            path_efes.get(random_idx).cloned().unwrap_or(path_efes[0].clone())
+            path_efes
+                .get(random_idx)
+                .cloned()
+                .unwrap_or(path_efes[0].clone())
         } else {
             // Exploit: Pick best
             path_efes[0].clone()
@@ -509,7 +536,10 @@ impl MetaCognitiveOptimizer {
             format!(
                 "Matched pattern '{}' (confidence {:.2}). Active Inference selected '{}' \
                  to minimize EFE. Expected Φ: {:.3}, Current free energy: {:.3}",
-                pattern.id, pattern.confidence, recommended.0, recommended.2,
+                pattern.id,
+                pattern.confidence,
+                recommended.0,
+                recommended.2,
                 self.current_free_energy
             )
         } else {
@@ -520,7 +550,8 @@ impl MetaCognitiveOptimizer {
             )
         };
 
-        let alternatives: Vec<(String, f64)> = path_efes.iter()
+        let alternatives: Vec<(String, f64)> = path_efes
+            .iter()
             .skip(1)
             .take(3)
             .map(|(p, _, phi)| (p.clone(), *phi))
@@ -558,7 +589,10 @@ impl MetaCognitiveOptimizer {
             recommended_path: path.clone(),
             expected_phi,
             confidence: matching_pattern.map(|p| p.confidence).unwrap_or(0.3),
-            reasoning: format!("Simple heuristic based on complexity {:.2}", features.complexity),
+            reasoning: format!(
+                "Simple heuristic based on complexity {:.2}",
+                features.complexity
+            ),
             alternatives: vec![],
         }
     }
@@ -571,7 +605,9 @@ impl MetaCognitiveOptimizer {
         matching_pattern: Option<&ConsciousnessPattern>,
     ) -> f64 {
         // Base expectation from beliefs
-        let base_expectation = self.beliefs.path_expectations
+        let base_expectation = self
+            .beliefs
+            .path_expectations
             .get(path)
             .copied()
             .unwrap_or(0.5);
@@ -583,7 +619,9 @@ impl MetaCognitiveOptimizer {
                 pattern.mean_phi
             } else {
                 // Estimate based on relative performance
-                let optimal_exp = self.beliefs.path_expectations
+                let optimal_exp = self
+                    .beliefs
+                    .path_expectations
                     .get(&pattern.optimal_path)
                     .copied()
                     .unwrap_or(0.5);
@@ -618,8 +656,7 @@ impl MetaCognitiveOptimizer {
     /// Get success rate of recommendations
     pub fn success_rate(&self) -> f64 {
         if self.stats.recommendations_made > 0 {
-            self.stats.successful_recommendations as f64 /
-            self.stats.recommendations_made as f64
+            self.stats.successful_recommendations as f64 / self.stats.recommendations_made as f64
         } else {
             0.0
         }
@@ -671,21 +708,25 @@ impl MetaCognitiveOptimizer {
 
     /// Format top patterns for report
     fn format_top_patterns(&self, n: usize) -> String {
-        let mut sorted_patterns: Vec<_> = self.patterns.iter()
+        let mut sorted_patterns: Vec<_> = self
+            .patterns
+            .iter()
             .filter(|p| p.observation_count >= self.config.min_observations)
             .collect();
 
         sorted_patterns.sort_by(|a, b| {
-            b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal)
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        sorted_patterns.iter()
+        sorted_patterns
+            .iter()
             .take(n)
             .map(|p| {
                 format!(
                     "  - {}: Φ={:.3}±{:.3}, path='{}', n={}, conf={:.2}",
-                    p.id, p.mean_phi, p.phi_std, p.optimal_path,
-                    p.observation_count, p.confidence
+                    p.id, p.mean_phi, p.phi_std, p.optimal_path, p.observation_count, p.confidence
                 )
             })
             .collect::<Vec<_>>()

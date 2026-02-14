@@ -36,8 +36,8 @@
 //!     └───── decays ───────┴───── predicts ─────┘
 //! ```
 
+use super::unified_consciousness_engine::{ConsciousnessDimensions, ConsciousnessUpdate};
 use super::unified_hv::ContinuousHV;
-use super::unified_consciousness_engine::{ConsciousnessUpdate, ConsciousnessDimensions};
 use std::collections::VecDeque;
 
 /// Temporal binding window configuration
@@ -207,7 +207,11 @@ impl TemporalBindingEngine {
     }
 
     /// Create experience bound with temporal context
-    fn create_bound_experience(&self, experience: &ContinuousHV, theta_weight: f64) -> ContinuousHV {
+    fn create_bound_experience(
+        &self,
+        experience: &ContinuousHV,
+        theta_weight: f64,
+    ) -> ContinuousHV {
         let mut components = vec![experience.clone()];
 
         // Add decayed past contributions
@@ -237,7 +241,8 @@ impl TemporalBindingEngine {
     /// Update running temporal context
     fn update_temporal_context(&mut self, bound: &ContinuousHV) {
         let lr = 0.2;
-        self.temporal_context = self.temporal_context
+        self.temporal_context = self
+            .temporal_context
             .scale((1.0 - lr) as f32)
             .add(&bound.scale(lr as f32))
             .normalize();
@@ -247,7 +252,8 @@ impl TemporalBindingEngine {
     fn update_narrative(&mut self, bound: &ContinuousHV) {
         // Narrative accumulates slowly (episodic integration)
         let lr = 0.05;
-        self.narrative = self.narrative
+        self.narrative = self
+            .narrative
             .scale((1.0 - lr) as f32)
             .add(&bound.scale(lr as f32))
             .normalize();
@@ -294,25 +300,28 @@ impl TemporalBindingEngine {
         let past_binding = if self.past_moments.is_empty() {
             0.0
         } else {
-            self.past_moments.iter()
+            self.past_moments
+                .iter()
                 .map(|m| m.past_integration)
-                .sum::<f64>() / self.past_moments.len() as f64
+                .sum::<f64>()
+                / self.past_moments.len() as f64
         };
 
         let future_binding = if self.past_moments.is_empty() {
             0.0
         } else {
-            self.past_moments.iter()
+            self.past_moments
+                .iter()
                 .map(|m| m.anticipation_match)
-                .sum::<f64>() / self.past_moments.len() as f64
+                .sum::<f64>()
+                / self.past_moments.len() as f64
         };
 
         let continuity_avg = if self.past_moments.is_empty() {
             0.0
         } else {
-            self.past_moments.iter()
-                .map(|m| m.continuity)
-                .sum::<f64>() / self.past_moments.len() as f64
+            self.past_moments.iter().map(|m| m.continuity).sum::<f64>()
+                / self.past_moments.len() as f64
         };
 
         let coherence = (past_binding + future_binding + continuity_avg) / 3.0;
@@ -478,13 +487,20 @@ pub struct StreamHealth {
 
 impl std::fmt::Display for StreamHealth {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let flow_status = if self.is_flowing { "FLOWING" } else { "FRAGMENTED" };
-        write!(f, "Stream[{}: coherence={:.1}%, integration={:.1}%, narrative={}steps, theta={:.1}Hz]",
-               flow_status,
-               self.coherence * 100.0,
-               self.temporal_integration * 100.0,
-               self.narrative_length,
-               self.theta_rhythm)
+        let flow_status = if self.is_flowing {
+            "FLOWING"
+        } else {
+            "FRAGMENTED"
+        };
+        write!(
+            f,
+            "Stream[{}: coherence={:.1}%, integration={:.1}%, narrative={}steps, theta={:.1}Hz]",
+            flow_status,
+            self.coherence * 100.0,
+            self.temporal_integration * 100.0,
+            self.narrative_length,
+            self.theta_rhythm
+        )
     }
 }
 
@@ -508,15 +524,25 @@ mod tests {
             let moment = engine.bind(&experience);
 
             if i % 5 == 0 {
-                println!("Step {}: past_int={:.3}, antic_match={:.3}, continuity={:.3}",
-                        moment.step, moment.past_integration,
-                        moment.anticipation_match, moment.continuity);
+                println!(
+                    "Step {}: past_int={:.3}, antic_match={:.3}, continuity={:.3}",
+                    moment.step,
+                    moment.past_integration,
+                    moment.anticipation_match,
+                    moment.continuity
+                );
             }
         }
 
         let summary = engine.integration_summary();
-        assert!(summary.past_binding.is_finite(), "Past binding should be finite");
-        assert!(summary.future_binding.is_finite(), "Future binding should be finite");
+        assert!(
+            summary.past_binding.is_finite(),
+            "Past binding should be finite"
+        );
+        assert!(
+            summary.future_binding.is_finite(),
+            "Future binding should be finite"
+        );
         assert!(summary.coherence.is_finite(), "Coherence should be finite");
         assert!(summary.coherence >= 0.0, "Coherence should be non-negative");
     }
@@ -545,12 +571,17 @@ mod tests {
         }
 
         let summary = engine.integration_summary();
-        assert!(summary.coherence > 0.5, "Similar experiences should create coherent stream");
+        assert!(
+            summary.coherence > 0.5,
+            "Similar experiences should create coherent stream"
+        );
     }
 
     #[test]
     fn test_stream_of_consciousness() {
-        use super::super::unified_consciousness_engine::{UnifiedConsciousnessEngine, EngineConfig};
+        use super::super::unified_consciousness_engine::{
+            EngineConfig, UnifiedConsciousnessEngine,
+        };
 
         let engine_config = EngineConfig {
             hdc_dim: 1024,
@@ -573,8 +604,17 @@ mod tests {
         }
 
         let health = stream.stream_health();
-        assert!(health.coherence.is_finite(), "Stream coherence should be finite");
-        assert!(health.temporal_integration.is_finite(), "Temporal integration should be finite");
-        assert!(health.theta_rhythm.is_finite(), "Theta rhythm should be finite");
+        assert!(
+            health.coherence.is_finite(),
+            "Stream coherence should be finite"
+        );
+        assert!(
+            health.temporal_integration.is_finite(),
+            "Temporal integration should be finite"
+        );
+        assert!(
+            health.theta_rhythm.is_finite(),
+            "Theta rhythm should be finite"
+        );
     }
 }

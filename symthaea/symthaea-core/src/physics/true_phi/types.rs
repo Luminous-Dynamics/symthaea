@@ -49,8 +49,7 @@ impl EntropyConfig {
 }
 
 /// Methods for continuous entropy estimation
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum EntropyMethod {
     /// Histogram binning (fast, default)
     #[default]
@@ -224,10 +223,15 @@ pub fn pyphi_reference_cases() -> Vec<PyPhiTestCase> {
 /// Run a PyPhi test case and return whether it passed
 pub fn run_pyphi_test(case: &PyPhiTestCase, components: &[ContinuousHV]) -> (bool, f64, String) {
     if components.len() != case.n_nodes {
-        return (false, 0.0, format!(
-            "Wrong number of components: expected {}, got {}",
-            case.n_nodes, components.len()
-        ));
+        return (
+            false,
+            0.0,
+            format!(
+                "Wrong number of components: expected {}, got {}",
+                case.n_nodes,
+                components.len()
+            ),
+        );
     }
 
     let calc = TruePhiCalculator::new();
@@ -238,7 +242,10 @@ pub fn run_pyphi_test(case: &PyPhiTestCase, components: &[ContinuousHV]) -> (boo
             phi: 0.0,
             system_ei: 0.0,
             mip_ei: 0.0,
-            mip: TruePartition { part_a: vec![], part_b: vec![] },
+            mip: TruePartition {
+                part_a: vec![],
+                part_b: vec![],
+            },
             component_entropies: vec![],
             mutual_information_matrix: vec![],
         }
@@ -255,7 +262,10 @@ pub fn run_pyphi_test(case: &PyPhiTestCase, components: &[ContinuousHV]) -> (boo
     let message = format!(
         "{}: computed \u{03a6} = {:.6}, expected \u{2248} {:.6} (diff = {:.6}, tol = {:.6})",
         if passed { "PASS" } else { "FAIL" },
-        result.phi, case.expected_phi, diff, case.tolerance
+        result.phi,
+        case.expected_phi,
+        diff,
+        case.tolerance
     );
 
     (passed, result.phi, message)

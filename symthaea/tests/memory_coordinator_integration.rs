@@ -10,9 +10,8 @@
 //! - Working memory eviction and graduation routing
 
 use symthaea::memory::{
-    MemoryCoordinator, CoordinatorConfig, GraduationEvent,
-    EpisodicMemory, EpisodicReplayConfig, Episode,
-    SemanticMemory,
+    CoordinatorConfig, Episode, EpisodicMemory, EpisodicReplayConfig, GraduationEvent,
+    MemoryCoordinator, SemanticMemory,
 };
 use symthaea_core::hdc::ContinuousHV;
 
@@ -29,7 +28,10 @@ fn test_coordinator_signal_updates() {
     let signals = coordinator.signals();
 
     assert!(signals.phi > 0.0, "Phi should be set after update");
-    assert!(signals.coherence > 0.0, "Coherence should be set after update");
+    assert!(
+        signals.coherence > 0.0,
+        "Coherence should be set after update"
+    );
 }
 
 #[test]
@@ -57,7 +59,10 @@ fn test_graduation_pipeline_end_to_end() {
 
     // Verify the episode was stored in episodic memory
     let stats = episodic.stats();
-    assert!(stats.total_stored > 0, "Episodic memory should have stored the graduated episode");
+    assert!(
+        stats.total_stored > 0,
+        "Episodic memory should have stored the graduated episode"
+    );
 }
 
 #[test]
@@ -82,9 +87,15 @@ fn test_graduation_rejected_when_too_few_steps() {
     });
 
     let graduated = coordinator.process_graduations(&mut episodic);
-    assert_eq!(graduated, 0, "Should reject items that didn't survive enough steps");
+    assert_eq!(
+        graduated, 0,
+        "Should reject items that didn't survive enough steps"
+    );
 
-    assert!(coordinator.stats.graduations_rejected > 0, "Should track rejected graduations");
+    assert!(
+        coordinator.stats.graduations_rejected > 0,
+        "Should track rejected graduations"
+    );
 }
 
 #[test]
@@ -163,7 +174,8 @@ fn test_phi_weighted_lr_increases_with_error() {
     assert!(
         high_error_lr >= low_error_lr,
         "Higher prediction error context should produce >= LR factor: {} vs {}",
-        high_error_lr, low_error_lr
+        high_error_lr,
+        low_error_lr
     );
 }
 
@@ -183,13 +195,11 @@ fn test_episodic_replay_stores_high_phi_episodes() {
     let input = ContinuousHV::random(128, 1);
     let output = ContinuousHV::random(128, 2);
     let episode = Episode::with_metadata(
-        input,
-        output,
-        0.9,   // High phi
-        1,     // cycle
-        0.1,   // prediction error
-        0.5,   // valence
-        0.8,   // coherence
+        input, output, 0.9, // High phi
+        1,   // cycle
+        0.1, // prediction error
+        0.5, // valence
+        0.8, // coherence
     );
 
     let stored = episodic.store_if_significant(episode);
@@ -208,13 +218,8 @@ fn test_episodic_replay_rejects_low_phi() {
     let input = ContinuousHV::random(128, 1);
     let output = ContinuousHV::random(128, 2);
     let episode = Episode::with_metadata(
-        input,
-        output,
-        0.1,   // Low phi (below threshold)
-        1,
-        0.1,
-        0.5,
-        0.3,
+        input, output, 0.1, // Low phi (below threshold)
+        1, 0.1, 0.5, 0.3,
     );
 
     let stored = episodic.store_if_significant(episode);
@@ -255,11 +260,18 @@ fn test_working_memory_eviction_tracking() {
     mind.tick();
 
     let evicted = mind.take_evicted();
-    assert_eq!(evicted.len(), 1, "Should evict exactly one item when capacity exceeded");
+    assert_eq!(
+        evicted.len(),
+        1,
+        "Should evict exactly one item when capacity exceeded"
+    );
 
     // Verify take_evicted drains the buffer
     let evicted_again = mind.take_evicted();
-    assert!(evicted_again.is_empty(), "Buffer should be empty after take");
+    assert!(
+        evicted_again.is_empty(),
+        "Buffer should be empty after take"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -308,7 +320,10 @@ fn test_full_eviction_to_graduation_pipeline() {
 
     // Process graduations into episodic memory
     let graduated = coordinator.process_graduations(&mut episodic);
-    assert!(graduated > 0, "Evicted items should graduate to episodic memory");
+    assert!(
+        graduated > 0,
+        "Evicted items should graduate to episodic memory"
+    );
 
     let stats = episodic.stats();
     assert!(

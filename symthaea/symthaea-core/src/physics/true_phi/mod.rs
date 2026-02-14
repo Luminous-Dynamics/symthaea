@@ -31,32 +31,32 @@
 //! - Tononi et al. (2016) - "Integrated Information Theory: From Consciousness to Its Physical Substrate"
 //! - Oizumi et al. (2014) - "From the Phenomenology to the Mechanisms of Consciousness"
 
-mod types;
-mod entropy;
-mod temporal;
-mod iit4;
-mod quantum;
-mod calculator;
-mod parallel;
-mod conceptual;
-mod simd;
-mod bounds;
 mod approximate;
+mod bounds;
+mod calculator;
+mod conceptual;
+mod entropy;
+mod iit4;
+mod parallel;
+mod quantum;
+mod simd;
 mod streaming;
+mod temporal;
+mod types;
 
 // Re-export all public items from submodules for backward compatibility
-pub use types::*;
-pub use entropy::*;
-pub use temporal::*;
-pub use iit4::*;
-pub use quantum::*;
-pub use calculator::*;
-pub use parallel::*;
-pub use conceptual::*;
-pub use simd::*;
-pub use bounds::*;
 pub use approximate::*;
+pub use bounds::*;
+pub use calculator::*;
+pub use conceptual::*;
+pub use entropy::*;
+pub use iit4::*;
+pub use parallel::*;
+pub use quantum::*;
+pub use simd::*;
 pub use streaming::*;
+pub use temporal::*;
+pub use types::*;
 
 #[cfg(test)]
 mod tests;

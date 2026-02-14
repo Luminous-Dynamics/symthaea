@@ -177,13 +177,18 @@ impl IIT4Calculator {
                 pair_count += 1;
             }
         }
-        let avg_id = if pair_count > 0 { total_id / pair_count as f64 } else { 0.0 };
+        let avg_id = if pair_count > 0 {
+            total_id / pair_count as f64
+        } else {
+            0.0
+        };
 
         // Compute small phi for each component
         let mut total_phi = 0.0;
         let mut concept_count = 0;
         for i in 0..n {
-            let context: Vec<ContinuousHV> = components.iter()
+            let context: Vec<ContinuousHV> = components
+                .iter()
                 .enumerate()
                 .filter(|(j, _)| *j != i)
                 .map(|(_, c)| c.clone())
@@ -201,7 +206,8 @@ impl IIT4Calculator {
         let phi_result = calc.compute_true_phi(components);
 
         // Compute total intrinsic information
-        let total_ii: f64 = components.iter()
+        let total_ii: f64 = components
+            .iter()
             .map(|c| self.intrinsic_information(c))
             .sum();
 

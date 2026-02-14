@@ -79,7 +79,11 @@ impl CodeAlgebra {
             .collect();
 
         // Sort by similarity descending
-        matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        matches.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         matches.truncate(top_k);
         matches
     }
@@ -271,9 +275,12 @@ mod tests {
 
     fn test_span() -> Span {
         Span {
-            start_byte: 0, end_byte: 10,
-            start_line: 0, start_col: 0,
-            end_line: 0, end_col: 10,
+            start_byte: 0,
+            end_byte: 10,
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 10,
         }
     }
 
@@ -316,11 +323,14 @@ mod tests {
         let algebra = make_algebra();
 
         let mut old = ParsedCode::new("fn a() {}", "rust");
-        old.entities.push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+        old.entities
+            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
 
         let mut new = ParsedCode::new("fn a() {} fn b() {}", "rust");
-        new.entities.push(CodeEntity::new(EntityKind::Function, "a", test_span()));
-        new.entities.push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+        new.entities
+            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+        new.entities
+            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
 
         let diff = algebra.semantic_diff(&old, &new);
         // There should be some change
@@ -345,8 +355,12 @@ mod tests {
         let sort_sim = pattern.similarity(&algebra.encoder().encode_name("heap_sort"));
         let other_sim = pattern.similarity(&algebra.encoder().encode_name("database_connection"));
 
-        assert!(sort_sim > other_sim,
-            "Abstract pattern should be more similar to sort: {} vs {}", sort_sim, other_sim);
+        assert!(
+            sort_sim > other_sim,
+            "Abstract pattern should be more similar to sort: {} vs {}",
+            sort_sim,
+            other_sim
+        );
     }
 
     #[test]
@@ -367,8 +381,12 @@ mod tests {
         let similar_coherence = algebra.measure_coherence(&similar);
         let diverse_coherence = algebra.measure_coherence(&diverse);
 
-        assert!(similar_coherence > diverse_coherence,
-            "Similar patterns should be more coherent: {} vs {}", similar_coherence, diverse_coherence);
+        assert!(
+            similar_coherence > diverse_coherence,
+            "Similar patterns should be more coherent: {} vs {}",
+            similar_coherence,
+            diverse_coherence
+        );
     }
 
     #[test]

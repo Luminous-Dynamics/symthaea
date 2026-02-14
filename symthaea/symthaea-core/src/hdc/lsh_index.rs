@@ -82,9 +82,9 @@ pub struct LshConfig {
 impl Default for LshConfig {
     fn default() -> Self {
         LshConfig {
-            num_bits: 10,      // 1024 buckets
-            num_tables: 10,    // 95% recall
-            seed: 12345,       // Reproducible by default
+            num_bits: 10,   // 1024 buckets
+            num_tables: 10, // 95% recall
+            seed: 12345,    // Reproducible by default
         }
     }
 }
@@ -116,7 +116,7 @@ impl LshConfig {
     /// Configuration for large datasets (>1M vectors)
     pub fn large_dataset() -> Self {
         LshConfig {
-            num_bits: 12,      // 4096 buckets
+            num_bits: 12, // 4096 buckets
             num_tables: 10,
             seed: 12345,
         }
@@ -222,7 +222,7 @@ impl LshTable {
 
         for (i, hash_fn) in self.hash_functions.iter().enumerate() {
             if hash_fn.hash(vector) {
-                hash_value |= 1 << i;  // Set bit i
+                hash_value |= 1 << i; // Set bit i
             }
         }
 
@@ -243,18 +243,11 @@ impl LshTable {
 
     /// Get statistics about this table
     pub fn stats(&self) -> LshTableStats {
-        let non_empty_buckets = self.buckets.iter()
-            .filter(|b| !b.is_empty())
-            .count();
+        let non_empty_buckets = self.buckets.iter().filter(|b| !b.is_empty()).count();
 
-        let total_entries: usize = self.buckets.iter()
-            .map(|b| b.len())
-            .sum();
+        let total_entries: usize = self.buckets.iter().map(|b| b.len()).sum();
 
-        let max_bucket_size = self.buckets.iter()
-            .map(|b| b.len())
-            .max()
-            .unwrap_or(0);
+        let max_bucket_size = self.buckets.iter().map(|b| b.len()).max().unwrap_or(0);
 
         let avg_bucket_size = if non_empty_buckets > 0 {
             total_entries as f32 / non_empty_buckets as f32
@@ -458,21 +451,14 @@ impl LshIndex {
 
     /// Get comprehensive statistics about the index
     pub fn stats(&self) -> LshIndexStats {
-        let table_stats: Vec<LshTableStats> = self.tables.iter()
-            .map(|t| t.stats())
-            .collect();
+        let table_stats: Vec<LshTableStats> = self.tables.iter().map(|t| t.stats()).collect();
 
-        let total_buckets: usize = table_stats.iter()
-            .map(|s| s.num_buckets)
-            .sum();
+        let total_buckets: usize = table_stats.iter().map(|s| s.num_buckets).sum();
 
-        let total_non_empty: usize = table_stats.iter()
-            .map(|s| s.non_empty_buckets)
-            .sum();
+        let total_non_empty: usize = table_stats.iter().map(|s| s.non_empty_buckets).sum();
 
-        let avg_candidates_per_query = table_stats.iter()
-            .map(|s| s.avg_bucket_size)
-            .sum::<f32>() / self.config.num_tables as f32;
+        let avg_candidates_per_query = table_stats.iter().map(|s| s.avg_bucket_size).sum::<f32>()
+            / self.config.num_tables as f32;
 
         LshIndexStats {
             num_tables: self.config.num_tables,
@@ -507,13 +493,25 @@ impl std::fmt::Display for LshIndexStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "LSH Index Statistics:")?;
         writeln!(f, "  Tables: {}", self.num_tables)?;
-        writeln!(f, "  Bits per table: {} ({} buckets)", self.num_bits, 1 << self.num_bits)?;
+        writeln!(
+            f,
+            "  Bits per table: {} ({} buckets)",
+            self.num_bits,
+            1 << self.num_bits
+        )?;
         writeln!(f, "  Vectors indexed: {}", self.num_vectors)?;
         writeln!(f, "  Total buckets: {}", self.total_buckets)?;
-        writeln!(f, "  Non-empty buckets: {} ({:.1}%)",
+        writeln!(
+            f,
+            "  Non-empty buckets: {} ({:.1}%)",
             self.total_non_empty_buckets,
-            100.0 * self.total_non_empty_buckets as f32 / self.total_buckets as f32)?;
-        writeln!(f, "  Avg candidates per query: {:.1}", self.avg_candidates_per_query)?;
+            100.0 * self.total_non_empty_buckets as f32 / self.total_buckets as f32
+        )?;
+        writeln!(
+            f,
+            "  Avg candidates per query: {:.1}",
+            self.avg_candidates_per_query
+        )?;
         Ok(())
     }
 }
@@ -539,11 +537,9 @@ mod tests {
 
     #[test]
     fn test_hash_table_basic() {
-        let mut table = LshTable::new(8, 42);  // 8 bits = 256 buckets
+        let mut table = LshTable::new(8, 42); // 8 bits = 256 buckets
 
-        let vectors: Vec<BinaryHV> = (0..100)
-            .map(|i| BinaryHV::random(i as u64))
-            .collect();
+        let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i as u64)).collect();
 
         for (id, vector) in vectors.iter().enumerate() {
             table.insert(id, vector);
@@ -560,12 +556,10 @@ mod tests {
 
     #[test]
     fn test_lsh_index_basic() {
-        let config = LshConfig::fast();  // 5 tables for speed
+        let config = LshConfig::fast(); // 5 tables for speed
         let mut index = LshIndex::new(config);
 
-        let vectors: Vec<BinaryHV> = (0..1000)
-            .map(|i| BinaryHV::random(i as u64))
-            .collect();
+        let vectors: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i as u64)).collect();
 
         index.insert_batch(&vectors);
 
@@ -588,9 +582,7 @@ mod tests {
         let config = LshConfig::balanced();
         let mut index = LshIndex::new(config);
 
-        let vectors: Vec<BinaryHV> = (0..100)
-            .map(|i| BinaryHV::random(i as u64))
-            .collect();
+        let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i as u64)).collect();
 
         index.insert_batch(&vectors);
 
@@ -621,9 +613,7 @@ mod tests {
         let config = LshConfig::balanced();
         let mut index = LshIndex::new(config);
 
-        let vectors: Vec<BinaryHV> = (0..1000)
-            .map(|i| BinaryHV::random(i as u64))
-            .collect();
+        let vectors: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i as u64)).collect();
 
         index.insert_batch(&vectors);
 
@@ -641,14 +631,17 @@ mod tests {
                 assert!(
                     results[i].1 >= results[i + 1].1,
                     "Results should be sorted descending at k={}, positions {} and {}",
-                    k, i, i + 1
+                    k,
+                    i,
+                    i + 1
                 );
             }
 
             // Verify these are actually the top-k by checking no other vector has higher similarity
             if !results.is_empty() {
                 let min_returned_sim = results.last().unwrap().1;
-                let returned_ids: std::collections::HashSet<_> = results.iter().map(|(id, _)| *id).collect();
+                let returned_ids: std::collections::HashSet<_> =
+                    results.iter().map(|(id, _)| *id).collect();
 
                 for (id, vec) in vectors.iter().enumerate() {
                     if !returned_ids.contains(&id) {
@@ -656,7 +649,10 @@ mod tests {
                         assert!(
                             sim <= min_returned_sim || results.len() < k,
                             "Vector {} with sim {:.4} should be in top-{} (min returned: {:.4})",
-                            id, sim, k, min_returned_sim
+                            id,
+                            sim,
+                            k,
+                            min_returned_sim
                         );
                     }
                 }
@@ -670,9 +666,7 @@ mod tests {
         let config = LshConfig::fast();
         let mut index = LshIndex::new(config);
 
-        let vectors: Vec<BinaryHV> = (0..100)
-            .map(|i| BinaryHV::random(i as u64))
-            .collect();
+        let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i as u64)).collect();
 
         index.insert_batch(&vectors);
 
@@ -680,7 +674,11 @@ mod tests {
 
         // k larger than dataset
         let results = index.query_brute_force(&query, 1000, &vectors);
-        assert_eq!(results.len(), 100, "Should return all 100 vectors when k > n");
+        assert_eq!(
+            results.len(),
+            100,
+            "Should return all 100 vectors when k > n"
+        );
 
         // Verify still sorted
         for i in 0..results.len().saturating_sub(1) {

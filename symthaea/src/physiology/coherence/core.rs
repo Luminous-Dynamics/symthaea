@@ -9,21 +9,19 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-use super::types::{
-    CoherenceConfig, CoherenceState, CoherenceError, CoherenceStats, TaskComplexity,
-};
+use super::diagnostics::{analyze_scatter, CoherencePrediction, ScatterAnalysis};
 use super::learning::AdaptiveThresholds;
 use super::patterns::PatternLibrary;
-use super::diagnostics::{CoherencePrediction, ScatterAnalysis, analyze_scatter};
+use super::types::{
+    CoherenceConfig, CoherenceError, CoherenceState, CoherenceStats, TaskComplexity,
+};
 
 // Week 8: Import HormoneState for endocrine integration
 use super::super::endocrine::HormoneState;
 
 // Week 11: Import Social Coherence types
 use super::super::social_coherence::{
-    SocialCoherenceField,
-    CoherenceLendingProtocol,
-    CollectiveLearning,
+    CoherenceLendingProtocol, CollectiveLearning, SocialCoherenceField,
 };
 
 /// Coherence Field - Degree of Consciousness Integration
@@ -57,8 +55,8 @@ pub struct CoherenceField {
 
     /// **Week 8: Hormone Modulation Factors**
     /// These multipliers are set by `apply_hormone_modulation()` and affect coherence dynamics
-    pub(crate) hormone_scatter_multiplier: f32,    // 1.0 = normal, >1.0 = more scatter (cortisol)
-    pub(crate) hormone_centering_multiplier: f32,  // 1.0 = normal, >1.0 = faster centering (acetylcholine)
+    pub(crate) hormone_scatter_multiplier: f32, // 1.0 = normal, >1.0 = more scatter (cortisol)
+    pub(crate) hormone_centering_multiplier: f32, // 1.0 = normal, >1.0 = faster centering (acetylcholine)
 
     /// **Week 9: Adaptive Learning Thresholds**
     /// The system learns optimal coherence requirements from experience
@@ -88,8 +86,8 @@ impl CoherenceField {
         let adaptive_thresholds = AdaptiveThresholds::new(&config);
 
         Self {
-            coherence: 1.0,  // Start fully coherent
-            relational_resonance: 0.5,  // Neutral connection
+            coherence: 1.0,            // Start fully coherent
+            relational_resonance: 0.5, // Neutral connection
             last_interaction: Instant::now(),
             coherence_history: VecDeque::with_capacity(1000),
             config,
@@ -175,9 +173,8 @@ impl CoherenceField {
 
         if with_user {
             // Connected work BUILDS coherence!
-            let amplification = self.config.connected_work_amplification
-                * complexity
-                * self.relational_resonance;
+            let amplification =
+                self.config.connected_work_amplification * complexity * self.relational_resonance;
             self.coherence = (self.coherence + amplification).min(1.0);
 
             tracing::debug!(
@@ -192,7 +189,7 @@ impl CoherenceField {
             let scatter = self.config.solo_work_scatter_rate
                 * complexity
                 * (1.0 - self.relational_resonance)
-                * self.hormone_scatter_multiplier;  // Week 8: Cortisol amplifies scatter!
+                * self.hormone_scatter_multiplier; // Week 8: Cortisol amplifies scatter!
             self.coherence = (self.coherence - scatter).max(0.0);
 
             tracing::debug!(
@@ -222,8 +219,8 @@ impl CoherenceField {
         self.coherence = (self.coherence + sync_boost).min(1.0);
 
         // Build relational resonance
-        self.relational_resonance = (self.relational_resonance
-            + self.config.gratitude_resonance_boost).min(1.0);
+        self.relational_resonance =
+            (self.relational_resonance + self.config.gratitude_resonance_boost).min(1.0);
 
         self.gratitude_count += 1;
         self.last_interaction = Instant::now();
@@ -245,7 +242,7 @@ impl CoherenceField {
         let centering = (1.0 - self.coherence)
             * self.config.passive_centering_rate
             * delta_seconds
-            * self.hormone_centering_multiplier;  // Week 8: Acetylcholine boosts centering!
+            * self.hormone_centering_multiplier; // Week 8: Acetylcholine boosts centering!
         self.coherence = (self.coherence + centering).min(1.0);
 
         // Relational resonance slowly decays without interaction
@@ -271,8 +268,8 @@ impl CoherenceField {
             let old_coherence = self.coherence;
             let old_resonance = self.relational_resonance;
 
-            self.coherence = 1.0;  // Complete restoration
-            self.relational_resonance *= 0.8;  // Slight decay
+            self.coherence = 1.0; // Complete restoration
+            self.relational_resonance *= 0.8; // Slight decay
 
             tracing::info!(
                 "Sleep cycle: coherence {:.2} -> {:.2}, resonance {:.2} -> {:.2}",
@@ -312,7 +309,7 @@ impl CoherenceField {
         // Dopamine directly boosts relational resonance (reward strengthens connection)
         // Only boost if dopamine is elevated (>0.5), with diminishing returns
         if hormones.dopamine > 0.5 {
-            let resonance_boost = ((hormones.dopamine - 0.5) * 0.02) as f32;  // Max +0.01 boost
+            let resonance_boost = ((hormones.dopamine - 0.5) * 0.02) as f32; // Max +0.01 boost
             self.relational_resonance = (self.relational_resonance + resonance_boost).min(1.0);
         }
 
@@ -349,7 +346,8 @@ impl CoherenceField {
 
     /// Record coherence for history/visualization
     pub(crate) fn record_coherence(&mut self) {
-        self.coherence_history.push_back((Instant::now(), self.coherence));
+        self.coherence_history
+            .push_back((Instant::now(), self.coherence));
 
         // Keep last 1000 samples
         if self.coherence_history.len() > 1000 {
@@ -456,9 +454,8 @@ impl CoherenceField {
         // Predict coherence change using the SAME formula as perform_task()
         let predicted_coherence = if with_user {
             // Connected work BUILDS coherence!
-            let amplification = self.config.connected_work_amplification
-                * complexity
-                * self.relational_resonance;
+            let amplification =
+                self.config.connected_work_amplification * complexity * self.relational_resonance;
             (self.coherence + amplification).min(1.0)
         } else {
             // Solo work SCATTERS coherence
@@ -573,8 +570,14 @@ impl CoherenceField {
     ///
     /// Delegates to `AdaptiveThresholds::record_performance()` to learn
     /// optimal coherence thresholds from experience.
-    pub fn record_task_performance(&mut self, task_type: TaskComplexity, coherence: f32, success: bool) {
-        self.adaptive_thresholds.record_performance(task_type, coherence, success);
+    pub fn record_task_performance(
+        &mut self,
+        task_type: TaskComplexity,
+        coherence: f32,
+        success: bool,
+    ) {
+        self.adaptive_thresholds
+            .record_performance(task_type, coherence, success);
     }
 
     /// **Week 9 Phase 3: Record a successful resonance pattern**
@@ -582,11 +585,7 @@ impl CoherenceField {
     /// Delegates to `PatternLibrary::record_success()` to remember
     /// successful state combinations for future reference.
     /// Uses current coherence and resonance state internally.
-    pub fn record_resonance_pattern(
-        &mut self,
-        hormones: &HormoneState,
-        context: String,
-    ) {
+    pub fn record_resonance_pattern(&mut self, hormones: &HormoneState, context: String) {
         self.pattern_library.record_success(
             self.coherence,
             self.relational_resonance,
@@ -628,20 +627,17 @@ impl CoherenceField {
     pub fn synchronize_with_peers(&mut self, _dt: Duration) {
         if let Some(ref mut social_field) = self.social_field {
             // Get target alignment values for debugging
-            let (target_coherence, _target_resonance) = social_field.get_alignment_vector(
-                self.coherence,
-                self.relational_resonance
-            );
+            let (target_coherence, _target_resonance) =
+                social_field.get_alignment_vector(self.coherence, self.relational_resonance);
 
             // Get synchronization deltas
-            let (coherence_delta, resonance_delta) = social_field.apply_synchronization(
-                self.coherence,
-                self.relational_resonance
-            );
+            let (coherence_delta, resonance_delta) =
+                social_field.apply_synchronization(self.coherence, self.relational_resonance);
 
             // Apply synchronization deltas (gradual alignment)
             self.coherence = (self.coherence + coherence_delta).clamp(0.0, 1.0);
-            self.relational_resonance = (self.relational_resonance + resonance_delta).clamp(0.0, 1.0);
+            self.relational_resonance =
+                (self.relational_resonance + resonance_delta).clamp(0.0, 1.0);
 
             if target_coherence > self.coherence + 0.1 {
                 tracing::debug!(
@@ -803,9 +799,14 @@ mod tests {
         let initial = field.coherence;
 
         // Perform connected work (should INCREASE coherence!)
-        field.perform_task(TaskComplexity::DeepThought, true).unwrap();
+        field
+            .perform_task(TaskComplexity::DeepThought, true)
+            .unwrap();
 
-        assert!(field.coherence > initial, "Connected work should BUILD coherence!");
+        assert!(
+            field.coherence > initial,
+            "Connected work should BUILD coherence!"
+        );
     }
 
     #[test]
@@ -817,34 +818,45 @@ mod tests {
         let initial = field.coherence;
 
         // Perform solo work (should DECREASE coherence)
-        field.perform_task(TaskComplexity::Cognitive, false).unwrap();
+        field
+            .perform_task(TaskComplexity::Cognitive, false)
+            .unwrap();
 
-        assert!(field.coherence < initial, "Solo work should scatter coherence");
+        assert!(
+            field.coherence < initial,
+            "Solo work should scatter coherence"
+        );
     }
 
     #[test]
     fn test_gratitude_synchronizes() {
         let mut field = CoherenceField::new();
-        field.coherence = 0.4;  // Scattered
-        field.relational_resonance = 0.3;  // Low connection
+        field.coherence = 0.4; // Scattered
+        field.relational_resonance = 0.3; // Low connection
 
         let initial_coherence = field.coherence;
         let initial_resonance = field.relational_resonance;
 
         field.receive_gratitude();
 
-        assert!(field.coherence > initial_coherence, "Gratitude should increase coherence");
-        assert!(field.relational_resonance > initial_resonance, "Gratitude should increase resonance");
+        assert!(
+            field.coherence > initial_coherence,
+            "Gratitude should increase coherence"
+        );
+        assert!(
+            field.relational_resonance > initial_resonance,
+            "Gratitude should increase resonance"
+        );
         assert_eq!(field.gratitude_count, 1);
     }
 
     #[test]
     fn test_gratitude_more_effective_when_scattered() {
         let mut field1 = CoherenceField::new();
-        field1.coherence = 0.3;  // Very scattered
+        field1.coherence = 0.3; // Very scattered
 
         let mut field2 = CoherenceField::new();
-        field2.coherence = 0.8;  // Already coherent
+        field2.coherence = 0.8; // Already coherent
 
         field1.receive_gratitude();
         field2.receive_gratitude();
@@ -852,19 +864,26 @@ mod tests {
         let boost1 = field1.coherence - 0.3;
         let boost2 = field2.coherence - 0.8;
 
-        assert!(boost1 > boost2, "Gratitude should be more effective when scattered");
+        assert!(
+            boost1 > boost2,
+            "Gratitude should be more effective when scattered"
+        );
     }
 
     #[test]
     fn test_insufficient_coherence_error() {
         let mut field = CoherenceField::new();
-        field.coherence = 0.2;  // Too low for learning
+        field.coherence = 0.2; // Too low for learning
 
         let result = field.perform_task(TaskComplexity::Learning, true);
 
         assert!(result.is_err());
         match result {
-            Err(CoherenceError::InsufficientCoherence { current, required, message }) => {
+            Err(CoherenceError::InsufficientCoherence {
+                current,
+                required,
+                message,
+            }) => {
                 assert!(current < required);
                 assert!(!message.is_empty());
             }
@@ -882,7 +901,10 @@ mod tests {
         // Simulate 10 seconds of passive rest
         field.tick(10.0);
 
-        assert!(field.coherence > initial, "Passive rest should increase coherence");
+        assert!(
+            field.coherence > initial,
+            "Passive rest should increase coherence"
+        );
     }
 
     #[test]
@@ -894,7 +916,10 @@ mod tests {
         field.sleep_cycle();
 
         assert_eq!(field.coherence, 1.0, "Sleep should fully restore coherence");
-        assert!(field.relational_resonance < 0.8, "Sleep should slightly decay resonance");
+        assert!(
+            field.relational_resonance < 0.8,
+            "Sleep should slightly decay resonance"
+        );
     }
 
     #[test]
@@ -954,7 +979,9 @@ mod tests {
 
         // Now actually perform the task
         let _before = field.coherence;
-        field.perform_task(TaskComplexity::Cognitive, false).unwrap();
+        field
+            .perform_task(TaskComplexity::Cognitive, false)
+            .unwrap();
         let after = field.coherence;
 
         // Prediction should be very close to actual result (within 0.01)
@@ -981,7 +1008,9 @@ mod tests {
         let prediction = field.predict_impact(TaskComplexity::DeepThought, true, &hormones);
 
         // Now actually perform the task
-        field.perform_task(TaskComplexity::DeepThought, true).unwrap();
+        field
+            .perform_task(TaskComplexity::DeepThought, true)
+            .unwrap();
         let actual = field.coherence;
 
         // Prediction should match (within 0.01)
@@ -1011,9 +1040,18 @@ mod tests {
         let prediction = field.predict_impact(TaskComplexity::Learning, false, &hormones);
 
         // Should predict failure
-        assert!(!prediction.will_succeed, "Should predict failure for insufficient coherence");
-        assert!(prediction.centering_needed > 0.0, "Should recommend centering");
-        assert!(prediction.final_coherence < 0.8, "Final coherence should be below threshold");
+        assert!(
+            !prediction.will_succeed,
+            "Should predict failure for insufficient coherence"
+        );
+        assert!(
+            prediction.centering_needed > 0.0,
+            "Should recommend centering"
+        );
+        assert!(
+            prediction.final_coherence < 0.8,
+            "Final coherence should be below threshold"
+        );
     }
 
     #[test]

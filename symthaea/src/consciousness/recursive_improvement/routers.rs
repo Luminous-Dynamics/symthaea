@@ -4,8 +4,7 @@
 //! These routers help find optimal paths between consciousness states.
 
 use super::world_model::{
-    LatentConsciousnessState, ConsciousnessAction, ActionType,
-    ConsciousnessTransition,
+    ActionType, ConsciousnessAction, ConsciousnessTransition, LatentConsciousnessState,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -149,9 +148,16 @@ impl PhiMaximizingRouter {
     /// Create a new phi-maximizing router
     pub fn new() -> Self {
         let mut q_values = HashMap::new();
-        for action in [ActionType::Attend, ActionType::Integrate, ActionType::Generate,
-                       ActionType::Recall, ActionType::Store, ActionType::Evaluate,
-                       ActionType::Transform, ActionType::Rest] {
+        for action in [
+            ActionType::Attend,
+            ActionType::Integrate,
+            ActionType::Generate,
+            ActionType::Recall,
+            ActionType::Store,
+            ActionType::Evaluate,
+            ActionType::Transform,
+            ActionType::Rest,
+        ] {
             q_values.insert(action, 0.0);
         }
 
@@ -164,12 +170,9 @@ impl PhiMaximizingRouter {
     }
 
     /// Create a deterministic phi-maximizing router from a genesis seed.
-    pub fn from_genesis(
-        genesis: &symthaea_core::genesis::GenesisSeed,
-        label: &str,
-    ) -> Self {
-        use rand::SeedableRng;
+    pub fn from_genesis(genesis: &symthaea_core::genesis::GenesisSeed, label: &str) -> Self {
         use rand::Rng;
+        use rand::SeedableRng;
         let mut shake = genesis.domain(&format!("{label}::phi_router"));
         let seed: u64 = shake.gen();
         let mut router = Self::new();
@@ -206,19 +209,30 @@ impl ConsciousnessRouter for PhiMaximizingRouter {
 
         let action = if should_explore {
             // Random exploration
-            let actions = [ActionType::Attend, ActionType::Integrate, ActionType::Generate];
+            let actions = [
+                ActionType::Attend,
+                ActionType::Integrate,
+                ActionType::Generate,
+            ];
             let idx = (rand_val2 * actions.len() as f64) as usize;
-            ConsciousnessAction::new(format!("{:?}", actions[idx % actions.len()]).to_lowercase(), actions[idx % actions.len()])
+            ConsciousnessAction::new(
+                format!("{:?}", actions[idx % actions.len()]).to_lowercase(),
+                actions[idx % actions.len()],
+            )
         } else {
             // Exploit best action
-            let best_action = self.q_values.iter()
+            let best_action = self
+                .q_values
+                .iter()
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|(k, _)| *k)
                 .unwrap_or(ActionType::Integrate);
             ConsciousnessAction::new(format!("{:?}", best_action).to_lowercase(), best_action)
         };
 
-        let confidence = self.q_values.get(&action.action_type)
+        let confidence = self
+            .q_values
+            .get(&action.action_type)
             .copied()
             .map(|v| ((v + 1.0) / 2.0).clamp(0.0, 1.0) as f32)
             .unwrap_or(0.5);
@@ -275,7 +289,9 @@ impl ExploratoryRouter {
         }
 
         // Find minimum distance to any visited state
-        let min_dist = self.visited_states.iter()
+        let min_dist = self
+            .visited_states
+            .iter()
             .map(|v| state.distance(v))
             .fold(f64::INFINITY, |a, b| a.min(b));
 
@@ -351,7 +367,10 @@ impl ConsciousnessRouter for ExploratoryRouter {
         }
 
         RoutingDecision {
-            action: ConsciousnessAction::new(format!("{:?}", best_action).to_lowercase(), best_action),
+            action: ConsciousnessAction::new(
+                format!("{:?}", best_action).to_lowercase(),
+                best_action,
+            ),
             confidence: best_novelty as f32,
             expected_state: best_state,
             alternatives: vec![],

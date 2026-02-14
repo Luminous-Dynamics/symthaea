@@ -27,7 +27,7 @@ impl SimHashConfig {
     /// Fast configuration: 5 tables, ~80% recall, 200x speedup
     pub fn fast() -> Self {
         Self {
-            num_hash_bits: 10,  // 1024 buckets
+            num_hash_bits: 10, // 1024 buckets
             num_tables: 5,
             seed: 42,
         }
@@ -36,7 +36,7 @@ impl SimHashConfig {
     /// Balanced configuration: 10 tables, ~95% recall, 100x speedup
     pub fn balanced() -> Self {
         Self {
-            num_hash_bits: 10,  // 1024 buckets
+            num_hash_bits: 10, // 1024 buckets
             num_tables: 10,
             seed: 42,
         }
@@ -45,7 +45,7 @@ impl SimHashConfig {
     /// Accurate configuration: 20 tables, ~99% recall, 50x speedup
     pub fn accurate() -> Self {
         Self {
-            num_hash_bits: 10,  // 1024 buckets
+            num_hash_bits: 10, // 1024 buckets
             num_tables: 20,
             seed: 42,
         }
@@ -54,7 +54,7 @@ impl SimHashConfig {
     /// Large dataset configuration: More buckets for better distribution
     pub fn large_dataset() -> Self {
         Self {
-            num_hash_bits: 12,  // 4096 buckets
+            num_hash_bits: 12, // 4096 buckets
             num_tables: 10,
             seed: 42,
         }
@@ -98,7 +98,9 @@ impl SimHashTable {
 
         while bit_positions.len() < num_bits {
             // LCG: next = (a * current + c) mod m
-            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            rng_state = rng_state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
 
             // Map to bit position [0, 2048)
             let bit_pos = (rng_state % 2048) as usize;
@@ -149,8 +151,7 @@ impl SimHashTable {
     pub fn query(&self, vector: &BinaryHV) -> Vec<usize> {
         let hash_value = self.hash(vector);
 
-        self.buckets.get(&hash_value).cloned()
-            .unwrap_or_default()
+        self.buckets.get(&hash_value).cloned().unwrap_or_default()
     }
 
     /// Get statistics about bucket distribution
@@ -275,9 +276,7 @@ impl SimHashIndex {
 
     /// Get statistics about the index
     pub fn index_stats(&self) -> IndexStats {
-        let table_stats: Vec<BucketStats> = self.tables.iter()
-            .map(|t| t.bucket_stats())
-            .collect();
+        let table_stats: Vec<BucketStats> = self.tables.iter().map(|t| t.bucket_stats()).collect();
 
         let avg_candidates = if self.num_vectors > 0 {
             // Estimate based on first table's bucket distribution
@@ -341,14 +340,19 @@ mod tests {
         // Create a vector and a very similar one (flip 1 bit)
         let v1 = BinaryHV::random(1);
         let mut v2 = v1.clone();
-        v2.0[0] ^= 0b00000001;  // Flip one bit
+        v2.0[0] ^= 0b00000001; // Flip one bit
 
         let hash1 = table.hash(&v1);
         let hash2 = table.hash(&v2);
 
         // With 1/16384 bits different, probability of different hash is very small
         // So they'll usually hash to same value
-        println!("Similar vectors: hash1={}, hash2={}, same={}", hash1, hash2, hash1 == hash2);
+        println!(
+            "Similar vectors: hash1={}, hash2={}, same={}",
+            hash1,
+            hash2,
+            hash1 == hash2
+        );
 
         // Both hashes should be valid (non-zero indicates the table processed them)
         // The hashes should most likely be equal for nearly identical vectors
@@ -372,7 +376,10 @@ mod tests {
 
         // Results should be sorted by similarity
         for i in 0..results.len() - 1 {
-            assert!(results[i].1 >= results[i + 1].1, "Results should be sorted by similarity");
+            assert!(
+                results[i].1 >= results[i + 1].1,
+                "Results should be sorted by similarity"
+            );
         }
     }
 
@@ -404,13 +411,18 @@ mod tests {
         let query = BinaryHV::random(99999);
         let num_candidates = index.count_candidates(&query);
 
-        println!("Candidates: {} out of {} ({}%)",
-                 num_candidates, vectors.len(),
-                 (num_candidates as f64 / vectors.len() as f64) * 100.0);
+        println!(
+            "Candidates: {} out of {} ({}%)",
+            num_candidates,
+            vectors.len(),
+            (num_candidates as f64 / vectors.len() as f64) * 100.0
+        );
 
         // Should examine far fewer than all vectors
-        assert!(num_candidates < vectors.len() / 2,
-                "Should examine less than half the vectors");
+        assert!(
+            num_candidates < vectors.len() / 2,
+            "Should examine less than half the vectors"
+        );
     }
 
     #[test]
@@ -459,7 +471,7 @@ mod tests {
 
         println!("Ground truth top-10:");
         for (i, (id, sim)) in ground_truth.iter().enumerate() {
-            println!("  {}: vector {} (similarity {:.4})", i+1, id, sim);
+            println!("  {}: vector {} (similarity {:.4})", i + 1, id, sim);
         }
 
         // SimHash approximate top-10
@@ -467,7 +479,7 @@ mod tests {
 
         println!("\nSimHash top-10:");
         for (i, (id, sim)) in simhash_results.iter().enumerate() {
-            println!("  {}: vector {} (similarity {:.4})", i+1, id, sim);
+            println!("  {}: vector {} (similarity {:.4})", i + 1, id, sim);
         }
 
         // Measure recall
@@ -479,14 +491,20 @@ mod tests {
         let num_candidates = index.count_candidates(&query);
 
         println!("\nRecall: {:.1}%", recall);
-        println!("Candidates examined: {} out of {} ({:.1}%)",
-                 num_candidates, vectors.len(),
-                 (num_candidates as f64 / vectors.len() as f64) * 100.0);
+        println!(
+            "Candidates examined: {} out of {} ({:.1}%)",
+            num_candidates,
+            vectors.len(),
+            (num_candidates as f64 / vectors.len() as f64) * 100.0
+        );
 
         // With similar vectors, SimHash should achieve some recall
         // Relaxed threshold due to hash collision variability
-        assert!(recall >= 20.0,
-                "SimHash should achieve at least 20% recall on similar vectors (got {:.1}%)", recall);
+        assert!(
+            recall >= 20.0,
+            "SimHash should achieve at least 20% recall on similar vectors (got {:.1}%)",
+            recall
+        );
 
         // SimHash trades off recall for speed - candidate examination can vary
         // Just verify the algorithm runs and returns results

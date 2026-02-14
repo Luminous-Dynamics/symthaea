@@ -12,15 +12,13 @@
 
 use std::collections::HashMap;
 
-use crate::aggregation::{
-    self, validate_gradient_consistency, AggregationError,
-};
+use crate::aggregation::{self, validate_gradient_consistency, AggregationError};
 use crate::byzantine::{MultiSignalByzantineDetector, MultiSignalDetectionResult};
-use crate::hybrid_bft::{
-    self, HybridAggregationResult, HybridBftConfig, ReputationGradient,
-};
+use crate::hybrid_bft::{self, HybridAggregationResult, HybridBftConfig, ReputationGradient};
 use crate::privacy::{self, DifferentialPrivacyConfig, PrivacyReport, RdpBudgetTracker};
-use crate::types::{AggregatedGradient, AggregationMethod, GradientUpdate, MAX_BYZANTINE_TOLERANCE};
+use crate::types::{
+    AggregatedGradient, AggregationMethod, GradientUpdate, MAX_BYZANTINE_TOLERANCE,
+};
 
 /// Per-participant weight adjustment from external modules (e.g., consciousness, epistemic).
 ///
@@ -183,9 +181,7 @@ pub struct UnifiedPipeline {
 
 impl UnifiedPipeline {
     pub fn new(config: PipelineConfig) -> Self {
-        let rdp_tracker = config
-            .dp_config
-            .map(|_| RdpBudgetTracker::new(1e-5));
+        let rdp_tracker = config.dp_config.map(|_| RdpBudgetTracker::new(1e-5));
         Self {
             config,
             rdp_tracker,
@@ -424,10 +420,8 @@ impl UnifiedPipeline {
                 if *rep < min_rep {
                     continue; // Would be gated anyway, don't touch
                 }
-                let combined_multiplier: f32 = adjustments
-                    .iter()
-                    .map(|a| a.weight_multiplier)
-                    .product();
+                let combined_multiplier: f32 =
+                    adjustments.iter().map(|a| a.weight_multiplier).product();
                 // Scale the effective weight. Floor at min_reputation so participants
                 // who pass the gate are never dropped by external weight alone.
                 *rep = (*rep * combined_multiplier).max(min_rep);
@@ -458,10 +452,7 @@ impl UnifiedPipeline {
         for plugin in &mut plugins.byzantine {
             let weights = plugin.analyze(contributions);
             for (pid, adjustments) in weights {
-                merged_weights
-                    .entry(pid)
-                    .or_default()
-                    .extend(adjustments);
+                merged_weights.entry(pid).or_default().extend(adjustments);
             }
         }
 
@@ -474,11 +465,7 @@ impl UnifiedPipeline {
 
         // Post-aggregation verification
         let verification = if let Some(verifier) = &mut plugins.verification {
-            Some(verifier.verify(
-                contributions,
-                &result.aggregated.gradients,
-                reputations,
-            ))
+            Some(verifier.verify(contributions, &result.aggregated.gradients, reputations))
         } else {
             None
         };
@@ -494,10 +481,7 @@ impl UnifiedPipeline {
         };
 
         for plugin in &mut plugins.byzantine {
-            plugin.record_outcome(
-                result.aggregated.model_version,
-                &excluded,
-            );
+            plugin.record_outcome(result.aggregated.model_version, &excluded);
         }
 
         Ok(PluginPipelineResult {
@@ -528,14 +512,21 @@ pub struct PluginPipelineResult {
 mod tests {
     use super::*;
 
-    fn test_contributions(n_honest: usize, n_byzantine: usize) -> (Vec<GradientUpdate>, HashMap<String, f32>) {
+    fn test_contributions(
+        n_honest: usize,
+        n_byzantine: usize,
+    ) -> (Vec<GradientUpdate>, HashMap<String, f32>) {
         let mut updates = Vec::new();
         let mut reps = HashMap::new();
 
         for i in 0..n_honest {
             let val = 0.5 + (i as f32 * 0.001);
             updates.push(GradientUpdate::new(
-                format!("h{}", i), 1, vec![val; 10], 100, 0.5,
+                format!("h{}", i),
+                1,
+                vec![val; 10],
+                100,
+                0.5,
             ));
             reps.insert(format!("h{}", i), 0.85 + (i as f32 * 0.001));
         }
@@ -543,7 +534,11 @@ mod tests {
         for i in 0..n_byzantine {
             let val = if i % 2 == 0 { 100.0 } else { -100.0 };
             updates.push(GradientUpdate::new(
-                format!("b{}", i), 1, vec![val; 10], 100, 0.5,
+                format!("b{}", i),
+                1,
+                vec![val; 10],
+                100,
+                0.5,
             ));
             reps.insert(format!("b{}", i), 0.15);
         }
@@ -611,11 +606,7 @@ mod tests {
         let result = pipeline.aggregate(&updates, &reps).unwrap();
         // Byzantine nodes have rep 0.15 < min_rep 0.3, so they're gated out
         for val in &result.aggregated.gradients {
-            assert!(
-                (*val - 0.5).abs() < 0.15,
-                "Should be ~0.5, got {}",
-                val
-            );
+            assert!((*val - 0.5).abs() < 0.15, "Should be ~0.5, got {}", val);
         }
     }
 
@@ -645,11 +636,14 @@ mod tests {
 
         // Boost first participant, leave others neutral
         let mut ext = ExternalWeightMap::new();
-        ext.insert("h0".to_string(), vec![ParticipantWeightAdjustment {
-            weight_multiplier: 1.5,
-            veto: false,
-            source: "test".to_string(),
-        }]);
+        ext.insert(
+            "h0".to_string(),
+            vec![ParticipantWeightAdjustment {
+                weight_multiplier: 1.5,
+                veto: false,
+                source: "test".to_string(),
+            }],
+        );
 
         let result = pipeline
             .aggregate_with_external_weights(&updates, &reps, &ext)
@@ -665,16 +659,22 @@ mod tests {
 
         // Veto first two participants
         let mut ext = ExternalWeightMap::new();
-        ext.insert("h0".to_string(), vec![ParticipantWeightAdjustment {
-            weight_multiplier: 1.0,
-            veto: true,
-            source: "consciousness".to_string(),
-        }]);
-        ext.insert("h1".to_string(), vec![ParticipantWeightAdjustment {
-            weight_multiplier: 1.0,
-            veto: true,
-            source: "epistemic".to_string(),
-        }]);
+        ext.insert(
+            "h0".to_string(),
+            vec![ParticipantWeightAdjustment {
+                weight_multiplier: 1.0,
+                veto: true,
+                source: "consciousness".to_string(),
+            }],
+        );
+        ext.insert(
+            "h1".to_string(),
+            vec![ParticipantWeightAdjustment {
+                weight_multiplier: 1.0,
+                veto: true,
+                source: "epistemic".to_string(),
+            }],
+        );
 
         let result = pipeline
             .aggregate_with_external_weights(&updates, &reps, &ext)
@@ -695,11 +695,14 @@ mod tests {
         // Dampen all participants to 50% weight via phi multiplier
         let mut ext = ExternalWeightMap::new();
         for i in 0..5 {
-            ext.insert(format!("h{}", i), vec![ParticipantWeightAdjustment {
-                weight_multiplier: 0.5,
-                veto: false,
-                source: "phi".to_string(),
-            }]);
+            ext.insert(
+                format!("h{}", i),
+                vec![ParticipantWeightAdjustment {
+                    weight_multiplier: 0.5,
+                    veto: false,
+                    source: "phi".to_string(),
+                }],
+            );
         }
 
         let result = pipeline
@@ -741,14 +744,14 @@ mod tests {
         // Sweep: (byzantine_pct, byzantine_rep, honest_rep)
         let scenarios: Vec<(usize, f32, f32, bool)> = vec![
             // (byz_count out of 100, byz_rep, honest_rep, should_converge)
-            (10, 0.15, 0.85, true),   // 10% low-rep: trivially safe
-            (20, 0.15, 0.85, true),   // 20% low-rep: safe
-            (30, 0.15, 0.85, true),   // 30% low-rep: safe (gated)
-            (34, 0.15, 0.85, true),   // 34% low-rep: safe (gated)
-            (34, 0.50, 0.85, true),   // 34% medium-rep: safe (trimming helps)
-            (10, 0.85, 0.85, true),   // 10% same-rep: classical BFT handles
-            (20, 0.85, 0.85, true),   // 20% same-rep: trimmed mean handles
-            (30, 0.85, 0.85, true),   // 30% same-rep: at limit but works
+            (10, 0.15, 0.85, true), // 10% low-rep: trivially safe
+            (20, 0.15, 0.85, true), // 20% low-rep: safe
+            (30, 0.15, 0.85, true), // 30% low-rep: safe (gated)
+            (34, 0.15, 0.85, true), // 34% low-rep: safe (gated)
+            (34, 0.50, 0.85, true), // 34% medium-rep: safe (trimming helps)
+            (10, 0.85, 0.85, true), // 10% same-rep: classical BFT handles
+            (20, 0.85, 0.85, true), // 20% same-rep: trimmed mean handles
+            (30, 0.85, 0.85, true), // 30% same-rep: at limit but works
         ];
 
         for (byz_count, byz_rep, honest_rep, should_converge) in &scenarios {
@@ -760,7 +763,11 @@ mod tests {
             for i in 0..honest_count {
                 let val = target + (i as f32 * 0.001);
                 updates.push(GradientUpdate::new(
-                    format!("h{}", i), 1, vec![val; dim], 100, 0.5,
+                    format!("h{}", i),
+                    1,
+                    vec![val; dim],
+                    100,
+                    0.5,
                 ));
                 reps.insert(format!("h{}", i), *honest_rep);
             }
@@ -768,7 +775,11 @@ mod tests {
             for i in 0..*byz_count {
                 let val = if i % 2 == 0 { 100.0 } else { -100.0 };
                 updates.push(GradientUpdate::new(
-                    format!("b{}", i), 1, vec![val; dim], 100, 0.5,
+                    format!("b{}", i),
+                    1,
+                    vec![val; dim],
+                    100,
+                    0.5,
                 ));
                 reps.insert(format!("b{}", i), *byz_rep);
             }
@@ -783,17 +794,25 @@ mod tests {
             let result = pipeline.aggregate(&updates, &reps);
 
             if *should_converge {
-                let result = result.unwrap_or_else(|e| panic!(
-                    "Scenario byz={}% rep={}/{} should converge, got: {:?}",
-                    byz_count, byz_rep, honest_rep, e
-                ));
-                let max_error = result.aggregated.gradients.iter()
+                let result = result.unwrap_or_else(|e| {
+                    panic!(
+                        "Scenario byz={}% rep={}/{} should converge, got: {:?}",
+                        byz_count, byz_rep, honest_rep, e
+                    )
+                });
+                let max_error = result
+                    .aggregated
+                    .gradients
+                    .iter()
                     .map(|v| (v - target).abs())
                     .fold(0.0_f32, f32::max);
                 assert!(
                     max_error < 0.5,
                     "Scenario byz={}% rep={}/{}: max_error={:.4} (should be <0.5)",
-                    byz_count, byz_rep, honest_rep, max_error
+                    byz_count,
+                    byz_rep,
+                    honest_rep,
+                    max_error
                 );
             }
         }
@@ -809,18 +828,21 @@ mod tests {
                 let mut weights = ExternalWeightMap::new();
                 for u in updates {
                     if u.participant_id.starts_with("b") {
-                        weights.insert(u.participant_id.clone(), vec![
-                            ParticipantWeightAdjustment {
+                        weights.insert(
+                            u.participant_id.clone(),
+                            vec![ParticipantWeightAdjustment {
                                 weight_multiplier: 0.0,
                                 veto: true,
                                 source: "test_plugin".into(),
-                            }
-                        ]);
+                            }],
+                        );
                     }
                 }
                 weights
             }
-            fn name(&self) -> &str { "test_flag_bad" }
+            fn name(&self) -> &str {
+                "test_flag_bad"
+            }
         }
 
         let (updates, reps) = test_contributions(8, 2);
@@ -837,7 +859,9 @@ mod tests {
             verification: None,
         };
 
-        let result = pipeline.aggregate_with_plugins(&updates, &reps, &mut plugins).unwrap();
+        let result = pipeline
+            .aggregate_with_plugins(&updates, &reps, &mut plugins)
+            .unwrap();
         assert!(result.plugin_weights_applied);
         // Byzantine nodes should be vetoed
         for val in &result.result.aggregated.gradients {
@@ -854,7 +878,11 @@ mod tests {
         // 8 honest high-rep
         for i in 0..8 {
             updates.push(GradientUpdate::new(
-                format!("h{}", i), 1, vec![0.5; 10], 100, 0.5,
+                format!("h{}", i),
+                1,
+                vec![0.5; 10],
+                100,
+                0.5,
             ));
             reps.insert(format!("h{}", i), 0.9);
         }
@@ -862,7 +890,11 @@ mod tests {
         // 2 low-rep outliers (25% < 34% so multi-signal won't reject)
         for i in 0..2 {
             updates.push(GradientUpdate::new(
-                format!("l{}", i), 1, vec![50.0; 10], 100, 0.5,
+                format!("l{}", i),
+                1,
+                vec![50.0; 10],
+                100,
+                0.5,
             ));
             reps.insert(format!("l{}", i), 0.1);
         }
@@ -876,8 +908,11 @@ mod tests {
 
         assert_eq!(result.stats.total_contributions, 10);
         // 2 low-rep should be gated out by hybrid BFT
-        assert!(result.aggregated.participant_count <= 8,
-            "At most 8 should survive, got {}", result.aggregated.participant_count);
+        assert!(
+            result.aggregated.participant_count <= 8,
+            "At most 8 should survive, got {}",
+            result.aggregated.participant_count
+        );
     }
 
     #[test]
@@ -911,15 +946,23 @@ mod tests {
                 byzantine: vec![&mut meta_plugin],
                 verification: None,
             };
-            let result = pipeline.aggregate_with_plugins(&updates, &reps, &mut plugins).unwrap();
-            assert!(result.result.aggregated.participant_count > 0,
-                "Round {} should produce results", round);
+            let result = pipeline
+                .aggregate_with_plugins(&updates, &reps, &mut plugins)
+                .unwrap();
+            assert!(
+                result.result.aggregated.participant_count > 0,
+                "Round {} should produce results",
+                round
+            );
         }
 
         // After 3 rounds, the plugin should have learned something
         // test_contributions uses "b0" for Byzantine IDs
         let profile = meta_plugin.get_participant_profile("b0");
-        assert!(profile.is_some(), "Should have tracked Byzantine participant");
+        assert!(
+            profile.is_some(),
+            "Should have tracked Byzantine participant"
+        );
         assert!(profile.unwrap().rounds_seen > 0, "Should have seen rounds");
     }
 }

@@ -78,7 +78,6 @@
 //! All randomness flows through SHAKE-256 domain-separated streams, ensuring
 //! identical phrase + domain produces identical values on any machine, forever.
 
-
 // ── Public submodules (re-exported) ─────────────────────────────────────────
 pub mod config;
 pub use config::*;
@@ -127,36 +126,34 @@ mod metrics_provider;
 mod identity_integration;
 
 // ── Impl-block submodules (split from this file) ────────────────────────────
+mod accessors;
 mod constructor;
 mod cycle;
+mod helpers;
 mod moral;
 mod prediction;
-mod helpers;
-mod accessors;
 
 // ── Imports (only what the struct definitions below require) ─────────────────
+use crate::causal::CausalLoopEnhancer;
+use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
+use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
+use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
+use crate::consciousness::primitive_consciousness::PrimitiveConsciousnessState;
+use crate::consciousness::primitive_discovery::PrimitiveDiscoveryService;
+use crate::consciousness::stability_regime::StabilityRegimeProcessor;
+use crate::dynamics::cfc_coherence::CfCCoherenceBridge;
+use crate::dynamics::temporal_signatures::TemporalSignatureEncoder;
+use crate::hdc::moral_algebra::MoralAlgebra;
+use crate::hdc::moral_parser::MoralParser;
+use crate::memory::coherence_tracker::ConversationCoherenceTracker;
+use crate::memory::memory_coordinator::MemoryCoordinator;
+use crate::memory::semantic_memory::SemanticMemory;
+#[cfg(feature = "neural-bridge")]
+use crate::perception::NeuralBridge;
+use crate::voice::voice_feedback::VoiceFeedbackBridge;
 use std::collections::VecDeque;
 use std::time::Instant;
 use symthaea_core::hdc::predictive_encoder::PredictiveHdcEncoder;
-use crate::dynamics::cfc_coherence::CfCCoherenceBridge;
-use crate::dynamics::temporal_signatures::TemporalSignatureEncoder;
-use crate::voice::voice_feedback::VoiceFeedbackBridge;
-use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
-use crate::consciousness::fep_active_inference::{
-    ActiveInferenceAgent, EnhancedFEPBridge,
-};
-use crate::memory::coherence_tracker::ConversationCoherenceTracker;
-use crate::memory::semantic_memory::SemanticMemory;
-use crate::memory::memory_coordinator::MemoryCoordinator;
-use crate::consciousness::stability_regime::StabilityRegimeProcessor;
-use crate::consciousness::primitive_discovery::PrimitiveDiscoveryService;
-use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
-use crate::consciousness::primitive_consciousness::PrimitiveConsciousnessState;
-use crate::causal::CausalLoopEnhancer;
-use crate::hdc::moral_algebra::MoralAlgebra;
-use crate::hdc::moral_parser::MoralParser;
-#[cfg(feature = "neural-bridge")]
-use crate::perception::NeuralBridge;
 
 use temporal_network::TemporalNetwork;
 
@@ -260,7 +257,6 @@ pub struct CognitiveLoopService {
     // ═══════════════════════════════════════════════════════════════════════
     // MEGA-UNIFIED ARCHITECTURE: Consciousness Unification Engine
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Thalamic router for cognitive depth selection
     /// Routes inputs to Reflex/Cortical/DeepThought paths based on novelty and urgency
     thalamic_router: ThalamicRouter,
@@ -362,7 +358,6 @@ pub struct CognitiveLoopService {
     // ═══════════════════════════════════════════════════════════════════════
     // MORAL ALGEBRA: Compositional Ethical Reasoning
     // ═══════════════════════════════════════════════════════════════════════
-
     /// Moral Algebra for compositional ethical reasoning using HDC
     /// Encodes moral primitives (AGENT, PATIENT, ACTION, INTENT, CONSENT, OBLIGATION, MAGNITUDE)
     /// and provides judgment operations for action evaluation

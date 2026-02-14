@@ -40,13 +40,10 @@
 //! upgrade to Ed25519 signatures (ed25519-dalek crate) so that verifiers
 //! only need the public key.
 
-use crate::swarm::{
-    SwarmConfig, SwarmResult, SwarmError,
-    TrustLevel, SwarmMessage,
-};
-use std::fmt;
-use std::time::{SystemTime, Duration};
+use crate::swarm::{SwarmConfig, SwarmError, SwarmMessage, SwarmResult, TrustLevel};
 use rand::Rng;
+use std::fmt;
+use std::time::{Duration, SystemTime};
 use tracing::warn;
 
 // ============================================================================
@@ -62,22 +59,13 @@ pub enum HandshakeError {
         actual: String,
     },
     /// Challenge nonce extraction failed
-    ChallengeExtractionFailed {
-        reason: String,
-    },
+    ChallengeExtractionFailed { reason: String },
     /// Response extraction failed
-    ResponseExtractionFailed {
-        reason: String,
-    },
+    ResponseExtractionFailed { reason: String },
     /// Invalid handshake state
-    InvalidState {
-        expected: String,
-        actual: String,
-    },
+    InvalidState { expected: String, actual: String },
     /// Protocol violation
-    ProtocolViolation {
-        message: String,
-    },
+    ProtocolViolation { message: String },
 }
 
 impl fmt::Display for HandshakeError {
@@ -93,7 +81,11 @@ impl fmt::Display for HandshakeError {
                 write!(f, "Failed to extract response: {}", reason)
             }
             Self::InvalidState { expected, actual } => {
-                write!(f, "Invalid handshake state: expected {}, got {}", expected, actual)
+                write!(
+                    f,
+                    "Invalid handshake state: expected {}, got {}",
+                    expected, actual
+                )
             }
             Self::ProtocolViolation { message } => {
                 write!(f, "Handshake protocol violation: {}", message)
@@ -138,9 +130,10 @@ impl SwarmMessageExt for SwarmMessage {
 
     fn try_into_response(self) -> Result<(Vec<u8>, String), HandshakeError> {
         match self {
-            SwarmMessage::TrustResponse { signed_nonce, agent_key } => {
-                Ok((signed_nonce, agent_key))
-            }
+            SwarmMessage::TrustResponse {
+                signed_nonce,
+                agent_key,
+            } => Ok((signed_nonce, agent_key)),
             other => {
                 let actual = other.message_type().to_string();
                 warn!(
@@ -272,7 +265,9 @@ impl HybridHandshake {
         agent_key: &str,
     ) -> SwarmResult<TrustLevel> {
         // Get pending challenge
-        let challenge = self.pending_challenges.remove(peer_node_id)
+        let challenge = self
+            .pending_challenges
+            .remove(peer_node_id)
             .ok_or_else(|| SwarmError::TrustVerificationError {
                 reason: "No pending challenge for this peer".to_string(),
             })?;
@@ -289,7 +284,8 @@ impl HybridHandshake {
             return Err(SwarmError::TrustVerificationError {
                 reason: format!(
                     "Invalid MAC length: expected {} bytes, got {}",
-                    MAC_LEN, signed_nonce.len()
+                    MAC_LEN,
+                    signed_nonce.len()
                 ),
             });
         }
@@ -331,7 +327,9 @@ impl HybridHandshake {
     /// Clean up expired challenges
     pub fn cleanup_expired(&mut self) {
         self.pending_challenges.retain(|_, challenge| {
-            challenge.issued_at.elapsed()
+            challenge
+                .issued_at
+                .elapsed()
                 .map(|d| d < self.challenge_timeout)
                 .unwrap_or(false)
         });
@@ -414,7 +412,8 @@ mod tests {
 
         let challenge = handshake.create_challenge("peer-123");
 
-        let nonce = challenge.try_into_challenge_nonce()
+        let nonce = challenge
+            .try_into_challenge_nonce()
             .expect("create_challenge should return TrustChallenge");
         assert_eq!(nonce.len(), 32);
 
@@ -429,7 +428,8 @@ mod tests {
         let nonce = vec![1, 2, 3, 4];
         let response = handshake.create_response(&nonce, "agent-key", b"private-key");
 
-        let (signed_nonce, agent_key) = response.try_into_response()
+        let (signed_nonce, agent_key) = response
+            .try_into_response()
             .expect("create_response should return TrustResponse");
         // MAC should be exactly 32 bytes (BLAKE3 output)
         assert_eq!(signed_nonce.len(), MAC_LEN);
@@ -443,16 +443,20 @@ mod tests {
 
         // Create challenge
         let challenge = handshake.create_challenge("peer-123");
-        let nonce = challenge.try_into_challenge_nonce()
+        let nonce = challenge
+            .try_into_challenge_nonce()
             .expect("create_challenge should return TrustChallenge");
 
         // Create response using agent_key as key material (matches verify_response lookup)
         let response = handshake.create_response(&nonce, "agent-key", b"agent-key");
-        let (signed_nonce, agent_key) = response.try_into_response()
+        let (signed_nonce, agent_key) = response
+            .try_into_response()
             .expect("create_response should return TrustResponse");
 
         // Verify
-        let trust = handshake.verify_response("peer-123", &signed_nonce, &agent_key).unwrap();
+        let trust = handshake
+            .verify_response("peer-123", &signed_nonce, &agent_key)
+            .unwrap();
         assert!(matches!(trust, TrustLevel::Verified(_)));
     }
 
@@ -463,12 +467,14 @@ mod tests {
 
         // Create challenge
         let challenge = handshake.create_challenge("peer-123");
-        let nonce = challenge.try_into_challenge_nonce()
+        let nonce = challenge
+            .try_into_challenge_nonce()
             .expect("create_challenge should return TrustChallenge");
 
         // Create response with a DIFFERENT private key
         let response = handshake.create_response(&nonce, "agent-key", b"wrong-key");
-        let (signed_nonce, agent_key) = response.try_into_response()
+        let (signed_nonce, agent_key) = response
+            .try_into_response()
             .expect("create_response should return TrustResponse");
 
         // Verification should fail because MAC was computed with wrong key
@@ -482,11 +488,13 @@ mod tests {
         let mut handshake = HybridHandshake::new(config);
 
         let challenge = handshake.create_challenge("peer-123");
-        let nonce = challenge.try_into_challenge_nonce()
+        let nonce = challenge
+            .try_into_challenge_nonce()
             .expect("create_challenge should return TrustChallenge");
 
         let response = handshake.create_response(&nonce, "agent-key", b"agent-key");
-        let (mut signed_nonce, agent_key) = response.try_into_response()
+        let (mut signed_nonce, agent_key) = response
+            .try_into_response()
             .expect("create_response should return TrustResponse");
 
         // Tamper with the MAC

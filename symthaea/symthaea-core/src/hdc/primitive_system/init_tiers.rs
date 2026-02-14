@@ -8,9 +8,11 @@
 //! - Tier 4: Strategic & Social Primitives
 //! - Tier 5: Meta-Cognitive & Metabolic Primitives
 
+use super::{
+    seed_from_name, BindingRule, DomainManifold, Primitive, PrimitiveSystem, PrimitiveTier,
+};
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::universal_semantics::SemanticPrime;
-use super::{PrimitiveSystem, seed_from_name, DomainManifold, PrimitiveTier, Primitive, BindingRule};
 
 impl PrimitiveSystem {
     /// Initialize Tier 0: NSM (Natural Semantic Metalanguage) Primitives
@@ -42,7 +44,7 @@ impl PrimitiveSystem {
         let nsm_domain = DomainManifold::new(
             "nsm",
             PrimitiveTier::NSM,
-            "Natural Semantic Metalanguage - universal human concepts"
+            "Natural Semantic Metalanguage - universal human concepts",
         );
 
         // Register all 65 semantic primes
@@ -59,7 +61,10 @@ impl PrimitiveSystem {
             );
 
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(PrimitiveTier::NSM).or_default().push(name);
+            self.by_tier
+                .entry(PrimitiveTier::NSM)
+                .or_default()
+                .push(name);
         }
 
         // Store the domain
@@ -176,13 +181,13 @@ impl PrimitiveSystem {
         let math_domain = DomainManifold::new(
             "mathematics",
             PrimitiveTier::Mathematical,
-            "Formal reasoning from first principles"
+            "Formal reasoning from first principles",
         );
 
         let logic_domain = DomainManifold::new(
             "logic",
             PrimitiveTier::Mathematical,
-            "Logical operators and inference"
+            "Logical operators and inference",
         );
 
         // === SET THEORY PRIMITIVES ===
@@ -193,7 +198,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("SET"))),
-            "A collection of distinct objects"
+            "A collection of distinct objects",
         );
 
         // MEMBERSHIP (∈) - element belongs to set
@@ -202,7 +207,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("MEMBERSHIP"))),
-            "Relation: x ∈ S (x is an element of set S)"
+            "Relation: x ∈ S (x is an element of set S)",
         );
 
         // UNION (∪) - combine sets
@@ -211,7 +216,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("UNION"))),
-            "Operation: A ∪ B (all elements in A or B)"
+            "Operation: A ∪ B (all elements in A or B)",
         );
 
         // INTERSECTION (∩) - common elements
@@ -220,7 +225,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("INTERSECTION"))),
-            "Operation: A ∩ B (elements in both A and B)"
+            "Operation: A ∩ B (elements in both A and B)",
         );
 
         // EMPTY_SET (∅) - the set with no elements
@@ -229,7 +234,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("EMPTY_SET"))),
-            "The unique set with no elements: ∅"
+            "The unique set with no elements: ∅",
         );
 
         // === LOGICAL PRIMITIVES ===
@@ -240,7 +245,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "logic",
             logic_domain.embed(BinaryHV::random(seed_from_name("NOT"))),
-            "Unary operator: ¬P (negation of proposition P)"
+            "Unary operator: ¬P (negation of proposition P)",
         );
 
         // AND (∧) - logical conjunction
@@ -249,7 +254,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "logic",
             logic_domain.embed(BinaryHV::random(seed_from_name("AND"))),
-            "Binary operator: P ∧ Q (both P and Q are true)"
+            "Binary operator: P ∧ Q (both P and Q are true)",
         );
 
         // OR (∨) - logical disjunction
@@ -258,7 +263,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "logic",
             logic_domain.embed(BinaryHV::random(seed_from_name("OR"))),
-            "Binary operator: P ∨ Q (at least one of P or Q is true)"
+            "Binary operator: P ∨ Q (at least one of P or Q is true)",
         );
 
         // IMPLIES (→) - logical implication
@@ -267,7 +272,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "logic",
             logic_domain.embed(BinaryHV::random(seed_from_name("IMPLIES"))),
-            "Binary operator: P → Q (if P then Q)"
+            "Binary operator: P → Q (if P then Q)",
         );
 
         // IFF (↔) - logical equivalence
@@ -276,7 +281,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "logic",
             logic_domain.embed(BinaryHV::random(seed_from_name("IFF"))),
-            "Binary operator: P ↔ Q (P if and only if Q)"
+            "Binary operator: P ↔ Q (P if and only if Q)",
         );
 
         // EQUALS (=) - equality relation
@@ -285,7 +290,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "logic",
             logic_domain.embed(BinaryHV::random(seed_from_name("EQUALS"))),
-            "Binary relation: x = y (x and y are the same)"
+            "Binary relation: x = y (x and y are the same)",
         );
 
         // TRUE (⊤) - logical truth
@@ -294,7 +299,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "logic",
             logic_domain.embed(BinaryHV::random(seed_from_name("TRUE"))),
-            "The constant truth value: ⊤"
+            "The constant truth value: ⊤",
         );
 
         // FALSE (⊥) - logical falsehood
@@ -303,7 +308,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "logic",
             logic_domain.embed(BinaryHV::random(seed_from_name("FALSE"))),
-            "The constant false value: ⊥"
+            "The constant false value: ⊥",
         );
 
         // === PEANO ARITHMETIC PRIMITIVES ===
@@ -314,7 +319,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("ZERO"))),
-            "The first natural number: 0"
+            "The first natural number: 0",
         );
 
         // ONE (1) - successor of zero
@@ -324,7 +329,7 @@ impl PrimitiveSystem {
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("ONE"))),
             "The natural number one: 1",
-            "SUCCESSOR(ZERO)"
+            "SUCCESSOR(ZERO)",
         );
 
         // SUCCESSOR (S) - next natural number
@@ -333,7 +338,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("SUCCESSOR"))),
-            "Function: S(n) = n+1 (next natural number)"
+            "Function: S(n) = n+1 (next natural number)",
         );
 
         // ADDITION (+) - derived from successor
@@ -343,7 +348,7 @@ impl PrimitiveSystem {
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("ADDITION"))),
             "Binary operation: m + n (sum of m and n)",
-            "Recursive: m + 0 = m, m + S(n) = S(m + n)"
+            "Recursive: m + 0 = m, m + S(n) = S(m + n)",
         );
 
         // MULTIPLICATION (×) - derived from addition
@@ -353,7 +358,7 @@ impl PrimitiveSystem {
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("MULTIPLICATION"))),
             "Binary operation: m × n (product of m and n)",
-            "Recursive: m × 0 = 0, m × S(n) = m × n + m"
+            "Recursive: m × 0 = 0, m × S(n) = m × n + m",
         );
 
         // === FOUNDATIONAL MATHEMATICAL PRIMITIVES ===
@@ -364,7 +369,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("RATIO"))),
-            "Relation: proportional comparison of two quantities (a/b)"
+            "Relation: proportional comparison of two quantities (a/b)",
         );
 
         let information = Primitive::base(
@@ -372,7 +377,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("INFORMATION"))),
-            "Quantity: reduction in uncertainty (bits)"
+            "Quantity: reduction in uncertainty (bits)",
         );
 
         let deviation = Primitive::base(
@@ -380,7 +385,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("DEVIATION"))),
-            "Measure: distance from a central or expected value"
+            "Measure: distance from a central or expected value",
         );
 
         let limit = Primitive::base(
@@ -388,7 +393,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("LIMIT"))),
-            "Bound: supremum or constraint on a quantity"
+            "Bound: supremum or constraint on a quantity",
         );
 
         let efficiency = Primitive::base(
@@ -396,7 +401,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("EFFICIENCY"))),
-            "Ratio: useful output to total input"
+            "Ratio: useful output to total input",
         );
 
         // === NEGATION PRIMITIVE ===
@@ -407,7 +412,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("NEGATION"))),
-            "Unary operation: additive inverse, -a where a + (-a) = 0"
+            "Unary operation: additive inverse, -a where a + (-a) = 0",
         );
 
         // === ALGEBRAIC STRUCTURE PRIMITIVES ===
@@ -416,7 +421,7 @@ impl PrimitiveSystem {
         let algebra_domain = DomainManifold::new(
             "algebra",
             PrimitiveTier::Mathematical,
-            "Abstract algebraic structures and their properties"
+            "Abstract algebraic structures and their properties",
         );
 
         let group = Primitive::base(
@@ -424,7 +429,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "algebra",
             algebra_domain.embed(BinaryHV::random(seed_from_name("GROUP"))),
-            "Set + associative binary op + identity + inverses"
+            "Set + associative binary op + identity + inverses",
         );
 
         let ring = Primitive::base(
@@ -432,7 +437,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "algebra",
             algebra_domain.embed(BinaryHV::random(seed_from_name("RING"))),
-            "(S,+) abelian group + (S,*) monoid + distributivity"
+            "(S,+) abelian group + (S,*) monoid + distributivity",
         );
 
         let field_alg = Primitive::base(
@@ -440,7 +445,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "algebra",
             algebra_domain.embed(BinaryHV::random(seed_from_name("FIELD_ALG"))),
-            "Ring where nonzero elements form multiplicative group"
+            "Ring where nonzero elements form multiplicative group",
         );
 
         let homomorphism = Primitive::base(
@@ -448,7 +453,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "algebra",
             algebra_domain.embed(BinaryHV::random(seed_from_name("HOMOMORPHISM"))),
-            "Structure-preserving map between algebraic objects"
+            "Structure-preserving map between algebraic objects",
         );
 
         let isomorphism = Primitive::base(
@@ -456,7 +461,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "algebra",
             algebra_domain.embed(BinaryHV::random(seed_from_name("ISOMORPHISM"))),
-            "Bijective homomorphism (structural equivalence)"
+            "Bijective homomorphism (structural equivalence)",
         );
 
         let order = Primitive::base(
@@ -464,7 +469,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "algebra",
             algebra_domain.embed(BinaryHV::random(seed_from_name("ORDER"))),
-            "Binary relation: reflexive, antisymmetric, transitive"
+            "Binary relation: reflexive, antisymmetric, transitive",
         );
 
         let inverse = Primitive::base(
@@ -472,7 +477,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "algebra",
             algebra_domain.embed(BinaryHV::random(seed_from_name("INVERSE"))),
-            "Element reversing an operation: a * a^(-1) = e"
+            "Element reversing an operation: a * a^(-1) = e",
         );
 
         let identity_element = Primitive::base(
@@ -480,7 +485,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "algebra",
             algebra_domain.embed(BinaryHV::random(seed_from_name("IDENTITY_ELEMENT"))),
-            "Neutral element: a * e = e * a = a"
+            "Neutral element: a * e = e * a = a",
         );
 
         let associativity_prop = Primitive::base(
@@ -488,7 +493,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "algebra",
             algebra_domain.embed(BinaryHV::random(seed_from_name("ASSOCIATIVITY_PROP"))),
-            "Property: (a*b)*c = a*(b*c)"
+            "Property: (a*b)*c = a*(b*c)",
         );
 
         let commutativity_prop = Primitive::base(
@@ -496,7 +501,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "algebra",
             algebra_domain.embed(BinaryHV::random(seed_from_name("COMMUTATIVITY_PROP"))),
-            "Property: a*b = b*a"
+            "Property: a*b = b*a",
         );
 
         let distributivity_prop = Primitive::base(
@@ -504,7 +509,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "algebra",
             algebra_domain.embed(BinaryHV::random(seed_from_name("DISTRIBUTIVITY_PROP"))),
-            "Property: a*(b+c) = a*b + a*c"
+            "Property: a*(b+c) = a*b + a*c",
         );
 
         // === CALCULUS / ANALYSIS PRIMITIVES ===
@@ -514,7 +519,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("INTEGRATION_CALC"))),
-            "Accumulation / antiderivative: integral of f over domain"
+            "Accumulation / antiderivative: integral of f over domain",
         );
 
         let convergence = Primitive::base(
@@ -522,7 +527,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("CONVERGENCE"))),
-            "Sequence/series approaching a limit"
+            "Sequence/series approaching a limit",
         );
 
         let continuity = Primitive::base(
@@ -530,7 +535,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("CONTINUITY"))),
-            "Small input changes produce small output changes"
+            "Small input changes produce small output changes",
         );
 
         let infinity = Primitive::base(
@@ -538,7 +543,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Mathematical,
             "mathematics",
             math_domain.embed(BinaryHV::random(seed_from_name("INFINITY"))),
-            "Unbounded quantity, larger than any finite number"
+            "Unbounded quantity, larger than any finite number",
         );
 
         // === REGISTER ALL PRIMITIVES ===
@@ -548,15 +553,45 @@ impl PrimitiveSystem {
         self.domains.insert("algebra".to_string(), algebra_domain);
 
         for primitive in vec![
-            set, membership, union, intersection, empty_set,
-            not, and, or, implies, iff, equals, true_const, false_const,
-            zero, one, successor, addition, multiplication,
-            ratio, information, deviation, limit, efficiency,
+            set,
+            membership,
+            union,
+            intersection,
+            empty_set,
+            not,
+            and,
+            or,
+            implies,
+            iff,
+            equals,
+            true_const,
+            false_const,
+            zero,
+            one,
+            successor,
+            addition,
+            multiplication,
+            ratio,
+            information,
+            deviation,
+            limit,
+            efficiency,
             negation,
-            group, ring, field_alg, homomorphism, isomorphism,
-            order, inverse, identity_element,
-            associativity_prop, commutativity_prop, distributivity_prop,
-            integration_calc, convergence, continuity, infinity,
+            group,
+            ring,
+            field_alg,
+            homomorphism,
+            isomorphism,
+            order,
+            inverse,
+            identity_element,
+            associativity_prop,
+            commutativity_prop,
+            distributivity_prop,
+            integration_calc,
+            convergence,
+            continuity,
+            infinity,
         ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
@@ -588,13 +623,13 @@ impl PrimitiveSystem {
         let physics_domain = DomainManifold::new(
             "physics",
             PrimitiveTier::Physical,
-            "Physical reality grounding - mass, energy, forces"
+            "Physical reality grounding - mass, energy, forces",
         );
 
         let causality_domain = DomainManifold::new(
             "causality",
             PrimitiveTier::Physical,
-            "Cause-effect relationships and state changes"
+            "Cause-effect relationships and state changes",
         );
 
         // === PHYSICAL PROPERTIES ===
@@ -605,7 +640,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("MASS"))),
-            "Property: quantity of matter in an object (kg)"
+            "Property: quantity of matter in an object (kg)",
         );
 
         // CHARGE - electric charge
@@ -614,7 +649,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("CHARGE"))),
-            "Property: electric charge (coulombs)"
+            "Property: electric charge (coulombs)",
         );
 
         // SPIN - quantum angular momentum
@@ -623,7 +658,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("SPIN"))),
-            "Property: intrinsic angular momentum (quantum)"
+            "Property: intrinsic angular momentum (quantum)",
         );
 
         // === ENERGY AND FORCES ===
@@ -634,7 +669,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("ENERGY"))),
-            "Property: capacity to perform work (joules)"
+            "Property: capacity to perform work (joules)",
         );
 
         // WORK - energy transfer through force
@@ -644,7 +679,7 @@ impl PrimitiveSystem {
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("WORK"))),
             "Quantity: energy transferred by force over distance",
-            "BIND(FORCE, DISTANCE)"
+            "BIND(FORCE, DISTANCE)",
         );
 
         // FORCE - interaction that changes motion
@@ -653,7 +688,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("FORCE"))),
-            "Vector: interaction that changes object's motion (newtons)"
+            "Vector: interaction that changes object's motion (newtons)",
         );
 
         // === MOTION PRIMITIVES ===
@@ -664,7 +699,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("VELOCITY"))),
-            "Vector: rate of change of position (m/s)"
+            "Vector: rate of change of position (m/s)",
         );
 
         // ACCELERATION - rate of velocity change
@@ -674,7 +709,7 @@ impl PrimitiveSystem {
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("ACCELERATION"))),
             "Vector: rate of change of velocity (m/s²)",
-            "DERIVATIVE(VELOCITY)"
+            "DERIVATIVE(VELOCITY)",
         );
 
         // MOMENTUM - quantity of motion
@@ -684,7 +719,7 @@ impl PrimitiveSystem {
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("MOMENTUM"))),
             "Vector: quantity of motion (mass × velocity)",
-            "BIND(MASS, VELOCITY)"
+            "BIND(MASS, VELOCITY)",
         );
 
         // === CAUSALITY ===
@@ -695,7 +730,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "causality",
             causality_domain.embed(BinaryHV::random(seed_from_name("CAUSE"))),
-            "Event: that which produces an effect"
+            "Event: that which produces an effect",
         );
 
         // EFFECT - result of a cause
@@ -704,7 +739,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "causality",
             causality_domain.embed(BinaryHV::random(seed_from_name("EFFECT"))),
-            "Event: result produced by a cause"
+            "Event: result produced by a cause",
         );
 
         // STATE_CHANGE - transition between states
@@ -714,7 +749,7 @@ impl PrimitiveSystem {
             "causality",
             causality_domain.embed(BinaryHV::random(seed_from_name("STATE_CHANGE"))),
             "Process: transition from one state to another",
-            "BIND(CAUSE, EFFECT)"
+            "BIND(CAUSE, EFFECT)",
         );
 
         // === THERMODYNAMICS ===
@@ -726,7 +761,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("THERMODYNAMIC_ENTROPY"))),
-            "Property: thermodynamic measure of disorder, S = k_B ln Ω (J/K)"
+            "Property: thermodynamic measure of disorder, S = k_B ln Ω (J/K)",
         );
 
         // TEMPERATURE - average kinetic energy
@@ -735,7 +770,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("TEMPERATURE"))),
-            "Property: average kinetic energy of particles (K)"
+            "Property: average kinetic energy of particles (K)",
         );
 
         // === CONSERVATION ===
@@ -746,7 +781,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("CONSERVATION"))),
-            "Principle: certain quantities remain constant over time"
+            "Principle: certain quantities remain constant over time",
         );
 
         // === FOUNDATIONAL PHYSICAL PRIMITIVES ===
@@ -757,7 +792,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("DIFFERENTIATION"))),
-            "Operation: rate of change of a quantity with respect to another"
+            "Operation: rate of change of a quantity with respect to another",
         );
 
         let space = Primitive::base(
@@ -765,7 +800,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("SPACE"))),
-            "Continuum: spatial extent in which objects exist and move"
+            "Continuum: spatial extent in which objects exist and move",
         );
 
         let oscillation = Primitive::base(
@@ -773,7 +808,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("OSCILLATION"))),
-            "Process: repetitive variation about a central value"
+            "Process: repetitive variation about a central value",
         );
 
         let propagation = Primitive::base(
@@ -781,21 +816,35 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "physics",
             physics_domain.embed(BinaryHV::random(seed_from_name("PROPAGATION"))),
-            "Process: transmission of a disturbance through a medium or field"
+            "Process: transmission of a disturbance through a medium or field",
         );
 
         // === REGISTER ALL TIER 2 PRIMITIVES ===
 
         self.domains.insert("physics".to_string(), physics_domain);
-        self.domains.insert("causality".to_string(), causality_domain);
+        self.domains
+            .insert("causality".to_string(), causality_domain);
 
         for primitive in vec![
-            mass, charge, spin,
-            energy, work, force,
-            velocity, acceleration, momentum,
-            cause, effect, state_change,
-            entropy, temperature, conservation,
-            differentiation, space, oscillation, propagation,
+            mass,
+            charge,
+            spin,
+            energy,
+            work,
+            force,
+            velocity,
+            acceleration,
+            momentum,
+            cause,
+            effect,
+            state_change,
+            entropy,
+            temperature,
+            conservation,
+            differentiation,
+            space,
+            oscillation,
+            propagation,
         ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
@@ -827,13 +876,13 @@ impl PrimitiveSystem {
         let geometry_domain = DomainManifold::new(
             "geometry",
             PrimitiveTier::Geometric,
-            "Euclidean and differential geometry"
+            "Euclidean and differential geometry",
         );
 
         let topology_domain = DomainManifold::new(
             "topology",
             PrimitiveTier::Geometric,
-            "Topological and mereotopological relations"
+            "Topological and mereotopological relations",
         );
 
         // === BASIC GEOMETRY ===
@@ -844,7 +893,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "geometry",
             geometry_domain.embed(BinaryHV::random(seed_from_name("POINT"))),
-            "Entity: location with no dimension"
+            "Entity: location with no dimension",
         );
 
         // LINE - one-dimensional extent
@@ -854,7 +903,7 @@ impl PrimitiveSystem {
             "geometry",
             geometry_domain.embed(BinaryHV::random(seed_from_name("LINE"))),
             "Entity: one-dimensional extent through space",
-            "CONNECT(POINT, POINT)"
+            "CONNECT(POINT, POINT)",
         );
 
         // PLANE - two-dimensional surface
@@ -863,7 +912,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "geometry",
             geometry_domain.embed(BinaryHV::random(seed_from_name("PLANE"))),
-            "Entity: flat two-dimensional surface"
+            "Entity: flat two-dimensional surface",
         );
 
         // ANGLE - measure of rotation
@@ -872,7 +921,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "geometry",
             geometry_domain.embed(BinaryHV::random(seed_from_name("ANGLE"))),
-            "Quantity: measure of rotation between two lines"
+            "Quantity: measure of rotation between two lines",
         );
 
         // DISTANCE - spatial separation
@@ -882,7 +931,7 @@ impl PrimitiveSystem {
             "geometry",
             geometry_domain.embed(BinaryHV::random(seed_from_name("DISTANCE"))),
             "Quantity: spatial separation between points",
-            "MEASURE(POINT, POINT)"
+            "MEASURE(POINT, POINT)",
         );
 
         // === VECTOR GEOMETRY ===
@@ -893,7 +942,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "geometry",
             geometry_domain.embed(BinaryHV::random(seed_from_name("VECTOR"))),
-            "Entity: quantity with magnitude and direction"
+            "Entity: quantity with magnitude and direction",
         );
 
         // DOT_PRODUCT - scalar product
@@ -902,7 +951,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "geometry",
             geometry_domain.embed(BinaryHV::random(seed_from_name("DOT_PRODUCT"))),
-            "Operation: scalar product of two vectors"
+            "Operation: scalar product of two vectors",
         );
 
         // CROSS_PRODUCT - vector product
@@ -911,7 +960,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "geometry",
             geometry_domain.embed(BinaryHV::random(seed_from_name("CROSS_PRODUCT"))),
-            "Operation: vector product perpendicular to both inputs"
+            "Operation: vector product perpendicular to both inputs",
         );
 
         // === DIFFERENTIAL GEOMETRY ===
@@ -922,7 +971,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "geometry",
             geometry_domain.embed(BinaryHV::random(seed_from_name("MANIFOLD"))),
-            "Entity: space that locally resembles Euclidean space"
+            "Entity: space that locally resembles Euclidean space",
         );
 
         // TANGENT_SPACE - local linear approximation
@@ -931,7 +980,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "geometry",
             geometry_domain.embed(BinaryHV::random(seed_from_name("TANGENT_SPACE"))),
-            "Entity: linear approximation at a manifold point"
+            "Entity: linear approximation at a manifold point",
         );
 
         // CURVATURE - deviation from flatness
@@ -940,7 +989,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "geometry",
             geometry_domain.embed(BinaryHV::random(seed_from_name("CURVATURE"))),
-            "Property: measure of deviation from flatness"
+            "Property: measure of deviation from flatness",
         );
 
         // === TOPOLOGY ===
@@ -951,7 +1000,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "topology",
             topology_domain.embed(BinaryHV::random(seed_from_name("OPEN_SET"))),
-            "Set: excluding its boundary points"
+            "Set: excluding its boundary points",
         );
 
         // CLOSED_SET - set including boundary
@@ -960,7 +1009,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "topology",
             topology_domain.embed(BinaryHV::random(seed_from_name("CLOSED_SET"))),
-            "Set: including all its boundary points"
+            "Set: including all its boundary points",
         );
 
         // BOUNDARY - edge of a region
@@ -969,7 +1018,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "topology",
             topology_domain.embed(BinaryHV::random(seed_from_name("BOUNDARY"))),
-            "Set: points on the edge of a region"
+            "Set: points on the edge of a region",
         );
 
         // INTERIOR - inside of a region
@@ -978,7 +1027,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "topology",
             topology_domain.embed(BinaryHV::random(seed_from_name("INTERIOR"))),
-            "Set: all points strictly inside a region"
+            "Set: all points strictly inside a region",
         );
 
         // === MEREOTOPOLOGY (part-whole) ===
@@ -989,7 +1038,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "topology",
             topology_domain.embed(BinaryHV::random(seed_from_name("PART_OF"))),
-            "Relation: x is part of y"
+            "Relation: x is part of y",
         );
 
         // OVERLAPS - shared parts
@@ -998,7 +1047,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "topology",
             topology_domain.embed(BinaryHV::random(seed_from_name("OVERLAPS"))),
-            "Relation: x and y share common parts"
+            "Relation: x and y share common parts",
         );
 
         // TOUCHES - external contact
@@ -1007,7 +1056,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Geometric,
             "topology",
             topology_domain.embed(BinaryHV::random(seed_from_name("TOUCHES"))),
-            "Relation: x and y are in contact at boundary"
+            "Relation: x and y are in contact at boundary",
         );
 
         // === REGISTER ALL TIER 3 PRIMITIVES ===
@@ -1016,11 +1065,24 @@ impl PrimitiveSystem {
         self.domains.insert("topology".to_string(), topology_domain);
 
         for primitive in vec![
-            point, line, plane, angle, distance,
-            vector, dot_product, cross_product,
-            manifold, tangent_space, curvature,
-            open_set, closed_set, boundary, interior,
-            part_of, overlaps, touches,
+            point,
+            line,
+            plane,
+            angle,
+            distance,
+            vector,
+            dot_product,
+            cross_product,
+            manifold,
+            tangent_space,
+            curvature,
+            open_set,
+            closed_set,
+            boundary,
+            interior,
+            part_of,
+            overlaps,
+            touches,
         ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
@@ -1052,19 +1114,19 @@ impl PrimitiveSystem {
         let game_theory_domain = DomainManifold::new(
             "game_theory",
             PrimitiveTier::Strategic,
-            "Strategic reasoning and multi-agent coordination"
+            "Strategic reasoning and multi-agent coordination",
         );
 
         let temporal_domain = DomainManifold::new(
             "temporal",
             PrimitiveTier::Strategic,
-            "Temporal logic and interval relations"
+            "Temporal logic and interval relations",
         );
 
         let social_domain = DomainManifold::new(
             "social",
             PrimitiveTier::Strategic,
-            "Social coordination and cooperation"
+            "Social coordination and cooperation",
         );
 
         // === GAME THEORY ===
@@ -1075,7 +1137,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "game_theory",
             game_theory_domain.embed(BinaryHV::random(seed_from_name("UTILITY"))),
-            "Function: measure of preference or value"
+            "Function: measure of preference or value",
         );
 
         // STRATEGY - action plan
@@ -1084,7 +1146,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "game_theory",
             game_theory_domain.embed(BinaryHV::random(seed_from_name("STRATEGY"))),
-            "Plan: complete specification of actions in all situations"
+            "Plan: complete specification of actions in all situations",
         );
 
         // EQUILIBRIUM - stable state
@@ -1093,7 +1155,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "game_theory",
             game_theory_domain.embed(BinaryHV::random(seed_from_name("EQUILIBRIUM"))),
-            "State: where no agent benefits from unilateral deviation"
+            "State: where no agent benefits from unilateral deviation",
         );
 
         // PAYOFF - outcome value
@@ -1103,7 +1165,7 @@ impl PrimitiveSystem {
             "game_theory",
             game_theory_domain.embed(BinaryHV::random(seed_from_name("PAYOFF"))),
             "Value: utility resulting from strategy profile",
-            "APPLY(UTILITY, STRATEGY)"
+            "APPLY(UTILITY, STRATEGY)",
         );
 
         // === TEMPORAL LOGIC (Allen's Intervals) ===
@@ -1114,7 +1176,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "temporal",
             temporal_domain.embed(BinaryHV::random(seed_from_name("BEFORE"))),
-            "Relation: interval x ends before interval y starts"
+            "Relation: interval x ends before interval y starts",
         );
 
         // AFTER - temporal succession
@@ -1123,7 +1185,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "temporal",
             temporal_domain.embed(BinaryHV::random(seed_from_name("AFTER"))),
-            "Relation: interval x starts after interval y ends"
+            "Relation: interval x starts after interval y ends",
         );
 
         // DURING - temporal containment
@@ -1132,7 +1194,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "temporal",
             temporal_domain.embed(BinaryHV::random(seed_from_name("DURING"))),
-            "Relation: interval x occurs within interval y"
+            "Relation: interval x occurs within interval y",
         );
 
         // MEETS - temporal adjacency
@@ -1141,7 +1203,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "temporal",
             temporal_domain.embed(BinaryHV::random(seed_from_name("MEETS"))),
-            "Relation: interval x ends exactly when y starts"
+            "Relation: interval x ends exactly when y starts",
         );
 
         // OVERLAPS_TEMPORAL - partial overlap
@@ -1150,7 +1212,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "temporal",
             temporal_domain.embed(BinaryHV::random(seed_from_name("OVERLAPS_TEMPORAL"))),
-            "Relation: intervals x and y partially overlap in time"
+            "Relation: intervals x and y partially overlap in time",
         );
 
         // === COUNTERFACTUAL REASONING ===
@@ -1161,7 +1223,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "game_theory",
             game_theory_domain.embed(BinaryHV::random(seed_from_name("COUNTERFACTUAL"))),
-            "Condition: what would have happened if..."
+            "Condition: what would have happened if...",
         );
 
         // POSSIBLE_WORLD - alternative reality
@@ -1170,7 +1232,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "game_theory",
             game_theory_domain.embed(BinaryHV::random(seed_from_name("POSSIBLE_WORLD"))),
-            "Structure: consistent alternative state of reality"
+            "Structure: consistent alternative state of reality",
         );
 
         // === SOCIAL COORDINATION ===
@@ -1181,7 +1243,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "social",
             social_domain.embed(BinaryHV::random(seed_from_name("COOPERATE"))),
-            "Action: work together for mutual benefit"
+            "Action: work together for mutual benefit",
         );
 
         // DEFECT - self-interested deviation
@@ -1190,7 +1252,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "social",
             social_domain.embed(BinaryHV::random(seed_from_name("DEFECT"))),
-            "Action: act in self-interest against cooperation"
+            "Action: act in self-interest against cooperation",
         );
 
         // RECIPROCATE - conditional cooperation
@@ -1200,7 +1262,7 @@ impl PrimitiveSystem {
             "social",
             social_domain.embed(BinaryHV::random(seed_from_name("RECIPROCATE"))),
             "Strategy: cooperate if and only if partner cooperates",
-            "CONDITIONAL(COOPERATE, COOPERATE)"
+            "CONDITIONAL(COOPERATE, COOPERATE)",
         );
 
         // TRUST - belief in cooperation
@@ -1209,7 +1271,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "social",
             social_domain.embed(BinaryHV::random(seed_from_name("TRUST"))),
-            "Belief: expectation that others will cooperate"
+            "Belief: expectation that others will cooperate",
         );
 
         // === INFORMATION ===
@@ -1220,7 +1282,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "social",
             social_domain.embed(BinaryHV::random(seed_from_name("SIGNAL"))),
-            "Action: transmit information to influence others"
+            "Action: transmit information to influence others",
         );
 
         // BELIEF - subjective probability
@@ -1229,7 +1291,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "social",
             social_domain.embed(BinaryHV::random(seed_from_name("BELIEF"))),
-            "State: subjective probability assignment"
+            "State: subjective probability assignment",
         );
 
         // COMMON_KNOWLEDGE - shared awareness
@@ -1238,21 +1300,35 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "social",
             social_domain.embed(BinaryHV::random(seed_from_name("COMMON_KNOWLEDGE"))),
-            "State: all know, all know that all know, etc."
+            "State: all know, all know that all know, etc.",
         );
 
         // === REGISTER ALL TIER 4 PRIMITIVES ===
 
-        self.domains.insert("game_theory".to_string(), game_theory_domain);
+        self.domains
+            .insert("game_theory".to_string(), game_theory_domain);
         self.domains.insert("temporal".to_string(), temporal_domain);
         self.domains.insert("social".to_string(), social_domain);
 
         for primitive in vec![
-            utility, strategy, equilibrium, payoff,
-            before, after, during, meets, overlaps_temporal,
-            counterfactual, possible_world,
-            cooperate, defect, reciprocate, trust,
-            signal, belief, common_knowledge,
+            utility,
+            strategy,
+            equilibrium,
+            payoff,
+            before,
+            after,
+            during,
+            meets,
+            overlaps_temporal,
+            counterfactual,
+            possible_world,
+            cooperate,
+            defect,
+            reciprocate,
+            trust,
+            signal,
+            belief,
+            common_knowledge,
         ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
@@ -1284,25 +1360,25 @@ impl PrimitiveSystem {
         let metacognition_domain = DomainManifold::new(
             "metacognition",
             PrimitiveTier::MetaCognitive,
-            "Self-awareness and introspection"
+            "Self-awareness and introspection",
         );
 
         let homeostasis_domain = DomainManifold::new(
             "homeostasis",
             PrimitiveTier::MetaCognitive,
-            "Self-regulation and repair"
+            "Self-regulation and repair",
         );
 
         let epistemic_domain = DomainManifold::new(
             "epistemic",
             PrimitiveTier::MetaCognitive,
-            "Knowledge and uncertainty"
+            "Knowledge and uncertainty",
         );
 
         let metabolic_domain = DomainManifold::new(
             "metabolic",
             PrimitiveTier::MetaCognitive,
-            "Resource allocation and management"
+            "Resource allocation and management",
         );
 
         // === SELF-AWARENESS ===
@@ -1313,7 +1389,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "metacognition",
             metacognition_domain.embed(BinaryHV::random(seed_from_name("SELF"))),
-            "Entity: the reflexive subject of awareness"
+            "Entity: the reflexive subject of awareness",
         );
 
         // IDENTITY - persistent self-recognition
@@ -1322,7 +1398,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "metacognition",
             metacognition_domain.embed(BinaryHV::random(seed_from_name("IDENTITY"))),
-            "Property: persistent self-recognition over time"
+            "Property: persistent self-recognition over time",
         );
 
         // META_BELIEF - belief about beliefs
@@ -1332,7 +1408,7 @@ impl PrimitiveSystem {
             "metacognition",
             metacognition_domain.embed(BinaryHV::random(seed_from_name("META_BELIEF"))),
             "State: belief about one's own beliefs",
-            "APPLY(SELF, BELIEF)"
+            "APPLY(SELF, BELIEF)",
         );
 
         // INTROSPECTION - self-examination
@@ -1341,7 +1417,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "metacognition",
             metacognition_domain.embed(BinaryHV::random(seed_from_name("INTROSPECTION"))),
-            "Process: examination of one's own mental states"
+            "Process: examination of one's own mental states",
         );
 
         // === HOMEOSTASIS & REGULATION ===
@@ -1351,7 +1427,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "homeostasis",
             homeostasis_domain.embed(BinaryHV::random(seed_from_name("HOMEOSTASIS"))),
-            "Process: maintaining stable internal state"
+            "Process: maintaining stable internal state",
         );
 
         let setpoint = Primitive::base(
@@ -1359,7 +1435,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "homeostasis",
             homeostasis_domain.embed(BinaryHV::random(seed_from_name("SETPOINT"))),
-            "Value: target state for homeostatic regulation"
+            "Value: target state for homeostatic regulation",
         );
 
         let regulation = Primitive::base(
@@ -1367,7 +1443,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "homeostasis",
             homeostasis_domain.embed(BinaryHV::random(seed_from_name("REGULATION"))),
-            "Process: adjusting state toward setpoint"
+            "Process: adjusting state toward setpoint",
         );
 
         let feedback = Primitive::base(
@@ -1375,7 +1451,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "homeostasis",
             homeostasis_domain.embed(BinaryHV::random(seed_from_name("FEEDBACK"))),
-            "Signal: information about current state vs setpoint"
+            "Signal: information about current state vs setpoint",
         );
 
         // === REPAIR & ADAPTATION ===
@@ -1385,7 +1461,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "homeostasis",
             homeostasis_domain.embed(BinaryHV::random(seed_from_name("REPAIR"))),
-            "Process: restoring damaged structures or functions"
+            "Process: restoring damaged structures or functions",
         );
 
         let restore = Primitive::base(
@@ -1393,7 +1469,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "homeostasis",
             homeostasis_domain.embed(BinaryHV::random(seed_from_name("RESTORE"))),
-            "Process: returning to a previous functional state"
+            "Process: returning to a previous functional state",
         );
 
         let adapt = Primitive::base(
@@ -1401,7 +1477,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "homeostasis",
             homeostasis_domain.embed(BinaryHV::random(seed_from_name("ADAPT"))),
-            "Process: modify structure/behavior in response to environment"
+            "Process: modify structure/behavior in response to environment",
         );
 
         let learn = Primitive::base(
@@ -1409,7 +1485,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "metacognition",
             metacognition_domain.embed(BinaryHV::random(seed_from_name("LEARN"))),
-            "Process: update knowledge or behavior from experience"
+            "Process: update knowledge or behavior from experience",
         );
 
         // === EPISTEMIC STRENGTH ===
@@ -1419,7 +1495,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "epistemic",
             epistemic_domain.embed(BinaryHV::random(seed_from_name("KNOW"))),
-            "State: justified true belief"
+            "State: justified true belief",
         );
 
         let uncertain = Primitive::base(
@@ -1427,7 +1503,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "epistemic",
             epistemic_domain.embed(BinaryHV::random(seed_from_name("UNCERTAIN"))),
-            "State: lacking sufficient information for certainty"
+            "State: lacking sufficient information for certainty",
         );
 
         let confidence = Primitive::base(
@@ -1435,7 +1511,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "epistemic",
             epistemic_domain.embed(BinaryHV::random(seed_from_name("CONFIDENCE"))),
-            "Measure: degree of certainty in a belief"
+            "Measure: degree of certainty in a belief",
         );
 
         let evidence = Primitive::base(
@@ -1443,7 +1519,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "epistemic",
             epistemic_domain.embed(BinaryHV::random(seed_from_name("EVIDENCE"))),
-            "Support: information supporting or refuting a belief"
+            "Support: information supporting or refuting a belief",
         );
 
         // === METABOLIC / RESOURCE MANAGEMENT ===
@@ -1453,7 +1529,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "metabolic",
             metabolic_domain.embed(BinaryHV::random(seed_from_name("RESOURCE"))),
-            "Entity: available capacity for use"
+            "Entity: available capacity for use",
         );
 
         let allocate = Primitive::base(
@@ -1461,7 +1537,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "metabolic",
             metabolic_domain.embed(BinaryHV::random(seed_from_name("ALLOCATE"))),
-            "Process: distribute resources to tasks"
+            "Process: distribute resources to tasks",
         );
 
         let consume = Primitive::base(
@@ -1469,7 +1545,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "metabolic",
             metabolic_domain.embed(BinaryHV::random(seed_from_name("CONSUME"))),
-            "Process: use resources to perform work"
+            "Process: use resources to perform work",
         );
 
         let produce = Primitive::base(
@@ -1477,7 +1553,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "metabolic",
             metabolic_domain.embed(BinaryHV::random(seed_from_name("PRODUCE"))),
-            "Process: generate resources from inputs"
+            "Process: generate resources from inputs",
         );
 
         // === REWARD & VALUE ===
@@ -1487,7 +1563,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "metacognition",
             metacognition_domain.embed(BinaryHV::random(seed_from_name("REWARD"))),
-            "Signal: positive reinforcement for actions"
+            "Signal: positive reinforcement for actions",
         );
 
         let goal = Primitive::base(
@@ -1495,7 +1571,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "metacognition",
             metacognition_domain.embed(BinaryHV::random(seed_from_name("GOAL"))),
-            "State: desired future state to achieve"
+            "State: desired future state to achieve",
         );
 
         let value = Primitive::base(
@@ -1503,7 +1579,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "metacognition",
             metacognition_domain.embed(BinaryHV::random(seed_from_name("VALUE"))),
-            "Measure: importance or worth of a state/action"
+            "Measure: importance or worth of a state/action",
         );
 
         let certainty = Primitive::base(
@@ -1511,23 +1587,45 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "epistemic",
             epistemic_domain.embed(BinaryHV::random(seed_from_name("CERTAINTY"))),
-            "State: complete confidence in a proposition's truth value"
+            "State: complete confidence in a proposition's truth value",
         );
 
         // === REGISTER ALL TIER 5 PRIMITIVES ===
 
-        self.domains.insert("metacognition".to_string(), metacognition_domain);
-        self.domains.insert("homeostasis".to_string(), homeostasis_domain);
-        self.domains.insert("epistemic".to_string(), epistemic_domain);
-        self.domains.insert("metabolic".to_string(), metabolic_domain);
+        self.domains
+            .insert("metacognition".to_string(), metacognition_domain);
+        self.domains
+            .insert("homeostasis".to_string(), homeostasis_domain);
+        self.domains
+            .insert("epistemic".to_string(), epistemic_domain);
+        self.domains
+            .insert("metabolic".to_string(), metabolic_domain);
 
         for primitive in vec![
-            self_prim, identity, meta_belief, introspection,
-            homeostasis, setpoint, regulation, feedback,
-            repair, restore, adapt, learn,
-            know, uncertain, confidence, evidence, certainty,
-            resource, allocate, consume, produce,
-            reward, goal, value,
+            self_prim,
+            identity,
+            meta_belief,
+            introspection,
+            homeostasis,
+            setpoint,
+            regulation,
+            feedback,
+            repair,
+            restore,
+            adapt,
+            learn,
+            know,
+            uncertain,
+            confidence,
+            evidence,
+            certainty,
+            resource,
+            allocate,
+            consume,
+            produce,
+            reward,
+            goal,
+            value,
         ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;

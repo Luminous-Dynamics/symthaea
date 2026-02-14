@@ -149,9 +149,7 @@ impl TrajectoryFeatures {
         let mean: f32 = history.iter().sum::<f32>() / n;
 
         // Variance and std dev
-        let variance: f32 = history.iter()
-            .map(|&t| (t - mean).powi(2))
-            .sum::<f32>() / n;
+        let variance: f32 = history.iter().map(|&t| (t - mean).powi(2)).sum::<f32>() / n;
         let std_dev = variance.sqrt();
 
         // Coefficient of variation
@@ -175,9 +173,11 @@ impl TrajectoryFeatures {
         let recent_len = (history.len() / 4).max(5);
         let recent = &history[history.len().saturating_sub(recent_len)..];
         let recent_mean: f32 = recent.iter().sum::<f32>() / recent.len() as f32;
-        let recent_var: f32 = recent.iter()
+        let recent_var: f32 = recent
+            .iter()
             .map(|&t| (t - recent_mean).powi(2))
-            .sum::<f32>() / recent.len() as f32;
+            .sum::<f32>()
+            / recent.len() as f32;
         let convergence = 1.0 / (1.0 + recent_var * 10.0);
 
         Self {
@@ -254,9 +254,7 @@ impl TrajectoryFeatures {
         }
 
         // Compute derivative (differences)
-        let derivatives: Vec<f32> = history.windows(2)
-            .map(|w| w[1] - w[0])
-            .collect();
+        let derivatives: Vec<f32> = history.windows(2).map(|w| w[1] - w[0]).collect();
 
         // Count zero crossings
         let mut crossings = 0;
@@ -313,25 +311,29 @@ impl TemporalSignatureEncoder {
     fn initialize_bases(&mut self) {
         // Create base vectors for each feature dimension
         let features = [
-            "mean", "std_dev", "cv", "trend", "range",
-            "entropy", "oscillation", "convergence",
+            "mean",
+            "std_dev",
+            "cv",
+            "trend",
+            "range",
+            "entropy",
+            "oscillation",
+            "convergence",
         ];
 
         for feature in features {
-            let seed = feature.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-            self.feature_bases.insert(
-                feature.to_string(),
-                ContinuousHV::random_default(seed),
-            );
+            let seed = feature
+                .bytes()
+                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            self.feature_bases
+                .insert(feature.to_string(), ContinuousHV::random_default(seed));
         }
 
         // Create position vectors for quantized values
         for i in 0..self.config.num_bins {
             let seed = (i as u64).wrapping_mul(7919);
-            self.feature_bases.insert(
-                format!("pos_{}", i),
-                ContinuousHV::random_default(seed),
-            );
+            self.feature_bases
+                .insert(format!("pos_{}", i), ContinuousHV::random_default(seed));
         }
     }
 
@@ -562,7 +564,10 @@ impl TemporalSignatureEncoder {
 
     /// Compute similarity to a specific consciousness pattern
     pub fn similarity_to(&self, pattern: ConsciousnessPattern) -> f32 {
-        match (&self.current_signature, self.pattern_signatures.get(&pattern)) {
+        match (
+            &self.current_signature,
+            self.pattern_signatures.get(&pattern),
+        ) {
             (Some(current), Some(canonical)) => current.similarity(canonical),
             _ => 0.0,
         }
@@ -712,18 +717,26 @@ mod tests {
         let history: Vec<f32> = (0..50).map(|i| i as f32 * 0.01).collect();
         let features = TrajectoryFeatures::from_history(&history);
 
-        assert!(features.trend > 0.0,
-                "Increasing sequence should have positive trend: {}", features.trend);
+        assert!(
+            features.trend > 0.0,
+            "Increasing sequence should have positive trend: {}",
+            features.trend
+        );
     }
 
     #[test]
     fn test_oscillation_detection() {
         // Alternating values
-        let history: Vec<f32> = (0..50).map(|i| if i % 2 == 0 { 1.0 } else { 0.0 }).collect();
+        let history: Vec<f32> = (0..50)
+            .map(|i| if i % 2 == 0 { 1.0 } else { 0.0 })
+            .collect();
         let features = TrajectoryFeatures::from_history(&history);
 
-        assert!(features.oscillation > 0.3,
-                "Alternating sequence should have high oscillation: {}", features.oscillation);
+        assert!(
+            features.oscillation > 0.3,
+            "Alternating sequence should have high oscillation: {}",
+            features.oscillation
+        );
     }
 
     #[test]
@@ -731,7 +744,10 @@ mod tests {
         let encoder = TemporalSignatureEncoder::default();
 
         // Should have all pattern signatures
-        assert_eq!(encoder.pattern_signatures.len(), ConsciousnessPattern::all().len());
+        assert_eq!(
+            encoder.pattern_signatures.len(),
+            ConsciousnessPattern::all().len()
+        );
     }
 
     #[test]
@@ -744,8 +760,11 @@ mod tests {
         }
 
         let sim = encoder.similarity_to(ConsciousnessPattern::Focused);
-        assert!(sim > 0.2,
-                "Constant tau should match focused pattern: {}", sim);
+        assert!(
+            sim > 0.2,
+            "Constant tau should match focused pattern: {}",
+            sim
+        );
     }
 
     #[test]
@@ -761,14 +780,20 @@ mod tests {
 
         // The excited pattern should have high oscillation detected
         let features = encoder.features();
-        assert!(features.oscillation > 0.3,
-                "Alternating tau should have oscillation feature > 0.3: {}", features.oscillation);
+        assert!(
+            features.oscillation > 0.3,
+            "Alternating tau should have oscillation feature > 0.3: {}",
+            features.oscillation
+        );
 
         // Should get some similarity to Excited pattern
         // (similarity may be modest since other features also need to match)
         let sim_excited = encoder.similarity_to(ConsciousnessPattern::Excited);
-        assert!(sim_excited >= 0.0,
-                "Should have non-negative similarity to Excited pattern: {}", sim_excited);
+        assert!(
+            sim_excited >= 0.0,
+            "Should have non-negative similarity to Excited pattern: {}",
+            sim_excited
+        );
     }
 
     #[test]
@@ -783,13 +808,19 @@ mod tests {
 
         // The contemplative pattern should have positive trend detected
         let features = encoder.features();
-        assert!(features.trend > 0.0,
-                "Increasing tau should have positive trend: {}", features.trend);
+        assert!(
+            features.trend > 0.0,
+            "Increasing tau should have positive trend: {}",
+            features.trend
+        );
 
         // Should get some similarity (not zero)
         let sim_contemplative = encoder.similarity_to(ConsciousnessPattern::Contemplative);
-        assert!(sim_contemplative > 0.0,
-                "Should have non-zero similarity to Contemplative pattern: {}", sim_contemplative);
+        assert!(
+            sim_contemplative > 0.0,
+            "Should have non-zero similarity to Contemplative pattern: {}",
+            sim_contemplative
+        );
     }
 
     #[test]

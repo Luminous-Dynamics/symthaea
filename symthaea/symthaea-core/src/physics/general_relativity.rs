@@ -20,10 +20,10 @@
 //! - **FLRW**: Cosmological spacetime
 //! - **Gravitational Waves**: Ripples in spacetime
 
+use super::constants::{C, G};
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::{C, G};
 use serde::{Deserialize, Serialize};
 
 /// Spacetime signature
@@ -40,21 +40,21 @@ pub enum Signature {
 pub enum CoordinateSystem {
     Cartesian,
     Spherical,
-    BoyerLindquist,  // For Kerr
-    Kruskal,         // Maximal extension
+    BoyerLindquist, // For Kerr
+    Kruskal,        // Maximal extension
     EddingtonFinkelstein,
 }
 
 /// Spacetime type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SpacetimeType {
-    Flat,           // Minkowski
-    Schwarzschild,  // Non-rotating BH
-    Kerr,           // Rotating BH
-    KerrNewman,     // Rotating charged BH
-    FLRW,           // Cosmological
-    DeSitter,       // Positive cosmological constant
-    AntiDeSitter,   // Negative cosmological constant
+    Flat,          // Minkowski
+    Schwarzschild, // Non-rotating BH
+    Kerr,          // Rotating BH
+    KerrNewman,    // Rotating charged BH
+    FLRW,          // Cosmological
+    DeSitter,      // Positive cosmological constant
+    AntiDeSitter,  // Negative cosmological constant
     GravitationalWave,
 }
 
@@ -110,9 +110,9 @@ pub struct Geodesic {
 /// Causal character of a vector/geodesic
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CausalType {
-    Timelike,   // Massive particles
-    Null,       // Light
-    Spacelike,  // Tachyonic (forbidden for particles)
+    Timelike,  // Massive particles
+    Null,      // Light
+    Spacelike, // Tachyonic (forbidden for particles)
 }
 
 impl CausalType {
@@ -176,10 +176,10 @@ pub struct GREncoder {
     pub geodesic: ContinuousHV,
 
     // Tensor concepts
-    pub riemann: ContinuousHV,      // Riemann curvature tensor
-    pub ricci: ContinuousHV,        // Ricci tensor
-    pub einstein: ContinuousHV,     // Einstein tensor
-    pub weyl: ContinuousHV,         // Weyl conformal tensor
+    pub riemann: ContinuousHV,       // Riemann curvature tensor
+    pub ricci: ContinuousHV,         // Ricci tensor
+    pub einstein: ContinuousHV,      // Einstein tensor
+    pub weyl: ContinuousHV,          // Weyl conformal tensor
     pub stress_energy: ContinuousHV, // Stress-energy tensor
 
     // Causal structure
@@ -258,10 +258,11 @@ impl GREncoder {
         // Schwarzschild radius: r_s = 2GM/c²
         let rs = 2.0 * G * mass_kg / (C * C);
 
-        let vector = self.spacetime
+        let vector = self
+            .spacetime
             .bind(&self.curved)
             .bind(&self.horizon)
-            .scale((mass_kg / 1e30).ln() as f32 + 1.0);  // Log scale for mass
+            .scale((mass_kg / 1e30).ln() as f32 + 1.0); // Log scale for mass
 
         Spacetime {
             name: "Schwarzschild".to_string(),
@@ -276,9 +277,10 @@ impl GREncoder {
     /// Kerr spacetime (rotating black hole)
     pub fn kerr(&self, mass_kg: f64, spin: f64) -> Spacetime {
         let rs = 2.0 * G * mass_kg / (C * C);
-        let a = spin.abs().min(1.0);  // Dimensionless spin parameter
+        let a = spin.abs().min(1.0); // Dimensionless spin parameter
 
-        let vector = self.spacetime
+        let vector = self
+            .spacetime
             .bind(&self.curved)
             .bind(&self.horizon)
             .bind(&self.frame_dragging.scale(a as f32))
@@ -298,7 +300,8 @@ impl GREncoder {
     pub fn de_sitter(&self, hubble_parameter: f64) -> Spacetime {
         let horizon_radius = C / hubble_parameter;
 
-        let vector = self.spacetime
+        let vector = self
+            .spacetime
             .bind(&self.curved)
             .bind(&self.horizon)
             .scale(hubble_parameter.ln() as f32);
@@ -343,7 +346,12 @@ impl GREncoder {
     }
 
     /// Gravitational wave from binary black hole merger
-    pub fn binary_bh_merger(&self, m1_solar: f64, m2_solar: f64, distance_mpc: f64) -> GravitationalWave {
+    pub fn binary_bh_merger(
+        &self,
+        m1_solar: f64,
+        m2_solar: f64,
+        distance_mpc: f64,
+    ) -> GravitationalWave {
         let m_total = m1_solar + m2_solar;
         let m_chirp = ((m1_solar * m2_solar).powf(3.0 / 5.0)) / m_total.powf(1.0 / 5.0);
 
@@ -353,8 +361,9 @@ impl GREncoder {
         // Strain amplitude: h ~ (GM_chirp/c²) / (distance)
         let strain = (G * m_chirp * 1.989e30 / (C * C)) / (distance_mpc * 3.086e22);
 
-        let source_vec = self.gw_strain
-            .scale(strain.log10() as f32 + 22.0)  // Strain is ~10^-22
+        let source_vec = self
+            .gw_strain
+            .scale(strain.log10() as f32 + 22.0) // Strain is ~10^-22
             .bind(&ContinuousHV::bundle(&[&self.gw_plus, &self.gw_cross]));
 
         GravitationalWave {
@@ -367,12 +376,18 @@ impl GREncoder {
     }
 
     /// Gravitational wave from binary neutron star merger
-    pub fn binary_ns_merger(&self, m1_solar: f64, m2_solar: f64, distance_mpc: f64) -> GravitationalWave {
+    pub fn binary_ns_merger(
+        &self,
+        m1_solar: f64,
+        m2_solar: f64,
+        distance_mpc: f64,
+    ) -> GravitationalWave {
         let _m_total = m1_solar + m2_solar;
-        let freq = 1000.0;  // ~kHz for NS mergers
+        let freq = 1000.0; // ~kHz for NS mergers
         let strain = 1e-22 * (40.0 / distance_mpc);
 
-        let source_vec = self.gw_strain
+        let source_vec = self
+            .gw_strain
             .scale(strain.log10() as f32 + 22.0)
             .bind(&self.gw_plus);
 
@@ -463,8 +478,12 @@ mod tests {
         let kerr_fd = kerr.vector.similarity(&encoder.frame_dragging);
         let schw_fd = schw.vector.similarity(&encoder.frame_dragging);
 
-        assert!(kerr_fd.abs() > schw_fd.abs(),
-            "Kerr should have more frame dragging: kerr={}, schw={}", kerr_fd, schw_fd);
+        assert!(
+            kerr_fd.abs() > schw_fd.abs(),
+            "Kerr should have more frame dragging: kerr={}, schw={}",
+            kerr_fd,
+            schw_fd
+        );
     }
 
     #[test]
@@ -541,7 +560,11 @@ mod tests {
         let flat_sim = flat.vector.similarity(&encoder.flat);
         let curved_flat_sim = curved.vector.similarity(&encoder.flat);
 
-        assert!(flat_sim > curved_flat_sim,
-            "Minkowski should be more flat: flat={}, curved={}", flat_sim, curved_flat_sim);
+        assert!(
+            flat_sim > curved_flat_sim,
+            "Minkowski should be more flat: flat={}, curved={}",
+            flat_sim,
+            curved_flat_sim
+        );
     }
 }

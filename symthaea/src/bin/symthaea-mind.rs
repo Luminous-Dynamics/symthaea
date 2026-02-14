@@ -78,7 +78,10 @@ enum MindRequest {
 #[serde(tag = "type")]
 enum MindResponse {
     #[serde(rename = "status")]
-    Status { status: MindStatus, timestamp_ms: u64 },
+    Status {
+        status: MindStatus,
+        timestamp_ms: u64,
+    },
     #[serde(rename = "shutdown_ack")]
     ShutdownAck,
     #[serde(rename = "error")]
@@ -87,7 +90,9 @@ enum MindResponse {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt().with_env_filter("symthaea_mind=info").init();
+    tracing_subscriber::fmt()
+        .with_env_filter("symthaea_mind=info")
+        .init();
 
     let args = Args::parse();
     let addr: SocketAddr = args
@@ -157,7 +162,10 @@ async fn handle_client(stream: TcpStream, mind: Arc<Mutex<ContinuousMind>>) -> R
                     .duration_since(UNIX_EPOCH)
                     .map(|d| d.as_millis() as u64)
                     .unwrap_or(0);
-                let resp = MindResponse::Status { status, timestamp_ms };
+                let resp = MindResponse::Status {
+                    status,
+                    timestamp_ms,
+                };
                 send_response(&mut write_half, &resp).await?;
             }
             MindRequest::Shutdown => {
@@ -178,7 +186,10 @@ async fn handle_client(stream: TcpStream, mind: Arc<Mutex<ContinuousMind>>) -> R
     Ok(())
 }
 
-async fn send_response<W: AsyncWriteExt + Unpin>(writer: &mut W, resp: &MindResponse) -> Result<()> {
+async fn send_response<W: AsyncWriteExt + Unpin>(
+    writer: &mut W,
+    resp: &MindResponse,
+) -> Result<()> {
     let json = serde_json::to_string(resp)?;
     writer.write_all(json.as_bytes()).await?;
     writer.write_all(b"\n").await?;

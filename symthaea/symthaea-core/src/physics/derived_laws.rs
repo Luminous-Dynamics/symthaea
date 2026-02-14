@@ -26,9 +26,9 @@
 //! 3. **Thermodynamic Relations** - From entropy maximization
 //! 4. **Field Equations** - From gauge invariance
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 use serde::{Deserialize, Serialize};
 
 /// A derived physical law
@@ -157,7 +157,8 @@ impl LawsDerivationEngine {
     /// Derive energy conservation from time translation symmetry
     /// Noether: time translation invariance → energy conservation
     pub fn derive_energy_conservation(&self) -> DerivedLaw {
-        let vector = self.time_translation
+        let vector = self
+            .time_translation
             .bind(&self.invariance)
             .bind(&self.conservation)
             .bind(&self.energy)
@@ -177,7 +178,8 @@ impl LawsDerivationEngine {
 
     /// Derive momentum conservation from space translation symmetry
     pub fn derive_momentum_conservation(&self) -> DerivedLaw {
-        let vector = self.space_translation
+        let vector = self
+            .space_translation
             .bind(&self.invariance)
             .bind(&self.conservation)
             .bind(&self.momentum)
@@ -198,7 +200,8 @@ impl LawsDerivationEngine {
     /// Derive angular momentum conservation from rotational symmetry
     pub fn derive_angular_momentum_conservation(&self) -> DerivedLaw {
         let angular_momentum = self.momentum.bind(&self.rotation);
-        let vector = self.rotation
+        let vector = self
+            .rotation
             .bind(&self.invariance)
             .bind(&self.conservation)
             .bind(&angular_momentum)
@@ -218,7 +221,8 @@ impl LawsDerivationEngine {
 
     /// Derive charge conservation from gauge symmetry
     pub fn derive_charge_conservation(&self) -> DerivedLaw {
-        let vector = self.gauge
+        let vector = self
+            .gauge
             .bind(&self.invariance)
             .bind(&self.conservation)
             .bind(&self.charge)
@@ -244,7 +248,8 @@ impl LawsDerivationEngine {
     pub fn derive_newtons_second_law(&self) -> DerivedLaw {
         // F = ma emerges from δS = 0 with S = ∫(T - V)dt
         let kinetic = self.mass.bind(&self.velocity).bind(&self.velocity);
-        let vector = self.extremal
+        let vector = self
+            .extremal
             .bind(&self.classical)
             .bind(&kinetic)
             .bind(&self.force)
@@ -269,7 +274,8 @@ impl LawsDerivationEngine {
         let lagrangian = self.genesis.hv("mechanics::lagrangian", PHYSICS_DIM);
         let generalized_coord = self.genesis.hv("mechanics::generalized_coord", PHYSICS_DIM);
 
-        let vector = self.extremal
+        let vector = self
+            .extremal
             .bind(&lagrangian)
             .bind(&generalized_coord)
             .bind(&self.time)
@@ -369,7 +375,8 @@ impl LawsDerivationEngine {
     pub fn derive_time_dilation(&self) -> DerivedLaw {
         let proper_time = self.genesis.hv("relativity::proper_time", PHYSICS_DIM);
 
-        let vector = self.lorentz
+        let vector = self
+            .lorentz
             .bind(&self.time)
             .bind(&proper_time)
             .bind(&self.velocity)
@@ -377,7 +384,8 @@ impl LawsDerivationEngine {
 
         DerivedLaw {
             name: "Time Dilation".to_string(),
-            equation: r"\Delta t = \gamma \Delta \tau, \quad \gamma = \frac{1}{\sqrt{1-v^2/c^2}}".to_string(),
+            equation: r"\Delta t = \gamma \Delta \tau, \quad \gamma = \frac{1}{\sqrt{1-v^2/c^2}}"
+                .to_string(),
             premises: vec![
                 "Lorentz transformation".to_string(),
                 "Invariance of spacetime interval".to_string(),
@@ -444,7 +452,9 @@ impl LawsDerivationEngine {
 
     /// Derive Faraday's law from electromagnetic induction
     pub fn derive_faradays_law(&self) -> DerivedLaw {
-        let magnetic_flux = self.magnetic_field.bind(&self.genesis.hv("geometry::area", PHYSICS_DIM));
+        let magnetic_flux = self
+            .magnetic_field
+            .bind(&self.genesis.hv("geometry::area", PHYSICS_DIM));
         let emf = self.genesis.hv("em::emf", PHYSICS_DIM);
 
         let vector = magnetic_flux
@@ -499,7 +509,8 @@ impl LawsDerivationEngine {
         let irreversibility = self.genesis.hv("thermo::irreversibility", PHYSICS_DIM);
         let isolated_system = self.genesis.hv("thermo::isolated", PHYSICS_DIM);
 
-        let vector = self.entropy
+        let vector = self
+            .entropy
             .bind(&irreversibility)
             .bind(&isolated_system)
             .bind(&self.time)
@@ -577,7 +588,8 @@ impl LawsDerivationEngine {
         let wavelength = self.genesis.hv("wave::wavelength", PHYSICS_DIM);
         let planck = self.genesis.hv("constant::planck", PHYSICS_DIM);
 
-        let vector = self.momentum
+        let vector = self
+            .momentum
             .bind(&wavelength)
             .bind(&planck)
             .bind(&self.quantum)
@@ -631,7 +643,11 @@ impl LawsDerivationEngine {
     }
 
     /// Find laws that share premises (connected by common foundations)
-    pub fn find_connected_laws(&self, law: &DerivedLaw, all_laws: &[DerivedLaw]) -> Vec<(String, f64)> {
+    pub fn find_connected_laws(
+        &self,
+        law: &DerivedLaw,
+        all_laws: &[DerivedLaw],
+    ) -> Vec<(String, f64)> {
         let mut connections = Vec::new();
 
         for other in all_laws {
@@ -656,7 +672,8 @@ impl LawsDerivationEngine {
 
         // A consistent hypothesis should have moderate similarity to existing laws
         // (not orthogonal = meaningless, not identical = already known)
-        let similarities: Vec<f64> = all_laws.iter()
+        let similarities: Vec<f64> = all_laws
+            .iter()
             .map(|law| (law.vector.similarity(hypothesis) as f64).abs())
             .collect();
 
@@ -675,7 +692,9 @@ impl LawsDerivationEngine {
 
     /// Attempt to derive a new law by composing existing ones
     pub fn compose_laws(&self, law1: &DerivedLaw, law2: &DerivedLaw) -> DerivedLaw {
-        let combined_premises: Vec<String> = law1.premises.iter()
+        let combined_premises: Vec<String> = law1
+            .premises
+            .iter()
             .chain(law2.premises.iter())
             .cloned()
             .collect();
@@ -790,8 +809,11 @@ mod tests {
 
         // Each connection should have a valid similarity score
         for (law_name, similarity) in &connections {
-            assert!(similarity.is_finite(),
-                    "Connection similarity for {} should be finite", law_name);
+            assert!(
+                similarity.is_finite(),
+                "Connection similarity for {} should be finite",
+                law_name
+            );
         }
     }
 

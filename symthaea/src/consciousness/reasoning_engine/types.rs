@@ -5,16 +5,14 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::consciousness::counterfactual::CausalQueryOutcome;
 use crate::consciousness::epistemic_conflict::{
     ConflictKind, ConflictMatrix, MultiTheoryMetrics, TheoryId,
 };
+use crate::consciousness::temporal_planning::types::{BudgetTier, MctsResult, PlannedAction};
 use crate::consciousness::tool_gate::types::{
     FallbackStrategy, GateDecision, GateResult, RiskLevel, ToolDescriptor,
 };
-use crate::consciousness::temporal_planning::types::{
-    BudgetTier, MctsResult, PlannedAction,
-};
-use crate::consciousness::counterfactual::CausalQueryOutcome;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reasoning Context (input to reason())

@@ -242,7 +242,8 @@ impl SevenHarmonies {
     pub fn coherence(&self) -> f32 {
         let acts = self.activations();
         let mean: f32 = acts.iter().sum::<f32>() / acts.len() as f32;
-        let variance: f32 = acts.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / acts.len() as f32;
+        let variance: f32 =
+            acts.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / acts.len() as f32;
 
         // Low variance = high coherence
         1.0 - variance.sqrt()
@@ -479,8 +480,7 @@ impl GisState {
 }
 
 /// GIS type classification
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum GisType {
     /// I know that I know
     KnownKnown,
@@ -498,7 +498,6 @@ pub enum GisType {
     /// Deliberately not knowing (ethical boundary)
     StrategicIgnorance,
 }
-
 
 impl std::fmt::Display for GisType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -526,8 +525,7 @@ pub struct DarkSpot {
 }
 
 /// Dominant mode of the KosmicSong
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum KosmicMode {
     #[default]
     Balanced,
@@ -539,7 +537,6 @@ pub enum KosmicMode {
     Connecting,    // Interconnect-dominant
     Giving,        // Reciprocity-dominant
 }
-
 
 #[cfg(test)]
 mod tests {

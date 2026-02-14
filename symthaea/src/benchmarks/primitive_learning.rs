@@ -17,12 +17,12 @@
 //! 3. **Compositional Pattern**: Learn "A ∘ B → C" structures
 //! 4. **Analogy Completion**: If X:Y then A:?
 
+use crate::learnable_ltc::{LearnableLTC, LearnableLTCConfig};
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+use std::time::Instant;
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
-use crate::learnable_ltc::{LearnableLTC, LearnableLTCConfig};
-use serde::{Serialize, Deserialize};
-use std::time::Instant;
-use rand::Rng;
 
 /// Configuration for primitive learning experiments
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,8 +46,8 @@ impl Default for PrimitiveLearningConfig {
             examples_per_episode: 50,
             test_size: 25,
             ltc_config: LearnableLTCConfig {
-                input_dim: 128,  // Compressed primitive encoding
-                output_dim: 64,  // Prediction target
+                input_dim: 128, // Compressed primitive encoding
+                output_dim: 64, // Prediction target
                 num_neurons: 128,
                 learning_rate: 0.01,
                 tau_bounds: (0.5, 5.0),
@@ -99,7 +99,11 @@ impl PrimitiveTask {
             },
             PrimitiveTask::LogicalInference => ReasoningPattern {
                 name: "Logical Inference".to_string(),
-                template: vec!["TRUE".to_string(), "_".to_string(), "CONSEQUENCE".to_string()],
+                template: vec![
+                    "TRUE".to_string(),
+                    "_".to_string(),
+                    "CONSEQUENCE".to_string(),
+                ],
                 valid_completions: vec![
                     "IMPLIES".to_string(),
                     "ENTAILS".to_string(),
@@ -109,11 +113,7 @@ impl PrimitiveTask {
             PrimitiveTask::ActionSequence => ReasoningPattern {
                 name: "Action Sequence".to_string(),
                 template: vec!["WANT".to_string(), "_".to_string(), "HAVE".to_string()],
-                valid_completions: vec![
-                    "DO".to_string(),
-                    "MAKE".to_string(),
-                    "GET".to_string(),
-                ],
+                valid_completions: vec!["DO".to_string(), "MAKE".to_string(), "GET".to_string()],
             },
             PrimitiveTask::TemporalOrder => ReasoningPattern {
                 name: "Temporal Order".to_string(),
@@ -127,11 +127,7 @@ impl PrimitiveTask {
             PrimitiveTask::QuantityRelation => ReasoningPattern {
                 name: "Quantity Relation".to_string(),
                 template: vec!["MORE".to_string(), "_".to_string(), "LESS".to_string()],
-                valid_completions: vec![
-                    "SAME".to_string(),
-                    "PART".to_string(),
-                    "SOME".to_string(),
-                ],
+                valid_completions: vec!["SAME".to_string(), "PART".to_string(), "SOME".to_string()],
             },
         }
     }
@@ -201,7 +197,7 @@ impl PrimitiveLearningGate {
         // BinaryHV is a newtype wrapping [u8; 2048], access via .0
         let bytes = &hv.0;
         let mut compressed = vec![0.0f32; 128];
-        let group_size = bytes.len() / 128;  // 16 bytes per group
+        let group_size = bytes.len() / 128; // 16 bytes per group
 
         for (i, chunk) in bytes.chunks(group_size).enumerate() {
             if i < 128 {
@@ -215,7 +211,8 @@ impl PrimitiveLearningGate {
             }
         }
 
-        self.primitive_cache.insert(name.to_string(), compressed.clone());
+        self.primitive_cache
+            .insert(name.to_string(), compressed.clone());
         compressed
     }
 
@@ -247,7 +244,8 @@ impl PrimitiveLearningGate {
         }
 
         // Pick a random valid completion as target
-        let target_name = &pattern.valid_completions[rng.gen_range(0..pattern.valid_completions.len())];
+        let target_name =
+            &pattern.valid_completions[rng.gen_range(0..pattern.valid_completions.len())];
         let target_encoding = self.encode_primitive(target_name);
 
         // Compress target to output_dim
@@ -339,9 +337,12 @@ impl PrimitiveLearningGate {
         for (input, target) in dataset {
             let (output, _) = self.ltc.forward(input)?;
 
-            let loss: f32 = output.iter().zip(target.iter())
+            let loss: f32 = output
+                .iter()
+                .zip(target.iter())
                 .map(|(o, t)| (o - t).powi(2))
-                .sum::<f32>() / target.len() as f32;
+                .sum::<f32>()
+                / target.len() as f32;
 
             total_loss += loss;
             self.ltc.reset_state();
@@ -358,9 +359,12 @@ impl PrimitiveLearningGate {
             let (output, _) = self.ltc.forward(input)?;
 
             // Check if output is close enough to target
-            let similarity: f32 = output.iter().zip(target.iter())
+            let similarity: f32 = output
+                .iter()
+                .zip(target.iter())
                 .map(|(o, t)| o * t)
-                .sum::<f32>() / (output.len() as f32);
+                .sum::<f32>()
+                / (output.len() as f32);
 
             if similarity > 0.5 {
                 correct += 1;

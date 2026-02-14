@@ -3,10 +3,10 @@
 //! Implements a feedback loop that allows the system to learn and
 //! improve its value alignment based on outcomes and corrections.
 
+use super::seven_harmonies::Harmony;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::ContinuousHV;
-use super::seven_harmonies::Harmony;
 
 /// Configuration for the value feedback loop
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -248,8 +248,8 @@ impl ValueFeedbackLoop {
             // Calculate update with momentum
             let prev_momentum = self.momentum.get(&action_id).copied().unwrap_or(0.0);
             let gradient = signal.value * signal.confidence;
-            let update = self.config.momentum * prev_momentum
-                + self.config.learning_rate * gradient;
+            let update =
+                self.config.momentum * prev_momentum + self.config.learning_rate * gradient;
 
             // Apply update
             estimate.value += update;
@@ -265,7 +265,11 @@ impl ValueFeedbackLoop {
 
             // Update specific harmony if provided
             if let Some(harmony) = signal.harmony {
-                let current = estimate.harmony_values.get(&harmony).copied().unwrap_or(0.0);
+                let current = estimate
+                    .harmony_values
+                    .get(&harmony)
+                    .copied()
+                    .unwrap_or(0.0);
                 estimate.harmony_values.insert(harmony, current + update);
                 harmonies_affected.push(harmony);
             }
@@ -306,11 +310,15 @@ impl ValueFeedbackLoop {
         next_pattern: &str,
         reward: f32,
     ) -> f32 {
-        let current_value = self.estimates.get(current_pattern)
+        let current_value = self
+            .estimates
+            .get(current_pattern)
             .map(|e| e.value)
             .unwrap_or(0.0);
 
-        let next_value = self.estimates.get(next_pattern)
+        let next_value = self
+            .estimates
+            .get(next_pattern)
             .map(|e| e.value)
             .unwrap_or(0.0);
 
@@ -372,7 +380,11 @@ impl ValueFeedbackLoop {
         let adjustment_delta = (rating - 0.5) * 2.0 * self.config.learning_rate as f64;
         for harmony in Harmony::all() {
             let name = harmony.name().to_string();
-            let current = self.importance_adjustments.get(&name).copied().unwrap_or(1.0);
+            let current = self
+                .importance_adjustments
+                .get(&name)
+                .copied()
+                .unwrap_or(1.0);
             let new_val = (current + adjustment_delta).clamp(0.5, 2.0);
             self.importance_adjustments.insert(name, new_val);
         }
@@ -479,11 +491,7 @@ mod tests {
 
         // Add some positive feedback
         for i in 0..5 {
-            let signal = loop_.create_signal(
-                format!("action{}", i),
-                FeedbackType::Explicit,
-                0.5
-            );
+            let signal = loop_.create_signal(format!("action{}", i), FeedbackType::Explicit, 0.5);
             loop_.history.push_back(signal);
         }
 

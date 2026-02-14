@@ -65,10 +65,10 @@
 // SUBMODULES
 // =============================================================================
 
+pub mod advanced;
+pub mod analysis;
 pub mod core;
 pub mod dynamics;
-pub mod analysis;
-pub mod advanced;
 pub mod streaming;
 
 #[cfg(test)]
@@ -84,96 +84,89 @@ pub use crate::hdc::unified_hv::ContinuousHV;
 
 // Core types (most commonly used)
 pub use core::{
-    ApproximationTier,
-    TieredPhiConfig,
-    TieredPhiStats,
-    TieredPhi,
-    IncrementalPhiState,
-    HierarchicalPhi,
-    PhiAttribution,
-    // Global functions
-    global_phi,
     auto_phi,
     auto_tier,
-    set_global_tier,
+    // Global functions
+    global_phi,
     global_phi_stats,
+    set_global_tier,
+    ApproximationTier,
+    HierarchicalPhi,
+    IncrementalPhiState,
+    PhiAttribution,
+    TieredPhi,
+    TieredPhiConfig,
+    TieredPhiStats,
 };
 
 // Dynamics types
 pub use dynamics::{
-    PhiDynamicsConfig,
-    PhiDynamics,
-    PhiDynamicsSnapshot,
-    PhiTrend,
-    TrendDirection,
-    PhaseTransition,
-    TransitionDirection,
-    TransitionType,
-    // Attractor types
-    AttractorConfig,
-    AttractorType,
-    AttractorResult,
-    PhiAttractor,
     analyze_phi_attractor,
     classify_consciousness_state,
+    // Attractor types
+    AttractorConfig,
+    AttractorResult,
+    AttractorType,
+    PhaseTransition,
+    PhiAttractor,
+    PhiDynamics,
+    PhiDynamicsConfig,
+    PhiDynamicsSnapshot,
+    PhiTrend,
+    TransitionDirection,
+    TransitionType,
+    TrendDirection,
 };
 
 // Analysis types
 pub use analysis::{
-    PhiPyramidConfig,
-    PhiPyramidResult,
-    PhiPyramid,
+    analyze_phi_complexity,
+    integrated_complexity,
     multi_scale_phi,
     optimal_scale,
+    PhiEntropyAnalyzer,
     // Entropy types
     PhiEntropyConfig,
     PhiEntropyResult,
-    PhiEntropyAnalyzer,
-    analyze_phi_complexity,
-    integrated_complexity,
+    PhiPyramid,
+    PhiPyramidConfig,
+    PhiPyramidResult,
 };
 
 // Advanced types
 pub use advanced::{
-    // Transfer types
-    PhiTransferConfig,
-    PhiSignature,
-    PhiTransferResult,
-    PhiTransfer,
-    transfer_from_ring,
-    compute_transfer_matrix,
-    // Intervention types
-    InterventionType,
-    CausalInterventionConfig,
-    NodeInterventionResult,
-    CausalAnalysisResult,
-    PhiCausalAnalyzer,
     analyze_causal_interventions,
-    find_critical_nodes,
+    analyze_network_modularity,
     compute_causal_power,
-    // Modularity types
-    ModuleDetectionMethod,
-    ModularityConfig,
+    compute_modularity_score,
+    compute_transfer_matrix,
+    detect_module_count,
+    find_critical_nodes,
+    transfer_from_ring,
+    CausalAnalysisResult,
+    CausalInterventionConfig,
     ConsciousnessModule,
     InterModuleRelation,
-    NodeRole,
-    NodeClassification,
+    // Intervention types
+    InterventionType,
+    ModularityConfig,
+    // Modularity types
+    ModuleDetectionMethod,
     NetworkModularityResult,
+    NodeClassification,
+    NodeInterventionResult,
+    NodeRole,
+    PhiCausalAnalyzer,
     PhiModularityAnalyzer,
-    analyze_network_modularity,
-    detect_module_count,
-    compute_modularity_score,
+    PhiSignature,
+    PhiTransfer,
+    // Transfer types
+    PhiTransferConfig,
+    PhiTransferResult,
 };
 
 // Streaming gradient types
 pub use streaming::{
-    GradientPrecision,
-    GradientConfig,
-    PhiGradient,
-    OptimizationAction,
-    GradientEvent,
-    StreamingPhiGradient,
-    GradientStats,
-    compute_phi_gradient,
-    compute_phi_gradient_fast,
+    compute_phi_gradient, compute_phi_gradient_fast, GradientConfig, GradientEvent,
+    GradientPrecision, GradientStats, OptimizationAction, PhiGradient, StreamingPhiGradient,
 };

@@ -64,7 +64,9 @@ fn test_g2p() {
             } else {
                 println!(
                     "  [WARN] '{}' -> {} phonemes but only {} unique (fallback mode?)",
-                    phrase, phoneme_count, unique_ids.len()
+                    phrase,
+                    phoneme_count,
+                    unique_ids.len()
                 );
             }
         }
@@ -101,11 +103,16 @@ fn test_kokoro_engine() {
             match engine.synthesize("Hello, this is a test.", None) {
                 Some(samples) => {
                     let duration_s = samples.len() as f32 / engine.sample_rate() as f32;
-                    println!("  [OK] Synthesis successful: {} samples ({:.2}s)", samples.len(), duration_s);
+                    println!(
+                        "  [OK] Synthesis successful: {} samples ({:.2}s)",
+                        samples.len(),
+                        duration_s
+                    );
 
                     // Check audio quality indicators
                     let max_amplitude = samples.iter().map(|x| x.abs()).fold(0.0f32, f32::max);
-                    let mean_amplitude = samples.iter().map(|x| x.abs()).sum::<f32>() / samples.len() as f32;
+                    let mean_amplitude =
+                        samples.iter().map(|x| x.abs()).sum::<f32>() / samples.len() as f32;
                     println!("  Max amplitude: {:.3}", max_amplitude);
                     println!("  Mean amplitude: {:.3}", mean_amplitude);
 
@@ -129,7 +136,7 @@ fn test_kokoro_engine() {
 }
 
 fn test_voice_output() {
-    use symthaea::voice::{VoiceOutput, VoiceOutputConfig, LTCPacing};
+    use symthaea::voice::{LTCPacing, VoiceOutput, VoiceOutputConfig};
 
     let config = VoiceOutputConfig {
         enable_tts: true,
@@ -149,7 +156,11 @@ fn test_voice_output() {
     match voice.synthesize(test_text) {
         Ok(samples) => {
             let duration_s = samples.len() as f32 / voice.config().sample_rate as f32;
-            println!("  [OK] Default synthesis: {} samples ({:.2}s)", samples.len(), duration_s);
+            println!(
+                "  [OK] Default synthesis: {} samples ({:.2}s)",
+                samples.len(),
+                duration_s
+            );
         }
         Err(e) => println!("  [FAIL] Synthesis failed: {}", e),
     }
@@ -159,7 +170,11 @@ fn test_voice_output() {
     match voice.synthesize_with_pacing(test_text, &calm_pacing) {
         Ok(samples) => {
             let duration_s = samples.len() as f32 / voice.config().sample_rate as f32;
-            println!("  [OK] Calm pacing synthesis: {} samples ({:.2}s)", samples.len(), duration_s);
+            println!(
+                "  [OK] Calm pacing synthesis: {} samples ({:.2}s)",
+                samples.len(),
+                duration_s
+            );
         }
         Err(e) => println!("  [FAIL] Calm synthesis failed: {}", e),
     }
@@ -169,7 +184,11 @@ fn test_voice_output() {
     match voice.synthesize_with_pacing(test_text, &excited_pacing) {
         Ok(samples) => {
             let duration_s = samples.len() as f32 / voice.config().sample_rate as f32;
-            println!("  [OK] Excited pacing synthesis: {} samples ({:.2}s)", samples.len(), duration_s);
+            println!(
+                "  [OK] Excited pacing synthesis: {} samples ({:.2}s)",
+                samples.len(),
+                duration_s
+            );
         }
         Err(e) => println!("  [FAIL] Excited synthesis failed: {}", e),
     }
@@ -179,6 +198,12 @@ fn test_voice_output() {
     println!("\n  Voice Statistics:");
     println!("    Total utterances: {}", stats.total_utterances);
     println!("    Total characters: {}", stats.total_chars);
-    println!("    Avg synthesis time: {:.2} ms", stats.avg_synthesis_time_ms);
-    println!("    Total audio generated: {:.2} s", stats.total_audio_seconds);
+    println!(
+        "    Avg synthesis time: {:.2} ms",
+        stats.avg_synthesis_time_ms
+    );
+    println!(
+        "    Total audio generated: {:.2} s",
+        stats.total_audio_seconds
+    );
 }

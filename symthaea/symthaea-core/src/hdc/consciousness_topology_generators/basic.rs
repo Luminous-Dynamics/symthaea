@@ -2,8 +2,8 @@
 //!
 //! Random, Star, Ring, Line, BinaryTree, DenseNetwork, Modular.
 
-use super::types::{ConsciousnessTopology, TopologyType};
 use super::super::unified_hv::ContinuousHV;
+use super::types::{ConsciousnessTopology, TopologyType};
 
 impl ConsciousnessTopology {
     /// Generate a random topology
@@ -20,9 +20,8 @@ impl ConsciousnessTopology {
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
         // Create unique basis vectors for each node
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         // For random topology, each node representation is just a random vector
         // This creates uniform similarity structure
@@ -37,9 +36,12 @@ impl ConsciousnessTopology {
         for i in 0..n_nodes {
             for j in (i + 1)..n_nodes {
                 // LCG: x_{n+1} = (a * x_n + c) mod m (using wrapping arithmetic for mod 2^64)
-                rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                rng_state = rng_state
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 // Use high bits for better randomness
-                if (rng_state >> 33) % 100 < 50 {  // ~50% probability
+                if (rng_state >> 33) % 100 < 50 {
+                    // ~50% probability
                     edges.push((i, j));
                 }
             }
@@ -104,15 +106,14 @@ impl ConsciousnessTopology {
         for (i, spoke_id) in spoke_ids.iter().enumerate() {
             let spoke_base = spoke_id.bind(hub_id);
             // Add 5% noise to each spoke (different for each spoke)
-            let spoke_noise = ContinuousHV::random(dim, seed + ((i + 1) as u64 * 100000)).scale(0.05_f32);
+            let spoke_noise =
+                ContinuousHV::random(dim, seed + ((i + 1) as u64 * 100000)).scale(0.05_f32);
             let spoke_repr = spoke_base.add(&spoke_noise);
             node_representations.push(spoke_repr);
         }
 
         // Star edges: hub (node 0) connected to all spokes (nodes 1..n)
-        let edges: Vec<(usize, usize)> = (1..n_nodes)
-            .map(|i| (0, i))
-            .collect();
+        let edges: Vec<(usize, usize)> = (1..n_nodes).map(|i| (0, i)).collect();
 
         Self {
             n_nodes,
@@ -137,9 +138,8 @@ impl ConsciousnessTopology {
         assert!(n_nodes >= 3, "Ring needs at least 3 nodes");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
 
@@ -156,9 +156,7 @@ impl ConsciousnessTopology {
         }
 
         // Ring edges: each node connects to next (wrapping)
-        let edges: Vec<(usize, usize)> = (0..n_nodes)
-            .map(|i| (i, (i + 1) % n_nodes))
-            .collect();
+        let edges: Vec<(usize, usize)> = (0..n_nodes).map(|i| (i, (i + 1) % n_nodes)).collect();
 
         Self {
             n_nodes,
@@ -183,9 +181,8 @@ impl ConsciousnessTopology {
         assert!(n_nodes >= 2, "Line needs at least 2 nodes");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
 
@@ -194,12 +191,12 @@ impl ConsciousnessTopology {
 
             // Connect to previous (if exists)
             if i > 0 {
-                connections.push(node_identities[i].bind(&node_identities[i-1]));
+                connections.push(node_identities[i].bind(&node_identities[i - 1]));
             }
 
             // Connect to next (if exists)
             if i < n_nodes - 1 {
-                connections.push(node_identities[i].bind(&node_identities[i+1]));
+                connections.push(node_identities[i].bind(&node_identities[i + 1]));
             }
 
             let repr = if connections.is_empty() {
@@ -213,9 +210,8 @@ impl ConsciousnessTopology {
         }
 
         // Line edges: sequential connections
-        let edges: Vec<(usize, usize)> = (0..n_nodes.saturating_sub(1))
-            .map(|i| (i, i + 1))
-            .collect();
+        let edges: Vec<(usize, usize)> =
+            (0..n_nodes.saturating_sub(1)).map(|i| (i, i + 1)).collect();
 
         Self {
             n_nodes,
@@ -241,9 +237,8 @@ impl ConsciousnessTopology {
         assert!(n_nodes >= 1, "Tree needs at least 1 node");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
 
@@ -319,9 +314,8 @@ impl ConsciousnessTopology {
         // k=None means complete graph (all-to-all connections), otherwise use specified k
         let k = k.map(|k| k.min(n_nodes - 1)).unwrap_or(n_nodes - 1);
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
 
@@ -350,7 +344,8 @@ impl ConsciousnessTopology {
         for i in 0..n_nodes {
             for offset in 1..=k {
                 let neighbor = (i + offset) % n_nodes;
-                if neighbor > i {  // Only add each edge once
+                if neighbor > i {
+                    // Only add each edge once
                     edges.push((i, neighbor));
                 }
             }
@@ -379,12 +374,14 @@ impl ConsciousnessTopology {
     /// * `seed` - Random seed for reproducibility
     pub fn modular(n_nodes: usize, dim: usize, n_modules: usize, _seed: u64) -> Self {
         assert!(n_nodes >= n_modules, "Need at least one node per module");
-        assert!(n_modules >= 2, "Need at least 2 modules for meaningful modularity");
+        assert!(
+            n_modules >= 2,
+            "Need at least 2 modules for meaningful modularity"
+        );
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
-            .map(|i| ContinuousHV::basis(i, dim))
-            .collect();
+        let node_identities: Vec<ContinuousHV> =
+            (0..n_nodes).map(|i| ContinuousHV::basis(i, dim)).collect();
 
         let nodes_per_module = n_nodes / n_modules;
 

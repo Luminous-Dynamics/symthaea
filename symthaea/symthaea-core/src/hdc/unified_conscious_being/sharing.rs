@@ -3,9 +3,9 @@
 //! Enables consciousness state export, agent synchronization, and
 //! participation in collective consciousness networks.
 
-use super::being::UnifiedConsciousBeing;
 use super::super::binary_hv::BinaryHV;
 use super::super::collective_consciousness::{CollectiveAgent, CommunicationLink};
+use super::being::UnifiedConsciousBeing;
 
 /// Consciousness state that can be shared with other agents
 #[derive(Debug, Clone)]
@@ -43,7 +43,9 @@ impl UnifiedConsciousBeing {
 
         // Create consciousness fingerprint from recent phi values
         let fingerprint = {
-            let seed = self.phi_history.iter()
+            let seed = self
+                .phi_history
+                .iter()
                 .fold(42u64, |acc, &p| acc.wrapping_add((p * 1000.0) as u64));
             BinaryHV::random(seed)
         };
@@ -86,7 +88,9 @@ impl UnifiedConsciousBeing {
     ) -> CommunicationLink {
         // Calculate shared representation from fingerprint similarity
         let my_state = self.export_consciousness_state(my_id);
-        let similarity = my_state.consciousness_fingerprint.similarity(&other_state.consciousness_fingerprint);
+        let similarity = my_state
+            .consciousness_fingerprint
+            .similarity(&other_state.consciousness_fingerprint);
 
         // Flow state alignment contributes to communication quality
         let flow_alignment = 1.0 - (my_state.flow_state - other_state.flow_state).abs();
@@ -95,7 +99,7 @@ impl UnifiedConsciousBeing {
             from: my_id.to_string(),
             to: other_id.to_string(),
             strength: (similarity as f64 * 0.5 + flow_alignment as f64 * 0.5).clamp(0.0, 1.0),
-            latency: 0.01, // Assume low latency in same network
+            latency: 0.01,  // Assume low latency in same network
             bandwidth: 1.0, // Full bandwidth
             shared_representation: similarity as f64,
         }
@@ -156,4 +160,3 @@ impl CollectiveContribution {
             + self.integration_potential * 0.2
     }
 }
-

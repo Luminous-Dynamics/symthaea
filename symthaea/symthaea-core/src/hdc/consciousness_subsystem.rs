@@ -34,7 +34,9 @@ pub struct SubsystemContext {
 impl SubsystemContext {
     /// Create an empty context.
     pub fn new() -> Self {
-        Self { data: HashMap::new() }
+        Self {
+            data: HashMap::new(),
+        }
     }
 
     /// Store a value. Overwrites any previous value with the same key.
@@ -124,8 +126,11 @@ pub trait ConsciousnessSubsystem: Send + Sync {
     ///
     /// Returns `Ok(())` on success, or a `SubsystemError` if processing fails.
     /// The pipeline collects errors and continues with remaining subsystems.
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV])
-        -> Result<(), SubsystemError>;
+    fn process_cycle(
+        &mut self,
+        state: &mut ConsciousnessState,
+        inputs: &[BinaryHV],
+    ) -> Result<(), SubsystemError>;
 
     /// Whether this subsystem is currently active.
     fn is_enabled(&self) -> bool;

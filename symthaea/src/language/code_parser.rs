@@ -231,7 +231,14 @@ pub struct CodeDiagnostic {
 impl std::fmt::Display for CodeDiagnostic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(ref span) = self.span {
-            write!(f, "[{:?}] {} at {}:{}", self.severity, self.message, span.start_line + 1, span.start_col + 1)
+            write!(
+                f,
+                "[{:?}] {} at {}:{}",
+                self.severity,
+                self.message,
+                span.start_line + 1,
+                span.start_col + 1
+            )
         } else {
             write!(f, "[{:?}] {}", self.severity, self.message)
         }
@@ -281,7 +288,9 @@ impl ParsedCode {
 
     /// Whether parsing produced errors
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == DiagnosticSeverity::Error)
+        self.diagnostics
+            .iter()
+            .any(|d| d.severity == DiagnosticSeverity::Error)
     }
 
     /// Get all entities of a specific kind
@@ -296,7 +305,9 @@ impl ParsedCode {
 
     /// Get source text for a span
     pub fn source_at(&self, span: &Span) -> &str {
-        self.source.get(span.start_byte..span.end_byte).unwrap_or("")
+        self.source
+            .get(span.start_byte..span.end_byte)
+            .unwrap_or("")
     }
 
     /// Iterate all entities recursively (depth-first)
@@ -347,7 +358,11 @@ pub trait CodeParser: Send + Sync {
 }
 
 /// Helper: collect all tree-sitter error/missing nodes into diagnostics
-pub fn collect_tree_errors(node: &tree_sitter::Node, source: &str, diagnostics: &mut Vec<CodeDiagnostic>) {
+pub fn collect_tree_errors(
+    node: &tree_sitter::Node,
+    source: &str,
+    diagnostics: &mut Vec<CodeDiagnostic>,
+) {
     if node.is_error() {
         let text: String = source[node.byte_range()].chars().take(50).collect();
         diagnostics.push(CodeDiagnostic {
@@ -397,9 +412,12 @@ mod tests {
     #[test]
     fn test_code_entity_builder() {
         let span = Span {
-            start_byte: 0, end_byte: 50,
-            start_line: 0, start_col: 0,
-            end_line: 2, end_col: 1,
+            start_byte: 0,
+            end_byte: 50,
+            start_line: 0,
+            start_col: 0,
+            end_line: 2,
+            end_col: 1,
         };
         let entity = CodeEntity::new(EntityKind::Function, "my_func", span)
             .with_source("fn my_func() {}")
@@ -408,25 +426,38 @@ mod tests {
 
         assert_eq!(entity.kind, EntityKind::Function);
         assert_eq!(entity.name, "my_func");
-        assert_eq!(entity.annotations.get("visibility"), Some(&"pub".to_string()));
+        assert_eq!(
+            entity.annotations.get("visibility"),
+            Some(&"pub".to_string())
+        );
         assert_eq!(entity.total_count(), 1);
     }
 
     #[test]
     fn test_code_entity_with_children() {
         let span = Span {
-            start_byte: 0, end_byte: 100,
-            start_line: 0, start_col: 0,
-            end_line: 10, end_col: 1,
+            start_byte: 0,
+            end_byte: 100,
+            start_line: 0,
+            start_col: 0,
+            end_line: 10,
+            end_col: 1,
         };
         let child_span = Span {
-            start_byte: 10, end_byte: 50,
-            start_line: 1, start_col: 4,
-            end_line: 3, end_col: 5,
+            start_byte: 10,
+            end_byte: 50,
+            start_line: 1,
+            start_col: 4,
+            end_line: 3,
+            end_col: 5,
         };
 
         let entity = CodeEntity::new(EntityKind::Struct, "MyStruct", span)
-            .with_child(CodeEntity::new(EntityKind::Method, "new", child_span.clone()))
+            .with_child(CodeEntity::new(
+                EntityKind::Method,
+                "new",
+                child_span.clone(),
+            ))
             .with_child(CodeEntity::new(EntityKind::Method, "run", child_span));
 
         assert_eq!(entity.total_count(), 3);
@@ -435,15 +466,24 @@ mod tests {
     #[test]
     fn test_parsed_code_entities_of_kind() {
         let span = Span {
-            start_byte: 0, end_byte: 10,
-            start_line: 0, start_col: 0,
-            end_line: 0, end_col: 10,
+            start_byte: 0,
+            end_byte: 10,
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 10,
         };
 
         let mut parsed = ParsedCode::new("fn a() {} fn b() {} struct C {}", "rust");
-        parsed.entities.push(CodeEntity::new(EntityKind::Function, "a", span.clone()));
-        parsed.entities.push(CodeEntity::new(EntityKind::Function, "b", span.clone()));
-        parsed.entities.push(CodeEntity::new(EntityKind::Struct, "C", span));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "a", span.clone()));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "b", span.clone()));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Struct, "C", span));
 
         assert_eq!(parsed.entities_of_kind(EntityKind::Function).len(), 2);
         assert_eq!(parsed.entities_of_kind(EntityKind::Struct).len(), 1);
@@ -453,16 +493,19 @@ mod tests {
     #[test]
     fn test_parsed_code_all_entities() {
         let span = Span {
-            start_byte: 0, end_byte: 10,
-            start_line: 0, start_col: 0,
-            end_line: 0, end_col: 10,
+            start_byte: 0,
+            end_byte: 10,
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 10,
         };
 
         let mut parsed = ParsedCode::new("", "rust");
         parsed.entities.push(
             CodeEntity::new(EntityKind::Struct, "S", span.clone())
                 .with_child(CodeEntity::new(EntityKind::Method, "m1", span.clone()))
-                .with_child(CodeEntity::new(EntityKind::Method, "m2", span))
+                .with_child(CodeEntity::new(EntityKind::Method, "m2", span)),
         );
 
         assert_eq!(parsed.all_entities().len(), 3);

@@ -44,11 +44,11 @@ use anyhow::Result;
 use std::collections::VecDeque;
 use std::f64::consts::PI;
 
-use crate::hdc::binary_hv::BinaryHV;
-use crate::consciousness::hierarchical_ltc::{HierarchicalLTC, HierarchicalConfig};
 use crate::consciousness::consciousness_equation_v2::{
-    ConsciousnessEquationV2, ConsciousnessStateV2, CoreComponent
+    ConsciousnessEquationV2, ConsciousnessStateV2, CoreComponent,
 };
+use crate::consciousness::hierarchical_ltc::{HierarchicalConfig, HierarchicalLTC};
+use crate::hdc::binary_hv::BinaryHV;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // OSCILLATORY BINDING (Gamma-Band Synchronization)
@@ -445,7 +445,13 @@ impl UnifiedConsciousnessPipeline {
         if self.config.enable_binding {
             // Convert semantic HV to channel activations
             let activations: Vec<f64> = (0..self.config.semantic_channels)
-                .map(|i| if semantic_hv.get_bit(i * 32) != 0 { 1.0 } else { 0.5 })
+                .map(|i| {
+                    if semantic_hv.get_bit(i * 32) != 0 {
+                        1.0
+                    } else {
+                        0.5
+                    }
+                })
                 .collect();
 
             self.binding_network.stimulate(&activations);
@@ -453,9 +459,7 @@ impl UnifiedConsciousnessPipeline {
         }
 
         // 3. Inject into hierarchical LTC
-        let ltc_input: Vec<f32> = sensory_input.iter()
-            .map(|&x| x as f32)
-            .collect();
+        let ltc_input: Vec<f32> = sensory_input.iter().map(|&x| x as f32).collect();
         self.ltc.inject_distributed(&ltc_input);
 
         // 4. Run LTC dynamics
@@ -496,7 +500,8 @@ impl UnifiedConsciousnessPipeline {
     fn update_consciousness_state(&mut self) {
         // Integration (Φ) from hierarchical LTC
         let phi = self.ltc.estimate_phi() as f64;
-        self.current_state.set_core(CoreComponent::Integration, phi.clamp(0.0, 1.0));
+        self.current_state
+            .set_core(CoreComponent::Integration, phi.clamp(0.0, 1.0));
 
         // Binding from oscillators
         let binding = self.binding_network.binding_coherence();
@@ -504,23 +509,28 @@ impl UnifiedConsciousnessPipeline {
 
         // Workspace from global integrator
         let workspace = self.ltc.workspace_access() as f64;
-        self.current_state.set_core(CoreComponent::Workspace, workspace.clamp(0.0, 1.0));
+        self.current_state
+            .set_core(CoreComponent::Workspace, workspace.clamp(0.0, 1.0));
 
         // Attention (based on activity concentration)
         let attention = self.compute_attention();
-        self.current_state.set_core(CoreComponent::Attention, attention);
+        self.current_state
+            .set_core(CoreComponent::Attention, attention);
 
         // Recursion (based on self-referential loops)
         let recursion = self.compute_recursion();
-        self.current_state.set_core(CoreComponent::Recursion, recursion);
+        self.current_state
+            .set_core(CoreComponent::Recursion, recursion);
 
         // Efficacy (based on causal accumulator)
         let efficacy = (self.causal_accumulator / (self.step as f64 + 1.0)).clamp(0.0, 1.0);
-        self.current_state.set_core(CoreComponent::Efficacy, efficacy);
+        self.current_state
+            .set_core(CoreComponent::Efficacy, efficacy);
 
         // Knowledge (based on semantic memory size)
         let knowledge = (self.semantic_memory.len() as f64 / 100.0).clamp(0.0, 1.0);
-        self.current_state.set_core(CoreComponent::Knowledge, knowledge);
+        self.current_state
+            .set_core(CoreComponent::Knowledge, knowledge);
     }
 
     /// Compute attention measure (activity concentration)
@@ -532,9 +542,7 @@ impl UnifiedConsciousnessPipeline {
 
         // Attention = normalized variance (high variance = focused attention)
         let mean = state.iter().sum::<f32>() / state.len() as f32;
-        let variance = state.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f32>() / state.len() as f32;
+        let variance = state.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / state.len() as f32;
 
         // Higher variance = more focused attention
         (variance.sqrt() as f64 * 2.0).clamp(0.0, 1.0)
@@ -564,9 +572,7 @@ impl UnifiedConsciousnessPipeline {
 
     /// Get current consciousness level
     pub fn consciousness_level(&self) -> f64 {
-        self.history.back()
-            .map(|m| m.consciousness)
-            .unwrap_or(0.0)
+        self.history.back().map(|m| m.consciousness).unwrap_or(0.0)
     }
 
     /// Get consciousness stream (recent history)
@@ -667,13 +673,20 @@ mod tests {
 
         let final_sync = binding.global_synchronization();
 
-        println!("Initial sync: {:.3}, Final sync: {:.3}", initial_sync, final_sync);
+        println!(
+            "Initial sync: {:.3}, Final sync: {:.3}",
+            initial_sync, final_sync
+        );
 
         // Both sync values should be in valid range [0, 1]
-        assert!((0.0..=1.0).contains(&final_sync),
-            "Final synchronization should be in valid range");
-        assert!((0.0..=1.0).contains(&initial_sync),
-            "Initial synchronization should be in valid range");
+        assert!(
+            (0.0..=1.0).contains(&final_sync),
+            "Final synchronization should be in valid range"
+        );
+        assert!(
+            (0.0..=1.0).contains(&initial_sync),
+            "Initial synchronization should be in valid range"
+        );
     }
 
     #[test]
@@ -718,9 +731,9 @@ mod tests {
 
         // Process varied input
         for i in 0..50 {
-            let input: Vec<f64> = (0..64).map(|j|
-                ((i + j) as f64 / 100.0).sin().abs()
-            ).collect();
+            let input: Vec<f64> = (0..64)
+                .map(|j| ((i + j) as f64 / 100.0).sin().abs())
+                .collect();
             pipeline.process(&input).unwrap();
         }
 

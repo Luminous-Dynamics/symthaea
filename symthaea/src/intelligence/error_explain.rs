@@ -42,7 +42,9 @@ impl ErrorCategory {
 
         if lower.contains("syntax error") || lower.contains("unexpected") {
             ErrorCategory::Syntax
-        } else if lower.contains("type") && (lower.contains("mismatch") || lower.contains("expected")) {
+        } else if lower.contains("type")
+            && (lower.contains("mismatch") || lower.contains("expected"))
+        {
             ErrorCategory::Type
         } else if lower.contains("attribute") && lower.contains("missing") {
             ErrorCategory::Missing
@@ -58,7 +60,8 @@ impl ErrorCategory {
             ErrorCategory::Dependency
         } else if lower.contains("permission") || lower.contains("access denied") {
             ErrorCategory::Permission
-        } else if lower.contains("network") || lower.contains("fetch") || lower.contains("download") {
+        } else if lower.contains("network") || lower.contains("fetch") || lower.contains("download")
+        {
             ErrorCategory::Network
         } else if lower.contains("hash mismatch") || lower.contains("sha256") {
             ErrorCategory::Hash
@@ -180,7 +183,8 @@ impl SemanticErrorExplainer {
             pattern: "value is a".to_string(),
             category: ErrorCategory::Type,
             summary: "Type mismatch in Nix expression".to_string(),
-            explanation: "A value of one type was used where another type was expected.".to_string(),
+            explanation: "A value of one type was used where another type was expected."
+                .to_string(),
             suggestions: vec![
                 "Check that you're not passing a string where a list is expected".to_string(),
                 "Ensure function arguments have the correct types".to_string(),
@@ -208,10 +212,12 @@ impl SemanticErrorExplainer {
             pattern: "undefined variable".to_string(),
             category: ErrorCategory::Undefined,
             summary: "Reference to undefined variable".to_string(),
-            explanation: "A variable was referenced that doesn't exist in the current scope.".to_string(),
+            explanation: "A variable was referenced that doesn't exist in the current scope."
+                .to_string(),
             suggestions: vec![
                 "Check variable name for typos".to_string(),
-                "Ensure the variable is defined in the correct let-binding or function argument".to_string(),
+                "Ensure the variable is defined in the correct let-binding or function argument"
+                    .to_string(),
                 "If using a package, make sure it's available in your pkgs argument".to_string(),
             ],
             confidence: 0.95,
@@ -222,7 +228,9 @@ impl SemanticErrorExplainer {
             pattern: "infinite recursion".to_string(),
             category: ErrorCategory::Recursion,
             summary: "Infinite recursion detected".to_string(),
-            explanation: "The configuration has a circular dependency where an option depends on itself.".to_string(),
+            explanation:
+                "The configuration has a circular dependency where an option depends on itself."
+                    .to_string(),
             suggestions: vec![
                 "Check for options that reference themselves".to_string(),
                 "Use mkDefault or mkForce to break cycles".to_string(),
@@ -292,7 +300,8 @@ impl SemanticErrorExplainer {
             pattern: "The option .* has conflicting".to_string(),
             category: ErrorCategory::Configuration,
             summary: "Configuration option conflict".to_string(),
-            explanation: "Multiple modules are trying to set the same option to different values.".to_string(),
+            explanation: "Multiple modules are trying to set the same option to different values."
+                .to_string(),
             suggestions: vec![
                 "Use mkForce to override the conflicting value".to_string(),
                 "Use mkDefault to set a lower-priority default".to_string(),
@@ -321,7 +330,8 @@ impl SemanticErrorExplainer {
 
         for pattern in &self.patterns {
             if lower.contains(&pattern.pattern.to_lowercase()) {
-                let score = pattern.confidence * (pattern.pattern.len() as f32 / lower.len() as f32);
+                let score =
+                    pattern.confidence * (pattern.pattern.len() as f32 / lower.len() as f32);
                 if score > best_score {
                     best_score = score;
                     best_match = Some(pattern);
@@ -336,12 +346,17 @@ impl SemanticErrorExplainer {
         };
 
         // Cache result
-        self.cache.insert(error_message.to_string(), explanation.clone());
+        self.cache
+            .insert(error_message.to_string(), explanation.clone());
 
         explanation
     }
 
-    fn create_explanation_from_pattern(&self, original: &str, pattern: &ErrorPattern) -> ErrorExplanation {
+    fn create_explanation_from_pattern(
+        &self,
+        original: &str,
+        pattern: &ErrorPattern,
+    ) -> ErrorExplanation {
         let mut explanation = ErrorExplanation::new(pattern.category.clone(), original);
 
         explanation.summary = pattern.summary.clone();
@@ -376,8 +391,11 @@ impl SemanticErrorExplainer {
             ErrorCategory::Unknown => "Error occurred".to_string(),
         };
 
-        explanation.explanation = "Unable to determine specific cause. Please review the full error message.".to_string();
-        explanation.suggestions.push("Check the NixOS manual for more information".to_string());
+        explanation.explanation =
+            "Unable to determine specific cause. Please review the full error message.".to_string();
+        explanation
+            .suggestions
+            .push("Check the NixOS manual for more information".to_string());
         explanation.confidence = 0.3;
 
         explanation
@@ -431,7 +449,10 @@ impl SemanticErrorExplainer {
             explanation.category.icon(),
             explanation.summary
         ));
-        output.push_str(&format!("Confidence: {:.0}%\n\n", explanation.confidence * 100.0));
+        output.push_str(&format!(
+            "Confidence: {:.0}%\n\n",
+            explanation.confidence * 100.0
+        ));
 
         output.push_str(&format!("{}\n\n", explanation.explanation));
 

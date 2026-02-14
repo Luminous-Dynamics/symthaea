@@ -391,7 +391,8 @@ impl TemporalSynchronizationAnalyzer {
     /// Compute phase from dimension value using oscillation model
     fn compute_phase(&self, dimension: ConsciousnessDimension, value: f64) -> f64 {
         // Get previous phase if available
-        let prev_phase = self.phase_history
+        let prev_phase = self
+            .phase_history
             .get(&dimension)
             .and_then(|h| h.back())
             .copied()
@@ -400,7 +401,6 @@ impl TemporalSynchronizationAnalyzer {
         // Phase advances based on value (higher value = faster oscillation)
         // This models active neural processing
         let phase_velocity = value * PI; // 0-π radians per step
-        
 
         (prev_phase + phase_velocity) % (2.0 * PI)
     }
@@ -496,9 +496,8 @@ impl TemporalSynchronizationAnalyzer {
     fn compute_recency_factor(&self) -> f64 {
         // Check temporal proximity of latest observations
         let now = Instant::now();
-        let binding_window = std::time::Duration::from_secs_f64(
-            self.config.binding_window_ms / 1000.0
-        );
+        let binding_window =
+            std::time::Duration::from_secs_f64(self.config.binding_window_ms / 1000.0);
 
         let mut within_window = 0;
         let mut total = 0;
@@ -522,7 +521,11 @@ impl TemporalSynchronizationAnalyzer {
     }
 
     /// Get pairwise coherence for specific dimensions
-    pub fn get_coherence(&self, dim_a: ConsciousnessDimension, dim_b: ConsciousnessDimension) -> f64 {
+    pub fn get_coherence(
+        &self,
+        dim_a: ConsciousnessDimension,
+        dim_b: ConsciousnessDimension,
+    ) -> f64 {
         self.coherence_matrix[dim_a.index()][dim_b.index()]
     }
 
@@ -620,7 +623,10 @@ impl TemporalSynchronizationAnalyzer {
         use ConsciousnessDimension::*;
 
         let has_sensory = pairs.iter().any(|(a, b)| {
-            matches!((a, b), (TemporalBinding, Workspace) | (Workspace, TemporalBinding))
+            matches!(
+                (a, b),
+                (TemporalBinding, Workspace) | (Workspace, TemporalBinding)
+            )
         });
 
         let has_cognitive = pairs.iter().any(|(a, b)| {
@@ -665,7 +671,8 @@ impl TemporalSynchronizationAnalyzer {
     ) -> String {
         match level {
             Some(BindingLevel::Sensory) => {
-                "Sensory binding disrupted. Increase temporal binding (B) or workspace access (W).".to_string()
+                "Sensory binding disrupted. Increase temporal binding (B) or workspace access (W)."
+                    .to_string()
             }
             Some(BindingLevel::Cognitive) => {
                 format!(
@@ -706,11 +713,10 @@ impl TemporalSynchronizationAnalyzer {
         for dim in &dims {
             let mut all_coherent = true;
             for other in &dims {
-                if dim != other
-                    && self.get_coherence(*dim, *other) < 0.7 {
-                        all_coherent = false;
-                        break;
-                    }
+                if dim != other && self.get_coherence(*dim, *other) < 0.7 {
+                    all_coherent = false;
+                    break;
+                }
             }
             if all_coherent {
                 locked.push(*dim);
@@ -818,13 +824,15 @@ impl TemporalSynchronizationAnalyzer {
         dim_a: ConsciousnessDimension,
         dim_b: ConsciousnessDimension,
     ) -> f64 {
-        let phase_a = self.phase_history
+        let phase_a = self
+            .phase_history
             .get(&dim_a)
             .and_then(|h| h.back())
             .copied()
             .unwrap_or(0.0);
 
-        let phase_b = self.phase_history
+        let phase_b = self
+            .phase_history
             .get(&dim_b)
             .and_then(|h| h.back())
             .copied()
@@ -959,10 +967,15 @@ mod tests {
         let warning = analyzer.detect_fragmentation();
         // With alternating desynchronized inputs, fragmentation is plausible
         if let Some(ref w) = warning {
-            assert!(w.severity >= 0.0 && w.severity <= 1.0,
-                "Fragmentation severity must be in [0,1]: {}", w.severity);
-            assert!(!w.fragmented_pairs.is_empty(),
-                "Warning should have at least one fragmented pair");
+            assert!(
+                w.severity >= 0.0 && w.severity <= 1.0,
+                "Fragmentation severity must be in [0,1]: {}",
+                w.severity
+            );
+            assert!(
+                !w.fragmented_pairs.is_empty(),
+                "Warning should have at least one fragmented pair"
+            );
         }
     }
 
@@ -1010,7 +1023,9 @@ mod tests {
         let report = analyzer.binding_report();
 
         assert!(report.synchronization_index >= 0.0 && report.synchronization_index <= 1.0);
-        assert!(report.phenomenal_binding_strength >= 0.0 && report.phenomenal_binding_strength <= 1.0);
+        assert!(
+            report.phenomenal_binding_strength >= 0.0 && report.phenomenal_binding_strength <= 1.0
+        );
         assert_eq!(report.stats.observations, 15 * 7);
     }
 

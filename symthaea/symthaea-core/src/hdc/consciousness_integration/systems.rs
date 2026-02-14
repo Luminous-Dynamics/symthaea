@@ -11,70 +11,63 @@ use super::super::binary_hv::BinaryHV;
 use super::super::unified_hv::ContinuousHV;
 
 // Integrated consciousness modules
-use super::super::metacognitive_monitor::MetacognitiveMonitor;
 use super::super::cross_modal_binding::CrossModalBinder;
-use super::super::temporal_binding::{TemporalBindingEngine, TemporalBindingConfig};
+use super::super::metacognitive_monitor::MetacognitiveMonitor;
+use super::super::temporal_binding::{TemporalBindingConfig, TemporalBindingEngine};
 
 // Phi-guided optimization
 use super::super::phi_guided_search::{
-    PhiGuidedOptimizer, PhiOptimizationConfig, ConsciousnessNetwork,
-    InitializationStrategy, OptimizationResult,
+    ConsciousnessNetwork, InitializationStrategy, OptimizationResult, PhiGuidedOptimizer,
+    PhiOptimizationConfig,
 };
 
 // Feedback dynamics
 use super::super::consciousness_feedback_dynamics::{
-    FeedbackDynamicsEngine, DreamInsight, EmotionalPrediction,
-    ProactiveIntervention,
+    DreamInsight, EmotionalPrediction, FeedbackDynamicsEngine, ProactiveIntervention,
 };
 
 // Recursive self-modeling
 use super::super::emergent_self_model::{
-    SelfAwareConsciousness, SelfModel, MetaCognitiveAssessment,
-    SelfAwareUpdate, IntrospectionReport,
+    IntrospectionReport, MetaCognitiveAssessment, SelfAwareConsciousness, SelfAwareUpdate,
+    SelfModel,
 };
 use super::super::unified_consciousness_engine::EngineConfig;
 
 // Meta-consciousness
-use super::super::meta_consciousness::{
-    MetaConsciousness, MetaConfig, MetaConsciousnessState,
-};
+use super::super::meta_consciousness::{MetaConfig, MetaConsciousness, MetaConsciousnessState};
 
 // Temporal consciousness
 use super::super::temporal_consciousness::{
-    TemporalConsciousness, TemporalConfig as TemporalConsciousnessConfig,
-    TemporalAssessment,
+    TemporalAssessment, TemporalConfig as TemporalConsciousnessConfig, TemporalConsciousness,
 };
 
 // Creativity
 use super::super::consciousness_creativity::{
-    ConsciousnessCreativity, CreativityConfig, CreativityAssessment,
-    CreativeMode, CreativeIdea,
+    ConsciousnessCreativity, CreativeIdea, CreativeMode, CreativityAssessment, CreativityConfig,
 };
 
 // Phase transitions
 use super::super::consciousness_phase_transitions::{
-    ConsciousnessPhaseTransitions, PhaseTransitionConfig,
-    ConsciousnessPhase, PhaseTransitionAssessment,
+    ConsciousnessPhase, ConsciousnessPhaseTransitions, PhaseTransitionAssessment,
+    PhaseTransitionConfig,
 };
 
 // Epistemic consciousness
 use super::super::epistemic_consciousness::{
-    EpistemicConsciousness, EpistemicConfig, KIndexAssessment,
+    EpistemicConfig, EpistemicConsciousness, KIndexAssessment,
 };
 
 // Fractal consciousness
-use super::super::fractal_consciousness::{
-    FractalConsciousness, FractalConfig, FractalMetrics,
-};
+use super::super::fractal_consciousness::{FractalConfig, FractalConsciousness, FractalMetrics};
 
 // Collective consciousness
 use super::super::collective_consciousness::{
-    CollectiveConsciousness, CollectiveConfig, CollectiveAgent, CollectiveAssessment,
+    CollectiveAgent, CollectiveAssessment, CollectiveConfig, CollectiveConsciousness,
 };
 
 // Phi feedback
-use super::super::phi_feedback::{PhiFeedbackController, PhiFeedbackConfig, FeedbackModulation};
 use super::super::consciousness_perf;
+use super::super::phi_feedback::{FeedbackModulation, PhiFeedbackConfig, PhiFeedbackController};
 
 // Adaptive topology
 use super::super::adaptive_topology::CognitiveMode;
@@ -83,9 +76,8 @@ use super::super::adaptive_topology::CognitiveMode;
 use super::super::consciousness_subsystem::ConsciousnessSubsystem;
 
 // Types from this module
-use super::types::*;
 use super::pipeline::ConsciousnessPipeline;
-
+use super::types::*;
 
 impl ConsciousnessPipeline {
     /// Enable all integrated consciousness systems
@@ -287,7 +279,11 @@ impl ConsciousnessPipeline {
     ///
     /// This records the current emotional state and runs prediction
     /// to anticipate future emotional trajectories and recommend interventions.
-    pub fn update_emotional_prediction(&mut self, valence: f64, arousal: f64) -> Option<EmotionalPrediction> {
+    pub fn update_emotional_prediction(
+        &mut self,
+        valence: f64,
+        arousal: f64,
+    ) -> Option<EmotionalPrediction> {
         if !self.feedback_dynamics_enabled {
             return None;
         }
@@ -343,8 +339,7 @@ impl ConsciousnessPipeline {
             }
             ProactiveIntervention::ConsolidateMemories => {
                 // Memory consolidation improves narrative coherence
-                self.state.narrative_coherence =
-                    (self.state.narrative_coherence + 0.15).min(1.0);
+                self.state.narrative_coherence = (self.state.narrative_coherence + 0.15).min(1.0);
             }
             ProactiveIntervention::ModeSwitch(mode_name) => {
                 // Switch cognitive mode
@@ -450,7 +445,9 @@ impl ConsciousnessPipeline {
 
     /// Perform introspection - get a report on what the system believes about itself
     pub fn introspect(&self) -> Option<IntrospectionReport> {
-        self.self_aware_consciousness.as_ref().map(|sac| sac.introspect())
+        self.self_aware_consciousness
+            .as_ref()
+            .map(|sac| sac.introspect())
     }
 
     /// Process input with self-awareness
@@ -573,7 +570,11 @@ impl ConsciousnessPipeline {
     }
 
     /// Enable meta-consciousness with custom config
-    pub fn enable_meta_consciousness_with_config(&mut self, num_components: usize, config: MetaConfig) -> &mut Self {
+    pub fn enable_meta_consciousness_with_config(
+        &mut self,
+        num_components: usize,
+        config: MetaConfig,
+    ) -> &mut Self {
         self.meta_consciousness = Some(MetaConsciousness::new(num_components, config));
         self.meta_consciousness_enabled = true;
         self
@@ -623,7 +624,11 @@ impl ConsciousnessPipeline {
     }
 
     /// Enable temporal consciousness with custom config
-    pub fn enable_temporal_consciousness_with_config(&mut self, num_components: usize, config: TemporalConsciousnessConfig) -> &mut Self {
+    pub fn enable_temporal_consciousness_with_config(
+        &mut self,
+        num_components: usize,
+        config: TemporalConsciousnessConfig,
+    ) -> &mut Self {
         self.temporal_consciousness = Some(TemporalConsciousness::new(num_components, config));
         self.temporal_consciousness_enabled = true;
         self
@@ -749,7 +754,10 @@ impl ConsciousnessPipeline {
     }
 
     /// Enable phase transitions with custom config
-    pub fn enable_phase_transitions_with_config(&mut self, config: PhaseTransitionConfig) -> &mut Self {
+    pub fn enable_phase_transitions_with_config(
+        &mut self,
+        config: PhaseTransitionConfig,
+    ) -> &mut Self {
         self.phase_transitions = Some(ConsciousnessPhaseTransitions::new(config));
         self.phase_transitions_enabled = true;
         self
@@ -775,7 +783,10 @@ impl ConsciousnessPipeline {
         if let Some(ref mut pt) = self.phase_transitions {
             // Observe with current Φ and conscious contents
             // Extract BinaryHV vectors from WorkspaceItems
-            let state: Vec<BinaryHV> = self.state.conscious_contents.iter()
+            let state: Vec<BinaryHV> = self
+                .state
+                .conscious_contents
+                .iter()
                 .map(|item| item.content)
                 .collect();
             pt.observe(self.state.phi, state);
@@ -810,7 +821,11 @@ impl ConsciousnessPipeline {
     }
 
     /// Enable epistemic consciousness with custom config
-    pub fn enable_epistemic_with_config(&mut self, num_components: usize, config: EpistemicConfig) -> &mut Self {
+    pub fn enable_epistemic_with_config(
+        &mut self,
+        num_components: usize,
+        config: EpistemicConfig,
+    ) -> &mut Self {
         self.epistemic_consciousness = Some(EpistemicConsciousness::new(num_components, config));
         self.epistemic_enabled = true;
         self
@@ -847,7 +862,7 @@ impl ConsciousnessPipeline {
         let config = FractalConfig {
             n_scales,
             nodes_per_scale: 8,
-            bridge_ratio: 0.425,  // Optimal from research
+            bridge_ratio: 0.425, // Optimal from research
             density: 0.10,
             cross_scale_coupling: 0.3,
             dim: 2048,
@@ -911,7 +926,11 @@ impl ConsciousnessPipeline {
     }
 
     /// Enable collective consciousness with custom config
-    pub fn enable_collective_with_config(&mut self, agent_id: &str, config: CollectiveConfig) -> &mut Self {
+    pub fn enable_collective_with_config(
+        &mut self,
+        agent_id: &str,
+        config: CollectiveConfig,
+    ) -> &mut Self {
         self.collective_consciousness = Some(CollectiveConsciousness::with_config(config));
         self.collective_agent_id = Some(agent_id.to_string());
         self.collective_enabled = true;
@@ -1022,7 +1041,9 @@ impl ConsciousnessPipeline {
     }
 
     /// Get the latest verification report (None until the first verification runs).
-    pub fn latest_verification(&self) -> Option<&super::super::consciousness_verifier::VerificationReport> {
+    pub fn latest_verification(
+        &self,
+    ) -> Option<&super::super::consciousness_verifier::VerificationReport> {
         self.latest_verification.as_ref()
     }
 
@@ -1039,7 +1060,8 @@ impl ConsciousnessPipeline {
         sub.on_register();
         self.subsystems.push(sub);
         // Re-sort by descending priority so highest-priority subsystems run first
-        self.subsystems.sort_by(|a, b| b.priority().cmp(&a.priority()));
+        self.subsystems
+            .sort_by(|a, b| b.priority().cmp(&a.priority()));
     }
 
     /// Get the number of registered subsystems.
@@ -1050,7 +1072,9 @@ impl ConsciousnessPipeline {
     /// Get errors from the most recent `process()` cycle's subsystem dispatch.
     ///
     /// Returns an empty slice if no subsystem errors occurred.
-    pub fn last_subsystem_errors(&self) -> &[super::super::consciousness_subsystem::SubsystemError] {
+    pub fn last_subsystem_errors(
+        &self,
+    ) -> &[super::super::consciousness_subsystem::SubsystemError] {
         &self.subsystem_errors
     }
 
@@ -1128,14 +1152,14 @@ impl ConsciousnessPipeline {
         self.enable_self_awareness(1024, 16); // 1024 dim, 16 processes
 
         // Enable ADVANCED systems
-        self.enable_meta_consciousness(8);      // 8 components for meta-reflection
-        self.enable_temporal_consciousness(8);   // 8 components for multi-scale time
-        self.enable_creativity();                // Creative generation
-        self.enable_phase_transitions();         // State transition detection
-        self.enable_epistemic(8);                // 8 components for belief tracking
-        self.enable_fractal(3);                  // 3 scales for fractal Φ
-        self.enable_collective("primary");       // Primary agent in collective
-        self.enable_phi_feedback();              // Φ feedback loop (closes the loop)
+        self.enable_meta_consciousness(8); // 8 components for meta-reflection
+        self.enable_temporal_consciousness(8); // 8 components for multi-scale time
+        self.enable_creativity(); // Creative generation
+        self.enable_phase_transitions(); // State transition detection
+        self.enable_epistemic(8); // 8 components for belief tracking
+        self.enable_fractal(3); // 3 scales for fractal Φ
+        self.enable_collective("primary"); // Primary agent in collective
+        self.enable_phi_feedback(); // Φ feedback loop (closes the loop)
 
         self
     }
@@ -1162,7 +1186,7 @@ impl ConsciousnessPipeline {
         self.enable_epistemic(phi_nodes);
         self.enable_fractal(3);
         self.enable_collective("primary");
-        self.enable_phi_feedback();              // Φ feedback loop (closes the loop)
+        self.enable_phi_feedback(); // Φ feedback loop (closes the loop)
 
         self
     }
@@ -1188,36 +1212,84 @@ impl ConsciousnessPipeline {
     /// Check how many consciousness systems are active
     pub fn active_system_count(&self) -> usize {
         let mut count = 0;
-        if self.has_integrated_systems() { count += 1; }
-        if self.has_phi_optimization() { count += 1; }
-        if self.has_feedback_dynamics() { count += 1; }
-        if self.has_self_awareness() { count += 1; }
-        if self.has_meta_consciousness() { count += 1; }
-        if self.has_temporal_consciousness() { count += 1; }
-        if self.has_creativity() { count += 1; }
-        if self.has_phase_transitions() { count += 1; }
-        if self.has_epistemic() { count += 1; }
-        if self.has_fractal() { count += 1; }
-        if self.has_collective() { count += 1; }
-        if self.has_phi_feedback() { count += 1; }
+        if self.has_integrated_systems() {
+            count += 1;
+        }
+        if self.has_phi_optimization() {
+            count += 1;
+        }
+        if self.has_feedback_dynamics() {
+            count += 1;
+        }
+        if self.has_self_awareness() {
+            count += 1;
+        }
+        if self.has_meta_consciousness() {
+            count += 1;
+        }
+        if self.has_temporal_consciousness() {
+            count += 1;
+        }
+        if self.has_creativity() {
+            count += 1;
+        }
+        if self.has_phase_transitions() {
+            count += 1;
+        }
+        if self.has_epistemic() {
+            count += 1;
+        }
+        if self.has_fractal() {
+            count += 1;
+        }
+        if self.has_collective() {
+            count += 1;
+        }
+        if self.has_phi_feedback() {
+            count += 1;
+        }
         count
     }
 
     /// Get a human-readable summary of active systems
     pub fn active_systems_summary(&self) -> String {
         let mut systems = Vec::new();
-        if self.has_integrated_systems() { systems.push("Integrated"); }
-        if self.has_phi_optimization() { systems.push("Φ-Optimization"); }
-        if self.has_feedback_dynamics() { systems.push("Feedback"); }
-        if self.has_self_awareness() { systems.push("Self-Awareness"); }
-        if self.has_meta_consciousness() { systems.push("Meta-Consciousness"); }
-        if self.has_temporal_consciousness() { systems.push("Temporal"); }
-        if self.has_creativity() { systems.push("Creativity"); }
-        if self.has_phase_transitions() { systems.push("Phase-Transitions"); }
-        if self.has_epistemic() { systems.push("Epistemic"); }
-        if self.has_fractal() { systems.push("Fractal"); }
-        if self.has_collective() { systems.push("Collective"); }
-        if self.has_phi_feedback() { systems.push("Φ-Feedback"); }
+        if self.has_integrated_systems() {
+            systems.push("Integrated");
+        }
+        if self.has_phi_optimization() {
+            systems.push("Φ-Optimization");
+        }
+        if self.has_feedback_dynamics() {
+            systems.push("Feedback");
+        }
+        if self.has_self_awareness() {
+            systems.push("Self-Awareness");
+        }
+        if self.has_meta_consciousness() {
+            systems.push("Meta-Consciousness");
+        }
+        if self.has_temporal_consciousness() {
+            systems.push("Temporal");
+        }
+        if self.has_creativity() {
+            systems.push("Creativity");
+        }
+        if self.has_phase_transitions() {
+            systems.push("Phase-Transitions");
+        }
+        if self.has_epistemic() {
+            systems.push("Epistemic");
+        }
+        if self.has_fractal() {
+            systems.push("Fractal");
+        }
+        if self.has_collective() {
+            systems.push("Collective");
+        }
+        if self.has_phi_feedback() {
+            systems.push("Φ-Feedback");
+        }
         format!("{}/{} systems: [{}]", systems.len(), 12, systems.join(", "))
     }
 
@@ -1238,10 +1310,14 @@ impl ConsciousnessPipeline {
 
             // Self-awareness metrics
             self_awareness_level: self.self_awareness_level,
-            prediction_accuracy: self.latest_introspection.as_ref()
+            prediction_accuracy: self
+                .latest_introspection
+                .as_ref()
                 .map(|r| r.prediction_accuracy)
                 .unwrap_or(0.0),
-            self_model_confidence: self.current_self_model.as_ref()
+            self_model_confidence: self
+                .current_self_model
+                .as_ref()
                 .map(|m| m.confidence)
                 .unwrap_or(0.0),
 
@@ -1268,7 +1344,9 @@ impl ConsciousnessPipeline {
                 system: "phi".to_string(),
                 priority: RecommendationPriority::High,
                 message: "Φ is low - consider increasing integration through binding".to_string(),
-                suggested_action: Some("Increase input complexity or enable Φ optimization".to_string()),
+                suggested_action: Some(
+                    "Increase input complexity or enable Φ optimization".to_string(),
+                ),
             });
         }
 
@@ -1299,7 +1377,9 @@ impl ConsciousnessPipeline {
                     system: "metacognition".to_string(),
                     priority: RecommendationPriority::High,
                     message: format!("Meta-cognitive assessment: {}", assessment.reasoning),
-                    suggested_action: assessment.recommended_mode.as_ref()
+                    suggested_action: assessment
+                        .recommended_mode
+                        .as_ref()
                         .map(|m| format!("Switch to {:?} mode", m)),
                 });
             }
@@ -1338,7 +1418,9 @@ impl ConsciousnessPipeline {
 
         // Run Φ optimization if enabled and due
         if self.phi_optimization_enabled
-            && self.current_cycle.is_multiple_of(self.optimize_every_n_cycles as u64)
+            && self
+                .current_cycle
+                .is_multiple_of(self.optimize_every_n_cycles as u64)
         {
             self.process_phi_optimization();
             summary.phi_optimized = true;

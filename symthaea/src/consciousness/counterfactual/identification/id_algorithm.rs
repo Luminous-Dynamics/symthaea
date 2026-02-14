@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::dag::{
-    CausalDAG, CausalEstimand, CausalQuery, CausalQueryOutcome,
-    IdentificationMethod, UnidentifiedReason,
+    CausalDAG, CausalEstimand, CausalQuery, CausalQueryOutcome, IdentificationMethod,
+    UnidentifiedReason,
 };
 use super::reasoner::CounterfactualReasoner;
 
@@ -38,7 +38,11 @@ impl CausalGraphWithLatents {
         directed: Vec<(usize, usize)>,
         bidirected: Vec<(usize, usize)>,
     ) -> Self {
-        Self { nodes, directed, bidirected }
+        Self {
+            nodes,
+            directed,
+            bidirected,
+        }
     }
 
     /// Convert to standard CausalDAG (loses bidirected information).
@@ -48,7 +52,8 @@ impl CausalGraphWithLatents {
 
     /// Get parents of a node (directed edges only).
     pub fn parents(&self, node: usize) -> Vec<usize> {
-        self.directed.iter()
+        self.directed
+            .iter()
             .filter(|(_, c)| *c == node)
             .map(|(p, _)| *p)
             .collect()
@@ -56,7 +61,8 @@ impl CausalGraphWithLatents {
 
     /// Get children of a node (directed edges only).
     pub fn children(&self, node: usize) -> Vec<usize> {
-        self.directed.iter()
+        self.directed
+            .iter()
             .filter(|(p, _)| *p == node)
             .map(|(_, c)| *c)
             .collect()
@@ -155,16 +161,18 @@ impl CausalGraphWithLatents {
             node_map.insert(old_idx, new_idx);
         }
 
-        let new_nodes: Vec<String> = node_list.iter()
-            .map(|&i| self.nodes[i].clone())
-            .collect();
+        let new_nodes: Vec<String> = node_list.iter().map(|&i| self.nodes[i].clone()).collect();
 
-        let new_directed: Vec<(usize, usize)> = self.directed.iter()
+        let new_directed: Vec<(usize, usize)> = self
+            .directed
+            .iter()
             .filter(|(p, c)| nodes.contains(p) && nodes.contains(c))
             .map(|(p, c)| (node_map[p], node_map[c]))
             .collect();
 
-        let new_bidirected: Vec<(usize, usize)> = self.bidirected.iter()
+        let new_bidirected: Vec<(usize, usize)> = self
+            .bidirected
+            .iter()
             .filter(|(a, b)| nodes.contains(a) && nodes.contains(b))
             .map(|(a, b)| (node_map[a], node_map[b]))
             .collect();
@@ -243,12 +251,16 @@ impl CausalExpression {
     /// Convert to human-readable string.
     pub fn to_string(&self, nodes: &[String]) -> String {
         match self {
-            CausalExpression::Probability { outcome, conditioning } => {
+            CausalExpression::Probability {
+                outcome,
+                conditioning,
+            } => {
                 let out_names: Vec<&str> = outcome.iter().map(|&i| nodes[i].as_str()).collect();
                 if conditioning.is_empty() {
                     format!("P({})", out_names.join(","))
                 } else {
-                    let cond_names: Vec<&str> = conditioning.iter().map(|&i| nodes[i].as_str()).collect();
+                    let cond_names: Vec<&str> =
+                        conditioning.iter().map(|&i| nodes[i].as_str()).collect();
                     format!("P({}|{})", out_names.join(","), cond_names.join(","))
                 }
             }
@@ -260,8 +272,15 @@ impl CausalExpression {
                 let inner: Vec<String> = exprs.iter().map(|e| e.to_string(nodes)).collect();
                 inner.join(" × ")
             }
-            CausalExpression::Fraction { numerator, denominator } => {
-                format!("[{}] / [{}]", numerator.to_string(nodes), denominator.to_string(nodes))
+            CausalExpression::Fraction {
+                numerator,
+                denominator,
+            } => {
+                format!(
+                    "[{}] / [{}]",
+                    numerator.to_string(nodes),
+                    denominator.to_string(nodes)
+                )
             }
         }
     }
@@ -336,14 +355,18 @@ impl IDAlgorithm {
         if x.is_empty() {
             let outcome_vars: Vec<usize> = y.iter().copied().collect();
             let conditioning: Vec<usize> = Vec::new();
-            return Ok(CausalExpression::Probability { outcome: outcome_vars, conditioning });
+            return Ok(CausalExpression::Probability {
+                outcome: outcome_vars,
+                conditioning,
+            });
         }
 
         // Line 2: Compute ancestors of Y in G
         let ancestors_y = self.ancestors_of_set(graph, y);
 
         // If there are variables not ancestors of Y, marginalize them out
-        let relevant: HashSet<usize> = v.iter()
+        let relevant: HashSet<usize> = v
+            .iter()
             .filter(|&&n| ancestors_y.contains(&n) || y.contains(&n))
             .copied()
             .collect();
@@ -360,7 +383,8 @@ impl IDAlgorithm {
         let an_y_in_g_x_bar = self.ancestors_of_set(&g_x_bar, y);
 
         let v_minus_x: HashSet<usize> = v.difference(x).copied().collect();
-        let w: HashSet<usize> = v_minus_x.difference(&an_y_in_g_x_bar)
+        let w: HashSet<usize> = v_minus_x
+            .difference(&an_y_in_g_x_bar)
             .filter(|&&n| !y.contains(&n))
             .copied()
             .collect();
@@ -378,7 +402,8 @@ impl IDAlgorithm {
 
         // Map component indices back to original graph indices
         let v_minus_x_vec: Vec<usize> = v_minus_x_set.iter().copied().collect();
-        let mapped_components: Vec<HashSet<usize>> = c_components.iter()
+        let mapped_components: Vec<HashSet<usize>> = c_components
+            .iter()
             .map(|comp| comp.iter().map(|&i| v_minus_x_vec[i]).collect())
             .collect();
 
@@ -394,7 +419,8 @@ impl IDAlgorithm {
             }
 
             // Sum over variables not in Y or X
-            let sum_over: Vec<usize> = v.iter()
+            let sum_over: Vec<usize> = v
+                .iter()
                 .filter(|&&n| !y.contains(&n) && !x.contains(&n))
                 .copied()
                 .collect();
@@ -421,37 +447,49 @@ impl IDAlgorithm {
         let full_c_components = graph.c_components();
 
         // Find the C-component containing S
-        let s_prime: Option<HashSet<usize>> = full_c_components.into_iter()
+        let s_prime: Option<HashSet<usize>> = full_c_components
+            .into_iter()
             .find(|c| CausalGraphWithLatents::is_subset(&s, c));
 
         // Additional check: S being equal to its C-component is only a hedge if S
         // actually has bidirected edges (i.e., is confounded). A singleton node
         // with no bidirected edges is trivially identifiable.
-        let s_has_bidirected = graph.bidirected.iter().any(|(a, b)| {
-            s.contains(a) && s.contains(b)
-        });
+        let s_has_bidirected = graph
+            .bidirected
+            .iter()
+            .any(|(a, b)| s.contains(a) && s.contains(b));
 
         match s_prime {
             Some(ref c_prime) if c_prime == &s && s_has_bidirected => {
                 // Line 6: S is a C-component in G AND S has internal bidirected edges
                 // This represents a true hedge (confounded structure)
                 let hedge_nodes: Vec<usize> = s.iter().copied().collect();
-                Err((hedge_nodes.clone(), format!(
-                    "Hedge found: C-component {:?} is a hedge for the causal effect",
-                    hedge_nodes.iter().map(|&i| &graph.nodes[i]).collect::<Vec<_>>()
-                )))
+                Err((
+                    hedge_nodes.clone(),
+                    format!(
+                        "Hedge found: C-component {:?} is a hedge for the causal effect",
+                        hedge_nodes
+                            .iter()
+                            .map(|&i| &graph.nodes[i])
+                            .collect::<Vec<_>>()
+                    ),
+                ))
             }
             Some(ref c_prime) if c_prime == &s => {
                 // S equals its C-component but has no internal bidirected edges
                 // This is a trivially identifiable case - just use P(s | pa(s))
                 let outcome_vars: Vec<usize> = y.iter().copied().collect();
-                let conditioning: Vec<usize> = s.iter()
+                let conditioning: Vec<usize> = s
+                    .iter()
                     .flat_map(|&node| graph.parents(node))
                     .filter(|&p| !s.contains(&p))
                     .collect::<HashSet<_>>()
                     .into_iter()
                     .collect();
-                Ok(CausalExpression::Probability { outcome: outcome_vars, conditioning })
+                Ok(CausalExpression::Probability {
+                    outcome: outcome_vars,
+                    conditioning,
+                })
             }
             Some(ref c_prime) => {
                 // Line 7: S ⊂ S' - use factorization
@@ -473,13 +511,22 @@ impl IDAlgorithm {
                     // Check if there's a direct edge X → Y
                     let x_node = *x.iter().next().unwrap();
                     let s_node = *s.iter().next().unwrap();
-                    let direct_edge = graph.directed.iter().any(|&(p, c)| p == x_node && c == s_node);
+                    let direct_edge = graph
+                        .directed
+                        .iter()
+                        .any(|&(p, c)| p == x_node && c == s_node);
                     if direct_edge {
                         let hedge_nodes: Vec<usize> = c_prime.iter().copied().collect();
-                        return Err((hedge_nodes.clone(), format!(
-                            "Hedge found: treatment and outcome directly confounded {:?}",
-                            hedge_nodes.iter().map(|&i| &graph.nodes[i]).collect::<Vec<_>>()
-                        )));
+                        return Err((
+                            hedge_nodes.clone(),
+                            format!(
+                                "Hedge found: treatment and outcome directly confounded {:?}",
+                                hedge_nodes
+                                    .iter()
+                                    .map(|&i| &graph.nodes[i])
+                                    .collect::<Vec<_>>()
+                            ),
+                        ));
                     }
                 }
 
@@ -527,7 +574,11 @@ impl IDAlgorithm {
     }
 
     /// Compute ancestors of a set of nodes.
-    fn ancestors_of_set(&self, graph: &CausalGraphWithLatents, nodes: &HashSet<usize>) -> HashSet<usize> {
+    fn ancestors_of_set(
+        &self,
+        graph: &CausalGraphWithLatents,
+        nodes: &HashSet<usize>,
+    ) -> HashSet<usize> {
         let mut result = nodes.clone();
         for &node in nodes {
             result.extend(graph.ancestors(node));
@@ -536,21 +587,27 @@ impl IDAlgorithm {
     }
 
     /// Create a graph with incoming edges to X removed.
-    fn remove_incoming(&self, graph: &CausalGraphWithLatents, x: &HashSet<usize>) -> CausalGraphWithLatents {
-        let new_directed: Vec<(usize, usize)> = graph.directed.iter()
+    fn remove_incoming(
+        &self,
+        graph: &CausalGraphWithLatents,
+        x: &HashSet<usize>,
+    ) -> CausalGraphWithLatents {
+        let new_directed: Vec<(usize, usize)> = graph
+            .directed
+            .iter()
             .filter(|(_, child)| !x.contains(child))
             .copied()
             .collect();
 
-        CausalGraphWithLatents::new(
-            graph.nodes.clone(),
-            new_directed,
-            graph.bidirected.clone(),
-        )
+        CausalGraphWithLatents::new(graph.nodes.clone(), new_directed, graph.bidirected.clone())
     }
 
     /// Topological sort of a subset of nodes.
-    fn topological_sort_subset(&self, graph: &CausalGraphWithLatents, nodes: &HashSet<usize>) -> Vec<usize> {
+    fn topological_sort_subset(
+        &self,
+        graph: &CausalGraphWithLatents,
+        nodes: &HashSet<usize>,
+    ) -> Vec<usize> {
         let mut result = Vec::new();
         let mut visited = HashSet::new();
         let mut temp_mark = HashSet::new();
@@ -587,7 +644,14 @@ impl IDAlgorithm {
         }
 
         for &node in nodes {
-            visit(node, graph, nodes, &mut visited, &mut temp_mark, &mut result);
+            visit(
+                node,
+                graph,
+                nodes,
+                &mut visited,
+                &mut temp_mark,
+                &mut result,
+            );
         }
 
         result.reverse();
@@ -595,11 +659,7 @@ impl IDAlgorithm {
     }
 
     /// Convenience method: query using the ID algorithm.
-    pub fn query(
-        &self,
-        graph: &CausalGraphWithLatents,
-        query: &CausalQuery,
-    ) -> CausalQueryOutcome {
+    pub fn query(&self, graph: &CausalGraphWithLatents, query: &CausalQuery) -> CausalQueryOutcome {
         match self.identify(graph, &[query.treatment], &[query.outcome]) {
             Ok(expression) => {
                 CausalQueryOutcome::Identified {
@@ -612,16 +672,14 @@ impl IDAlgorithm {
                     confidence: 0.95,
                 }
             }
-            Err((hedge_nodes, _description)) => {
-                CausalQueryOutcome::Unidentified {
-                    reason: UnidentifiedReason::HedgeFound { hedge_nodes },
-                    missing: vec![],
-                    suggestions: vec![
-                        "The causal effect is not identifiable from observational data".to_string(),
-                        "Consider running a randomized experiment".to_string(),
-                    ],
-                }
-            }
+            Err((hedge_nodes, _description)) => CausalQueryOutcome::Unidentified {
+                reason: UnidentifiedReason::HedgeFound { hedge_nodes },
+                missing: vec![],
+                suggestions: vec![
+                    "The causal effect is not identifiable from observational data".to_string(),
+                    "Consider running a randomized experiment".to_string(),
+                ],
+            },
         }
     }
 }
@@ -677,9 +735,14 @@ impl CausalReferenceHarness {
             return HarnessResult::Passed;
         }
 
-        let matches = self.test_suite.iter()
+        let matches = self
+            .test_suite
+            .iter()
             .filter(|(dag, query, _exact)| {
-                matches!(engine.query(dag, query), CausalQueryOutcome::Identified { .. })
+                matches!(
+                    engine.query(dag, query),
+                    CausalQueryOutcome::Identified { .. }
+                )
             })
             .count();
 
@@ -701,21 +764,42 @@ impl CausalReferenceHarness {
             vec!["X".into(), "M".into(), "Y".into()],
             vec![(0, 1), (1, 2)],
         );
-        suite.push((chain, CausalQuery { treatment: 0, outcome: 2, conditioning: vec![] }, 0.0));
+        suite.push((
+            chain,
+            CausalQuery {
+                treatment: 0,
+                outcome: 2,
+                conditioning: vec![],
+            },
+            0.0,
+        ));
 
         // Test 2: Confounded X ← U → Y, X → Y (backdoor via U)
         let confounded = CausalDAG::new(
             vec!["X".into(), "Y".into(), "U".into()],
             vec![(2, 0), (2, 1), (0, 1)],
         );
-        suite.push((confounded, CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] }, 0.0));
+        suite.push((
+            confounded,
+            CausalQuery {
+                treatment: 0,
+                outcome: 1,
+                conditioning: vec![],
+            },
+            0.0,
+        ));
 
         // Test 3: Direct cause X → Y (trivially identifiable)
-        let direct = CausalDAG::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-        );
-        suite.push((direct, CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] }, 0.0));
+        let direct = CausalDAG::new(vec!["X".into(), "Y".into()], vec![(0, 1)]);
+        suite.push((
+            direct,
+            CausalQuery {
+                treatment: 0,
+                outcome: 1,
+                conditioning: vec![],
+            },
+            0.0,
+        ));
 
         // Test 4: Instrumental variable structure for Rule 2
         // Z → X → Y with U → X, U → Y (Z is an instrument)
@@ -724,7 +808,15 @@ impl CausalReferenceHarness {
             vec!["Z".into(), "X".into(), "Y".into(), "U".into()],
             vec![(0, 1), (1, 2), (3, 1), (3, 2)],
         );
-        suite.push((iv, CausalQuery { treatment: 1, outcome: 2, conditioning: vec![] }, 0.0));
+        suite.push((
+            iv,
+            CausalQuery {
+                treatment: 1,
+                outcome: 2,
+                conditioning: vec![],
+            },
+            0.0,
+        ));
 
         // Test 5: Rule 3 test - Z doesn't affect Y given X
         // X → Y, X → Z (Z is downstream of X, no effect on Y)
@@ -733,7 +825,15 @@ impl CausalReferenceHarness {
             vec!["X".into(), "Y".into(), "Z".into()],
             vec![(0, 1), (0, 2)],
         );
-        suite.push((rule3_dag, CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] }, 0.0));
+        suite.push((
+            rule3_dag,
+            CausalQuery {
+                treatment: 0,
+                outcome: 1,
+                conditioning: vec![],
+            },
+            0.0,
+        ));
 
         // Test 6: M-bias structure (collider test)
         // U1 → X, U1 → M, U2 → M, U2 → Y, X → Y
@@ -742,7 +842,15 @@ impl CausalReferenceHarness {
             vec!["X".into(), "Y".into(), "M".into(), "U1".into(), "U2".into()],
             vec![(3, 0), (3, 2), (4, 2), (4, 1), (0, 1)],
         );
-        suite.push((m_bias, CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] }, 0.0));
+        suite.push((
+            m_bias,
+            CausalQuery {
+                treatment: 0,
+                outcome: 1,
+                conditioning: vec![],
+            },
+            0.0,
+        ));
 
         suite
     }

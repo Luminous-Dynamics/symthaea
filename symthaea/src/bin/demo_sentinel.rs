@@ -32,8 +32,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use symthaea::perception::video::{
-    MockVideoSource, VideoSource, VideoSourceConfig, MockPattern,
-    TemporalFeatureExtractor, LtcRhythmDetector, LtcRhythmConfig,
+    LtcRhythmConfig, LtcRhythmDetector, MockPattern, MockVideoSource, TemporalFeatureExtractor,
+    VideoSource, VideoSourceConfig,
 };
 
 #[cfg(feature = "webcam")]
@@ -104,7 +104,10 @@ fn get_patterns(complex: bool) -> Vec<PatternDef> {
                 key: 'D',
                 name: "Polyrhythm 3:2",
                 description: "90 + 60 BPM interference",
-                pattern: MockPattern::Polyrhythm { bpm_a: 90, bpm_b: 60 },
+                pattern: MockPattern::Polyrhythm {
+                    bpm_a: 90,
+                    bpm_b: 60,
+                },
             },
             PatternDef {
                 key: 'E',
@@ -116,7 +119,11 @@ fn get_patterns(complex: bool) -> Vec<PatternDef> {
                 key: 'F',
                 name: "Accelerando",
                 description: "60→120 BPM speedup",
-                pattern: MockPattern::Accelerando { start_bpm: 60, end_bpm: 120, cycle_frames: 90 },
+                pattern: MockPattern::Accelerando {
+                    start_bpm: 60,
+                    end_bpm: 120,
+                    cycle_frames: 90,
+                },
             },
         ]);
     }
@@ -160,7 +167,10 @@ impl SentinelDemo {
         println!("╠════════════════════════════════════════════════════════════════╣");
         println!("║  Learn Patterns:                                               ║");
         for p in &self.patterns {
-            println!("║    [{:}] - {:16} ({:24})   ║", p.key, p.name, p.description);
+            println!(
+                "║    [{:}] - {:16} ({:24})   ║",
+                p.key, p.name, p.description
+            );
         }
         println!("╠════════════════════════════════════════════════════════════════╣");
         println!("║  Commands:                                                     ║");
@@ -211,7 +221,10 @@ impl SentinelDemo {
         let fps = self.config.fps;
 
         println!("\n╔══════════════════════════════════════════════════════════════╗");
-        println!("║  🧠 Learning Pattern {} - {}                       ", key, pattern_def.name);
+        println!(
+            "║  🧠 Learning Pattern {} - {}                       ",
+            key, pattern_def.name
+        );
         println!("╠══════════════════════════════════════════════════════════════╣");
         println!("║  {} ", pattern_def.description);
         println!("║  The HierarchicalLTC will absorb the temporal dynamics...   ║");
@@ -235,11 +248,13 @@ impl SentinelDemo {
                 let progress = start.elapsed().as_secs_f32() / learn_duration;
                 let bar_len = 30;
                 let filled = (progress * bar_len as f32) as usize;
-                print!("\r   [{}{}] {:.0}%  Φ = {:.4}",
+                print!(
+                    "\r   [{}{}] {:.0}%  Φ = {:.4}",
                     "█".repeat(filled),
                     "░".repeat(bar_len - filled),
                     progress * 100.0,
-                    result.phi);
+                    result.phi
+                );
                 io::stdout().flush()?;
             }
         }
@@ -254,8 +269,10 @@ impl SentinelDemo {
             // Show frequency signature
             if let Some(freq_sig) = self.detector.get_pattern_frequency_signature(p) {
                 println!("   • Frequency signature:");
-                println!("     0.5Hz: {:.3}  1Hz: {:.3}  2Hz: {:.3}  4Hz: {:.3}",
-                    freq_sig[0], freq_sig[1], freq_sig[2], freq_sig[3]);
+                println!(
+                    "     0.5Hz: {:.3}  1Hz: {:.3}  2Hz: {:.3}  4Hz: {:.3}",
+                    freq_sig[0], freq_sig[1], freq_sig[2], freq_sig[3]
+                );
             }
 
             if let Some(detected_bpm) = self.detector.get_pattern_bpm(p, fps) {
@@ -269,7 +286,10 @@ impl SentinelDemo {
     fn run_detection(&mut self) -> Result<()> {
         let learned_count = self.detector.learned_pattern_count();
         if learned_count < 2 {
-            println!("\n⚠️  Please learn at least 2 patterns first! (Currently: {})", learned_count);
+            println!(
+                "\n⚠️  Please learn at least 2 patterns first! (Currently: {})",
+                learned_count
+            );
             return Ok(());
         }
 
@@ -277,7 +297,10 @@ impl SentinelDemo {
         println!("\n╔══════════════════════════════════════════════════════════════╗");
         println!("║  🔍 Detection Mode - LTC Trajectory Matching                 ║");
         println!("╠══════════════════════════════════════════════════════════════╣");
-        println!("║  Learned patterns: {:?}                                       ", learned);
+        println!(
+            "║  Learned patterns: {:?}                                       ",
+            learned
+        );
         println!("║  Comparing input trajectory shape to learned attractors...   ║");
         println!("║  Press Ctrl+C to stop                                        ║");
         println!("╚══════════════════════════════════════════════════════════════╝\n");
@@ -356,12 +379,14 @@ impl SentinelDemo {
             let is_best = result.pattern == key.to_string();
             let color = if is_best { "\x1b[32m" } else { "\x1b[90m" };
             let bar = (sim * bar_len as f32) as usize;
-            sim_display.push_str(&format!("{}: {}[{}{}]\x1b[0m {:.2}  ",
+            sim_display.push_str(&format!(
+                "{}: {}[{}{}]\x1b[0m {:.2}  ",
                 key,
                 color,
                 "█".repeat(bar.min(bar_len)),
                 "░".repeat(bar_len - bar.min(bar_len)),
-                sim));
+                sim
+            ));
         }
 
         let detected_color = match result.pattern.as_str() {
@@ -370,12 +395,14 @@ impl SentinelDemo {
             _ => "\x1b[32m",
         };
 
-        print!("\r   {} │ {}Detected: {}\x1b[0m ({:.0}%)  Φ = {:.4}   ",
+        print!(
+            "\r   {} │ {}Detected: {}\x1b[0m ({:.0}%)  Φ = {:.4}   ",
             sim_display,
             detected_color,
             result.pattern,
             result.confidence * 100.0,
-            result.phi);
+            result.phi
+        );
         io::stdout().flush().ok();
     }
 
@@ -391,9 +418,14 @@ impl SentinelDemo {
             for key in learned {
                 if let Some(p) = self.get_pattern_def(key) {
                     if let Some(freq) = self.detector.get_pattern_frequency_signature(key) {
-                        println!("║  {} - {:16}                                     ║", key, p.name);
-                        println!("║      Freq: 0.5Hz={:.2} 1Hz={:.2} 2Hz={:.2} 4Hz={:.2}        ║",
-                            freq[0], freq[1], freq[2], freq[3]);
+                        println!(
+                            "║  {} - {:16}                                     ║",
+                            key, p.name
+                        );
+                        println!(
+                            "║      Freq: 0.5Hz={:.2} 1Hz={:.2} 2Hz={:.2} 4Hz={:.2}        ║",
+                            freq[0], freq[1], freq[2], freq[3]
+                        );
                     }
                 }
             }
@@ -414,7 +446,8 @@ impl SentinelDemo {
         let running = self.running.clone();
         ctrlc::set_handler(move || {
             running.store(false, Ordering::Relaxed);
-        }).ok();
+        })
+        .ok();
 
         loop {
             print!("\nCommand> ");
@@ -494,7 +527,9 @@ fn main() -> Result<()> {
                 println!();
                 println!("OPTIONS:");
                 println!("    --webcam          Use real webcam instead of mock video");
-                println!("    --complex, -c     Enable complex patterns (heartbeat, polyrhythm, etc.)");
+                println!(
+                    "    --complex, -c     Enable complex patterns (heartbeat, polyrhythm, etc.)"
+                );
                 println!("    --fps <FPS>       Frame rate (default: 30)");
                 println!("    --duration <SEC>  Learning duration in seconds (default: 3.0)");
                 println!("    -h, --help        Show this help message");
@@ -518,16 +553,29 @@ fn main() -> Result<()> {
         i += 1;
     }
 
-    let mode_str = if config.complex_mode { "Complex (6 patterns)" } else { "Simple (2 patterns)" };
+    let mode_str = if config.complex_mode {
+        "Complex (6 patterns)"
+    } else {
+        "Simple (2 patterns)"
+    };
 
     println!("\n╔════════════════════════════════════════════════════════════════╗");
     println!("║  🧠 Symthaea Semantic Sentinel                                 ║");
     println!("║     Zero-Shot Temporal Rhythm Recognition via LTC Dynamics     ║");
     println!("╠════════════════════════════════════════════════════════════════╣");
     println!("║  Mode: {:^54} ║", mode_str);
-    println!("║  Video: {:^53} ║", if config.use_webcam { "Webcam" } else { "Mock" });
-    println!("║  Frame Rate: {:>2} fps                                           ║", config.fps);
-    println!("║  Learn Duration: {:.1}s                                         ║", config.learn_duration);
+    println!(
+        "║  Video: {:^53} ║",
+        if config.use_webcam { "Webcam" } else { "Mock" }
+    );
+    println!(
+        "║  Frame Rate: {:>2} fps                                           ║",
+        config.fps
+    );
+    println!(
+        "║  Learn Duration: {:.1}s                                         ║",
+        config.learn_duration
+    );
     println!("╚════════════════════════════════════════════════════════════════╝");
 
     let mut demo = SentinelDemo::new(config);

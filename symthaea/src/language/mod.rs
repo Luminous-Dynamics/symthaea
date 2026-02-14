@@ -1184,3 +1184,164 @@ impl Default for ConsciousnessLanguageCore {
 
 // Note: Types defined above are automatically public since they're
 // declared with `pub`. No need for re-export.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // NixErrorDiagnoser tests
+    // ========================================================================
+
+    #[test]
+    fn nix_error_diagnoser_new_creates_successfully() {
+        let diagnoser = NixErrorDiagnoser::new();
+        // The diagnoser should have compiled its regex patterns without panicking.
+        // Default impl should also work identically.
+        let _default = NixErrorDiagnoser::default();
+        assert!(!diagnoser.patterns.is_empty());
+    }
+
+    #[test]
+    fn diagnose_classifies_missing_attribute() {
+        let diagnoser = NixErrorDiagnoser::new();
+        let diagnosis = diagnoser.diagnose("error: attribute 'foo' missing at /etc/nixos/configuration.nix:42:5");
+        assert_eq!(diagnosis.category, NixErrorCategory::Evaluation);
+        assert!(diagnosis.confidence > 0.0 && diagnosis.confidence.is_finite());
+        assert!(!diagnosis.explanation.is_empty());
+        // Location extraction should pick up the file path
+        assert!(diagnosis.location.is_some());
+        let loc = diagnosis.location.unwrap();
+        assert!(loc.contains("/etc/nixos/configuration.nix"));
+    }
+
+    #[test]
+    fn diagnose_classifies_undefined_variable() {
+        let diagnoser = NixErrorDiagnoser::new();
+        let diagnosis = diagnoser.diagnose("error: undefined variable 'pkgs'");
+        assert_eq!(diagnosis.category, NixErrorCategory::Evaluation);
+        assert!(diagnosis.confidence >= 0.5);
+    }
+
+    #[test]
+    fn diagnose_classifies_build_failure() {
+        let diagnoser = NixErrorDiagnoser::new();
+        let diagnosis = diagnoser.diagnose("builder for '/nix/store/abc-pkg.drv' failed with exit code 1");
+        assert_eq!(diagnosis.category, NixErrorCategory::Build);
+    }
+
+    #[test]
+    fn diagnose_classifies_permission_error() {
+        let diagnoser = NixErrorDiagnoser::new();
+        let diagnosis = diagnoser.diagnose("error: permission denied while accessing /nix/store");
+        assert_eq!(diagnosis.category, NixErrorCategory::Permission);
+    }
+
+    #[test]
+    fn diagnose_returns_unknown_for_unrecognised_text() {
+        let diagnoser = NixErrorDiagnoser::new();
+        let diagnosis = diagnoser.diagnose("something completely unrelated happened");
+        assert_eq!(diagnosis.category, NixErrorCategory::Unknown);
+        // Unknown errors should have low confidence
+        assert!(diagnosis.confidence < 0.5);
+        assert!(!diagnosis.explanation.is_empty());
+    }
+
+    // ========================================================================
+    // ConsciousnessLanguageCore tests
+    // ========================================================================
+
+    #[test]
+    fn consciousness_language_core_default_construction() {
+        let core = ConsciousnessLanguageCore::default();
+        assert_eq!(core.consciousness_state(), ConsciousnessStateLevel::Active);
+        assert!(core.phi().is_finite());
+        assert!(core.phi() >= 0.0 && core.phi() <= 1.0);
+    }
+
+    #[test]
+    fn consciousness_state_get_and_set() {
+        let mut core = ConsciousnessLanguageCore::default();
+        assert_eq!(core.consciousness_state(), ConsciousnessStateLevel::Active);
+
+        core.set_consciousness_state(ConsciousnessStateLevel::Reflective);
+        assert_eq!(core.consciousness_state(), ConsciousnessStateLevel::Reflective);
+
+        core.set_consciousness_state(ConsciousnessStateLevel::Dormant);
+        assert_eq!(core.consciousness_state(), ConsciousnessStateLevel::Dormant);
+    }
+
+    #[test]
+    fn phi_get_set_and_clamping() {
+        let mut core = ConsciousnessLanguageCore::default();
+        let initial_phi = core.phi();
+        assert!(initial_phi.is_finite());
+
+        core.set_phi(0.8);
+        assert!((core.phi() - 0.8).abs() < f64::EPSILON);
+
+        // Values above 1.0 should clamp to 1.0
+        core.set_phi(5.0);
+        assert!((core.phi() - 1.0).abs() < f64::EPSILON);
+
+        // Values below 0.0 should clamp to 0.0
+        core.set_phi(-2.0);
+        assert!(core.phi().abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn understand_produces_finite_confidence() {
+        let mut core = ConsciousnessLanguageCore::default();
+        let result = core.understand("install firefox on NixOS");
+
+        assert!(result.confidence.is_finite());
+        assert!(result.confidence >= 0.0 && result.confidence <= 1.0);
+        assert!(result.epistemic_confidence.is_finite());
+        assert!(result.consciousness_phi.is_finite());
+        assert!(result.unified_free_energy.is_finite());
+
+        // An install-related query should be classified as Install
+        assert_eq!(result.nixos.intent, NixOSIntent::Install);
+        assert!(!result.nixos.description.is_empty());
+    }
+
+    #[test]
+    fn understand_unknown_input_yields_low_confidence_and_clarifying_questions() {
+        let mut core = ConsciousnessLanguageCore::default();
+        // Gibberish that does not match any NixOS keyword
+        let result = core.understand("xyzzy plugh");
+
+        assert_eq!(result.nixos.intent, NixOSIntent::Unknown);
+        // Unknown intent produces confidence 0.3, which is below the default
+        // confidence_threshold (0.6), so clarifying questions should be generated.
+        assert!(!result.clarifying_questions.is_empty());
+    }
+
+    #[test]
+    fn create_feedback_from_execution_produces_valid_feedback() {
+        let mut core = ConsciousnessLanguageCore::default();
+        // Run understand first so last_input / last_quadrant are populated
+        let _result = core.understand("build my flake");
+
+        let feedback = core.create_feedback_from_execution(true, 0.7, None, false);
+        assert!(feedback.is_some());
+        let fb = feedback.unwrap();
+        assert!(fb.action_succeeded);
+        assert!(fb.success);
+        assert!(!fb.was_dry_run);
+        assert!(fb.error_message.is_none());
+        assert!(fb.errors.is_empty());
+        assert!((fb.phi_after - 0.7).abs() < f64::EPSILON);
+        // original_input should reflect the last understand() call
+        assert!(fb.original_input.contains("build my flake"));
+
+        // Also test failure case
+        let feedback_err = core
+            .create_feedback_from_execution(false, 0.3, Some("boom".to_string()), true);
+        let fb_err = feedback_err.unwrap();
+        assert!(!fb_err.action_succeeded);
+        assert!(fb_err.was_dry_run);
+        assert_eq!(fb_err.error_message.as_deref(), Some("boom"));
+        assert_eq!(fb_err.errors, vec!["boom".to_string()]);
+    }
+}

@@ -51,8 +51,7 @@ impl VisualCortex {
 
     /// Load an image from a file path
     pub fn load_image(&self, path: &Path) -> Result<DynamicImage> {
-        image::open(path)
-            .with_context(|| format!("Failed to load image from {:?}", path))
+        image::open(path).with_context(|| format!("Failed to load image from {:?}", path))
     }
 
     /// Process an image and extract semantic features
@@ -63,7 +62,10 @@ impl VisualCortex {
         if width < self._min_size.0 || height < self._min_size.1 {
             anyhow::bail!(
                 "Image too small: {}x{} (minimum: {}x{})",
-                width, height, self._min_size.0, self._min_size.1
+                width,
+                height,
+                self._min_size.0,
+                self._min_size.1
             );
         }
 
@@ -106,10 +108,7 @@ impl VisualCortex {
         // Simple clustering: just take evenly spaced samples
         // (Full k-means would be more accurate but slower)
         let step = samples.len() / k.min(samples.len());
-        samples.into_iter()
-            .step_by(step.max(1))
-            .take(k)
-            .collect()
+        samples.into_iter().step_by(step.max(1)).take(k).collect()
     }
 
     /// Calculate average brightness of an image
@@ -122,8 +121,8 @@ impl VisualCortex {
             if pixel[3] > 128 {
                 // Perceived brightness formula (weighted by human eye sensitivity)
                 let brightness = (0.299 * pixel[0] as f64
-                                + 0.587 * pixel[1] as f64
-                                + 0.114 * pixel[2] as f64) as u64;
+                    + 0.587 * pixel[1] as f64
+                    + 0.114 * pixel[2] as f64) as u64;
                 sum += brightness;
                 count += 1;
             }
@@ -148,9 +147,7 @@ impl VisualCortex {
                 let b = pixel[2] as f32;
 
                 let mean = (r + g + b) / 3.0;
-                let variance = ((r - mean).powi(2)
-                              + (g - mean).powi(2)
-                              + (b - mean).powi(2)) / 3.0;
+                let variance = ((r - mean).powi(2) + (g - mean).powi(2) + (b - mean).powi(2)) / 3.0;
 
                 variance_sum += variance;
                 count += 1;
@@ -190,19 +187,20 @@ impl VisualCortex {
                 let left = img.get_pixel(x - 1, y);
                 let right = img.get_pixel(x + 1, y);
                 let gx = (right[0] as i32 - left[0] as i32).abs()
-                       + (right[1] as i32 - left[1] as i32).abs()
-                       + (right[2] as i32 - left[2] as i32).abs();
+                    + (right[1] as i32 - left[1] as i32).abs()
+                    + (right[2] as i32 - left[2] as i32).abs();
 
                 // Check vertical gradient
                 let top = img.get_pixel(x, y - 1);
                 let bottom = img.get_pixel(x, y + 1);
                 let gy = (bottom[0] as i32 - top[0] as i32).abs()
-                       + (bottom[1] as i32 - top[1] as i32).abs()
-                       + (bottom[2] as i32 - top[2] as i32).abs();
+                    + (bottom[1] as i32 - top[1] as i32).abs()
+                    + (bottom[2] as i32 - top[2] as i32).abs();
 
                 // If gradient is significant, count as edge
                 let gradient = gx + gy;
-                if gradient > 100 {  // Threshold
+                if gradient > 100 {
+                    // Threshold
                     edge_count += 1;
                 }
 
@@ -227,9 +225,9 @@ impl VisualCortex {
             0.0
         } else {
             let w_diff = (features1.dimensions.0 as f32 - features2.dimensions.0 as f32).abs()
-                       / features1.dimensions.0.max(features2.dimensions.0) as f32;
+                / features1.dimensions.0.max(features2.dimensions.0) as f32;
             let h_diff = (features1.dimensions.1 as f32 - features2.dimensions.1 as f32).abs()
-                       / features1.dimensions.1.max(features2.dimensions.1) as f32;
+                / features1.dimensions.1.max(features2.dimensions.1) as f32;
             (w_diff + h_diff) / 2.0
         };
 
@@ -243,10 +241,8 @@ impl VisualCortex {
         let edge_diff = (features1.edge_density - features2.edge_density).abs();
 
         // Weighted average of differences
-        let similarity = dim_diff * 0.2
-                        + brightness_diff * 0.3
-                        + variance_diff * 0.25
-                        + edge_diff * 0.25;
+        let similarity =
+            dim_diff * 0.2 + brightness_diff * 0.3 + variance_diff * 0.25 + edge_diff * 0.25;
 
         Ok(similarity.min(1.0))
     }
@@ -338,7 +334,13 @@ mod tests {
         let sim_identical = cortex.image_similarity(&img1, &img2).unwrap();
         let sim_different = cortex.image_similarity(&img1, &img3).unwrap();
 
-        assert!(sim_identical < 0.1, "Identical images should be very similar");
-        assert!(sim_different > 0.1, "Different images should be less similar");
+        assert!(
+            sim_identical < 0.1,
+            "Identical images should be very similar"
+        );
+        assert!(
+            sim_different > 0.1,
+            "Different images should be less similar"
+        );
     }
 }

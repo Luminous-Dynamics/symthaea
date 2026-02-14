@@ -22,9 +22,9 @@
 //! - Lorenz (1963) - "Deterministic Nonperiodic Flow"
 //! - Strogatz (2015) - "Nonlinear Dynamics and Chaos"
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 use serde::{Deserialize, Serialize};
 
 /// Lyapunov exponent calculator
@@ -143,12 +143,7 @@ impl LyapunovCalculator {
     /// Compute full Lyapunov spectrum via QR decomposition
     ///
     /// Returns all Lyapunov exponents λ₁ ≥ λ₂ ≥ ... ≥ λₙ
-    pub fn lyapunov_spectrum<F, J>(
-        &self,
-        system: F,
-        jacobian: J,
-        initial: &[f64],
-    ) -> Vec<f64>
+    pub fn lyapunov_spectrum<F, J>(&self, system: F, jacobian: J, initial: &[f64]) -> Vec<f64>
     where
         F: Fn(&[f64]) -> Vec<f64>,
         J: Fn(&[f64]) -> Vec<Vec<f64>>,
@@ -158,9 +153,7 @@ impl LyapunovCalculator {
 
         // Initialize orthonormal basis (identity matrix)
         let mut q: Vec<Vec<f64>> = (0..dim)
-            .map(|i| {
-                (0..dim).map(|j| if i == j { 1.0 } else { 0.0 }).collect()
-            })
+            .map(|i| (0..dim).map(|j| if i == j { 1.0 } else { 0.0 }).collect())
             .collect();
 
         // Skip transient
@@ -609,11 +602,7 @@ pub mod systems {
         let y = state[1];
         let z = state[2];
 
-        vec![
-            sigma * (y - x),
-            x * (rho - z) - y,
-            x * y - beta * z,
-        ]
+        vec![sigma * (y - x), x * (rho - z) - y, x * y - beta * z]
     }
 
     /// Lorenz Jacobian
@@ -641,11 +630,7 @@ pub mod systems {
         let y = state[1];
         let z = state[2];
 
-        vec![
-            -y - z,
-            x + a * y,
-            b + z * (x - c),
-        ]
+        vec![-y - z, x + a * y, b + z * (x - c)]
     }
 
     /// Rossler Jacobian
@@ -670,10 +655,7 @@ pub mod systems {
         let x = state[0];
         let y = state[1];
 
-        vec![
-            1.0 - a * x * x + y,
-            b * x,
-        ]
+        vec![1.0 - a * x * x + y, b * x]
     }
 
     /// Logistic map (population dynamics)
@@ -748,7 +730,9 @@ impl ChaosEncoder {
 
     /// Encode attractor type
     pub fn encode_attractor_type(&self, attractor_type: &str) -> ContinuousHV {
-        let type_hv = self.genesis.hv(&format!("attractor::{}", attractor_type), PHYSICS_DIM);
+        let type_hv = self
+            .genesis
+            .hv(&format!("attractor::{}", attractor_type), PHYSICS_DIM);
         self.attractor.bind(&type_hv)
     }
 
@@ -762,15 +746,17 @@ impl ChaosEncoder {
             BifurcationType::Hopf => "hopf",
             BifurcationType::ChaoticOnset => "chaos_onset",
         };
-        let type_hv = self.genesis.hv(&format!("bifurcation::{}", type_label), PHYSICS_DIM);
+        let type_hv = self
+            .genesis
+            .hv(&format!("bifurcation::{}", type_label), PHYSICS_DIM);
         self.bifurcation.bind(&type_hv)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::systems::*;
+    use super::*;
 
     #[test]
     fn test_lorenz_lyapunov() {
@@ -782,8 +768,11 @@ mod tests {
         let lambda = calc.maximal_lyapunov(system, &initial, 1e-8);
 
         // Lorenz system should have λ₁ ≈ 0.9
-        assert!(lambda > 0.5 && lambda < 1.5,
-            "Lorenz λ₁ = {:.3}, expected ~0.9", lambda);
+        assert!(
+            lambda > 0.5 && lambda < 1.5,
+            "Lorenz λ₁ = {:.3}, expected ~0.9",
+            lambda
+        );
     }
 
     #[test]
@@ -905,13 +894,7 @@ mod tests {
     fn test_bifurcation_diagram() {
         let analyzer = BifurcationAnalyzer;
 
-        let diagram = analyzer.bifurcation_diagram(
-            logistic,
-            (2.5, 4.0),
-            100,
-            200,
-            50,
-        );
+        let diagram = analyzer.bifurcation_diagram(logistic, (2.5, 4.0), 100, 200, 50);
 
         assert_eq!(diagram.parameters.len(), 100);
         assert_eq!(diagram.attractors.len(), 100);
@@ -921,13 +904,7 @@ mod tests {
     fn test_find_bifurcations() {
         let analyzer = BifurcationAnalyzer;
 
-        let diagram = analyzer.bifurcation_diagram(
-            logistic,
-            (2.8, 3.6),
-            50,
-            500,
-            100,
-        );
+        let diagram = analyzer.bifurcation_diagram(logistic, (2.8, 3.6), 50, 500, 100);
 
         let bifurcations = analyzer.find_bifurcations(&diagram);
 

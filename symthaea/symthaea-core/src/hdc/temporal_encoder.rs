@@ -18,8 +18,8 @@ Integration Points:
 - Powers temporal memory queries (Week 17 Day 5)
 */
 
-use std::time::Duration;
 use anyhow::Result;
+use std::time::Duration;
 
 use super::HDC_DIMENSION;
 
@@ -218,7 +218,8 @@ impl TemporalEncoder {
             );
         }
 
-        Ok(temporal.iter()
+        Ok(temporal
+            .iter()
             .zip(semantic.iter())
             .map(|(t, s)| t * s)
             .collect())
@@ -284,31 +285,43 @@ mod tests {
 
         let sim = encoder.temporal_similarity(time1, time2).unwrap();
 
-        assert!(sim > 0.95, "Times 1 minute apart should have >0.95 similarity, got {}", sim);
+        assert!(
+            sim > 0.95,
+            "Times 1 minute apart should have >0.95 similarity, got {}",
+            sim
+        );
     }
 
     #[test]
     fn test_temporal_similarity_distant() {
         // Distant times should have lower similarity
         let encoder = TemporalEncoder::new();
-        let time1 = Duration::from_secs(0);       // Midnight
+        let time1 = Duration::from_secs(0); // Midnight
         let time2 = Duration::from_secs(12 * 3600); // Noon (opposite on 24h circle)
 
         let sim = encoder.temporal_similarity(time1, time2).unwrap();
 
-        assert!(sim < 0.6, "Opposite times should have <0.6 similarity, got {}", sim);
+        assert!(
+            sim < 0.6,
+            "Opposite times should have <0.6 similarity, got {}",
+            sim
+        );
     }
 
     #[test]
     fn test_circular_wraparound() {
         // Times at opposite ends of scale should be similar (circular property)
         let encoder = TemporalEncoder::new();
-        let time1 = Duration::from_secs(0);                    // Start of cycle
-        let time2 = Duration::from_secs(24 * 3600 - 60);      // End of cycle (1 min before wrap)
+        let time1 = Duration::from_secs(0); // Start of cycle
+        let time2 = Duration::from_secs(24 * 3600 - 60); // End of cycle (1 min before wrap)
 
         let sim = encoder.temporal_similarity(time1, time2).unwrap();
 
-        assert!(sim > 0.95, "Times near wraparound should be similar, got {}", sim);
+        assert!(
+            sim > 0.95,
+            "Times near wraparound should be similar, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -323,7 +336,10 @@ mod tests {
         let first_10: Vec<f32> = vec.iter().take(10).copied().collect();
         let last_10: Vec<f32> = vec.iter().rev().take(10).copied().collect();
 
-        assert_ne!(first_10, last_10, "Multi-scale frequencies should create variation");
+        assert_ne!(
+            first_10, last_10,
+            "Multi-scale frequencies should create variation"
+        );
     }
 
     #[test]
@@ -331,14 +347,16 @@ mod tests {
         // More recent times should have higher similarity
         let encoder = TemporalEncoder::new();
         let base = Duration::from_secs(10000);
-        let recent = Duration::from_secs(10060);  // 1 minute later
+        let recent = Duration::from_secs(10060); // 1 minute later
         let distant = Duration::from_secs(13600); // 1 hour later
 
         let sim_recent = encoder.temporal_similarity(base, recent).unwrap();
         let sim_distant = encoder.temporal_similarity(base, distant).unwrap();
 
-        assert!(sim_recent > sim_distant,
-                "Recent time should be more similar than distant time");
+        assert!(
+            sim_recent > sim_distant,
+            "Recent time should be more similar than distant time"
+        );
     }
 
     #[test]
@@ -347,7 +365,12 @@ mod tests {
         let encoder = TemporalEncoder::new();
         let vec = encoder.encode_time(Duration::from_secs(5000)).unwrap();
 
-        assert_eq!(vec.len(), DEFAULT_DIMENSION, "Vector should have {} dimensions", DEFAULT_DIMENSION);
+        assert_eq!(
+            vec.len(),
+            DEFAULT_DIMENSION,
+            "Vector should have {} dimensions",
+            DEFAULT_DIMENSION
+        );
     }
 
     #[test]
@@ -357,8 +380,12 @@ mod tests {
         let vec = encoder.encode_time(Duration::from_secs(7777)).unwrap();
 
         for (i, &value) in vec.iter().enumerate() {
-            assert!(value >= -1.0 && value <= 1.0,
-                    "Dimension {} has invalid value: {}", i, value);
+            assert!(
+                value >= -1.0 && value <= 1.0,
+                "Dimension {} has invalid value: {}",
+                i,
+                value
+            );
         }
     }
 
@@ -372,8 +399,11 @@ mod tests {
         let phase = encoder.time_to_phase(quarter_cycle);
 
         let expected = std::f32::consts::PI / 2.0; // π/2
-        assert!((phase - expected).abs() < 0.01,
-                "Quarter cycle should be π/2, got {}", phase);
+        assert!(
+            (phase - expected).abs() < 0.01,
+            "Quarter cycle should be π/2, got {}",
+            phase
+        );
     }
 
     #[test]
@@ -413,9 +443,21 @@ mod tests {
 
         // Relaxed threshold for debug mode with 16K dimensions
         // Note: In CI or loaded systems, these can vary significantly
-        let threshold = if cfg!(debug_assertions) { 50_000 } else { 10_000 };
-        assert!(avg_time < threshold, "Average encoding time {}μs should be <{}μs", avg_time, threshold);
-        println!("✅ Temporal encoding: {}μs average (target: <{}μs)", avg_time, threshold);
+        let threshold = if cfg!(debug_assertions) {
+            50_000
+        } else {
+            10_000
+        };
+        assert!(
+            avg_time < threshold,
+            "Average encoding time {}μs should be <{}μs",
+            avg_time,
+            threshold
+        );
+        println!(
+            "✅ Temporal encoding: {}μs average (target: <{}μs)",
+            avg_time, threshold
+        );
     }
 
     #[test]
@@ -432,6 +474,9 @@ mod tests {
 
         assert!(sim_ab > 0.9, "A-B should be highly similar");
         assert!(sim_bc > 0.9, "B-C should be highly similar");
-        assert!(sim_ac > 0.7, "A-C should still be reasonably similar (transitivity)");
+        assert!(
+            sim_ac > 0.7,
+            "A-C should still be reasonably similar (transitivity)"
+        );
     }
 }

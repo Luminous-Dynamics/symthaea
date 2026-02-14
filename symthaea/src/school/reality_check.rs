@@ -218,7 +218,8 @@ impl RealityChecker {
         };
 
         // Detect hallucination
-        let is_hallucination = abs_error > self.hallucination_threshold * predicted.abs().max(0.001);
+        let is_hallucination =
+            abs_error > self.hallucination_threshold * predicted.abs().max(0.001);
 
         if is_hallucination {
             self.hallucination_count += 1;
@@ -280,7 +281,10 @@ impl RealityChecker {
                 learning_rate * error
             }
 
-            CorrectionStrategy::Adaptive { base_rate, max_rate } => {
+            CorrectionStrategy::Adaptive {
+                base_rate,
+                max_rate,
+            } => {
                 // Adaptive learning rate based on error magnitude
                 let error_ratio = self.error_ema / (self.error_ema + 0.01);
                 let adaptive_rate = base_rate + (max_rate - base_rate) * error_ratio;
@@ -320,9 +324,7 @@ impl RealityChecker {
         let errors: Vec<f32> = self.history.iter().map(|r| r.abs_error).collect();
         let mean_error = errors.iter().sum::<f32>() / n as f32;
 
-        let variance = errors.iter()
-            .map(|e| (e - mean_error).powi(2))
-            .sum::<f32>() / n as f32;
+        let variance = errors.iter().map(|e| (e - mean_error).powi(2)).sum::<f32>() / n as f32;
         let std_error = variance.sqrt();
 
         let max_error = errors.iter().cloned().fold(0.0_f32, f32::max);
@@ -330,13 +332,21 @@ impl RealityChecker {
 
         // Calculate improvement trend
         let first_quarter_avg = if n >= 4 {
-            self.history[..n/4].iter().map(|r| r.abs_error).sum::<f32>() / (n/4) as f32
+            self.history[..n / 4]
+                .iter()
+                .map(|r| r.abs_error)
+                .sum::<f32>()
+                / (n / 4) as f32
         } else {
             mean_error
         };
 
         let last_quarter_avg = if n >= 4 {
-            self.history[3*n/4..].iter().map(|r| r.abs_error).sum::<f32>() / (n - 3*n/4) as f32
+            self.history[3 * n / 4..]
+                .iter()
+                .map(|r| r.abs_error)
+                .sum::<f32>()
+                / (n - 3 * n / 4) as f32
         } else {
             mean_error
         };
@@ -348,10 +358,26 @@ impl RealityChecker {
         };
 
         // Count by accuracy category
-        let excellent = self.history.iter().filter(|r| matches!(r.accuracy(), AccuracyCategory::Excellent)).count();
-        let good = self.history.iter().filter(|r| matches!(r.accuracy(), AccuracyCategory::Good)).count();
-        let fair = self.history.iter().filter(|r| matches!(r.accuracy(), AccuracyCategory::Fair)).count();
-        let poor = self.history.iter().filter(|r| matches!(r.accuracy(), AccuracyCategory::Poor)).count();
+        let excellent = self
+            .history
+            .iter()
+            .filter(|r| matches!(r.accuracy(), AccuracyCategory::Excellent))
+            .count();
+        let good = self
+            .history
+            .iter()
+            .filter(|r| matches!(r.accuracy(), AccuracyCategory::Good))
+            .count();
+        let fair = self
+            .history
+            .iter()
+            .filter(|r| matches!(r.accuracy(), AccuracyCategory::Fair))
+            .count();
+        let poor = self
+            .history
+            .iter()
+            .filter(|r| matches!(r.accuracy(), AccuracyCategory::Poor))
+            .count();
 
         RealityCheckStats {
             total_checks: self.total_checks,
@@ -501,8 +527,10 @@ mod tests {
 
     #[test]
     fn test_correction_strategies() {
-        let mut checker = RealityChecker::new(0.2, 0.001)
-            .with_strategy(CorrectionStrategy::GradientDescent { learning_rate: 0.01 });
+        let mut checker =
+            RealityChecker::new(0.2, 0.001).with_strategy(CorrectionStrategy::GradientDescent {
+                learning_rate: 0.01,
+            });
         let mut lookahead = create_test_lookahead();
 
         let result = checker.check(0.01, 0.005, &mut lookahead).unwrap();
@@ -531,8 +559,11 @@ mod tests {
         assert_eq!(stats.total_checks, 20);
         assert!(stats.mean_error > 0.0);
         // First quarter should have higher error than last quarter (improvement!)
-        assert!(stats.last_quarter_error <= stats.first_quarter_error,
+        assert!(
+            stats.last_quarter_error <= stats.first_quarter_error,
             "Expected improvement: last_quarter={:.6} should be <= first_quarter={:.6}",
-            stats.last_quarter_error, stats.first_quarter_error);
+            stats.last_quarter_error,
+            stats.first_quarter_error
+        );
     }
 }

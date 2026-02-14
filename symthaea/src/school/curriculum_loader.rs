@@ -34,11 +34,11 @@
 //!     estimated_minutes: 45
 //! ```
 
+use super::curriculum::{Curriculum, CurriculumError};
+use super::objective::{Difficulty, Domain, LearningObjective};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
-use super::objective::{LearningObjective, Difficulty, Domain};
-use super::curriculum::{Curriculum, CurriculumError};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SERIALIZABLE TYPES
@@ -206,9 +206,7 @@ impl CurriculumLoader {
             return Err(LoadError::FileNotFound(path.display().to_string()));
         }
 
-        let extension = path.extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
         let content = fs::read_to_string(path)?;
 
@@ -232,8 +230,7 @@ impl CurriculumLoader {
     pub fn load_from_yaml(yaml: &str) -> Result<Curriculum, LoadError> {
         // Simple YAML to JSON conversion for basic cases
         // This handles the subset of YAML we need for curricula
-        let json = yaml_to_json(yaml)
-            .map_err(LoadError::YamlError)?;
+        let json = yaml_to_json(yaml).map_err(LoadError::YamlError)?;
         Self::load_from_json(&json)
     }
 
@@ -299,7 +296,9 @@ impl CurriculumLoader {
 
     /// Convert a Curriculum to CurriculumSpec for serialization
     fn curriculum_to_spec(curriculum: &Curriculum) -> CurriculumSpec {
-        let objectives: Vec<ObjectiveSpec> = curriculum.objectives.iter()
+        let objectives: Vec<ObjectiveSpec> = curriculum
+            .objectives
+            .iter()
             .map(|obj| ObjectiveSpec {
                 id: obj.id.clone(),
                 name: obj.name.clone(),
@@ -403,7 +402,8 @@ fn yaml_to_json(yaml: &str) -> Result<String, String> {
                 result.push('{');
                 let parts: Vec<&str> = content.splitn(2, ':').collect();
                 if parts.len() == 2 {
-                    result.push_str(&format!("\"{}\":{}",
+                    result.push_str(&format!(
+                        "\"{}\":{}",
                         parts[0].trim(),
                         json_value(parts[1].trim())
                     ));
@@ -549,7 +549,10 @@ mod tests {
     #[test]
     fn test_parse_difficulty() {
         assert_eq!(parse_difficulty("Beginner"), Some(Difficulty::Beginner));
-        assert_eq!(parse_difficulty("INTERMEDIATE"), Some(Difficulty::Intermediate));
+        assert_eq!(
+            parse_difficulty("INTERMEDIATE"),
+            Some(Difficulty::Intermediate)
+        );
         assert_eq!(parse_difficulty("expert"), Some(Difficulty::Expert));
         assert_eq!(parse_difficulty("hard"), Some(Difficulty::Advanced));
         assert_eq!(parse_difficulty("invalid"), None);

@@ -33,12 +33,10 @@
 use anyhow::Result;
 
 use super::{
-    SymthaeaObserver, ObserverStats,
-    CorrelationContext, EventMetadata,
-    RouterSelectionEvent, WorkspaceIgnitionEvent, PhiMeasurementEvent,
-    PrimitiveActivationEvent, ResponseGeneratedEvent, SecurityCheckEvent,
-    ErrorEvent, LanguageStepEvent, NarrativeSelfEvent, CrossModalBindingEvent,
-    GWTIntegrationEvent, BrocaPipelineEvent,
+    BrocaPipelineEvent, CorrelationContext, CrossModalBindingEvent, ErrorEvent, EventMetadata,
+    GWTIntegrationEvent, LanguageStepEvent, NarrativeSelfEvent, ObserverStats, PhiMeasurementEvent,
+    PrimitiveActivationEvent, ResponseGeneratedEvent, RouterSelectionEvent, SecurityCheckEvent,
+    SymthaeaObserver, WorkspaceIgnitionEvent,
 };
 
 /// Observer wrapper that injects causal correlation metadata
@@ -203,69 +201,117 @@ pub trait WithCausalMetadata {
 
 // Implement for all event types
 impl WithCausalMetadata for RouterSelectionEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 impl WithCausalMetadata for WorkspaceIgnitionEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 impl WithCausalMetadata for PhiMeasurementEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 impl WithCausalMetadata for PrimitiveActivationEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 impl WithCausalMetadata for ResponseGeneratedEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 impl WithCausalMetadata for SecurityCheckEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 impl WithCausalMetadata for ErrorEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 impl WithCausalMetadata for LanguageStepEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 impl WithCausalMetadata for NarrativeSelfEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 impl WithCausalMetadata for CrossModalBindingEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 impl WithCausalMetadata for GWTIntegrationEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 impl WithCausalMetadata for BrocaPipelineEvent {
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
-    fn get_metadata(&self) -> &EventMetadata { &self.metadata }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
+    fn get_metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::NullObserver;
+    use super::*;
 
     fn make_phi_event() -> PhiMeasurementEvent {
         PhiMeasurementEvent {
@@ -345,10 +391,14 @@ mod tests {
         observer.record_phi_measurement(make_phi_event()).unwrap();
 
         // Second event - should have first as parent (via auto_link context)
-        observer.record_router_selection(make_router_event()).unwrap();
+        observer
+            .record_router_selection(make_router_event())
+            .unwrap();
 
         // Third event - should have second as parent
-        observer.record_workspace_ignition(make_workspace_event()).unwrap();
+        observer
+            .record_workspace_ignition(make_workspace_event())
+            .unwrap();
 
         assert_eq!(observer.event_count(), 3);
     }

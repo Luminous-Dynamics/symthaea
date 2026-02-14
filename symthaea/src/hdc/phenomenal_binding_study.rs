@@ -57,7 +57,7 @@ use serde::{Deserialize, Serialize};
 // Re-export from symthaea-core
 pub use symthaea_core::hdc::phenomenal_binding_study::{
     AnovaResult, BindingStudyConfig, CellMeans, ConceptPair, ConceptPairJson,
-    ConceptPairsFile, ConceptPairWithVectors, OperationComparisonResult, PairType,
+    ConceptPairWithVectors, ConceptPairsFile, OperationComparisonResult, PairType,
     PhenomenalBindingStudy as CoreBindingStudy, StudyMetadata,
 };
 
@@ -345,8 +345,7 @@ impl BindingStudy {
             .collect();
 
         // Test 1: Binding advantage in unified pairs
-        let unified_advantages: Vec<f64> =
-            unified.iter().map(|r| r.base.unity_advantage).collect();
+        let unified_advantages: Vec<f64> = unified.iter().map(|r| r.base.unity_advantage).collect();
         if !unified_advantages.is_empty() {
             let test = self.one_sample_test("binding_advantage_unified", &unified_advantages, 0.0);
             tests.push(test);
@@ -446,13 +445,12 @@ impl BindingStudy {
 
         let std_a = self.std_dev(group_a);
         let std_b = self.std_dev(group_b);
-        let pooled_std =
-            ((std_a.powi(2) * (group_a.len() - 1) as f64 + std_b.powi(2) * (group_b.len() - 1) as f64)
-                / (group_a.len() + group_b.len() - 2) as f64)
-                .sqrt();
+        let pooled_std = ((std_a.powi(2) * (group_a.len() - 1) as f64
+            + std_b.powi(2) * (group_b.len() - 1) as f64)
+            / (group_a.len() + group_b.len() - 2) as f64)
+            .sqrt();
 
-        let se = pooled_std
-            * (1.0 / group_a.len() as f64 + 1.0 / group_b.len() as f64).sqrt();
+        let se = pooled_std * (1.0 / group_a.len() as f64 + 1.0 / group_b.len() as f64).sqrt();
         let t_stat = if se > 0.0 { diff / se } else { 0.0 };
 
         let p_value = if self.config.permutation_tests {
@@ -509,9 +507,8 @@ impl BindingStudy {
 
     /// Permutation test for two samples
     fn permutation_test_two_sample(&mut self, group_a: &[f64], group_b: &[f64]) -> f64 {
-        let observed =
-            group_a.iter().sum::<f64>() / group_a.len() as f64
-                - group_b.iter().sum::<f64>() / group_b.len() as f64;
+        let observed = group_a.iter().sum::<f64>() / group_a.len() as f64
+            - group_b.iter().sum::<f64>() / group_b.len() as f64;
 
         let mut combined: Vec<f64> = group_a.iter().chain(group_b.iter()).copied().collect();
         let n_a = group_a.len();
@@ -551,8 +548,10 @@ impl BindingStudy {
 
         means.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-        let lower_idx = ((1.0 - self.config.confidence_level) / 2.0 * self.config.n_bootstrap as f64) as usize;
-        let upper_idx = ((1.0 + self.config.confidence_level) / 2.0 * self.config.n_bootstrap as f64) as usize;
+        let lower_idx =
+            ((1.0 - self.config.confidence_level) / 2.0 * self.config.n_bootstrap as f64) as usize;
+        let upper_idx =
+            ((1.0 + self.config.confidence_level) / 2.0 * self.config.n_bootstrap as f64) as usize;
 
         (
             means[lower_idx.min(means.len() - 1)],
@@ -582,8 +581,10 @@ impl BindingStudy {
 
         diffs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-        let lower_idx = ((1.0 - self.config.confidence_level) / 2.0 * self.config.n_bootstrap as f64) as usize;
-        let upper_idx = ((1.0 + self.config.confidence_level) / 2.0 * self.config.n_bootstrap as f64) as usize;
+        let lower_idx =
+            ((1.0 - self.config.confidence_level) / 2.0 * self.config.n_bootstrap as f64) as usize;
+        let upper_idx =
+            ((1.0 + self.config.confidence_level) / 2.0 * self.config.n_bootstrap as f64) as usize;
 
         (
             diffs[lower_idx.min(diffs.len() - 1)],
@@ -616,7 +617,10 @@ impl BindingStudy {
             .filter(|r| r.base.pair_type == PairType::Unified)
             .collect();
         if !unified.is_empty() {
-            stats.insert("unified".to_string(), self.compute_single_category_stats("unified", &unified));
+            stats.insert(
+                "unified".to_string(),
+                self.compute_single_category_stats("unified", &unified),
+            );
         }
 
         // Separate pairs
@@ -625,7 +629,10 @@ impl BindingStudy {
             .filter(|r| r.base.pair_type == PairType::Separate)
             .collect();
         if !separate.is_empty() {
-            stats.insert("separate".to_string(), self.compute_single_category_stats("separate", &separate));
+            stats.insert(
+                "separate".to_string(),
+                self.compute_single_category_stats("separate", &separate),
+            );
         }
 
         stats
@@ -666,13 +673,17 @@ impl BindingStudy {
             return 0.0;
         }
         let mean = values.iter().sum::<f64>() / values.len() as f64;
-        let variance = values.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
+        let variance =
+            values.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
         variance.sqrt()
     }
 
     /// Simple LCG random number generator
     fn next_random(&mut self) -> f64 {
-        self.rng_state = self.rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        self.rng_state = self
+            .rng_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1);
         (self.rng_state >> 33) as f64 / (1u64 << 31) as f64
     }
 }
@@ -696,7 +707,10 @@ impl BindingStudyResults {
         // Metadata
         report.push_str(&format!("Timestamp: {}\n", self.metadata.timestamp));
         report.push_str(&format!("Total pairs: {}\n", self.metadata.total_pairs));
-        report.push_str(&format!("Duration: {:.2}s\n\n", self.metadata.duration_secs));
+        report.push_str(&format!(
+            "Duration: {:.2}s\n\n",
+            self.metadata.duration_secs
+        ));
 
         // ANOVA results
         report.push_str("----------------------------------------------------------------\n");
@@ -732,7 +746,11 @@ impl BindingStudyResults {
         report.push_str(&format!("  F-statistic: {:.4}\n", self.anova.f_interaction));
         report.push_str(&format!(
             "  Significant: {}\n\n",
-            if self.anova.interaction_significant { "YES" } else { "No" }
+            if self.anova.interaction_significant {
+                "YES"
+            } else {
+                "No"
+            }
         ));
 
         // Statistical tests
@@ -743,9 +761,16 @@ impl BindingStudyResults {
         for test in &self.tests {
             report.push_str(&format!("{}:\n", test.name));
             report.push_str(&format!("  Statistic: {:.4}\n", test.statistic));
-            report.push_str(&format!("  p-value: {:.4} {}\n", test.p_value, if test.significant { "*" } else { "" }));
+            report.push_str(&format!(
+                "  p-value: {:.4} {}\n",
+                test.p_value,
+                if test.significant { "*" } else { "" }
+            ));
             report.push_str(&format!("  Effect size (d): {:+.4}\n", test.effect_size));
-            report.push_str(&format!("  95% CI: [{:.4}, {:.4}]\n\n", test.ci_lower, test.ci_upper));
+            report.push_str(&format!(
+                "  95% CI: [{:.4}, {:.4}]\n\n",
+                test.ci_lower, test.ci_upper
+            ));
         }
 
         // Category statistics
@@ -755,11 +780,26 @@ impl BindingStudyResults {
 
         for (name, stats) in &self.category_stats {
             report.push_str(&format!("{} pairs (n={}):\n", name, stats.count));
-            report.push_str(&format!("  Mean bind unity: {:.4}\n", stats.mean_bind_unity));
-            report.push_str(&format!("  Mean bundle unity: {:.4}\n", stats.mean_bundle_unity));
-            report.push_str(&format!("  Mean advantage: {:+.4} (SD: {:.4})\n", stats.mean_advantage, stats.std_advantage));
-            report.push_str(&format!("  Median advantage: {:+.4}\n", stats.median_advantage));
-            report.push_str(&format!("  Range: [{:.4}, {:.4}]\n\n", stats.min_advantage, stats.max_advantage));
+            report.push_str(&format!(
+                "  Mean bind unity: {:.4}\n",
+                stats.mean_bind_unity
+            ));
+            report.push_str(&format!(
+                "  Mean bundle unity: {:.4}\n",
+                stats.mean_bundle_unity
+            ));
+            report.push_str(&format!(
+                "  Mean advantage: {:+.4} (SD: {:.4})\n",
+                stats.mean_advantage, stats.std_advantage
+            ));
+            report.push_str(&format!(
+                "  Median advantage: {:+.4}\n",
+                stats.median_advantage
+            ));
+            report.push_str(&format!(
+                "  Range: [{:.4}, {:.4}]\n\n",
+                stats.min_advantage, stats.max_advantage
+            ));
         }
 
         // Interpretation

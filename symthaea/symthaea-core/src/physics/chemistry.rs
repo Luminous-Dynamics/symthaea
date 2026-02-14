@@ -27,10 +27,10 @@
 //! - Exothermic: Products have lower energy (more stable bonds)
 //! - Endothermic: Products have higher energy
 
-use crate::genesis::GenesisSeed;
-use crate::hdc::unified_hv::ContinuousHV;
 use super::periodic_table::PeriodicTable;
 use super::standard_model::PHYSICS_DIM;
+use crate::genesis::GenesisSeed;
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 /// Chemical bond types
@@ -140,13 +140,13 @@ pub struct Chemistry {
     pub activation_energy: ContinuousHV,
 
     // Functional group vectors
-    pub hydroxyl: ContinuousHV,    // -OH
-    pub carbonyl: ContinuousHV,    // C=O
-    pub carboxyl: ContinuousHV,    // -COOH
-    pub amino: ContinuousHV,       // -NH2
-    pub phosphate: ContinuousHV,   // -PO4
-    pub sulfhydryl: ContinuousHV,  // -SH
-    pub methyl: ContinuousHV,      // -CH3
+    pub hydroxyl: ContinuousHV,   // -OH
+    pub carbonyl: ContinuousHV,   // C=O
+    pub carboxyl: ContinuousHV,   // -COOH
+    pub amino: ContinuousHV,      // -NH2
+    pub phosphate: ContinuousHV,  // -PO4
+    pub sulfhydryl: ContinuousHV, // -SH
+    pub methyl: ContinuousHV,     // -CH3
 
     // Reference to periodic table
     elements: Vec<ContinuousHV>, // Cached element vectors
@@ -173,17 +173,29 @@ impl Chemistry {
         let activation_energy = genesis.hv("reaction::activation_energy", PHYSICS_DIM);
 
         // Functional groups (composed from elements)
-        let o = table.element(8).map(|e| e.vector.clone())
+        let o = table
+            .element(8)
+            .map(|e| e.vector.clone())
             .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
-        let h = table.element(1).map(|e| e.vector.clone())
+        let h = table
+            .element(1)
+            .map(|e| e.vector.clone())
             .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
-        let c = table.element(6).map(|e| e.vector.clone())
+        let c = table
+            .element(6)
+            .map(|e| e.vector.clone())
             .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
-        let n = table.element(7).map(|e| e.vector.clone())
+        let n = table
+            .element(7)
+            .map(|e| e.vector.clone())
             .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
-        let p = table.element(15).map(|e| e.vector.clone())
+        let p = table
+            .element(15)
+            .map(|e| e.vector.clone())
             .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
-        let s = table.element(16).map(|e| e.vector.clone())
+        let s = table
+            .element(16)
+            .map(|e| e.vector.clone())
             .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
 
         // Compose functional groups
@@ -196,9 +208,7 @@ impl Chemistry {
         let methyl = ContinuousHV::bundle(&[&c, &h, &h, &h]).bind(&single_bond);
 
         // Cache element vectors
-        let elements: Vec<ContinuousHV> = table.iter()
-            .map(|e| e.vector.clone())
-            .collect();
+        let elements: Vec<ContinuousHV> = table.iter().map(|e| e.vector.clone()).collect();
 
         Self {
             single_bond,
@@ -240,7 +250,12 @@ impl Chemistry {
     }
 
     /// Create a bond between two atoms
-    pub fn create_bond(&self, atom1: &ContinuousHV, atom2: &ContinuousHV, bond_type: BondType) -> ContinuousHV {
+    pub fn create_bond(
+        &self,
+        atom1: &ContinuousHV,
+        atom2: &ContinuousHV,
+        bond_type: BondType,
+    ) -> ContinuousHV {
         let bond_vector = self.bond(bond_type);
         let strength = bond_type.strength();
 
@@ -261,7 +276,8 @@ impl Chemistry {
         bonds: &[BondType],
     ) -> Molecule {
         // Bundle atoms with multiplicity
-        let atom_vectors: Vec<ContinuousHV> = atoms.iter()
+        let atom_vectors: Vec<ContinuousHV> = atoms
+            .iter()
             .map(|(atom, count)| atom.scale(*count as f32))
             .collect();
 
@@ -269,9 +285,7 @@ impl Chemistry {
         let atom_bundle = ContinuousHV::bundle(&refs);
 
         // Bundle bonds
-        let bond_vectors: Vec<&ContinuousHV> = bonds.iter()
-            .map(|b| self.bond(*b))
-            .collect();
+        let bond_vectors: Vec<&ContinuousHV> = bonds.iter().map(|b| self.bond(*b)).collect();
 
         let bond_bundle = if bond_vectors.is_empty() {
             ContinuousHV::zero(PHYSICS_DIM)
@@ -294,7 +308,12 @@ impl Chemistry {
     }
 
     /// Create a simple molecule from element symbols
-    pub fn simple_molecule(&self, name: &str, formula: &str, table: &PeriodicTable) -> Option<Molecule> {
+    pub fn simple_molecule(
+        &self,
+        name: &str,
+        formula: &str,
+        table: &PeriodicTable,
+    ) -> Option<Molecule> {
         // Parse simple formulas like H2O, CO2, CH4
         // This is a simplified parser
 
@@ -354,15 +373,11 @@ impl Chemistry {
         products: Vec<Molecule>,
     ) -> Reaction {
         // Bundle reactants
-        let reactant_refs: Vec<&ContinuousHV> = reactants.iter()
-            .map(|m| &m.vector)
-            .collect();
+        let reactant_refs: Vec<&ContinuousHV> = reactants.iter().map(|m| &m.vector).collect();
         let reactant_bundle = ContinuousHV::bundle(&reactant_refs);
 
         // Bundle products
-        let product_refs: Vec<&ContinuousHV> = products.iter()
-            .map(|m| &m.vector)
-            .collect();
+        let product_refs: Vec<&ContinuousHV> = products.iter().map(|m| &m.vector).collect();
         let product_bundle = ContinuousHV::bundle(&product_refs);
 
         // Reaction vector: transformation from reactants to products
@@ -454,7 +469,7 @@ impl Chemistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::physics::{StandardModel, Hadrons};
+    use crate::physics::{Hadrons, StandardModel};
 
     fn setup() -> (PeriodicTable, Chemistry, GenesisSeed) {
         let genesis = GenesisSeed::from_phrase("chemistry test");

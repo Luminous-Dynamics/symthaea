@@ -11,26 +11,56 @@
 //! - ProgrammingPlugin: handles discussion about programming concepts
 //! - CodeDomainPlugin: handles actual code snippets, generation requests
 
-
 use super::domain_plugin::{
     DomainPlugin, DomainPrompts, Entity, IntentPrototypes, ValidationResult,
 };
 
 /// Code markers that indicate actual code (not just discussion about code)
 const CODE_MARKERS: &[&str] = &[
-    "```", "fn ", "def ", "class ", "struct ", "impl ", "pub fn",
-    "let ", "const ", "import ", "from ", "use ", "mod ",
-    "if __name__", "#[derive", "#![", "async fn", "pub struct",
-    "pub enum", "trait ", "type ", "match ", "enum ",
+    "```",
+    "fn ",
+    "def ",
+    "class ",
+    "struct ",
+    "impl ",
+    "pub fn",
+    "let ",
+    "const ",
+    "import ",
+    "from ",
+    "use ",
+    "mod ",
+    "if __name__",
+    "#[derive",
+    "#![",
+    "async fn",
+    "pub struct",
+    "pub enum",
+    "trait ",
+    "type ",
+    "match ",
+    "enum ",
 ];
 
 /// Keywords that indicate a code generation/understanding request
 const CODE_REQUEST_KEYWORDS: &[&str] = &[
-    "write a function", "generate code", "write code", "implement",
-    "create a function", "create a struct", "create a class",
-    "write a test", "refactor", "code review", "what does this code",
-    "explain this code", "debug this", "fix this code",
-    "write a module", "generate a", "scaffold",
+    "write a function",
+    "generate code",
+    "write code",
+    "implement",
+    "create a function",
+    "create a struct",
+    "create a class",
+    "write a test",
+    "refactor",
+    "code review",
+    "what does this code",
+    "explain this code",
+    "debug this",
+    "fix this code",
+    "write a module",
+    "generate a",
+    "scaffold",
 ];
 
 /// Plugin for code understanding and generation via HDC+CfC pipeline
@@ -46,10 +76,7 @@ impl DomainPlugin for CodeDomainPlugin {
 
         // Detect language
         if let Some((lang, start, end)) = detect_language_mention(text) {
-            entities.push(
-                Entity::new("language", lang, start, end)
-                    .with_confidence(0.9),
-            );
+            entities.push(Entity::new("language", lang, start, end).with_confidence(0.9));
         }
 
         // Detect code blocks
@@ -63,11 +90,13 @@ impl DomainPlugin for CodeDomainPlugin {
                 let first_line = block_content.lines().next().unwrap_or("").trim();
 
                 // Language tag on the opening fence
-                let lang_tag = if !first_line.is_empty() && first_line.len() < 20 && !first_line.contains(' ') {
-                    first_line
-                } else {
-                    "unknown"
-                };
+                let lang_tag =
+                    if !first_line.is_empty() && first_line.len() < 20 && !first_line.contains(' ')
+                    {
+                        first_line
+                    } else {
+                        "unknown"
+                    };
 
                 entities.push(
                     Entity::new("code_block", lang_tag, abs_start, abs_end)
@@ -115,38 +144,71 @@ impl DomainPlugin for CodeDomainPlugin {
 
         // Code-specific command vocabulary
         protos.command = vec![
-            "write", "generate", "create", "implement", "scaffold",
-            "refactor", "debug", "fix", "optimize", "test",
-            "explain", "review", "analyze", "parse", "compile",
-        ].into_iter().map(String::from).collect();
+            "write",
+            "generate",
+            "create",
+            "implement",
+            "scaffold",
+            "refactor",
+            "debug",
+            "fix",
+            "optimize",
+            "test",
+            "explain",
+            "review",
+            "analyze",
+            "parse",
+            "compile",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         // Code-specific question vocabulary
         protos.question = vec![
-            "what does", "how does", "why does", "where is",
-            "what type", "what are the parameters", "what is the return",
-            "how to", "can this", "should this",
-        ].into_iter().map(String::from).collect();
+            "what does",
+            "how does",
+            "why does",
+            "where is",
+            "what type",
+            "what are the parameters",
+            "what is the return",
+            "how to",
+            "can this",
+            "should this",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         // Custom code intents
         protos.custom.insert(
             "code_create".to_string(),
             vec!["write", "generate", "create", "implement", "scaffold"]
-                .into_iter().map(String::from).collect(),
+                .into_iter()
+                .map(String::from)
+                .collect(),
         );
         protos.custom.insert(
             "code_explain".to_string(),
             vec!["explain", "what does", "how does", "why", "trace"]
-                .into_iter().map(String::from).collect(),
+                .into_iter()
+                .map(String::from)
+                .collect(),
         );
         protos.custom.insert(
             "code_fix".to_string(),
             vec!["fix", "debug", "repair", "resolve", "patch"]
-                .into_iter().map(String::from).collect(),
+                .into_iter()
+                .map(String::from)
+                .collect(),
         );
         protos.custom.insert(
             "code_refactor".to_string(),
             vec!["refactor", "restructure", "simplify", "optimize", "clean"]
-                .into_iter().map(String::from).collect(),
+                .into_iter()
+                .map(String::from)
+                .collect(),
         );
 
         protos
@@ -192,8 +254,16 @@ impl DomainPlugin for CodeDomainPlugin {
 
         // Check for programming language mentions
         let lang_keywords = [
-            "rust", "python", "nix", "typescript", "javascript",
-            "function", "struct", "class", "module", "trait",
+            "rust",
+            "python",
+            "nix",
+            "typescript",
+            "javascript",
+            "function",
+            "struct",
+            "class",
+            "module",
+            "trait",
         ];
         for kw in &lang_keywords {
             if lower.contains(kw) {
@@ -204,8 +274,15 @@ impl DomainPlugin for CodeDomainPlugin {
 
         // Check for code-adjacent terms
         let code_terms = [
-            "code", "program", "compile", "syntax", "api",
-            "algorithm", "data structure", "type system", "generic",
+            "code",
+            "program",
+            "compile",
+            "syntax",
+            "api",
+            "algorithm",
+            "data structure",
+            "type system",
+            "generic",
         ];
         for term in &code_terms {
             if lower.contains(term) {
@@ -220,19 +297,67 @@ impl DomainPlugin for CodeDomainPlugin {
     fn vocabulary(&self) -> Vec<String> {
         vec![
             // Rust
-            "fn", "let", "mut", "impl", "trait", "struct", "enum", "match",
-            "pub", "mod", "use", "crate", "self", "super", "async", "await",
-            "Result", "Option", "Vec", "String", "Box", "Arc", "Rc",
+            "fn",
+            "let",
+            "mut",
+            "impl",
+            "trait",
+            "struct",
+            "enum",
+            "match",
+            "pub",
+            "mod",
+            "use",
+            "crate",
+            "self",
+            "super",
+            "async",
+            "await",
+            "Result",
+            "Option",
+            "Vec",
+            "String",
+            "Box",
+            "Arc",
+            "Rc",
             // Python
-            "def", "class", "import", "from", "return", "yield", "async",
-            "self", "None", "True", "False", "lambda", "with",
+            "def",
+            "class",
+            "import",
+            "from",
+            "return",
+            "yield",
+            "async",
+            "self",
+            "None",
+            "True",
+            "False",
+            "lambda",
+            "with",
             // Nix
-            "mkDerivation", "buildInputs", "fetchFromGitHub", "pkgs",
-            "lib", "stdenv", "callPackage", "override", "overlays",
+            "mkDerivation",
+            "buildInputs",
+            "fetchFromGitHub",
+            "pkgs",
+            "lib",
+            "stdenv",
+            "callPackage",
+            "override",
+            "overlays",
             // General
-            "function", "variable", "parameter", "return type", "generic",
-            "interface", "abstract", "constructor", "destructor",
-        ].into_iter().map(String::from).collect()
+            "function",
+            "variable",
+            "parameter",
+            "return type",
+            "generic",
+            "interface",
+            "abstract",
+            "constructor",
+            "destructor",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect()
     }
 
     fn validate_input(&self, input: &str) -> ValidationResult {
@@ -240,7 +365,7 @@ impl DomainPlugin for CodeDomainPlugin {
         let backtick_count = input.matches("```").count();
         if backtick_count % 2 != 0 {
             return ValidationResult::invalid(vec![
-                "Unclosed code block (missing closing ```)".to_string(),
+                "Unclosed code block (missing closing ```)".to_string()
             ]);
         }
 
@@ -331,11 +456,15 @@ mod tests {
         let input = "Here's some code:\n```rust\nfn main() {}\n```";
         let entities = plugin.extract_entities(input);
 
-        let code_blocks: Vec<_> = entities.iter()
+        let code_blocks: Vec<_> = entities
+            .iter()
             .filter(|e| e.entity_type == "code_block")
             .collect();
         assert_eq!(code_blocks.len(), 1);
-        assert_eq!(code_blocks[0].metadata.get("language"), Some(&"rust".to_string()));
+        assert_eq!(
+            code_blocks[0].metadata.get("language"),
+            Some(&"rust".to_string())
+        );
     }
 
     #[test]
@@ -344,7 +473,8 @@ mod tests {
         let input = "The `sort` function calls `compare`";
         let entities = plugin.extract_entities(input);
 
-        let refs: Vec<_> = entities.iter()
+        let refs: Vec<_> = entities
+            .iter()
             .filter(|e| e.entity_type == "code_reference")
             .collect();
         assert_eq!(refs.len(), 2);
@@ -357,7 +487,8 @@ mod tests {
         let plugin = CodeDomainPlugin;
         let entities = plugin.extract_entities("Write this in Rust please");
 
-        let langs: Vec<_> = entities.iter()
+        let langs: Vec<_> = entities
+            .iter()
             .filter(|e| e.entity_type == "language")
             .collect();
         assert_eq!(langs.len(), 1);

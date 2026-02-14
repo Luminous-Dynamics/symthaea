@@ -10,13 +10,12 @@
 
 #![cfg(feature = "shell")]
 
-use symthaea::shell::{
-    IntelliSenseEngine, PhiGate, GateDecision, ExecutionRequest,
-    ShellContext, CommandClassification,
-    EpistemicOverlayEngine, KnowledgeSource, CommandContext, OverlayType,
-    classify_command_destructiveness,
-};
 use symthaea::action::DestructivenessLevel;
+use symthaea::shell::{
+    classify_command_destructiveness, CommandClassification, CommandContext,
+    EpistemicOverlayEngine, ExecutionRequest, GateDecision, IntelliSenseEngine, KnowledgeSource,
+    OverlayType, PhiGate, ShellContext,
+};
 
 mod intellisense_tests {
     use super::*;
@@ -87,9 +86,9 @@ mod intellisense_tests {
         let completions = engine.complete(input, input.len());
 
         // Should find nix-env -i since it's semantically related to "install"
-        let has_install_related = completions.iter().any(|c| {
-            c.text.contains("nix-env") || c.text.contains("nix profile install")
-        });
+        let has_install_related = completions
+            .iter()
+            .any(|c| c.text.contains("nix-env") || c.text.contains("nix profile install"));
 
         assert!(
             has_install_related,
@@ -112,7 +111,10 @@ mod phi_gate_tests {
 
         match decision {
             GateDecision::Allowed { phi, .. } => {
-                assert!(phi >= 0.5, "Safe commands should be allowed with sufficient Phi");
+                assert!(
+                    phi >= 0.5,
+                    "Safe commands should be allowed with sufficient Phi"
+                );
             }
             GateDecision::Vetoed { message, .. } => {
                 panic!("Safe command vetoed: {}", message);
@@ -179,7 +181,11 @@ mod phi_gate_tests {
         let decision = gate.evaluate(command, destructiveness);
 
         match decision {
-            GateDecision::InsufficientPhi { current_phi, required_phi, .. } => {
+            GateDecision::InsufficientPhi {
+                current_phi,
+                required_phi,
+                ..
+            } => {
                 assert!(current_phi < required_phi, "Should require higher Phi");
             }
             GateDecision::NeedsConfirmation { .. } | GateDecision::Vetoed { .. } => {
@@ -217,8 +223,13 @@ mod epistemic_overlay_tests {
         assert!(!overlays.is_empty(), "Should generate overlays");
 
         // Check for knowledge source overlay
-        let has_knowledge_overlay = overlays.iter().any(|o| o.overlay_type == OverlayType::KnowledgeSource);
-        assert!(has_knowledge_overlay, "Should have knowledge source overlay");
+        let has_knowledge_overlay = overlays
+            .iter()
+            .any(|o| o.overlay_type == OverlayType::KnowledgeSource);
+        assert!(
+            has_knowledge_overlay,
+            "Should have knowledge source overlay"
+        );
     }
 
     #[test]
@@ -238,8 +249,13 @@ mod epistemic_overlay_tests {
         let overlays = engine.generate_for_command("some-unknown-command", &context);
 
         // Should have uncertainty warning
-        let has_warning = overlays.iter().any(|o| o.overlay_type == OverlayType::UncertaintyWarning);
-        assert!(has_warning, "Should have uncertainty warning for low confidence");
+        let has_warning = overlays
+            .iter()
+            .any(|o| o.overlay_type == OverlayType::UncertaintyWarning);
+        assert!(
+            has_warning,
+            "Should have uncertainty warning for low confidence"
+        );
     }
 
     #[test]
@@ -250,19 +266,23 @@ mod epistemic_overlay_tests {
         let overlays = engine.generate_for_command("rm -rf /tmp/test", &context);
 
         // Should have safety hint
-        let has_safety = overlays.iter().any(|o| o.overlay_type == OverlayType::SafetyHint);
+        let has_safety = overlays
+            .iter()
+            .any(|o| o.overlay_type == OverlayType::SafetyHint);
         assert!(has_safety, "Should have safety hint for rm command");
     }
 
     #[test]
     fn test_knowledge_source_confidence_modifiers() {
         assert!(
-            KnowledgeSource::Builtin.confidence_modifier() > KnowledgeSource::Unknown.confidence_modifier(),
+            KnowledgeSource::Builtin.confidence_modifier()
+                > KnowledgeSource::Unknown.confidence_modifier(),
             "Builtin should have higher confidence than Unknown"
         );
 
         assert!(
-            KnowledgeSource::NixosDocs.confidence_modifier() > KnowledgeSource::SemanticInference.confidence_modifier(),
+            KnowledgeSource::NixosDocs.confidence_modifier()
+                > KnowledgeSource::SemanticInference.confidence_modifier(),
             "NixosDocs should have higher confidence than SemanticInference"
         );
     }
@@ -275,7 +295,10 @@ mod command_classification_tests {
     fn test_readonly_command_classification() {
         let classification = CommandClassification::from_command("nix search nixpkgs#firefox");
 
-        assert_eq!(classification.destructiveness, DestructivenessLevel::ReadOnly);
+        assert_eq!(
+            classification.destructiveness,
+            DestructivenessLevel::ReadOnly
+        );
         assert!(!classification.needs_confirmation);
     }
 
@@ -283,7 +306,10 @@ mod command_classification_tests {
     fn test_destructive_command_classification() {
         let classification = CommandClassification::from_command("nix-collect-garbage -d");
 
-        assert_eq!(classification.destructiveness, DestructivenessLevel::Destructive);
+        assert_eq!(
+            classification.destructiveness,
+            DestructivenessLevel::Destructive
+        );
         assert!(classification.needs_confirmation);
     }
 
@@ -293,7 +319,11 @@ mod command_classification_tests {
 
         assert!(classification.rollback_hint.is_some());
         assert!(
-            classification.rollback_hint.as_ref().unwrap().contains("rollback"),
+            classification
+                .rollback_hint
+                .as_ref()
+                .unwrap()
+                .contains("rollback"),
             "Should mention rollback option"
         );
     }
@@ -353,13 +383,22 @@ mod shell_context_tests {
         let mut context = ShellContext::new();
 
         context.update_metrics(0.8, 0.9, true);
-        assert!(context.status_color().contains("32"), "High Phi should be green");
+        assert!(
+            context.status_color().contains("32"),
+            "High Phi should be green"
+        );
 
         context.update_metrics(0.5, 0.6, true);
-        assert!(context.status_color().contains("33"), "Medium Phi should be yellow");
+        assert!(
+            context.status_color().contains("33"),
+            "Medium Phi should be yellow"
+        );
 
         context.update_metrics(0.2, 0.3, false);
-        assert!(context.status_color().contains("31"), "Low Phi should be red");
+        assert!(
+            context.status_color().contains("31"),
+            "Low Phi should be red"
+        );
     }
 }
 
@@ -396,7 +435,10 @@ mod integration_flow_tests {
         let decision = phi_gate.evaluate(&command, destructiveness);
 
         // 6. Verify the flow
-        assert_eq!(classification.destructiveness, DestructivenessLevel::ReadOnly);
+        assert_eq!(
+            classification.destructiveness,
+            DestructivenessLevel::ReadOnly
+        );
         match decision {
             GateDecision::Allowed { phi, .. } => {
                 assert!(phi >= 0.7, "Command should be allowed with high Phi");
@@ -427,8 +469,14 @@ mod integration_flow_tests {
         let classification = CommandClassification::from_command(command);
 
         // Verify classification
-        assert!(classification.needs_confirmation, "Should need confirmation");
-        assert!(classification.rollback_hint.is_some(), "Should have rollback hint");
+        assert!(
+            classification.needs_confirmation,
+            "Should need confirmation"
+        );
+        assert!(
+            classification.rollback_hint.is_some(),
+            "Should have rollback hint"
+        );
 
         // Check epistemic overlays
         let epi_context = CommandContext {
@@ -444,10 +492,9 @@ mod integration_flow_tests {
         let overlays = epistemic_engine.generate_for_command(command, &epi_context);
 
         // Should have safety-related overlays
-        let has_safety_overlay = overlays.iter().any(|o| {
-            o.overlay_type == OverlayType::SafetyHint ||
-            o.header.contains("System")
-        });
+        let has_safety_overlay = overlays
+            .iter()
+            .any(|o| o.overlay_type == OverlayType::SafetyHint || o.header.contains("System"));
 
         // Gate the command
         let destructiveness = classify_command_destructiveness(command);

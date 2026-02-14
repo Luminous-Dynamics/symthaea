@@ -23,32 +23,34 @@
 //! - **Tier 1** (≤8ms): + micro-MCTS (K=5, N=50)
 //! - **Tier 2** (≤20ms): + full MCTS + counterfactuals + narrative (best-effort)
 
-pub mod types;
 pub mod narrative;
 pub mod telemetry;
+pub mod types;
 
-pub use types::{ReasoningContext, ReasoningResult, ReasoningEvent, PosthocOutcome, ReasoningContextBuilder};
-pub use telemetry::{
-    TelemetrySink, TelemetryError, TelemetryExporter, TelemetryExporterBuilder,
-    TelemetryConfig, PrometheusMetrics, PrometheusSink, JsonLinesSink, CsvSink,
-};
 pub use narrative::generate_narrative;
+pub use telemetry::{
+    CsvSink, JsonLinesSink, PrometheusMetrics, PrometheusSink, TelemetryConfig, TelemetryError,
+    TelemetryExporter, TelemetryExporterBuilder, TelemetrySink,
+};
+pub use types::{
+    PosthocOutcome, ReasoningContext, ReasoningContextBuilder, ReasoningEvent, ReasoningResult,
+};
 
 use std::collections::VecDeque;
 use std::time::Instant;
 
+use crate::consciousness::counterfactual::{
+    CausalDAG, CausalQuery, CausalQueryOutcome, CounterfactualReasoner,
+};
 use crate::consciousness::epistemic_conflict::{
-    ConflictDetector, TheoryCalibrator, MultiTheoryMetrics,
-    phi_integration::{effective_phi, compute_phi_eff, thresholds},
+    phi_integration::{compute_phi_eff, effective_phi, thresholds},
+    ConflictDetector, MultiTheoryMetrics, TheoryCalibrator,
+};
+use crate::consciousness::temporal_planning::{
+    mcts::{evs, MctsPlanner},
+    types::{BudgetTier, ForkedState, MctsConfig, PlannedAction, ReasoningBudget},
 };
 use crate::consciousness::tool_gate::classifier;
-use crate::consciousness::temporal_planning::{
-    types::{BudgetTier, ReasoningBudget, MctsConfig, ForkedState, PlannedAction},
-    mcts::{evs, MctsPlanner},
-};
-use crate::consciousness::counterfactual::{
-    CausalDAG, CausalQuery, CounterfactualReasoner, CausalQueryOutcome,
-};
 
 /// The Conscious Reasoning Engine.
 ///
@@ -193,7 +195,8 @@ impl ConsciousReasoningEngine {
 
         // ── STEP 4: PLAN ────────────────────────────────────────────────
         let plan = if evs_val > thresholds::EVS_THRESHOLD && !ctx.available_actions.is_empty() {
-            let sim_state = self.simulation_state
+            let sim_state = self
+                .simulation_state
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| default_simulation_state());
@@ -228,9 +231,10 @@ impl ConsciousReasoningEngine {
         }
 
         // ── STEP 5 (refined): GATE with plan confidence ────────────────
-        let gate = ctx.tool.as_ref().map(|tool| {
-            classifier::gate(tool, phi_eff, plan.confidence)
-        });
+        let gate = ctx
+            .tool
+            .as_ref()
+            .map(|tool| classifier::gate(tool, phi_eff, plan.confidence));
         if let Some(ref g) = gate {
             event.risk_level = Some(g.risk_level);
             event.required_phi = g.required_phi;
@@ -248,7 +252,14 @@ impl ConsciousReasoningEngine {
             event.tier_selected_reason = tier_reason(&budget, r);
             self.emit_event(event);
             return ReasoningResult::tier1(
-                phi_eff, r, gamma, conflicts, plan, gate, wall_time_us, budget.exceeded(),
+                phi_eff,
+                r,
+                gamma,
+                conflicts,
+                plan,
+                gate,
+                wall_time_us,
+                budget.exceeded(),
             );
         }
 
@@ -287,7 +298,15 @@ impl ConsciousReasoningEngine {
         self.emit_event(event);
 
         ReasoningResult::tier2(
-            phi_eff, r, gamma, conflicts, plan, gate, cf, narrative, wall_time_us,
+            phi_eff,
+            r,
+            gamma,
+            conflicts,
+            plan,
+            gate,
+            cf,
+            narrative,
+            wall_time_us,
             budget.exceeded(),
         )
     }
@@ -319,12 +338,22 @@ impl ConsciousReasoningEngine {
             return EngineStats::default();
         }
 
-        let avg_wall_time = events.iter().map(|e| e.wall_time_us).sum::<u64>() as f64 / total as f64;
+        let avg_wall_time =
+            events.iter().map(|e| e.wall_time_us).sum::<u64>() as f64 / total as f64;
         let avg_phi_eff = events.iter().map(|e| e.phi_eff).sum::<f64>() / total as f64;
         let avg_reliability = events.iter().map(|e| e.reliability).sum::<f64>() / total as f64;
-        let tier0_count = events.iter().filter(|e| e.budget_tier == BudgetTier::Tier0).count();
-        let tier1_count = events.iter().filter(|e| e.budget_tier == BudgetTier::Tier1).count();
-        let tier2_count = events.iter().filter(|e| e.budget_tier == BudgetTier::Tier2).count();
+        let tier0_count = events
+            .iter()
+            .filter(|e| e.budget_tier == BudgetTier::Tier0)
+            .count();
+        let tier1_count = events
+            .iter()
+            .filter(|e| e.budget_tier == BudgetTier::Tier1)
+            .count();
+        let tier2_count = events
+            .iter()
+            .filter(|e| e.budget_tier == BudgetTier::Tier2)
+            .count();
         let budget_exceeded_count = events.iter().filter(|e| e.budget_exceeded).count();
 
         EngineStats {
@@ -545,9 +574,11 @@ mod tests {
         let mut engine = ConsciousReasoningEngine::new();
 
         let mut ctx = make_context(0.8, 0.8, 25_000);
-        ctx.tool = Some(crate::consciousness::tool_gate::types::ToolDescriptor::read_only(
-            "nix search nixpkgs firefox",
-        ));
+        ctx.tool = Some(
+            crate::consciousness::tool_gate::types::ToolDescriptor::read_only(
+                "nix search nixpkgs firefox",
+            ),
+        );
         let result = engine.reason(&ctx);
 
         // Read-only tool should be allowed with reasonable Φ_eff
@@ -593,10 +624,7 @@ mod tests {
     fn test_counterfactual_analysis() {
         let engine = ConsciousReasoningEngine::new();
 
-        let dag = CausalDAG::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-        );
+        let dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![(0, 1)]);
         let query = CausalQuery {
             treatment: 0,
             outcome: 1,
@@ -605,7 +633,7 @@ mod tests {
 
         let outcome = engine.analyze_counterfactual(&dag, &query);
         match outcome {
-            CausalQueryOutcome::Identified { .. } => {}, // good
+            CausalQueryOutcome::Identified { .. } => {} // good
             _ => panic!("Simple X→Y should be identified"),
         }
     }

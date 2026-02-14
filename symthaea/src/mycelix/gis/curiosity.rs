@@ -38,15 +38,12 @@
 //! 3. **Peer** - Ask other agents in the swarm
 //! 4. **Expert** - Escalate to human experts
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
-use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)] // Uncertainty3D used in tests
-use super::{
-    IgnoranceType, IgnoranceDetection, Domain, Harmony,
-    HarmonicIgnorance, Uncertainty3D,
-};
+use super::{Domain, HarmonicIgnorance, Harmony, IgnoranceDetection, IgnoranceType, Uncertainty3D};
 
 /// Exploration strategy for resolving ignorance
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -315,7 +312,10 @@ impl ActiveExplorer {
     /// Plan exploration for a detection
     ///
     /// Returns ordered list of (strategy, source) pairs to try
-    pub fn plan_exploration(&self, detection: &IgnoranceDetection) -> Vec<(ExplorationStrategy, KnowledgeSource)> {
+    pub fn plan_exploration(
+        &self,
+        detection: &IgnoranceDetection,
+    ) -> Vec<(ExplorationStrategy, KnowledgeSource)> {
         let mut plans = Vec::new();
 
         // Get recommended strategies for this ignorance type
@@ -335,55 +335,61 @@ impl ActiveExplorer {
         plans.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
 
         // Return top plans
-        plans.into_iter()
+        plans
+            .into_iter()
             .take(self.config.max_concurrent * 2)
             .map(|(s, src, _)| (s, src))
             .collect()
     }
 
     /// Get suitable sources for a strategy
-    fn sources_for_strategy(&self, strategy: ExplorationStrategy, _domain: &Domain) -> Vec<KnowledgeSource> {
+    fn sources_for_strategy(
+        &self,
+        strategy: ExplorationStrategy,
+        _domain: &Domain,
+    ) -> Vec<KnowledgeSource> {
         match strategy {
             ExplorationStrategy::Direct => vec![
                 KnowledgeSource::Memory,
                 KnowledgeSource::VectorDB,
                 KnowledgeSource::GraphDB,
             ],
-            ExplorationStrategy::Semantic => vec![
-                KnowledgeSource::VectorDB,
-                KnowledgeSource::Memory,
-            ],
-            ExplorationStrategy::Analogical => vec![
-                KnowledgeSource::GraphDB,
-                KnowledgeSource::Inference,
-            ],
-            ExplorationStrategy::Socratic => vec![
-                KnowledgeSource::Inference,
-                KnowledgeSource::Memory,
-            ],
-            ExplorationStrategy::Harmonic => vec![
-                KnowledgeSource::GraphDB,
-                KnowledgeSource::Inference,
-            ],
-            ExplorationStrategy::Clarification => vec![
-                KnowledgeSource::Expert,
-            ],
+            ExplorationStrategy::Semantic => {
+                vec![KnowledgeSource::VectorDB, KnowledgeSource::Memory]
+            }
+            ExplorationStrategy::Analogical => {
+                vec![KnowledgeSource::GraphDB, KnowledgeSource::Inference]
+            }
+            ExplorationStrategy::Socratic => {
+                vec![KnowledgeSource::Inference, KnowledgeSource::Memory]
+            }
+            ExplorationStrategy::Harmonic => {
+                vec![KnowledgeSource::GraphDB, KnowledgeSource::Inference]
+            }
+            ExplorationStrategy::Clarification => vec![KnowledgeSource::Expert],
         }
     }
 
     /// Score a (strategy, source) plan
-    fn plan_score(&self, strategy: ExplorationStrategy, source: KnowledgeSource, detection: &IgnoranceDetection) -> f32 {
+    fn plan_score(
+        &self,
+        strategy: ExplorationStrategy,
+        source: KnowledgeSource,
+        detection: &IgnoranceDetection,
+    ) -> f32 {
         // Base effectiveness
         let strategy_base = strategy.base_effectiveness();
         let source_reliability = source.reliability();
 
         // Learned effectiveness (with prior)
-        let strategy_learned = self.strategy_history
+        let strategy_learned = self
+            .strategy_history
             .get(&strategy)
             .map(|s| s.success_rate())
             .unwrap_or(strategy_base);
 
-        let source_learned = self.source_history
+        let source_learned = self
+            .source_history
             .get(&source)
             .map(|s| s.success_rate())
             .unwrap_or(source_reliability);
@@ -400,7 +406,6 @@ impl ActiveExplorer {
         };
 
         // Combined score
-
 
         (strategy_base * 0.3 + strategy_learned * 0.3)
             * (source_reliability * 0.2 + source_learned * 0.2)
@@ -434,7 +439,8 @@ impl ActiveExplorer {
 
         // Check for definitional questions
         if query.to_lowercase().contains("what is") {
-            let term = query.to_lowercase()
+            let term = query
+                .to_lowercase()
                 .replace("what is", "")
                 .replace("?", "")
                 .trim()
@@ -446,8 +452,9 @@ impl ActiveExplorer {
         }
 
         // Check for comparative questions
-        if query.to_lowercase().contains("difference between") ||
-           query.to_lowercase().contains("compare") {
+        if query.to_lowercase().contains("difference between")
+            || query.to_lowercase().contains("compare")
+        {
             sub_questions.push("What are the key attributes to compare?".to_string());
             sub_questions.push("What context matters for this comparison?".to_string());
         }
@@ -517,12 +524,21 @@ impl ActiveExplorer {
         // Simple analogy mapping
         match source_domain {
             Domain::Mathematics => {
-                analogies.push((Domain::Physics, format!("Physical interpretation of: {}", query)));
+                analogies.push((
+                    Domain::Physics,
+                    format!("Physical interpretation of: {}", query),
+                ));
                 analogies.push((Domain::General, format!("Everyday analogy for: {}", query)));
             }
             Domain::Physics => {
-                analogies.push((Domain::Mathematics, format!("Mathematical formulation of: {}", query)));
-                analogies.push((Domain::General, format!("Intuitive explanation of: {}", query)));
+                analogies.push((
+                    Domain::Mathematics,
+                    format!("Mathematical formulation of: {}", query),
+                ));
+                analogies.push((
+                    Domain::General,
+                    format!("Intuitive explanation of: {}", query),
+                ));
             }
             Domain::History => {
                 analogies.push((Domain::General, format!("Modern parallel to: {}", query)));
@@ -538,7 +554,10 @@ impl ActiveExplorer {
     /// Execute harmonic exploration
     ///
     /// Explores based on affected harmonies
-    pub fn harmonic_explore(&self, harmonic_ignorance: &HarmonicIgnorance) -> Vec<(Harmony, String)> {
+    pub fn harmonic_explore(
+        &self,
+        harmonic_ignorance: &HarmonicIgnorance,
+    ) -> Vec<(Harmony, String)> {
         let mut explorations = Vec::new();
 
         for (harmony, impact) in &harmonic_ignorance.affected_harmonies {
@@ -550,18 +569,12 @@ impl ActiveExplorer {
                     Harmony::PanSentientFlourishing => {
                         "What are the well-being implications?".to_string()
                     }
-                    Harmony::IntegralWisdom => {
-                        "What does deep truth reveal here?".to_string()
-                    }
-                    Harmony::InfinitePlay => {
-                        "What creative possibilities emerge?".to_string()
-                    }
+                    Harmony::IntegralWisdom => "What does deep truth reveal here?".to_string(),
+                    Harmony::InfinitePlay => "What creative possibilities emerge?".to_string(),
                     Harmony::UniversalInterconnectedness => {
                         "How is this connected to the larger whole?".to_string()
                     }
-                    Harmony::SacredReciprocity => {
-                        "What are the exchange dynamics?".to_string()
-                    }
+                    Harmony::SacredReciprocity => "What are the exchange dynamics?".to_string(),
                     Harmony::EvolutionaryProgression => {
                         "How does this serve growth and evolution?".to_string()
                     }
@@ -580,9 +593,7 @@ impl ActiveExplorer {
         }
 
         // Update strategy stats
-        let strategy_stats = self.strategy_history
-            .entry(result.strategy)
-            .or_default();
+        let strategy_stats = self.strategy_history.entry(result.strategy).or_default();
         strategy_stats.record(
             result.success,
             result.confidence,
@@ -590,9 +601,7 @@ impl ActiveExplorer {
         );
 
         // Update source stats
-        let source_stats = self.source_history
-            .entry(result.source)
-            .or_default();
+        let source_stats = self.source_history.entry(result.source).or_default();
         source_stats.record(
             result.success,
             result.confidence,
@@ -612,58 +621,71 @@ impl ActiveExplorer {
     pub fn best_strategy(&self, ig_type: &IgnoranceType) -> Option<ExplorationStrategy> {
         let candidates = ExplorationStrategy::for_ignorance_type(ig_type);
 
-        candidates.into_iter()
-            .max_by(|a, b| {
-                let score_a = self.strategy_history
-                    .get(a)
-                    .map(|s| s.success_rate() * s.avg_confidence())
-                    .unwrap_or(a.base_effectiveness() * 0.5);
-                let score_b = self.strategy_history
-                    .get(b)
-                    .map(|s| s.success_rate() * s.avg_confidence())
-                    .unwrap_or(b.base_effectiveness() * 0.5);
-                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
-            })
+        candidates.into_iter().max_by(|a, b| {
+            let score_a = self
+                .strategy_history
+                .get(a)
+                .map(|s| s.success_rate() * s.avg_confidence())
+                .unwrap_or(a.base_effectiveness() * 0.5);
+            let score_b = self
+                .strategy_history
+                .get(b)
+                .map(|s| s.success_rate() * s.avg_confidence())
+                .unwrap_or(b.base_effectiveness() * 0.5);
+            score_a
+                .partial_cmp(&score_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// Get best source for a strategy based on learned history
-    pub fn best_source(&self, strategy: ExplorationStrategy, domain: &Domain) -> Option<KnowledgeSource> {
+    pub fn best_source(
+        &self,
+        strategy: ExplorationStrategy,
+        domain: &Domain,
+    ) -> Option<KnowledgeSource> {
         let candidates = self.sources_for_strategy(strategy, domain);
 
-        candidates.into_iter()
-            .max_by(|a, b| {
-                let score_a = self.source_history
-                    .get(a)
-                    .map(|s| s.success_rate() * (1.0 / (1.0 + s.avg_latency_ms as f32 / 1000.0)))
-                    .unwrap_or(a.reliability() * 0.5);
-                let score_b = self.source_history
-                    .get(b)
-                    .map(|s| s.success_rate() * (1.0 / (1.0 + s.avg_latency_ms as f32 / 1000.0)))
-                    .unwrap_or(b.reliability() * 0.5);
-                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
-            })
+        candidates.into_iter().max_by(|a, b| {
+            let score_a = self
+                .source_history
+                .get(a)
+                .map(|s| s.success_rate() * (1.0 / (1.0 + s.avg_latency_ms as f32 / 1000.0)))
+                .unwrap_or(a.reliability() * 0.5);
+            let score_b = self
+                .source_history
+                .get(b)
+                .map(|s| s.success_rate() * (1.0 / (1.0 + s.avg_latency_ms as f32 / 1000.0)))
+                .unwrap_or(b.reliability() * 0.5);
+            score_a
+                .partial_cmp(&score_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// Get exploration statistics
     pub fn statistics(&self) -> ExplorationStatistics {
-        let total_attempts: u32 = self.strategy_history.values()
-            .map(|s| s.attempts)
-            .sum();
-        let total_successes: u32 = self.strategy_history.values()
-            .map(|s| s.successes)
-            .sum();
+        let total_attempts: u32 = self.strategy_history.values().map(|s| s.attempts).sum();
+        let total_successes: u32 = self.strategy_history.values().map(|s| s.successes).sum();
 
-        let best_strategy = self.strategy_history.iter()
+        let best_strategy = self
+            .strategy_history
+            .iter()
             .max_by(|a, b| {
                 let score_a = a.1.success_rate() * a.1.avg_confidence();
                 let score_b = b.1.success_rate() * b.1.avg_confidence();
-                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+                score_a
+                    .partial_cmp(&score_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(s, _)| *s);
 
-        let best_source = self.source_history.iter()
+        let best_source = self
+            .source_history
+            .iter()
             .max_by(|a, b| {
-                a.1.success_rate().partial_cmp(&b.1.success_rate())
+                a.1.success_rate()
+                    .partial_cmp(&b.1.success_rate())
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(s, _)| *s);
@@ -729,7 +751,9 @@ mod tests {
         assert!(!plans.is_empty());
 
         // Plans should include semantic exploration
-        assert!(plans.iter().any(|(s, _)| *s == ExplorationStrategy::Semantic));
+        assert!(plans
+            .iter()
+            .any(|(s, _)| *s == ExplorationStrategy::Semantic));
     }
 
     #[test]
@@ -742,7 +766,9 @@ mod tests {
 
         // Why question
         let subs = explorer.socratic_decompose("Why does water freeze?");
-        assert!(subs.iter().any(|q| q.contains("context") || q.contains("factors")));
+        assert!(subs
+            .iter()
+            .any(|q| q.contains("context") || q.contains("factors")));
     }
 
     #[test]
@@ -825,13 +851,20 @@ mod tests {
 
         // Should have explorations for affected harmonies
         assert!(explorations.len() >= 2);
-        assert!(explorations.iter().any(|(h, _)| *h == Harmony::PanSentientFlourishing));
+        assert!(explorations
+            .iter()
+            .any(|(h, _)| *h == Harmony::PanSentientFlourishing));
     }
 
     #[test]
     fn test_source_latency_ordering() {
         // Sources should be ordered by latency for planning
-        assert!(KnowledgeSource::Memory.latency_estimate() < KnowledgeSource::Web.latency_estimate());
-        assert!(KnowledgeSource::Inference.latency_estimate() < KnowledgeSource::Peer.latency_estimate());
+        assert!(
+            KnowledgeSource::Memory.latency_estimate() < KnowledgeSource::Web.latency_estimate()
+        );
+        assert!(
+            KnowledgeSource::Inference.latency_estimate()
+                < KnowledgeSource::Peer.latency_estimate()
+        );
     }
 }

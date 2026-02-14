@@ -70,27 +70,27 @@ impl PythonParser {
                 }
             }
             "match_statement" => {
-                let entity = CodeEntity::new(
-                    EntityKind::MatchStatement,
-                    "match",
-                    Span::from_node(node),
-                ).with_source(node_text(node, source).to_string());
+                let entity =
+                    CodeEntity::new(EntityKind::MatchStatement, "match", Span::from_node(node))
+                        .with_source(node_text(node, source).to_string());
                 entities.push(entity);
             }
             "with_statement" => {
-                let entity = CodeEntity::new(
-                    EntityKind::WithStatement,
-                    "with",
-                    Span::from_node(node),
-                ).with_source(node_text(node, source).to_string());
+                let entity =
+                    CodeEntity::new(EntityKind::WithStatement, "with", Span::from_node(node))
+                        .with_source(node_text(node, source).to_string());
                 entities.push(entity);
             }
-            "list_comprehension" | "set_comprehension" | "dictionary_comprehension" | "generator_expression" => {
+            "list_comprehension"
+            | "set_comprehension"
+            | "dictionary_comprehension"
+            | "generator_expression" => {
                 let entity = CodeEntity::new(
                     EntityKind::Comprehension,
                     node.kind(),
                     Span::from_node(node),
-                ).with_source(node_text(node, source).to_string());
+                )
+                .with_source(node_text(node, source).to_string());
                 entities.push(entity);
             }
             _ => {}
@@ -104,7 +104,8 @@ impl PythonParser {
     }
 
     fn parse_function(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
-        let name = node.child_by_field_name("name")
+        let name = node
+            .child_by_field_name("name")
             .map(|n| node_text(&n, source).to_string())?;
 
         let mut entity = CodeEntity::new(EntityKind::Function, &name, Span::from_node(node))
@@ -158,7 +159,8 @@ impl PythonParser {
         source: &str,
         relations: &mut Vec<CodeRelation>,
     ) -> Option<CodeEntity> {
-        let name = node.child_by_field_name("name")
+        let name = node
+            .child_by_field_name("name")
             .map(|n| node_text(&n, source).to_string())?;
 
         let mut entity = CodeEntity::new(EntityKind::Class, &name, Span::from_node(node))
@@ -172,7 +174,11 @@ impl PythonParser {
             // Create inheritance relations
             let mut cursor = superclasses.walk();
             for child in superclasses.children(&mut cursor) {
-                if child.is_named() && child.kind() != "(" && child.kind() != ")" && child.kind() != "," {
+                if child.is_named()
+                    && child.kind() != "("
+                    && child.kind() != ")"
+                    && child.kind() != ","
+                {
                     let base_name = node_text(&child, source).to_string();
                     if !base_name.is_empty() {
                         relations.push(CodeRelation {
@@ -202,7 +208,9 @@ impl PythonParser {
                     "decorated_definition" => {
                         // Decorated method inside class
                         let mut dummy_relations = Vec::new();
-                        if let Some(method) = self.parse_decorated(&child, source, &mut dummy_relations) {
+                        if let Some(method) =
+                            self.parse_decorated(&child, source, &mut dummy_relations)
+                        {
                             let method = CodeEntity {
                                 kind: EntityKind::Method,
                                 ..method
@@ -230,7 +238,7 @@ impl PythonParser {
 
         Some(
             CodeEntity::new(EntityKind::Import, &import_path, Span::from_node(node))
-                .with_source(text)
+                .with_source(text),
         )
     }
 
@@ -271,7 +279,8 @@ impl PythonParser {
     }
 
     fn parse_assignment(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
-        let left = node.child_by_field_name("left")
+        let left = node
+            .child_by_field_name("left")
             .map(|n| node_text(&n, source).to_string())?;
 
         // Only extract simple name assignments (not attribute access, subscripts, etc.)
@@ -288,8 +297,15 @@ impl PythonParser {
         }
 
         // Check if it's UPPER_CASE (convention for constants)
-        if left.chars().all(|c| c.is_uppercase() || c == '_' || c.is_numeric()) && left.len() > 1 {
-            entity = CodeEntity { kind: EntityKind::Constant, ..entity };
+        if left
+            .chars()
+            .all(|c| c.is_uppercase() || c == '_' || c.is_numeric())
+            && left.len() > 1
+        {
+            entity = CodeEntity {
+                kind: EntityKind::Constant,
+                ..entity
+            };
         }
 
         Some(entity)
@@ -308,11 +324,14 @@ impl CodeParser for PythonParser {
     }
 
     fn parse(&mut self, source: &str) -> Result<ParsedCode, CodeDiagnostic> {
-        let tree = self.parser.parse(source, None).ok_or_else(|| CodeDiagnostic {
-            severity: DiagnosticSeverity::Error,
-            message: "Failed to parse Python source".to_string(),
-            span: None,
-        })?;
+        let tree = self
+            .parser
+            .parse(source, None)
+            .ok_or_else(|| CodeDiagnostic {
+                severity: DiagnosticSeverity::Error,
+                message: "Failed to parse Python source".to_string(),
+                span: None,
+            })?;
 
         let root = tree.root_node();
 
@@ -411,7 +430,9 @@ class Animal:
         assert_eq!(classes.len(), 1);
         assert_eq!(classes[0].name, "Animal");
 
-        let methods: Vec<&CodeEntity> = classes[0].children.iter()
+        let methods: Vec<&CodeEntity> = classes[0]
+            .children
+            .iter()
             .filter(|c| c.kind == EntityKind::Method)
             .collect();
         assert_eq!(methods.len(), 2); // __init__, speak
@@ -431,9 +452,11 @@ class Dog(Animal):
         assert_eq!(classes.len(), 1);
         assert!(classes[0].annotations.contains_key("bases"));
 
-        assert!(result.structure.relations.iter().any(|r| {
-            r.source == "Dog" && r.relation == Relation::Extends
-        }));
+        assert!(result
+            .structure
+            .relations
+            .iter()
+            .any(|r| { r.source == "Dog" && r.relation == Relation::Extends }));
     }
 
     #[test]
@@ -505,7 +528,9 @@ async def fetch(url: str) -> bytes:
 
     // Helper to get all functions from parsed result
     fn parsed_functions(parsed: &ParsedCode) -> Vec<&CodeEntity> {
-        parsed.all_entities().into_iter()
+        parsed
+            .all_entities()
+            .into_iter()
             .filter(|e| e.kind == EntityKind::Function)
             .collect()
     }

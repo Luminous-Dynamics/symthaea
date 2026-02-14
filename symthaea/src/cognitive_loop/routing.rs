@@ -3,7 +3,7 @@
 //! Determines cognitive depth (Reflex/Cortical/DeepThought) based on input
 //! characteristics, and tracks prediction-outcome coupling quality.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 
@@ -17,8 +17,7 @@ use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 /// - Reflex: Pattern matching only, <10ms response
 /// - Cortical: Standard cognitive cycle, 50-200ms
 /// - DeepThought: Full deliberation with causal reasoning, 200ms+
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum CognitiveDepth {
     /// Fast pattern matching, minimal processing
     /// Used for: Familiar inputs, low novelty, low urgency
@@ -33,7 +32,6 @@ pub enum CognitiveDepth {
     /// Used for: Novel situations, high stakes, complex reasoning
     DeepThought,
 }
-
 
 /// Thalamic router - determines cognitive depth before processing
 ///
@@ -98,10 +96,7 @@ impl ThalamicRouter {
         {
             // High stakes - use deep thought
             CognitiveDepth::DeepThought
-        } else if novelty < self.familiarity_threshold
-            && complexity < 0.3
-            && urgency < 0.5
-        {
+        } else if novelty < self.familiarity_threshold && complexity < 0.3 && urgency < 0.5 {
             // Familiar, simple, not urgent - use reflex
             CognitiveDepth::Reflex
         } else {
@@ -134,7 +129,7 @@ impl ThalamicRouter {
         complexity: f32,
         emotional_intensity: f32,
     ) -> CognitiveDepth {
-        use crate::consciousness::factor_graph::{FactorGraph, BPConfig, MessageSchedule};
+        use crate::consciousness::factor_graph::{BPConfig, FactorGraph, MessageSchedule};
 
         let mut fg = FactorGraph::new();
 
@@ -149,9 +144,9 @@ impl ThalamicRouter {
         // Novelty factor: low novelty → Reflex, high → DeepThought
         let n = novelty.clamp(0.0, 1.0);
         let novelty_table = vec![
-            (1.0 - n as f64).max(0.01),         // P(Reflex | novelty)
-            0.3_f64,                              // P(Cortical | novelty) - base rate
-            (n as f64 + 0.1).min(1.0),            // P(DeepThought | novelty)
+            (1.0 - n as f64).max(0.01), // P(Reflex | novelty)
+            0.3_f64,                    // P(Cortical | novelty) - base rate
+            (n as f64 + 0.1).min(1.0),  // P(DeepThought | novelty)
         ];
         fg.add_factor(&[v_novelty], novelty_table);
 
@@ -186,9 +181,9 @@ impl ThalamicRouter {
         // Pairwise consistency factor: encourage agreement between variables
         // Table: 3x3 (row = v_novelty state, col = v_urgency state)
         let agreement_table = vec![
-            1.0, 0.3, 0.1,  // novelty=Reflex: strongly prefer urgency=Reflex
-            0.3, 1.0, 0.3,  // novelty=Cortical: prefer urgency=Cortical
-            0.1, 0.3, 1.0,  // novelty=DeepThought: prefer urgency=DeepThought
+            1.0, 0.3, 0.1, // novelty=Reflex: strongly prefer urgency=Reflex
+            0.3, 1.0, 0.3, // novelty=Cortical: prefer urgency=Cortical
+            0.1, 0.3, 1.0, // novelty=DeepThought: prefer urgency=DeepThought
         ];
         fg.add_factor(&[v_novelty, v_urgency], agreement_table.clone());
         fg.add_factor(&[v_urgency, v_complexity], agreement_table);
@@ -271,15 +266,24 @@ impl ThalamicRouter {
 
         // Safe cast via f64 to prevent precision loss on large counts
         let total = self.routing_history.len().max(1) as f64;
-        let reflex = (self.routing_history.iter()
+        let reflex = (self
+            .routing_history
+            .iter()
             .filter(|d| **d == CognitiveDepth::Reflex)
-            .count() as f64 / total) as f32;
-        let cortical = (self.routing_history.iter()
+            .count() as f64
+            / total) as f32;
+        let cortical = (self
+            .routing_history
+            .iter()
             .filter(|d| **d == CognitiveDepth::Cortical)
-            .count() as f64 / total) as f32;
-        let deep = (self.routing_history.iter()
+            .count() as f64
+            / total) as f32;
+        let deep = (self
+            .routing_history
+            .iter()
             .filter(|d| **d == CognitiveDepth::DeepThought)
-            .count() as f64 / total) as f32;
+            .count() as f64
+            / total) as f32;
 
         (reflex, cortical, deep)
     }
@@ -322,35 +326,109 @@ impl Default for CodeTaskDetector {
         Self {
             code_keywords: vec![
                 // Language constructs
-                "function", "class", "struct", "impl", "def", "fn", "method",
-                "trait", "interface", "enum", "const", "static", "async", "await",
+                "function",
+                "class",
+                "struct",
+                "impl",
+                "def",
+                "fn",
+                "method",
+                "trait",
+                "interface",
+                "enum",
+                "const",
+                "static",
+                "async",
+                "await",
                 // Operations
-                "parse", "compile", "syntax", "ast", "code", "source", "script",
-                "refactor", "debug", "optimize", "generate", "implement", "build",
+                "parse",
+                "compile",
+                "syntax",
+                "ast",
+                "code",
+                "source",
+                "script",
+                "refactor",
+                "debug",
+                "optimize",
+                "generate",
+                "implement",
+                "build",
                 // Issues
-                "bug", "fix", "error", "exception", "panic", "crash", "issue",
+                "bug",
+                "fix",
+                "error",
+                "exception",
+                "panic",
+                "crash",
+                "issue",
                 // Testing
-                "test", "unit", "integration", "benchmark", "assert",
+                "test",
+                "unit",
+                "integration",
+                "benchmark",
+                "assert",
                 // Structure
-                "api", "module", "import", "export", "package", "crate", "library",
-                "variable", "type", "return", "parameter", "argument", "generic",
+                "api",
+                "module",
+                "import",
+                "export",
+                "package",
+                "crate",
+                "library",
+                "variable",
+                "type",
+                "return",
+                "parameter",
+                "argument",
+                "generic",
                 // Languages
-                "rust", "python", "nix", "javascript", "typescript", "golang", "java",
+                "rust",
+                "python",
+                "nix",
+                "javascript",
+                "typescript",
+                "golang",
+                "java",
             ],
             code_verbs: vec![
                 // These verbs + object often indicate code tasks
-                "write", "create", "add", "implement", "define", "declare",
-                "modify", "change", "update", "edit", "refactor", "rename",
-                "delete", "remove", "deprecate",
-                "fix", "debug", "repair", "patch", "resolve",
-                "explain", "describe", "document", "comment",
-                "optimize", "improve", "enhance", "simplify",
-                "test", "validate", "verify", "check",
+                "write",
+                "create",
+                "add",
+                "implement",
+                "define",
+                "declare",
+                "modify",
+                "change",
+                "update",
+                "edit",
+                "refactor",
+                "rename",
+                "delete",
+                "remove",
+                "deprecate",
+                "fix",
+                "debug",
+                "repair",
+                "patch",
+                "resolve",
+                "explain",
+                "describe",
+                "document",
+                "comment",
+                "optimize",
+                "improve",
+                "enhance",
+                "simplify",
+                "test",
+                "validate",
+                "verify",
+                "check",
             ],
             code_extensions: vec![
-                ".rs", ".py", ".nix", ".js", ".ts", ".go", ".java",
-                ".c", ".cpp", ".h", ".hpp", ".rb", ".ex", ".hs",
-                ".sh", ".bash", ".zsh", ".toml", ".yaml", ".json",
+                ".rs", ".py", ".nix", ".js", ".ts", ".go", ".java", ".c", ".cpp", ".h", ".hpp",
+                ".rb", ".ex", ".hs", ".sh", ".bash", ".zsh", ".toml", ".yaml", ".json",
             ],
             detection_threshold: 0.20,
         }
@@ -389,8 +467,7 @@ impl CodeTaskDetector {
         }
 
         // Signal 2: File extensions
-        let has_extension = self.code_extensions.iter()
-            .any(|ext| lower.contains(ext));
+        let has_extension = self.code_extensions.iter().any(|ext| lower.contains(ext));
         if has_extension {
             confidence += 0.35;
         }
@@ -402,7 +479,8 @@ impl CodeTaskDetector {
         }
 
         // Signal 4: Code keyword density
-        let keyword_matches: usize = words.iter()
+        let keyword_matches: usize = words
+            .iter()
             .filter(|w| self.code_keywords.iter().any(|kw| w.contains(kw)))
             .count();
         let keyword_ratio = keyword_matches as f32 / words.len() as f32;
@@ -426,9 +504,13 @@ impl CodeTaskDetector {
                 // Check if next few words contain a code keyword
                 for j in 1..=4 {
                     if i + j < words.len()
-                        && self.code_keywords.iter().any(|kw| words[i + j].contains(kw)) {
-                            return true;
-                        }
+                        && self
+                            .code_keywords
+                            .iter()
+                            .any(|kw| words[i + j].contains(kw))
+                    {
+                        return true;
+                    }
                 }
             }
         }
@@ -441,12 +523,16 @@ impl CodeTaskDetector {
 
         if is_code {
             DetectedTaskType::Code
-        } else if input.contains("integral") || input.contains("derivative")
-            || input.contains("equation") || input.contains("calculate")
+        } else if input.contains("integral")
+            || input.contains("derivative")
+            || input.contains("equation")
+            || input.contains("calculate")
         {
             DetectedTaskType::Mathematical
-        } else if input.contains("sequence") || input.contains("next")
-            || input.contains("predict") || input.contains("forecast")
+        } else if input.contains("sequence")
+            || input.contains("next")
+            || input.contains("predict")
+            || input.contains("forecast")
         {
             DetectedTaskType::Temporal
         } else {
@@ -459,13 +545,12 @@ impl CodeTaskDetector {
         let lower = input.to_lowercase();
         let words: Vec<&str> = lower.split_whitespace().collect();
 
-        let has_code_block = input.contains("```")
-            || input.contains("fn ")
-            || input.contains("def ");
-        let has_extension = self.code_extensions.iter()
-            .any(|ext| lower.contains(ext));
+        let has_code_block =
+            input.contains("```") || input.contains("fn ") || input.contains("def ");
+        let has_extension = self.code_extensions.iter().any(|ext| lower.contains(ext));
         let has_verb_pattern = self.detect_verb_pattern(&words);
-        let keyword_matches: usize = words.iter()
+        let keyword_matches: usize = words
+            .iter()
             .filter(|w| self.code_keywords.iter().any(|kw| w.contains(kw)))
             .count();
 
@@ -605,7 +690,11 @@ impl ActiveInferenceBridge {
         let mut conf_variance = 0.0;
         let mut out_variance = 0.0;
 
-        for (c, o) in self.confidence_history.iter().zip(self.outcome_history.iter()) {
+        for (c, o) in self
+            .confidence_history
+            .iter()
+            .zip(self.outcome_history.iter())
+        {
             let c_diff = c - conf_mean;
             let o_diff = o - out_mean;
             covariance += c_diff * o_diff;
@@ -641,8 +730,8 @@ impl ActiveInferenceBridge {
             return None;
         }
         // Error = 1 - success rate (safe division with max(1))
-        let success_rate: f64 = self.outcome_history.iter().sum::<f64>()
-            / self.outcome_history.len().max(1) as f64;
+        let success_rate: f64 =
+            self.outcome_history.iter().sum::<f64>() / self.outcome_history.len().max(1) as f64;
         Some(1.0 - success_rate)
     }
 
@@ -711,7 +800,9 @@ mod tests {
         // The high-novelty case should agree:
         let mut r2 = ThalamicRouter::new();
         let bp_high = r2.route_probabilistic(0.95, 0.9, 0.8, 0.5);
-        assert_eq!(bp_high, threshold_depth,
-            "BP routing should agree with threshold routing for extreme high inputs");
+        assert_eq!(
+            bp_high, threshold_depth,
+            "BP routing should agree with threshold routing for extreme high inputs"
+        );
     }
 }

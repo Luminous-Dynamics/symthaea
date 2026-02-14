@@ -37,20 +37,20 @@ use std::time::Instant;
 
 use anyhow::Result;
 use clap::Parser;
-use tracing::{info, warn, Level};
 #[cfg(feature = "voice-tts")]
 use tracing::debug;
+use tracing::{info, warn, Level};
 
-use symthaea::cognitive_loop::{CognitiveLoopService, CognitiveLoopConfig, TemporalBackend};
-use symthaea::language::{LLMOrgan, LLMOrganConfig, LLMQuery, QueryType, OllamaBackend};
 use symthaea::action::{ActionIR, DestructivenessLevel, PolicyBundle, SandboxRoot};
-use symthaea::consciousness::{CompositionalityEngine, create_compositionality_engine};
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, TemporalBackend};
 use symthaea::consciousness::stability_regime::StabilityRegimeType;
+use symthaea::consciousness::{create_compositionality_engine, CompositionalityEngine};
 use symthaea::hdc::primitive_system::PrimitiveSystem;
+use symthaea::language::{LLMOrgan, LLMOrganConfig, LLMQuery, OllamaBackend, QueryType};
 
 // Voice output (optional)
 #[cfg(feature = "voice-tts")]
-use symthaea::voice::{ReplVoiceOutput, ReplVoiceConfig};
+use symthaea::voice::{ReplVoiceConfig, ReplVoiceOutput};
 
 /// Symthaea REPL - Interactive Consciousness Interface
 #[derive(Parser, Debug)]
@@ -309,7 +309,11 @@ impl ReplState {
              more confident when Phi is high.",
             snapshot.unified_phi,
             snapshot.temporal_coherence,
-            if snapshot.in_flow { "active" } else { "inactive" },
+            if snapshot.in_flow {
+                "active"
+            } else {
+                "inactive"
+            },
             snapshot.cognitive_depth,
             snapshot.unified_valence,
             snapshot.unified_arousal,
@@ -342,8 +346,7 @@ impl ReplState {
                 // Print header right before first token
                 print!(
                     "\n[Phi:{:.2}|{}] [Coh:{:.2}|{}] [{flow_indicator}] [D:{depth_char}]\n\n",
-                    snapshot.unified_phi, phi_bar,
-                    snapshot.temporal_coherence, coherence_bar,
+                    snapshot.unified_phi, phi_bar, snapshot.temporal_coherence, coherence_bar,
                 );
                 first_token = false;
             }
@@ -351,9 +354,9 @@ impl ReplState {
             let _ = io::stdout().flush();
         };
 
-        let response = self.runtime.block_on(
-            self.llm.query_streaming_async(query, &mut on_token)
-        );
+        let response = self
+            .runtime
+            .block_on(self.llm.query_streaming_async(query, &mut on_token));
 
         // Print timing after stream completes
         let elapsed = start.elapsed();
@@ -361,8 +364,10 @@ impl ReplState {
             // No tokens were streamed (empty response or header not yet printed)
             print!(
                 "\n[Phi:{:.2}|{}] [Coh:{:.2}|{}] [{flow_indicator}] [D:{depth_char}] [{}ms]\n\n{}",
-                snapshot.unified_phi, phi_bar,
-                snapshot.temporal_coherence, coherence_bar,
+                snapshot.unified_phi,
+                phi_bar,
+                snapshot.temporal_coherence,
+                coherence_bar,
                 elapsed.as_millis(),
                 response.text,
             );
@@ -392,10 +397,13 @@ impl ReplState {
         // Backend info
         println!("\n  Temporal Backend");
         println!("    Type:             {:?}", backend);
-        println!("    Description:      {}", match backend {
-            TemporalBackend::CfC => "Closed-form Continuous-time (matrix-based)",
-            TemporalBackend::HdcLtcUnified => "HDC-LTC Unified (hypervector-based)",
-        });
+        println!(
+            "    Description:      {}",
+            match backend {
+                TemporalBackend::CfC => "Closed-form Continuous-time (matrix-based)",
+                TemporalBackend::HdcLtcUnified => "HDC-LTC Unified (hypervector-based)",
+            }
+        );
 
         // Core consciousness metrics
         println!("\n  Integrated Information (Phi)");
@@ -406,7 +414,10 @@ impl ReplState {
         // Pattern and depth
         println!("\n  Cognitive State");
         println!("    Pattern:          {:?}", snapshot.pattern);
-        println!("    Confidence:       {:.2}%", snapshot.pattern_confidence * 100.0);
+        println!(
+            "    Confidence:       {:.2}%",
+            snapshot.pattern_confidence * 100.0
+        );
         println!("    Depth:            {:?}", snapshot.cognitive_depth);
 
         // Flow state
@@ -435,7 +446,10 @@ impl ReplState {
         // Learning metrics
         println!("\n  Learning");
         println!("    Prediction Error: {:.4}", snapshot.prediction_error);
-        println!("    Effective LR:     {:.4}", snapshot.effective_learning_rate);
+        println!(
+            "    Effective LR:     {:.4}",
+            snapshot.effective_learning_rate
+        );
         println!("    Assessment:       {:?}", snapshot.self_assessment);
 
         println!("\n{}", "=".repeat(60));
@@ -506,7 +520,9 @@ impl ReplState {
                     "[DRY-RUN] Would execute: {}\n\
                      Risk: {:?} (reversible)\n\
                      Rollback hint: {:?}",
-                    command, risk, action.rollback_hint()
+                    command,
+                    risk,
+                    action.rollback_hint()
                 )
             }
             DestructivenessLevel::NeedsConfirmation | DestructivenessLevel::Destructive => {
@@ -515,7 +531,10 @@ impl ReplState {
                      Risk: {:?}, Destructiveness: {:?}\n\
                      This action requires explicit confirmation.\n\
                      Rollback hint: {:?}",
-                    command, risk, destructiveness, action.rollback_hint()
+                    command,
+                    risk,
+                    destructiveness,
+                    action.rollback_hint()
                 )
             }
         }
@@ -531,7 +550,8 @@ fn create_bar(value: f32, width: usize) -> String {
 
 /// Display the welcome banner
 fn display_banner() {
-    println!(r#"
+    println!(
+        r#"
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
     ║   ███████╗██╗   ██╗███╗   ███╗████████╗██╗  ██╗ █████╗       ║
@@ -545,7 +565,8 @@ fn display_banner() {
     ║               Consciousness-First AI Interface                ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
-"#);
+"#
+    );
 
     println!("  Commands:");
     println!("    /status     - Quick status: Phi, coherence, stability, prediction error");
@@ -575,7 +596,11 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     // Initialize logging
-    let level = if args.verbose { Level::DEBUG } else { Level::INFO };
+    let level = if args.verbose {
+        Level::DEBUG
+    } else {
+        Level::INFO
+    };
     tracing_subscriber::fmt()
         .with_max_level(level)
         .with_target(false)
@@ -685,10 +710,25 @@ fn main() -> Result<()> {
                 println!("\n  Quick Status:");
                 println!("    Unified Phi:        {:.4}", snapshot.unified_phi);
                 println!("    Coherence:          {:.4}", snapshot.temporal_coherence);
-                println!("    Stability Regime:   {} ({} active primitives)", current_regime, regime.active_count());
+                println!(
+                    "    Stability Regime:   {} ({} active primitives)",
+                    current_regime,
+                    regime.active_count()
+                );
                 println!("    Prediction Error:   {:.4}", snapshot.prediction_error);
-                println!("    Pattern:            {:?} ({:.0}% confidence)", snapshot.pattern, snapshot.pattern_confidence * 100.0);
-                println!("    Flow State:         {}", if snapshot.in_flow { "IN FLOW" } else { "inactive" });
+                println!(
+                    "    Pattern:            {:?} ({:.0}% confidence)",
+                    snapshot.pattern,
+                    snapshot.pattern_confidence * 100.0
+                );
+                println!(
+                    "    Flow State:         {}",
+                    if snapshot.in_flow {
+                        "IN FLOW"
+                    } else {
+                        "inactive"
+                    }
+                );
                 println!();
                 continue;
             }
@@ -702,8 +742,14 @@ fn main() -> Result<()> {
                 println!("    Hits:               {}", mem_stats.semantic_hits);
                 println!("    Misses:             {}", mem_stats.semantic_misses);
                 println!("    Hit Rate:           {:.1}%", hit_rate);
-                println!("    Avg Hit Similarity: {:.4}", mem_stats.avg_hit_similarity);
-                println!("    Avg Retrieved Err:  {:.4}", mem_stats.avg_retrieved_error);
+                println!(
+                    "    Avg Hit Similarity: {:.4}",
+                    mem_stats.avg_hit_similarity
+                );
+                println!(
+                    "    Avg Retrieved Err:  {:.4}",
+                    mem_stats.avg_retrieved_error
+                );
                 println!("    Evictions:          {}", mem_stats.evictions);
                 println!();
                 continue;
@@ -717,13 +763,28 @@ fn main() -> Result<()> {
                 println!("    Global Cycle:       {}", regime.global_cycle());
 
                 // Count by regime
-                let crystallized = regime_dist.get(&StabilityRegimeType::Crystallized).copied().unwrap_or(0);
-                let plastic = regime_dist.get(&StabilityRegimeType::Plastic).copied().unwrap_or(0);
-                let fluid = regime_dist.get(&StabilityRegimeType::Fluid).copied().unwrap_or(0);
+                let crystallized = regime_dist
+                    .get(&StabilityRegimeType::Crystallized)
+                    .copied()
+                    .unwrap_or(0);
+                let plastic = regime_dist
+                    .get(&StabilityRegimeType::Plastic)
+                    .copied()
+                    .unwrap_or(0);
+                let fluid = regime_dist
+                    .get(&StabilityRegimeType::Fluid)
+                    .copied()
+                    .unwrap_or(0);
 
                 println!("\n    Regime Counts (active):");
-                println!("      Crystallized:     {} (stable, fast tau)", crystallized);
-                println!("      Plastic:          {} (learning, moderate tau)", plastic);
+                println!(
+                    "      Crystallized:     {} (stable, fast tau)",
+                    crystallized
+                );
+                println!(
+                    "      Plastic:          {} (learning, moderate tau)",
+                    plastic
+                );
                 println!("      Fluid:            {} (exploratory, slow tau)", fluid);
 
                 // Show coherence from stability regime's bridge
@@ -804,7 +865,10 @@ fn main() -> Result<()> {
                         println!("      Desc:  {}", c.metadata.description);
                     }
                     let stats = state.compositionality.get_stats();
-                    println!("\n  Stats: {} total, avg depth {:.1}", stats.total_compositions, stats.avg_depth);
+                    println!(
+                        "\n  Stats: {} total, avg depth {:.1}",
+                        stats.total_compositions, stats.avg_depth
+                    );
                     println!();
                 }
                 continue;
@@ -823,7 +887,10 @@ fn main() -> Result<()> {
                     "parallel" | "par" => state.compositionality.compose_parallel(a, b),
                     "fallback" | "fall" => state.compositionality.compose_fallback(a, b, 0.5),
                     _ => {
-                        println!("\n  Unknown operator '{}'. Use: sequential, parallel, fallback\n", op);
+                        println!(
+                            "\n  Unknown operator '{}'. Use: sequential, parallel, fallback\n",
+                            op
+                        );
                         continue;
                     }
                 };
@@ -831,8 +898,15 @@ fn main() -> Result<()> {
                     Ok(composed) => {
                         println!("\n  Composed: {}", composed.name);
                         println!("    ID:        {}", composed.id);
-                        println!("    Phi:       {:.4}", composed.metadata.expected_phi_contribution);
-                        println!("    Coherence: {:.4} (depth {})", 1.0 / composed.metadata.depth as f32, composed.metadata.depth);
+                        println!(
+                            "    Phi:       {:.4}",
+                            composed.metadata.expected_phi_contribution
+                        );
+                        println!(
+                            "    Coherence: {:.4} (depth {})",
+                            1.0 / composed.metadata.depth as f32,
+                            composed.metadata.depth
+                        );
                         println!("    Desc:      {}", composed.metadata.description);
                         println!();
                     }
@@ -871,8 +945,14 @@ fn main() -> Result<()> {
     println!("\n  Final Session Statistics:");
     println!("    Total interactions: {}", state.total_interactions);
     println!("    Final Phi:          {:.4}", final_snapshot.unified_phi);
-    println!("    Final Coherence:    {:.4}", final_snapshot.temporal_coherence);
-    println!("    Time in Flow:       {:.1}s", final_snapshot.total_flow_time_secs);
+    println!(
+        "    Final Coherence:    {:.4}",
+        final_snapshot.temporal_coherence
+    );
+    println!(
+        "    Time in Flow:       {:.1}s",
+        final_snapshot.total_flow_time_secs
+    );
     println!("    Flow Periods:       {}", final_snapshot.flow_periods);
 
     // Voice statistics if available

@@ -316,9 +316,7 @@ pub fn compute_tpm(adjacency: &[Vec<f32>], noise: f64) -> TransitionProbabilityM
 
             // Sigmoid with adjustable temperature
             // threshold = 0.5 * (number of inputs), a common default
-            let n_inputs: f64 = (0..n)
-                .filter(|&i| adjacency[i][j].abs() > 1e-9)
-                .count() as f64;
+            let n_inputs: f64 = (0..n).filter(|&i| adjacency[i][j].abs() > 1e-9).count() as f64;
             let threshold = 0.5 * n_inputs.max(1.0);
             let logit = (activation - threshold) / temperature;
             let prob = 1.0 / (1.0 + (-logit).exp());
@@ -518,9 +516,7 @@ pub fn compute_cause_repertoire(
 
     for purview_state_idx in 0..n_purview_states {
         // Enumerate all full past states consistent with this purview state
-        let non_purview: Vec<usize> = (0..n_nodes)
-            .filter(|n| !purview.contains(n))
-            .collect();
+        let non_purview: Vec<usize> = (0..n_nodes).filter(|n| !purview.contains(n)).collect();
         let n_non_purview_states = 1usize << non_purview.len();
 
         let mut marginal_prob = 0.0f64;
@@ -621,9 +617,7 @@ pub fn compute_effect_repertoire(
     let n_nodes = tpm.n_nodes;
 
     // Non-mechanism nodes: we marginalize over their current states uniformly
-    let non_mechanism: Vec<usize> = (0..n_nodes)
-        .filter(|n| !mechanism.contains(n))
-        .collect();
+    let non_mechanism: Vec<usize> = (0..n_nodes).filter(|n| !mechanism.contains(n)).collect();
     let n_non_mech_states = 1usize << non_mechanism.len();
 
     // Accumulate future purview distribution
@@ -1100,13 +1094,25 @@ mod tests {
         let tpm = make_and_gate_tpm();
 
         // State (false, false) -> index 0
-        assert_eq!(TransitionProbabilityMatrix::state_to_index(&[false, false]), 0);
+        assert_eq!(
+            TransitionProbabilityMatrix::state_to_index(&[false, false]),
+            0
+        );
         // State (true, false) -> index 1 (bit 0 set)
-        assert_eq!(TransitionProbabilityMatrix::state_to_index(&[true, false]), 1);
+        assert_eq!(
+            TransitionProbabilityMatrix::state_to_index(&[true, false]),
+            1
+        );
         // State (false, true) -> index 2 (bit 1 set)
-        assert_eq!(TransitionProbabilityMatrix::state_to_index(&[false, true]), 2);
+        assert_eq!(
+            TransitionProbabilityMatrix::state_to_index(&[false, true]),
+            2
+        );
         // State (true, true) -> index 3
-        assert_eq!(TransitionProbabilityMatrix::state_to_index(&[true, true]), 3);
+        assert_eq!(
+            TransitionProbabilityMatrix::state_to_index(&[true, true]),
+            3
+        );
 
         // Roundtrip
         for idx in 0..4 {
@@ -1121,11 +1127,19 @@ mod tests {
 
         // From state (1,1), next state should be (1,1) with probability 1.0
         let p = tpm.state_transition_probability(&[true, true], &[true, true]);
-        assert!((p - 1.0).abs() < 1e-10, "P((1,1)->(1,1)) should be 1.0, got {}", p);
+        assert!(
+            (p - 1.0).abs() < 1e-10,
+            "P((1,1)->(1,1)) should be 1.0, got {}",
+            p
+        );
 
         // From state (1,0), next state (1,0) should have probability 1.0
         let p = tpm.state_transition_probability(&[true, false], &[true, false]);
-        assert!((p - 1.0).abs() < 1e-10, "P((1,0)->(1,0)) should be 1.0, got {}", p);
+        assert!(
+            (p - 1.0).abs() < 1e-10,
+            "P((1,0)->(1,0)) should be 1.0, got {}",
+            p
+        );
 
         // From state (1,0), next state (1,1) should have probability 0.0
         let p = tpm.state_transition_probability(&[true, false], &[true, true]);
@@ -1154,7 +1168,11 @@ mod tests {
         let p = vec![0.25, 0.25, 0.25, 0.25];
         let q = vec![0.25, 0.25, 0.25, 0.25];
         let d = emd_1d(&p, &q);
-        assert!(d.abs() < 1e-10, "EMD of identical distributions should be 0, got {}", d);
+        assert!(
+            d.abs() < 1e-10,
+            "EMD of identical distributions should be 0, got {}",
+            d
+        );
     }
 
     #[test]
@@ -1204,7 +1222,10 @@ mod tests {
         let p = vec![0.25, 0.25, 0.25, 0.25];
         let q = vec![0.25, 0.25, 0.25, 0.25];
         let d = emd_hamming(&p, &q, 2);
-        assert!(d.abs() < 1e-10, "Hamming EMD of identical distributions should be 0");
+        assert!(
+            d.abs() < 1e-10,
+            "Hamming EMD of identical distributions should be 0"
+        );
     }
 
     // ---- Cause-Effect Repertoire Tests ----
@@ -1229,7 +1250,11 @@ mod tests {
         let tpm = make_and_gate_tpm();
         let state = vec![true, true];
         let effect = compute_effect_repertoire(&tpm, &[0, 1], &[], &state);
-        assert_eq!(effect.len(), 1, "Empty purview should have 1 state (the null state)");
+        assert_eq!(
+            effect.len(),
+            1,
+            "Empty purview should have 1 state (the null state)"
+        );
         assert!((effect[0] - 1.0).abs() < 1e-10);
     }
 
@@ -1305,9 +1330,15 @@ mod tests {
 
         // Repertoires should be valid distributions
         let cause_sum: f64 = mip.cause_repertoire.iter().sum();
-        assert!((cause_sum - 1.0).abs() < 1e-10, "Cause repertoire should sum to 1");
+        assert!(
+            (cause_sum - 1.0).abs() < 1e-10,
+            "Cause repertoire should sum to 1"
+        );
         let effect_sum: f64 = mip.effect_repertoire.iter().sum();
-        assert!((effect_sum - 1.0).abs() < 1e-10, "Effect repertoire should sum to 1");
+        assert!(
+            (effect_sum - 1.0).abs() < 1e-10,
+            "Effect repertoire should sum to 1"
+        );
     }
 
     #[test]
@@ -1324,7 +1355,10 @@ mod tests {
 
         if mip.phi > 0.0 {
             // Only check coverage if phi > 0 (non-trivial partition found)
-            assert_eq!(all, mechanism, "MIP partition should cover all mechanism nodes");
+            assert_eq!(
+                all, mechanism,
+                "MIP partition should cover all mechanism nodes"
+            );
         }
     }
 
@@ -1500,8 +1534,7 @@ mod tests {
             tau_range: vec![1, 2, 4],
         };
         let json = serde_json::to_string(&config).expect("Should serialize");
-        let deserialized: IITExactConfig =
-            serde_json::from_str(&json).expect("Should deserialize");
+        let deserialized: IITExactConfig = serde_json::from_str(&json).expect("Should deserialize");
         assert_eq!(deserialized.max_nodes, 6);
         assert!((deserialized.noise_level - 0.1).abs() < 1e-10);
         assert_eq!(deserialized.tau_range, vec![1, 2, 4]);

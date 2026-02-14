@@ -44,9 +44,7 @@ use thiserror::Error;
 
 pub mod hdc_cfc_bridge;
 
-pub use hdc_cfc_bridge::{
-    HdcCfcBridge, HdcCfcBridgeConfig, BridgeAttention, AttentionOutput,
-};
+pub use hdc_cfc_bridge::{AttentionOutput, BridgeAttention, HdcCfcBridge, HdcCfcBridgeConfig};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // BRIDGE ERROR TYPES
@@ -329,10 +327,7 @@ impl BridgeRegistry {
     }
 
     /// Register a bridge.
-    pub fn register<B: ConsciousnessBridge + Send + Sync + 'static>(
-        &mut self,
-        bridge: B,
-    ) {
+    pub fn register<B: ConsciousnessBridge + Send + Sync + 'static>(&mut self, bridge: B) {
         let name = bridge.name().to_string();
         self.bridges.insert(name, Box::new(bridge));
     }
@@ -347,12 +342,16 @@ impl BridgeRegistry {
 
     /// Get a bridge by name.
     pub fn get(&self, name: &str) -> Option<&dyn ConsciousnessBridge> {
-        self.bridges.get(name).map(|b| &**b as &dyn ConsciousnessBridge)
+        self.bridges
+            .get(name)
+            .map(|b| &**b as &dyn ConsciousnessBridge)
     }
 
     /// Get a mutable bridge by name.
     pub fn get_mut(&mut self, name: &str) -> Option<&mut dyn ConsciousnessBridge> {
-        self.bridges.get_mut(name).map(|b| &mut **b as &mut dyn ConsciousnessBridge)
+        self.bridges
+            .get_mut(name)
+            .map(|b| &mut **b as &mut dyn ConsciousnessBridge)
     }
 
     /// Get all bridge names.

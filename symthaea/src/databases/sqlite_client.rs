@@ -68,13 +68,16 @@
 //! reads efficiently. Calls are wrapped in `spawn_blocking` to avoid stalling
 //! async runtimes.
 
-use super::{ConsciousnessDatabase, DbResult, DatabaseError, DatabaseStats, MemoryRecord, MemoryType, SearchResult};
-use symthaea_core::hdc::binary_hv::BinaryHV;
-use async_trait::async_trait;
-use rusqlite::{Connection, params};
-use std::sync::{Arc, Mutex};
-use std::path::Path;
+use super::{
+    ConsciousnessDatabase, DatabaseError, DatabaseStats, DbResult, MemoryRecord, MemoryType,
+    SearchResult,
+};
 use crate::infrastructure::lock_guard::ResilientMutex;
+use async_trait::async_trait;
+use rusqlite::{params, Connection};
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LSH CONSTANTS
@@ -164,9 +167,8 @@ impl SqliteMemory {
             })?;
         }
 
-        let conn = Connection::open(&path).map_err(|e| {
-            DatabaseError::ConnectionFailed(format!("SQLite open failed: {}", e))
-        })?;
+        let conn = Connection::open(&path)
+            .map_err(|e| DatabaseError::ConnectionFailed(format!("SQLite open failed: {}", e)))?;
 
         let db = Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -220,7 +222,8 @@ impl SqliteMemory {
     fn initialize_schema(&self) -> DbResult<()> {
         let conn = self.conn.lock_resilient("sqlite");
 
-        conn.execute_batch(r#"
+        conn.execute_batch(
+            r#"
             CREATE TABLE IF NOT EXISTS memories (
                 id TEXT PRIMARY KEY,
                 encoding BLOB NOT NULL,
@@ -239,18 +242,21 @@ impl SqliteMemory {
             CREATE INDEX IF NOT EXISTS idx_memories_timestamp ON memories(timestamp_ms);
             CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(memory_type);
             CREATE INDEX IF NOT EXISTS idx_memories_phi ON memories(phi);
-        "#).map_err(|e| {
-            DatabaseError::QueryFailed(format!("Schema creation failed: {}", e))
-        })?;
+        "#,
+        )
+        .map_err(|e| DatabaseError::QueryFailed(format!("Schema creation failed: {}", e)))?;
 
         // Migration: add reconsolidation columns to existing databases
-        let _ = conn.execute_batch(r#"
+        let _ = conn.execute_batch(
+            r#"
             ALTER TABLE memories ADD COLUMN consolidation_strength REAL NOT NULL DEFAULT 0.0;
             ALTER TABLE memories ADD COLUMN retrieval_count INTEGER NOT NULL DEFAULT 0;
-        "#);
+        "#,
+        );
 
         // Migration: create LSH index table for approximate nearest-neighbor search
-        conn.execute_batch(r#"
+        conn.execute_batch(
+            r#"
             CREATE TABLE IF NOT EXISTS vector_lsh (
                 memory_id TEXT NOT NULL,
                 band_idx INTEGER NOT NULL,
@@ -260,19 +266,23 @@ impl SqliteMemory {
             );
 
             CREATE INDEX IF NOT EXISTS idx_lsh_band_hash ON vector_lsh(band_idx, band_hash);
-        "#).map_err(|e| {
-            DatabaseError::QueryFailed(format!("LSH schema creation failed: {}", e))
-        })?;
+        "#,
+        )
+        .map_err(|e| DatabaseError::QueryFailed(format!("LSH schema creation failed: {}", e)))?;
 
         // Backfill LSH index for any existing records
-        let record_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM memories", [], |row| row.get(0)
-        ).unwrap_or(0);
+        let record_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))
+            .unwrap_or(0);
 
         if record_count > 0 {
-            let lsh_count: i64 = conn.query_row(
-                "SELECT COUNT(DISTINCT memory_id) FROM vector_lsh", [], |row| row.get(0)
-            ).unwrap_or(0);
+            let lsh_count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(DISTINCT memory_id) FROM vector_lsh",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0);
 
             if lsh_count < record_count {
                 Self::backfill_lsh_index(&conn)?;
@@ -394,14 +404,16 @@ impl SqliteMemory {
         // Build query: match any band where band_idx = ? AND band_hash = ?
         // Using UNION for each band is cleaner than OR chains
         let mut candidates = std::collections::HashSet::new();
-        let mut stmt = conn.prepare_cached(
-            "SELECT DISTINCT memory_id FROM vector_lsh WHERE band_idx = ?1 AND band_hash = ?2"
-        ).map_err(|e| DatabaseError::QueryFailed(format!("LSH query prepare failed: {}", e)))?;
+        let mut stmt = conn
+            .prepare_cached(
+                "SELECT DISTINCT memory_id FROM vector_lsh WHERE band_idx = ?1 AND band_hash = ?2",
+            )
+            .map_err(|e| DatabaseError::QueryFailed(format!("LSH query prepare failed: {}", e)))?;
 
         for (band, &hash) in hashes.iter().enumerate() {
-            let rows = stmt.query_map(params![band as i64, hash], |row| {
-                row.get::<_, String>(0)
-            }).map_err(|e| DatabaseError::QueryFailed(format!("LSH query failed: {}", e)))?;
+            let rows = stmt
+                .query_map(params![band as i64, hash], |row| row.get::<_, String>(0))
+                .map_err(|e| DatabaseError::QueryFailed(format!("LSH query failed: {}", e)))?;
 
             for id in rows.flatten() {
                 candidates.insert(id);
@@ -454,7 +466,8 @@ impl SqliteMemory {
              FROM memories ORDER BY timestamp_ms DESC LIMIT ?1"
         ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
 
-        let rows = stmt.query_map([limit as i64], Self::row_to_record)
+        let rows = stmt
+            .query_map([limit as i64], Self::row_to_record)
             .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
 
         Ok(rows.filter_map(|r| r.ok()).collect())
@@ -469,7 +482,9 @@ impl SqliteMemory {
         // Use batched queries to avoid SQLite variable limit (999)
         let mut records = Vec::with_capacity(ids.len());
         for chunk in ids.chunks(500) {
-            let placeholders: String = chunk.iter().enumerate()
+            let placeholders: String = chunk
+                .iter()
+                .enumerate()
                 .map(|(i, _)| format!("?{}", i + 1))
                 .collect::<Vec<_>>()
                 .join(",");
@@ -479,14 +494,17 @@ impl SqliteMemory {
                  FROM memories WHERE id IN ({})", placeholders
             );
 
-            let mut stmt = conn.prepare(&sql)
+            let mut stmt = conn
+                .prepare(&sql)
                 .map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
 
-            let params: Vec<&dyn rusqlite::types::ToSql> = chunk.iter()
+            let params: Vec<&dyn rusqlite::types::ToSql> = chunk
+                .iter()
                 .map(|id| id as &dyn rusqlite::types::ToSql)
                 .collect();
 
-            let rows = stmt.query_map(params.as_slice(), Self::row_to_record)
+            let rows = stmt
+                .query_map(params.as_slice(), Self::row_to_record)
                 .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
 
             records.extend(rows.filter_map(|r| r.ok()));
@@ -502,11 +520,13 @@ impl SqliteMemory {
             "SELECT id, encoding FROM memories WHERE id NOT IN (SELECT DISTINCT memory_id FROM vector_lsh)"
         ).map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill query failed: {}", e)))?;
 
-        let rows: Vec<(String, Vec<u8>)> = stmt.query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
-        }).map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill failed: {}", e)))?
-        .filter_map(|r| r.ok())
-        .collect();
+        let rows: Vec<(String, Vec<u8>)> = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+            })
+            .map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill failed: {}", e)))?
+            .filter_map(|r| r.ok())
+            .collect();
 
         let count = rows.len();
         for (id, encoding_bytes) in rows {
@@ -567,7 +587,8 @@ impl ConsciousnessDatabase for SqliteMemory {
         let query = *query;
         self.with_connection(move |conn| {
             // Check total record count to decide LSH vs brute-force
-            let total: i64 = conn.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))
+            let total: i64 = conn
+                .query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))
                 .unwrap_or(0);
 
             let records: Vec<MemoryRecord> = if total as usize >= LSH_MIN_RECORDS {
@@ -628,7 +649,8 @@ impl ConsciousnessDatabase for SqliteMemory {
             // Clean up LSH index entries (CASCADE may not be enabled in all SQLite builds)
             Self::delete_lsh_entries(conn, &id)?;
 
-            let affected = conn.execute("DELETE FROM memories WHERE id = ?1", [&id])
+            let affected = conn
+                .execute("DELETE FROM memories WHERE id = ?1", [&id])
                 .map_err(|e| DatabaseError::QueryFailed(format!("Delete failed: {}", e)))?;
 
             Ok(affected > 0)
@@ -638,7 +660,8 @@ impl ConsciousnessDatabase for SqliteMemory {
 
     async fn count(&self) -> DbResult<usize> {
         self.with_connection(|conn| {
-            let count: i64 = conn.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))
+            let count: i64 = conn
+                .query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))
                 .map_err(|e| DatabaseError::QueryFailed(format!("Count failed: {}", e)))?;
 
             Ok(count as usize)
@@ -910,7 +933,11 @@ mod tests {
 
         // Very similar vectors should share most LSH bands
         let matching_bands = h1.iter().zip(h2.iter()).filter(|(a, b)| a == b).count();
-        assert!(matching_bands >= 3, "Very similar vectors should share at least 3 of 6 bands, got {}", matching_bands);
+        assert!(
+            matching_bands >= 3,
+            "Very similar vectors should share at least 3 of 6 bands, got {}",
+            matching_bands
+        );
     }
 
     #[tokio::test]
@@ -934,10 +961,13 @@ mod tests {
 
         // Check that LSH entries were created
         let conn = db.conn.lock().unwrap();
-        let lsh_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM vector_lsh WHERE memory_id = 'lsh-test-1'",
-            [], |row| row.get(0)
-        ).unwrap();
+        let lsh_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM vector_lsh WHERE memory_id = 'lsh-test-1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(lsh_count, LSH_NUM_BANDS as i64);
     }
 
@@ -962,10 +992,13 @@ mod tests {
         db.delete("lsh-del-1").await.unwrap();
 
         let conn = db.conn.lock().unwrap();
-        let lsh_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM vector_lsh WHERE memory_id = 'lsh-del-1'",
-            [], |row| row.get(0)
-        ).unwrap();
+        let lsh_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM vector_lsh WHERE memory_id = 'lsh-del-1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(lsh_count, 0);
     }
 
@@ -1062,7 +1095,11 @@ mod tests {
                 id: format!("stats-test-{}", i),
                 encoding: BinaryHV::random(i as u64),
                 timestamp_ms: 1000000000 + i as u64 * 1000,
-                memory_type: if i % 2 == 0 { MemoryType::Episodic } else { MemoryType::Semantic },
+                memory_type: if i % 2 == 0 {
+                    MemoryType::Episodic
+                } else {
+                    MemoryType::Semantic
+                },
                 content: format!("Test memory {}", i),
                 valence: 0.5,
                 arousal: 0.5,

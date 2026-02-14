@@ -19,10 +19,10 @@
 //! If ~40-45% bridge ratio optimizes Φ, there may be corresponding optimal
 //! topological signatures (e.g., β₀=1, specific β₁/β₂ patterns).
 
-use super::spectral_connectivity::ConnectivityCalculator;
 use super::adaptive_topology::{AdaptiveTopology, CognitiveMode};
-#[allow(unused_imports)]  // Used in tests
-use super::fractal_consciousness::{FractalConsciousness, FractalConfig};
+#[allow(unused_imports)] // Used in tests
+use super::fractal_consciousness::{FractalConfig, FractalConsciousness};
+use super::spectral_connectivity::ConnectivityCalculator;
 
 /// Extended metrics including topological features
 #[derive(Clone, Debug)]
@@ -45,9 +45,15 @@ pub struct TopologicalMetrics {
 
 impl std::fmt::Display for TopologicalMetrics {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Φ={:.4}, β₀={}, β₁={}, χ={}, bridges={:.1}%",
-               self.phi, self.beta_0, self.beta_1, self.euler_characteristic,
-               self.bridge_ratio * 100.0)
+        write!(
+            f,
+            "Φ={:.4}, β₀={}, β₁={}, χ={}, bridges={:.1}%",
+            self.phi,
+            self.beta_0,
+            self.beta_1,
+            self.euler_characteristic,
+            self.bridge_ratio * 100.0
+        )
     }
 }
 
@@ -75,7 +81,13 @@ impl TopologySynergy {
         let (beta_0, beta_1) = self.estimate_betti_from_edges(
             adaptive.organizer().processes().len(),
             &adaptive.active_bridge_connections(),
-            adaptive.organizer().topology().edges.iter().map(|&(a,b)| (a, b)).collect(),
+            adaptive
+                .organizer()
+                .topology()
+                .edges
+                .iter()
+                .map(|&(a, b)| (a, b))
+                .collect(),
         );
 
         TopologicalMetrics {
@@ -95,11 +107,13 @@ impl TopologySynergy {
         let ms_phi = fractal.multi_scale_phi();
 
         // Generate metrics for each scale
-        ms_phi.scale_phis.iter()
+        ms_phi
+            .scale_phis
+            .iter()
             .map(|(scale, phi)| {
                 TopologicalMetrics {
                     phi: *phi,
-                    beta_0: 1, // Assume connected at each scale
+                    beta_0: 1,      // Assume connected at each scale
                     beta_1: *scale, // Hypothetical: more cycles at higher scales
                     euler_characteristic: 1 - *scale as i64,
                     bridge_ratio: metrics.top_level_bridge_ratio,
@@ -120,7 +134,8 @@ impl TopologySynergy {
         base_edges: Vec<(usize, usize)>,
     ) -> (usize, usize) {
         // Combine all edges
-        let all_edges: Vec<(usize, usize)> = base_edges.into_iter()
+        let all_edges: Vec<(usize, usize)> = base_edges
+            .into_iter()
             .chain(bridge_edges.iter().copied())
             .collect();
 
@@ -249,12 +264,23 @@ pub struct ModeTransitionReport {
 impl std::fmt::Display for ModeTransitionReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Mode Transition Analysis:")?;
-        writeln!(f, "{:<25} {:>10} {:>8} {:>8} {:>10}", "Transition", "ΔΦ", "Δβ₀", "Δβ₁", "ΔBridge")?;
+        writeln!(
+            f,
+            "{:<25} {:>10} {:>8} {:>8} {:>10}",
+            "Transition", "ΔΦ", "Δβ₀", "Δβ₁", "ΔBridge"
+        )?;
         writeln!(f, "{}", "-".repeat(65))?;
         for t in &self.transitions {
             writeln!(f, "{:?} → {:?}", t.from, t.to)?;
-            writeln!(f, "{:>25} {:>+10.4} {:>+8} {:>+8} {:>+10.1}%",
-                     "", t.phi_delta, t.beta_0_delta, t.beta_1_delta, t.bridge_delta * 100.0)?;
+            writeln!(
+                f,
+                "{:>25} {:>+10.4} {:>+8} {:>+8} {:>+10.1}%",
+                "",
+                t.phi_delta,
+                t.beta_0_delta,
+                t.beta_1_delta,
+                t.bridge_delta * 100.0
+            )?;
         }
         Ok(())
     }
@@ -334,9 +360,17 @@ mod tests {
         let fractal = FractalConsciousness::new(config);
         let scale_metrics = synergy.analyze_fractal(&fractal);
 
-        assert_eq!(scale_metrics.len(), 3, "Should have metrics for all 3 scales");
+        assert_eq!(
+            scale_metrics.len(),
+            3,
+            "Should have metrics for all 3 scales"
+        );
         for m in &scale_metrics {
-            assert!(m.phi.is_finite(), "Phi at scale {:?} should be finite", m.scale);
+            assert!(
+                m.phi.is_finite(),
+                "Phi at scale {:?} should be finite",
+                m.scale
+            );
         }
     }
 
@@ -344,7 +378,10 @@ mod tests {
     fn test_mode_transitions() {
         let synergy = TopologySynergy::new(2048);
         let report = synergy.mode_transition_analysis();
-        assert!(!report.transitions.is_empty(), "Mode transition report should have transitions");
+        assert!(
+            !report.transitions.is_empty(),
+            "Mode transition report should have transitions"
+        );
     }
 
     #[test]
@@ -352,18 +389,42 @@ mod tests {
         let synergy = TopologySynergy::new(2048);
 
         let test_cases = [
-            (TopologicalMetrics {
-                phi: 0.5, beta_0: 1, beta_1: 1, euler_characteristic: 0,
-                bridge_ratio: 0.3, mode: None, scale: None,
-            }, ConsciousnessState::Focused),
-            (TopologicalMetrics {
-                phi: 0.5, beta_0: 1, beta_1: 4, euler_characteristic: -3,
-                bridge_ratio: 0.4, mode: None, scale: None,
-            }, ConsciousnessState::NormalWaking),
-            (TopologicalMetrics {
-                phi: 0.5, beta_0: 3, beta_1: 2, euler_characteristic: 1,
-                bridge_ratio: 0.2, mode: None, scale: None,
-            }, ConsciousnessState::Fragmented),
+            (
+                TopologicalMetrics {
+                    phi: 0.5,
+                    beta_0: 1,
+                    beta_1: 1,
+                    euler_characteristic: 0,
+                    bridge_ratio: 0.3,
+                    mode: None,
+                    scale: None,
+                },
+                ConsciousnessState::Focused,
+            ),
+            (
+                TopologicalMetrics {
+                    phi: 0.5,
+                    beta_0: 1,
+                    beta_1: 4,
+                    euler_characteristic: -3,
+                    bridge_ratio: 0.4,
+                    mode: None,
+                    scale: None,
+                },
+                ConsciousnessState::NormalWaking,
+            ),
+            (
+                TopologicalMetrics {
+                    phi: 0.5,
+                    beta_0: 3,
+                    beta_1: 2,
+                    euler_characteristic: 1,
+                    bridge_ratio: 0.2,
+                    mode: None,
+                    scale: None,
+                },
+                ConsciousnessState::Fragmented,
+            ),
         ];
 
         for (metrics, expected) in &test_cases {

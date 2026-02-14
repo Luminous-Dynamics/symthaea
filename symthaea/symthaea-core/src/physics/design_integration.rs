@@ -46,12 +46,12 @@
 //! not consciousness. The HDC encoding is a valid dimensionality reduction
 //! technique; the "consciousness" terminology was misleading.
 
-use crate::genesis::GenesisSeed;
-use crate::hdc::unified_hv::ContinuousHV;
 use super::consciousness_bridge::PhysicsConsciousnessBridge;
 use super::coupled_physics::{CoupledSimulationResult, OperatingConditions};
-use super::thermal_transport::TemperatureProfile;
 use super::standard_model::PHYSICS_DIM;
+use super::thermal_transport::TemperatureProfile;
+use crate::genesis::GenesisSeed;
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 /// Integration metrics computed from a physics simulation result
@@ -179,7 +179,8 @@ impl DesignIntegrationEngine {
 
         for (i, &temp) in profile.temperatures.iter().enumerate() {
             let normalized = ((temp - profile.t_min) / t_scale) as f32;
-            let position_phase = (i as f32 / profile.temperatures.len() as f32) * 2.0 * std::f32::consts::PI;
+            let position_phase =
+                (i as f32 / profile.temperatures.len() as f32) * 2.0 * std::f32::consts::PI;
 
             for harmonic in 0..8 {
                 let freq = (harmonic + 1) as f32;
@@ -244,7 +245,9 @@ impl DesignIntegrationEngine {
         }
 
         let structure_vec = ContinuousHV::from_vec(features);
-        structure_vec.bind(&self.geometry_basis).bind(&self.shielding_basis)
+        structure_vec
+            .bind(&self.geometry_basis)
+            .bind(&self.shielding_basis)
     }
 
     /// Encode pulse dynamics as temporal rhythm
@@ -278,7 +281,7 @@ impl DesignIntegrationEngine {
         let power_vec = self.power_basis.scale(power_norm);
         let reaction_vec = self.genesis.hv(
             &format!("physics::reaction::{:?}", conditions.reaction),
-            PHYSICS_DIM
+            PHYSICS_DIM,
         );
         power_vec.bind(&reaction_vec)
     }
@@ -367,7 +370,11 @@ impl DesignIntegrationEngine {
         // Thermal coherence
         let thermal_coherence = {
             let norm = state.thermal_vector.norm();
-            if norm > 0.0 { 1.0 / (1.0 + (norm - 1.0).abs()) } else { 0.0 }
+            if norm > 0.0 {
+                1.0 / (1.0 + (norm - 1.0).abs())
+            } else {
+                0.0
+            }
         };
 
         // Damage-healing balance
@@ -444,7 +451,11 @@ pub struct DesignComparison {
 impl DesignComparison {
     /// Which design has higher integration?
     pub fn more_integrated_design(&self) -> &'static str {
-        if self.integration_difference > 0.0 { "A" } else { "B" }
+        if self.integration_difference > 0.0 {
+            "A"
+        } else {
+            "B"
+        }
     }
 }
 
@@ -482,7 +493,10 @@ mod tests {
 
         let damage_vec_high = integration.encode_damage_state(100.0, 10.0, 15.0);
         let similarity = damage_vec.similarity(&damage_vec_high);
-        assert!(similarity < 1.0, "Different damage should produce distinguishable vectors");
+        assert!(
+            similarity < 1.0,
+            "Different damage should produce distinguishable vectors"
+        );
     }
 
     #[test]
@@ -497,7 +511,10 @@ mod tests {
         assert_eq!(state.unified_state.dim(), PHYSICS_DIM);
 
         let bound_bundle_sim = state.unified_state.similarity(&state.bundled_state);
-        assert!(bound_bundle_sim < 0.5, "Binding should create different structure than bundling");
+        assert!(
+            bound_bundle_sim < 0.5,
+            "Binding should create different structure than bundling"
+        );
     }
 
     #[test]
@@ -514,7 +531,10 @@ mod tests {
         println!("Coupling index:        {:.4}", metrics.coupling_index);
         println!("Design integration:    {:.4}", metrics.design_integration);
         println!("Thermal coherence:     {:.4}", metrics.thermal_coherence);
-        println!("Damage-healing:        {:.4}", metrics.damage_healing_balance);
+        println!(
+            "Damage-healing:        {:.4}",
+            metrics.damage_healing_balance
+        );
         println!("Geometry harmony:      {:.4}", metrics.geometry_harmony);
         println!("Binding advantage:     {:.4}", metrics.binding_advantage);
         println!("----------------------------------------");
@@ -540,14 +560,24 @@ mod tests {
         println!("\n========================================");
         println!("DESIGN COMPARISON");
         println!("========================================");
-        println!("Consumer integration:   {:.4}", comparison.metrics_a.overall_integration);
-        println!("Industrial integration: {:.4}", comparison.metrics_b.overall_integration);
+        println!(
+            "Consumer integration:   {:.4}",
+            comparison.metrics_a.overall_integration
+        );
+        println!(
+            "Industrial integration: {:.4}",
+            comparison.metrics_b.overall_integration
+        );
         println!("State similarity:       {:.4}", comparison.state_similarity);
-        println!("More integrated design: {}", comparison.more_integrated_design());
+        println!(
+            "More integrated design: {}",
+            comparison.more_integrated_design()
+        );
         println!("========================================\n");
 
-        assert!(comparison.integration_difference.abs() > 0.001 ||
-                comparison.state_similarity < 0.99);
+        assert!(
+            comparison.integration_difference.abs() > 0.001 || comparison.state_similarity < 0.99
+        );
     }
 
     #[test]
@@ -570,8 +600,10 @@ mod tests {
             let result = physics.simulate(&conditions);
             let metrics = integration.compute_metrics(&result);
 
-            println!("{:>5.0} kW: integration={:.4}, feasible={}",
-                     power, metrics.overall_integration, result.feasible);
+            println!(
+                "{:>5.0} kW: integration={:.4}, feasible={}",
+                power, metrics.overall_integration, result.feasible
+            );
 
             if result.feasible {
                 feasible_integration.push(metrics.overall_integration);
@@ -580,15 +612,27 @@ mod tests {
             }
         }
 
-        let feasible_mean = if feasible_integration.is_empty() { 0.0 }
-            else { feasible_integration.iter().sum::<f32>() / feasible_integration.len() as f32 };
-        let infeasible_mean = if infeasible_integration.is_empty() { 0.0 }
-            else { infeasible_integration.iter().sum::<f32>() / infeasible_integration.len() as f32 };
+        let feasible_mean = if feasible_integration.is_empty() {
+            0.0
+        } else {
+            feasible_integration.iter().sum::<f32>() / feasible_integration.len() as f32
+        };
+        let infeasible_mean = if infeasible_integration.is_empty() {
+            0.0
+        } else {
+            infeasible_integration.iter().sum::<f32>() / infeasible_integration.len() as f32
+        };
 
-        println!("\nFeasible mean integration:   {:.4} (n={})",
-                 feasible_mean, feasible_integration.len());
-        println!("Infeasible mean integration: {:.4} (n={})",
-                 infeasible_mean, infeasible_integration.len());
+        println!(
+            "\nFeasible mean integration:   {:.4} (n={})",
+            feasible_mean,
+            feasible_integration.len()
+        );
+        println!(
+            "Infeasible mean integration: {:.4} (n={})",
+            infeasible_mean,
+            infeasible_integration.len()
+        );
         println!("========================================\n");
     }
 }

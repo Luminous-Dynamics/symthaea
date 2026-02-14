@@ -67,8 +67,8 @@
 
 use ndarray::Array1;
 use serde::{Deserialize, Serialize};
-use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 use crate::dynamics::cfc::CfCNetwork;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
@@ -249,7 +249,9 @@ impl PartialOrd for PrioritizedEpisode {
 impl Ord for PrioritizedEpisode {
     fn cmp(&self, other: &Self) -> Ordering {
         // Reverse order for max-heap (higher score = higher priority)
-        self.score.partial_cmp(&other.score).unwrap_or(Ordering::Equal)
+        self.score
+            .partial_cmp(&other.score)
+            .unwrap_or(Ordering::Equal)
     }
 }
 
@@ -296,14 +298,14 @@ impl Default for EpisodicReplayConfig {
     fn default() -> Self {
         Self {
             capacity: 1000,
-            phi_threshold: 0.3,          // Only store episodes with Phi > 0.3
-            replay_interval: 100,        // Replay every 100 cycles
-            batch_size: 8,               // 8 episodes per replay session
-            recency_weight: 0.2,         // Moderate recency preference
+            phi_threshold: 0.3,   // Only store episodes with Phi > 0.3
+            replay_interval: 100, // Replay every 100 cycles
+            batch_size: 8,        // 8 episodes per replay session
+            recency_weight: 0.2,  // Moderate recency preference
             replay_learning_rate_multiplier: 0.5, // Half the normal learning rate
-            replay_dt: 0.02,             // Same as cognitive loop default
+            replay_dt: 0.02,      // Same as cognitive loop default
             phi_weighted_sampling: true, // Sample high-Phi episodes more often
-            sampling_temperature: 1.0,   // Normal temperature
+            sampling_temperature: 1.0, // Normal temperature
             min_episodes_for_replay: 10, // Need at least 10 episodes
         }
     }
@@ -446,8 +448,7 @@ impl EpisodicMemory {
     pub fn should_replay(&self) -> bool {
         let periodic = self.cycles_since_replay >= self.config.replay_interval;
         let triggered = self.demand_replay_triggered;
-        (periodic || triggered)
-            && self.episodes.len() >= self.config.min_episodes_for_replay
+        (periodic || triggered) && self.episodes.len() >= self.config.min_episodes_for_replay
     }
 
     /// Trigger an immediate consolidation replay.
@@ -622,9 +623,7 @@ impl EpisodicMemory {
             // Check if this episode was in the batch
             // Simple approximation: increment if Phi matches any batch episode
             for be in &batch {
-                if (pe.episode.phi - be.phi).abs() < 0.001
-                    && pe.episode.timestamp == be.timestamp
-                {
+                if (pe.episode.phi - be.phi).abs() < 0.001 && pe.episode.timestamp == be.timestamp {
                     pe.episode.replay_count += 1;
                     pe.episode.reconsolidate(current_phi);
                     break;

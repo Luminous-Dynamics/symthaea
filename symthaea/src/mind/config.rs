@@ -1,9 +1,9 @@
 //! Configuration and data types for the Continuous Mind system.
 
+use crate::chronobiology::Biorhythm;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
-use crate::chronobiology::Biorhythm;
 
 /// Configuration for the continuous mind
 #[derive(Debug, Clone, Serialize, Deserialize)]

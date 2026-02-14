@@ -6,10 +6,10 @@
 //! - Phi-gated execution policies
 //! - HDC-based semantic context for intelligent completions
 
+use crate::action::DestructivenessLevel;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use crate::action::DestructivenessLevel;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHELL CONTEXT
@@ -52,12 +52,11 @@ impl ShellContext {
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
         let user = std::env::var("USER").unwrap_or_else(|_| "unknown".to_string());
 
-        let hostname = std::env::var("HOSTNAME")
-            .unwrap_or_else(|_| {
-                std::fs::read_to_string("/etc/hostname")
-                    .map(|s| s.trim().to_string())
-                    .unwrap_or_else(|_| "localhost".to_string())
-            });
+        let hostname = std::env::var("HOSTNAME").unwrap_or_else(|_| {
+            std::fs::read_to_string("/etc/hostname")
+                .map(|s| s.trim().to_string())
+                .unwrap_or_else(|_| "localhost".to_string())
+        });
 
         Self {
             cwd,
@@ -374,19 +373,53 @@ impl IntelliSenseEngine {
         // Common NixOS commands - both short forms and full command names
         let commands = vec![
             // Short command names
-            "install", "remove", "search", "info", "list",
-            "rebuild", "switch", "test", "rollback", "gc",
-            "flake", "update", "build", "run", "develop",
-            "profile", "channel", "doctor", "store",
+            "install",
+            "remove",
+            "search",
+            "info",
+            "list",
+            "rebuild",
+            "switch",
+            "test",
+            "rollback",
+            "gc",
+            "flake",
+            "update",
+            "build",
+            "run",
+            "develop",
+            "profile",
+            "channel",
+            "doctor",
+            "store",
             // Full nix commands
-            "nix", "nix-env", "nix-shell", "nix-build", "nix-store",
-            "nix-channel", "nix-collect-garbage", "nix-instantiate",
-            "nixos-rebuild", "nixos-option", "nixos-generate-config",
-            "nix search", "nix build", "nix run", "nix develop",
-            "nix shell", "nix flake", "nix profile",
-            "nix-env -i", "nix-env -e", "nix-env -q",
-            "nix profile install", "nix profile remove",
-        ].into_iter().map(String::from).collect();
+            "nix",
+            "nix-env",
+            "nix-shell",
+            "nix-build",
+            "nix-store",
+            "nix-channel",
+            "nix-collect-garbage",
+            "nix-instantiate",
+            "nixos-rebuild",
+            "nixos-option",
+            "nixos-generate-config",
+            "nix search",
+            "nix build",
+            "nix run",
+            "nix develop",
+            "nix shell",
+            "nix flake",
+            "nix profile",
+            "nix-env -i",
+            "nix-env -e",
+            "nix-env -q",
+            "nix profile install",
+            "nix profile remove",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         Self {
             packages: Vec::new(),
@@ -412,9 +445,11 @@ impl IntelliSenseEngine {
             // Direct prefix matching
             for cmd in &self.commands {
                 if cmd.starts_with(cmd_prefix) {
-                    completions.push(Completion::new(cmd.clone(), CompletionKind::Command)
-                        .with_confidence(self.prefix_similarity(cmd, cmd_prefix))
-                        .with_similarity(self.prefix_similarity(cmd, cmd_prefix)));
+                    completions.push(
+                        Completion::new(cmd.clone(), CompletionKind::Command)
+                            .with_confidence(self.prefix_similarity(cmd, cmd_prefix))
+                            .with_similarity(self.prefix_similarity(cmd, cmd_prefix)),
+                    );
                 }
             }
 
@@ -423,9 +458,11 @@ impl IntelliSenseEngine {
             for (cmd, similarity) in semantic_matches {
                 // Don't add if already present
                 if !completions.iter().any(|c| c.text == cmd) {
-                    completions.push(Completion::new(cmd, CompletionKind::NixCommand)
-                        .with_confidence(similarity)
-                        .with_similarity(similarity));
+                    completions.push(
+                        Completion::new(cmd, CompletionKind::NixCommand)
+                            .with_confidence(similarity)
+                            .with_similarity(similarity),
+                    );
                 }
             }
         } else {
@@ -442,9 +479,11 @@ impl IntelliSenseEngine {
                     // Package completions
                     for pkg in &self.packages {
                         if pkg.starts_with(arg_prefix) {
-                            completions.push(Completion::new(pkg.clone(), CompletionKind::Package)
-                                .with_confidence(self.prefix_similarity(pkg, arg_prefix))
-                                .with_similarity(self.prefix_similarity(pkg, arg_prefix)));
+                            completions.push(
+                                Completion::new(pkg.clone(), CompletionKind::Package)
+                                    .with_confidence(self.prefix_similarity(pkg, arg_prefix))
+                                    .with_similarity(self.prefix_similarity(pkg, arg_prefix)),
+                            );
                         }
                     }
                 }
@@ -453,8 +492,10 @@ impl IntelliSenseEngine {
                     let flake_cmds = ["update", "lock", "check", "show", "metadata", "archive"];
                     for subcmd in flake_cmds {
                         if subcmd.starts_with(arg_prefix) {
-                            completions.push(Completion::new(subcmd, CompletionKind::Command)
-                                .with_confidence(0.9));
+                            completions.push(
+                                Completion::new(subcmd, CompletionKind::Command)
+                                    .with_confidence(0.9),
+                            );
                         }
                     }
                 }
@@ -465,14 +506,20 @@ impl IntelliSenseEngine {
         // Add history completions
         for hist in self.context.history.iter().rev().take(5) {
             if hist.starts_with(prefix) && hist != prefix {
-                completions.push(Completion::new(hist.clone(), CompletionKind::History)
-                    .with_confidence(0.5)
-                    .with_similarity(0.5));
+                completions.push(
+                    Completion::new(hist.clone(), CompletionKind::History)
+                        .with_confidence(0.5)
+                        .with_similarity(0.5),
+                );
             }
         }
 
         // Sort by confidence (descending)
-        completions.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        completions.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         completions.truncate(10);
 
         completions
@@ -541,10 +588,7 @@ impl IntelliSenseEngine {
 #[derive(Debug, Clone)]
 pub enum GateDecision {
     /// Execute immediately
-    Allowed {
-        phi: f64,
-        confidence: f64,
-    },
+    Allowed { phi: f64, confidence: f64 },
     /// Require confirmation
     NeedsConfirmation {
         phi: f64,
@@ -552,10 +596,7 @@ pub enum GateDecision {
         prompt: String,
     },
     /// Block execution
-    Vetoed {
-        reason: String,
-        message: String,
-    },
+    Vetoed { reason: String, message: String },
     /// Insufficient Phi for execution
     InsufficientPhi {
         current_phi: f64,
@@ -563,10 +604,7 @@ pub enum GateDecision {
         centering_time_secs: u64,
     },
     /// Pending user input
-    Pending {
-        phi: f64,
-        waiting_for: String,
-    },
+    Pending { phi: f64, waiting_for: String },
 }
 
 impl GateDecision {
@@ -577,7 +615,11 @@ impl GateDecision {
 
     /// Create a NeedsConfirmation decision
     pub fn new_needs_confirmation(phi: f64, reason: String, prompt: String) -> Self {
-        Self::NeedsConfirmation { phi, reason, prompt }
+        Self::NeedsConfirmation {
+            phi,
+            reason,
+            prompt,
+        }
     }
 
     /// Create a Vetoed decision
@@ -660,8 +702,12 @@ impl PhiGate {
         }
 
         // Check destructiveness
-        if self.always_confirm_destructive &&
-           matches!(destructiveness, DestructivenessLevel::Destructive | DestructivenessLevel::NeedsConfirmation) {
+        if self.always_confirm_destructive
+            && matches!(
+                destructiveness,
+                DestructivenessLevel::Destructive | DestructivenessLevel::NeedsConfirmation
+            )
+        {
             return GateDecision::NeedsConfirmation {
                 phi: self.current_phi,
                 reason: format!(
@@ -745,34 +791,48 @@ pub fn classify_command_destructiveness(command: &str) -> DestructivenessLevel {
     let cmd = command.trim().to_lowercase();
 
     // Destructive operations
-    if cmd.contains("--purge") || cmd.contains("gc") || cmd.contains("delete")
-        || cmd.contains("rm ") || cmd.contains("remove")
+    if cmd.contains("--purge")
+        || cmd.contains("gc")
+        || cmd.contains("delete")
+        || cmd.contains("rm ")
+        || cmd.contains("remove")
         || cmd.starts_with("nix-collect-garbage")
-        || cmd.contains("wipe") || cmd.contains("format")
+        || cmd.contains("wipe")
+        || cmd.contains("format")
     {
         return DestructivenessLevel::Destructive;
     }
 
     // Needs confirmation
-    if cmd.starts_with("nixos-rebuild") || cmd.contains("switch")
-        || cmd.starts_with("nix profile install") || cmd.starts_with("nix-env -i")
-        || cmd.contains("upgrade") || cmd.contains("update")
+    if cmd.starts_with("nixos-rebuild")
+        || cmd.contains("switch")
+        || cmd.starts_with("nix profile install")
+        || cmd.starts_with("nix-env -i")
+        || cmd.contains("upgrade")
+        || cmd.contains("update")
     {
         return DestructivenessLevel::NeedsConfirmation;
     }
 
     // Reversible
-    if cmd.starts_with("nix build") || cmd.starts_with("nix develop")
-        || cmd.starts_with("nix shell") || cmd.contains("install")
+    if cmd.starts_with("nix build")
+        || cmd.starts_with("nix develop")
+        || cmd.starts_with("nix shell")
+        || cmd.contains("install")
     {
         return DestructivenessLevel::Reversible;
     }
 
     // Read-only
-    if cmd.starts_with("nix search") || cmd.starts_with("nix-env -q")
-        || cmd.starts_with("nixos-option") || cmd.contains("list")
-        || cmd.contains("info") || cmd.contains("show") || cmd.contains("search")
-        || cmd.starts_with("nix flake show") || cmd.starts_with("nix flake metadata")
+    if cmd.starts_with("nix search")
+        || cmd.starts_with("nix-env -q")
+        || cmd.starts_with("nixos-option")
+        || cmd.contains("list")
+        || cmd.contains("info")
+        || cmd.contains("show")
+        || cmd.contains("search")
+        || cmd.starts_with("nix flake show")
+        || cmd.starts_with("nix flake metadata")
     {
         return DestructivenessLevel::ReadOnly;
     }
@@ -905,7 +965,10 @@ impl CommandContext {
         let (command_type, arguments) = if parts.is_empty() {
             (None, Vec::new())
         } else {
-            (Some(parts[0].to_string()), parts[1..].iter().map(|s| s.to_string()).collect())
+            (
+                Some(parts[0].to_string()),
+                parts[1..].iter().map(|s| s.to_string()).collect(),
+            )
         };
 
         Self {

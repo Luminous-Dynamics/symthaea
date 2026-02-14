@@ -7,17 +7,21 @@
 
 #![cfg(feature = "api_module")]
 
-use std::process::{Command, Stdio};
-use std::path::PathBuf;
-use std::time::Duration;
-use std::thread;
 use std::net::TcpStream;
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::Duration;
 
 /// Get the path to the built binary
 fn binary_path() -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("target");
-    path.push(if cfg!(debug_assertions) { "debug" } else { "release" });
+    path.push(if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    });
     path.push("symthaea-api");
     path
 }
@@ -148,7 +152,8 @@ mod health_endpoint_tests {
         let client = reqwest::Client::new();
         let health_url = format!("http://{}/health", addr);
 
-        let response = client.get(&health_url)
+        let response = client
+            .get(&health_url)
             .timeout(Duration::from_secs(2))
             .send()
             .await;
@@ -159,7 +164,10 @@ mod health_endpoint_tests {
 
         match response {
             Ok(resp) => {
-                assert!(resp.status().is_success(), "Health endpoint should return 2xx");
+                assert!(
+                    resp.status().is_success(),
+                    "Health endpoint should return 2xx"
+                );
                 eprintln!("[Info] Health endpoint returned status: {}", resp.status());
             }
             Err(e) => {
@@ -192,7 +200,8 @@ mod health_endpoint_tests {
         let client = reqwest::Client::new();
         let health_url = format!("http://{}/v1/health", addr);
 
-        let response = client.get(&health_url)
+        let response = client
+            .get(&health_url)
             .timeout(Duration::from_secs(2))
             .send()
             .await;
@@ -233,7 +242,8 @@ mod api_endpoint_tests {
         let client = reqwest::Client::new();
         let url = format!("http://{}/v1/leaderboard", addr);
 
-        let response = client.get(&url)
+        let response = client
+            .get(&url)
             .timeout(Duration::from_secs(2))
             .send()
             .await;
@@ -244,9 +254,9 @@ mod api_endpoint_tests {
         if let Ok(resp) = response {
             // May require auth, so 401/403 is acceptable
             assert!(
-                resp.status().is_success() ||
-                resp.status() == reqwest::StatusCode::UNAUTHORIZED ||
-                resp.status() == reqwest::StatusCode::FORBIDDEN,
+                resp.status().is_success()
+                    || resp.status() == reqwest::StatusCode::UNAUTHORIZED
+                    || resp.status() == reqwest::StatusCode::FORBIDDEN,
                 "Leaderboard should return 2xx or auth error, got: {}",
                 resp.status()
             );
@@ -278,7 +288,8 @@ mod api_endpoint_tests {
         let client = reqwest::Client::new();
         let url = format!("http://{}/v1/datasets", addr);
 
-        let response = client.get(&url)
+        let response = client
+            .get(&url)
             .timeout(Duration::from_secs(2))
             .send()
             .await;
@@ -288,9 +299,9 @@ mod api_endpoint_tests {
 
         if let Ok(resp) = response {
             assert!(
-                resp.status().is_success() ||
-                resp.status() == reqwest::StatusCode::UNAUTHORIZED ||
-                resp.status() == reqwest::StatusCode::FORBIDDEN,
+                resp.status().is_success()
+                    || resp.status() == reqwest::StatusCode::UNAUTHORIZED
+                    || resp.status() == reqwest::StatusCode::FORBIDDEN,
                 "Datasets should return 2xx or auth error"
             );
         }
@@ -320,7 +331,8 @@ mod api_endpoint_tests {
         let client = reqwest::Client::new();
         let url = format!("http://{}/v1/definitely-not-an-endpoint", addr);
 
-        let response = client.get(&url)
+        let response = client
+            .get(&url)
             .timeout(Duration::from_secs(2))
             .send()
             .await;
@@ -366,10 +378,19 @@ mod router_unit_tests {
         let config = ApiConfig::default();
 
         // Default config should have localhost origins
-        assert!(!config.allowed_origins.is_empty(), "Default should have allowed origins");
-        assert!(config.bearer_token.is_none(), "Default should not require auth");
+        assert!(
+            !config.allowed_origins.is_empty(),
+            "Default should have allowed origins"
+        );
+        assert!(
+            config.bearer_token.is_none(),
+            "Default should not require auth"
+        );
 
-        eprintln!("[Info] Default config: origins={:?}", config.allowed_origins);
+        eprintln!(
+            "[Info] Default config: origins={:?}",
+            config.allowed_origins
+        );
     }
 
     #[test]

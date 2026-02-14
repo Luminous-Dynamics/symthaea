@@ -65,8 +65,8 @@ pub struct DifferentiableHDCConfig {
 impl Default for DifferentiableHDCConfig {
     fn default() -> Self {
         Self {
-            input_dim: 768,       // Common embedding size (BERT, etc.)
-            hdc_dim: 16_384,      // Standard HDC dimension
+            input_dim: 768,        // Common embedding size (BERT, etc.)
+            hdc_dim: 16_384,       // Standard HDC dimension
             hidden_dim: Some(512), // Bottleneck for efficiency
             learning_rate: 0.0001, // Conservative for encoder
             temperature: 1.0,      // Start soft, anneal to hard
@@ -198,9 +198,13 @@ impl DifferentiableHDCEncoder {
         let grad_out = Array1::from_vec(grad_output.to_vec());
 
         // Get cached values from forward pass
-        let pre_act = self.last_pre_activation.as_ref()
+        let pre_act = self
+            .last_pre_activation
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Must call forward before backward"))?;
-        let input = self.last_input.as_ref()
+        let input = self
+            .last_input
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Must call forward before backward"))?;
 
         // STE: Gradient through sign() is passed through as identity
@@ -316,9 +320,13 @@ impl DifferentiableHDCEncoder {
 
         // Threshold back to binary
         if bipolar {
-            sum.iter().map(|&x| if x >= 0.0 { 1.0 } else { -1.0 }).collect()
+            sum.iter()
+                .map(|&x| if x >= 0.0 { 1.0 } else { -1.0 })
+                .collect()
         } else {
-            sum.iter().map(|&x| if x >= 0.0 { 1.0 } else { 0.0 }).collect()
+            sum.iter()
+                .map(|&x| if x >= 0.0 { 1.0 } else { 0.0 })
+                .collect()
         }
     }
 
@@ -363,15 +371,17 @@ impl HDCEncoder {
                     .chunks_exact(4)
                     .map(|chunk| {
                         let bits = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-                        if bits & 1 == 0 { 1.0 } else { -1.0 }
+                        if bits & 1 == 0 {
+                            1.0
+                        } else {
+                            -1.0
+                        }
                     })
                     .collect();
 
                 Ok(hv)
             }
-            HDCEncoder::Learnable(encoder) => {
-                encoder.encode_binary(input)
-            }
+            HDCEncoder::Learnable(encoder) => encoder.encode_binary(input),
         }
     }
 
@@ -427,7 +437,9 @@ mod tests {
         encoder.backward(&grad).unwrap();
 
         // Weights should have changed
-        let changed = encoder.w_out.iter()
+        let changed = encoder
+            .w_out
+            .iter()
             .zip(w_out_before.iter())
             .any(|(a, b)| (a - b).abs() > 1e-6);
 

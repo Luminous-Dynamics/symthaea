@@ -10,16 +10,76 @@ use std::collections::HashMap;
 fn load_fixture_updates() -> (Vec<GradientUpdate>, HashMap<String, f32>) {
     // These are the EXACT values from generate_fl_fixtures.rs
     let updates = vec![
-        GradientUpdate::new("honest_0".into(), 1, vec![0.10, 0.20, 0.30, 0.40, 0.50], 100, 0.50),
-        GradientUpdate::new("honest_1".into(), 1, vec![0.12, 0.22, 0.28, 0.42, 0.48], 200, 0.45),
-        GradientUpdate::new("honest_2".into(), 1, vec![0.11, 0.19, 0.31, 0.39, 0.51], 150, 0.48),
-        GradientUpdate::new("honest_3".into(), 1, vec![0.09, 0.21, 0.29, 0.41, 0.49], 100, 0.52),
-        GradientUpdate::new("honest_4".into(), 1, vec![0.13, 0.18, 0.32, 0.38, 0.52], 120, 0.47),
-        GradientUpdate::new("byz_0".into(), 1, vec![50.0, -30.0, 80.0, -60.0, 100.0], 100, 0.90),
-        GradientUpdate::new("byz_1".into(), 1, vec![-40.0, 70.0, -50.0, 90.0, -80.0], 100, 0.85),
-        GradientUpdate::new("byz_2".into(), 1, vec![30.0, 30.0, 30.0, 30.0, 30.0], 100, 0.88),
-        GradientUpdate::new("lowrep_0".into(), 1, vec![0.50, 0.50, 0.50, 0.50, 0.50], 80, 0.60),
-        GradientUpdate::new("lowrep_1".into(), 1, vec![0.40, 0.60, 0.40, 0.60, 0.40], 80, 0.55),
+        GradientUpdate::new(
+            "honest_0".into(),
+            1,
+            vec![0.10, 0.20, 0.30, 0.40, 0.50],
+            100,
+            0.50,
+        ),
+        GradientUpdate::new(
+            "honest_1".into(),
+            1,
+            vec![0.12, 0.22, 0.28, 0.42, 0.48],
+            200,
+            0.45,
+        ),
+        GradientUpdate::new(
+            "honest_2".into(),
+            1,
+            vec![0.11, 0.19, 0.31, 0.39, 0.51],
+            150,
+            0.48,
+        ),
+        GradientUpdate::new(
+            "honest_3".into(),
+            1,
+            vec![0.09, 0.21, 0.29, 0.41, 0.49],
+            100,
+            0.52,
+        ),
+        GradientUpdate::new(
+            "honest_4".into(),
+            1,
+            vec![0.13, 0.18, 0.32, 0.38, 0.52],
+            120,
+            0.47,
+        ),
+        GradientUpdate::new(
+            "byz_0".into(),
+            1,
+            vec![50.0, -30.0, 80.0, -60.0, 100.0],
+            100,
+            0.90,
+        ),
+        GradientUpdate::new(
+            "byz_1".into(),
+            1,
+            vec![-40.0, 70.0, -50.0, 90.0, -80.0],
+            100,
+            0.85,
+        ),
+        GradientUpdate::new(
+            "byz_2".into(),
+            1,
+            vec![30.0, 30.0, 30.0, 30.0, 30.0],
+            100,
+            0.88,
+        ),
+        GradientUpdate::new(
+            "lowrep_0".into(),
+            1,
+            vec![0.50, 0.50, 0.50, 0.50, 0.50],
+            80,
+            0.60,
+        ),
+        GradientUpdate::new(
+            "lowrep_1".into(),
+            1,
+            vec![0.40, 0.60, 0.40, 0.60, 0.40],
+            80,
+            0.55,
+        ),
     ];
 
     let mut reps = HashMap::new();
@@ -42,15 +102,13 @@ fn assert_vec_close(label: &str, actual: &[f32], _tolerance: f32) {
         assert!(
             v.is_finite(),
             "{}: dimension {} is not finite: {}",
-            label, i, v
+            label,
+            i,
+            v
         );
     }
     // Just verify the output is valid (specific values checked by fixture JSON)
-    assert!(
-        !actual.is_empty(),
-        "{}: result is empty",
-        label
-    );
+    assert!(!actual.is_empty(), "{}: result is empty", label);
 }
 
 #[test]

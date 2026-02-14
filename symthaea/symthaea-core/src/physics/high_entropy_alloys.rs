@@ -23,12 +23,14 @@
 //! - **Light HEA**: AlCrFeMnTi (lighter, good H-storage)
 //! - **Eutectic HEA**: AlCoCrFeNi2.1 (dual-phase, excellent mechanical)
 
+use super::constants::R_GAS;
+use super::phonon_dynamics::CrystalStructure;
+use super::radiation_damage::{
+    FusionReaction, HealingAnalysis, RadiationDamage, RadiationDamageSystem,
+};
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::phonon_dynamics::CrystalStructure;
-use super::radiation_damage::{RadiationDamageSystem, RadiationDamage, HealingAnalysis, FusionReaction};
-use super::constants::R_GAS;
 use std::collections::HashMap;
 
 /// An element contribution to an HEA
@@ -110,11 +112,11 @@ impl HEATarget {
     /// Optimal target for LCF self-healing lattice
     pub fn lcf_wolverine() -> Self {
         Self {
-            h_solubility: 0.9,      // Must hold deuterium
+            h_solubility: 0.9,       // Must hold deuterium
             neutron_tolerance: 0.95, // Must survive DT neutrons
-            self_healing: 0.99,     // Critical: must heal
-            phonon_coupling: 0.8,   // Good phonon properties
-            cost_tolerance: 0.7,    // Prefer common elements
+            self_healing: 0.99,      // Critical: must heal
+            phonon_coupling: 0.8,    // Good phonon properties
+            cost_tolerance: 0.7,     // Prefer common elements
         }
     }
 }
@@ -173,17 +175,15 @@ impl HEADesigner {
             // Light elements
             (13, "Al", 143.0, 933.0, 0.1, 0.23),
             (14, "Si", 111.0, 1687.0, 0.05, 0.17),
-
             // First-row transition metals
-            (22, "Ti", 147.0, 1941.0, 0.95, 6.1),  // Excellent H-storage
-            (23, "V",  134.0, 2183.0, 0.90, 5.0),
+            (22, "Ti", 147.0, 1941.0, 0.95, 6.1), // Excellent H-storage
+            (23, "V", 134.0, 2183.0, 0.90, 5.0),
             (24, "Cr", 128.0, 2180.0, 0.30, 3.1),
             (25, "Mn", 127.0, 1519.0, 0.20, 13.3),
             (26, "Fe", 126.0, 1811.0, 0.15, 2.6),
             (27, "Co", 125.0, 1768.0, 0.10, 37.2), // High activation
             (28, "Ni", 124.0, 1728.0, 0.35, 4.5),
             (29, "Cu", 128.0, 1358.0, 0.05, 3.8),
-
             // Second-row transition metals
             (40, "Zr", 160.0, 2128.0, 0.90, 0.18), // Low activation, good H
             (41, "Nb", 146.0, 2750.0, 0.85, 1.15),
@@ -191,13 +191,11 @@ impl HEADesigner {
             (44, "Ru", 134.0, 2607.0, 0.10, 2.6),
             (45, "Rh", 134.0, 2237.0, 0.10, 145.0), // Very high activation
             (46, "Pd", 137.0, 1828.0, 1.00, 12.0),  // Best H-storage
-
             // Third-row transition metals (refractory)
             (72, "Hf", 159.0, 2506.0, 0.70, 104.0), // High activation
             (73, "Ta", 146.0, 3290.0, 0.60, 20.6),
-            (74, "W",  139.0, 3695.0, 0.15, 18.3),
+            (74, "W", 139.0, 3695.0, 0.15, 18.3),
             (75, "Re", 137.0, 3459.0, 0.10, 90.0),
-
             // Lanthanides (for H-storage)
             (57, "La", 187.0, 1193.0, 0.85, 8.9),
             (68, "Er", 176.0, 1802.0, 0.95, 160.0), // NASA LCF host
@@ -205,15 +203,18 @@ impl HEADesigner {
         ];
 
         for (z, symbol, radius, melting, h_sol, activation) in element_data {
-            self.elements.insert(z, HEAElement {
+            self.elements.insert(
                 z,
-                symbol: symbol.to_string(),
-                fraction: 0.0, // Set when composing alloys
-                radius_pm: radius,
-                melting_k: melting,
-                h_solubility: h_sol,
-                activation_barn: activation,
-            });
+                HEAElement {
+                    z,
+                    symbol: symbol.to_string(),
+                    fraction: 0.0, // Set when composing alloys
+                    radius_pm: radius,
+                    melting_k: melting,
+                    h_solubility: h_sol,
+                    activation_barn: activation,
+                },
+            );
         }
     }
 
@@ -321,15 +322,11 @@ impl HEADesigner {
         let lattice_distortion = radius_variance.sqrt();
 
         // Configurational entropy: S = -R * Σ(x_i * ln(x_i))
-        let entropy: f64 = -R_GAS * composition.iter()
-            .map(|(_, x)| {
-                if *x > 0.0 {
-                    x * x.ln()
-                } else {
-                    0.0
-                }
-            })
-            .sum::<f64>();
+        let entropy: f64 = -R_GAS
+            * composition
+                .iter()
+                .map(|(_, x)| if *x > 0.0 { x * x.ln() } else { 0.0 })
+                .sum::<f64>();
 
         // Sluggish diffusion factor (higher entropy + distortion = slower)
         let sluggish_factor = (entropy / R_GAS) * (1.0 + lattice_distortion * 10.0);
@@ -348,8 +345,8 @@ impl HEADesigner {
             _ => 0.6,
         };
         let activation_factor = (100.0 / (total_activation + 10.0)).min(1.0);
-        let radiation_resistance = (structure_factor * activation_factor * 0.8
-            + sluggish_factor / 10.0 * 0.2) as f32;
+        let radiation_resistance =
+            (structure_factor * activation_factor * 0.8 + sluggish_factor / 10.0 * 0.2) as f32;
 
         // Self-healing score
         let self_healing_score = (sluggish_factor / 5.0).min(1.0) as f32
@@ -357,10 +354,9 @@ impl HEADesigner {
             * (1.0 + lattice_distortion * 5.0) as f32;
 
         // LCF score
-        let lcf_score = (total_h_sol as f32 * 0.4
-            + radiation_resistance * 0.3
-            + self_healing_score * 0.3)
-            .min(1.0);
+        let lcf_score =
+            (total_h_sol as f32 * 0.4 + radiation_resistance * 0.3 + self_healing_score * 0.3)
+                .min(1.0);
 
         // Build vector
         let mut vecs = vec![
@@ -481,7 +477,9 @@ impl HEADesigner {
 
         // Sort by match score
         results.sort_by(|a, b| {
-            b.match_score.partial_cmp(&a.match_score).unwrap_or(std::cmp::Ordering::Equal)
+            b.match_score
+                .partial_cmp(&a.match_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         results
@@ -491,7 +489,9 @@ impl HEADesigner {
     fn estimate_cost(&self, alloy: &HighEntropyAlloy) -> f32 {
         let expensive_elements = [72, 73, 75, 68, 46, 45]; // Hf, Ta, Re, Er, Pd, Rh
 
-        let expensive_fraction: f64 = alloy.elements.iter()
+        let expensive_fraction: f64 = alloy
+            .elements
+            .iter()
             .filter(|e| expensive_elements.contains(&e.z))
             .map(|e| e.fraction)
             .sum();
@@ -511,7 +511,11 @@ impl HEADesigner {
 
         // Neutron tolerance match
         let n_weight = 1.5;
-        total += (1.0 - (target.neutron_tolerance - scores.neutron_tolerance).abs().min(1.0)) * n_weight;
+        total += (1.0
+            - (target.neutron_tolerance - scores.neutron_tolerance)
+                .abs()
+                .min(1.0))
+            * n_weight;
         weight_sum += n_weight;
 
         // Self-healing match (most critical)
@@ -526,18 +530,15 @@ impl HEADesigner {
 
         // Cost constraint
         let cost_weight = 0.5;
-        total += (scores.cost.min(target.cost_tolerance) / target.cost_tolerance.max(0.1)) * cost_weight;
+        total +=
+            (scores.cost.min(target.cost_tolerance) / target.cost_tolerance.max(0.1)) * cost_weight;
         weight_sum += cost_weight;
 
         total / weight_sum
     }
 
     /// Generate novel HEA composition via inverse search
-    pub fn generate_optimal(
-        &self,
-        target: &HEATarget,
-        genesis: &GenesisSeed,
-    ) -> HighEntropyAlloy {
+    pub fn generate_optimal(&self, target: &HEATarget, genesis: &GenesisSeed) -> HighEntropyAlloy {
         // Build ideal composition by selecting best elements for each property
 
         // H-storage elements: Ti, V, Zr, Nb, Pd
@@ -561,7 +562,8 @@ impl HEADesigner {
         }
         if target.cost_tolerance < 0.8 {
             for (z, score) in cheap_elements {
-                *element_scores.entry(z).or_insert(0.0) += score * (1.0 - target.cost_tolerance as f64);
+                *element_scores.entry(z).or_insert(0.0) +=
+                    score * (1.0 - target.cost_tolerance as f64);
             }
         }
 
@@ -569,12 +571,14 @@ impl HEADesigner {
         let mut scored: Vec<(u8, f64)> = element_scores.into_iter().collect();
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        let top_5: Vec<(u8, f64)> = scored.into_iter()
+        let top_5: Vec<(u8, f64)> = scored
+            .into_iter()
             .take(5)
             .map(|(z, _)| (z, 0.2)) // Equiatomic
             .collect();
 
-        let composition_str: String = top_5.iter()
+        let composition_str: String = top_5
+            .iter()
             .filter_map(|(z, _)| self.elements.get(z).map(|e| e.symbol.clone()))
             .collect::<Vec<_>>()
             .join("");
@@ -649,17 +653,25 @@ pub fn multi_seed_hea_search(
         // Track top N results from this seed
         for result in results.into_iter().take(top_n) {
             let name = result.alloy.name.clone();
-            all_results.entry(name)
+            all_results
+                .entry(name)
                 .or_default()
                 .push((result, seed_idx));
         }
     }
 
     // Aggregate by alloy name
-    let mut consensus: Vec<HEAConsensusResult> = all_results.into_values().map(|results| {
+    let mut consensus: Vec<HEAConsensusResult> = all_results
+        .into_values()
+        .map(|results| {
             let occurrence_count = results.len();
-            let best_result = results.iter()
-                .max_by(|a, b| a.0.match_score.partial_cmp(&b.0.match_score).unwrap_or(std::cmp::Ordering::Equal))
+            let best_result = results
+                .iter()
+                .max_by(|a, b| {
+                    a.0.match_score
+                        .partial_cmp(&b.0.match_score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .expect("results vec is non-empty by construction (accumulated via push)");
 
             let total_match: f32 = results.iter().map(|(r, _)| r.match_score).sum();
@@ -679,7 +691,11 @@ pub fn multi_seed_hea_search(
         .collect();
 
     // Sort by consensus score
-    consensus.sort_by(|a, b| b.consensus_score.partial_cmp(&a.consensus_score).unwrap_or(std::cmp::Ordering::Equal));
+    consensus.sort_by(|a, b| {
+        b.consensus_score
+            .partial_cmp(&a.consensus_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     consensus
 }
@@ -699,14 +715,19 @@ mod tests {
     #[test]
     fn test_hea_creation() {
         let (_, designer, _) = setup();
-        assert!(designer.alloys.len() >= 5, "Should have at least 5 HEA families");
+        assert!(
+            designer.alloys.len() >= 5,
+            "Should have at least 5 HEA families"
+        );
     }
 
     #[test]
     fn test_cantor_properties() {
         let (_, designer, _) = setup();
 
-        let cantor = designer.alloys.iter()
+        let cantor = designer
+            .alloys
+            .iter()
             .find(|a| a.name.contains("Cantor"))
             .expect("Cantor alloy should exist");
 
@@ -719,15 +740,23 @@ mod tests {
     fn test_wolverine_properties() {
         let (_, designer, _) = setup();
 
-        let wolverine = designer.alloys.iter()
+        let wolverine = designer
+            .alloys
+            .iter()
             .find(|a| a.name.contains("Wolverine"))
             .expect("Wolverine alloy should exist");
 
         // Should have good H-storage (Ti, Zr, Nb are H-philic)
-        assert!(wolverine.h_solubility > 0.5, "Wolverine should have good H-storage");
+        assert!(
+            wolverine.h_solubility > 0.5,
+            "Wolverine should have good H-storage"
+        );
 
         // Should have good radiation resistance
-        assert!(wolverine.radiation_resistance > 0.5, "Wolverine should resist radiation");
+        assert!(
+            wolverine.radiation_resistance > 0.5,
+            "Wolverine should resist radiation"
+        );
     }
 
     #[test]
@@ -751,11 +780,15 @@ mod tests {
         let target = HEATarget::lcf_wolverine();
         let results = designer.search(&target, &radiation, FusionReaction::DT);
 
-        let liquid = results.iter()
+        let liquid = results
+            .iter()
             .find(|r| r.alloy.name.contains("Galinstan"))
             .expect("Galinstan should be in results");
 
-        assert_eq!(liquid.scores.self_healing, 1.0, "Liquid metal should have perfect healing");
+        assert_eq!(
+            liquid.scores.self_healing, 1.0,
+            "Liquid metal should have perfect healing"
+        );
     }
 
     #[test]
@@ -778,15 +811,21 @@ mod tests {
             "test consensus",
             &target,
             FusionReaction::DT,
-            3,  // n_seeds
-            5,  // top_n
+            3, // n_seeds
+            5, // top_n
         );
 
         assert!(!consensus.is_empty(), "Should find consensus candidates");
 
         // Top result should appear in multiple seeds
         let top = &consensus[0];
-        assert!(top.occurrence_count >= 1, "Top result should appear at least once");
-        assert!(top.consensus_score > 0.0, "Should have positive consensus score");
+        assert!(
+            top.occurrence_count >= 1,
+            "Top result should appear at least once"
+        );
+        assert!(
+            top.consensus_score > 0.0,
+            "Should have positive consensus score"
+        );
     }
 }

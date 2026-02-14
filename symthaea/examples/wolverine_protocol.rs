@@ -24,10 +24,8 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    StandardModel, Hadrons, PeriodicTable,
-    RadiationDamageSystem, FusionReaction,
-    HEADesigner, HEATarget, HEASearchResult,
-    PhononDynamics,
+    FusionReaction, HEADesigner, HEASearchResult, HEATarget, Hadrons, PeriodicTable,
+    PhononDynamics, RadiationDamageSystem, StandardModel,
 };
 
 fn main() {
@@ -48,7 +46,10 @@ fn main() {
     let radiation = RadiationDamageSystem::from_genesis(&genesis);
     let hea_designer = HEADesigner::from_genesis(&genesis);
 
-    println!("  > Genesis:       {:?}", genesis.phrase().chars().take(30).collect::<String>());
+    println!(
+        "  > Genesis:       {:?}",
+        genesis.phrase().chars().take(30).collect::<String>()
+    );
     println!("  > Elements:      {} loaded", table.len());
     println!("  > Lattices:      {} materials", phonons.materials.len());
     println!("  > HEA Families:  {} alloys", hea_designer.alloys.len());
@@ -75,15 +76,14 @@ fn main() {
         let failure_str = format_time(damage.time_to_failure_s);
         println!(
             "  {:<14} {:>8.1}    {:>10.2e}    {}",
-            name,
-            damage.pka_energy_kev,
-            damage.dpa_rate_per_second,
-            failure_str
+            name, damage.pka_energy_kev, damage.dpa_rate_per_second, failure_str
         );
     }
 
-    println!("\n  {} Palladium/Erbium fail in MINUTES under fusion conditions",
-        "\u{26A0}");
+    println!(
+        "\n  {} Palladium/Erbium fail in MINUTES under fusion conditions",
+        "\u{26A0}"
+    );
 
     // Search for self-healing alloys
     println!("\n{}", "━".repeat(72));
@@ -93,10 +93,19 @@ fn main() {
     let target = HEATarget::lcf_wolverine();
     println!("\n  Target Properties:");
     println!("    H-Solubility:     {:.0}%", target.h_solubility * 100.0);
-    println!("    Neutron Tolerance: {:.0}%", target.neutron_tolerance * 100.0);
+    println!(
+        "    Neutron Tolerance: {:.0}%",
+        target.neutron_tolerance * 100.0
+    );
     println!("    Self-Healing:     {:.0}%", target.self_healing * 100.0);
-    println!("    Phonon Coupling:  {:.0}%", target.phonon_coupling * 100.0);
-    println!("    Cost Tolerance:   {:.0}%", target.cost_tolerance * 100.0);
+    println!(
+        "    Phonon Coupling:  {:.0}%",
+        target.phonon_coupling * 100.0
+    );
+    println!(
+        "    Cost Tolerance:   {:.0}%",
+        target.cost_tolerance * 100.0
+    );
 
     let results = hea_designer.search(&target, &radiation, FusionReaction::DT);
 
@@ -110,15 +119,24 @@ fn main() {
         } else if result.scores.self_healing >= 0.7 {
             "\u{2705}" // Checkmark for good
         } else {
-            "\u{26A0}"  // Warning for marginal
+            "\u{26A0}" // Warning for marginal
         };
 
-        println!("  {}  #{} {} (Match: {:.1}%)", icon, rank, result.alloy.name, result.match_score * 100.0);
+        println!(
+            "  {}  #{} {} (Match: {:.1}%)",
+            icon,
+            rank,
+            result.alloy.name,
+            result.match_score * 100.0
+        );
         println!();
 
         // Composition
         if !result.alloy.elements.is_empty() {
-            let comp: String = result.alloy.elements.iter()
+            let comp: String = result
+                .alloy
+                .elements
+                .iter()
                 .map(|e| format!("{}{:.0}", e.symbol, e.fraction * 100.0))
                 .collect::<Vec<_>>()
                 .join("-");
@@ -126,17 +144,41 @@ fn main() {
         }
 
         println!("      Structure:      {:?}", result.alloy.structure);
-        println!("      Entropy:        {:.1} J/mol·K", result.alloy.entropy_j_mol_k);
+        println!(
+            "      Entropy:        {:.1} J/mol·K",
+            result.alloy.entropy_j_mol_k
+        );
         println!("      Sluggish Factor: {:.2}", result.alloy.sluggish_factor);
         println!();
-        println!("      H-Solubility:   {:.0}%", result.scores.h_solubility * 100.0);
-        println!("      Neutron Resist: {:.0}%", result.scores.neutron_tolerance * 100.0);
-        println!("      Self-Healing:   {:.0}%", result.scores.self_healing * 100.0);
-        println!("      Phonon Coup:    {:.0}%", result.scores.phonon_coupling * 100.0);
+        println!(
+            "      H-Solubility:   {:.0}%",
+            result.scores.h_solubility * 100.0
+        );
+        println!(
+            "      Neutron Resist: {:.0}%",
+            result.scores.neutron_tolerance * 100.0
+        );
+        println!(
+            "      Self-Healing:   {:.0}%",
+            result.scores.self_healing * 100.0
+        );
+        println!(
+            "      Phonon Coup:    {:.0}%",
+            result.scores.phonon_coupling * 100.0
+        );
         println!();
-        println!("      Primary Mechanism: {}", result.healing.primary_mechanism);
-        println!("      Lifetime Factor:   {:.1}x vs pure metal", result.healing.lifetime_factor);
-        println!("      Sustainable DPA:   {:.1}", result.healing.sustainable_dpa);
+        println!(
+            "      Primary Mechanism: {}",
+            result.healing.primary_mechanism
+        );
+        println!(
+            "      Lifetime Factor:   {:.1}x vs pure metal",
+            result.healing.lifetime_factor
+        );
+        println!(
+            "      Sustainable DPA:   {:.1}",
+            result.healing.sustainable_dpa
+        );
         println!();
     }
 
@@ -149,12 +191,24 @@ fn main() {
 
     println!("\n  \u{1F31F} GENERATED OPTIMAL: {}", optimal.name);
     println!();
-    println!("      Elements: {:?}",
-        optimal.elements.iter().map(|e| e.symbol.clone()).collect::<Vec<_>>());
+    println!(
+        "      Elements: {:?}",
+        optimal
+            .elements
+            .iter()
+            .map(|e| e.symbol.clone())
+            .collect::<Vec<_>>()
+    );
     println!("      Structure:      {:?}", optimal.structure);
     println!("      H-Solubility:   {:.0}%", optimal.h_solubility * 100.0);
-    println!("      Rad Resistance: {:.0}%", optimal.radiation_resistance * 100.0);
-    println!("      Self-Healing:   {:.0}%", optimal.self_healing_score * 100.0);
+    println!(
+        "      Rad Resistance: {:.0}%",
+        optimal.radiation_resistance * 100.0
+    );
+    println!(
+        "      Self-Healing:   {:.0}%",
+        optimal.self_healing_score * 100.0
+    );
     println!("      LCF Score:      {:.0}%", optimal.lcf_score * 100.0);
 
     // Liquid metal alternative
@@ -162,14 +216,22 @@ fn main() {
     println!("ALTERNATIVE: Liquid Metal Core");
     println!("{}", "━".repeat(72));
 
-    let liquid = results.iter()
-        .find(|r| r.alloy.name.contains("Galinstan"));
+    let liquid = results.iter().find(|r| r.alloy.name.contains("Galinstan"));
 
     if let Some(liq) = liquid {
-        println!("\n  {} {} - The Ultimate Self-Healer", "\u{1F4A7}", liq.alloy.name);
+        println!(
+            "\n  {} {} - The Ultimate Self-Healer",
+            "\u{1F4A7}", liq.alloy.name
+        );
         println!();
-        println!("      Self-Healing:   {:.0}% (PERFECT)", liq.scores.self_healing * 100.0);
-        println!("      H-Solubility:   {:.0}% (Limited)", liq.scores.h_solubility * 100.0);
+        println!(
+            "      Self-Healing:   {:.0}% (PERFECT)",
+            liq.scores.self_healing * 100.0
+        );
+        println!(
+            "      H-Solubility:   {:.0}% (Limited)",
+            liq.scores.h_solubility * 100.0
+        );
         println!("      Mechanism:      {}", liq.healing.primary_mechanism);
         println!();
         println!("      \u{2139} Liquid metals have no lattice to break.");
@@ -182,7 +244,8 @@ fn main() {
     println!("RECOMMENDED ARCHITECTURE: Hybrid Self-Healing Core");
     println!("{}", "━".repeat(72));
 
-    let best_solid = results.iter()
+    let best_solid = results
+        .iter()
         .filter(|r| !r.alloy.name.contains("Galinstan"))
         .max_by(|a, b| a.match_score.partial_cmp(&b.match_score).unwrap());
 
@@ -192,7 +255,10 @@ fn main() {
         println!("  ├─────────────────────────────────────────────────────────┤");
         println!("  │                                                         │");
         println!("  │   ╔═══════════════════════════════════════════════╗     │");
-        println!("  │   ║  OUTER SHELL: {}                   ║     │", format!("{:<24}", best.alloy.name));
+        println!(
+            "  │   ║  OUTER SHELL: {}                   ║     │",
+            format!("{:<24}", best.alloy.name)
+        );
         println!("  │   ║  • H-storage + LCF trigger zone              ║     │");
         println!("  │   ║  • Self-healing via sluggish diffusion       ║     │");
         println!("  │   ╠═══════════════════════════════════════════════╣     │");
@@ -237,7 +303,10 @@ fn main() {
 
     if let Some(best) = best_solid {
         println!("  RECOMMENDED NEXT STEP:");
-        println!("     Synthesize {} and test under neutron irradiation.", best.alloy.name);
+        println!(
+            "     Synthesize {} and test under neutron irradiation.",
+            best.alloy.name
+        );
         println!("     Target: Demonstrate >100x lifetime extension vs pure Pd.");
     }
 

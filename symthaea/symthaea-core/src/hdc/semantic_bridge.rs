@@ -26,9 +26,9 @@
 //! - **Reversible**: decode_hv recovers nearest words from an HV
 //! - **Consciousness-grounded**: Φ weights modulate semantic importance
 
-use std::collections::HashMap;
 use super::binary_hv::BinaryHV;
 use super::deterministic_seeds::seed_from_name;
+use std::collections::HashMap;
 
 /// Bidirectional semantic bridge between text and hypervectors.
 ///

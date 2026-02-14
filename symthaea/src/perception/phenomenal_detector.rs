@@ -46,15 +46,13 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "neural-bridge")]
-use crate::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use crate::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
-use crate::perception::modern_embeddings::{
-    UnifiedEmbedder, EmbeddingConfig, ModelBackend,
-};
+use crate::perception::modern_embeddings::{EmbeddingConfig, ModelBackend, UnifiedEmbedder};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -113,10 +111,10 @@ impl Default for DetectorConfig {
             // Φ loadings are much more discriminating (d=8.32)
             phen_phi_baseline: 7.52,
             func_phi_baseline: 1.74,
-            unity_weight: 0.2, // Φ gets most weight (0.8) due to much higher d
-            context_aware: true, // Enable context-aware scoring by default
+            unity_weight: 0.2,    // Φ gets most weight (0.8) due to much higher d
+            context_aware: true,  // Enable context-aware scoring by default
             negative_weight: 1.5, // Weight negative examples 1.5x in calibration
-            context_window: 3, // Consider 3 words on each side
+            context_window: 3,    // Consider 3 words on each side
         }
     }
 }
@@ -124,27 +122,97 @@ impl Default for DetectorConfig {
 /// Context indicators for semantic disambiguation
 /// Words that suggest functional/technical context when near phenomenal vocabulary
 const FUNCTIONAL_CONTEXT_INDICATORS: &[&str] = &[
-    "system", "sensor", "algorithm", "network", "robot", "camera", "thermostat",
-    "machine", "computer", "software", "hardware", "database", "server", "user",
-    "customer", "product", "application", "device", "model", "function", "api",
-    "interface", "module", "component", "service", "platform", "technology",
-    "drone", "radar", "security", "location", "context-aware", "self-aware",
-    "design", "team", "years", "first-hand", "immersive", "virtual", "gaming",
+    "system",
+    "sensor",
+    "algorithm",
+    "network",
+    "robot",
+    "camera",
+    "thermostat",
+    "machine",
+    "computer",
+    "software",
+    "hardware",
+    "database",
+    "server",
+    "user",
+    "customer",
+    "product",
+    "application",
+    "device",
+    "model",
+    "function",
+    "api",
+    "interface",
+    "module",
+    "component",
+    "service",
+    "platform",
+    "technology",
+    "drone",
+    "radar",
+    "security",
+    "location",
+    "context-aware",
+    "self-aware",
+    "design",
+    "team",
+    "years",
+    "first-hand",
+    "immersive",
+    "virtual",
+    "gaming",
 ];
 
 /// Context indicators for phenomenal/philosophical context
 const PHENOMENAL_CONTEXT_INDICATORS: &[&str] = &[
-    "consciousness", "conscious", "subjective", "qualia", "phenomenal", "feel",
-    "felt", "raw", "inner", "intrinsic", "mysterious", "hard problem", "zombie",
-    "what it is like", "eliminativ", "metaphysic", "philosophy", "nature of",
-    "gives rise", "constitutes", "underlying", "accompanies", "generates",
-    "illusory", "absence", "lack", "denial", "impossibility", "nothing it is like",
+    "consciousness",
+    "conscious",
+    "subjective",
+    "qualia",
+    "phenomenal",
+    "feel",
+    "felt",
+    "raw",
+    "inner",
+    "intrinsic",
+    "mysterious",
+    "hard problem",
+    "zombie",
+    "what it is like",
+    "eliminativ",
+    "metaphysic",
+    "philosophy",
+    "nature of",
+    "gives rise",
+    "constitutes",
+    "underlying",
+    "accompanies",
+    "generates",
+    "illusory",
+    "absence",
+    "lack",
+    "denial",
+    "impossibility",
+    "nothing it is like",
 ];
 
 /// Negation indicators that don't change topic category
 const NEGATION_INDICATORS: &[&str] = &[
-    "no", "not", "without", "lack", "absence", "deny", "denial", "impossible",
-    "non-existence", "neither", "nor", "failure", "empty", "illusory",
+    "no",
+    "not",
+    "without",
+    "lack",
+    "absence",
+    "deny",
+    "denial",
+    "impossible",
+    "non-existence",
+    "neither",
+    "nor",
+    "failure",
+    "empty",
+    "illusory",
 ];
 
 /// Contrastive example for training
@@ -237,7 +305,10 @@ impl PhenomenalDetector {
     }
 
     /// Create detector with contrastive examples for improved robustness
-    pub fn with_contrastive_examples(config: DetectorConfig, contrastive_path: &str) -> Result<Self> {
+    pub fn with_contrastive_examples(
+        config: DetectorConfig,
+        contrastive_path: &str,
+    ) -> Result<Self> {
         let mut detector = Self::with_config(config)?;
         detector.load_contrastive_examples(contrastive_path)?;
         detector.calibrate_from_contrastive()?;
@@ -320,7 +391,9 @@ impl PhenomenalDetector {
     /// Calibrate detector using loaded contrastive examples
     pub fn calibrate_from_contrastive(&mut self) -> Result<ContrastiveCalibrationResult> {
         // Clone examples to avoid borrow conflicts
-        let examples = self.contrastive_examples.as_ref()
+        let examples = self
+            .contrastive_examples
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No contrastive examples loaded"))?
             .clone();
 
@@ -352,7 +425,8 @@ impl PhenomenalDetector {
 
         // Apply negative weighting to baselines
         let neg_weight = self.config.negative_weight;
-        let adjustment = (cal_result.phen_phi_mean - cal_result.func_phi_mean) * 0.1 * (neg_weight - 1.0);
+        let adjustment =
+            (cal_result.phen_phi_mean - cal_result.func_phi_mean) * 0.1 * (neg_weight - 1.0);
         self.config.func_phi_baseline += adjustment;
 
         Ok(ContrastiveCalibrationResult {
@@ -382,10 +456,16 @@ impl PhenomenalDetector {
         }
 
         // Compute mean context scores for each category
-        let func_mean = if functional_context_scores.is_empty() { 0.0 }
-            else { functional_context_scores.iter().sum::<f64>() / functional_context_scores.len() as f64 };
-        let phen_mean = if phenomenal_context_scores.is_empty() { 0.0 }
-            else { phenomenal_context_scores.iter().sum::<f64>() / phenomenal_context_scores.len() as f64 };
+        let func_mean = if functional_context_scores.is_empty() {
+            0.0
+        } else {
+            functional_context_scores.iter().sum::<f64>() / functional_context_scores.len() as f64
+        };
+        let phen_mean = if phenomenal_context_scores.is_empty() {
+            0.0
+        } else {
+            phenomenal_context_scores.iter().sum::<f64>() / phenomenal_context_scores.len() as f64
+        };
 
         // Set adjustments based on learned patterns
         // Functional context should push scores down, phenomenal context should push up
@@ -420,7 +500,15 @@ impl PhenomenalDetector {
         }
 
         // Context window analysis: look at word surroundings
-        let phenomenal_vocab = ["aware", "perceive", "perceives", "experience", "feel", "sense", "conscious"];
+        let phenomenal_vocab = [
+            "aware",
+            "perceive",
+            "perceives",
+            "experience",
+            "feel",
+            "sense",
+            "conscious",
+        ];
 
         for (i, word) in words.iter().enumerate() {
             let is_phenomenal_word = phenomenal_vocab.iter().any(|pv| word.contains(pv));
@@ -433,7 +521,9 @@ impl PhenomenalDetector {
             let window_end = (i + self.config.context_window + 1).min(words.len());
 
             for j in window_start..window_end {
-                if j == i { continue; }
+                if j == i {
+                    continue;
+                }
                 let context_word = words[j];
 
                 // Functional context neighbors penalize
@@ -509,7 +599,11 @@ impl PhenomenalDetector {
     /// Calibrate detector from labeled examples
     ///
     /// Takes phenomenal and functional example texts and computes appropriate baselines.
-    pub fn calibrate(&mut self, phenomenal_texts: &[&str], functional_texts: &[&str]) -> Result<CalibrationResult> {
+    pub fn calibrate(
+        &mut self,
+        phenomenal_texts: &[&str],
+        functional_texts: &[&str],
+    ) -> Result<CalibrationResult> {
         // Collect metrics for phenomenal texts
         let mut phen_unity = Vec::new();
         let mut phen_phi = Vec::new();
@@ -537,14 +631,26 @@ impl PhenomenalDetector {
         }
 
         // Compute means
-        let phen_unity_mean = if phen_unity.is_empty() { 0.8 }
-            else { phen_unity.iter().sum::<f64>() / phen_unity.len() as f64 };
-        let func_unity_mean = if func_unity.is_empty() { 0.7 }
-            else { func_unity.iter().sum::<f64>() / func_unity.len() as f64 };
-        let phen_phi_mean = if phen_phi.is_empty() { 8.0 }
-            else { phen_phi.iter().sum::<f64>() / phen_phi.len() as f64 };
-        let func_phi_mean = if func_phi.is_empty() { 2.0 }
-            else { func_phi.iter().sum::<f64>() / func_phi.len() as f64 };
+        let phen_unity_mean = if phen_unity.is_empty() {
+            0.8
+        } else {
+            phen_unity.iter().sum::<f64>() / phen_unity.len() as f64
+        };
+        let func_unity_mean = if func_unity.is_empty() {
+            0.7
+        } else {
+            func_unity.iter().sum::<f64>() / func_unity.len() as f64
+        };
+        let phen_phi_mean = if phen_phi.is_empty() {
+            8.0
+        } else {
+            phen_phi.iter().sum::<f64>() / phen_phi.len() as f64
+        };
+        let func_phi_mean = if func_phi.is_empty() {
+            2.0
+        } else {
+            func_phi.iter().sum::<f64>() / func_phi.len() as f64
+        };
 
         // Update config
         self.config.phen_unity_baseline = phen_unity_mean;
@@ -609,17 +715,20 @@ impl PhenomenalDetector {
         let context_score = self.compute_context_score(text);
 
         // Check for negation - topic doesn't change but we note it
-        let has_negation = NEGATION_INDICATORS.iter()
+        let has_negation = NEGATION_INDICATORS
+            .iter()
             .any(|neg| text.to_lowercase().contains(neg));
 
         let mut adjusted = base_score;
 
         if context_score < -1.0 {
             // Strong functional context - penalize phenomenal scores
-            adjusted -= self.context_adjustments.functional_context_penalty * (base_score - 0.5).max(0.0);
+            adjusted -=
+                self.context_adjustments.functional_context_penalty * (base_score - 0.5).max(0.0);
         } else if context_score > 1.0 {
             // Strong phenomenal context - boost ambiguous scores
-            adjusted += self.context_adjustments.phenomenal_context_bonus * (0.5 - (base_score - 0.5).abs());
+            adjusted += self.context_adjustments.phenomenal_context_bonus
+                * (0.5 - (base_score - 0.5).abs());
         }
 
         // Negation adjustment (minimal - topic remains the same)
@@ -671,8 +780,8 @@ impl PhenomenalDetector {
         let unity_score = self.score_unity(text)?;
         let phi_score = self.score_phi(text)?;
 
-        let combined = self.config.unity_weight * unity_score
-                     + (1.0 - self.config.unity_weight) * phi_score;
+        let combined =
+            self.config.unity_weight * unity_score + (1.0 - self.config.unity_weight) * phi_score;
 
         Ok(combined.clamp(0.0, 1.0))
     }
@@ -698,7 +807,8 @@ impl PhenomenalDetector {
         let activation = &acts[0].activation;
 
         // Project onto Φ signature (dot product)
-        let loading: f64 = activation.iter()
+        let loading: f64 = activation
+            .iter()
             .zip(self.phi_signature.iter())
             .map(|(a, p)| (*a as f64) * p)
             .sum();
@@ -795,7 +905,8 @@ impl PhenomenalDetector {
     /// Analyze a document and identify phenomenal passages
     pub fn analyze_document(&self, text: &str) -> Result<DocumentAnalysis> {
         // Split into sentences (simple split)
-        let sentences: Vec<&str> = text.split(|c| c == '.' || c == '!' || c == '?')
+        let sentences: Vec<&str> = text
+            .split(|c| c == '.' || c == '!' || c == '?')
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .collect();
@@ -809,7 +920,11 @@ impl PhenomenalDetector {
             total_score += score;
         }
 
-        let mean_score = if sentences.is_empty() { 0.5 } else { total_score / sentences.len() as f64 };
+        let mean_score = if sentences.is_empty() {
+            0.5
+        } else {
+            total_score / sentences.len() as f64
+        };
 
         // Calculate phenomenal ratio before moving
         let phenomenal_count = passage_scores.iter().filter(|(_, s)| *s > 0.6).count();
@@ -849,12 +964,16 @@ impl PhenomenalDetector {
 
     /// Evaluate detector on contrastive examples
     pub fn evaluate_contrastive(&self) -> Result<ContrastiveEvaluation> {
-        let examples = self.contrastive_examples.as_ref()
+        let examples = self
+            .contrastive_examples
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No contrastive examples loaded"))?;
 
         let mut evaluations = Vec::new();
-        let mut by_category: std::collections::HashMap<String, (usize, usize)> = std::collections::HashMap::new();
-        let mut by_difficulty: std::collections::HashMap<String, (usize, usize)> = std::collections::HashMap::new();
+        let mut by_category: std::collections::HashMap<String, (usize, usize)> =
+            std::collections::HashMap::new();
+        let mut by_difficulty: std::collections::HashMap<String, (usize, usize)> =
+            std::collections::HashMap::new();
 
         for ex in &examples.examples {
             let score = self.score(&ex.text)?;
@@ -875,17 +994,25 @@ impl PhenomenalDetector {
             // Update category stats
             let cat_entry = by_category.entry(ex.category.clone()).or_insert((0, 0));
             cat_entry.0 += 1;
-            if correct { cat_entry.1 += 1; }
+            if correct {
+                cat_entry.1 += 1;
+            }
 
             // Update difficulty stats
             let diff_entry = by_difficulty.entry(ex.difficulty.clone()).or_insert((0, 0));
             diff_entry.0 += 1;
-            if correct { diff_entry.1 += 1; }
+            if correct {
+                diff_entry.1 += 1;
+            }
         }
 
         let total = evaluations.len();
         let correct = evaluations.iter().filter(|e| e.correct).count();
-        let accuracy = if total > 0 { correct as f64 / total as f64 } else { 0.0 };
+        let accuracy = if total > 0 {
+            correct as f64 / total as f64
+        } else {
+            0.0
+        };
 
         // Convert to final format with accuracy
         let by_category_final: std::collections::HashMap<String, (usize, usize, f64)> = by_category
@@ -893,10 +1020,11 @@ impl PhenomenalDetector {
             .map(|(k, (t, c))| (k, (t, c, if t > 0 { c as f64 / t as f64 } else { 0.0 })))
             .collect();
 
-        let by_difficulty_final: std::collections::HashMap<String, (usize, usize, f64)> = by_difficulty
-            .into_iter()
-            .map(|(k, (t, c))| (k, (t, c, if t > 0 { c as f64 / t as f64 } else { 0.0 })))
-            .collect();
+        let by_difficulty_final: std::collections::HashMap<String, (usize, usize, f64)> =
+            by_difficulty
+                .into_iter()
+                .map(|(k, (t, c))| (k, (t, c, if t > 0 { c as f64 / t as f64 } else { 0.0 })))
+                .collect();
 
         Ok(ContrastiveEvaluation {
             total,
@@ -910,12 +1038,16 @@ impl PhenomenalDetector {
 
     /// Evaluate detector on contrastive examples without context adjustment (baseline)
     pub fn evaluate_contrastive_baseline(&self) -> Result<ContrastiveEvaluation> {
-        let examples = self.contrastive_examples.as_ref()
+        let examples = self
+            .contrastive_examples
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No contrastive examples loaded"))?;
 
         let mut evaluations = Vec::new();
-        let mut by_category: std::collections::HashMap<String, (usize, usize)> = std::collections::HashMap::new();
-        let mut by_difficulty: std::collections::HashMap<String, (usize, usize)> = std::collections::HashMap::new();
+        let mut by_category: std::collections::HashMap<String, (usize, usize)> =
+            std::collections::HashMap::new();
+        let mut by_difficulty: std::collections::HashMap<String, (usize, usize)> =
+            std::collections::HashMap::new();
 
         for ex in &examples.examples {
             let score = self.score_raw(&ex.text)?;
@@ -936,17 +1068,25 @@ impl PhenomenalDetector {
             // Update category stats
             let cat_entry = by_category.entry(ex.category.clone()).or_insert((0, 0));
             cat_entry.0 += 1;
-            if correct { cat_entry.1 += 1; }
+            if correct {
+                cat_entry.1 += 1;
+            }
 
             // Update difficulty stats
             let diff_entry = by_difficulty.entry(ex.difficulty.clone()).or_insert((0, 0));
             diff_entry.0 += 1;
-            if correct { diff_entry.1 += 1; }
+            if correct {
+                diff_entry.1 += 1;
+            }
         }
 
         let total = evaluations.len();
         let correct = evaluations.iter().filter(|e| e.correct).count();
-        let accuracy = if total > 0 { correct as f64 / total as f64 } else { 0.0 };
+        let accuracy = if total > 0 {
+            correct as f64 / total as f64
+        } else {
+            0.0
+        };
 
         // Convert to final format with accuracy
         let by_category_final: std::collections::HashMap<String, (usize, usize, f64)> = by_category
@@ -954,10 +1094,11 @@ impl PhenomenalDetector {
             .map(|(k, (t, c))| (k, (t, c, if t > 0 { c as f64 / t as f64 } else { 0.0 })))
             .collect();
 
-        let by_difficulty_final: std::collections::HashMap<String, (usize, usize, f64)> = by_difficulty
-            .into_iter()
-            .map(|(k, (t, c))| (k, (t, c, if t > 0 { c as f64 / t as f64 } else { 0.0 })))
-            .collect();
+        let by_difficulty_final: std::collections::HashMap<String, (usize, usize, f64)> =
+            by_difficulty
+                .into_iter()
+                .map(|(k, (t, c))| (k, (t, c, if t > 0 { c as f64 / t as f64 } else { 0.0 })))
+                .collect();
 
         Ok(ContrastiveEvaluation {
             total,
@@ -1114,13 +1255,22 @@ mod tests {
         let detector = PhenomenalDetector::new().unwrap();
 
         // Clearly phenomenal
-        let phen_score = detector.score("The vivid redness of the sunset filled my awareness").unwrap();
+        let phen_score = detector
+            .score("The vivid redness of the sunset filled my awareness")
+            .unwrap();
 
         // Clearly functional
-        let func_score = detector.score("The recursive algorithm terminates in O(n log n) time").unwrap();
+        let func_score = detector
+            .score("The recursive algorithm terminates in O(n log n) time")
+            .unwrap();
 
         // Phenomenal should score higher
-        assert!(phen_score > func_score, "Phenomenal: {}, Functional: {}", phen_score, func_score);
+        assert!(
+            phen_score > func_score,
+            "Phenomenal: {}, Functional: {}",
+            phen_score,
+            func_score
+        );
     }
 
     #[test]
@@ -1129,17 +1279,25 @@ mod tests {
         let text = "The system is aware of the network state";
         let text_lower = text.to_lowercase();
 
-        let has_functional = FUNCTIONAL_CONTEXT_INDICATORS.iter()
+        let has_functional = FUNCTIONAL_CONTEXT_INDICATORS
+            .iter()
             .any(|ind| text_lower.contains(ind));
-        assert!(has_functional, "Should detect functional context indicators");
+        assert!(
+            has_functional,
+            "Should detect functional context indicators"
+        );
 
         // Test that phenomenal context indicators are recognized
         let phen_text = "The subjective awareness of consciousness";
         let phen_lower = phen_text.to_lowercase();
 
-        let has_phenomenal = PHENOMENAL_CONTEXT_INDICATORS.iter()
+        let has_phenomenal = PHENOMENAL_CONTEXT_INDICATORS
+            .iter()
             .any(|ind| phen_lower.contains(ind));
-        assert!(has_phenomenal, "Should detect phenomenal context indicators");
+        assert!(
+            has_phenomenal,
+            "Should detect phenomenal context indicators"
+        );
     }
 
     #[test]
@@ -1147,7 +1305,8 @@ mod tests {
         let text = "No qualia exist in the physical world";
         let text_lower = text.to_lowercase();
 
-        let has_negation = NEGATION_INDICATORS.iter()
+        let has_negation = NEGATION_INDICATORS
+            .iter()
             .any(|neg| text_lower.contains(neg));
         assert!(has_negation, "Should detect negation indicators");
     }
@@ -1158,15 +1317,22 @@ mod tests {
         let detector = PhenomenalDetector::new().unwrap();
 
         // Phenomenal word ("aware") in functional context should score lower
-        let func_score = detector.score("The system is aware of the network state").unwrap();
+        let func_score = detector
+            .score("The system is aware of the network state")
+            .unwrap();
 
         // Phenomenal word ("aware") in phenomenal context should score higher
-        let phen_score = detector.score("The subjective awareness of conscious experience").unwrap();
+        let phen_score = detector
+            .score("The subjective awareness of conscious experience")
+            .unwrap();
 
         // The phenomenal context should score higher
-        assert!(phen_score > func_score,
-                "Phenomenal context ({:.2}) should score higher than functional context ({:.2})",
-                phen_score, func_score);
+        assert!(
+            phen_score > func_score,
+            "Phenomenal context ({:.2}) should score higher than functional context ({:.2})",
+            phen_score,
+            func_score
+        );
     }
 
     #[test]
@@ -1175,11 +1341,15 @@ mod tests {
         let detector = PhenomenalDetector::new().unwrap();
 
         // Negated phenomenal claim should still be classified as phenomenal topic
-        let negated_score = detector.score("No qualia exist in the physical world").unwrap();
+        let negated_score = detector
+            .score("No qualia exist in the physical world")
+            .unwrap();
 
         // Should still be recognized as phenomenal topic (score > 0.4)
-        assert!(negated_score > 0.4,
-                "Negated phenomenal claim ({:.2}) should still be phenomenal topic",
-                negated_score);
+        assert!(
+            negated_score > 0.4,
+            "Negated phenomenal claim ({:.2}) should still be phenomenal topic",
+            negated_score
+        );
     }
 }

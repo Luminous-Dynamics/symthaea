@@ -34,8 +34,8 @@
 //! complex values are encoded via `HdcComplex::encode`.
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::numeric_tower::{NumericTower, Number, NumberResult};
-use crate::hdc::complex::{Complex, HdcComplex, ComplexArithmeticEngine};
+use crate::hdc::complex::{Complex, ComplexArithmeticEngine, HdcComplex};
+use crate::hdc::numeric_tower::{Number, NumberResult, NumericTower};
 use crate::hdc::primitive_system::PrimitiveSystem;
 
 // ============================================================================
@@ -72,9 +72,10 @@ impl MathValue {
         match self {
             MathValue::Natural(n) => *n as f64,
             MathValue::Integer(n) => *n as f64,
-            MathValue::Rational { numerator, denominator } => {
-                *numerator as f64 / *denominator as f64
-            }
+            MathValue::Rational {
+                numerator,
+                denominator,
+            } => *numerator as f64 / *denominator as f64,
             MathValue::Real(x) => *x,
             MathValue::Complex { re, .. } => *re,
         }
@@ -83,11 +84,11 @@ impl MathValue {
     /// Return the Unicode label for the domain this value belongs to.
     pub fn domain(&self) -> &str {
         match self {
-            MathValue::Natural(_) => "\u{2115}",   // ℕ
-            MathValue::Integer(_) => "\u{2124}",   // ℤ
+            MathValue::Natural(_) => "\u{2115}",      // ℕ
+            MathValue::Integer(_) => "\u{2124}",      // ℤ
             MathValue::Rational { .. } => "\u{211a}", // ℚ
-            MathValue::Real(_) => "\u{211d}",      // ℝ
-            MathValue::Complex { .. } => "\u{2102}", // ℂ
+            MathValue::Real(_) => "\u{211d}",         // ℝ
+            MathValue::Complex { .. } => "\u{2102}",  // ℂ
         }
     }
 
@@ -120,9 +121,13 @@ impl MathValue {
         match self {
             MathValue::Natural(n) => Number::Natural(*n),
             MathValue::Integer(n) => Number::Integer(*n),
-            MathValue::Rational { numerator, denominator } => {
-                Number::Rational { numerator: *numerator, denominator: *denominator }
-            }
+            MathValue::Rational {
+                numerator,
+                denominator,
+            } => Number::Rational {
+                numerator: *numerator,
+                denominator: *denominator,
+            },
             MathValue::Real(x) => Number::Real(*x),
             MathValue::Complex { re, .. } => Number::Real(*re),
         }
@@ -133,9 +138,10 @@ impl MathValue {
         match self {
             MathValue::Natural(n) => Complex::new(*n as f64, 0.0),
             MathValue::Integer(n) => Complex::new(*n as f64, 0.0),
-            MathValue::Rational { numerator, denominator } => {
-                Complex::new(*numerator as f64 / *denominator as f64, 0.0)
-            }
+            MathValue::Rational {
+                numerator,
+                denominator,
+            } => Complex::new(*numerator as f64 / *denominator as f64, 0.0),
             MathValue::Real(x) => Complex::new(*x, 0.0),
             MathValue::Complex { re, im } => Complex::new(*re, *im),
         }
@@ -152,7 +158,10 @@ impl std::fmt::Display for MathValue {
         match self {
             MathValue::Natural(n) => write!(f, "{}", n),
             MathValue::Integer(n) => write!(f, "{}", n),
-            MathValue::Rational { numerator, denominator } => {
+            MathValue::Rational {
+                numerator,
+                denominator,
+            } => {
                 write!(f, "{}/{}", numerator, denominator)
             }
             MathValue::Real(x) => write!(f, "{:.10}", x),
@@ -176,9 +185,13 @@ fn number_to_math_value(n: &Number) -> MathValue {
     match n {
         Number::Natural(v) => MathValue::Natural(*v),
         Number::Integer(v) => MathValue::Integer(*v),
-        Number::Rational { numerator, denominator } => {
-            MathValue::Rational { numerator: *numerator, denominator: *denominator }
-        }
+        Number::Rational {
+            numerator,
+            denominator,
+        } => MathValue::Rational {
+            numerator: *numerator,
+            denominator: *denominator,
+        },
         Number::Real(v) => MathValue::Real(*v),
     }
 }
@@ -376,12 +389,7 @@ impl UnifiedMathEngine {
     }
 
     /// Build a MathResult from a unary tower operation.
-    fn from_tower_result_unary(
-        &self,
-        nr: &NumberResult,
-        a: &MathValue,
-        op: &str,
-    ) -> MathResult {
+    fn from_tower_result_unary(&self, nr: &NumberResult, a: &MathValue, op: &str) -> MathResult {
         let value = number_to_math_value(&nr.number);
         let result_domain = value.domain();
 
@@ -429,12 +437,7 @@ impl UnifiedMathEngine {
     }
 
     /// Build a unary MathResult from a complex operation.
-    fn from_complex_result_unary(
-        &self,
-        c: Complex,
-        a: &MathValue,
-        op: &str,
-    ) -> MathResult {
+    fn from_complex_result_unary(&self, c: Complex, a: &MathValue, op: &str) -> MathResult {
         let value = complex_to_math_value(c);
         let encoding = self.encode(&value);
         let result_domain = value.domain();
@@ -442,8 +445,8 @@ impl UnifiedMathEngine {
         let mut promotions = Vec::new();
         Self::record_promotion(&mut promotions, a.domain(), result_domain);
 
-        let phi = Self::operation_phi(op)
-            + Self::promotion_phi(a.domain_rank(), value.domain_rank());
+        let phi =
+            Self::operation_phi(op) + Self::promotion_phi(a.domain_rank(), value.domain_rank());
 
         MathResult {
             value,
@@ -631,14 +634,15 @@ mod tests {
         assert_eq!(MathValue::Natural(5).domain(), "\u{2115}");
         assert_eq!(MathValue::Integer(-3).domain(), "\u{2124}");
         assert_eq!(
-            MathValue::Rational { numerator: 1, denominator: 2 }.domain(),
+            MathValue::Rational {
+                numerator: 1,
+                denominator: 2
+            }
+            .domain(),
             "\u{211a}"
         );
         assert_eq!(MathValue::Real(3.14).domain(), "\u{211d}");
-        assert_eq!(
-            MathValue::Complex { re: 1.0, im: 2.0 }.domain(),
-            "\u{2102}"
-        );
+        assert_eq!(MathValue::Complex { re: 1.0, im: 2.0 }.domain(), "\u{2102}");
     }
 
     // ====================================================================
@@ -649,7 +653,16 @@ mod tests {
     fn test_to_f64() {
         assert!((MathValue::Natural(7).to_f64() - 7.0).abs() < 1e-10);
         assert!((MathValue::Integer(-3).to_f64() - (-3.0)).abs() < 1e-10);
-        assert!((MathValue::Rational { numerator: 1, denominator: 3 }.to_f64() - 1.0 / 3.0).abs() < 1e-10);
+        assert!(
+            (MathValue::Rational {
+                numerator: 1,
+                denominator: 3
+            }
+            .to_f64()
+                - 1.0 / 3.0)
+                .abs()
+                < 1e-10
+        );
         assert!((MathValue::Real(2.5).to_f64() - 2.5).abs() < 1e-10);
         assert!((MathValue::Complex { re: 4.0, im: 3.0 }.to_f64() - 4.0).abs() < 1e-10);
     }
@@ -675,7 +688,8 @@ mod tests {
         let r = e.add(&MathValue::Natural(3), &MathValue::Natural(7));
         assert!(
             matches!(r.value, MathValue::Natural(10)),
-            "3 + 7 = 10 in N, got {:?}", r.value
+            "3 + 7 = 10 in N, got {:?}",
+            r.value
         );
         assert!(r.domain_promotions.is_empty(), "No promotions expected");
     }
@@ -686,7 +700,8 @@ mod tests {
         let r = e.multiply(&MathValue::Natural(4), &MathValue::Natural(5));
         assert!(
             matches!(r.value, MathValue::Natural(20)),
-            "4 * 5 = 20, got {:?}", r.value
+            "4 * 5 = 20, got {:?}",
+            r.value
         );
     }
 
@@ -700,7 +715,8 @@ mod tests {
         let r = e.add(&MathValue::Integer(-3), &MathValue::Integer(-5));
         assert!(
             matches!(r.value, MathValue::Integer(-8)),
-            "-3 + -5 = -8, got {:?}", r.value
+            "-3 + -5 = -8, got {:?}",
+            r.value
         );
     }
 
@@ -710,7 +726,8 @@ mod tests {
         let r = e.subtract(&MathValue::Integer(10), &MathValue::Integer(3));
         assert!(
             matches!(r.value, MathValue::Natural(7)),
-            "10 - 3 = 7 (narrows to N), got {:?}", r.value
+            "10 - 3 = 7 (narrows to N), got {:?}",
+            r.value
         );
     }
 
@@ -721,26 +738,52 @@ mod tests {
     #[test]
     fn test_add_rationals() {
         let e = engine();
-        let a = MathValue::Rational { numerator: 1, denominator: 2 };
-        let b = MathValue::Rational { numerator: 1, denominator: 3 };
+        let a = MathValue::Rational {
+            numerator: 1,
+            denominator: 2,
+        };
+        let b = MathValue::Rational {
+            numerator: 1,
+            denominator: 3,
+        };
         let r = e.add(&a, &b);
         // 1/2 + 1/3 = 5/6
         assert!(
-            matches!(r.value, MathValue::Rational { numerator: 5, denominator: 6 }),
-            "1/2 + 1/3 = 5/6, got {:?}", r.value
+            matches!(
+                r.value,
+                MathValue::Rational {
+                    numerator: 5,
+                    denominator: 6
+                }
+            ),
+            "1/2 + 1/3 = 5/6, got {:?}",
+            r.value
         );
     }
 
     #[test]
     fn test_multiply_rationals() {
         let e = engine();
-        let a = MathValue::Rational { numerator: 2, denominator: 3 };
-        let b = MathValue::Rational { numerator: 3, denominator: 4 };
+        let a = MathValue::Rational {
+            numerator: 2,
+            denominator: 3,
+        };
+        let b = MathValue::Rational {
+            numerator: 3,
+            denominator: 4,
+        };
         let r = e.multiply(&a, &b);
         // (2/3) * (3/4) = 1/2
         assert!(
-            matches!(r.value, MathValue::Rational { numerator: 1, denominator: 2 }),
-            "(2/3) * (3/4) = 1/2, got {:?}", r.value
+            matches!(
+                r.value,
+                MathValue::Rational {
+                    numerator: 1,
+                    denominator: 2
+                }
+            ),
+            "(2/3) * (3/4) = 1/2, got {:?}",
+            r.value
         );
     }
 
@@ -826,7 +869,8 @@ mod tests {
         let r = e.subtract(&MathValue::Natural(3), &MathValue::Natural(5));
         assert!(
             matches!(r.value, MathValue::Integer(-2)),
-            "3 - 5 should promote to Z(-2), got {:?}", r.value
+            "3 - 5 should promote to Z(-2), got {:?}",
+            r.value
         );
         assert!(
             !r.domain_promotions.is_empty(),
@@ -838,11 +882,19 @@ mod tests {
     fn test_promotion_integer_to_rational() {
         let e = engine();
         // 7 / 2 = 7/2 (ℤ → ℚ)
-        let r = e.divide(&MathValue::Natural(7), &MathValue::Natural(2))
+        let r = e
+            .divide(&MathValue::Natural(7), &MathValue::Natural(2))
             .expect("nonzero divisor");
         assert!(
-            matches!(r.value, MathValue::Rational { numerator: 7, denominator: 2 }),
-            "7 / 2 should promote to Q(7/2), got {:?}", r.value
+            matches!(
+                r.value,
+                MathValue::Rational {
+                    numerator: 7,
+                    denominator: 2
+                }
+            ),
+            "7 / 2 should promote to Q(7/2), got {:?}",
+            r.value
         );
     }
 
@@ -853,7 +905,8 @@ mod tests {
         let r = e.add(&MathValue::Natural(5), &MathValue::Integer(-3));
         assert!(
             matches!(r.value, MathValue::Natural(2)),
-            "5 + (-3) = 2, got {:?}", r.value
+            "5 + (-3) = 2, got {:?}",
+            r.value
         );
     }
 
@@ -863,11 +916,21 @@ mod tests {
         // Integer(1) + Rational(1/2) = Rational(3/2)
         let r = e.add(
             &MathValue::Integer(1),
-            &MathValue::Rational { numerator: 1, denominator: 2 },
+            &MathValue::Rational {
+                numerator: 1,
+                denominator: 2,
+            },
         );
         assert!(
-            matches!(r.value, MathValue::Rational { numerator: 3, denominator: 2 }),
-            "1 + 1/2 = 3/2, got {:?}", r.value
+            matches!(
+                r.value,
+                MathValue::Rational {
+                    numerator: 3,
+                    denominator: 2
+                }
+            ),
+            "1 + 1/2 = 3/2, got {:?}",
+            r.value
         );
     }
 
@@ -878,8 +941,11 @@ mod tests {
         let r = e.sqrt(&MathValue::Natural(2));
         match &r.value {
             MathValue::Real(x) => {
-                assert!((x - std::f64::consts::SQRT_2).abs() < 1e-10,
-                    "sqrt(2) should be ~1.41421, got {}", x);
+                assert!(
+                    (x - std::f64::consts::SQRT_2).abs() < 1e-10,
+                    "sqrt(2) should be ~1.41421, got {}",
+                    x
+                );
             }
             other => panic!("sqrt(2) should promote to R, got {:?}", other),
         }
@@ -913,7 +979,11 @@ mod tests {
         match &r.value {
             MathValue::Complex { re, im } => {
                 assert!(re.abs() < 1e-10, "sqrt(-1) re should be ~0, got {}", re);
-                assert!((im - 1.0).abs() < 1e-10, "sqrt(-1) im should be ~1, got {}", im);
+                assert!(
+                    (im - 1.0).abs() < 1e-10,
+                    "sqrt(-1) im should be ~1, got {}",
+                    im
+                );
             }
             other => panic!("sqrt(-1) should be Complex(0+1i), got {:?}", other),
         }
@@ -926,7 +996,11 @@ mod tests {
         match &r.value {
             MathValue::Complex { re, im } => {
                 assert!(re.abs() < 1e-10, "sqrt(-4) re should be ~0, got {}", re);
-                assert!((im - 2.0).abs() < 1e-10, "sqrt(-4) im should be ~2, got {}", im);
+                assert!(
+                    (im - 2.0).abs() < 1e-10,
+                    "sqrt(-4) im should be ~2, got {}",
+                    im
+                );
             }
             other => panic!("sqrt(-4) should be Complex(0+2i), got {:?}", other),
         }
@@ -938,7 +1012,8 @@ mod tests {
         let r = e.sqrt(&MathValue::Natural(9));
         assert!(
             matches!(r.value, MathValue::Natural(3)),
-            "sqrt(9) = 3 in N, got {:?}", r.value
+            "sqrt(9) = 3 in N, got {:?}",
+            r.value
         );
     }
 
@@ -949,7 +1024,8 @@ mod tests {
         let r = e.sqrt(&MathValue::Complex { re: 0.0, im: 1.0 });
         assert!(
             matches!(r.value, MathValue::Complex { .. }),
-            "sqrt(i) should be Complex, got {:?}", r.value
+            "sqrt(i) should be Complex, got {:?}",
+            r.value
         );
     }
 
@@ -961,7 +1037,8 @@ mod tests {
     fn test_divide_by_zero_returns_none() {
         let e = engine();
         assert!(
-            e.divide(&MathValue::Natural(5), &MathValue::Natural(0)).is_none(),
+            e.divide(&MathValue::Natural(5), &MathValue::Natural(0))
+                .is_none(),
             "Division by zero should return None"
         );
     }
@@ -969,11 +1046,13 @@ mod tests {
     #[test]
     fn test_divide_exact_stays_natural() {
         let e = engine();
-        let r = e.divide(&MathValue::Natural(6), &MathValue::Natural(3))
+        let r = e
+            .divide(&MathValue::Natural(6), &MathValue::Natural(3))
             .expect("nonzero divisor");
         assert!(
             matches!(r.value, MathValue::Natural(2)),
-            "6 / 3 = 2 in N, got {:?}", r.value
+            "6 / 3 = 2 in N, got {:?}",
+            r.value
         );
     }
 
@@ -984,7 +1063,8 @@ mod tests {
             e.divide(
                 &MathValue::Complex { re: 1.0, im: 1.0 },
                 &MathValue::Complex { re: 0.0, im: 0.0 },
-            ).is_none(),
+            )
+            .is_none(),
             "Division by zero complex should return None"
         );
     }
@@ -999,7 +1079,8 @@ mod tests {
         let r = e.power(&MathValue::Natural(2), &MathValue::Natural(10));
         assert!(
             matches!(r.value, MathValue::Natural(1024)),
-            "2^10 = 1024, got {:?}", r.value
+            "2^10 = 1024, got {:?}",
+            r.value
         );
     }
 
@@ -1008,8 +1089,15 @@ mod tests {
         let e = engine();
         let r = e.power(&MathValue::Natural(2), &MathValue::Integer(-1));
         assert!(
-            matches!(r.value, MathValue::Rational { numerator: 1, denominator: 2 }),
-            "2^(-1) = 1/2, got {:?}", r.value
+            matches!(
+                r.value,
+                MathValue::Rational {
+                    numerator: 1,
+                    denominator: 2
+                }
+            ),
+            "2^(-1) = 1/2, got {:?}",
+            r.value
         );
     }
 
@@ -1023,7 +1111,11 @@ mod tests {
         );
         match &r.value {
             MathValue::Complex { re, im } => {
-                assert!((re - (-1.0)).abs() < 1e-6, "i^2 re should be -1, got {}", re);
+                assert!(
+                    (re - (-1.0)).abs() < 1e-6,
+                    "i^2 re should be -1, got {}",
+                    re
+                );
                 assert!(im.abs() < 1e-6, "i^2 im should be ~0, got {}", im);
             }
             // May narrow to Integer(-1) via complex_to_math_value
@@ -1056,7 +1148,8 @@ mod tests {
         assert!(
             r_yes.phi > r_no.phi,
             "Promotion should increase Phi: promo={}, no_promo={}",
-            r_yes.phi, r_no.phi
+            r_yes.phi,
+            r_no.phi
         );
     }
 
@@ -1076,7 +1169,8 @@ mod tests {
         assert!(
             r_complex.phi > r_real.phi,
             "Complex promotion should add more Phi: complex={}, real={}",
-            r_complex.phi, r_real.phi
+            r_complex.phi,
+            r_real.phi
         );
     }
 
@@ -1097,7 +1191,10 @@ mod tests {
         let e = engine();
         let r1 = e.add(&MathValue::Natural(5), &MathValue::Natural(0));
         let r2 = e.add(&MathValue::Natural(7), &MathValue::Natural(0));
-        assert_ne!(r1.encoding, r2.encoding, "5 and 7 should have different encodings");
+        assert_ne!(
+            r1.encoding, r2.encoding,
+            "5 and 7 should have different encodings"
+        );
     }
 
     #[test]
@@ -1105,7 +1202,10 @@ mod tests {
         let e = engine();
         let r1 = e.add(&MathValue::Natural(42), &MathValue::Natural(0));
         let r2 = e.add(&MathValue::Natural(42), &MathValue::Natural(0));
-        assert_eq!(r1.encoding, r2.encoding, "Same value should produce same encoding");
+        assert_eq!(
+            r1.encoding, r2.encoding,
+            "Same value should produce same encoding"
+        );
     }
 
     #[test]
@@ -1128,7 +1228,13 @@ mod tests {
         let s = format!("{}", MathValue::Integer(-3));
         assert_eq!(s, "-3");
 
-        let s = format!("{}", MathValue::Rational { numerator: 1, denominator: 2 });
+        let s = format!(
+            "{}",
+            MathValue::Rational {
+                numerator: 1,
+                denominator: 2
+            }
+        );
         assert_eq!(s, "1/2");
 
         let s = format!("{}", MathValue::Complex { re: 1.0, im: -2.0 });
@@ -1143,7 +1249,11 @@ mod tests {
     fn test_is_zero() {
         assert!(MathValue::Natural(0).is_zero());
         assert!(MathValue::Integer(0).is_zero());
-        assert!(MathValue::Rational { numerator: 0, denominator: 5 }.is_zero());
+        assert!(MathValue::Rational {
+            numerator: 0,
+            denominator: 5
+        }
+        .is_zero());
         assert!(MathValue::Real(0.0).is_zero());
         assert!(MathValue::Complex { re: 0.0, im: 0.0 }.is_zero());
         assert!(!MathValue::Natural(1).is_zero());
@@ -1164,14 +1274,28 @@ mod tests {
 
         // Subtract to promote to ℤ: 10 - 15 = -5
         let r1 = e.subtract(&n, &MathValue::Natural(15));
-        assert!(matches!(r1.value, MathValue::Integer(-5)),
-            "10 - 15 = -5, got {:?}", r1.value);
+        assert!(
+            matches!(r1.value, MathValue::Integer(-5)),
+            "10 - 15 = -5, got {:?}",
+            r1.value
+        );
         assert_eq!(r1.value.domain(), "\u{2124}");
 
         // Divide to promote to ℚ: -5 / 3 = -5/3
-        let r2 = e.divide(&r1.value, &MathValue::Natural(3)).expect("nonzero");
-        assert!(matches!(r2.value, MathValue::Rational { numerator: -5, denominator: 3 }),
-            "-5 / 3 = -5/3, got {:?}", r2.value);
+        let r2 = e
+            .divide(&r1.value, &MathValue::Natural(3))
+            .expect("nonzero");
+        assert!(
+            matches!(
+                r2.value,
+                MathValue::Rational {
+                    numerator: -5,
+                    denominator: 3
+                }
+            ),
+            "-5 / 3 = -5/3, got {:?}",
+            r2.value
+        );
         assert_eq!(r2.value.domain(), "\u{211a}");
 
         // sqrt of the absolute value to promote to ℝ: sqrt(5/3)
@@ -1199,12 +1323,14 @@ mod tests {
         let r = e.sqrt(&MathValue::Integer(-1));
         assert!(
             !r.domain_promotions.is_empty(),
-            "sqrt(-1) should record domain promotion, got {:?}", r.domain_promotions
+            "sqrt(-1) should record domain promotion, got {:?}",
+            r.domain_promotions
         );
         // Should contain an arrow
         assert!(
             r.domain_promotions.iter().any(|s| s.contains('\u{2192}')),
-            "Promotion trace should contain arrow: {:?}", r.domain_promotions
+            "Promotion trace should contain arrow: {:?}",
+            r.domain_promotions
         );
     }
 

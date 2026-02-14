@@ -2,8 +2,8 @@
 //!
 //! Extracted from `mod.rs` to reduce file size.
 
-use anyhow::Result;
 use super::{CognitiveLoopConfig, CognitiveLoopService, TemporalBackend};
+use anyhow::Result;
 
 /// Builder for configuring the cognitive loop service
 pub struct CognitiveLoopBuilder {
@@ -19,7 +19,7 @@ impl CognitiveLoopBuilder {
 
     pub fn with_cfc_neurons(mut self, neurons: usize) -> Self {
         self.config.cfc_config.num_neurons = neurons;
-        self.config.cfc_config.input_dim = neurons;  // Keep in sync for train_step
+        self.config.cfc_config.input_dim = neurons; // Keep in sync for train_step
         self
     }
 

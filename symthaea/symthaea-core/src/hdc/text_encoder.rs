@@ -20,12 +20,12 @@
 // ==================================================================================
 
 use anyhow::Result;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 
-use super::HDC_DIMENSION;
 use super::primitive_system::PrimitiveSystem;
+use super::HDC_DIMENSION;
 
 /// Text encoder configuration
 #[derive(Debug, Clone)]
@@ -137,9 +137,7 @@ impl TextEncoder {
     /// Generate deterministic position vectors
     fn generate_position_vectors(dimension: usize, max_length: usize) -> Vec<Vec<i8>> {
         (0..max_length)
-            .map(|pos| {
-                Self::hash_to_bipolar(&format!("__POS_{}__", pos), dimension)
-            })
+            .map(|pos| Self::hash_to_bipolar(&format!("__POS_{}__", pos), dimension))
             .collect()
     }
 
@@ -148,20 +146,50 @@ impl TextEncoder {
         let mut tokens = HashMap::new();
 
         // Core special tokens
-        tokens.insert("[PAD]".to_string(), Self::hash_to_bipolar("[PAD]", dimension));
-        tokens.insert("[UNK]".to_string(), Self::hash_to_bipolar("[UNK]", dimension));
-        tokens.insert("[CLS]".to_string(), Self::hash_to_bipolar("[CLS]", dimension));
-        tokens.insert("[SEP]".to_string(), Self::hash_to_bipolar("[SEP]", dimension));
-        tokens.insert("[MASK]".to_string(), Self::hash_to_bipolar("[MASK]", dimension));
+        tokens.insert(
+            "[PAD]".to_string(),
+            Self::hash_to_bipolar("[PAD]", dimension),
+        );
+        tokens.insert(
+            "[UNK]".to_string(),
+            Self::hash_to_bipolar("[UNK]", dimension),
+        );
+        tokens.insert(
+            "[CLS]".to_string(),
+            Self::hash_to_bipolar("[CLS]", dimension),
+        );
+        tokens.insert(
+            "[SEP]".to_string(),
+            Self::hash_to_bipolar("[SEP]", dimension),
+        );
+        tokens.insert(
+            "[MASK]".to_string(),
+            Self::hash_to_bipolar("[MASK]", dimension),
+        );
 
         // Negation token (for "not X" encoding)
-        tokens.insert("[NEG]".to_string(), Self::hash_to_bipolar("[NEG]", dimension));
+        tokens.insert(
+            "[NEG]".to_string(),
+            Self::hash_to_bipolar("[NEG]", dimension),
+        );
 
         // Relation tokens
-        tokens.insert("[CAUSE]".to_string(), Self::hash_to_bipolar("[CAUSE]", dimension));
-        tokens.insert("[EFFECT]".to_string(), Self::hash_to_bipolar("[EFFECT]", dimension));
-        tokens.insert("[AGENT]".to_string(), Self::hash_to_bipolar("[AGENT]", dimension));
-        tokens.insert("[PATIENT]".to_string(), Self::hash_to_bipolar("[PATIENT]", dimension));
+        tokens.insert(
+            "[CAUSE]".to_string(),
+            Self::hash_to_bipolar("[CAUSE]", dimension),
+        );
+        tokens.insert(
+            "[EFFECT]".to_string(),
+            Self::hash_to_bipolar("[EFFECT]", dimension),
+        );
+        tokens.insert(
+            "[AGENT]".to_string(),
+            Self::hash_to_bipolar("[AGENT]", dimension),
+        );
+        tokens.insert(
+            "[PATIENT]".to_string(),
+            Self::hash_to_bipolar("[PATIENT]", dimension),
+        );
 
         tokens
     }
@@ -247,7 +275,7 @@ impl TextEncoder {
         // Check learned embeddings first (word-level cache)
         if let Some(embedding) = self.word_embeddings.get(&normalized) {
             self.stats.words_encoded += 1;
-            self.stats.cache_hits += 1;  // Word embedding cache hit
+            self.stats.cache_hits += 1; // Word embedding cache hit
             return Ok(embedding.clone());
         }
 
@@ -255,7 +283,8 @@ impl TextEncoder {
         let ngram_encoding = self.encode_ngrams(&normalized);
 
         // Store in word embeddings for future use
-        self.word_embeddings.insert(normalized, ngram_encoding.clone());
+        self.word_embeddings
+            .insert(normalized, ngram_encoding.clone());
         self.stats.vocabulary_size = self.word_embeddings.len();
         self.stats.words_encoded += 1;
 
@@ -331,7 +360,10 @@ impl TextEncoder {
                 primitive_hits += 1;
                 // Convert BinaryHV (f32 bipolar) to i8 bipolar
                 let f32_vec = prim.encoding.to_bipolar();
-                f32_vec.iter().map(|&x| if x > 0.0 { 1i8 } else { -1i8 }).collect()
+                f32_vec
+                    .iter()
+                    .map(|&x| if x > 0.0 { 1i8 } else { -1i8 })
+                    .collect()
             } else {
                 // Fall back to n-gram encoding
                 self.encode_word(word)?
@@ -361,7 +393,12 @@ impl TextEncoder {
     /// Encode with explicit semantic role marking
     ///
     /// Useful for causal reasoning: "A causes B" → bind(A, [CAUSE]) + bind(B, [EFFECT])
-    pub fn encode_with_roles(&mut self, subject: &str, predicate: &str, object: &str) -> Result<Vec<i8>> {
+    pub fn encode_with_roles(
+        &mut self,
+        subject: &str,
+        predicate: &str,
+        object: &str,
+    ) -> Result<Vec<i8>> {
         let subject_vec = self.encode_word(subject)?;
         let predicate_vec = self.encode_word(predicate)?;
         let object_vec = self.encode_word(object)?;
@@ -444,7 +481,11 @@ impl TextEncoder {
 
     /// Compute cosine similarity between two vectors
     pub fn cosine_similarity(&self, a: &[i8], b: &[i8]) -> f32 {
-        let dot: i32 = a.iter().zip(b.iter()).map(|(x, y)| (*x as i32) * (*y as i32)).sum();
+        let dot: i32 = a
+            .iter()
+            .zip(b.iter())
+            .map(|(x, y)| (*x as i32) * (*y as i32))
+            .sum();
         let norm_a: f32 = (a.iter().map(|x| (*x as i32).pow(2)).sum::<i32>() as f32).sqrt();
         let norm_b: f32 = (b.iter().map(|x| (*x as i32).pow(2)).sum::<i32>() as f32).sqrt();
 
@@ -487,7 +528,7 @@ impl TextEncoder {
 
     /// Normalize vector (for bipolar, this is a no-op but ensures consistency)
     fn normalize_vector(&self, v: &[i8]) -> Vec<i8> {
-        v.to_vec()  // Bipolar vectors are already normalized
+        v.to_vec() // Bipolar vectors are already normalized
     }
 
     /// Get encoder statistics
@@ -518,7 +559,10 @@ impl TextEncoder {
 
     /// Convert f32 to i8 bipolar
     pub fn from_f32(&self, float_vec: &[f32]) -> Vec<i8> {
-        float_vec.iter().map(|&x| if x > 0.0 { 1 } else { -1 }).collect()
+        float_vec
+            .iter()
+            .map(|&x| if x > 0.0 { 1 } else { -1 })
+            .collect()
     }
 }
 
@@ -584,10 +628,22 @@ mod tests {
         let sim_cat_car = encoder.hamming_similarity(&cat, &car);
 
         // Both similarities should be valid
-        assert!(sim_cat_kitten.is_finite(), "cat-kitten similarity should be finite");
-        assert!(sim_cat_car.is_finite(), "cat-car similarity should be finite");
-        assert!(sim_cat_kitten >= 0.0 && sim_cat_kitten <= 1.0, "Similarity should be in [0,1]");
-        assert!(sim_cat_car >= 0.0 && sim_cat_car <= 1.0, "Similarity should be in [0,1]");
+        assert!(
+            sim_cat_kitten.is_finite(),
+            "cat-kitten similarity should be finite"
+        );
+        assert!(
+            sim_cat_car.is_finite(),
+            "cat-car similarity should be finite"
+        );
+        assert!(
+            sim_cat_kitten >= 0.0 && sim_cat_kitten <= 1.0,
+            "Similarity should be in [0,1]"
+        );
+        assert!(
+            sim_cat_car >= 0.0 && sim_cat_car <= 1.0,
+            "Similarity should be in [0,1]"
+        );
     }
 
     #[test]
@@ -625,11 +681,11 @@ mod tests {
         let mut encoder = TextEncoder::new(TextEncoderConfig::default()).unwrap();
 
         encoder.encode_word("test").unwrap();
-        encoder.encode_word("test").unwrap();  // Cache hit
+        encoder.encode_word("test").unwrap(); // Cache hit
         encoder.encode_sentence("hello world").unwrap();
 
         let stats = encoder.stats();
-        assert_eq!(stats.words_encoded, 4);  // test + test + hello + world
+        assert_eq!(stats.words_encoded, 4); // test + test + hello + world
         assert_eq!(stats.sentences_encoded, 1);
         assert!(stats.cache_hits > 0);
     }

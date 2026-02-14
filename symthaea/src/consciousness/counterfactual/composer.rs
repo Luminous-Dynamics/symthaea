@@ -4,8 +4,8 @@
 //! dream insights. This enables "retroactive self-improvement":
 //! learning from pasts that never happened.
 
-use super::identification::{CausalDAG, CausalQuery, CausalQueryOutcome, CounterfactualReasoner};
 use super::hdc_surgery::GraphSurgery;
+use super::identification::{CausalDAG, CausalQuery, CausalQueryOutcome, CounterfactualReasoner};
 use super::semantic_roles::RoleSubstitution;
 
 /// Composes counterfactual queries with temporal rollouts.
@@ -25,15 +25,15 @@ impl CounterfactualComposer {
     /// 1. Query causal identification
     /// 2. If identified, describe what-if scenario
     /// 3. If not, explain why and suggest fixes
-    pub fn analyze(
-        &self,
-        dag: &CausalDAG,
-        query: &CausalQuery,
-    ) -> CounterfactualAnalysis {
+    pub fn analyze(&self, dag: &CausalDAG, query: &CausalQuery) -> CounterfactualAnalysis {
         let outcome = self.reasoner.query(dag, query);
 
         match outcome {
-            CausalQueryOutcome::Identified { ref method, confidence, ref estimand } => {
+            CausalQueryOutcome::Identified {
+                ref method,
+                confidence,
+                ref estimand,
+            } => {
                 let narrative = format!(
                     "Causal effect identified via {:?} (confidence={:.2}). {}",
                     method, confidence, estimand.description,
@@ -45,7 +45,11 @@ impl CounterfactualComposer {
                     uncertainty: 1.0 - confidence,
                 }
             }
-            CausalQueryOutcome::Unidentified { ref reason, ref suggestions, .. } => {
+            CausalQueryOutcome::Unidentified {
+                ref reason,
+                ref suggestions,
+                ..
+            } => {
                 let narrative = format!(
                     "Cannot identify causal effect: {:?}. Suggestions: {}",
                     reason,
@@ -58,7 +62,11 @@ impl CounterfactualComposer {
                     uncertainty: 1.0,
                 }
             }
-            CausalQueryOutcome::AssumptionRequired { ref assumption, plausibility, .. } => {
+            CausalQueryOutcome::AssumptionRequired {
+                ref assumption,
+                plausibility,
+                ..
+            } => {
                 let narrative = format!(
                     "Causal effect identifiable if '{}' holds (plausibility={:.2})",
                     assumption.condition, plausibility,
@@ -126,11 +134,12 @@ mod tests {
 
     #[test]
     fn test_compose_identified() {
-        let dag = CausalDAG::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-        );
-        let query = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+        let dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![(0, 1)]);
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
         let composer = CounterfactualComposer::new();
         let analysis = composer.analyze(&dag, &query);
         assert!(analysis.actionable);
@@ -143,7 +152,11 @@ mod tests {
             vec!["X".into(), "Y".into()],
             vec![], // no connection
         );
-        let query = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
         let composer = CounterfactualComposer::new();
         let analysis = composer.analyze(&dag, &query);
         assert!(!analysis.actionable);

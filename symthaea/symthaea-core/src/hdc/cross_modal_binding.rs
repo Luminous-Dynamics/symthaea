@@ -82,14 +82,14 @@ impl Modality {
     /// (some modalities naturally have higher/lower intrinsic dimensions)
     pub fn dimension_weight(&self) -> f32 {
         match self {
-            Modality::Visual => 1.0,        // Full spatial complexity
-            Modality::Auditory => 0.8,      // Temporal but lower spatial
-            Modality::Semantic => 1.0,      // Full conceptual space
-            Modality::Temporal => 0.6,      // Lower dimensional (sequential)
+            Modality::Visual => 1.0,         // Full spatial complexity
+            Modality::Auditory => 0.8,       // Temporal but lower spatial
+            Modality::Semantic => 1.0,       // Full conceptual space
+            Modality::Temporal => 0.6,       // Lower dimensional (sequential)
             Modality::Proprioceptive => 0.7, // Body space
-            Modality::Emotional => 0.5,     // Valence/arousal dimensions
-            Modality::Symbolic => 0.9,      // Discrete but high variety
-            Modality::Motor => 0.7,         // Action space
+            Modality::Emotional => 0.5,      // Valence/arousal dimensions
+            Modality::Symbolic => 0.9,       // Discrete but high variety
+            Modality::Motor => 0.7,          // Action space
         }
     }
 }
@@ -244,7 +244,9 @@ impl CrossModalBinder {
 
     /// Get modality-specific projection of a hypervector
     fn project_to_modality(&self, hv: &ContinuousHV, modality: Modality) -> ContinuousHV {
-        let basis = self.modality_bases.get(&modality)
+        let basis = self
+            .modality_bases
+            .get(&modality)
             .expect("All modalities should have bases");
 
         // Project by binding with modality basis (creates modality-specific subspace)
@@ -376,15 +378,15 @@ impl CrossModalBinder {
         };
 
         // Measure coherence and preservation
-        let refs: Vec<(&ContinuousHV, Modality)> = projected.iter()
-            .map(|(hv, m)| (hv, *m))
-            .collect();
+        let refs: Vec<(&ContinuousHV, Modality)> =
+            projected.iter().map(|(hv, m)| (hv, *m)).collect();
         let coherence = self.measure_coherence(&bound_hv, &refs);
 
         let mut preservation = HashMap::new();
         for (hv, mod_) in &projected {
             let sim = bound_hv.similarity(hv).abs();
-            preservation.entry(*mod_)
+            preservation
+                .entry(*mod_)
                 .and_modify(|v| *v = (*v + sim) / 2.0)
                 .or_insert(sim);
         }
@@ -437,16 +439,16 @@ impl CrossModalBinder {
         };
 
         // Calculate coherence and preservation
-        let refs: Vec<(&ContinuousHV, Modality)> = inputs.iter()
-            .map(|(hv, m, _)| (hv, *m))
-            .collect();
+        let refs: Vec<(&ContinuousHV, Modality)> =
+            inputs.iter().map(|(hv, m, _)| (hv, *m)).collect();
         let coherence = self.measure_coherence(&bound_hv, &refs);
 
         let mut preservation = HashMap::new();
         for ((hv, mod_, _), w) in inputs.iter().zip(softmax_weights.iter()) {
             let projected = self.project_to_modality(hv, *mod_);
             let sim = bound_hv.similarity(&projected).abs() * w;
-            preservation.entry(*mod_)
+            preservation
+                .entry(*mod_)
                 .and_modify(|v| *v += sim)
                 .or_insert(sim);
         }
@@ -546,7 +548,8 @@ impl CrossModalBinder {
     /// Update alignment based on binding success/failure feedback
     pub fn update_alignment(&mut self, mod1: Modality, mod2: Modality, success_signal: f32) {
         let key = (mod1, mod2);
-        let alignment = self.alignments
+        let alignment = self
+            .alignments
             .entry(key)
             .or_insert_with(|| ModalityAlignment::new(mod1, mod2));
 
@@ -554,7 +557,11 @@ impl CrossModalBinder {
     }
 
     /// Measure coherence of a binding (how well information was integrated)
-    fn measure_coherence(&self, bound: &ContinuousHV, sources: &[(&ContinuousHV, Modality)]) -> f32 {
+    fn measure_coherence(
+        &self,
+        bound: &ContinuousHV,
+        sources: &[(&ContinuousHV, Modality)],
+    ) -> f32 {
         if sources.is_empty() {
             return 0.0;
         }
@@ -656,9 +663,7 @@ pub enum HierarchicalStructure {
 impl HierarchicalStructure {
     /// Create a flat structure (all leaves under one branch)
     pub fn flat(n: usize) -> Self {
-        HierarchicalStructure::Branch(
-            (0..n).map(HierarchicalStructure::Leaf).collect()
-        )
+        HierarchicalStructure::Branch((0..n).map(HierarchicalStructure::Leaf).collect())
     }
 
     /// Create a binary tree structure
@@ -671,10 +676,7 @@ impl HierarchicalStructure {
                 return HierarchicalStructure::Leaf(start);
             }
             let mid = (start + end) / 2;
-            HierarchicalStructure::Branch(vec![
-                build(start, mid),
-                build(mid, end),
-            ])
+            HierarchicalStructure::Branch(vec![build(start, mid), build(mid, end)])
         }
         build(0, n)
     }
@@ -700,7 +702,11 @@ mod tests {
         // Symmetric binding should be approximately commutative
         // (not exact due to normalization differences)
         let sim = result1.bound_hv.similarity(&result2.bound_hv);
-        assert!(sim > 0.8, "Symmetric binding should be approximately commutative, got {}", sim);
+        assert!(
+            sim > 0.8,
+            "Symmetric binding should be approximately commutative, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -714,7 +720,11 @@ mod tests {
 
         // Asymmetric binding should NOT be commutative
         let sim = result1.bound_hv.similarity(&result2.bound_hv);
-        assert!(sim < 0.7, "Asymmetric binding should not be commutative, got {}", sim);
+        assert!(
+            sim < 0.7,
+            "Asymmetric binding should not be commutative, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -733,7 +743,11 @@ mod tests {
         let proj1 = binder.project_to_modality(&hv1, Modality::Visual);
         let sim1 = result.bound_hv.similarity(&proj1).abs();
 
-        assert!(sim1 > 0.5, "Attentional binding should favor heavily weighted input, got {}", sim1);
+        assert!(
+            sim1 > 0.5,
+            "Attentional binding should favor heavily weighted input, got {}",
+            sim1
+        );
     }
 
     #[test]
@@ -746,8 +760,14 @@ mod tests {
         let structure = HierarchicalStructure::binary_tree(4);
         let result = binder.bind_hierarchical(&constituents, &structure);
 
-        assert!(result.coherence > 0.0, "Hierarchical binding should have positive coherence");
-        assert!(result.bound_hv.values.iter().any(|v| *v != 0.0), "Result should not be zero");
+        assert!(
+            result.coherence > 0.0,
+            "Hierarchical binding should have positive coherence"
+        );
+        assert!(
+            result.bound_hv.values.iter().any(|v| *v != 0.0),
+            "Result should not be zero"
+        );
     }
 
     #[test]
@@ -757,14 +777,23 @@ mod tests {
         let hv2 = create_test_hv(2048, 2);
 
         let bound = binder.bind_symmetric(&hv1, &hv2, Modality::Visual, Modality::Auditory);
-        let recovered = binder.unbind(&bound.bound_hv, &hv1, Modality::Visual, BindingType::Symmetric);
+        let recovered = binder.unbind(
+            &bound.bound_hv,
+            &hv1,
+            Modality::Visual,
+            BindingType::Symmetric,
+        );
 
         // The recovered vector should have some similarity to hv2's projection
         let proj2 = binder.project_to_modality(&hv2, Modality::Auditory);
         let sim = recovered.similarity(&proj2).abs();
 
         // Unbinding is approximate, but should show some recovery
-        assert!(sim > 0.1, "Unbinding should partially recover the other component, got {}", sim);
+        assert!(
+            sim > 0.1,
+            "Unbinding should partially recover the other component, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -777,12 +806,19 @@ mod tests {
         let proj2 = binder.project_to_modality(&hv, Modality::Visual);
 
         let sim = proj1.similarity(&proj2);
-        assert!((sim - 1.0).abs() < 0.0001, "Same projection should be identical");
+        assert!(
+            (sim - 1.0).abs() < 0.0001,
+            "Same projection should be identical"
+        );
 
         // Different modalities should give different projections
         let proj3 = binder.project_to_modality(&hv, Modality::Auditory);
         let sim_diff = proj1.similarity(&proj3).abs();
-        assert!(sim_diff < 0.5, "Different modality projections should differ, got {}", sim_diff);
+        assert!(
+            sim_diff < 0.5,
+            "Different modality projections should differ, got {}",
+            sim_diff
+        );
     }
 
     #[test]
@@ -793,7 +829,13 @@ mod tests {
 
         let result = binder.bind_convolution(&hv1, &hv2, Modality::Visual, Modality::Auditory);
 
-        assert!(result.coherence > 0.0, "Convolution binding should have positive coherence");
-        assert!(result.bound_hv.values.iter().any(|v| *v != 0.0), "Result should not be zero");
+        assert!(
+            result.coherence > 0.0,
+            "Convolution binding should have positive coherence"
+        );
+        assert!(
+            result.bound_hv.values.iter().any(|v| *v != 0.0),
+            "Result should not be zero"
+        );
     }
 }

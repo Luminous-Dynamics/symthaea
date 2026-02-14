@@ -91,7 +91,7 @@ impl NixCausalGraph {
 
     /// Observe an execution outcome and update causal edges via Hebbian learning.
     ///
-    /// When action A is followed by outcome effects [B, C, ...]:
+    /// When action A is followed by outcome effects \[B, C, ...\]:
     /// - Strengthen A→B and A→C edges (they co-occurred)
     /// - Weaken A→X edges where X was predicted but didn't occur
     ///
@@ -1418,10 +1418,46 @@ mod tests {
             analyzer.observe("config.C", 1.5 * x + (i % 5) as f64);
         }
 
-        analyzer.discover_structure();
+        let edges = analyzer.discover_structure();
+        assert!(
+            !edges.is_empty(),
+            "Should discover causal edges from correlated observations"
+        );
 
         let effects = analyzer.predict_side_effects("config.A");
-        println!("Side effects of changing config.A: {:?}", effects);
+        assert!(
+            !effects.is_empty(),
+            "config.A should have predicted side effects on B and/or C"
+        );
+
+        // All predicted effects should have valid (non-NaN, non-negative) confidence
+        for effect in &effects {
+            assert!(
+                effect.confidence >= 0.0 && effect.confidence <= 1.0,
+                "Side effect confidence should be in [0, 1], got {} for {}",
+                effect.confidence,
+                effect.affected_variable
+            );
+            assert!(
+                !effect.affected_variable.is_empty(),
+                "Affected variable name should not be empty"
+            );
+            assert!(
+                !effect.direction.is_empty(),
+                "Direction should not be empty"
+            );
+        }
+
+        // The affected variables should be among the ones we observed (B and/or C)
+        let affected: Vec<&str> = effects
+            .iter()
+            .map(|e| e.affected_variable.as_str())
+            .collect();
+        assert!(
+            affected.contains(&"config.B") || affected.contains(&"config.C"),
+            "Expected side effects on config.B or config.C, got {:?}",
+            affected
+        );
     }
 
     #[test]

@@ -302,10 +302,14 @@ impl ProbabilisticHV {
             let sum_var: f64 = hvs.iter().map(|hv| hv.variance[i]).sum();
 
             // Variance of means (disagreement)
-            let var_of_means: f64 = hvs.iter().map(|hv| {
-                let diff = hv.mean[i] - mean_of_means;
-                diff * diff
-            }).sum::<f64>() / n;
+            let var_of_means: f64 = hvs
+                .iter()
+                .map(|hv| {
+                    let diff = hv.mean[i] - mean_of_means;
+                    diff * diff
+                })
+                .sum::<f64>()
+                / n;
 
             result_mean[i] = mean_of_means;
             let v = sum_var / n2 + var_of_means / n;
@@ -387,9 +391,7 @@ impl ProbabilisticHV {
             weight_sum += weight;
 
             // Variance of the product mu_a * mu_b given uncertainties
-            let product_var = self.mean[i].powi(2) * vb
-                + other.mean[i].powi(2) * va
-                + va * vb;
+            let product_var = self.mean[i].powi(2) * vb + other.mean[i].powi(2) * va + va * vb;
             var_sum += product_var * weight * weight;
         }
 
@@ -406,12 +408,18 @@ impl ProbabilisticHV {
         };
 
         // Confidence: average precision (1/variance), normalised to [0, 1]
-        let avg_precision_self: f64 = self.variance.iter()
+        let avg_precision_self: f64 = self
+            .variance
+            .iter()
             .map(|&v| 1.0 / v.max(config.min_variance))
-            .sum::<f64>() / d;
-        let avg_precision_other: f64 = other.variance.iter()
+            .sum::<f64>()
+            / d;
+        let avg_precision_other: f64 = other
+            .variance
+            .iter()
             .map(|&v| 1.0 / v.max(config.min_variance))
-            .sum::<f64>() / d;
+            .sum::<f64>()
+            / d;
         // Geometric mean of normalised precisions; at default_variance=1.0,
         // precision=1.0 maps to confidence ~0.5 via sigmoid-like scaling.
         let combined = (avg_precision_self * avg_precision_other).sqrt();
@@ -526,7 +534,9 @@ impl ProbabilisticHV {
         let config = PHVConfig::default();
         let d = self.dim as f64;
         let base = d * 0.5 * (2.0 * std::f64::consts::PI * std::f64::consts::E).ln();
-        let log_var_sum: f64 = self.variance.iter()
+        let log_var_sum: f64 = self
+            .variance
+            .iter()
             .map(|&v| v.max(config.min_variance).ln())
             .sum();
         base + 0.5 * log_var_sum
@@ -554,7 +564,9 @@ impl ProbabilisticHV {
     /// Returns a value in (0, +inf). Higher means more certain.
     pub fn confidence(&self) -> f64 {
         let config = PHVConfig::default();
-        let total: f64 = self.variance.iter()
+        let total: f64 = self
+            .variance
+            .iter()
             .map(|&v| 1.0 / v.max(config.min_variance))
             .sum();
         total / self.dim as f64
@@ -604,7 +616,9 @@ mod tests {
             assert!(
                 (bound.mean[i] - expected).abs() < 1e-10,
                 "Bind self: dim {} expected {} got {}",
-                i, expected, bound.mean[i]
+                i,
+                expected,
+                bound.mean[i]
             );
         }
     }
@@ -630,7 +644,9 @@ mod tests {
             assert!(
                 (bundled.variance[i] - expected_var).abs() < 1e-10,
                 "Bundle variance: dim {} expected {} got {}",
-                i, expected_var, bundled.variance[i]
+                i,
+                expected_var,
+                bundled.variance[i]
             );
         }
     }
@@ -652,8 +668,16 @@ mod tests {
         let b = ProbabilisticHV::random(TEST_DIM, 2);
         let kl_ab = a.kl_divergence(&b);
         let kl_ba = b.kl_divergence(&a);
-        assert!(kl_ab >= 0.0, "KL(a||b) should be non-negative, got {}", kl_ab);
-        assert!(kl_ba >= 0.0, "KL(b||a) should be non-negative, got {}", kl_ba);
+        assert!(
+            kl_ab >= 0.0,
+            "KL(a||b) should be non-negative, got {}",
+            kl_ab
+        );
+        assert!(
+            kl_ba >= 0.0,
+            "KL(b||a) should be non-negative, got {}",
+            kl_ba
+        );
     }
 
     #[test]
@@ -669,7 +693,8 @@ mod tests {
         assert!(
             updated_var < initial_var,
             "Bayesian update should reduce variance: {} -> {}",
-            initial_var, updated_var
+            initial_var,
+            updated_var
         );
 
         // Exact posterior variance: (2.0 * 1.0) / (2.0 + 1.0) = 2/3
@@ -677,7 +702,8 @@ mod tests {
         assert!(
             (updated_var - expected_var).abs() < 1e-10,
             "Posterior variance should be {}, got {}",
-            expected_var, updated_var
+            expected_var,
+            updated_var
         );
     }
 
@@ -693,7 +719,8 @@ mod tests {
             assert!(
                 (phv.mean[i] - 0.5).abs() < 1e-10,
                 "Mean should be 0.5 after update, got {} at dim {}",
-                phv.mean[i], i
+                phv.mean[i],
+                i
             );
         }
     }
@@ -734,7 +761,8 @@ mod tests {
             assert!(
                 (phv.mean[i] - 1.0).abs() < 1e-10 || (phv.mean[i] + 1.0).abs() < 1e-10,
                 "PHV from BinaryHV should have mean +/-1, got {} at dim {}",
-                phv.mean[i], i
+                phv.mean[i],
+                i
             );
         }
     }
@@ -770,12 +798,14 @@ mod tests {
             assert!(
                 (shifted.mean[target] - a.mean[i]).abs() < 1e-12,
                 "Permute: mean mismatch at {} -> {}",
-                i, target
+                i,
+                target
             );
             assert!(
                 (shifted.variance[target] - a.variance[i]).abs() < 1e-12,
                 "Permute: variance mismatch at {} -> {}",
-                i, target
+                i,
+                target
             );
         }
     }
@@ -804,7 +834,9 @@ mod tests {
             assert!(
                 (original.values[i] - recovered.values[i]).abs() < 1e-5,
                 "ContinuousHV roundtrip failed at dim {}: {} vs {}",
-                i, original.values[i], recovered.values[i]
+                i,
+                original.values[i],
+                recovered.values[i]
             );
         }
     }
@@ -837,7 +869,8 @@ mod tests {
         assert!(
             sim_certain.confidence > sim_uncertain.confidence,
             "Certain PHVs should yield higher similarity confidence: {} vs {}",
-            sim_certain.confidence, sim_uncertain.confidence
+            sim_certain.confidence,
+            sim_uncertain.confidence
         );
     }
 
@@ -884,7 +917,8 @@ mod tests {
             assert!(
                 (phv.mean[i] - 0.7).abs() < 0.01,
                 "After 100 updates, mean should be ~0.7, got {} at dim {}",
-                phv.mean[i], i
+                phv.mean[i],
+                i
             );
         }
     }

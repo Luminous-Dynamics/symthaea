@@ -32,12 +32,12 @@
 //! let turns = memory.resume_session(&session_id)?;
 //! ```
 
-use symthaea_core::hdc::ContinuousHV;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use symthaea_core::hdc::ContinuousHV;
 use uuid::Uuid;
 
 /// A single turn in a conversation
@@ -257,7 +257,8 @@ impl ConversationMemory {
         self.turn_count += 1;
 
         // Serialize embedding if provided
-        let embedding_blob: Option<Vec<u8>> = embedding.and_then(|e| bincode::serialize(&e.values).ok());
+        let embedding_blob: Option<Vec<u8>> =
+            embedding.and_then(|e| bincode::serialize(&e.values).ok());
 
         self.conn.execute(
             r#"
@@ -319,9 +320,9 @@ impl ConversationMemory {
         query_embedding: &ContinuousHV,
         limit: usize,
     ) -> Result<Vec<(String, f32)>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, hypervector FROM conversations WHERE hypervector IS NOT NULL",
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, hypervector FROM conversations WHERE hypervector IS NOT NULL")?;
 
         let mut similarities: Vec<(String, f32)> = stmt
             .query_map([], |row| {
@@ -363,9 +364,17 @@ impl ConversationMemory {
 
         // Extract pattern from Φ change
         let pattern = if phi_after > phi_before + 0.05 {
-            format!("POSITIVE: '{}' improved integration (+{:.2}Φ)", action, phi_after - phi_before)
+            format!(
+                "POSITIVE: '{}' improved integration (+{:.2}Φ)",
+                action,
+                phi_after - phi_before
+            )
         } else if phi_after < phi_before - 0.05 {
-            format!("NEGATIVE: '{}' reduced integration ({:.2}Φ)", action, phi_after - phi_before)
+            format!(
+                "NEGATIVE: '{}' reduced integration ({:.2}Φ)",
+                action,
+                phi_after - phi_before
+            )
         } else {
             format!("NEUTRAL: '{}' had minimal Φ impact", action)
         };
@@ -501,29 +510,28 @@ impl ConversationMemory {
 
     /// Get database statistics
     pub fn stats(&self) -> Result<ConversationMemoryStats> {
-        let conversation_count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM conversations",
-            [],
-            |row| row.get(0),
-        )?;
+        let conversation_count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM conversations", [], |row| row.get(0))?;
 
-        let turn_count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM conversation_turns",
-            [],
-            |row| row.get(0),
-        )?;
+        let turn_count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM conversation_turns", [], |row| {
+                    row.get(0)
+                })?;
 
-        let causal_count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM causal_chains",
-            [],
-            |row| row.get(0),
-        )?;
+        let causal_count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM causal_chains", [], |row| row.get(0))?;
 
-        let avg_phi: Option<f64> = self.conn.query_row(
-            "SELECT AVG(phi_at_turn) FROM conversation_turns WHERE phi_at_turn IS NOT NULL",
-            [],
-            |row| row.get(0),
-        ).ok();
+        let avg_phi: Option<f64> = self
+            .conn
+            .query_row(
+                "SELECT AVG(phi_at_turn) FROM conversation_turns WHERE phi_at_turn IS NOT NULL",
+                [],
+                |row| row.get(0),
+            )
+            .ok();
 
         Ok(ConversationMemoryStats {
             conversation_count: conversation_count as usize,
@@ -560,10 +568,14 @@ mod tests {
         assert_eq!(memory.turn_count(), 0);
 
         // Add turns
-        memory.add_turn("user", "Hello, how are you?", 0.45, None).unwrap();
+        memory
+            .add_turn("user", "Hello, how are you?", 0.45, None)
+            .unwrap();
         assert_eq!(memory.turn_count(), 1);
 
-        memory.add_turn("assistant", "I'm doing well, thank you!", 0.52, None).unwrap();
+        memory
+            .add_turn("assistant", "I'm doing well, thank you!", 0.52, None)
+            .unwrap();
         assert_eq!(memory.turn_count(), 2);
 
         // Verify current conversation
@@ -602,12 +614,9 @@ mod tests {
         memory.start_session().unwrap();
 
         // Record positive learning
-        memory.record_causal_learning(
-            "nix-env -i vim",
-            "Success: vim installed",
-            0.45,
-            0.55,
-        ).unwrap();
+        memory
+            .record_causal_learning("nix-env -i vim", "Success: vim installed", 0.45, 0.55)
+            .unwrap();
 
         let learnings = memory.get_recent_learnings(10).unwrap();
         assert_eq!(learnings.len(), 1);
@@ -623,7 +632,9 @@ mod tests {
 
         // Set conversation embedding
         let embedding = ContinuousHV::random(HDC_DIMENSION, 42);
-        memory.set_conversation_embedding(&session_id, &embedding).unwrap();
+        memory
+            .set_conversation_embedding(&session_id, &embedding)
+            .unwrap();
 
         // Search for similar
         let similar = memory.find_similar(&embedding, 5).unwrap();
@@ -639,7 +650,9 @@ mod tests {
 
         memory.start_session().unwrap();
         memory.add_turn("user", "Test 1", 0.4, None).unwrap();
-        memory.add_turn("assistant", "Response 1", 0.5, None).unwrap();
+        memory
+            .add_turn("assistant", "Response 1", 0.5, None)
+            .unwrap();
 
         let stats = memory.stats().unwrap();
         assert_eq!(stats.conversation_count, 1);

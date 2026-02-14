@@ -50,15 +50,9 @@ use std::collections::VecDeque;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CognitiveEvent {
     /// Processing completed with associated Φ and latency
-    Processing {
-        phi: f32,
-        latency_ms: u64,
-    },
+    Processing { phi: f32, latency_ms: u64 },
     /// Uncertainty detected in a processing stream
-    Uncertainty {
-        source: String,
-        level: f32,
-    },
+    Uncertainty { source: String, level: f32 },
     /// Error or anomaly detected
     Error {
         error_type: ErrorType,
@@ -71,10 +65,7 @@ pub enum CognitiveEvent {
         strength: f32,
     },
     /// Binding operation completed
-    Binding {
-        success: bool,
-        coherence: f32,
-    },
+    Binding { success: bool, coherence: f32 },
     /// Memory operation (encoding or retrieval)
     Memory {
         operation: MemoryOperation,
@@ -331,7 +322,9 @@ impl MetacognitiveMonitor {
                 self.running_stats.confidence =
                     self.running_stats.confidence * 0.9 + confidence * 0.1;
             }
-            CognitiveEvent::Integration { phi_contribution, .. } => {
+            CognitiveEvent::Integration {
+                phi_contribution, ..
+            } => {
                 self.running_stats.phi_sum += phi_contribution;
                 self.running_stats.phi_count += 1;
             }
@@ -353,7 +346,8 @@ impl MetacognitiveMonitor {
             }
             CognitiveEvent::Uncertainty { level, .. } => {
                 self.running_stats.uncertainty_sum -= level;
-                self.running_stats.uncertainty_count = self.running_stats.uncertainty_count.saturating_sub(1);
+                self.running_stats.uncertainty_count =
+                    self.running_stats.uncertainty_count.saturating_sub(1);
             }
             CognitiveEvent::Error { .. } => {
                 self.running_stats.error_count = self.running_stats.error_count.saturating_sub(1);
@@ -444,7 +438,11 @@ impl MetacognitiveMonitor {
 
         // Generate recommendations
         let recommendations = self.generate_recommendations(
-            phi_level, uncertainty, error_rate, confidence, coherence
+            phi_level,
+            uncertainty,
+            error_rate,
+            confidence,
+            coherence,
         );
 
         let assessment = MetacognitiveAssessment {
@@ -471,13 +469,16 @@ impl MetacognitiveMonitor {
         }
 
         // Collect recent Φ values (rev to get recent, then reverse to get chronological order)
-        let mut phi_values: Vec<f32> = self.history
+        let mut phi_values: Vec<f32> = self
+            .history
             .iter()
             .rev()
             .take(window)
             .filter_map(|e| match &e.event {
                 CognitiveEvent::Processing { phi, .. } => Some(*phi),
-                CognitiveEvent::Integration { phi_contribution, .. } => Some(*phi_contribution),
+                CognitiveEvent::Integration {
+                    phi_contribution, ..
+                } => Some(*phi_contribution),
                 _ => None,
             })
             .collect();
@@ -493,7 +494,11 @@ impl MetacognitiveMonitor {
         let n = phi_values.len() as f32;
         let sum_x: f32 = (0..phi_values.len()).map(|i| i as f32).sum();
         let sum_y: f32 = phi_values.iter().sum();
-        let sum_xy: f32 = phi_values.iter().enumerate().map(|(i, y)| i as f32 * y).sum();
+        let sum_xy: f32 = phi_values
+            .iter()
+            .enumerate()
+            .map(|(i, y)| i as f32 * y)
+            .sum();
         let sum_xx: f32 = (0..phi_values.len()).map(|i| (i * i) as f32).sum();
 
         let denominator = n * sum_xx - sum_x * sum_x;
@@ -572,15 +577,16 @@ impl MetacognitiveMonitor {
         let phi_count = self.running_stats.phi_count;
 
         let phi_std = if phi_count > 1 {
-            let variance = (self.running_stats.phi_sum_sq / phi_count as f32)
-                - (phi_mean * phi_mean);
+            let variance =
+                (self.running_stats.phi_sum_sq / phi_count as f32) - (phi_mean * phi_mean);
             variance.abs().sqrt()
         } else {
             0.0
         };
 
         // Calculate trend from recent history
-        let phi_trend = self.predict_phi()
+        let phi_trend = self
+            .predict_phi()
             .map(|pred| pred - phi_mean)
             .unwrap_or(0.0);
 
@@ -666,7 +672,10 @@ impl MetacognitiveController {
     }
 
     /// Record an event and optionally apply recommendations
-    pub fn process_event(&mut self, event: CognitiveEvent) -> Option<Vec<MetacognitiveRecommendation>> {
+    pub fn process_event(
+        &mut self,
+        event: CognitiveEvent,
+    ) -> Option<Vec<MetacognitiveRecommendation>> {
         self.monitor.record_event(event);
 
         if self.auto_apply {
@@ -675,7 +684,8 @@ impl MetacognitiveController {
 
             // Store recommendations in action history
             for rec in &recommendations {
-                self.action_history.push((self.monitor.current_timestamp(), rec.clone()));
+                self.action_history
+                    .push((self.monitor.current_timestamp(), rec.clone()));
             }
 
             // Trim action history
@@ -734,7 +744,10 @@ mod tests {
 
         // Record successful processing
         for _ in 0..5 {
-            monitor.record_event(CognitiveEvent::Processing { phi: 0.7, latency_ms: 10 });
+            monitor.record_event(CognitiveEvent::Processing {
+                phi: 0.7,
+                latency_ms: 10,
+            });
         }
 
         let before = monitor.assess_current_state();
@@ -747,7 +760,10 @@ mod tests {
 
         let after = monitor.assess_current_state();
 
-        assert!(after.confidence < before.confidence, "Error should reduce confidence");
+        assert!(
+            after.confidence < before.confidence,
+            "Error should reduce confidence"
+        );
         assert!(after.error_rate > 0.0, "Error rate should be positive");
     }
 
@@ -767,7 +783,10 @@ mod tests {
 
         let assessment = monitor.assess_current_state();
 
-        assert!(assessment.uncertainty > 0.5, "High uncertainty should be reflected");
+        assert!(
+            assessment.uncertainty > 0.5,
+            "High uncertainty should be reflected"
+        );
     }
 
     #[test]
@@ -776,17 +795,24 @@ mod tests {
 
         // Create a low-Φ state
         for _ in 0..10 {
-            monitor.record_event(CognitiveEvent::Processing { phi: 0.2, latency_ms: 10 });
+            monitor.record_event(CognitiveEvent::Processing {
+                phi: 0.2,
+                latency_ms: 10,
+            });
         }
 
         let assessment = monitor.assess_current_state();
 
         // Should recommend increasing integration
-        let has_integration_rec = assessment.recommendations.iter().any(|r| {
-            matches!(r, MetacognitiveRecommendation::IncreaseIntegration { .. })
-        });
+        let has_integration_rec = assessment
+            .recommendations
+            .iter()
+            .any(|r| matches!(r, MetacognitiveRecommendation::IncreaseIntegration { .. }));
 
-        assert!(has_integration_rec, "Low Φ should trigger integration recommendation");
+        assert!(
+            has_integration_rec,
+            "Low Φ should trigger integration recommendation"
+        );
     }
 
     #[test]
@@ -805,9 +831,12 @@ mod tests {
 
         // Should predict higher Φ due to upward trend
         if let Some(predicted) = assessment.predicted_phi {
-            assert!(predicted >= assessment.phi_level,
+            assert!(
+                predicted >= assessment.phi_level,
                 "Upward trend should predict higher Φ: predicted={}, current={}",
-                predicted, assessment.phi_level);
+                predicted,
+                assessment.phi_level
+            );
         }
     }
 
@@ -815,11 +844,20 @@ mod tests {
     fn test_state_vector_updates() {
         let mut monitor = MetacognitiveMonitor::new();
 
-        assert!(monitor.get_state_vector().is_none(), "No state vector initially");
+        assert!(
+            monitor.get_state_vector().is_none(),
+            "No state vector initially"
+        );
 
-        monitor.record_event(CognitiveEvent::Processing { phi: 0.6, latency_ms: 10 });
+        monitor.record_event(CognitiveEvent::Processing {
+            phi: 0.6,
+            latency_ms: 10,
+        });
 
-        assert!(monitor.get_state_vector().is_some(), "State vector should exist after event");
+        assert!(
+            monitor.get_state_vector().is_some(),
+            "State vector should exist after event"
+        );
     }
 
     #[test]
@@ -832,12 +870,15 @@ mod tests {
         for _ in 0..5 {
             let recs = controller.process_event(CognitiveEvent::Processing {
                 phi: 0.3,
-                latency_ms: 10
+                latency_ms: 10,
             });
             assert!(recs.is_some(), "Auto-apply should return recommendations");
         }
 
-        assert!(!controller.action_history().is_empty(), "Action history should be populated");
+        assert!(
+            !controller.action_history().is_empty(),
+            "Action history should be populated"
+        );
     }
 
     #[test]
@@ -846,7 +887,10 @@ mod tests {
 
         // Record some events
         for _ in 0..10 {
-            monitor.record_event(CognitiveEvent::Processing { phi: 0.6, latency_ms: 10 });
+            monitor.record_event(CognitiveEvent::Processing {
+                phi: 0.6,
+                latency_ms: 10,
+            });
         }
 
         assert!(monitor.event_count() > 0, "Should have events");
@@ -854,7 +898,10 @@ mod tests {
         monitor.reset();
 
         assert_eq!(monitor.event_count(), 0, "Should be empty after reset");
-        assert!(monitor.last_assessment().is_none(), "No assessment after reset");
+        assert!(
+            monitor.last_assessment().is_none(),
+            "No assessment after reset"
+        );
     }
 
     #[test]
@@ -874,7 +921,10 @@ mod tests {
         let assessment = monitor.assess_current_state();
 
         // Memory operations should contribute to confidence
-        assert!(assessment.confidence > 0.0, "Memory ops should maintain confidence");
+        assert!(
+            assessment.confidence > 0.0,
+            "Memory ops should maintain confidence"
+        );
     }
 
     #[test]
@@ -884,13 +934,19 @@ mod tests {
         // Record varied Φ values
         let phi_values = vec![0.4, 0.5, 0.6, 0.5, 0.55, 0.45, 0.5, 0.52];
         for phi in phi_values {
-            monitor.record_event(CognitiveEvent::Processing { phi, latency_ms: 10 });
+            monitor.record_event(CognitiveEvent::Processing {
+                phi,
+                latency_ms: 10,
+            });
         }
 
         let stats = monitor.get_historical_stats();
 
-        assert!(stats.phi_mean > 0.4 && stats.phi_mean < 0.6,
-            "Mean should be around 0.5, got {}", stats.phi_mean);
+        assert!(
+            stats.phi_mean > 0.4 && stats.phi_mean < 0.6,
+            "Mean should be around 0.5, got {}",
+            stats.phi_mean
+        );
         assert!(stats.phi_std > 0.0, "Should have some variance");
         assert_eq!(stats.error_count, 0, "No errors");
         assert_eq!(stats.processing_count, 8, "8 processing events");

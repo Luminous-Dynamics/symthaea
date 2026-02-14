@@ -63,24 +63,19 @@
 //! println!("Moral Uncertainty: {}", response.moral_uncertainty.summary());
 //! ```
 
-use std::time::SystemTime;
 use super::gis::{
-    GracefulIgnoranceSystem, IgnoranceDetection, Harmony, HarmonicIgnorance,
-    MoralUncertainty, RashomonEngine, Situation, SynthesizedView,
+    GracefulIgnoranceSystem, HarmonicIgnorance, Harmony, IgnoranceDetection, MoralUncertainty,
+    RashomonEngine, Situation, SynthesizedView,
 };
+use std::time::SystemTime;
 
 // Import real types from the crate's consciousness infrastructure
-use symthaea_core::hdc::{
-    ContinuousHV,
-    ConsciousnessTopology as HdcConsciousnessTopology,
-    TopologyType,
-    HDC_DIMENSION,
+use crate::consciousness::seven_harmonies::{
+    AlignmentResult, Harmony as CoreHarmony, SevenHarmonies,
 };
 use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
-use crate::consciousness::seven_harmonies::{
-    Harmony as CoreHarmony,
-    SevenHarmonies,
-    AlignmentResult,
+use symthaea_core::hdc::{
+    ConsciousnessTopology as HdcConsciousnessTopology, ContinuousHV, TopologyType, HDC_DIMENSION,
 };
 
 /// Timestamp type alias
@@ -229,7 +224,9 @@ impl HarmonicProfile {
                 *a /= sum;
             }
         }
-        Self { activations: normalized }
+        Self {
+            activations: normalized,
+        }
     }
 
     /// Get activation for a specific harmony
@@ -246,7 +243,9 @@ impl HarmonicProfile {
 
     /// Get the dominant harmony
     pub fn dominant(&self) -> Harmony {
-        let (idx, _) = self.activations.iter()
+        let (idx, _) = self
+            .activations
+            .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((0, &0.0));
@@ -258,9 +257,12 @@ impl HarmonicProfile {
     pub fn alignment(&self) -> f32 {
         // Perfect alignment = all equal
         let balanced = 1.0 / 7.0;
-        let variance: f32 = self.activations.iter()
+        let variance: f32 = self
+            .activations
+            .iter()
             .map(|a| (a - balanced).powi(2))
-            .sum::<f32>() / 7.0;
+            .sum::<f32>()
+            / 7.0;
 
         // Convert variance to 0-1 score (lower variance = higher alignment)
         1.0 - (variance * 4.0).min(1.0)
@@ -493,10 +495,8 @@ impl KosmicSong {
     /// Synthesize all layers into coherent state
     pub fn synthesize(&mut self) -> CoherenceResult {
         // Record current harmonic profile
-        self.harmonic_trajectory.push((
-            SystemTime::now(),
-            self.harmonic_profile.clone(),
-        ));
+        self.harmonic_trajectory
+            .push((SystemTime::now(), self.harmonic_profile.clone()));
 
         // Trim trajectory if too long
         if self.harmonic_trajectory.len() > 1000 {
@@ -548,8 +548,7 @@ impl KosmicSong {
         let harmonic_ignorance = self.create_harmonic_ignorance(&detection);
 
         // 3. Generate Rashomon perspectives
-        let situation = Situation::new(query)
-            .with_moral_uncertainty(self.moral_uncertainty);
+        let situation = Situation::new(query).with_moral_uncertainty(self.moral_uncertainty);
         let perspectives = self.rashomon.generate_perspectives(&situation);
         let synthesis = self.rashomon.synthesize(perspectives.clone());
 
@@ -583,7 +582,10 @@ impl KosmicSong {
                 harmony.epistemic_mode(),
                 harmony.focus_question()
             ),
-            insights: vec![format!("Current activation: {:.2}", self.harmonic_profile.activation(harmony))],
+            insights: vec![format!(
+                "Current activation: {:.2}",
+                self.harmonic_profile.activation(harmony)
+            )],
             questions: vec![harmony.focus_question().to_string()],
         }
     }
@@ -609,7 +611,10 @@ impl KosmicSong {
 
         // Check ignorance type
         if !detection.ignorance_type.is_resolvable() {
-            reasons.push(format!("Unresolvable ignorance: {}", detection.ignorance_type.description()));
+            reasons.push(format!(
+                "Unresolvable ignorance: {}",
+                detection.ignorance_type.description()
+            ));
         }
 
         // Check N3
@@ -652,7 +657,8 @@ impl KosmicSong {
             } else {
                 -0.03 // Decrease less for negative
             };
-            self.harmonic_profile.set_activation(*harmony, current + adjustment);
+            self.harmonic_profile
+                .set_activation(*harmony, current + adjustment);
         }
 
         // Reduce moral uncertainty based on successful experiences
@@ -706,7 +712,8 @@ impl KosmicSong {
             // Slightly adjust profile based on action alignment patterns
             // Positive alignment reinforces, negative alignment weakens
             let adjustment = alignment.alignment() * 0.01;
-            self.harmonic_profile.set_activation(gis_harmony, current + adjustment);
+            self.harmonic_profile
+                .set_activation(gis_harmony, current + adjustment);
         }
 
         // Update moral uncertainty if violations detected
@@ -774,7 +781,11 @@ impl KosmicSong {
         hi
     }
 
-    fn build_response_content(&self, detection: &IgnoranceDetection, synthesis: &SynthesizedView) -> String {
+    fn build_response_content(
+        &self,
+        detection: &IgnoranceDetection,
+        synthesis: &SynthesizedView,
+    ) -> String {
         let mut parts = Vec::new();
 
         // Add synthesis view
@@ -782,12 +793,17 @@ impl KosmicSong {
 
         // Add agreements if any
         if !synthesis.agreements.is_empty() {
-            parts.push(format!("Points of agreement: {}", synthesis.agreements.join(", ")));
+            parts.push(format!(
+                "Points of agreement: {}",
+                synthesis.agreements.join(", ")
+            ));
         }
 
         // Add dissents if any
         if synthesis.has_significant_dissent() {
-            let dissent_summary: Vec<String> = synthesis.preserved_dissents.iter()
+            let dissent_summary: Vec<String> = synthesis
+                .preserved_dissents
+                .iter()
                 .map(|d| format!("{}: {}", d.harmony, d.reason))
                 .collect();
             parts.push(format!("Note: {}", dissent_summary.join("; ")));
@@ -805,7 +821,11 @@ impl KosmicSong {
         parts.join("\n\n")
     }
 
-    fn calculate_response_confidence(&self, detection: &IgnoranceDetection, synthesis: &SynthesizedView) -> f32 {
+    fn calculate_response_confidence(
+        &self,
+        detection: &IgnoranceDetection,
+        synthesis: &SynthesizedView,
+    ) -> f32 {
         let base = synthesis.confidence;
         let ignorance_penalty = 1.0 - detection.uncertainty.total();
         let moral_penalty = synthesis.moral_uncertainty.confidence();
@@ -944,7 +964,7 @@ mod tests {
         let mut profile = HarmonicProfile::balanced();
 
         // All should start equal
-        assert!((profile.activation(Harmony::ResonantCoherence) - 1.0/7.0).abs() < 0.001);
+        assert!((profile.activation(Harmony::ResonantCoherence) - 1.0 / 7.0).abs() < 0.001);
 
         // Set and verify
         profile.set_activation(Harmony::IntegralWisdom, 0.5);

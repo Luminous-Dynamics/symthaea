@@ -249,8 +249,10 @@ impl SocialCoherence {
         }
         let dim = self.config.dimension;
         let ts = self.timestamp;
-        let model = self.mental_models.entry(agent_id.to_string()).or_insert_with(|| {
-            MentalModel {
+        let model = self
+            .mental_models
+            .entry(agent_id.to_string())
+            .or_insert_with(|| MentalModel {
                 agent_id: agent_id.to_string(),
                 beliefs: ContinuousHV::random(dim, seed),
                 desires: ContinuousHV::random(dim, seed.wrapping_add(1)),
@@ -259,12 +261,15 @@ impl SocialCoherence {
                 confidence: 0.1,
                 last_updated: ts,
                 observation_count: 0,
-            }
-        });
+            });
 
         // Update model based on observation
-        model.intentions = ContinuousHV::bundle_owned(&[model.intentions.clone(), observed_behavior.clone().scale(0.3)]);
-        model.beliefs = ContinuousHV::bundle_owned(&[model.beliefs.clone(), context.clone().scale(0.1)]);
+        model.intentions = ContinuousHV::bundle_owned(&[
+            model.intentions.clone(),
+            observed_behavior.clone().scale(0.3),
+        ]);
+        model.beliefs =
+            ContinuousHV::bundle_owned(&[model.beliefs.clone(), context.clone().scale(0.1)]);
         model.observation_count += 1;
         model.last_updated = self.timestamp;
 
@@ -288,8 +293,10 @@ impl SocialCoherence {
         self.timestamp += 1;
         self.stats.interactions_recorded += 1;
 
-        let relationship = self.relationships.entry(agent_id.to_string()).or_insert_with(|| {
-            Relationship {
+        let relationship = self
+            .relationships
+            .entry(agent_id.to_string())
+            .or_insert_with(|| Relationship {
                 agent_id: agent_id.to_string(),
                 relationship_type: RelationshipType::Unknown,
                 trust: 0.5,
@@ -298,8 +305,7 @@ impl SocialCoherence {
                 interaction_history: Vec::new(),
                 positive_interactions: 0,
                 negative_interactions: 0,
-            }
-        });
+            });
 
         // Record interaction
         let interaction = Interaction {
@@ -329,7 +335,9 @@ impl SocialCoherence {
         relationship.familiarity = (relationship.familiarity + 0.05).min(1.0);
 
         // Update reciprocity
-        if interaction_type == InteractionType::Cooperation || interaction_type == InteractionType::Help {
+        if interaction_type == InteractionType::Cooperation
+            || interaction_type == InteractionType::Help
+        {
             relationship.reciprocity = (relationship.reciprocity + 0.1).min(1.0);
         }
 
@@ -401,15 +409,29 @@ impl SocialCoherence {
         let confidence = model.confidence * (0.5 + trust * 0.5);
 
         let mut reasoning = Vec::new();
-        reasoning.push(format!("Agent {} has {} confidence model", agent_id, model.confidence));
+        reasoning.push(format!(
+            "Agent {} has {} confidence model",
+            agent_id, model.confidence
+        ));
         reasoning.push(format!("Action-intention alignment: {:.2}", alignment));
         reasoning.push(format!("Trust level: {:.2}", trust));
 
-        let risk = if alignment < 0.0 { (-alignment * 0.5).min(1.0) } else { 0.1 };
-        let potential_reward = if alignment > 0.0 { alignment * trust } else { 0.0 };
+        let risk = if alignment < 0.0 {
+            (-alignment * 0.5).min(1.0)
+        } else {
+            0.1
+        };
+        let potential_reward = if alignment > 0.0 {
+            alignment * trust
+        } else {
+            0.0
+        };
 
         Some(SocialReasoningResult {
-            recommended_action: format!("Proceed with {} caution", if risk > 0.5 { "high" } else { "low" }),
+            recommended_action: format!(
+                "Proceed with {} caution",
+                if risk > 0.5 { "high" } else { "low" }
+            ),
             predicted_response: format!("{} response expected", predicted_valence),
             confidence,
             risk,
@@ -440,14 +462,21 @@ impl SocialCoherence {
 
     /// Get all allies (trusted cooperative agents)
     pub fn get_allies(&self) -> Vec<&Relationship> {
-        self.relationships.values()
-            .filter(|r| matches!(r.relationship_type, RelationshipType::Ally | RelationshipType::Friend))
+        self.relationships
+            .values()
+            .filter(|r| {
+                matches!(
+                    r.relationship_type,
+                    RelationshipType::Ally | RelationshipType::Friend
+                )
+            })
             .collect()
     }
 
     /// Get all rivals
     pub fn get_rivals(&self) -> Vec<&Relationship> {
-        self.relationships.values()
+        self.relationships
+            .values()
             .filter(|r| r.relationship_type == RelationshipType::Rival)
             .collect()
     }
@@ -458,7 +487,12 @@ impl SocialCoherence {
     }
 
     /// Update self model
-    pub fn update_self_model(&mut self, beliefs: ContinuousHV, desires: ContinuousHV, intentions: ContinuousHV) {
+    pub fn update_self_model(
+        &mut self,
+        beliefs: ContinuousHV,
+        desires: ContinuousHV,
+        intentions: ContinuousHV,
+    ) {
         self.self_model.beliefs = beliefs;
         self.self_model.desires = desires;
         self.self_model.intentions = intentions;
@@ -581,6 +615,9 @@ mod tests {
         }
 
         let rel = sc.get_relationship("friend").unwrap();
-        assert!(matches!(rel.relationship_type, RelationshipType::Friend | RelationshipType::Ally));
+        assert!(matches!(
+            rel.relationship_type,
+            RelationshipType::Friend | RelationshipType::Ally
+        ));
     }
 }

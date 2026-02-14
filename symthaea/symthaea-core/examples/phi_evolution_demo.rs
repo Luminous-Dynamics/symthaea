@@ -10,11 +10,9 @@
 //! Run with: cargo run --example phi_evolution_demo
 
 use symthaea_core::hdc::{
-    HdcLtcUnifiedNetwork, UnifiedNetworkConfig, UnifiedConfig,
-    ContinuousHV,
-    UnifiedNetworkPhiMeasurer, UnifiedPhiConfig, PhiCalculationMethod,
-    PhiValidator, PhiDiagnosticAnalyzer,
-    demo_phi_evolution,
+    demo_phi_evolution, ContinuousHV, HdcLtcUnifiedNetwork, PhiCalculationMethod,
+    PhiDiagnosticAnalyzer, PhiValidator, UnifiedConfig, UnifiedNetworkConfig,
+    UnifiedNetworkPhiMeasurer, UnifiedPhiConfig,
 };
 
 fn main() {
@@ -43,9 +41,15 @@ fn main() {
     let initial_phi = measurer.measure(&network);
     println!("Initial State:");
     println!("  Phi = {:.6}", initial_phi.phi);
-    println!("  Neurons = {}, Layers = {}", initial_phi.n_neurons, initial_phi.n_layers);
+    println!(
+        "  Neurons = {}, Layers = {}",
+        initial_phi.n_neurons, initial_phi.n_layers
+    );
     println!("  Avg Similarity = {:.4}", initial_phi.avg_similarity);
-    println!("  Consciousness Level: {}", initial_phi.consciousness_level());
+    println!(
+        "  Consciousness Level: {}",
+        initial_phi.consciousness_level()
+    );
     println!();
 
     // Evolve with random inputs
@@ -58,7 +62,10 @@ fn main() {
     println!("After 100 evolution steps:");
     println!("  Phi = {:.6}", evolved_phi.phi);
     println!("  Avg Similarity = {:.4}", evolved_phi.avg_similarity);
-    println!("  Consciousness Level: {}", evolved_phi.consciousness_level());
+    println!(
+        "  Consciousness Level: {}",
+        evolved_phi.consciousness_level()
+    );
     println!();
 
     // =========================================================================
@@ -90,8 +97,10 @@ fn main() {
     ] {
         if i < tracker.history.len() {
             let m = &tracker.history[i];
-            println!("  [{}] {} - Phi: {:.4}, AvgSim: {:.4}",
-                     i, desc, m.phi, m.avg_similarity);
+            println!(
+                "  [{}] {} - Phi: {:.4}, AvgSim: {:.4}",
+                i, desc, m.phi, m.avg_similarity
+            );
         }
     }
     println!();
@@ -128,8 +137,14 @@ fn main() {
 
     let mut networks = vec![
         ("Small (2-2)", HdcLtcUnifiedNetwork::new(small_config, 42)),
-        ("Medium (4-6-4)", HdcLtcUnifiedNetwork::new(medium_config, 42)),
-        ("Large (6-10-8-6)", HdcLtcUnifiedNetwork::new(large_config, 42)),
+        (
+            "Medium (4-6-4)",
+            HdcLtcUnifiedNetwork::new(medium_config, 42),
+        ),
+        (
+            "Large (6-10-8-6)",
+            HdcLtcUnifiedNetwork::new(large_config, 42),
+        ),
     ];
 
     // Evolve all networks with the same input
@@ -143,8 +158,13 @@ fn main() {
     println!("Network Comparison (after 100 evolution steps):");
     for (name, net) in &networks {
         let phi = measurer.measure(net);
-        println!("  {} - Phi: {:.4}, Neurons: {}, Level: {}",
-                 name, phi.phi, phi.n_neurons, phi.consciousness_level());
+        println!(
+            "  {} - Phi: {:.4}, Neurons: {}, Level: {}",
+            name,
+            phi.phi,
+            phi.n_neurons,
+            phi.consciousness_level()
+        );
     }
     println!();
 
@@ -166,10 +186,7 @@ fn main() {
     for i in 0..100 {
         // 80% base pattern, 20% noise
         let noise = ContinuousHV::random_default(300 + i);
-        let correlated_input = ContinuousHV::weighted_bundle(
-            &[&base_pattern, &noise],
-            &[0.8, 0.2],
-        );
+        let correlated_input = ContinuousHV::weighted_bundle(&[&base_pattern, &noise], &[0.8, 0.2]);
         net_correlated.evolve_closed_form(0.01, &correlated_input);
     }
 
@@ -262,8 +279,12 @@ fn main() {
         println!();
     }
 
-    println!("Summary: {} passed, {} failed out of {} validations",
-             passed, failed, validations.len());
+    println!(
+        "Summary: {} passed, {} failed out of {} validations",
+        passed,
+        failed,
+        validations.len()
+    );
     println!();
 
     // =========================================================================
@@ -306,7 +327,10 @@ fn main() {
     println!();
     println!("Autodiff Method:");
     println!("  Phi: {:.6}", autodiff_phi.phi);
-    println!("  Whole Integration: {:.4}", autodiff_phi.whole_integration.unwrap_or(0.0));
+    println!(
+        "  Whole Integration: {:.4}",
+        autodiff_phi.whole_integration.unwrap_or(0.0)
+    );
     println!("  Computation Time: {:?}", autodiff_phi.computation_time);
     println!();
 

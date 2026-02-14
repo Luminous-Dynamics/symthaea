@@ -23,11 +23,13 @@
 //! 4. **Conscious Broadcast**: Salient patterns enter workspace and broadcast
 
 use crate::hdc::cincinnati_ltc::CincinnatiLtcEngine;
-use crate::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent, WorkspaceAssessment};
+use crate::hdc::global_workspace::{
+    GlobalWorkspace, WorkspaceAssessment, WorkspaceConfig, WorkspaceContent,
+};
 use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::BinaryHV;
 use crate::hdc::HDC_DIMENSION;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 // =============================================================================
 // CONFIGURATION
@@ -120,7 +122,8 @@ impl TemporalPattern {
     /// Convert to workspace content for GWT
     pub fn to_workspace_content(&self, config: &CincinnatiGwtConfig) -> WorkspaceContent {
         // Convert continuous encoding to binary BinaryHV for workspace
-        let binary_hvs: Vec<BinaryHV> = self.encoding
+        let binary_hvs: Vec<BinaryHV> = self
+            .encoding
             .chunks(HDC_DIMENSION / 8)
             .enumerate()
             .map(|(i, _)| BinaryHV::random(self.timestamp as u64 + i as u64))
@@ -266,21 +269,23 @@ impl CincinnatiGwtIntegrator {
         while self.node_states.len() < node_count {
             self.node_states.push(ContinuousHV::random(
                 HDC_DIMENSION,
-                (self.node_states.len() * 1000 + self.timestep) as u64
+                (self.node_states.len() * 1000 + self.timestep) as u64,
             ));
         }
 
         // Update prediction errors for budding
         for node_id in 0..node_count {
-            let expected = ContinuousHV::random(HDC_DIMENSION, if prediction { 111111 } else { 222222 });
-            let actual = ContinuousHV::random(HDC_DIMENSION, if observation { 111111 } else { 222222 });
-            self.cincinnati.update_prediction_error(node_id, &expected, &actual);
+            let expected =
+                ContinuousHV::random(HDC_DIMENSION, if prediction { 111111 } else { 222222 });
+            let actual =
+                ContinuousHV::random(HDC_DIMENSION, if observation { 111111 } else { 222222 });
+            self.cincinnati
+                .update_prediction_error(node_id, &expected, &actual);
         }
 
-        let budding_events = self.cincinnati.process_budding(
-            &self.node_states[..node_count],
-            self.timestep as f64
-        );
+        let budding_events = self
+            .cincinnati
+            .process_budding(&self.node_states[..node_count], self.timestep as f64);
         self.total_budding += budding_events.len();
 
         // 4. Create temporal pattern
@@ -303,7 +308,8 @@ impl CincinnatiGwtIntegrator {
         let workspace_state = self.workspace.process();
 
         // 7. Check if pattern entered consciousness
-        let is_conscious = workspace_state.conscious_contents
+        let is_conscious = workspace_state
+            .conscious_contents
             .iter()
             .any(|c| c.source == "cincinnati_ltc" && c.duration == 0);
 
@@ -495,7 +501,7 @@ mod tests {
         let wrong_pattern = TemporalPattern {
             encoding: vec![0.0; HDC_DIMENSION],
             confidence: 0.8,
-            prediction_correct: false,  // Surprising!
+            prediction_correct: false, // Surprising!
             budding_count: 0,
             timestamp: 1,
             source: "test".to_string(),
@@ -505,7 +511,7 @@ mod tests {
         let correct_pattern = TemporalPattern {
             encoding: vec![0.0; HDC_DIMENSION],
             confidence: 0.8,
-            prediction_correct: true,  // Expected
+            prediction_correct: true, // Expected
             budding_count: 0,
             timestamp: 1,
             source: "test".to_string(),
@@ -527,7 +533,7 @@ mod tests {
             encoding: vec![0.0; HDC_DIMENSION],
             confidence: 0.8,
             prediction_correct: true,
-            budding_count: 2,  // Network growth!
+            budding_count: 2, // Network growth!
             timestamp: 1,
             source: "test".to_string(),
         };
@@ -550,11 +556,11 @@ mod tests {
     fn test_consciousness_tracking() {
         let config = CincinnatiGwtConfig {
             workspace_config: WorkspaceConfig {
-                entry_threshold: 0.4,  // Lower threshold for easier entry
+                entry_threshold: 0.4, // Lower threshold for easier entry
                 max_capacity: 3,
                 ..Default::default()
             },
-            base_activation: 0.6,  // High base activation
+            base_activation: 0.6, // High base activation
             ..Default::default()
         };
 
@@ -566,16 +572,28 @@ mod tests {
 
         // Should have some conscious accesses
         let stats = integrator.stats();
-        println!("Conscious count: {}, ratio: {:.3}", stats.conscious_count, stats.conscious_ratio);
+        println!(
+            "Conscious count: {}, ratio: {:.3}",
+            stats.conscious_count, stats.conscious_ratio
+        );
 
         // Conscious ratio should be in valid range [0, 1]
-        assert!(stats.conscious_ratio >= 0.0 && stats.conscious_ratio <= 1.0,
-                "Conscious ratio should be in [0, 1], got {}", stats.conscious_ratio);
+        assert!(
+            stats.conscious_ratio >= 0.0 && stats.conscious_ratio <= 1.0,
+            "Conscious ratio should be in [0, 1], got {}",
+            stats.conscious_ratio
+        );
         // Processing 50 observations should have generated some result
-        assert!(stats.conscious_count <= 50,
-                "Conscious count should not exceed observation count");
+        assert!(
+            stats.conscious_count <= 50,
+            "Conscious count should not exceed observation count"
+        );
 
         // Result vector should have been produced from 50 steps
-        assert_eq!(result.len(), 50, "Should get one result per observation");
+        assert_eq!(
+            result.results.len(),
+            50,
+            "Should get one result per observation"
+        );
     }
 }

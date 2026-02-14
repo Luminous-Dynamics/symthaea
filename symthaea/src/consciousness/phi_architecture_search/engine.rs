@@ -6,7 +6,7 @@ use symthaea_core::hdc::HDC_DIMENSION;
 
 use super::genome::ArchitectureGenome;
 use super::phenotype::DecodedArchitecture;
-use super::phi_gradient::{PhiGradient, GradientVelocity};
+use super::phi_gradient::{GradientVelocity, PhiGradient};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SEARCH CONFIGURATION
@@ -215,7 +215,14 @@ impl PhiArchitectureSearch {
 
             let individual = Individual { genome, fitness };
 
-            if self.best.is_none() || fitness > self.best.as_ref().expect("best individual must be set after initialization").fitness {
+            if self.best.is_none()
+                || fitness
+                    > self
+                        .best
+                        .as_ref()
+                        .expect("best individual must be set after initialization")
+                        .fitness
+            {
                 self.best = Some(individual.clone());
             }
 
@@ -223,7 +230,11 @@ impl PhiArchitectureSearch {
         }
 
         // Sort by fitness (descending)
-        self.population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal));
+        self.population.sort_by(|a, b| {
+            b.fitness
+                .partial_cmp(&a.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
     /// Run random search
@@ -259,17 +270,36 @@ impl PhiArchitectureSearch {
     /// Run evolutionary search
     pub fn evolutionary_search(&mut self, generations: usize) -> SearchResult {
         self.initialize_population();
-        self.phi_history.push(self.best.as_ref().expect("best individual must be set after initialization").fitness);
+        self.phi_history.push(
+            self.best
+                .as_ref()
+                .expect("best individual must be set after initialization")
+                .fitness,
+        );
 
         for gen in 0..generations {
             self.generation = gen + 1;
             self.evolve_generation();
-            self.phi_history.push(self.best.as_ref().expect("best individual must be set after initialization").fitness);
+            self.phi_history.push(
+                self.best
+                    .as_ref()
+                    .expect("best individual must be set after initialization")
+                    .fitness,
+            );
         }
 
         SearchResult {
-            best_phi: self.best.as_ref().expect("best individual must be set after initialization").fitness,
-            best_architecture: self.best.as_ref().expect("best individual must be set after initialization").genome.clone(),
+            best_phi: self
+                .best
+                .as_ref()
+                .expect("best individual must be set after initialization")
+                .fitness,
+            best_architecture: self
+                .best
+                .as_ref()
+                .expect("best individual must be set after initialization")
+                .genome
+                .clone(),
             phi_history: self.phi_history.clone(),
             evaluations: self.evaluations,
             strategy: SearchStrategy::Evolutionary,
@@ -290,7 +320,7 @@ impl PhiArchitectureSearch {
         for _step in 0..steps {
             // Compute gradient
             let gradient = PhiGradient::compute(&genome, self.config.gradient_epsilon);
-            self.evaluations += 12;  // ~6 parameters * 2 (forward/backward)
+            self.evaluations += 12; // ~6 parameters * 2 (forward/backward)
 
             // Apply gradient
             gradient.apply(&mut genome, self.config.learning_rate);
@@ -320,7 +350,12 @@ impl PhiArchitectureSearch {
     /// Run hybrid search (evolutionary + gradient)
     pub fn hybrid_search(&mut self, generations: usize) -> SearchResult {
         self.initialize_population();
-        self.phi_history.push(self.best.as_ref().expect("best individual must be set after initialization").fitness);
+        self.phi_history.push(
+            self.best
+                .as_ref()
+                .expect("best individual must be set after initialization")
+                .fitness,
+        );
 
         for gen in 0..generations {
             self.generation = gen + 1;
@@ -331,12 +366,26 @@ impl PhiArchitectureSearch {
             // Gradient refinement on top individuals
             self.gradient_refine_elites();
 
-            self.phi_history.push(self.best.as_ref().expect("best individual must be set after initialization").fitness);
+            self.phi_history.push(
+                self.best
+                    .as_ref()
+                    .expect("best individual must be set after initialization")
+                    .fitness,
+            );
         }
 
         SearchResult {
-            best_phi: self.best.as_ref().expect("best individual must be set after initialization").fitness,
-            best_architecture: self.best.as_ref().expect("best individual must be set after initialization").genome.clone(),
+            best_phi: self
+                .best
+                .as_ref()
+                .expect("best individual must be set after initialization")
+                .fitness,
+            best_architecture: self
+                .best
+                .as_ref()
+                .expect("best individual must be set after initialization")
+                .genome
+                .clone(),
             phi_history: self.phi_history.clone(),
             evaluations: self.evaluations,
             strategy: SearchStrategy::Hybrid,
@@ -364,17 +413,27 @@ impl PhiArchitectureSearch {
     /// enabling more efficient exploration of the consciousness landscape.
     pub fn gradient_evolutionary_search(&mut self, generations: usize) -> SearchResult {
         self.initialize_population();
-        self.phi_history.push(self.best.as_ref().expect("best individual must be set after initialization").fitness);
+        self.phi_history.push(
+            self.best
+                .as_ref()
+                .expect("best individual must be set after initialization")
+                .fitness,
+        );
 
         // Compute initial gradients for the population
-        let mut population_gradients: Vec<PhiGradient> = self.population
+        let mut population_gradients: Vec<PhiGradient> = self
+            .population
             .iter()
             .map(|ind| PhiGradient::compute(&ind.genome, self.config.gradient_epsilon))
             .collect();
         self.evaluations += self.population.len() * 12;
 
         let mut no_improvement_count = 0;
-        let mut prev_best = self.best.as_ref().expect("best individual must be set after initialization").fitness;
+        let mut prev_best = self
+            .best
+            .as_ref()
+            .expect("best individual must be set after initialization")
+            .fitness;
 
         for gen in 0..generations {
             self.generation = gen + 1;
@@ -383,13 +442,18 @@ impl PhiArchitectureSearch {
             self.evolve_generation_with_gradients(&population_gradients);
 
             // Update gradients for new population
-            population_gradients = self.population
+            population_gradients = self
+                .population
                 .iter()
                 .map(|ind| PhiGradient::compute(&ind.genome, self.config.gradient_epsilon))
                 .collect();
             self.evaluations += self.population.len() * 12;
 
-            let current_best = self.best.as_ref().expect("best individual must be set after initialization").fitness;
+            let current_best = self
+                .best
+                .as_ref()
+                .expect("best individual must be set after initialization")
+                .fitness;
             self.phi_history.push(current_best);
 
             // Early stopping check
@@ -405,8 +469,17 @@ impl PhiArchitectureSearch {
         }
 
         SearchResult {
-            best_phi: self.best.as_ref().expect("best individual must be set after initialization").fitness,
-            best_architecture: self.best.as_ref().expect("best individual must be set after initialization").genome.clone(),
+            best_phi: self
+                .best
+                .as_ref()
+                .expect("best individual must be set after initialization")
+                .fitness,
+            best_architecture: self
+                .best
+                .as_ref()
+                .expect("best individual must be set after initialization")
+                .genome
+                .clone(),
             phi_history: self.phi_history.clone(),
             evaluations: self.evaluations,
             strategy: SearchStrategy::GradientEvolutionary,
@@ -451,7 +524,13 @@ impl PhiArchitectureSearch {
             };
 
             // Update best
-            if fitness > self.best.as_ref().expect("best individual must be set after initialization").fitness {
+            if fitness
+                > self
+                    .best
+                    .as_ref()
+                    .expect("best individual must be set after initialization")
+                    .fitness
+            {
                 self.best = Some(child.clone());
             }
 
@@ -461,7 +540,9 @@ impl PhiArchitectureSearch {
         // Replace population
         self.population = new_population;
         self.population.sort_by(|a, b| {
-            b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal)
+            b.fitness
+                .partial_cmp(&a.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
     }
 
@@ -510,9 +591,7 @@ impl PhiArchitectureSearch {
                 // Check for convergence (gradient alignment)
                 if let Some(ref prev) = prev_gradient {
                     let similarity = gradient.cosine_similarity(prev);
-                    if gradient.magnitude < self.config.convergence_threshold
-                        || similarity > 0.99
-                    {
+                    if gradient.magnitude < self.config.convergence_threshold || similarity > 0.99 {
                         // Converged, try random restart
                         break;
                     }
@@ -579,7 +658,9 @@ impl PhiArchitectureSearch {
                     island.push(Individual { genome, fitness });
                 }
                 island.sort_by(|a, b| {
-                    b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal)
+                    b.fitness
+                        .partial_cmp(&a.fitness)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 });
                 island
             })
@@ -590,14 +671,23 @@ impl PhiArchitectureSearch {
         for island in &islands {
             if let Some(best) = island.first() {
                 if global_best.is_none()
-                    || best.fitness > global_best.as_ref().expect("global_best must be set after first island").fitness
+                    || best.fitness
+                        > global_best
+                            .as_ref()
+                            .expect("global_best must be set after first island")
+                            .fitness
                 {
                     global_best = Some(best.clone());
                 }
             }
         }
 
-        let mut phi_history = vec![global_best.as_ref().expect("global_best must be set after first island").fitness];
+        let mut phi_history = vec![
+            global_best
+                .as_ref()
+                .expect("global_best must be set after first island")
+                .fitness,
+        ];
 
         for gen in 0..generations {
             // Evolve each island independently
@@ -613,13 +703,23 @@ impl PhiArchitectureSearch {
             // Update global best
             for island in &islands {
                 if let Some(best) = island.first() {
-                    if best.fitness > global_best.as_ref().expect("global_best must be set after first island").fitness {
+                    if best.fitness
+                        > global_best
+                            .as_ref()
+                            .expect("global_best must be set after first island")
+                            .fitness
+                    {
                         global_best = Some(best.clone());
                     }
                 }
             }
 
-            phi_history.push(global_best.as_ref().expect("global_best must be set after first island").fitness);
+            phi_history.push(
+                global_best
+                    .as_ref()
+                    .expect("global_best must be set after first island")
+                    .fitness,
+            );
         }
 
         let best = global_best.expect("global_best must be set after island evolution");
@@ -673,7 +773,9 @@ impl PhiArchitectureSearch {
 
         *island = new_island;
         island.sort_by(|a, b| {
-            b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal)
+            b.fitness
+                .partial_cmp(&a.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
     }
 
@@ -691,13 +793,7 @@ impl PhiArchitectureSearch {
         // Collect migrants from each island (best individuals)
         let migrants: Vec<Vec<Individual>> = islands
             .iter()
-            .map(|island| {
-                island
-                    .iter()
-                    .take(migrants_per_island)
-                    .cloned()
-                    .collect()
-            })
+            .map(|island| island.iter().take(migrants_per_island).cloned().collect())
             .collect();
 
         // Ring migration: island i receives migrants from island (i-1) mod n
@@ -707,8 +803,7 @@ impl PhiArchitectureSearch {
             for migrant in &migrants[source] {
                 // Gradient-refine migrant before insertion
                 let mut refined_genome = migrant.genome.clone();
-                let gradient =
-                    PhiGradient::compute(&refined_genome, self.config.gradient_epsilon);
+                let gradient = PhiGradient::compute(&refined_genome, self.config.gradient_epsilon);
                 self.evaluations += 12;
 
                 gradient.apply(&mut refined_genome, self.config.learning_rate);
@@ -718,14 +813,18 @@ impl PhiArchitectureSearch {
                 self.evaluations += 1;
 
                 // Replace worst individual in target island
-                if !islands[i].is_empty() && fitness > islands[i].last().expect("island must not be empty").fitness {
+                if !islands[i].is_empty()
+                    && fitness > islands[i].last().expect("island must not be empty").fitness
+                {
                     islands[i].pop();
                     islands[i].push(Individual {
                         genome: refined_genome,
                         fitness,
                     });
                     islands[i].sort_by(|a, b| {
-                        b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal)
+                        b.fitness
+                            .partial_cmp(&a.fitness)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     });
                 }
             }
@@ -768,7 +867,14 @@ impl PhiArchitectureSearch {
             };
 
             // Update best
-            if self.best.is_none() || fitness > self.best.as_ref().expect("best individual must be set after initialization").fitness {
+            if self.best.is_none()
+                || fitness
+                    > self
+                        .best
+                        .as_ref()
+                        .expect("best individual must be set after initialization")
+                        .fitness
+            {
                 self.best = Some(child.clone());
             }
 
@@ -777,7 +883,11 @@ impl PhiArchitectureSearch {
 
         // Replace population
         self.population = new_population;
-        self.population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal));
+        self.population.sort_by(|a, b| {
+            b.fitness
+                .partial_cmp(&a.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
     /// Tournament selection
@@ -815,14 +925,24 @@ impl PhiArchitectureSearch {
                 self.population[i].genome = genome;
                 self.population[i].fitness = fitness;
 
-                if fitness > self.best.as_ref().expect("best individual must be set after initialization").fitness {
+                if fitness
+                    > self
+                        .best
+                        .as_ref()
+                        .expect("best individual must be set after initialization")
+                        .fitness
+                {
                     self.best = Some(self.population[i].clone());
                 }
             }
         }
 
         // Re-sort
-        self.population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal));
+        self.population.sort_by(|a, b| {
+            b.fitness
+                .partial_cmp(&a.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
     // PRNG helpers
@@ -858,13 +978,19 @@ impl PhiArchitectureSearch {
             avg_phi: if self.population.is_empty() {
                 0.0
             } else {
-                self.population.iter().map(|i| i.fitness).sum::<f64>() / self.population.len() as f64
+                self.population.iter().map(|i| i.fitness).sum::<f64>()
+                    / self.population.len() as f64
             },
             phi_std: if self.population.len() < 2 {
                 0.0
             } else {
-                let avg = self.population.iter().map(|i| i.fitness).sum::<f64>() / self.population.len() as f64;
-                let variance = self.population.iter().map(|i| (i.fitness - avg).powi(2)).sum::<f64>()
+                let avg = self.population.iter().map(|i| i.fitness).sum::<f64>()
+                    / self.population.len() as f64;
+                let variance = self
+                    .population
+                    .iter()
+                    .map(|i| (i.fitness - avg).powi(2))
+                    .sum::<f64>()
                     / (self.population.len() - 1) as f64;
                 variance.sqrt()
             },
@@ -900,5 +1026,222 @@ impl std::fmt::Display for SearchStats {
             "Gen {}: Best Phi = {:.4}, Avg = {:.4} +/- {:.4} ({} evals)",
             self.generation, self.best_phi, self.avg_phi, self.phi_std, self.evaluations
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: create a small, fast config for unit tests.
+    fn small_config() -> SearchConfig {
+        SearchConfig {
+            population_size: 6,
+            elite_count: 1,
+            hdc_dim: 256,
+            min_nodes: 4,
+            max_nodes: 8,
+            random_samples: 8,
+            seed: 42,
+            parallel: false,
+            gradient_steps_per_generation: 2,
+            num_islands: 2,
+            migration_interval: 2,
+            migration_rate: 0.2,
+            patience: 5,
+            ..SearchConfig::default()
+        }
+    }
+
+    #[test]
+    fn test_search_config_default_produces_valid_config() {
+        let cfg = SearchConfig::default();
+
+        assert!(cfg.population_size > 0);
+        assert!(cfg.elite_count <= cfg.population_size);
+        assert!(cfg.mutation_rate >= 0.0 && cfg.mutation_rate <= 1.0);
+        assert!(cfg.crossover_rate >= 0.0 && cfg.crossover_rate <= 1.0);
+        assert!(cfg.learning_rate > 0.0);
+        assert!(cfg.gradient_epsilon > 0.0);
+        assert!(cfg.min_nodes <= cfg.max_nodes);
+        assert!(cfg.hdc_dim > 0);
+        assert!(cfg.random_samples > 0);
+        assert!(cfg.momentum >= 0.0 && cfg.momentum <= 1.0);
+        assert!(cfg.num_islands >= 1);
+        assert!(cfg.migration_interval >= 1);
+        assert!(cfg.convergence_threshold > 0.0);
+        assert!(cfg.patience > 0);
+    }
+
+    #[test]
+    fn test_new_creates_engine_successfully() {
+        let cfg = small_config();
+        let searcher = PhiArchitectureSearch::new(cfg.clone());
+
+        assert_eq!(searcher.generation, 0);
+        assert_eq!(searcher.evaluations, 0);
+        assert!(searcher.best.is_none());
+        assert!(searcher.population().is_empty());
+    }
+
+    #[test]
+    fn test_stats_zeroed_initially() {
+        let searcher = PhiArchitectureSearch::new(small_config());
+        let stats = searcher.stats();
+
+        assert_eq!(stats.generation, 0);
+        assert_eq!(stats.evaluations, 0);
+        assert_eq!(stats.population_size, 0);
+        assert!((stats.best_phi - 0.0).abs() < f64::EPSILON);
+        assert!((stats.avg_phi - 0.0).abs() < f64::EPSILON);
+        assert!((stats.phi_std - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_best_returns_none_before_search() {
+        let searcher = PhiArchitectureSearch::new(small_config());
+        assert!(searcher.best().is_none());
+    }
+
+    #[test]
+    fn test_population_populated_after_evolutionary_search() {
+        let cfg = small_config();
+        let pop_size = cfg.population_size;
+        let mut searcher = PhiArchitectureSearch::new(cfg);
+
+        searcher.evolutionary_search(1);
+
+        assert_eq!(searcher.population().len(), pop_size);
+        // Population should be sorted descending by fitness
+        let pop = searcher.population();
+        for w in pop.windows(2) {
+            assert!(
+                w[0].fitness >= w[1].fitness || (w[0].fitness - w[1].fitness).abs() < 1e-12,
+                "Population not sorted: {} < {}",
+                w[0].fitness,
+                w[1].fitness
+            );
+        }
+    }
+
+    #[test]
+    fn test_random_search_returns_finite_best_phi() {
+        let mut searcher = PhiArchitectureSearch::new(small_config());
+        let result = searcher.random_search();
+
+        assert!(result.best_phi.is_finite(), "best_phi must be finite");
+        assert!(result.best_phi >= 0.0, "best_phi must be non-negative");
+        assert_eq!(result.strategy, SearchStrategy::Random);
+        assert!(result.evaluations >= 8, "should have evaluated at least random_samples");
+        assert!(!result.phi_history.is_empty());
+    }
+
+    #[test]
+    fn test_evolutionary_search_returns_positive_evaluations() {
+        let mut searcher = PhiArchitectureSearch::new(small_config());
+        let result = searcher.evolutionary_search(2);
+
+        assert!(result.evaluations > 0);
+        assert!(result.best_phi.is_finite());
+        assert!(result.best_phi >= 0.0);
+        assert_eq!(result.strategy, SearchStrategy::Evolutionary);
+        // phi_history: initial + 2 generations = at least 3 entries
+        assert!(result.phi_history.len() >= 3);
+    }
+
+    #[test]
+    fn test_gradient_search_returns_finite_phi() {
+        let mut searcher = PhiArchitectureSearch::new(small_config());
+        let result = searcher.gradient_search(3);
+
+        assert!(result.best_phi.is_finite(), "best_phi must be finite");
+        assert!(result.best_phi >= 0.0);
+        assert_eq!(result.strategy, SearchStrategy::GradientGuided);
+        // phi_history: initial + 3 steps = 4 entries
+        assert_eq!(result.phi_history.len(), 4);
+        assert!(result.evaluations > 0);
+    }
+
+    #[test]
+    fn test_search_dispatcher_routes_all_strategies() {
+        let strategies = [
+            (SearchStrategy::Random, "Random"),
+            (SearchStrategy::Evolutionary, "Evolutionary"),
+            (SearchStrategy::GradientGuided, "GradientGuided"),
+            (SearchStrategy::Hybrid, "Hybrid"),
+            (SearchStrategy::GradientEvolutionary, "GradientEvolutionary"),
+            (SearchStrategy::MomentumOptimization, "MomentumOptimization"),
+            (SearchStrategy::IslandGradient, "IslandGradient"),
+        ];
+
+        for (strategy, label) in strategies {
+            let mut searcher = PhiArchitectureSearch::new(small_config());
+            let result = searcher.search(strategy, 2);
+
+            assert!(
+                result.best_phi.is_finite(),
+                "{label}: best_phi must be finite"
+            );
+            assert!(
+                result.best_phi >= 0.0,
+                "{label}: best_phi must be non-negative"
+            );
+            assert_eq!(
+                result.strategy, strategy,
+                "{label}: returned strategy must match requested"
+            );
+            assert!(
+                result.evaluations > 0,
+                "{label}: evaluations must be > 0"
+            );
+        }
+    }
+
+    #[test]
+    fn test_reset_clears_state() {
+        let cfg = small_config();
+        let mut searcher = PhiArchitectureSearch::new(cfg);
+
+        // Run a search to populate state
+        searcher.evolutionary_search(2);
+        assert!(searcher.best().is_some());
+        assert!(searcher.evaluations > 0);
+        assert!(!searcher.population().is_empty());
+
+        // Reset
+        searcher.reset();
+
+        assert!(searcher.best().is_none());
+        assert_eq!(searcher.evaluations, 0);
+        assert_eq!(searcher.generation, 0);
+        assert!(searcher.population().is_empty());
+
+        let stats = searcher.stats();
+        assert_eq!(stats.evaluations, 0);
+        assert_eq!(stats.generation, 0);
+        assert_eq!(stats.population_size, 0);
+    }
+
+    #[test]
+    fn test_stats_after_search_reflect_state() {
+        let cfg = small_config();
+        let pop_size = cfg.population_size;
+        let mut searcher = PhiArchitectureSearch::new(cfg);
+
+        searcher.evolutionary_search(3);
+        let stats = searcher.stats();
+
+        assert_eq!(stats.generation, 3);
+        assert!(stats.evaluations > 0);
+        assert_eq!(stats.population_size, pop_size);
+        assert!(stats.best_phi.is_finite());
+        assert!(stats.avg_phi.is_finite());
+        assert!(stats.phi_std.is_finite());
+        assert!(stats.avg_phi >= 0.0);
+        assert!(stats.phi_std >= 0.0);
+
+        // Display impl should not panic
+        let display = format!("{}", stats);
+        assert!(display.contains("Gen 3"));
     }
 }

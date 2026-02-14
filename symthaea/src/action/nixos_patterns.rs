@@ -67,9 +67,7 @@ pub enum NixOSCommand {
         packages: Vec<String>,
     },
     /// nix-env -e (user package remove)
-    EnvRemove {
-        packages: Vec<String>,
-    },
+    EnvRemove { packages: Vec<String> },
     /// nix-env --rollback (user profile rollback)
     EnvRollback,
     /// nix search (package search)
@@ -79,17 +77,11 @@ pub enum NixOSCommand {
         json: bool,
     },
     /// nix-channel operations
-    Channel {
-        operation: ChannelOperation,
-    },
+    Channel { operation: ChannelOperation },
     /// nix flake operations
-    Flake {
-        operation: FlakeOperation,
-    },
+    Flake { operation: FlakeOperation },
     /// home-manager switch
-    HomeManagerSwitch {
-        flake: Option<String>,
-    },
+    HomeManagerSwitch { flake: Option<String> },
     /// nix-collect-garbage
     CollectGarbage {
         /// Delete older than N days
@@ -169,18 +161,34 @@ impl NixOSCommand {
     pub fn safety_level(&self) -> SafetyLevel {
         match self {
             Self::Search { .. } => SafetyLevel::ReadOnly,
-            Self::Channel { operation: ChannelOperation::List } => SafetyLevel::ReadOnly,
-            Self::Flake { operation: FlakeOperation::Show } => SafetyLevel::ReadOnly,
-            Self::Flake { operation: FlakeOperation::Check } => SafetyLevel::ReadOnly,
+            Self::Channel {
+                operation: ChannelOperation::List,
+            } => SafetyLevel::ReadOnly,
+            Self::Flake {
+                operation: FlakeOperation::Show,
+            } => SafetyLevel::ReadOnly,
+            Self::Flake {
+                operation: FlakeOperation::Check,
+            } => SafetyLevel::ReadOnly,
 
             Self::EnvInstall { .. } => SafetyLevel::UserModify,
             Self::EnvRemove { .. } => SafetyLevel::UserModify,
             Self::EnvRollback => SafetyLevel::UserModify,
-            Self::Channel { operation: ChannelOperation::Update { .. } } => SafetyLevel::UserModify,
-            Self::Channel { operation: ChannelOperation::Add { .. } } => SafetyLevel::UserModify,
-            Self::Channel { operation: ChannelOperation::Remove { .. } } => SafetyLevel::UserModify,
-            Self::Flake { operation: FlakeOperation::Update { .. } } => SafetyLevel::UserModify,
-            Self::Flake { operation: FlakeOperation::Lock { .. } } => SafetyLevel::UserModify,
+            Self::Channel {
+                operation: ChannelOperation::Update { .. },
+            } => SafetyLevel::UserModify,
+            Self::Channel {
+                operation: ChannelOperation::Add { .. },
+            } => SafetyLevel::UserModify,
+            Self::Channel {
+                operation: ChannelOperation::Remove { .. },
+            } => SafetyLevel::UserModify,
+            Self::Flake {
+                operation: FlakeOperation::Update { .. },
+            } => SafetyLevel::UserModify,
+            Self::Flake {
+                operation: FlakeOperation::Lock { .. },
+            } => SafetyLevel::UserModify,
             Self::HomeManagerSwitch { .. } => SafetyLevel::UserModify,
 
             Self::RebuildTest { .. } => SafetyLevel::SystemModify,
@@ -204,9 +212,7 @@ impl NixOSCommand {
                     safety_level: SafetyLevel::SystemCritical,
                 })
             }
-            Self::EnvInstall { .. } | Self::EnvRemove { .. } => {
-                Some(NixOSCommand::EnvRollback)
-            }
+            Self::EnvInstall { .. } | Self::EnvRemove { .. } => Some(NixOSCommand::EnvRollback),
             Self::HomeManagerSwitch { .. } => {
                 // Home-manager rollback is more complex
                 Some(NixOSCommand::Custom {
@@ -264,9 +270,7 @@ impl NixOSCommand {
                 args.extend(packages.clone());
                 ("nix-env".to_string(), args)
             }
-            Self::EnvRollback => {
-                ("nix-env".to_string(), vec!["--rollback".to_string()])
-            }
+            Self::EnvRollback => ("nix-env".to_string(), vec!["--rollback".to_string()]),
             Self::Search { query, json } => {
                 let mut args = vec!["search".to_string(), "nixpkgs".to_string(), query.clone()];
                 if *json {
@@ -274,49 +278,47 @@ impl NixOSCommand {
                 }
                 ("nix".to_string(), args)
             }
-            Self::Channel { operation } => {
-                match operation {
-                    ChannelOperation::Update { channel } => {
-                        let mut args = vec!["--update".to_string()];
-                        if let Some(ch) = channel {
-                            args.push(ch.clone());
-                        }
-                        ("nix-channel".to_string(), args)
+            Self::Channel { operation } => match operation {
+                ChannelOperation::Update { channel } => {
+                    let mut args = vec!["--update".to_string()];
+                    if let Some(ch) = channel {
+                        args.push(ch.clone());
                     }
-                    ChannelOperation::Add { url, name } => {
-                        ("nix-channel".to_string(), vec!["--add".to_string(), url.clone(), name.clone()])
-                    }
-                    ChannelOperation::Remove { name } => {
-                        ("nix-channel".to_string(), vec!["--remove".to_string(), name.clone()])
-                    }
-                    ChannelOperation::List => {
-                        ("nix-channel".to_string(), vec!["--list".to_string()])
-                    }
+                    ("nix-channel".to_string(), args)
                 }
-            }
-            Self::Flake { operation } => {
-                match operation {
-                    FlakeOperation::Update { inputs } => {
-                        let mut args = vec!["flake".to_string(), "update".to_string()];
-                        args.extend(inputs.clone());
-                        ("nix".to_string(), args)
-                    }
-                    FlakeOperation::Lock { inputs } => {
-                        let mut args = vec!["flake".to_string(), "lock".to_string()];
-                        for input in inputs {
-                            args.push("--update-input".to_string());
-                            args.push(input.clone());
-                        }
-                        ("nix".to_string(), args)
-                    }
-                    FlakeOperation::Show => {
-                        ("nix".to_string(), vec!["flake".to_string(), "show".to_string()])
-                    }
-                    FlakeOperation::Check => {
-                        ("nix".to_string(), vec!["flake".to_string(), "check".to_string()])
-                    }
+                ChannelOperation::Add { url, name } => (
+                    "nix-channel".to_string(),
+                    vec!["--add".to_string(), url.clone(), name.clone()],
+                ),
+                ChannelOperation::Remove { name } => (
+                    "nix-channel".to_string(),
+                    vec!["--remove".to_string(), name.clone()],
+                ),
+                ChannelOperation::List => ("nix-channel".to_string(), vec!["--list".to_string()]),
+            },
+            Self::Flake { operation } => match operation {
+                FlakeOperation::Update { inputs } => {
+                    let mut args = vec!["flake".to_string(), "update".to_string()];
+                    args.extend(inputs.clone());
+                    ("nix".to_string(), args)
                 }
-            }
+                FlakeOperation::Lock { inputs } => {
+                    let mut args = vec!["flake".to_string(), "lock".to_string()];
+                    for input in inputs {
+                        args.push("--update-input".to_string());
+                        args.push(input.clone());
+                    }
+                    ("nix".to_string(), args)
+                }
+                FlakeOperation::Show => (
+                    "nix".to_string(),
+                    vec!["flake".to_string(), "show".to_string()],
+                ),
+                FlakeOperation::Check => (
+                    "nix".to_string(),
+                    vec!["flake".to_string(), "check".to_string()],
+                ),
+            },
             Self::HomeManagerSwitch { flake } => {
                 let mut args = vec!["switch".to_string()];
                 if let Some(f) = flake {
@@ -325,7 +327,10 @@ impl NixOSCommand {
                 }
                 ("home-manager".to_string(), args)
             }
-            Self::CollectGarbage { older_than_days, delete_all } => {
+            Self::CollectGarbage {
+                older_than_days,
+                delete_all,
+            } => {
                 let mut args = vec!["-d".to_string()];
                 if let Some(days) = older_than_days {
                     args.push("--delete-older-than".to_string());
@@ -336,9 +341,7 @@ impl NixOSCommand {
                 }
                 ("nix-collect-garbage".to_string(), args)
             }
-            Self::Custom { command, args, .. } => {
-                (command.clone(), args.clone())
-            }
+            Self::Custom { command, args, .. } => (command.clone(), args.clone()),
         }
     }
 }
@@ -529,7 +532,8 @@ impl NixOSExecutor {
                         Ok(rb_output) if rb_output.status.success() => {
                             let exec_result = ExecutionResult::RolledBack {
                                 error,
-                                rollback_output: String::from_utf8_lossy(&rb_output.stdout).to_string(),
+                                rollback_output: String::from_utf8_lossy(&rb_output.stdout)
+                                    .to_string(),
                             };
                             self.record_execution(&command, phi, &exec_result);
                             exec_result
@@ -537,7 +541,9 @@ impl NixOSExecutor {
                         Ok(rb_output) => {
                             let exec_result = ExecutionResult::FailedNoRollback {
                                 error,
-                                rollback_error: Some(String::from_utf8_lossy(&rb_output.stderr).to_string()),
+                                rollback_error: Some(
+                                    String::from_utf8_lossy(&rb_output.stderr).to_string(),
+                                ),
                             };
                             self.record_execution(&command, phi, &exec_result);
                             exec_result
@@ -604,25 +610,19 @@ impl NixOSExecutor {
         let elapsed = start.elapsed().as_millis() as u64;
 
         match result {
-            Ok(output) if output.status.success() => {
-                ExecutionResult::Success {
-                    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                    execution_time_ms: elapsed,
-                }
-            }
-            Ok(output) => {
-                ExecutionResult::FailedNoRollback {
-                    error: String::from_utf8_lossy(&output.stderr).to_string(),
-                    rollback_error: None,
-                }
-            }
-            Err(e) => {
-                ExecutionResult::FailedNoRollback {
-                    error: e.to_string(),
-                    rollback_error: None,
-                }
-            }
+            Ok(output) if output.status.success() => ExecutionResult::Success {
+                stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                execution_time_ms: elapsed,
+            },
+            Ok(output) => ExecutionResult::FailedNoRollback {
+                error: String::from_utf8_lossy(&output.stderr).to_string(),
+                rollback_error: None,
+            },
+            Err(e) => ExecutionResult::FailedNoRollback {
+                error: e.to_string(),
+                rollback_error: None,
+            },
         }
     }
 
@@ -652,7 +652,9 @@ impl NixOSExecutor {
 
     /// Get success rate for a command type
     pub fn success_rate(&self, safety_level: SafetyLevel) -> Option<f32> {
-        let matching: Vec<_> = self.history.iter()
+        let matching: Vec<_> = self
+            .history
+            .iter()
             .filter(|r| r.command.safety_level() == safety_level)
             .collect();
 
@@ -660,7 +662,8 @@ impl NixOSExecutor {
             return None;
         }
 
-        let successes = matching.iter()
+        let successes = matching
+            .iter()
             .filter(|r| matches!(r.result, ExecutionResult::Success { .. }))
             .count();
 
@@ -675,30 +678,46 @@ mod tests {
     #[test]
     fn test_command_safety_levels() {
         // Read-only
-        let search = NixOSCommand::Search { query: "vim".to_string(), json: false };
+        let search = NixOSCommand::Search {
+            query: "vim".to_string(),
+            json: false,
+        };
         assert_eq!(search.safety_level(), SafetyLevel::ReadOnly);
 
         // User modify
-        let install = NixOSCommand::EnvInstall { packages: vec!["vim".to_string()] };
+        let install = NixOSCommand::EnvInstall {
+            packages: vec!["vim".to_string()],
+        };
         assert_eq!(install.safety_level(), SafetyLevel::UserModify);
 
         // System critical
-        let rebuild = NixOSCommand::RebuildSwitch { flake: None, extra_args: vec![] };
+        let rebuild = NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec![],
+        };
         assert_eq!(rebuild.safety_level(), SafetyLevel::SystemCritical);
 
         // Destructive
-        let gc = NixOSCommand::CollectGarbage { older_than_days: Some(7), delete_all: false };
+        let gc = NixOSCommand::CollectGarbage {
+            older_than_days: Some(7),
+            delete_all: false,
+        };
         assert_eq!(gc.safety_level(), SafetyLevel::Destructive);
     }
 
     #[test]
     fn test_command_to_shell() {
-        let install = NixOSCommand::EnvInstall { packages: vec!["vim".to_string(), "git".to_string()] };
+        let install = NixOSCommand::EnvInstall {
+            packages: vec!["vim".to_string(), "git".to_string()],
+        };
         let (cmd, args) = install.to_command();
         assert_eq!(cmd, "nix-env");
         assert_eq!(args, vec!["-iA", "nixpkgs.vim", "nixpkgs.git"]);
 
-        let search = NixOSCommand::Search { query: "editor".to_string(), json: true };
+        let search = NixOSCommand::Search {
+            query: "editor".to_string(),
+            json: true,
+        };
         let (cmd, args) = search.to_command();
         assert_eq!(cmd, "nix");
         assert_eq!(args, vec!["search", "nixpkgs", "editor", "--json"]);
@@ -706,13 +725,21 @@ mod tests {
 
     #[test]
     fn test_rollback_commands() {
-        let rebuild = NixOSCommand::RebuildSwitch { flake: None, extra_args: vec![] };
+        let rebuild = NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec![],
+        };
         assert!(rebuild.rollback_command().is_some());
 
-        let install = NixOSCommand::EnvInstall { packages: vec!["vim".to_string()] };
+        let install = NixOSCommand::EnvInstall {
+            packages: vec!["vim".to_string()],
+        };
         assert!(install.rollback_command().is_some());
 
-        let search = NixOSCommand::Search { query: "vim".to_string(), json: false };
+        let search = NixOSCommand::Search {
+            query: "vim".to_string(),
+            json: false,
+        };
         assert!(search.rollback_command().is_none());
     }
 
@@ -728,7 +755,10 @@ mod tests {
     async fn test_dry_run_execution() {
         let mut executor = NixOSExecutor::new().with_dry_run(true);
 
-        let search = NixOSCommand::Search { query: "vim".to_string(), json: false };
+        let search = NixOSCommand::Search {
+            query: "vim".to_string(),
+            json: false,
+        };
         let result = executor.execute(search, 0.5).await;
 
         match result {
@@ -744,11 +774,16 @@ mod tests {
         let mut executor = NixOSExecutor::new().with_dry_run(true);
 
         // Try to execute system-critical with low Φ
-        let rebuild = NixOSCommand::RebuildSwitch { flake: None, extra_args: vec![] };
+        let rebuild = NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec![],
+        };
         let result = executor.execute(rebuild, 0.2).await;
 
         match result {
-            ExecutionResult::PendingConfirmation { phi, required_phi, .. } => {
+            ExecutionResult::PendingConfirmation {
+                phi, required_phi, ..
+            } => {
                 assert_eq!(phi, 0.2);
                 assert!(required_phi > phi);
             }

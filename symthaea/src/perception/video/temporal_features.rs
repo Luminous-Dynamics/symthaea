@@ -52,7 +52,9 @@ impl TemporalFeatures {
 
     /// Compute cosine similarity with another feature vector
     pub fn similarity(&self, other: &TemporalFeatures) -> f32 {
-        let dot: f32 = self.features.iter()
+        let dot: f32 = self
+            .features
+            .iter()
             .zip(other.features.iter())
             .map(|(&a, &b)| a * b)
             .sum();
@@ -127,7 +129,8 @@ impl TemporalFeatureExtractor {
         features[31] = variance;
 
         // Update running averages
-        self.avg_brightness = self.avg_brightness * (1.0 - self.ema_alpha) + brightness * self.ema_alpha;
+        self.avg_brightness =
+            self.avg_brightness * (1.0 - self.ema_alpha) + brightness * self.ema_alpha;
         self.avg_motion = self.avg_motion * (1.0 - self.ema_alpha) + motion * self.ema_alpha;
         self.prev_brightness = brightness;
         self.frame_count += 1;
@@ -219,7 +222,11 @@ impl TemporalFeatureExtractor {
     }
 
     /// Compute motion histogram from motion vectors
-    fn compute_motion_histogram(&self, vectors: &[super::optical_flow::MotionVector], hist: &mut [f32]) {
+    fn compute_motion_histogram(
+        &self,
+        vectors: &[super::optical_flow::MotionVector],
+        hist: &mut [f32],
+    ) {
         if vectors.is_empty() {
             return;
         }
@@ -239,7 +246,11 @@ impl TemporalFeatureExtractor {
     }
 
     /// Compute motion per quadrant
-    fn compute_quadrant_motion(&self, vectors: &[super::optical_flow::MotionVector], quadrants: &mut [f32]) {
+    fn compute_quadrant_motion(
+        &self,
+        vectors: &[super::optical_flow::MotionVector],
+        quadrants: &mut [f32],
+    ) {
         let mut quad_sum = [0.0f32; 4];
         let mut quad_count = [0u32; 4];
 
@@ -267,7 +278,8 @@ impl TemporalFeatureExtractor {
         }
 
         let mean_byte = (mean * 255.0) as i32;
-        let sum_sq: i64 = pixels.iter()
+        let sum_sq: i64 = pixels
+            .iter()
             .map(|&p| {
                 let diff = p as i32 - mean_byte;
                 (diff * diff) as i64
@@ -301,8 +313,8 @@ impl Default for TemporalFeatureExtractor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::frame::FrameFormat;
+    use super::*;
 
     fn create_test_frame(brightness: u8, seq: u64) -> Frame {
         let data = vec![brightness; 64 * 64 * 3];

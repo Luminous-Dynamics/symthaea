@@ -6,8 +6,7 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    OperatingConditions, CoupledPhysicsEngine,
-    EconomicEngine, CapitalCosts, OmCosts, FuelCosts,
+    CapitalCosts, CoupledPhysicsEngine, EconomicEngine, FuelCosts, OmCosts, OperatingConditions,
 };
 
 fn main() {
@@ -37,24 +36,34 @@ fn main() {
     println!("├────────────────────────────────────────────────────────────────────┤");
     println!("│  Neutron Energy      2.45 MeV            None (protons only)      │");
     println!("│  Ignition Temp       15 keV              58 keV (3.9× harder)     │");
-    println!("│  Dose Rate           {:<8.4} mSv/hr     {:<8.6} mSv/hr         │",
-             dd_result.geometry_shielding.shielding.final_dose,
-             dhe3_result.geometry_shielding.shielding.final_dose);
-    println!("│  Total Mass          {:<8.0} kg         {:<8.0} kg               │",
-             dd_result.geometry_shielding.total_mass_kg,
-             dhe3_result.geometry_shielding.total_mass_kg);
-    println!("│  Shielding           {:<8.2} m          {:<8.2} m                │",
-             dd_result.geometry_shielding.shielding.thickness_m,
-             dhe3_result.geometry_shielding.shielding.thickness_m);
-    println!("│  Shell Material      {}           {}               │",
-             &dd_result.shell_material[..13.min(dd_result.shell_material.len())],
-             &dhe3_result.shell_material[..13.min(dhe3_result.shell_material.len())]);
-    println!("│  Max Temp            {:<8.0} K           {:<8.0} K                │",
-             dd_result.thermal_profile.t_max,
-             dhe3_result.thermal_profile.t_max);
-    println!("│  Feasible            {}                {}                    │",
-             if dd_result.feasible { "YES" } else { "NO " },
-             if dhe3_result.feasible { "YES" } else { "NO " });
+    println!(
+        "│  Dose Rate           {:<8.4} mSv/hr     {:<8.6} mSv/hr         │",
+        dd_result.geometry_shielding.shielding.final_dose,
+        dhe3_result.geometry_shielding.shielding.final_dose
+    );
+    println!(
+        "│  Total Mass          {:<8.0} kg         {:<8.0} kg               │",
+        dd_result.geometry_shielding.total_mass_kg, dhe3_result.geometry_shielding.total_mass_kg
+    );
+    println!(
+        "│  Shielding           {:<8.2} m          {:<8.2} m                │",
+        dd_result.geometry_shielding.shielding.thickness_m,
+        dhe3_result.geometry_shielding.shielding.thickness_m
+    );
+    println!(
+        "│  Shell Material      {}           {}               │",
+        &dd_result.shell_material[..13.min(dd_result.shell_material.len())],
+        &dhe3_result.shell_material[..13.min(dhe3_result.shell_material.len())]
+    );
+    println!(
+        "│  Max Temp            {:<8.0} K           {:<8.0} K                │",
+        dd_result.thermal_profile.t_max, dhe3_result.thermal_profile.t_max
+    );
+    println!(
+        "│  Feasible            {}                {}                    │",
+        if dd_result.feasible { "YES" } else { "NO " },
+        if dhe3_result.feasible { "YES" } else { "NO " }
+    );
     println!("└────────────────────────────────────────────────────────────────────┘");
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -74,21 +83,34 @@ fn main() {
     println!("├────────────────────────────────────────────────────────────────────┤");
     println!("│  Neutron Energy      14.1 MeV           None (protons only)       │");
     println!("│  Ignition Temp       10 keV             58 keV (5.8× harder)      │");
-    println!("│  Dose Rate           {:<8.4} mSv/hr    {:<8.6} mSv/hr          │",
-             dt_result.geometry_shielding.shielding.final_dose,
-             dhe3_ind_result.geometry_shielding.shielding.final_dose);
-    println!("│  Total Mass          {:<8.0} t         {:<8.0} t                │",
-             dt_result.geometry_shielding.total_mass_kg / 1000.0,
-             dhe3_ind_result.geometry_shielding.total_mass_kg / 1000.0);
-    println!("│  Shielding           {:<8.2} m         {:<8.2} m                 │",
-             dt_result.geometry_shielding.shielding.thickness_m,
-             dhe3_ind_result.geometry_shielding.shielding.thickness_m);
-    println!("│  Max Temp            {:<8.0} K          {:<8.0} K                 │",
-             dt_result.thermal_profile.t_max,
-             dhe3_ind_result.thermal_profile.t_max);
-    println!("│  Feasible            {}                {}                     │",
-             if dt_result.feasible { "YES" } else { "NO " },
-             if dhe3_ind_result.feasible { "YES" } else { "NO " });
+    println!(
+        "│  Dose Rate           {:<8.4} mSv/hr    {:<8.6} mSv/hr          │",
+        dt_result.geometry_shielding.shielding.final_dose,
+        dhe3_ind_result.geometry_shielding.shielding.final_dose
+    );
+    println!(
+        "│  Total Mass          {:<8.0} t         {:<8.0} t                │",
+        dt_result.geometry_shielding.total_mass_kg / 1000.0,
+        dhe3_ind_result.geometry_shielding.total_mass_kg / 1000.0
+    );
+    println!(
+        "│  Shielding           {:<8.2} m         {:<8.2} m                 │",
+        dt_result.geometry_shielding.shielding.thickness_m,
+        dhe3_ind_result.geometry_shielding.shielding.thickness_m
+    );
+    println!(
+        "│  Max Temp            {:<8.0} K          {:<8.0} K                 │",
+        dt_result.thermal_profile.t_max, dhe3_ind_result.thermal_profile.t_max
+    );
+    println!(
+        "│  Feasible            {}                {}                     │",
+        if dt_result.feasible { "YES" } else { "NO " },
+        if dhe3_ind_result.feasible {
+            "YES"
+        } else {
+            "NO "
+        }
+    );
     println!("└────────────────────────────────────────────────────────────────────┘");
 
     // Economic comparison
@@ -110,8 +132,14 @@ fn main() {
     println!("┌────────────────────────────────────────────────────────────────────┐");
     println!("│  LCOE COMPARISON (5 kW Consumer)                                  │");
     println!("├────────────────────────────────────────────────────────────────────┤");
-    println!("│  D-D Fusion:   ${:.1}/MWh                                       │", lcoe_dd.lcoe_usd_mwh);
-    println!("│  D-He3 Fusion: ${:.1}/MWh (He-3 fuel cost dominant)           │", lcoe_dhe3.lcoe_usd_mwh);
+    println!(
+        "│  D-D Fusion:   ${:.1}/MWh                                       │",
+        lcoe_dd.lcoe_usd_mwh
+    );
+    println!(
+        "│  D-He3 Fusion: ${:.1}/MWh (He-3 fuel cost dominant)           │",
+        lcoe_dhe3.lcoe_usd_mwh
+    );
     println!("└────────────────────────────────────────────────────────────────────┘");
 
     // Summary
@@ -140,7 +168,9 @@ fn main() {
     println!();
 
     let recommendation = if dhe3_result.feasible && dd_result.feasible {
-        if dhe3_result.geometry_shielding.total_mass_kg < dd_result.geometry_shielding.total_mass_kg * 0.5 {
+        if dhe3_result.geometry_shielding.total_mass_kg
+            < dd_result.geometry_shielding.total_mass_kg * 0.5
+        {
             "D-He3 offers significant mass advantage if ignition can be achieved"
         } else {
             "D-D preferred for near-term due to lower ignition requirements"

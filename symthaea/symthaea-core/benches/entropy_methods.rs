@@ -13,11 +13,11 @@
 //!
 //! Run with: cargo bench --bench entropy_methods
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::physics::true_phi::{
-    ContinuousEntropyEstimator, EntropyMethod, TruePhiCalculator,
-    IIT4Calculator, QuantumEntropyCalculator, ParallelEntropyCalculator,
+    ContinuousEntropyEstimator, EntropyMethod, IIT4Calculator, ParallelEntropyCalculator,
+    QuantumEntropyCalculator, TruePhiCalculator,
 };
 
 const HDC_DIMENSION: usize = 16384;
@@ -52,9 +52,7 @@ fn bench_entropy_methods(c: &mut Criterion) {
 
     // KDE (accurate but slow)
     let kde_estimator = ContinuousEntropyEstimator::kde();
-    group.bench_function("kde", |b| {
-        b.iter(|| black_box(kde_estimator.entropy(&hv)))
-    });
+    group.bench_function("kde", |b| b.iter(|| black_box(kde_estimator.entropy(&hv))));
 
     // KDE fast (truncated Gaussian)
     let kde_fast_estimator = ContinuousEntropyEstimator::kde_fast();
@@ -120,7 +118,7 @@ fn bench_true_phi(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("compute_phi", n),
             &components,
-            |b, comps| b.iter(|| black_box(calc.compute_true_phi(comps)))
+            |b, comps| b.iter(|| black_box(calc.compute_true_phi(comps))),
         );
     }
 
@@ -141,11 +139,9 @@ fn bench_iit4(c: &mut Criterion) {
 
         let calc = IIT4Calculator::new();
 
-        group.bench_with_input(
-            BenchmarkId::new("analyze", n),
-            &components,
-            |b, comps| b.iter(|| black_box(calc.analyze(comps)))
-        );
+        group.bench_with_input(BenchmarkId::new("analyze", n), &components, |b, comps| {
+            b.iter(|| black_box(calc.analyze(comps)))
+        });
     }
 
     group.finish();
@@ -201,7 +197,8 @@ fn bench_parallel_entropy(c: &mut Criterion) {
     // Serial entropy computation
     group.bench_function("serial_16_vectors", |b| {
         b.iter(|| {
-            vectors.iter()
+            vectors
+                .iter()
                 .map(|v| serial_estimator.entropy(v))
                 .collect::<Vec<_>>()
         })

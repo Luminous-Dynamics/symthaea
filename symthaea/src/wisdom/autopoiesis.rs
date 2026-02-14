@@ -140,9 +140,8 @@ impl AutopoieticMonitor {
 
         // Closure = high coherence + low prediction error + intact boundary
         // Weighted: coherence is most important for internal closure
-        self.closure_estimate = (avg_coherence * 0.5)
-            + ((1.0 - avg_error) * 0.3)
-            + (boundary * 0.2);
+        self.closure_estimate =
+            (avg_coherence * 0.5) + ((1.0 - avg_error) * 0.3) + (boundary * 0.2);
 
         self.update_health();
     }

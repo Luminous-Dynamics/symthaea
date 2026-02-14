@@ -29,13 +29,13 @@
 //! assert_eq!(result.phi, result2.phi);
 //! ```
 
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
-use crate::hdc::unified_hv::ContinuousHV;
 use super::{PhiEngine, PhiMethod, PhiResult};
+use crate::hdc::unified_hv::ContinuousHV;
 
 /// Cache entry for Φ results
 #[derive(Clone, Debug)]
@@ -284,9 +284,7 @@ thread_local! {
 
 #[cfg(feature = "thread_local_cache")]
 pub fn compute_phi_cached(node_representations: &[ContinuousHV]) -> PhiResult {
-    PHI_CACHE.with(|cache| {
-        cache.borrow_mut().compute(node_representations)
-    })
+    PHI_CACHE.with(|cache| cache.borrow_mut().compute(node_representations))
 }
 
 #[cfg(test)]

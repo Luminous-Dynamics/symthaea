@@ -71,7 +71,9 @@ impl OpticalFlow {
         };
 
         // Compute frame difference
-        let diff: Vec<u8> = gray.data.iter()
+        let diff: Vec<u8> = gray
+            .data
+            .iter()
             .zip(prev.iter())
             .map(|(&a, &b)| (a as i16 - b as i16).unsigned_abs() as u8)
             .collect();
@@ -92,7 +94,9 @@ impl OpticalFlow {
         for gy in 0..grid_h {
             for gx in 0..grid_w {
                 let (magnitude, dx, dy) = self.compute_cell_motion(
-                    &diff, width, height,
+                    &diff,
+                    width,
+                    height,
                     gx * self.grid_size,
                     gy * self.grid_size,
                     self.grid_size,
@@ -189,8 +193,8 @@ impl OpticalFlow {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::frame::FrameFormat;
+    use super::*;
 
     fn create_frame(brightness: u8, width: u32, height: u32, seq: u64) -> Frame {
         let data = vec![brightness; (width * height * 3) as usize];

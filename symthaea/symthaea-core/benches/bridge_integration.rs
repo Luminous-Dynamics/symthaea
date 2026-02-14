@@ -7,10 +7,12 @@
 //! - simulation_bridge: PhysicsSimulator for each system type
 //! - Cross-bridge: full pipeline (simulate → encode → process)
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use symthaea_core::hdc::math_bridge::{UnifiedMathEngine, MathValue};
-use symthaea_core::physics::simulation_bridge::{PhysicsSimulator, SimulationAnalysis, state_to_binary_hv};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_core::hdc::math_bridge::{MathValue, UnifiedMathEngine};
+use symthaea_core::physics::simulation_bridge::{
+    state_to_binary_hv, PhysicsSimulator, SimulationAnalysis,
+};
 
 // =============================================================================
 // MATH BRIDGE BENCHMARKS
@@ -146,7 +148,9 @@ fn bench_trajectory_encoding(c: &mut Criterion) {
             &count,
             |bench, &count| {
                 bench.iter(|| {
-                    let hvs: Vec<BinaryHV> = result.states.iter()
+                    let hvs: Vec<BinaryHV> = result
+                        .states
+                        .iter()
                         .take(count)
                         .map(|s| state_to_binary_hv(s))
                         .collect();
@@ -168,10 +172,11 @@ fn bench_full_pipeline_harmonic(c: &mut Criterion) {
             // Simulate → Analyze → Encode
             let sim = PhysicsSimulator::harmonic(2.0, 1.0, 0.0);
             let result = sim.simulate(2.0, 0.01);
-            let analysis = SimulationAnalysis::from_result(&result)
-                .with_harmonic_energy(2.0);
+            let analysis = SimulationAnalysis::from_result(&result).with_harmonic_energy(2.0);
 
-            let hvs: Vec<BinaryHV> = result.states.iter()
+            let hvs: Vec<BinaryHV> = result
+                .states
+                .iter()
                 .step_by(20)
                 .take(10)
                 .map(|s| state_to_binary_hv(s))
@@ -232,4 +237,9 @@ criterion_group!(
     bench_full_pipeline_math_to_hdc,
 );
 
-criterion_main!(math_benches, simulation_benches, encoding_benches, pipeline_benches);
+criterion_main!(
+    math_benches,
+    simulation_benches,
+    encoding_benches,
+    pipeline_benches
+);

@@ -24,10 +24,10 @@
 //! - Chain reactions
 //! - Catalytic cycles
 
+use super::constants::R_GAS;
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::R_GAS;
 use serde::{Deserialize, Serialize};
 
 /// Reaction order
@@ -89,8 +89,8 @@ pub struct Catalyst {
     pub name: String,
     pub catalyst_type: CatalystType,
     pub activation_energy_reduction: f64, // How much it lowers Ea
-    pub selectivity: f64, // 0-1
-    pub turnover_frequency: f64, // 1/s
+    pub selectivity: f64,                 // 0-1
+    pub turnover_frequency: f64,          // 1/s
     pub vector: ContinuousHV,
 }
 
@@ -245,10 +245,13 @@ impl KineticsEncoder {
             ReactionType::Catalytic => self.catalyst.bind(&self.elementary),
             ReactionType::Enzymatic => self.enzyme.clone(),
             ReactionType::Photochemical => self.genesis.hv("reaction::photochemical", PHYSICS_DIM),
-            ReactionType::Electrochemical => self.genesis.hv("reaction::electrochemical", PHYSICS_DIM),
+            ReactionType::Electrochemical => {
+                self.genesis.hv("reaction::electrochemical", PHYSICS_DIM)
+            }
         };
 
-        let vector = self.rate
+        let vector = self
+            .rate
             .bind(&type_vec)
             .bind(&self.activation_energy.scale(ea_kj as f32))
             .bind(&self.enthalpy.scale(delta_h as f32));
@@ -299,11 +302,9 @@ impl KineticsEncoder {
 
     /// Chain reaction mechanism
     pub fn chain_mechanism(&self) -> ContinuousHV {
-        ContinuousHV::bundle(&[
-            &self.initiation,
-            &self.propagation,
-            &self.termination,
-        ]).bind(&self.chain).bind(&self.radical)
+        ContinuousHV::bundle(&[&self.initiation, &self.propagation, &self.termination])
+            .bind(&self.chain)
+            .bind(&self.radical)
     }
 
     /// Chain length = rate of propagation / rate of initiation
@@ -334,7 +335,8 @@ impl KineticsEncoder {
             CatalystType::Photocatalyst => self.genesis.hv("photo::catalyst", PHYSICS_DIM),
         };
 
-        let vector = self.catalyst
+        let vector = self
+            .catalyst
             .bind(&type_vec)
             .bind(&self.active_site)
             .bind(&self.turnover.scale(tof as f32));
@@ -350,7 +352,12 @@ impl KineticsEncoder {
     }
 
     /// Catalyst effect: k_cat = A·exp(-(Ea - ΔEa)/RT)
-    pub fn catalyzed_rate_constant(&self, reaction: &Reaction, catalyst: &Catalyst, temp_k: f64) -> f64 {
+    pub fn catalyzed_rate_constant(
+        &self,
+        reaction: &Reaction,
+        catalyst: &Catalyst,
+        temp_k: f64,
+    ) -> f64 {
         let effective_ea = reaction.activation_energy_kj - catalyst.activation_energy_reduction;
         reaction.pre_exponential * (-effective_ea * 1000.0 / (R_GAS * temp_k)).exp()
     }
@@ -390,21 +397,19 @@ impl KineticsEncoder {
 
     /// Calculate rate constant ratio at two temperatures
     pub fn rate_constant_ratio(&self, ea_kj: f64, t1: f64, t2: f64) -> f64 {
-        let factor = ea_kj * 1000.0 / R_GAS * (1.0/t1 - 1.0/t2);
+        let factor = ea_kj * 1000.0 / R_GAS * (1.0 / t1 - 1.0 / t2);
         factor.exp()
     }
 
     /// Van't Hoff equation: d(ln K)/dT = ΔH°/RT²
     pub fn vant_hoff(&self) -> ContinuousHV {
         let temperature = self.genesis.hv("thermo::temperature", PHYSICS_DIM);
-        self.equilibrium
-            .bind(&self.enthalpy)
-            .bind(&temperature)
+        self.equilibrium.bind(&self.enthalpy).bind(&temperature)
     }
 
     /// Activation energy from rate constants at two temperatures
     pub fn activation_energy_from_rates(&self, k1: f64, k2: f64, t1: f64, t2: f64) -> f64 {
-        R_GAS * (k2/k1).ln() / (1.0/t1 - 1.0/t2) / 1000.0 // kJ/mol
+        R_GAS * (k2 / k1).ln() / (1.0 / t1 - 1.0 / t2) / 1000.0 // kJ/mol
     }
 }
 
@@ -430,8 +435,8 @@ mod tests {
 
         let reaction = encoder.create_reaction(
             "Test",
-            50.0,  // Ea = 50 kJ/mol
-            1e13,  // A = 10^13 s^-1
+            50.0,   // Ea = 50 kJ/mol
+            1e13,   // A = 10^13 s^-1
             -100.0, // ΔH = -100 kJ/mol (exothermic)
             ReactionType::Elementary,
             ReactionOrder::First,
@@ -450,7 +455,9 @@ mod tests {
 
         let reaction = encoder.create_reaction(
             "Uncatalyzed",
-            80.0, 1e12, -50.0,
+            80.0,
+            1e12,
+            -50.0,
             ReactionType::Elementary,
             ReactionOrder::Second,
         );
@@ -458,7 +465,7 @@ mod tests {
         let catalyst = encoder.create_catalyst(
             "Pt",
             CatalystType::Heterogeneous,
-            30.0,  // Reduces Ea by 30 kJ/mol
+            30.0, // Reduces Ea by 30 kJ/mol
             0.95,
             100.0, // TOF = 100/s
         );

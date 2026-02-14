@@ -8,7 +8,7 @@
 //!
 //! Produces an ASCII table and phase diagram showing convergence boundaries.
 
-use mycelix_fl_core::{GradientUpdate, PipelineConfig, UnifiedPipeline, krum};
+use mycelix_fl_core::{krum, GradientUpdate, PipelineConfig, UnifiedPipeline};
 use std::collections::HashMap;
 
 /// Total number of participants in each trial.
@@ -183,8 +183,10 @@ fn run_krum_trial(updates: &[GradientUpdate], byz_pct: usize) -> TrialResult {
 fn main() {
     println!("=============================================================");
     println!("  Byzantine Tolerance Phase Diagram Benchmark");
-    println!("  {} nodes, {} gradient dims, honest={}, byz={}",
-             TOTAL_NODES, GRADIENT_DIM, HONEST_VALUE, BYZANTINE_VALUE);
+    println!(
+        "  {} nodes, {} gradient dims, honest={}, byz={}",
+        TOTAL_NODES, GRADIENT_DIM, HONEST_VALUE, BYZANTINE_VALUE
+    );
     println!("  Convergence threshold: MSE < {}", CONVERGENCE_THRESHOLD);
     println!("=============================================================\n");
 
@@ -264,7 +266,12 @@ fn main() {
             .collect::<Vec<_>>()
             .join(" ")
     );
-    println!("  {:-<10}-+-{:-<width$}", "", "", width = BYZANTINE_PERCENTAGES.len() * 6);
+    println!(
+        "  {:-<10}-+-{:-<width$}",
+        "",
+        "",
+        width = BYZANTINE_PERCENTAGES.len() * 6
+    );
 
     let methods_display: &[(&str, &[TrialResult])] = &[
         ("EqualRep", &equal_rep_results),
@@ -287,7 +294,12 @@ fn main() {
             .collect();
         println!("  {:>10} | {}", name, cells.join(""));
     }
-    println!("  {:-<10}-+-{:-<width$}", "", "", width = BYZANTINE_PERCENTAGES.len() * 6);
+    println!(
+        "  {:-<10}-+-{:-<width$}",
+        "",
+        "",
+        width = BYZANTINE_PERCENTAGES.len() * 6
+    );
     println!(
         "  Legend: [OK] = converged (MSE<{:.1}), [XX] = diverged, [ERR] = pipeline error\n",
         CONVERGENCE_THRESHOLD
@@ -393,7 +405,11 @@ fn main() {
             format!(
                 "MSE = {:.6}{}",
                 kr_30.mse,
-                kr_30.error_msg.as_deref().map(|e| format!(", err: {}", e)).unwrap_or_default()
+                kr_30
+                    .error_msg
+                    .as_deref()
+                    .map(|e| format!(", err: {}", e))
+                    .unwrap_or_default()
             )
         );
     }
@@ -431,15 +447,16 @@ fn main() {
             format!(
                 "MSE = {:.6}{}",
                 lr_20.mse,
-                lr_20.error_msg.as_deref().map(|e| format!(", err: {}", e)).unwrap_or_default()
+                lr_20
+                    .error_msg
+                    .as_deref()
+                    .map(|e| format!(", err: {}", e))
+                    .unwrap_or_default()
             )
         );
     }
 
-    println!(
-        "\n  Results: {} passed, {} failed",
-        pass_count, fail_count
-    );
+    println!("\n  Results: {} passed, {} failed", pass_count, fail_count);
     println!("=============================================================\n");
 
     if fail_count > 0 {

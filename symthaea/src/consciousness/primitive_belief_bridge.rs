@@ -108,8 +108,7 @@ impl PrimitiveBeliefBridge {
                         if actives.is_empty() {
                             0.0
                         } else {
-                            actives.iter().map(|a| a.activation).sum::<f64>()
-                                / actives.len() as f64
+                            actives.iter().map(|a| a.activation).sum::<f64>() / actives.len() as f64
                         }
                     })
                     .unwrap_or(0.0)
@@ -309,7 +308,10 @@ mod tests {
             phi_delta: -0.3,
         };
         let td = bridge.td_error_signal(&error);
-        assert!(td < 0.0, "Phi decline + high error should yield negative TD signal");
+        assert!(
+            td < 0.0,
+            "Phi decline + high error should yield negative TD signal"
+        );
     }
 
     #[test]

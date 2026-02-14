@@ -5,11 +5,8 @@
 //! requiring actual ONNX models or GPU hardware.
 
 use symthaea::perception::{
-    JLProjector, NGramEncoder,
-    ModalityType, ModalityWeights,
-    OcrMethod,
-    ModelHub, ModelSpec,
-    SIGLIP_DIM, QWEN3_DIM, SIGLIP_EMBEDDING_DIM,
+    JLProjector, ModalityType, ModalityWeights, ModelHub, ModelSpec, NGramEncoder, OcrMethod,
+    QWEN3_DIM, SIGLIP_DIM, SIGLIP_EMBEDDING_DIM,
 };
 
 // ============================================================================
@@ -63,7 +60,10 @@ fn test_jl_projector_different_seeds() {
     let output2 = projector2.project(&input);
 
     // Should produce different outputs with different seeds
-    assert_ne!(output1, output2, "Different seeds should produce different projections");
+    assert_ne!(
+        output1, output2,
+        "Different seeds should produce different projections"
+    );
 }
 
 #[test]
@@ -111,7 +111,10 @@ fn test_ngram_encoder_different_inputs() {
     let encoded1 = encoder.encode("hello");
     let encoded2 = encoder.encode("world");
 
-    assert_ne!(encoded1, encoded2, "Different inputs should produce different outputs");
+    assert_ne!(
+        encoded1, encoded2,
+        "Different inputs should produce different outputs"
+    );
 }
 
 #[test]
@@ -186,11 +189,7 @@ fn test_modality_type_debug() {
 
 #[test]
 fn test_ocr_method_variants() {
-    let methods = [
-        OcrMethod::RustOcr,
-        OcrMethod::Tesseract,
-        OcrMethod::None,
-    ];
+    let methods = [OcrMethod::RustOcr, OcrMethod::Tesseract, OcrMethod::None];
 
     assert_eq!(methods.len(), 3);
 }
@@ -281,7 +280,11 @@ fn test_jl_similarity_preservation() {
         let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
         let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if norm_a > 0.0 && norm_b > 0.0 { dot / (norm_a * norm_b) } else { 0.0 }
+        if norm_a > 0.0 && norm_b > 0.0 {
+            dot / (norm_a * norm_b)
+        } else {
+            0.0
+        }
     }
 
     let sim_12 = cosine_sim(&proj1, &proj2);
@@ -292,6 +295,7 @@ fn test_jl_similarity_preservation() {
     assert!(
         sim_12 > sim_13,
         "Similar inputs should have higher similarity: {} vs {}",
-        sim_12, sim_13
+        sim_12,
+        sim_13
     );
 }

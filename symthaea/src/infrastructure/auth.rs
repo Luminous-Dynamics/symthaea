@@ -4,10 +4,10 @@
 //! to the Symthaea service.
 
 use std::collections::HashMap;
+use std::fs;
+use std::io;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
-use std::io;
-use std::fs;
 
 /// Authentication token for IPC clients
 #[derive(Debug, Clone)]
@@ -232,7 +232,8 @@ impl AuthProvider {
             last_used: None,
         };
 
-        self.token_lookup.insert(token.token_hash.clone(), token.id.clone());
+        self.token_lookup
+            .insert(token.token_hash.clone(), token.id.clone());
         self.tokens.insert(token.id.clone(), token.clone());
 
         (token_value, token)
@@ -310,7 +311,8 @@ impl AuthProvider {
 
     /// Revoke all tokens for a client
     pub fn revoke_client(&mut self, client_id: &str) {
-        let to_remove: Vec<String> = self.tokens
+        let to_remove: Vec<String> = self
+            .tokens
             .iter()
             .filter(|(_, t)| t.client_id == client_id)
             .map(|(id, _)| id.clone())
@@ -323,7 +325,8 @@ impl AuthProvider {
 
     /// Clean up expired tokens
     pub fn cleanup_expired(&mut self) {
-        let expired: Vec<String> = self.tokens
+        let expired: Vec<String> = self
+            .tokens
             .iter()
             .filter(|(_, t)| t.is_expired())
             .map(|(id, _)| id.clone())
@@ -372,11 +375,20 @@ impl AuthProvider {
         // id:client_id:hash:perms:created:expires
         let mut lines = Vec::new();
         for token in self.tokens.values() {
-            let expires = token.expires_at
-                .map(|t| format!("{}", t.duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default().as_secs()))
+            let expires = token
+                .expires_at
+                .map(|t| {
+                    format!(
+                        "{}",
+                        t.duration_since(SystemTime::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs()
+                    )
+                })
                 .unwrap_or_else(|| "none".to_string());
 
-            let created = token.created_at
+            let created = token
+                .created_at
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs();
@@ -407,9 +419,10 @@ impl AuthProvider {
                 let expires = if parts[5] == "none" {
                     None
                 } else {
-                    parts[5].parse::<u64>().ok().map(|s| {
-                        SystemTime::UNIX_EPOCH + Duration::from_secs(s)
-                    })
+                    parts[5]
+                        .parse::<u64>()
+                        .ok()
+                        .map(|s| SystemTime::UNIX_EPOCH + Duration::from_secs(s))
                 };
 
                 let token = AuthToken {
@@ -672,7 +685,11 @@ mod tests {
         ];
         for err in &variants {
             let dbg = format!("{:?}", err);
-            assert!(!dbg.is_empty(), "Debug output must be non-empty for {:?}", err);
+            assert!(
+                !dbg.is_empty(),
+                "Debug output must be non-empty for {:?}",
+                err
+            );
         }
     }
 
@@ -710,7 +727,11 @@ mod tests {
             AuthError::IoError("x".into()),
         ];
         for err in &variants {
-            assert!(err.source().is_none(), "source() should be None for {:?}", err);
+            assert!(
+                err.source().is_none(),
+                "source() should be None for {:?}",
+                err
+            );
         }
     }
 

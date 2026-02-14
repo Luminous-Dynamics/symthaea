@@ -2,13 +2,12 @@
 
 use std::collections::VecDeque;
 
-use super::types::{
-    CognitiveLoopFEPResult, EnhancedFEPCycleResult,
-    MotorCommand, MotorCommandType, Observation,
-};
 use super::agent::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
-use super::motor::{MotorSystem, rand_f64};
+use super::motor::{rand_f64, MotorSystem};
 use super::td_learning::TemporalDifferenceLearningStats;
+use super::types::{
+    CognitiveLoopFEPResult, EnhancedFEPCycleResult, MotorCommand, MotorCommandType, Observation,
+};
 
 // =============================================================================
 // COGNITIVE LOOP FEP BRIDGE
@@ -45,9 +44,16 @@ impl CognitiveLoopFEPBridge {
     }
 
     /// Process cognitive loop state with temporal difference learning
-    pub fn process(&mut self, phi: f64, integration: f64, coherence: f64, attention: f64) -> CognitiveLoopFEPResult {
+    pub fn process(
+        &mut self,
+        phi: f64,
+        integration: f64,
+        coherence: f64,
+        attention: f64,
+    ) -> CognitiveLoopFEPResult {
         // Create observation from consciousness state
-        let observation = Observation::from_consciousness_state(phi, integration, coherence, attention);
+        let observation =
+            Observation::from_consciousness_state(phi, integration, coherence, attention);
 
         // Run perception (this now includes TD learning internally)
         let perception = self.agent.perceive(&observation);
@@ -74,14 +80,15 @@ impl CognitiveLoopFEPBridge {
             && perception.free_energy.prediction_error < 0.8;
 
         // Get TD error if available
-        let td_error = self.agent.td_stats()
-            .map(|s| s.avg_td_error)
-            .unwrap_or(0.0);
+        let td_error = self.agent.td_stats().map(|s| s.avg_td_error).unwrap_or(0.0);
 
         CognitiveLoopFEPResult {
             free_energy: perception.free_energy.total,
             prediction_error: perception.free_energy.prediction_error,
-            precision_weighted_error: self.agent.precision.weight_error(perception.free_energy.prediction_error),
+            precision_weighted_error: self
+                .agent
+                .precision
+                .weight_error(perception.free_energy.prediction_error),
             recommended_action: action_selection.action,
             is_surprised: self.agent.is_surprised(),
             learning_rate_modulation: learning_rate_mod,
@@ -91,7 +98,9 @@ impl CognitiveLoopFEPBridge {
             epistemic_value: action_selection.epistemic_value,
             pragmatic_value: action_selection.pragmatic_value,
             td_error,
-            model_confidence: self.agent.td_stats()
+            model_confidence: self
+                .agent
+                .td_stats()
                 .map(|s| (s.avg_transition_confidence + s.avg_likelihood_confidence) / 2.0)
                 .unwrap_or(0.5),
         }
@@ -130,19 +139,34 @@ impl CognitiveLoopFEPBridge {
         let stability = self.agent.precision.stability();
 
         // Also factor in TD learning confidence
-        let td_confidence = self.agent.td_stats()
+        let td_confidence = self
+            .agent
+            .td_stats()
             .map(|s| s.avg_prediction_accuracy)
             .unwrap_or(0.5);
 
         // High precision + high stability + high TD confidence = boost learning
         // Low values = reduce learning
-        ((precision * stability * td_confidence).powf(1.0/3.0)).max(0.1).min(2.0)
+        ((precision * stability * td_confidence).powf(1.0 / 3.0))
+            .max(0.1)
+            .min(2.0)
     }
 
     /// Set goals for the agent
-    pub fn set_goals(&mut self, preferred_phi: f64, preferred_integration: f64, preferred_coherence: f64, preferred_attention: f64) {
+    pub fn set_goals(
+        &mut self,
+        preferred_phi: f64,
+        preferred_integration: f64,
+        preferred_coherence: f64,
+        preferred_attention: f64,
+    ) {
         self.agent.set_goals(
-            vec![preferred_phi, preferred_integration, preferred_coherence, preferred_attention],
+            vec![
+                preferred_phi,
+                preferred_integration,
+                preferred_coherence,
+                preferred_attention,
+            ],
             2.0,
         );
     }
@@ -343,7 +367,8 @@ impl EnhancedFEPBridge {
         if self.action_outcome_history.len() >= 100 {
             self.action_outcome_history.pop_front();
         }
-        self.action_outcome_history.push_back((command_type, motor_outcome.prediction_error));
+        self.action_outcome_history
+            .push_back((command_type, motor_outcome.prediction_error));
 
         // 5. Compute learning signal
         self.learning_signal = self.compute_learning_signal(&fep_result, &motor_outcome);
@@ -386,7 +411,8 @@ impl EnhancedFEPBridge {
         let fe_signal = (fep.free_energy.abs() / 10.0).min(1.0);
 
         // Learning should increase with surprise/error, but be gated by precision
-        let raw_signal = td_weight * td_signal + motor_weight * motor_signal + fe_weight * fe_signal;
+        let raw_signal =
+            td_weight * td_signal + motor_weight * motor_signal + fe_weight * fe_signal;
 
         // Precision-weight the learning signal
         raw_signal * fep.learning_rate_modulation
@@ -395,13 +421,16 @@ impl EnhancedFEPBridge {
     /// Compute action-outcome coupling (how well actions predict outcomes)
     fn action_outcome_coupling(&self) -> f64 {
         if self.action_outcome_history.is_empty() {
-            return 0.5;  // Neutral
+            return 0.5; // Neutral
         }
 
         // Lower average error = better coupling
-        let avg_error: f64 = self.action_outcome_history.iter()
+        let avg_error: f64 = self
+            .action_outcome_history
+            .iter()
             .map(|(_, e)| *e)
-            .sum::<f64>() / self.action_outcome_history.len() as f64;
+            .sum::<f64>()
+            / self.action_outcome_history.len() as f64;
 
         (1.0 - avg_error).clamp(0.0, 1.0)
     }

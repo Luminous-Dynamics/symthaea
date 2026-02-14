@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
 use std::thread;
+use std::time::{Duration, Instant};
 
 /// Event types from file watcher
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -176,7 +176,8 @@ impl ConfigWatcher {
 
                     if let Ok(metadata) = std::fs::metadata(&*path) {
                         if let Ok(modified) = metadata.modified() {
-                            let changed = last_modified.get(&*path)
+                            let changed = last_modified
+                                .get(&*path)
                                 .map(|&last| modified > last)
                                 .unwrap_or(true);
 
@@ -361,21 +362,31 @@ impl ConfigChangeDetector {
             let change = match event.kind {
                 WatchEventKind::Modify => {
                     // Compute diff
-                    let (diff, added, removed) = if let Ok(new_content) = std::fs::read_to_string(&event.path) {
-                        let old_content = self.previous_content.get(&event.path)
-                            .map(|s| s.as_str())
-                            .unwrap_or("");
+                    let (diff, added, removed) =
+                        if let Ok(new_content) = std::fs::read_to_string(&event.path) {
+                            let old_content = self
+                                .previous_content
+                                .get(&event.path)
+                                .map(|s| s.as_str())
+                                .unwrap_or("");
 
-                        let diff = compute_simple_diff(old_content, &new_content);
-                        let added = new_content.lines().count().saturating_sub(old_content.lines().count());
-                        let removed = old_content.lines().count().saturating_sub(new_content.lines().count());
+                            let diff = compute_simple_diff(old_content, &new_content);
+                            let added = new_content
+                                .lines()
+                                .count()
+                                .saturating_sub(old_content.lines().count());
+                            let removed = old_content
+                                .lines()
+                                .count()
+                                .saturating_sub(new_content.lines().count());
 
-                        self.previous_content.insert(event.path.clone(), new_content);
+                            self.previous_content
+                                .insert(event.path.clone(), new_content);
 
-                        (Some(diff), added.max(0), removed.max(0))
-                    } else {
-                        (None, 0, 0)
-                    };
+                            (Some(diff), added.max(0), removed.max(0))
+                        } else {
+                            (None, 0, 0)
+                        };
 
                     ConfigChange {
                         path: event.path,

@@ -3,11 +3,11 @@
 //! Creates semantic embeddings that incorporate value alignment,
 //! allowing concepts to be represented with their ethical implications.
 
+use super::seven_harmonies::Harmony;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
-use super::seven_harmonies::Harmony;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Configuration for the semantic value embedder
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,7 +58,8 @@ impl ValueEmbeddedConcept {
 
     /// Get semantic similarity to another concept
     pub fn semantic_similarity(&self, other: &ValueEmbeddedConcept) -> f32 {
-        self.semantic_embedding.similarity(&other.semantic_embedding)
+        self.semantic_embedding
+            .similarity(&other.semantic_embedding)
     }
 
     /// Get value similarity to another concept
@@ -120,7 +121,10 @@ impl SemanticValueEmbedder {
     ///
     /// Maps each of the 7 Harmonies to a primitive tier, then creates
     /// a basis vector by bundling the tier's primitive encodings.
-    fn build_primitive_grounded_bases(dim: usize, system: &PrimitiveSystem) -> HashMap<Harmony, ContinuousHV> {
+    fn build_primitive_grounded_bases(
+        dim: usize,
+        system: &PrimitiveSystem,
+    ) -> HashMap<Harmony, ContinuousHV> {
         let mut bases = HashMap::new();
 
         // Mapping of Harmonies to Primitive Tiers:
@@ -134,10 +138,16 @@ impl SemanticValueEmbedder {
 
         let tier_mapping: [(Harmony, PrimitiveTier); 7] = [
             (Harmony::ResonantCoherence, PrimitiveTier::Geometric),
-            (Harmony::PanSentientFlourishing, PrimitiveTier::Consciousness),
+            (
+                Harmony::PanSentientFlourishing,
+                PrimitiveTier::Consciousness,
+            ),
             (Harmony::IntegralWisdom, PrimitiveTier::Compositional),
             (Harmony::InfinitePlay, PrimitiveTier::Mathematical),
-            (Harmony::UniversalInterconnectedness, PrimitiveTier::Physical),
+            (
+                Harmony::UniversalInterconnectedness,
+                PrimitiveTier::Physical,
+            ),
             (Harmony::SacredReciprocity, PrimitiveTier::Strategic),
             (Harmony::EvolutionaryProgression, PrimitiveTier::Temporal),
         ];
@@ -269,7 +279,9 @@ impl SemanticValueEmbedder {
 
     /// Find most similar concepts
     pub fn find_similar(&self, query: &ValueEmbeddedConcept, top_k: usize) -> Vec<(String, f32)> {
-        let mut similarities: Vec<_> = self.cache.iter()
+        let mut similarities: Vec<_> = self
+            .cache
+            .iter()
             .map(|(id, concept)| {
                 let sim = query.similarity(concept, self.config.value_weight);
                 (id.clone(), sim)

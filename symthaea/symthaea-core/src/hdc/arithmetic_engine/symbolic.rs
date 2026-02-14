@@ -1,8 +1,8 @@
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::PrimitiveSystem;
 use crate::hdc::deterministic_seeds::seed_from_name;
 use crate::hdc::integrated_information::IntegratedInformation;
-use serde::{Serialize, Deserialize};
+use crate::hdc::primitive_system::PrimitiveSystem;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::core_number::HdcNumber;
@@ -52,10 +52,7 @@ pub enum TermType {
     },
     /// Named function application (sin, cos, exp, ln, tan, etc.)
     /// Enables transcendental function differentiation with chain rule.
-    Function {
-        name: String,
-        arg: Box<TermType>,
-    },
+    Function { name: String, arg: Box<TermType> },
 }
 
 /// A symbolic algebraic expression with HDC encoding
@@ -80,7 +77,8 @@ pub struct SymbolicExpr {
 impl SymbolicExpr {
     /// Create a constant expression
     pub fn constant(value: i64, primitives: &PrimitiveSystem) -> Self {
-        let constant_prim = primitives.get("CONSTANT")
+        let constant_prim = primitives
+            .get("CONSTANT")
             .or_else(|| primitives.get("ZERO"))
             .expect("Need CONSTANT or ZERO primitive");
 
@@ -109,12 +107,14 @@ impl SymbolicExpr {
 
     /// Create a variable expression
     pub fn variable(name: &str, primitives: &PrimitiveSystem) -> Self {
-        let var_prim = primitives.get("VARIABLE")
+        let var_prim = primitives
+            .get("VARIABLE")
             .or_else(|| primitives.get("UNKNOWN"))
             .unwrap_or_else(|| primitives.get("ZERO").expect("Need ZERO primitive"));
 
         // Create unique encoding for this variable based on name
-        let name_seed: u64 = name.bytes()
+        let name_seed: u64 = name
+            .bytes()
             .enumerate()
             .map(|(i, b)| (b as u64) << (i % 8))
             .fold(0, |acc, x| acc.wrapping_add(x));
@@ -132,7 +132,8 @@ impl SymbolicExpr {
 
     /// Add two expressions: self + other
     pub fn add(&self, other: &SymbolicExpr, primitives: &PrimitiveSystem) -> Self {
-        let add_prim = primitives.get("ADDITION")
+        let add_prim = primitives
+            .get("ADDITION")
             .or_else(|| primitives.get("ADD"))
             .expect("ADDITION primitive required");
 
@@ -140,7 +141,8 @@ impl SymbolicExpr {
         let combined = BinaryHV::bundle(&[self.encoding, other.encoding]);
         let encoding = add_prim.encoding.bind(&combined);
 
-        let phi = self.phi + other.phi + Self::measure_composition_phi(&self.encoding, &other.encoding);
+        let phi =
+            self.phi + other.phi + Self::measure_composition_phi(&self.encoding, &other.encoding);
 
         Self {
             term_type: TermType::BinaryOp {
@@ -156,14 +158,16 @@ impl SymbolicExpr {
 
     /// Subtract: self - other
     pub fn sub(&self, other: &SymbolicExpr, primitives: &PrimitiveSystem) -> Self {
-        let sub_prim = primitives.get("SUBTRACT")
+        let sub_prim = primitives
+            .get("SUBTRACT")
             .or_else(|| primitives.get("ADD"))
             .expect("SUBTRACT or ADD primitive required");
 
         let combined = BinaryHV::bundle(&[self.encoding, other.encoding]);
         let encoding = sub_prim.encoding.bind(&combined);
 
-        let phi = self.phi + other.phi + Self::measure_composition_phi(&self.encoding, &other.encoding);
+        let phi =
+            self.phi + other.phi + Self::measure_composition_phi(&self.encoding, &other.encoding);
 
         Self {
             term_type: TermType::BinaryOp {
@@ -179,14 +183,17 @@ impl SymbolicExpr {
 
     /// Multiply: self * other
     pub fn mul(&self, other: &SymbolicExpr, primitives: &PrimitiveSystem) -> Self {
-        let mul_prim = primitives.get("MULTIPLICATION")
+        let mul_prim = primitives
+            .get("MULTIPLICATION")
             .or_else(|| primitives.get("MULTIPLY"))
             .expect("MULTIPLICATION primitive required");
 
         // For multiplication, use binding (not bundling) to capture relationship
         let encoding = mul_prim.encoding.bind(&self.encoding).bind(&other.encoding);
 
-        let phi = self.phi + other.phi + Self::measure_composition_phi(&self.encoding, &other.encoding) * 1.5;
+        let phi = self.phi
+            + other.phi
+            + Self::measure_composition_phi(&self.encoding, &other.encoding) * 1.5;
 
         Self {
             term_type: TermType::BinaryOp {
@@ -202,13 +209,16 @@ impl SymbolicExpr {
 
     /// Divide: self / other
     pub fn div(&self, other: &SymbolicExpr, primitives: &PrimitiveSystem) -> Self {
-        let div_prim = primitives.get("DIVIDE")
+        let div_prim = primitives
+            .get("DIVIDE")
             .or_else(|| primitives.get("MULTIPLY"))
             .expect("DIVIDE or MULTIPLY primitive required");
 
         let encoding = div_prim.encoding.bind(&self.encoding).bind(&other.encoding);
 
-        let phi = self.phi + other.phi + Self::measure_composition_phi(&self.encoding, &other.encoding) * 1.3;
+        let phi = self.phi
+            + other.phi
+            + Self::measure_composition_phi(&self.encoding, &other.encoding) * 1.3;
 
         Self {
             term_type: TermType::BinaryOp {
@@ -224,14 +234,17 @@ impl SymbolicExpr {
 
     /// Power: self ^ other
     pub fn pow(&self, other: &SymbolicExpr, primitives: &PrimitiveSystem) -> Self {
-        let pow_prim = primitives.get("POWER")
+        let pow_prim = primitives
+            .get("POWER")
             .or_else(|| primitives.get("MULTIPLY"))
             .or_else(|| primitives.get("MULTIPLICATION"))
             .expect("POWER, MULTIPLY, or MULTIPLICATION primitive required");
 
         let encoding = pow_prim.encoding.bind(&self.encoding).bind(&other.encoding);
 
-        let phi = self.phi + other.phi + Self::measure_composition_phi(&self.encoding, &other.encoding) * 2.0;
+        let phi = self.phi
+            + other.phi
+            + Self::measure_composition_phi(&self.encoding, &other.encoding) * 2.0;
 
         Self {
             term_type: TermType::BinaryOp {
@@ -247,7 +260,8 @@ impl SymbolicExpr {
 
     /// Negate: -self
     pub fn neg(&self, primitives: &PrimitiveSystem) -> Self {
-        let neg_prim = primitives.get("NEGATION")
+        let neg_prim = primitives
+            .get("NEGATION")
             .or_else(|| primitives.get("SUBTRACT"))
             .expect("NEGATION primitive required");
 
@@ -272,7 +286,11 @@ impl SymbolicExpr {
     }
 
     /// Evaluate expression with variable bindings
-    pub fn evaluate(&self, bindings: &HashMap<String, i64>, engine: &mut HybridArithmeticEngine) -> Option<HybridResult> {
+    pub fn evaluate(
+        &self,
+        bindings: &HashMap<String, i64>,
+        engine: &mut HybridArithmeticEngine,
+    ) -> Option<HybridResult> {
         match &self.term_type {
             TermType::Constant(v) => {
                 if *v >= 0 {
@@ -281,20 +299,18 @@ impl SymbolicExpr {
                     // Negative constant - represent as 0 - |v|
                     let abs_result = engine.add((-*v) as u64, 0);
                     Some(HybridResult {
-                        value: *v as u64,  // Will wrap for negative, but track in semantics
+                        value: *v as u64, // Will wrap for negative, but track in semantics
                         ..abs_result
                     })
                 }
             }
-            TermType::Variable(name) => {
-                bindings.get(name).map(|&v| {
-                    if v >= 0 {
-                        engine.add(v as u64, 0)
-                    } else {
-                        engine.add((-v) as u64, 0)
-                    }
-                })
-            }
+            TermType::Variable(name) => bindings.get(name).map(|&v| {
+                if v >= 0 {
+                    engine.add(v as u64, 0)
+                } else {
+                    engine.add((-v) as u64, 0)
+                }
+            }),
             TermType::BinaryOp { op, left, right } => {
                 let left_expr = SymbolicExpr::from_term_type(*left.clone(), &self.encoding);
                 let right_expr = SymbolicExpr::from_term_type(*right.clone(), &self.encoding);
@@ -426,7 +442,8 @@ impl Polynomial {
         }
 
         // Build HDC encoding
-        let poly_prim = primitives.get("POLYNOMIAL")
+        let poly_prim = primitives
+            .get("POLYNOMIAL")
             .or_else(|| primitives.get("ADDITION"))
             .or_else(|| primitives.get("ADD"))
             .expect("Need POLYNOMIAL or ADDITION primitive");
@@ -434,7 +451,8 @@ impl Polynomial {
         let var_encoding = SymbolicExpr::variable(variable, primitives).encoding;
 
         // Encode each term and bundle
-        let term_encodings: Vec<BinaryHV> = coeffs.iter()
+        let term_encodings: Vec<BinaryHV> = coeffs
+            .iter()
             .enumerate()
             .filter(|(_, &c)| c != 0)
             .map(|(degree, &coeff)| {
@@ -519,7 +537,9 @@ impl Polynomial {
         if self.coefficients.len() <= 1 {
             return Self::new(vec![0], &self.variable, primitives);
         }
-        let deriv_coeffs: Vec<i64> = self.coefficients.iter()
+        let deriv_coeffs: Vec<i64> = self
+            .coefficients
+            .iter()
             .enumerate()
             .skip(1)
             .map(|(i, &c)| c * i as i64)
@@ -652,7 +672,8 @@ impl SymbolicAlgebra {
         self.stats.total_phi += result.phi;
 
         // Cache result
-        self.simplify_cache.insert(expr.display.clone(), result.clone());
+        self.simplify_cache
+            .insert(expr.display.clone(), result.clone());
 
         result
     }
@@ -683,7 +704,11 @@ impl SymbolicAlgebra {
                 match op {
                     SymbolicOp::Neg => {
                         // Simplify double negation
-                        if let TermType::UnaryOp { op: SymbolicOp::Neg, operand: inner_operand } = &inner.term_type {
+                        if let TermType::UnaryOp {
+                            op: SymbolicOp::Neg,
+                            operand: inner_operand,
+                        } = &inner.term_type
+                        {
                             return self.simplify_recursive(inner_operand, primitives);
                         }
                         // Simplify negation of constant
@@ -714,9 +739,15 @@ impl SymbolicAlgebra {
         }
     }
 
-    fn simplify_add(&self, left: &SymbolicExpr, right: &SymbolicExpr, primitives: &PrimitiveSystem) -> SymbolicExpr {
+    fn simplify_add(
+        &self,
+        left: &SymbolicExpr,
+        right: &SymbolicExpr,
+        primitives: &PrimitiveSystem,
+    ) -> SymbolicExpr {
         // Constant folding
-        if let (TermType::Constant(l), TermType::Constant(r)) = (&left.term_type, &right.term_type) {
+        if let (TermType::Constant(l), TermType::Constant(r)) = (&left.term_type, &right.term_type)
+        {
             return SymbolicExpr::constant(l + r, primitives);
         }
 
@@ -737,9 +768,15 @@ impl SymbolicAlgebra {
         left.add(right, primitives)
     }
 
-    fn simplify_sub(&self, left: &SymbolicExpr, right: &SymbolicExpr, primitives: &PrimitiveSystem) -> SymbolicExpr {
+    fn simplify_sub(
+        &self,
+        left: &SymbolicExpr,
+        right: &SymbolicExpr,
+        primitives: &PrimitiveSystem,
+    ) -> SymbolicExpr {
         // Constant folding
-        if let (TermType::Constant(l), TermType::Constant(r)) = (&left.term_type, &right.term_type) {
+        if let (TermType::Constant(l), TermType::Constant(r)) = (&left.term_type, &right.term_type)
+        {
             return SymbolicExpr::constant(l - r, primitives);
         }
 
@@ -756,9 +793,15 @@ impl SymbolicAlgebra {
         left.sub(right, primitives)
     }
 
-    fn simplify_mul(&self, left: &SymbolicExpr, right: &SymbolicExpr, primitives: &PrimitiveSystem) -> SymbolicExpr {
+    fn simplify_mul(
+        &self,
+        left: &SymbolicExpr,
+        right: &SymbolicExpr,
+        primitives: &PrimitiveSystem,
+    ) -> SymbolicExpr {
         // Constant folding
-        if let (TermType::Constant(l), TermType::Constant(r)) = (&left.term_type, &right.term_type) {
+        if let (TermType::Constant(l), TermType::Constant(r)) = (&left.term_type, &right.term_type)
+        {
             return SymbolicExpr::constant(l * r, primitives);
         }
 
@@ -789,7 +832,12 @@ impl SymbolicAlgebra {
         left.mul(right, primitives)
     }
 
-    fn simplify_div(&self, left: &SymbolicExpr, right: &SymbolicExpr, primitives: &PrimitiveSystem) -> SymbolicExpr {
+    fn simplify_div(
+        &self,
+        left: &SymbolicExpr,
+        right: &SymbolicExpr,
+        primitives: &PrimitiveSystem,
+    ) -> SymbolicExpr {
         // x / 1 = x
         if let TermType::Constant(1) = right.term_type {
             return left.clone();
@@ -806,7 +854,8 @@ impl SymbolicAlgebra {
         }
 
         // Constant folding for exact division
-        if let (TermType::Constant(l), TermType::Constant(r)) = (&left.term_type, &right.term_type) {
+        if let (TermType::Constant(l), TermType::Constant(r)) = (&left.term_type, &right.term_type)
+        {
             if *r != 0 && l % r == 0 {
                 return SymbolicExpr::constant(l / r, primitives);
             }
@@ -815,7 +864,12 @@ impl SymbolicAlgebra {
         left.div(right, primitives)
     }
 
-    fn simplify_pow(&self, base: &SymbolicExpr, exp: &SymbolicExpr, primitives: &PrimitiveSystem) -> SymbolicExpr {
+    fn simplify_pow(
+        &self,
+        base: &SymbolicExpr,
+        exp: &SymbolicExpr,
+        primitives: &PrimitiveSystem,
+    ) -> SymbolicExpr {
         // x^0 = 1
         if let TermType::Constant(0) = exp.term_type {
             return SymbolicExpr::constant(1, primitives);
@@ -840,7 +894,8 @@ impl SymbolicAlgebra {
 
         // Constant folding
         if let (TermType::Constant(b), TermType::Constant(e)) = (&base.term_type, &exp.term_type) {
-            if *e >= 0 && *e < 20 {  // Reasonable exponent
+            if *e >= 0 && *e < 20 {
+                // Reasonable exponent
                 let result = (*b).pow(*e as u32);
                 return SymbolicExpr::constant(result, primitives);
             }
@@ -864,12 +919,21 @@ impl SymbolicAlgebra {
             TermType::Constant(v) => SymbolicExpr::constant(*v, primitives),
             TermType::Variable(n) => SymbolicExpr::variable(n, primitives),
 
-            TermType::BinaryOp { op: SymbolicOp::Mul, left, right } => {
+            TermType::BinaryOp {
+                op: SymbolicOp::Mul,
+                left,
+                right,
+            } => {
                 let l = self.expand_recursive(left, primitives);
                 let r = self.expand_recursive(right, primitives);
 
                 // Distribute: a * (b + c) = a*b + a*c
-                if let TermType::BinaryOp { op: SymbolicOp::Add, left: b, right: c } = &r.term_type {
+                if let TermType::BinaryOp {
+                    op: SymbolicOp::Add,
+                    left: b,
+                    right: c,
+                } = &r.term_type
+                {
                     let b_expr = self.expand_recursive(b, primitives);
                     let c_expr = self.expand_recursive(c, primitives);
                     let ab = l.mul(&b_expr, primitives);
@@ -878,7 +942,12 @@ impl SymbolicAlgebra {
                 }
 
                 // Distribute: (a + b) * c = a*c + b*c
-                if let TermType::BinaryOp { op: SymbolicOp::Add, left: a, right: b } = &l.term_type {
+                if let TermType::BinaryOp {
+                    op: SymbolicOp::Add,
+                    left: a,
+                    right: b,
+                } = &l.term_type
+                {
                     let a_expr = self.expand_recursive(a, primitives);
                     let b_expr = self.expand_recursive(b, primitives);
                     let ac = a_expr.mul(&r, primitives);
@@ -902,14 +971,15 @@ impl SymbolicAlgebra {
                 }
             }
 
-            TermType::UnaryOp { op: SymbolicOp::Neg, operand } => {
+            TermType::UnaryOp {
+                op: SymbolicOp::Neg,
+                operand,
+            } => {
                 let inner = self.expand_recursive(operand, primitives);
                 inner.neg(primitives)
             }
 
-            TermType::UnaryOp { operand, .. } => {
-                self.expand_recursive(operand, primitives)
-            }
+            TermType::UnaryOp { operand, .. } => self.expand_recursive(operand, primitives),
 
             TermType::Function { name, arg } => {
                 let expanded_arg = self.expand_recursive(arg, primitives);
@@ -933,7 +1003,12 @@ impl SymbolicAlgebra {
     // ========================================================================
 
     /// Add two polynomials
-    pub fn poly_add(&self, p1: &Polynomial, p2: &Polynomial, primitives: &PrimitiveSystem) -> Polynomial {
+    pub fn poly_add(
+        &self,
+        p1: &Polynomial,
+        p2: &Polynomial,
+        primitives: &PrimitiveSystem,
+    ) -> Polynomial {
         let max_len = p1.coefficients.len().max(p2.coefficients.len());
         let mut coeffs = vec![0; max_len];
 
@@ -948,7 +1023,12 @@ impl SymbolicAlgebra {
     }
 
     /// Subtract polynomials: p1 - p2
-    pub fn poly_subtract(&self, p1: &Polynomial, p2: &Polynomial, primitives: &PrimitiveSystem) -> Polynomial {
+    pub fn poly_subtract(
+        &self,
+        p1: &Polynomial,
+        p2: &Polynomial,
+        primitives: &PrimitiveSystem,
+    ) -> Polynomial {
         let max_len = p1.coefficients.len().max(p2.coefficients.len());
         let mut coeffs = vec![0; max_len];
 
@@ -963,7 +1043,12 @@ impl SymbolicAlgebra {
     }
 
     /// Multiply polynomials
-    pub fn poly_multiply(&self, p1: &Polynomial, p2: &Polynomial, primitives: &PrimitiveSystem) -> Polynomial {
+    pub fn poly_multiply(
+        &self,
+        p1: &Polynomial,
+        p2: &Polynomial,
+        primitives: &PrimitiveSystem,
+    ) -> Polynomial {
         if p1.is_zero() || p2.is_zero() {
             return Polynomial::new(vec![0], &p1.variable, primitives);
         }
@@ -1010,7 +1095,7 @@ impl SymbolicAlgebra {
         if b % a == 0 {
             Some(-b / a)
         } else {
-            None  // No integer solution
+            None // No integer solution
         }
     }
 
@@ -1034,20 +1119,21 @@ impl SymbolicAlgebra {
         let discriminant = b * b - 4.0 * a * c;
 
         if discriminant < 0.0 {
-            Vec::new()  // No real solutions
+            Vec::new() // No real solutions
         } else if discriminant.abs() < 1e-10 {
-            vec![-b / (2.0 * a)]  // One solution
+            vec![-b / (2.0 * a)] // One solution
         } else {
             let sqrt_d = discriminant.sqrt();
-            vec![
-                (-b - sqrt_d) / (2.0 * a),
-                (-b + sqrt_d) / (2.0 * a),
-            ]
+            vec![(-b - sqrt_d) / (2.0 * a), (-b + sqrt_d) / (2.0 * a)]
         }
     }
 
     /// Find integer roots of a polynomial using rational root theorem
-    pub fn find_integer_roots(&mut self, p: &Polynomial, engine: &mut HybridArithmeticEngine) -> Vec<i64> {
+    pub fn find_integer_roots(
+        &mut self,
+        p: &Polynomial,
+        engine: &mut HybridArithmeticEngine,
+    ) -> Vec<i64> {
         if p.is_zero() {
             return Vec::new();
         }
@@ -1094,4 +1180,3 @@ impl Default for SymbolicAlgebra {
         Self::new()
     }
 }
-

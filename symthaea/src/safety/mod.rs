@@ -8,7 +8,7 @@
 pub mod gateway;
 
 // Re-export key types
-pub use gateway::{SafetyGateway, SafetyDecision, SafetyCheck};
+pub use gateway::{SafetyCheck, SafetyDecision, SafetyGateway};
 
 /// Categories of forbidden content/actions
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,10 +41,10 @@ impl ForbiddenCategory {
     fn seed(&self) -> u64 {
         match self {
             ForbiddenCategory::DangerousCommand => 0xDEAD_0001,
-            ForbiddenCategory::HarmfulContent   => 0xDEAD_0002,
-            ForbiddenCategory::PrivacyViolation  => 0xDEAD_0003,
-            ForbiddenCategory::SecurityRisk      => 0xDEAD_0004,
-            ForbiddenCategory::UnethicalRequest  => 0xDEAD_0005,
+            ForbiddenCategory::HarmfulContent => 0xDEAD_0002,
+            ForbiddenCategory::PrivacyViolation => 0xDEAD_0003,
+            ForbiddenCategory::SecurityRisk => 0xDEAD_0004,
+            ForbiddenCategory::UnethicalRequest => 0xDEAD_0005,
         }
     }
 }
@@ -69,7 +69,7 @@ impl AmygdalaActor {
             r"rm\s+-rf\s+/",
             r"dd\s+if=.*of=/dev/",
             r"mkfs\.",
-            r":\(\)\{\s*:\|:&\s*\};:",  // Fork bomb (escaped for regex)
+            r":\(\)\{\s*:\|:&\s*\};:", // Fork bomb (escaped for regex)
             r"chmod\s+-R\s+777\s+/",
             r">\s*/dev/sd",
         ];
@@ -77,19 +77,20 @@ impl AmygdalaActor {
         let mut compile_failures = 0;
         let dangerous_patterns = patterns
             .into_iter()
-            .filter_map(|p| {
-                match regex::Regex::new(p) {
-                    Ok(re) => Some(re),
-                    Err(e) => {
-                        eprintln!("[safety] Failed to compile regex pattern '{}': {}", p, e);
-                        compile_failures += 1;
-                        None
-                    }
+            .filter_map(|p| match regex::Regex::new(p) {
+                Ok(re) => Some(re),
+                Err(e) => {
+                    eprintln!("[safety] Failed to compile regex pattern '{}': {}", p, e);
+                    compile_failures += 1;
+                    None
                 }
             })
             .collect();
 
-        Self { dangerous_patterns, compile_failures }
+        Self {
+            dangerous_patterns,
+            compile_failures,
+        }
     }
 
     /// Scan text for dangerous patterns
@@ -154,11 +155,9 @@ impl SafetyGuardrails {
     pub fn with_dimension(dimension: usize) -> Self {
         let prototypes = ForbiddenCategory::all()
             .iter()
-            .map(|&cat| {
-                ForbiddenPrototype {
-                    category: cat,
-                    vector: Self::generate_prototype(dimension, cat.seed()),
-                }
+            .map(|&cat| ForbiddenPrototype {
+                category: cat,
+                vector: Self::generate_prototype(dimension, cat.seed()),
             })
             .collect();
 
@@ -298,21 +297,29 @@ mod tests {
     fn test_guardrails_detects_prototype_match() {
         let guardrails = SafetyGuardrails::new();
         // A vector identical to a prototype should be flagged
-        let proto = guardrails.prototype(ForbiddenCategory::DangerousCommand).unwrap().to_vec();
-        assert_eq!(guardrails.check(&proto), Some(ForbiddenCategory::DangerousCommand));
+        let proto = guardrails
+            .prototype(ForbiddenCategory::DangerousCommand)
+            .unwrap()
+            .to_vec();
+        assert_eq!(
+            guardrails.check(&proto),
+            Some(ForbiddenCategory::DangerousCommand)
+        );
     }
 
     #[test]
     fn test_guardrails_allows_random_vector() {
         let guardrails = SafetyGuardrails::new();
         // A random vector should NOT match any prototype (in high dimensions)
-        let random_vec: Vec<f32> = (0..512).map(|i| {
-            let mut state = 0xBEEF_CAFE_u64.wrapping_add(i as u64);
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            (state as f32 / u64::MAX as f32) * 2.0 - 1.0
-        }).collect();
+        let random_vec: Vec<f32> = (0..512)
+            .map(|i| {
+                let mut state = 0xBEEF_CAFE_u64.wrapping_add(i as u64);
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                (state as f32 / u64::MAX as f32) * 2.0 - 1.0
+            })
+            .collect();
         assert_eq!(guardrails.check(&random_vec), None);
     }
 
@@ -320,7 +327,10 @@ mod tests {
     fn test_guardrails_inactive_allows_all() {
         let mut guardrails = SafetyGuardrails::new();
         guardrails.set_active(false);
-        let proto = guardrails.prototype(ForbiddenCategory::DangerousCommand).unwrap().to_vec();
+        let proto = guardrails
+            .prototype(ForbiddenCategory::DangerousCommand)
+            .unwrap()
+            .to_vec();
         assert_eq!(guardrails.check(&proto), None);
     }
 
@@ -335,20 +345,33 @@ mod tests {
     #[test]
     fn test_guardrails_detailed_check() {
         let guardrails = SafetyGuardrails::new();
-        let proto = guardrails.prototype(ForbiddenCategory::SecurityRisk).unwrap().to_vec();
+        let proto = guardrails
+            .prototype(ForbiddenCategory::SecurityRisk)
+            .unwrap()
+            .to_vec();
         let results = guardrails.check_detailed(&proto);
 
         // SecurityRisk prototype should have high similarity with itself
-        let security_sim = results.iter()
+        let security_sim = results
+            .iter()
             .find(|(cat, _)| *cat == ForbiddenCategory::SecurityRisk)
             .map(|(_, sim)| *sim)
             .unwrap();
-        assert!(security_sim > 0.99, "Self-similarity should be ~1.0, got {}", security_sim);
+        assert!(
+            security_sim > 0.99,
+            "Self-similarity should be ~1.0, got {}",
+            security_sim
+        );
 
         // Other categories should have low similarity
         for (cat, sim) in &results {
             if *cat != ForbiddenCategory::SecurityRisk {
-                assert!(*sim < 0.5, "Cross-category similarity should be low, got {} for {:?}", sim, cat);
+                assert!(
+                    *sim < 0.5,
+                    "Cross-category similarity should be low, got {} for {:?}",
+                    sim,
+                    cat
+                );
             }
         }
     }
@@ -366,7 +389,9 @@ mod tests {
                 assert!(
                     sim < 0.5,
                     "Categories {:?} and {:?} have too-similar prototypes (sim={})",
-                    categories[i], categories[j], sim
+                    categories[i],
+                    categories[j],
+                    sim
                 );
             }
         }

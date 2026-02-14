@@ -4,7 +4,7 @@
 //! enabling behavioral adaptation based on prediction error feedback.
 
 use rand::Rng;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use symthaea_core::genesis::ShakeRng;
 
 use super::flow::ResponseStrategy;
@@ -114,7 +114,9 @@ impl ClosedLearningLoop {
             }
         } else {
             // Greedy: select best Q-value
-            let best_idx = self.q_values.iter()
+            let best_idx = self
+                .q_values
+                .iter()
                 .enumerate()
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|(i, _)| i)
@@ -212,7 +214,9 @@ impl ClosedLearningLoop {
 
     /// Get best strategy according to Q-values
     pub fn best_strategy(&self) -> ResponseStrategy {
-        let best_idx = self.q_values.iter()
+        let best_idx = self
+            .q_values
+            .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)

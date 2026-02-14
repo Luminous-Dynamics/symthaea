@@ -27,11 +27,11 @@
 //! This enables reasoning about energy transformations as
 //! vector operations.
 
-use crate::genesis::GenesisSeed;
-use crate::hdc::unified_hv::ContinuousHV;
 use super::hadrons::Hadrons;
 use super::periodic_table::PeriodicTable;
 use super::standard_model::PHYSICS_DIM;
+use crate::genesis::GenesisSeed;
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 /// Energy scales for comparison
@@ -138,11 +138,7 @@ pub struct NuclearPhysics {
 
 impl NuclearPhysics {
     /// Create nuclear physics system from genesis
-    pub fn from_genesis(
-        genesis: &GenesisSeed,
-        hadrons: &Hadrons,
-        table: &PeriodicTable,
-    ) -> Self {
+    pub fn from_genesis(genesis: &GenesisSeed, hadrons: &Hadrons, table: &PeriodicTable) -> Self {
         // Energy scale vectors
         let chemical_energy = genesis.hv("nuclear::energy::chemical", PHYSICS_DIM);
         let isomeric_energy = genesis.hv("nuclear::energy::isomeric", PHYSICS_DIM);
@@ -188,13 +184,41 @@ impl NuclearPhysics {
     /// Initialize binding energy curve
     fn init_binding_curve() -> Vec<BindingEnergyPoint> {
         vec![
-            BindingEnergyPoint { mass_number: 2, binding_per_nucleon_mev: 1.11, element_symbol: "H" },
-            BindingEnergyPoint { mass_number: 4, binding_per_nucleon_mev: 7.07, element_symbol: "He" },
-            BindingEnergyPoint { mass_number: 12, binding_per_nucleon_mev: 7.68, element_symbol: "C" },
-            BindingEnergyPoint { mass_number: 16, binding_per_nucleon_mev: 7.98, element_symbol: "O" },
-            BindingEnergyPoint { mass_number: 56, binding_per_nucleon_mev: 8.79, element_symbol: "Fe" }, // PEAK
-            BindingEnergyPoint { mass_number: 62, binding_per_nucleon_mev: 8.79, element_symbol: "Ni" },
-            BindingEnergyPoint { mass_number: 238, binding_per_nucleon_mev: 7.57, element_symbol: "U" },
+            BindingEnergyPoint {
+                mass_number: 2,
+                binding_per_nucleon_mev: 1.11,
+                element_symbol: "H",
+            },
+            BindingEnergyPoint {
+                mass_number: 4,
+                binding_per_nucleon_mev: 7.07,
+                element_symbol: "He",
+            },
+            BindingEnergyPoint {
+                mass_number: 12,
+                binding_per_nucleon_mev: 7.68,
+                element_symbol: "C",
+            },
+            BindingEnergyPoint {
+                mass_number: 16,
+                binding_per_nucleon_mev: 7.98,
+                element_symbol: "O",
+            },
+            BindingEnergyPoint {
+                mass_number: 56,
+                binding_per_nucleon_mev: 8.79,
+                element_symbol: "Fe",
+            }, // PEAK
+            BindingEnergyPoint {
+                mass_number: 62,
+                binding_per_nucleon_mev: 8.79,
+                element_symbol: "Ni",
+            },
+            BindingEnergyPoint {
+                mass_number: 238,
+                binding_per_nucleon_mev: 7.57,
+                element_symbol: "U",
+            },
         ]
     }
 
@@ -292,7 +316,8 @@ impl NuclearPhysics {
         // Linear interpolation
         let t = (mass_number - lower.mass_number) as f32
             / (upper.mass_number - lower.mass_number) as f32;
-        lower.binding_per_nucleon_mev + t * (upper.binding_per_nucleon_mev - lower.binding_per_nucleon_mev)
+        lower.binding_per_nucleon_mev
+            + t * (upper.binding_per_nucleon_mev - lower.binding_per_nucleon_mev)
     }
 
     /// Calculate Q-value for fusion reaction
@@ -339,10 +364,10 @@ impl NuclearPhysics {
     pub fn energy_density_comparison(&self) -> ContinuousHV {
         // Bundle all energy scales with weights proportional to log(density)
         let weights = [
-            1.0,   // Chemical: 1 eV baseline
-            5.0,   // Isomeric: ~100 keV
-            6.0,   // Nuclear: ~1 MeV
-            9.0,   // Relativistic: ~1 GeV
+            1.0, // Chemical: 1 eV baseline
+            5.0, // Isomeric: ~100 keV
+            6.0, // Nuclear: ~1 MeV
+            9.0, // Relativistic: ~1 GeV
         ];
 
         ContinuousHV::weighted_bundle(
@@ -358,9 +383,9 @@ impl NuclearPhysics {
 
     /// Get isomer by element and mass number
     pub fn get_isomer(&self, atomic_number: u8, mass_number: u16) -> Option<&NuclearIsomer> {
-        self.isomers.iter().find(|i| {
-            i.atomic_number == atomic_number && i.mass_number == mass_number
-        })
+        self.isomers
+            .iter()
+            .find(|i| i.atomic_number == atomic_number && i.mass_number == mass_number)
     }
 
     /// Encode a nuclear reaction
@@ -403,7 +428,11 @@ impl NuclearPhysics {
     pub fn most_stable_mass_number(&self) -> u16 {
         self.binding_curve
             .iter()
-            .max_by(|a, b| a.binding_per_nucleon_mev.partial_cmp(&b.binding_per_nucleon_mev).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.binding_per_nucleon_mev
+                    .partial_cmp(&b.binding_per_nucleon_mev)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|p| p.mass_number)
             .unwrap_or(56)
     }
@@ -412,7 +441,7 @@ impl NuclearPhysics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::physics::{StandardModel, Hadrons, PeriodicTable};
+    use crate::physics::{Hadrons, PeriodicTable, StandardModel};
 
     fn setup() -> (PeriodicTable, Hadrons, NuclearPhysics, GenesisSeed) {
         let genesis = GenesisSeed::from_phrase("nuclear test");
@@ -441,7 +470,10 @@ mod tests {
         let u_238 = nuclear.binding_energy_per_nucleon(238);
 
         assert!(fe_56 > h_2, "Fe-56 should be more tightly bound than H-2");
-        assert!(fe_56 > u_238, "Fe-56 should be more tightly bound than U-238");
+        assert!(
+            fe_56 > u_238,
+            "Fe-56 should be more tightly bound than U-238"
+        );
         assert!(fe_56 > 8.5, "Fe-56 should have ~8.79 MeV/nucleon");
     }
 
@@ -481,7 +513,10 @@ mod tests {
         assert!(hf_isomer.is_some(), "Hf-178m2 should exist");
 
         let isomer = hf_isomer.unwrap();
-        assert!(isomer.excitation_kev > 2000.0, "Hf-178m2 has ~2.4 MeV excitation");
+        assert!(
+            isomer.excitation_kev > 2000.0,
+            "Hf-178m2 has ~2.4 MeV excitation"
+        );
     }
 
     #[test]
@@ -489,7 +524,10 @@ mod tests {
         let (_, _, nuclear, _) = setup();
 
         let most_stable = nuclear.most_stable_mass_number();
-        assert!(most_stable >= 56 && most_stable <= 62, "Most stable should be Fe/Ni region");
+        assert!(
+            most_stable >= 56 && most_stable <= 62,
+            "Most stable should be Fe/Ni region"
+        );
     }
 
     #[test]

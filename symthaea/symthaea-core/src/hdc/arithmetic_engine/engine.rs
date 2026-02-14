@@ -1,10 +1,10 @@
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::verification::VerificationThreshold;
 use super::core_number::HdcNumber;
+use super::verification::VerificationThreshold;
 
 /// Result of an arithmetic operation with full proof trace
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,10 +147,16 @@ impl ArithmeticEngine {
         }
 
         // Clone primitives we need before mutable borrow
-        let add_prim = self.primitives.get("ADDITION")
-            .expect("ADDITION primitive must exist").clone();
-        let succ_prim = self.primitives.get("SUCCESSOR")
-            .expect("SUCCESSOR primitive must exist").clone();
+        let add_prim = self
+            .primitives
+            .get("ADDITION")
+            .expect("ADDITION primitive must exist")
+            .clone();
+        let succ_prim = self
+            .primitives
+            .get("SUCCESSOR")
+            .expect("SUCCESSOR primitive must exist")
+            .clone();
 
         let mut proof = Vec::new();
         let mut total_phi = 0.0;
@@ -180,7 +186,14 @@ impl ArithmeticEngine {
             total_phi += step_phi;
 
             proof.push(ProofStep {
-                description: format!("Apply S (step {}/{}): {} + {} = {}", i + 1, b, a, i + 1, a + i + 1),
+                description: format!(
+                    "Apply S (step {}/{}): {} + {} = {}",
+                    i + 1,
+                    b,
+                    a,
+                    i + 1,
+                    a + i + 1
+                ),
                 primitives_used: vec!["SUCCESSOR".to_string()],
                 transformation: "bind".to_string(),
                 phi: step_phi,
@@ -241,10 +254,15 @@ impl ArithmeticEngine {
         self.stats.total_computations += 1;
         self.stats.total_phi += total_phi;
         self.stats.mean_phi = self.stats.total_phi / self.stats.total_computations as f64;
-        *self.stats.by_operation.entry("add".to_string()).or_insert(0) += 1;
+        *self
+            .stats
+            .by_operation
+            .entry("add".to_string())
+            .or_insert(0) += 1;
 
         // Cache result
-        self.result_cache.insert(cache_key, arithmetic_result.clone());
+        self.result_cache
+            .insert(cache_key, arithmetic_result.clone());
 
         arithmetic_result
     }
@@ -265,10 +283,16 @@ impl ArithmeticEngine {
         }
 
         // Clone primitives we need before mutable borrow
-        let mul_prim = self.primitives.get("MULTIPLICATION")
-            .expect("MULTIPLICATION primitive must exist").clone();
-        let add_prim = self.primitives.get("ADDITION")
-            .expect("ADDITION primitive must exist").clone();
+        let mul_prim = self
+            .primitives
+            .get("MULTIPLICATION")
+            .expect("MULTIPLICATION primitive must exist")
+            .clone();
+        let add_prim = self
+            .primitives
+            .get("ADDITION")
+            .expect("ADDITION primitive must exist")
+            .clone();
 
         let mut proof = Vec::new();
         let mut total_phi = 0.0;
@@ -304,7 +328,14 @@ impl ArithmeticEngine {
             proof.push(ProofStep {
                 description: format!(
                     "Apply {} × S({}) = {} × {} + {} = {} + {} = {}",
-                    a, i, a, i, a, running_value - a, a, running_value
+                    a,
+                    i,
+                    a,
+                    i,
+                    a,
+                    running_value - a,
+                    a,
+                    running_value
                 ),
                 primitives_used: vec!["ADDITION".to_string()],
                 transformation: "bind".to_string(),
@@ -365,10 +396,15 @@ impl ArithmeticEngine {
         self.stats.total_computations += 1;
         self.stats.total_phi += total_phi;
         self.stats.mean_phi = self.stats.total_phi / self.stats.total_computations as f64;
-        *self.stats.by_operation.entry("multiply".to_string()).or_insert(0) += 1;
+        *self
+            .stats
+            .by_operation
+            .entry("multiply".to_string())
+            .or_insert(0) += 1;
 
         // Cache result
-        self.result_cache.insert(cache_key, arithmetic_result.clone());
+        self.result_cache
+            .insert(cache_key, arithmetic_result.clone());
 
         arithmetic_result
     }
@@ -429,9 +465,14 @@ impl ArithmeticEngine {
         self.stats.total_computations += 1;
         self.stats.total_phi += total_phi;
         self.stats.mean_phi = self.stats.total_phi / self.stats.total_computations as f64;
-        *self.stats.by_operation.entry("subtract".to_string()).or_insert(0) += 1;
+        *self
+            .stats
+            .by_operation
+            .entry("subtract".to_string())
+            .or_insert(0) += 1;
 
-        self.result_cache.insert(cache_key, arithmetic_result.clone());
+        self.result_cache
+            .insert(cache_key, arithmetic_result.clone());
 
         Some(arithmetic_result)
     }
@@ -469,8 +510,17 @@ impl ArithmeticEngine {
             total_phi += mul_result.total_phi;
 
             proof.push(ProofStep {
-                description: format!("{}^{} = {}^{} × {} = {} × {} = {}",
-                    base, i + 1, base, i, base, result.value, base, mul_result.result.value),
+                description: format!(
+                    "{}^{} = {}^{} × {} = {} × {} = {}",
+                    base,
+                    i + 1,
+                    base,
+                    i,
+                    base,
+                    result.value,
+                    base,
+                    mul_result.result.value
+                ),
                 primitives_used: vec!["MULTIPLICATION".to_string()],
                 transformation: "bind".to_string(),
                 phi: mul_result.total_phi,
@@ -498,9 +548,14 @@ impl ArithmeticEngine {
         self.stats.total_computations += 1;
         self.stats.total_phi += total_phi;
         self.stats.mean_phi = self.stats.total_phi / self.stats.total_computations as f64;
-        *self.stats.by_operation.entry("power".to_string()).or_insert(0) += 1;
+        *self
+            .stats
+            .by_operation
+            .entry("power".to_string())
+            .or_insert(0) += 1;
 
-        self.result_cache.insert(cache_key, arithmetic_result.clone());
+        self.result_cache
+            .insert(cache_key, arithmetic_result.clone());
 
         arithmetic_result
     }
@@ -538,8 +593,15 @@ impl ArithmeticEngine {
             total_phi += mul_result.total_phi;
 
             proof.push(ProofStep {
-                description: format!("{}! = {} × {}! = {} × {} = {}",
-                    k, k, k - 1, k, result.value, mul_result.result.value),
+                description: format!(
+                    "{}! = {} × {}! = {} × {} = {}",
+                    k,
+                    k,
+                    k - 1,
+                    k,
+                    result.value,
+                    mul_result.result.value
+                ),
                 primitives_used: vec!["MULTIPLICATION".to_string()],
                 transformation: "bind".to_string(),
                 phi: mul_result.total_phi,
@@ -568,9 +630,14 @@ impl ArithmeticEngine {
         self.stats.total_computations += 1;
         self.stats.total_phi += total_phi;
         self.stats.mean_phi = self.stats.total_phi / self.stats.total_computations as f64;
-        *self.stats.by_operation.entry("factorial".to_string()).or_insert(0) += 1;
+        *self
+            .stats
+            .by_operation
+            .entry("factorial".to_string())
+            .or_insert(0) += 1;
 
-        self.result_cache.insert(cache_key, arithmetic_result.clone());
+        self.result_cache
+            .insert(cache_key, arithmetic_result.clone());
 
         arithmetic_result
     }

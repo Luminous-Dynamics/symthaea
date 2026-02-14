@@ -7,8 +7,8 @@
 use std::collections::HashMap;
 
 use super::domain_plugin::{
-    DomainPlugin, DomainPrompts, Entity, ErrorDiagnosis as DomainErrorDiagnosis,
-    IntentPrototypes, RiskLevel, ValidationResult,
+    DomainPlugin, DomainPrompts, Entity, ErrorDiagnosis as DomainErrorDiagnosis, IntentPrototypes,
+    RiskLevel, ValidationResult,
 };
 
 // ============================================================================
@@ -17,69 +17,298 @@ use super::domain_plugin::{
 
 /// Keywords that indicate programming domain content
 const PROGRAMMING_KEYWORDS: &[&str] = &[
-    "code", "function", "variable", "class", "method", "object",
-    "array", "string", "integer", "boolean", "float", "type",
-    "compile", "compiler", "runtime", "debug", "debugger",
-    "bug", "error", "exception", "stack trace", "segfault",
-    "syntax", "semantic", "parser", "lexer", "token",
-    "api", "endpoint", "request", "response", "http",
-    "database", "query", "sql", "schema", "migration",
-    "test", "unit test", "integration test", "mock", "assert",
-    "git", "commit", "branch", "merge", "rebase", "pull request",
-    "deploy", "ci/cd", "pipeline", "docker", "container",
-    "algorithm", "data structure", "recursion", "iteration",
-    "loop", "conditional", "if", "else", "switch", "match",
-    "import", "module", "package", "library", "framework",
-    "refactor", "optimize", "performance", "benchmark",
-    "memory", "pointer", "reference", "ownership", "borrow",
-    "async", "await", "thread", "concurrency", "parallel",
-    "interface", "trait", "generic", "template", "polymorphism",
-    "inheritance", "composition", "design pattern", "singleton",
-    "callback", "promise", "future", "closure", "lambda",
-    "ide", "linter", "formatter", "build system", "makefile",
-    "source code", "repository", "dependency", "crate", "gem",
-    "npm", "pip", "cargo", "maven", "gradle",
+    "code",
+    "function",
+    "variable",
+    "class",
+    "method",
+    "object",
+    "array",
+    "string",
+    "integer",
+    "boolean",
+    "float",
+    "type",
+    "compile",
+    "compiler",
+    "runtime",
+    "debug",
+    "debugger",
+    "bug",
+    "error",
+    "exception",
+    "stack trace",
+    "segfault",
+    "syntax",
+    "semantic",
+    "parser",
+    "lexer",
+    "token",
+    "api",
+    "endpoint",
+    "request",
+    "response",
+    "http",
+    "database",
+    "query",
+    "sql",
+    "schema",
+    "migration",
+    "test",
+    "unit test",
+    "integration test",
+    "mock",
+    "assert",
+    "git",
+    "commit",
+    "branch",
+    "merge",
+    "rebase",
+    "pull request",
+    "deploy",
+    "ci/cd",
+    "pipeline",
+    "docker",
+    "container",
+    "algorithm",
+    "data structure",
+    "recursion",
+    "iteration",
+    "loop",
+    "conditional",
+    "if",
+    "else",
+    "switch",
+    "match",
+    "import",
+    "module",
+    "package",
+    "library",
+    "framework",
+    "refactor",
+    "optimize",
+    "performance",
+    "benchmark",
+    "memory",
+    "pointer",
+    "reference",
+    "ownership",
+    "borrow",
+    "async",
+    "await",
+    "thread",
+    "concurrency",
+    "parallel",
+    "interface",
+    "trait",
+    "generic",
+    "template",
+    "polymorphism",
+    "inheritance",
+    "composition",
+    "design pattern",
+    "singleton",
+    "callback",
+    "promise",
+    "future",
+    "closure",
+    "lambda",
+    "ide",
+    "linter",
+    "formatter",
+    "build system",
+    "makefile",
+    "source code",
+    "repository",
+    "dependency",
+    "crate",
+    "gem",
+    "npm",
+    "pip",
+    "cargo",
+    "maven",
+    "gradle",
 ];
 
 /// Programming languages for entity extraction
 const LANGUAGES: &[&str] = &[
-    "rust", "python", "javascript", "typescript", "java", "c++",
-    "c#", "go", "golang", "ruby", "php", "swift", "kotlin",
-    "scala", "haskell", "elixir", "erlang", "clojure", "lisp",
-    "lua", "perl", "r", "matlab", "julia", "fortran",
-    "assembly", "sql", "html", "css", "bash", "shell",
-    "powershell", "zig", "nim", "ocaml", "f#", "dart",
+    "rust",
+    "python",
+    "javascript",
+    "typescript",
+    "java",
+    "c++",
+    "c#",
+    "go",
+    "golang",
+    "ruby",
+    "php",
+    "swift",
+    "kotlin",
+    "scala",
+    "haskell",
+    "elixir",
+    "erlang",
+    "clojure",
+    "lisp",
+    "lua",
+    "perl",
+    "r",
+    "matlab",
+    "julia",
+    "fortran",
+    "assembly",
+    "sql",
+    "html",
+    "css",
+    "bash",
+    "shell",
+    "powershell",
+    "zig",
+    "nim",
+    "ocaml",
+    "f#",
+    "dart",
 ];
 
 /// Common frameworks and tools
 const FRAMEWORKS: &[&str] = &[
-    "react", "angular", "vue", "svelte", "next.js", "nuxt",
-    "django", "flask", "fastapi", "express", "spring",
-    "rails", "laravel", "phoenix", "actix", "axum", "rocket",
-    "tokio", "tensorflow", "pytorch", "pandas", "numpy",
-    "webpack", "vite", "rollup", "esbuild", "turbopack",
-    "kubernetes", "terraform", "ansible", "jenkins", "github actions",
-    "postgres", "mysql", "mongodb", "redis", "elasticsearch",
-    "graphql", "rest", "grpc", "websocket", "oauth",
+    "react",
+    "angular",
+    "vue",
+    "svelte",
+    "next.js",
+    "nuxt",
+    "django",
+    "flask",
+    "fastapi",
+    "express",
+    "spring",
+    "rails",
+    "laravel",
+    "phoenix",
+    "actix",
+    "axum",
+    "rocket",
+    "tokio",
+    "tensorflow",
+    "pytorch",
+    "pandas",
+    "numpy",
+    "webpack",
+    "vite",
+    "rollup",
+    "esbuild",
+    "turbopack",
+    "kubernetes",
+    "terraform",
+    "ansible",
+    "jenkins",
+    "github actions",
+    "postgres",
+    "mysql",
+    "mongodb",
+    "redis",
+    "elasticsearch",
+    "graphql",
+    "rest",
+    "grpc",
+    "websocket",
+    "oauth",
 ];
 
 /// Common programming error patterns
 const ERROR_PATTERNS: &[(&str, &str, &str, RiskLevel)] = &[
-    ("null pointer", "null_reference", "Attempted to use a null/nil reference", RiskLevel::Medium),
-    ("segmentation fault", "segfault", "Memory access violation; check pointer arithmetic and bounds", RiskLevel::High),
-    ("stack overflow", "stack_overflow", "Recursive call depth exceeded; check for infinite recursion", RiskLevel::Medium),
-    ("out of memory", "oom", "Process ran out of memory; reduce allocations or increase limits", RiskLevel::High),
-    ("type mismatch", "type_error", "Incompatible types in expression or assignment", RiskLevel::Low),
-    ("undefined is not", "undefined_access", "Attempted to access property on undefined/null value", RiskLevel::Low),
-    ("cannot find module", "missing_module", "Module or package not found; check imports and installed dependencies", RiskLevel::Low),
-    ("permission denied", "permission", "Insufficient permissions for file or network operation", RiskLevel::Medium),
-    ("connection refused", "connection_error", "Could not connect to server; check the address and whether the service is running", RiskLevel::Low),
-    ("syntax error", "syntax_error", "Invalid syntax; check for missing brackets, semicolons, or typos", RiskLevel::Safe),
-    ("index out of bounds", "index_error", "Array/list index exceeds valid range", RiskLevel::Medium),
-    ("deadlock", "deadlock", "Two or more threads are waiting on each other; review lock ordering", RiskLevel::High),
-    ("race condition", "race_condition", "Concurrent access to shared state without proper synchronization", RiskLevel::High),
-    ("borrow checker", "borrow_error", "Rust borrow checker violation; review ownership and lifetime annotations", RiskLevel::Safe),
-    ("lifetime", "lifetime_error", "Lifetime mismatch; ensure references do not outlive their referents", RiskLevel::Safe),
+    (
+        "null pointer",
+        "null_reference",
+        "Attempted to use a null/nil reference",
+        RiskLevel::Medium,
+    ),
+    (
+        "segmentation fault",
+        "segfault",
+        "Memory access violation; check pointer arithmetic and bounds",
+        RiskLevel::High,
+    ),
+    (
+        "stack overflow",
+        "stack_overflow",
+        "Recursive call depth exceeded; check for infinite recursion",
+        RiskLevel::Medium,
+    ),
+    (
+        "out of memory",
+        "oom",
+        "Process ran out of memory; reduce allocations or increase limits",
+        RiskLevel::High,
+    ),
+    (
+        "type mismatch",
+        "type_error",
+        "Incompatible types in expression or assignment",
+        RiskLevel::Low,
+    ),
+    (
+        "undefined is not",
+        "undefined_access",
+        "Attempted to access property on undefined/null value",
+        RiskLevel::Low,
+    ),
+    (
+        "cannot find module",
+        "missing_module",
+        "Module or package not found; check imports and installed dependencies",
+        RiskLevel::Low,
+    ),
+    (
+        "permission denied",
+        "permission",
+        "Insufficient permissions for file or network operation",
+        RiskLevel::Medium,
+    ),
+    (
+        "connection refused",
+        "connection_error",
+        "Could not connect to server; check the address and whether the service is running",
+        RiskLevel::Low,
+    ),
+    (
+        "syntax error",
+        "syntax_error",
+        "Invalid syntax; check for missing brackets, semicolons, or typos",
+        RiskLevel::Safe,
+    ),
+    (
+        "index out of bounds",
+        "index_error",
+        "Array/list index exceeds valid range",
+        RiskLevel::Medium,
+    ),
+    (
+        "deadlock",
+        "deadlock",
+        "Two or more threads are waiting on each other; review lock ordering",
+        RiskLevel::High,
+    ),
+    (
+        "race condition",
+        "race_condition",
+        "Concurrent access to shared state without proper synchronization",
+        RiskLevel::High,
+    ),
+    (
+        "borrow checker",
+        "borrow_error",
+        "Rust borrow checker violation; review ownership and lifetime annotations",
+        RiskLevel::Safe,
+    ),
+    (
+        "lifetime",
+        "lifetime_error",
+        "Lifetime mismatch; ensure references do not outlive their referents",
+        RiskLevel::Safe,
+    ),
 ];
 
 // ============================================================================
@@ -110,8 +339,7 @@ impl DomainPlugin for ProgrammingPlugin {
             if lang.len() <= 2 && min_len == 0 {
                 // For 1-2 char language names (r, c#, f#, go), require exact word match
                 for (idx, _) in lower.match_indices(lang) {
-                    let before_ok = idx == 0
-                        || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
+                    let before_ok = idx == 0 || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
                     let after_ok = idx + lang.len() >= lower.len()
                         || !lower.as_bytes()[idx + lang.len()].is_ascii_alphanumeric();
                     if before_ok && after_ok {
@@ -124,8 +352,7 @@ impl DomainPlugin for ProgrammingPlugin {
                 }
             } else {
                 for (idx, _) in lower.match_indices(lang) {
-                    let before_ok = idx == 0
-                        || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
+                    let before_ok = idx == 0 || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
                     let after_ok = idx + lang.len() >= lower.len()
                         || !lower.as_bytes()[idx + lang.len()].is_ascii_alphanumeric();
                     if before_ok && after_ok {
@@ -142,8 +369,7 @@ impl DomainPlugin for ProgrammingPlugin {
         // Extract framework mentions
         for fw in FRAMEWORKS {
             for (idx, _) in lower.match_indices(fw) {
-                let before_ok = idx == 0
-                    || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
+                let before_ok = idx == 0 || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
                 let after_ok = idx + fw.len() >= lower.len()
                     || !lower.as_bytes()[idx + fw.len()].is_ascii_alphanumeric();
                 if before_ok && after_ok {
@@ -175,7 +401,8 @@ impl DomainPlugin for ProgrammingPlugin {
                     }
                     if id_start < paren_pos {
                         let identifier = &text[id_start..paren_pos];
-                        if identifier.len() >= 2 && !identifier.chars().all(|c| c.is_ascii_digit()) {
+                        if identifier.len() >= 2 && !identifier.chars().all(|c| c.is_ascii_digit())
+                        {
                             entities.push(
                                 Entity::new("code_pattern", identifier, id_start, paren_pos)
                                     .with_confidence(0.7)
@@ -192,8 +419,7 @@ impl DomainPlugin for ProgrammingPlugin {
         let error_terms = ["error", "exception", "warning", "panic", "crash", "bug"];
         for term in &error_terms {
             for (idx, _) in lower.match_indices(term) {
-                let before_ok = idx == 0
-                    || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
+                let before_ok = idx == 0 || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
                 let after_ok = idx + term.len() >= lower.len()
                     || !lower.as_bytes()[idx + term.len()].is_ascii_alphanumeric();
                 if before_ok && after_ok {
@@ -214,63 +440,118 @@ impl DomainPlugin for ProgrammingPlugin {
 
         // Programming-specific command intents
         prototypes.command = vec![
-            "write", "create", "implement", "build", "compile",
-            "run", "execute", "test", "debug", "deploy",
-            "install", "update", "refactor", "optimize", "fix",
-            "format", "lint", "review", "merge", "rebase",
-        ].into_iter().map(String::from).collect();
+            "write",
+            "create",
+            "implement",
+            "build",
+            "compile",
+            "run",
+            "execute",
+            "test",
+            "debug",
+            "deploy",
+            "install",
+            "update",
+            "refactor",
+            "optimize",
+            "fix",
+            "format",
+            "lint",
+            "review",
+            "merge",
+            "rebase",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         // Programming-specific question intents
         prototypes.question = vec![
-            "how to", "what does", "why does", "when should",
-            "what is the best way", "how do I", "can I",
-            "what is the difference", "which is better",
-            "how to fix", "what causes", "how to debug",
-            "what library", "what framework",
-        ].into_iter().map(String::from).collect();
+            "how to",
+            "what does",
+            "why does",
+            "when should",
+            "what is the best way",
+            "how do I",
+            "can I",
+            "what is the difference",
+            "which is better",
+            "how to fix",
+            "what causes",
+            "how to debug",
+            "what library",
+            "what framework",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         // Programming-specific complaint intents
         prototypes.complaint = vec![
-            "not compiling", "crashes", "segfault", "memory leak",
-            "slow", "doesn't work", "returns wrong", "type error",
-            "null pointer", "stack overflow", "infinite loop",
-            "race condition", "deadlock",
-        ].into_iter().map(String::from).collect();
+            "not compiling",
+            "crashes",
+            "segfault",
+            "memory leak",
+            "slow",
+            "doesn't work",
+            "returns wrong",
+            "type error",
+            "null pointer",
+            "stack overflow",
+            "infinite loop",
+            "race condition",
+            "deadlock",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         // Custom intents for programming
         let mut custom = HashMap::new();
-        custom.insert("debug".to_string(), vec![
+        custom.insert(
             "debug".to_string(),
-            "fix bug".to_string(),
-            "investigate".to_string(),
-            "trace".to_string(),
-            "breakpoint".to_string(),
-            "stack trace".to_string(),
-            "reproduce".to_string(),
-        ]);
-        custom.insert("explain_code".to_string(), vec![
-            "explain".to_string(),
-            "what does this do".to_string(),
-            "how does this work".to_string(),
-            "walk through".to_string(),
-            "step by step".to_string(),
-        ]);
-        custom.insert("write_code".to_string(), vec![
-            "write".to_string(),
-            "implement".to_string(),
-            "create a function".to_string(),
-            "generate".to_string(),
-            "scaffold".to_string(),
-            "boilerplate".to_string(),
-        ]);
-        custom.insert("refactor".to_string(), vec![
+            vec![
+                "debug".to_string(),
+                "fix bug".to_string(),
+                "investigate".to_string(),
+                "trace".to_string(),
+                "breakpoint".to_string(),
+                "stack trace".to_string(),
+                "reproduce".to_string(),
+            ],
+        );
+        custom.insert(
+            "explain_code".to_string(),
+            vec![
+                "explain".to_string(),
+                "what does this do".to_string(),
+                "how does this work".to_string(),
+                "walk through".to_string(),
+                "step by step".to_string(),
+            ],
+        );
+        custom.insert(
+            "write_code".to_string(),
+            vec![
+                "write".to_string(),
+                "implement".to_string(),
+                "create a function".to_string(),
+                "generate".to_string(),
+                "scaffold".to_string(),
+                "boilerplate".to_string(),
+            ],
+        );
+        custom.insert(
             "refactor".to_string(),
-            "clean up".to_string(),
-            "simplify".to_string(),
-            "restructure".to_string(),
-            "extract method".to_string(),
-            "rename".to_string(),
-        ]);
+            vec![
+                "refactor".to_string(),
+                "clean up".to_string(),
+                "simplify".to_string(),
+                "restructure".to_string(),
+                "extract method".to_string(),
+                "rename".to_string(),
+            ],
+        );
         prototypes.custom = custom;
 
         prototypes
@@ -286,8 +567,7 @@ impl DomainPlugin for ProgrammingPlugin {
             clarification: "Could you provide more details about the code? \
                            Specifically: '{}'"
                 .to_string(),
-            action_confirm: "I'll help you with this programming task: {}"
-                .to_string(),
+            action_confirm: "I'll help you with this programming task: {}".to_string(),
             error_explain: "I found a programming issue: {}. \
                            Here's how to fix it."
                 .to_string(),
@@ -324,7 +604,10 @@ impl DomainPlugin for ProgrammingPlugin {
                     "Compilation error: {}",
                     error_text.lines().next().unwrap_or("unknown")
                 ),
-                suggestion: Some("Read the error message carefully; the compiler often suggests a fix".to_string()),
+                suggestion: Some(
+                    "Read the error message carefully; the compiler often suggests a fix"
+                        .to_string(),
+                ),
                 confidence: 0.7,
                 risk_level: RiskLevel::Safe,
                 location: extract_code_location(&lower),
@@ -376,7 +659,8 @@ impl DomainPlugin for ProgrammingPlugin {
         }
 
         if input.contains("unwrap()") {
-            warnings.push("Using unwrap() can panic at runtime; consider using ? or match".to_string());
+            warnings
+                .push("Using unwrap() can panic at runtime; consider using ? or match".to_string());
             suggestions.push("Replace unwrap() with proper error handling".to_string());
         }
 
@@ -406,9 +690,19 @@ impl DomainPlugin for ProgrammingPlugin {
             if lower.contains(keyword) {
                 keyword_matches += 1;
                 // Strong indicators
-                if ["code", "function", "compile", "debug", "algorithm",
-                    "refactor", "repository", "api", "deploy", "test"]
-                    .contains(keyword)
+                if [
+                    "code",
+                    "function",
+                    "compile",
+                    "debug",
+                    "algorithm",
+                    "refactor",
+                    "repository",
+                    "api",
+                    "deploy",
+                    "test",
+                ]
+                .contains(keyword)
                 {
                     score += 0.3;
                 } else {
@@ -437,8 +731,12 @@ impl DomainPlugin for ProgrammingPlugin {
         }
 
         // Check for code-like patterns
-        if lower.contains("()") || lower.contains("{}") || lower.contains("[]")
-            || lower.contains("->") || lower.contains("=>") || lower.contains("::")
+        if lower.contains("()")
+            || lower.contains("{}")
+            || lower.contains("[]")
+            || lower.contains("->")
+            || lower.contains("=>")
+            || lower.contains("::")
         {
             score += 0.2;
         }
@@ -555,7 +853,8 @@ mod tests {
         let plugin = ProgrammingPlugin;
 
         let entities = plugin.extract_entities("I'm writing a Rust function that calls Python");
-        let languages: Vec<&Entity> = entities.iter()
+        let languages: Vec<&Entity> = entities
+            .iter()
             .filter(|e| e.entity_type == "language")
             .collect();
         assert!(languages.iter().any(|e| e.value == "rust"));
@@ -567,7 +866,8 @@ mod tests {
         let plugin = ProgrammingPlugin;
 
         let entities = plugin.extract_entities("Build a REST API with actix and postgres");
-        let frameworks: Vec<&Entity> = entities.iter()
+        let frameworks: Vec<&Entity> = entities
+            .iter()
             .filter(|e| e.entity_type == "framework")
             .collect();
         assert!(frameworks.iter().any(|e| e.value == "actix"));
@@ -587,7 +887,9 @@ mod tests {
     fn test_error_diagnosis() {
         let plugin = ProgrammingPlugin;
 
-        let diag = plugin.diagnose_error("thread 'main' panicked at 'index out of bounds: len is 3 but index is 5'");
+        let diag = plugin.diagnose_error(
+            "thread 'main' panicked at 'index out of bounds: len is 3 but index is 5'",
+        );
         assert!(diag.is_some());
         let diag = diag.unwrap();
         assert_eq!(diag.error_type, "index_error");
@@ -601,7 +903,8 @@ mod tests {
         let plugin = ProgrammingPlugin;
 
         let entities = plugin.extract_entities("Call fetch_data() and process_result(x, y)");
-        let patterns: Vec<&Entity> = entities.iter()
+        let patterns: Vec<&Entity> = entities
+            .iter()
             .filter(|e| e.entity_type == "code_pattern")
             .collect();
         assert!(patterns.iter().any(|e| e.value == "fetch_data"));

@@ -13,8 +13,12 @@ fn test_cached_entropy_consistent() {
     // Second call uses cache
     let h2 = calc.entropy(&hv);
 
-    assert!((h1 - h2).abs() < 1e-10,
-        "Cached entropy should be consistent: {:.6} vs {:.6}", h1, h2);
+    assert!(
+        (h1 - h2).abs() < 1e-10,
+        "Cached entropy should be consistent: {:.6} vs {:.6}",
+        h1,
+        h2
+    );
 
     println!("Cached entropy: {:.6} (consistent)", h1);
 }
@@ -55,7 +59,11 @@ fn test_cache_statistics() {
     }
 
     let (entropy_size, mi_size) = ParallelEntropyCalculator::cache_stats();
-    assert!(entropy_size >= 5, "Cache should have at least 5 entries: {}", entropy_size);
+    assert!(
+        entropy_size >= 5,
+        "Cache should have at least 5 entries: {}",
+        entropy_size
+    );
 
     println!("Cache stats: entropy={}, mi={}", entropy_size, mi_size);
 }

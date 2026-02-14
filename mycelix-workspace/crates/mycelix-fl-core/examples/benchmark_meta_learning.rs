@@ -26,7 +26,9 @@ fn magnitude_attack(id: &str, dim: usize, seed: usize) -> GradientUpdate {
 
 /// Generate direction attack: opposite direction to honest mean
 fn direction_attack(id: &str, dim: usize, _seed: usize) -> GradientUpdate {
-    let gradients: Vec<f32> = (0..dim).map(|i| if i % 2 == 0 { -0.5 } else { 0.5 }).collect();
+    let gradients: Vec<f32> = (0..dim)
+        .map(|i| if i % 2 == 0 { -0.5 } else { 0.5 })
+        .collect();
     GradientUpdate::new(id.into(), 1, gradients, 100, 0.9)
 }
 
@@ -54,18 +56,42 @@ fn main() {
 
     // === Scenario 1: Magnitude Attacks ===
     println!("--- Scenario 1: Magnitude Attack (byz values = ±100) ---\n");
-    run_scenario("magnitude", dim, n_honest, n_byz, total_rounds, reform_round,
-                 config.clone(), |id, dim, seed| magnitude_attack(id, dim, seed));
+    run_scenario(
+        "magnitude",
+        dim,
+        n_honest,
+        n_byz,
+        total_rounds,
+        reform_round,
+        config.clone(),
+        |id, dim, seed| magnitude_attack(id, dim, seed),
+    );
 
     // === Scenario 2: Direction Attacks ===
     println!("\n--- Scenario 2: Direction Attack (opposite to honest mean) ---\n");
-    run_scenario("direction", dim, n_honest, n_byz, total_rounds, reform_round,
-                 config.clone(), |id, dim, seed| direction_attack(id, dim, seed));
+    run_scenario(
+        "direction",
+        dim,
+        n_honest,
+        n_byz,
+        total_rounds,
+        reform_round,
+        config.clone(),
+        |id, dim, seed| direction_attack(id, dim, seed),
+    );
 
     // === Scenario 3: Subtle Attacks ===
     println!("\n--- Scenario 3: Subtle Attack (2x honest magnitude) ---\n");
-    run_scenario("subtle", dim, n_honest, n_byz, total_rounds, reform_round,
-                 config.clone(), |id, dim, seed| subtle_attack(id, dim, seed));
+    run_scenario(
+        "subtle",
+        dim,
+        n_honest,
+        n_byz,
+        total_rounds,
+        reform_round,
+        config.clone(),
+        |id, dim, seed| subtle_attack(id, dim, seed),
+    );
 
     println!("\n=== Verification ===");
 
@@ -91,7 +117,10 @@ fn main() {
     // Test 1: Persistent attackers are suspicious after 15 rounds
     let all_suspicious = (0..n_byz).all(|i| plugin.is_suspicious(&format!("b{}", i)));
     if all_suspicious {
-        println!("[PASS] Test 1: All {} persistent attackers flagged suspicious", n_byz);
+        println!(
+            "[PASS] Test 1: All {} persistent attackers flagged suspicious",
+            n_byz
+        );
         passed += 1;
     } else {
         println!("[FAIL] Test 1: Not all persistent attackers suspicious");
@@ -111,11 +140,16 @@ fn main() {
     let initial_mag = 0.25; // Default from SignalWeights::default()
     let adapted = (w.magnitude - initial_mag).abs() > 0.01;
     if adapted {
-        println!("[PASS] Test 3: Signal weights adapted (magnitude: {:.3} != {:.3})",
-                 w.magnitude, initial_mag);
+        println!(
+            "[PASS] Test 3: Signal weights adapted (magnitude: {:.3} != {:.3})",
+            w.magnitude, initial_mag
+        );
         passed += 1;
     } else {
-        println!("[FAIL] Test 3: Signal weights unchanged: mag={:.3}", w.magnitude);
+        println!(
+            "[FAIL] Test 3: Signal weights unchanged: mag={:.3}",
+            w.magnitude
+        );
     }
 
     // Test 4: Weights still sum to ~1.0
@@ -124,7 +158,10 @@ fn main() {
         println!("[PASS] Test 4: Signal weights sum to {:.4} (≈1.0)", sum);
         passed += 1;
     } else {
-        println!("[FAIL] Test 4: Signal weights sum to {:.4} (expected ≈1.0)", sum);
+        println!(
+            "[FAIL] Test 4: Signal weights sum to {:.4} (expected ≈1.0)",
+            sum
+        );
     }
 
     // Phase 2: 20 more rounds where attackers reform (honest gradients)
@@ -143,12 +180,16 @@ fn main() {
     // Test 5: After 20 honest rounds, exclusion rates should have decayed
     let b0_profile = plugin.get_participant_profile("b0").unwrap();
     if b0_profile.exclusion_rate < 0.15 {
-        println!("[PASS] Test 5: Reformed attacker b0 exclusion rate decayed to {:.4}",
-                 b0_profile.exclusion_rate);
+        println!(
+            "[PASS] Test 5: Reformed attacker b0 exclusion rate decayed to {:.4}",
+            b0_profile.exclusion_rate
+        );
         passed += 1;
     } else {
-        println!("[FAIL] Test 5: b0 exclusion rate still high: {:.4} (expected < 0.15)",
-                 b0_profile.exclusion_rate);
+        println!(
+            "[FAIL] Test 5: b0 exclusion rate still high: {:.4} (expected < 0.15)",
+            b0_profile.exclusion_rate
+        );
     }
 
     println!("\n=== RESULTS: {}/{} passed ===", passed, total_tests);
@@ -171,9 +212,10 @@ fn run_scenario<F>(
 {
     let mut plugin = MetaLearningByzantinePlugin::with_config(config);
 
-    println!("{:<6} {:>6} {:>6} {:>6} {:>6}  {:>8} {:>8} {:>8}  {:>8}",
-             "Round", "Mag", "Dir", "XVal", "Coord",
-             "b0_rate", "b1_rate", "b2_rate", "Phase");
+    println!(
+        "{:<6} {:>6} {:>6} {:>6} {:>6}  {:>8} {:>8} {:>8}  {:>8}",
+        "Round", "Mag", "Dir", "XVal", "Coord", "b0_rate", "b1_rate", "b2_rate", "Phase"
+    );
     println!("{:-<85}", "");
 
     for round in 0..total_rounds {
@@ -182,7 +224,11 @@ fn run_scenario<F>(
             updates.push(honest_update(&format!("h{}", i), dim, i + round));
         }
 
-        let phase = if round < reform_round { "attack" } else { "reform" };
+        let phase = if round < reform_round {
+            "attack"
+        } else {
+            "reform"
+        };
 
         for i in 0..n_byz {
             if round < reform_round {
@@ -204,27 +250,42 @@ fn run_scenario<F>(
 
         // Print signal weights and exclusion rates
         let w = plugin.signal_weights();
-        let rates: Vec<f32> = (0..n_byz.min(3)).map(|i| {
-            plugin.get_participant_profile(&format!("b{}", i))
-                .map(|p| p.exclusion_rate)
-                .unwrap_or(0.0)
-        }).collect();
+        let rates: Vec<f32> = (0..n_byz.min(3))
+            .map(|i| {
+                plugin
+                    .get_participant_profile(&format!("b{}", i))
+                    .map(|p| p.exclusion_rate)
+                    .unwrap_or(0.0)
+            })
+            .collect();
 
-        println!("{:<6} {:>6.3} {:>6.3} {:>6.3} {:>6.3}  {:>8.4} {:>8.4} {:>8.4}  {:>8}",
-                 round + 1,
-                 w.magnitude, w.direction, w.cross_validation, w.coordinate,
-                 rates.first().copied().unwrap_or(0.0),
-                 rates.get(1).copied().unwrap_or(0.0),
-                 rates.get(2).copied().unwrap_or(0.0),
-                 phase);
+        println!(
+            "{:<6} {:>6.3} {:>6.3} {:>6.3} {:>6.3}  {:>8.4} {:>8.4} {:>8.4}  {:>8}",
+            round + 1,
+            w.magnitude,
+            w.direction,
+            w.cross_validation,
+            w.coordinate,
+            rates.first().copied().unwrap_or(0.0),
+            rates.get(1).copied().unwrap_or(0.0),
+            rates.get(2).copied().unwrap_or(0.0),
+            phase
+        );
     }
 
     // Summary
     let w = plugin.signal_weights();
-    println!("\n  {} final weights: mag={:.3} dir={:.3} xval={:.3} coord={:.3}",
-             name, w.magnitude, w.direction, w.cross_validation, w.coordinate);
-    let final_rate = plugin.get_participant_profile("b0")
-        .map(|p| p.exclusion_rate).unwrap_or(0.0);
-    println!("  b0 final exclusion rate: {:.4} (suspicious: {})",
-             final_rate, plugin.is_suspicious("b0"));
+    println!(
+        "\n  {} final weights: mag={:.3} dir={:.3} xval={:.3} coord={:.3}",
+        name, w.magnitude, w.direction, w.cross_validation, w.coordinate
+    );
+    let final_rate = plugin
+        .get_participant_profile("b0")
+        .map(|p| p.exclusion_rate)
+        .unwrap_or(0.0);
+    println!(
+        "  b0 final exclusion rate: {:.4} (suspicious: {})",
+        final_rate,
+        plugin.is_suspicious("b0")
+    );
 }

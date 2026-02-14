@@ -3,8 +3,8 @@
 //! Combines hyperdimensional computing with Liquid Time-Constant dynamics
 //! for neurons that process information in continuous time.
 
-use symthaea_core::hdc::ContinuousHV;
 use serde::{Deserialize, Serialize};
+use symthaea_core::hdc::ContinuousHV;
 
 /// Configuration for HDC-LTC neuron
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,7 +114,14 @@ impl HdcLtcNeuron {
         self.state.tau = adjusted_tau;
 
         // Calculate activation
-        let magnitude: f32 = self.state.hidden.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let magnitude: f32 = self
+            .state
+            .hidden
+            .values
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
         self.state.activation = (magnitude / (self.config.dimension as f32).sqrt()).tanh();
 
         self.state.hidden.clone()
@@ -168,11 +175,13 @@ impl HdcLtcNeuron {
         let recurrent_correlation = self.state.hidden.bind(&self.state.hidden);
         let recurrent_error = recurrent_correlation.bind(error_signal);
         let scaled_recurrent = recurrent_error.scale(self.config.learning_rate * 0.5);
-        self.recurrent_weight = ContinuousHV::bundle_owned(&[self.recurrent_weight.clone(), scaled_recurrent]);
+        self.recurrent_weight =
+            ContinuousHV::bundle_owned(&[self.recurrent_weight.clone(), scaled_recurrent]);
 
         // Accumulate error for monitoring
-        self.state.error_acc = 0.9 * self.state.error_acc +
-            0.1 * error_signal.values.iter().map(|x| x.abs()).sum::<f32>() / error_signal.dim() as f32;
+        self.state.error_acc = 0.9 * self.state.error_acc
+            + 0.1 * error_signal.values.iter().map(|x| x.abs()).sum::<f32>()
+                / error_signal.dim() as f32;
     }
 }
 
@@ -214,9 +223,8 @@ impl HdcLtcLayer {
 
     /// Process input through layer
     pub fn forward(&mut self, input: &ContinuousHV, dt: f32) -> ContinuousHV {
-        let outputs: Vec<ContinuousHV> = self.neurons.iter_mut()
-            .map(|n| n.step(input, dt))
-            .collect();
+        let outputs: Vec<ContinuousHV> =
+            self.neurons.iter_mut().map(|n| n.step(input, dt)).collect();
 
         // Bundle all neuron outputs
         self.output = if outputs.is_empty() {
@@ -230,7 +238,9 @@ impl HdcLtcLayer {
 
     /// CfC closed-form prediction across all neurons in the layer
     pub fn predict_forward(&self, input: &ContinuousHV, horizon: f32) -> ContinuousHV {
-        let predictions: Vec<ContinuousHV> = self.neurons.iter()
+        let predictions: Vec<ContinuousHV> = self
+            .neurons
+            .iter()
             .map(|n| n.predict_forward(input, horizon))
             .collect();
         if predictions.is_empty() {
@@ -270,7 +280,8 @@ pub struct HdcLtcNetwork {
 impl HdcLtcNetwork {
     /// Create new network
     pub fn new(layer_sizes: &[usize], dimension: usize) -> Self {
-        let layers = layer_sizes.iter()
+        let layers = layer_sizes
+            .iter()
             .map(|&size| HdcLtcLayer::new(size, dimension))
             .collect();
 
@@ -337,7 +348,10 @@ mod tests {
         // At horizon=0, prediction should equal current hidden state
         let prediction = neuron.predict_forward(&input, 0.0);
         let sim = prediction.similarity(&neuron.state().hidden);
-        assert!(sim > 0.99, "Zero-horizon prediction should match current state, got sim={sim}");
+        assert!(
+            sim > 0.99,
+            "Zero-horizon prediction should match current state, got sim={sim}"
+        );
     }
 
     #[test]
@@ -353,8 +367,10 @@ mod tests {
         // Far predictions should converge (be more similar to each other than to near)
         let sim_far_vfar = far.similarity(&very_far);
         let sim_near_vfar = near.similarity(&very_far);
-        assert!(sim_far_vfar >= sim_near_vfar,
-            "Far predictions should converge: far-vfar={sim_far_vfar}, near-vfar={sim_near_vfar}");
+        assert!(
+            sim_far_vfar >= sim_near_vfar,
+            "Far predictions should converge: far-vfar={sim_far_vfar}, near-vfar={sim_near_vfar}"
+        );
     }
 
     #[test]

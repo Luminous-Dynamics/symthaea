@@ -13,16 +13,14 @@ pub mod memory_coordinator;
 pub mod semantic_memory;
 
 // Re-export key types
-pub use hippocampus::{
-    HippocampusActor, MemoryTrace, RecallQuery, RecallResult,
-    EmotionalValence, HippocampusStats,
-};
-pub use semantic_memory::{SemanticMemory, SemanticEntry, SemanticMemoryStats};
 pub use episodic_replay::{
-    EpisodicMemory, EpisodicReplayConfig, Episode,
-    EpisodicMemoryStats, ReplaySessionResult,
+    Episode, EpisodicMemory, EpisodicMemoryStats, EpisodicReplayConfig, ReplaySessionResult,
+};
+pub use hippocampus::{
+    EmotionalValence, HippocampusActor, HippocampusStats, MemoryTrace, RecallQuery, RecallResult,
 };
 pub use memory_coordinator::{
-    MemoryCoordinator, CoordinatorConfig, MemorySignals,
-    GraduationEvent, CoordinatorStats, content_hash,
+    content_hash, CoordinatorConfig, CoordinatorStats, GraduationEvent, MemoryCoordinator,
+    MemorySignals,
 };
+pub use semantic_memory::{SemanticEntry, SemanticMemory, SemanticMemoryStats};

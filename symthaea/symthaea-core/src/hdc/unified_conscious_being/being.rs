@@ -3,28 +3,28 @@
 //! Core struct, configuration, statistics, and primary interaction logic.
 //! This is the central integration point that ties all consciousness subsystems together.
 
-use super::do_calculus::{StructuralCausalModel, InterventionResult, CounterfactualResult};
-use super::dialogue::{
-    ConsciousDialogueGenerator, ConsciousResponse, DialogueContext, DialogueStyle,
-};
-use super::super::full_stack_consciousness::{FullStackConsciousness, ConsciousComprehension};
-use super::super::unified_understanding::DeepUnderstanding;
-use super::super::causal_mind::{CausalMind, CausalExplanation, CausalPrediction};
-use super::super::unified_cognitive_core::{UnifiedCognitiveCore, QueryResult as UCEQueryResult};
-use super::super::emotional_depth::EmotionalDepthSystem;
-use super::super::cross_modal_attention_router::CrossModalAttentionRouter;
-use super::super::self_improvement_integration::SelfImprovementSystem;
-use super::super::counterfactual_dreams::CounterfactualDreamEngine;
+use super::super::adaptive_topology::CognitiveMode;
+use super::super::binary_hv::BinaryHV;
+use super::super::causal_mind::{CausalExplanation, CausalMind, CausalPrediction};
+use super::super::consciousness_advanced_cognition::AdvancedCognitionEngine;
 use super::super::consciousness_cross_integration::ConsciousnessIntegrationBridge;
 use super::super::consciousness_feedback_dynamics::FeedbackDynamicsEngine;
 use super::super::consciousness_metacognition::MetacognitionEngine;
-use super::super::consciousness_advanced_cognition::AdvancedCognitionEngine;
-use super::super::adaptive_topology::CognitiveMode;
-use super::super::math_bridge::{UnifiedMathEngine, MathValue, MathResult};
-use super::super::cross_modal_binding::Modality;
+use super::super::counterfactual_dreams::CounterfactualDreamEngine;
+use super::super::cross_modal_attention_router::CrossModalAttentionRouter;
 use super::super::cross_modal_attention_router::ModalityInput;
-use super::super::binary_hv::BinaryHV;
-use crate::physics::simulation_bridge::{PhysicsSimulator, SimulationAnalysis, state_to_binary_hv};
+use super::super::cross_modal_binding::Modality;
+use super::super::emotional_depth::EmotionalDepthSystem;
+use super::super::full_stack_consciousness::{ConsciousComprehension, FullStackConsciousness};
+use super::super::math_bridge::{MathResult, MathValue, UnifiedMathEngine};
+use super::super::self_improvement_integration::SelfImprovementSystem;
+use super::super::unified_cognitive_core::{QueryResult as UCEQueryResult, UnifiedCognitiveCore};
+use super::super::unified_understanding::DeepUnderstanding;
+use super::dialogue::{
+    ConsciousDialogueGenerator, ConsciousResponse, DialogueContext, DialogueStyle,
+};
+use super::do_calculus::{CounterfactualResult, InterventionResult, StructuralCausalModel};
+use crate::physics::simulation_bridge::{state_to_binary_hv, PhysicsSimulator, SimulationAnalysis};
 use std::collections::{HashMap, VecDeque};
 
 /// Complete consciousness integration stats
@@ -131,7 +131,7 @@ pub struct BeingConfig {
 impl Default for BeingConfig {
     fn default() -> Self {
         Self {
-            voice_enabled: false,  // Disabled by default (requires Kokoro)
+            voice_enabled: false, // Disabled by default (requires Kokoro)
             counterfactuals_enabled: true,
             max_memories: 1000,
             dialogue_style: DialogueStyle::Empathetic,
@@ -160,8 +160,7 @@ impl UnifiedConsciousBeing {
     }
 
     pub fn with_config(config: BeingConfig) -> Self {
-        let dialogue = ConsciousDialogueGenerator::new()
-            .with_style(config.dialogue_style);
+        let dialogue = ConsciousDialogueGenerator::new().with_style(config.dialogue_style);
 
         Self {
             full_stack: FullStackConsciousness::new()
@@ -211,7 +210,8 @@ impl UnifiedConsciousBeing {
         self.update_flow_state();
 
         // 3. Update Pearl structural causal model
-        self.causal_model.learn_from_understanding(&comprehension.understanding);
+        self.causal_model
+            .learn_from_understanding(&comprehension.understanding);
 
         // 4. Update HDC-native CausalMind (revolutionary: causality in the vector!)
         self.causal_mind.learn_from_text(input);
@@ -220,8 +220,8 @@ impl UnifiedConsciousBeing {
         self.cognitive_core.learn_from_text(input);
 
         // Aggregate causal edges from all systems
-        self.stats.causal_edges = self.causal_model.equation_count()
-            + self.causal_mind.link_count();
+        self.stats.causal_edges =
+            self.causal_model.equation_count() + self.causal_mind.link_count();
 
         // 6. Perform Pearl do-calculus if causal structure present
         let causal_analysis = self.perform_causal_analysis(&comprehension.understanding);
@@ -272,26 +272,37 @@ impl UnifiedConsciousBeing {
 
         // Flow increases with consistent high phi
         let recent_avg: f64 = self.phi_history.iter().rev().take(5).sum::<f64>() / 5.0;
-        let variance: f64 = self.phi_history.iter().rev().take(5)
+        let variance: f64 = self
+            .phi_history
+            .iter()
+            .rev()
+            .take(5)
             .map(|p| (p - recent_avg).powi(2))
-            .sum::<f64>() / 5.0;
+            .sum::<f64>()
+            / 5.0;
 
         // High average + low variance = flow state
         self.flow_state = (recent_avg as f32 * (1.0 - variance.sqrt() as f32)).clamp(0.0, 1.0);
     }
 
-    fn perform_causal_analysis(&self, understanding: &DeepUnderstanding) -> Option<InterventionResult> {
+    fn perform_causal_analysis(
+        &self,
+        understanding: &DeepUnderstanding,
+    ) -> Option<InterventionResult> {
         let causal = understanding.grounded.causal_structure.as_ref()?;
 
         // Perform do-intervention: what if cause didn't happen?
         Some(self.causal_model.do_intervention(
             &causal.cause,
-            0.0,  // Negate the cause
-            &causal.effect
+            0.0, // Negate the cause
+            &causal.effect,
         ))
     }
 
-    fn perform_pearl_counterfactual(&self, understanding: &DeepUnderstanding) -> Option<CounterfactualResult> {
+    fn perform_pearl_counterfactual(
+        &self,
+        understanding: &DeepUnderstanding,
+    ) -> Option<CounterfactualResult> {
         let causal = understanding.grounded.causal_structure.as_ref()?;
 
         // Build evidence from current state
@@ -303,8 +314,8 @@ impl UnifiedConsciousBeing {
         Some(self.causal_model.counterfactual(
             &evidence,
             &causal.cause,
-            0.0,  // Counterfactual: cause didn't happen
-            &causal.effect
+            0.0, // Counterfactual: cause didn't happen
+            &causal.effect,
         ))
     }
 
@@ -343,7 +354,10 @@ impl UnifiedConsciousBeing {
 
     /// Get causal model size
     pub fn causal_model_size(&self) -> (usize, usize) {
-        (self.causal_model.variable_count(), self.causal_model.equation_count())
+        (
+            self.causal_model.variable_count(),
+            self.causal_model.equation_count(),
+        )
     }
 
     /// Clear history for new conversation
@@ -365,7 +379,8 @@ impl UnifiedConsciousBeing {
         intervention_val: f64,
         target: &str,
     ) -> CounterfactualResult {
-        self.causal_model.counterfactual(&evidence, intervention_var, intervention_val, target)
+        self.causal_model
+            .counterfactual(&evidence, intervention_var, intervention_val, target)
     }
 
     // =========================================================================
@@ -383,7 +398,11 @@ impl UnifiedConsciousBeing {
     }
 
     /// Query CausalMind: What if we intervene on X? (do-calculus in HDC)
-    pub fn causal_query_intervention(&self, concept: &str, min_strength: f64) -> Vec<CausalPrediction> {
+    pub fn causal_query_intervention(
+        &self,
+        concept: &str,
+        min_strength: f64,
+    ) -> Vec<CausalPrediction> {
         self.causal_mind.query_intervention(concept, min_strength)
     }
 
@@ -482,7 +501,12 @@ impl UnifiedConsciousBeing {
     /// consciousness Phi from the being's current state.
     ///
     /// Auto-enables the math bridge if not yet initialized.
-    pub fn conscious_compute(&mut self, op: &str, a: &MathValue, b: &MathValue) -> Option<MathInsight> {
+    pub fn conscious_compute(
+        &mut self,
+        op: &str,
+        a: &MathValue,
+        b: &MathValue,
+    ) -> Option<MathInsight> {
         if self.math_engine.is_none() {
             self.enable_math_bridge();
         }
@@ -549,23 +573,27 @@ impl UnifiedConsciousBeing {
 
         // 3. Sample and encode as BinaryHV
         let step = (result.states.len() / sample_count.max(1)).max(1);
-        let binary_hvs: Vec<BinaryHV> = result.states.iter()
+        let binary_hvs: Vec<BinaryHV> = result
+            .states
+            .iter()
             .step_by(step)
             .take(sample_count)
             .map(|state| state_to_binary_hv(state))
             .collect();
 
         // 4. Route through attention as Proprioceptive (embodied physics)
-        let inputs: Vec<ModalityInput> = binary_hvs.iter().enumerate().map(|(i, hv)| {
-            ModalityInput {
+        let inputs: Vec<ModalityInput> = binary_hvs
+            .iter()
+            .enumerate()
+            .map(|(i, hv)| ModalityInput {
                 modality: Modality::Proprioceptive,
                 hv: *hv,
                 salience: 0.7 + 0.3 * (i as f64 / sample_count.max(1) as f64),
                 confidence: 0.85,
                 timestamp: i as u64,
                 label: Some(format!("{}[t={}]", system_name, i)),
-            }
-        }).collect();
+            })
+            .collect();
 
         let current_phi = self.phi_history.back().copied().unwrap_or(0.5);
         let routing = self.attention_router.route(&inputs, current_phi);

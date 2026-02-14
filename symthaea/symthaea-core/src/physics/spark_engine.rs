@@ -37,14 +37,12 @@
 //! println!("{}", spec.summary());
 //! ```
 
-use crate::genesis::GenesisSeed;
 use super::{
-    StandardModel, Hadrons, PeriodicTable, PhononDynamics,
-    RadiationDamageSystem, FusionReaction,
-    HEADesigner, HEATarget, HighEntropyAlloy,
-    AdvancedMaterials,
-    TriggerProtocol, TriggerMethod,
+    AdvancedMaterials, FusionReaction, HEADesigner, HEATarget, Hadrons, HighEntropyAlloy,
+    PeriodicTable, PhononDynamics, RadiationDamageSystem, StandardModel, TriggerMethod,
+    TriggerProtocol,
 };
+use crate::genesis::GenesisSeed;
 
 /// Target specification for Spark Engine design
 #[derive(Debug, Clone)]
@@ -64,11 +62,11 @@ pub struct SparkTarget {
 impl Default for SparkTarget {
     fn default() -> Self {
         Self {
-            power_kw: 10.0,          // 10 kW residential
-            lifetime_years: 20.0,     // 20 year lifespan
-            cost_tolerance: 0.5,      // Mid-range budget
-            size_class: 0.3,          // Compact
-            safety_level: 0.9,        // Near consumer-grade
+            power_kw: 10.0,       // 10 kW residential
+            lifetime_years: 20.0, // 20 year lifespan
+            cost_tolerance: 0.5,  // Mid-range budget
+            size_class: 0.3,      // Compact
+            safety_level: 0.9,    // Near consumer-grade
         }
     }
 }
@@ -77,7 +75,7 @@ impl SparkTarget {
     /// Industrial-scale power plant
     pub fn industrial() -> Self {
         Self {
-            power_kw: 100_000.0,     // 100 MW
+            power_kw: 100_000.0, // 100 MW
             lifetime_years: 40.0,
             cost_tolerance: 0.8,
             size_class: 1.0,
@@ -88,7 +86,7 @@ impl SparkTarget {
     /// Compact consumer device
     pub fn consumer() -> Self {
         Self {
-            power_kw: 5.0,           // 5 kW home
+            power_kw: 5.0, // 5 kW home
             lifetime_years: 25.0,
             cost_tolerance: 0.3,
             size_class: 0.1,
@@ -227,9 +225,9 @@ impl SparkEngineSpec {
 
         // Determine fusion reaction
         let reaction = if target.safety_level > 0.8 {
-            FusionReaction::DD  // Lower neutron energy, safer
+            FusionReaction::DD // Lower neutron energy, safer
         } else {
-            FusionReaction::DT  // Higher energy density
+            FusionReaction::DT // Higher energy density
         };
 
         let neutron_energy = reaction.neutron_energy_mev().unwrap_or(2.45);
@@ -250,7 +248,8 @@ impl SparkEngineSpec {
         let shell = if let Some(hea) = best_hea {
             if hea.alloy.name.contains("Galinstan") {
                 // Skip liquid for shell, use second best
-                let solid_hea = hea_results.iter()
+                let solid_hea = hea_results
+                    .iter()
                     .find(|r| !r.alloy.name.contains("Galinstan"))
                     .unwrap_or(hea);
                 Self::make_shell_spec(&solid_hea.alloy, &solid_hea.healing, target.lifetime_years)
@@ -259,12 +258,16 @@ impl SparkEngineSpec {
             }
         } else {
             // Fallback to MAX phase
-            let (best_max, _) = advanced.best_max_phase(&damage)
+            let (best_max, _) = advanced
+                .best_max_phase(&damage)
                 .expect("spark_engine: no MAX phase material in advanced_materials catalog");
             ShellSpec {
                 name: best_max.name.clone(),
                 material_type: ShellMaterial::MAXPhase,
-                composition: format!("M{}A{}X{}", best_max.m_element, best_max.a_element, best_max.x_element),
+                composition: format!(
+                    "M{}A{}X{}",
+                    best_max.m_element, best_max.a_element, best_max.x_element
+                ),
                 h_solubility: 0.3, // MAX phases have limited H storage
                 healing_score: best_max.healing_score,
                 lifetime_factor: 5.0,
@@ -273,7 +276,8 @@ impl SparkEngineSpec {
         };
 
         // Select interface layer
-        let (best_laminate, lam_analysis) = advanced.best_nano_laminate(&damage)
+        let (best_laminate, lam_analysis) = advanced
+            .best_nano_laminate(&damage)
             .expect("spark_engine: no nano-laminate material in advanced_materials catalog");
 
         let interface = if lam_analysis.h_compatible {
@@ -315,13 +319,14 @@ impl SparkEngineSpec {
         // Calculate performance metrics
         // Energy density: E_mev × J/MeV × N_A/mol / (fuel_mass_g_per_mol × 1e9 J/GJ)
         let fuel_mass_g_mol = match reaction {
-            FusionReaction::DD => 4.028,    // 2 deuterium atoms
-            FusionReaction::DT => 5.030,    // deuterium + tritium
-            FusionReaction::DHe3 => 5.008,  // deuterium + He-3
-            _ => 5.0,                       // conservative default
+            FusionReaction::DD => 4.028,   // 2 deuterium atoms
+            FusionReaction::DT => 5.030,   // deuterium + tritium
+            FusionReaction::DHe3 => 5.008, // deuterium + He-3
+            _ => 5.0,                      // conservative default
         };
-        let energy_density = reaction.total_energy_mev() * super::constants::MEV_TO_J
-            * super::constants::N_AVOGADRO / (fuel_mass_g_mol * 1e9); // GJ/g
+        let energy_density =
+            reaction.total_energy_mev() * super::constants::MEV_TO_J * super::constants::N_AVOGADRO
+                / (fuel_mass_g_mol * 1e9); // GJ/g
         let fuel_rate = target.power_kw * 3.15e7 / (energy_density * 1e9); // g/year
 
         let lifetime = target.lifetime_years * shell.lifetime_factor.min(100.0) / 10.0;
@@ -335,13 +340,19 @@ impl SparkEngineSpec {
 
         // Notes
         let mut notes = vec![
-            format!("Reaction: {:?} ({:.1} MeV neutrons)", reaction, neutron_energy),
+            format!(
+                "Reaction: {:?} ({:.1} MeV neutrons)",
+                reaction, neutron_energy
+            ),
             format!("Shell healing: {:.0}%", shell.healing_score * 100.0),
         ];
 
         if interface.layer_type != InterfaceType::None {
-            notes.push(format!("Interface: {} (sink eff: {:.0}%)",
-                interface.name, interface.sink_efficiency * 100.0));
+            notes.push(format!(
+                "Interface: {} (sink eff: {:.0}%)",
+                interface.name,
+                interface.sink_efficiency * 100.0
+            ));
         }
 
         if target.safety_level > 0.8 {
@@ -372,7 +383,9 @@ impl SparkEngineSpec {
         let composition = if alloy.elements.is_empty() {
             alloy.name.clone()
         } else {
-            alloy.elements.iter()
+            alloy
+                .elements
+                .iter()
                 .map(|e| format!("{}{:.0}", e.symbol, e.fraction * 100.0))
                 .collect::<Vec<_>>()
                 .join("-")
@@ -401,19 +414,46 @@ impl SparkEngineSpec {
         s.push_str(&format!("{}\n\n", "═".repeat(60)));
 
         s.push_str("  ARCHITECTURE:\n\n");
-        s.push_str(&format!("    Shell:     {} ({:?})\n", self.shell.name, self.shell.material_type));
-        s.push_str(&format!("               Composition: {}\n", self.shell.composition));
-        s.push_str(&format!("               H-Solubility: {:.0}%\n", self.shell.h_solubility * 100.0));
-        s.push_str(&format!("               Thickness: {:.1} mm\n\n", self.shell.thickness_mm));
+        s.push_str(&format!(
+            "    Shell:     {} ({:?})\n",
+            self.shell.name, self.shell.material_type
+        ));
+        s.push_str(&format!(
+            "               Composition: {}\n",
+            self.shell.composition
+        ));
+        s.push_str(&format!(
+            "               H-Solubility: {:.0}%\n",
+            self.shell.h_solubility * 100.0
+        ));
+        s.push_str(&format!(
+            "               Thickness: {:.1} mm\n\n",
+            self.shell.thickness_mm
+        ));
 
         if self.interface.layer_type != InterfaceType::None {
-            s.push_str(&format!("    Interface: {} ({:?})\n", self.interface.name, self.interface.layer_type));
-            s.push_str(&format!("               Thickness: {:.0} nm\n", self.interface.thickness_nm));
-            s.push_str(&format!("               Sink Eff: {:.0}%\n\n", self.interface.sink_efficiency * 100.0));
+            s.push_str(&format!(
+                "    Interface: {} ({:?})\n",
+                self.interface.name, self.interface.layer_type
+            ));
+            s.push_str(&format!(
+                "               Thickness: {:.0} nm\n",
+                self.interface.thickness_nm
+            ));
+            s.push_str(&format!(
+                "               Sink Eff: {:.0}%\n\n",
+                self.interface.sink_efficiency * 100.0
+            ));
         }
 
-        s.push_str(&format!("    Core:      {} ({:?})\n", self.core.name, self.core.core_type));
-        s.push_str(&format!("               Temp: {:.0} K\n\n", self.core.operating_temp_k));
+        s.push_str(&format!(
+            "    Core:      {} ({:?})\n",
+            self.core.name, self.core.core_type
+        ));
+        s.push_str(&format!(
+            "               Temp: {:.0} K\n\n",
+            self.core.operating_temp_k
+        ));
 
         s.push_str("  TRIGGER:\n\n");
         s.push_str(&format!("    Method:    {:?}\n", self.trigger.method));
@@ -427,11 +467,23 @@ impl SparkEngineSpec {
 
         s.push_str("  PERFORMANCE:\n\n");
         s.push_str(&format!("    Power:     {:.1} kW\n", self.power_kw));
-        s.push_str(&format!("    Lifetime:  {:.1} years\n", self.lifetime_years));
-        s.push_str(&format!("    Fuel Rate: {:.4} g/year\n", self.fuel_rate_g_year));
-        s.push_str(&format!("    Energy:    {:.0} GJ/g\n\n", self.energy_density_gj_g));
+        s.push_str(&format!(
+            "    Lifetime:  {:.1} years\n",
+            self.lifetime_years
+        ));
+        s.push_str(&format!(
+            "    Fuel Rate: {:.4} g/year\n",
+            self.fuel_rate_g_year
+        ));
+        s.push_str(&format!(
+            "    Energy:    {:.0} GJ/g\n\n",
+            self.energy_density_gj_g
+        ));
 
-        s.push_str(&format!("  CONFIDENCE: {:.0}%\n\n", self.confidence * 100.0));
+        s.push_str(&format!(
+            "  CONFIDENCE: {:.0}%\n\n",
+            self.confidence * 100.0
+        ));
 
         s.push_str("  NOTES:\n");
         for note in &self.notes {

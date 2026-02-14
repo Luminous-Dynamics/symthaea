@@ -120,7 +120,9 @@ impl HardLocation {
             return 0.0;
         }
 
-        let matches: usize = self.address.iter()
+        let matches: usize = self
+            .address
+            .iter()
             .zip(query.iter())
             .filter(|(a, b)| a == b)
             .count();
@@ -144,16 +146,15 @@ impl HardLocation {
 
     /// Read pattern from this location (threshold counters)
     pub fn read(&self) -> Vec<i8> {
-        self.counters.iter()
+        self.counters
+            .iter()
             .map(|&c| if c > 0 { 1 } else { -1 })
             .collect()
     }
 
     /// Get counter sum for weighted reading
     pub fn counter_sum(&self) -> Vec<i32> {
-        self.counters.iter()
-            .map(|&c| c as i32)
-            .collect()
+        self.counters.iter().map(|&c| c as i32).collect()
     }
 
     /// Reset this location's counters
@@ -348,7 +349,9 @@ impl SparseDistributedMemory {
         if activated_count == 0 {
             WriteResult::NoActivations
         } else {
-            WriteResult::Success { activated: activated_count }
+            WriteResult::Success {
+                activated: activated_count,
+            }
         }
     }
 
@@ -359,7 +362,9 @@ impl SparseDistributedMemory {
     /// of written-to locations is evicted.
     fn evict_oldest(&mut self) {
         // Collect indices of locations that have been written to, sorted by age (oldest first)
-        let mut written_indices: Vec<(usize, u64)> = self.hard_locations.iter()
+        let mut written_indices: Vec<(usize, u64)> = self
+            .hard_locations
+            .iter()
             .enumerate()
             .filter(|(_, loc)| loc.write_count > 0)
             .map(|(i, loc)| (i, loc.last_write_tick))
@@ -383,7 +388,9 @@ impl SparseDistributedMemory {
     ///
     /// Returns the number of locations actually evicted.
     pub fn evict_n_oldest(&mut self, count: usize) -> usize {
-        let mut written_indices: Vec<(usize, u64)> = self.hard_locations.iter()
+        let mut written_indices: Vec<(usize, u64)> = self
+            .hard_locations
+            .iter()
             .enumerate()
             .filter(|(_, loc)| loc.write_count > 0)
             .map(|(i, loc)| (i, loc.last_write_tick))
@@ -443,18 +450,21 @@ impl SparseDistributedMemory {
 
         // Update stats
         self.stats.reads += 1;
-        self.stats.avg_activations =
-            (self.stats.avg_activations * (self.stats.reads - 1) as f32 + activated_count as f32)
+        self.stats.avg_activations = (self.stats.avg_activations * (self.stats.reads - 1) as f32
+            + activated_count as f32)
             / self.stats.reads as f32;
         self.stats.max_activations = self.stats.max_activations.max(activated_count);
 
         if activated_count < self.config.min_activation_count {
             self.stats.read_failures += 1;
-            return ReadResult::InsufficientActivations { count: activated_count };
+            return ReadResult::InsufficientActivations {
+                count: activated_count,
+            };
         }
 
         // Threshold to bipolar
-        let pattern: Vec<i8> = total_counters.iter()
+        let pattern: Vec<i8> = total_counters
+            .iter()
             .map(|&c| if c > 0 { 1 } else { -1 })
             .collect();
 
@@ -532,7 +542,8 @@ impl SparseDistributedMemory {
 
     /// Get number of locations that have been written to
     pub fn locations_used(&self) -> usize {
-        self.hard_locations.iter()
+        self.hard_locations
+            .iter()
             .filter(|loc| loc.write_count > 0)
             .count()
     }
@@ -550,7 +561,11 @@ impl SparseDistributedMemory {
     /// Find most similar stored pattern to query
     pub fn nearest_neighbor(&mut self, query: &[i8]) -> Option<(Vec<i8>, f32)> {
         match self.read(query) {
-            ReadResult::Success { pattern, confidence: _, .. } => {
+            ReadResult::Success {
+                pattern,
+                confidence: _,
+                ..
+            } => {
                 let similarity = hamming_similarity(&pattern, query);
                 Some((pattern, similarity))
             }
@@ -589,15 +604,9 @@ pub enum ReadResult {
 #[derive(Debug, Clone)]
 pub enum IterativeReadResult {
     /// Pattern converged to stable attractor
-    Converged {
-        pattern: Vec<i8>,
-        iterations: usize,
-    },
+    Converged { pattern: Vec<i8>, iterations: usize },
     /// Reached max iterations without convergence
-    MaxIterations {
-        pattern: Vec<i8>,
-        iterations: usize,
-    },
+    MaxIterations { pattern: Vec<i8>, iterations: usize },
     /// Failed to read
     Failed { iterations: usize },
 }
@@ -608,10 +617,7 @@ pub fn hamming_similarity(a: &[i8], b: &[i8]) -> f32 {
         return 0.0;
     }
 
-    let matches: usize = a.iter()
-        .zip(b.iter())
-        .filter(|(x, y)| x == y)
-        .count();
+    let matches: usize = a.iter().zip(b.iter()).filter(|(x, y)| x == y).count();
 
     matches as f32 / a.len() as f32
 }
@@ -721,7 +727,8 @@ impl EpisodicSDM {
     /// Episode IDs are sequential: episode 1 was stored first, episode N last.
     /// `from` and `to` are 1-based episode IDs.
     pub fn query_time_range(&self, from: usize, to: usize) -> Vec<&EpisodeMeta> {
-        self.episodes.iter()
+        self.episodes
+            .iter()
             .filter(|ep| ep.episode_id >= from && ep.episode_id <= to)
             .collect()
     }
@@ -743,7 +750,11 @@ impl EpisodicSDM {
 
         // Read from SDM using the temporal context as cue
         match self.sdm.read(&temporal_context) {
-            ReadResult::Success { pattern, activated, confidence } => {
+            ReadResult::Success {
+                pattern,
+                activated,
+                confidence,
+            } => {
                 // Unbind temporal context to recover content
                 let content = bind_vectors(&pattern, &temporal_context);
                 ReadResult::Success {
@@ -795,10 +806,7 @@ impl EpisodicSDM {
 
 /// Bind two bipolar vectors element-wise
 fn bind_vectors(a: &[i8], b: &[i8]) -> Vec<i8> {
-    a.iter()
-        .zip(b.iter())
-        .map(|(&x, &y)| x * y)
-        .collect()
+    a.iter().zip(b.iter()).map(|(&x, &y)| x * y).collect()
 }
 
 // ============================================================================
@@ -865,7 +873,10 @@ mod tests {
         // Write same pattern again
         loc.write(&pattern);
         let read_back2 = loc.read();
-        assert_eq!(read_back2, pattern, "Multiple writes should reinforce pattern");
+        assert_eq!(
+            read_back2, pattern,
+            "Multiple writes should reinforce pattern"
+        );
     }
 
     #[test]
@@ -881,8 +892,8 @@ mod tests {
         // Use larger SDM for reliable retrieval
         let mut sdm = SparseDistributedMemory::new(SDMConfig {
             dimension: 256,
-            num_hard_locations: 2000,  // More locations for better coverage
-            activation_radius: 0.40,   // Lower threshold for more activations
+            num_hard_locations: 2000, // More locations for better coverage
+            activation_radius: 0.40,  // Lower threshold for more activations
             weighted_read: true,
             min_activation_count: 5,
             max_writes: None,
@@ -903,7 +914,11 @@ mod tests {
         if let ReadResult::Success { pattern, .. } = read_result {
             let similarity = hamming_similarity(&pattern, &data);
             // With 10 writes, should achieve high similarity
-            assert!(similarity > 0.7, "Read similarity {} should be > 0.7", similarity);
+            assert!(
+                similarity > 0.7,
+                "Read similarity {} should be > 0.7",
+                similarity
+            );
         } else {
             // May fail with insufficient activations for small test config
             // That's acceptable for unit test
@@ -935,7 +950,11 @@ mod tests {
         if let ReadResult::Success { pattern, .. } = sdm.read(&noisy_address) {
             let similarity = hamming_similarity(&pattern, &data);
             // Should still recognize with noise (threshold lowered for realistic SDM)
-            assert!(similarity > 0.55, "Noisy read similarity {} should be > 0.55", similarity);
+            assert!(
+                similarity > 0.55,
+                "Noisy read similarity {} should be > 0.55",
+                similarity
+            );
         }
     }
 
@@ -945,8 +964,8 @@ mod tests {
         // Counters only move ±1 per write, so reinforcement is essential
         let mut sdm = SparseDistributedMemory::new(SDMConfig {
             dimension: 256,
-            num_hard_locations: 2000,  // More locations for better coverage
-            activation_radius: 0.40,   // Lower threshold for more activations
+            num_hard_locations: 2000, // More locations for better coverage
+            activation_radius: 0.40,  // Lower threshold for more activations
             weighted_read: true,
             min_activation_count: 5,
             max_writes: None,
@@ -960,10 +979,17 @@ mod tests {
         }
 
         // Should retrieve itself
-        if let ReadResult::Success { pattern: retrieved, .. } = sdm.read(&pattern) {
+        if let ReadResult::Success {
+            pattern: retrieved, ..
+        } = sdm.read(&pattern)
+        {
             let similarity = hamming_similarity(&retrieved, &pattern);
             // With multiple writes, should achieve reasonable similarity
-            assert!(similarity > 0.65, "Auto-associative similarity {} should be > 0.65", similarity);
+            assert!(
+                similarity > 0.65,
+                "Auto-associative similarity {} should be > 0.65",
+                similarity
+            );
         }
         // Note: May fail for small test configs - acceptable for unit test
     }
@@ -980,9 +1006,7 @@ mod tests {
         });
 
         // Store multiple patterns
-        let patterns: Vec<Vec<i8>> = (0..5)
-            .map(|_| random_bipolar_vector(1000))
-            .collect();
+        let patterns: Vec<Vec<i8>> = (0..5).map(|_| random_bipolar_vector(1000)).collect();
 
         for pattern in &patterns {
             sdm.write_auto(pattern);
@@ -993,10 +1017,17 @@ mod tests {
         // Each pattern should be retrievable
         // Note: Single-write patterns may have marginal interference; threshold is relaxed
         for (i, pattern) in patterns.iter().enumerate() {
-            if let ReadResult::Success { pattern: retrieved, .. } = sdm.read(pattern) {
+            if let ReadResult::Success {
+                pattern: retrieved, ..
+            } = sdm.read(pattern)
+            {
                 let similarity = hamming_similarity(&retrieved, pattern);
-                assert!(similarity > 0.45,
-                    "Pattern {} similarity {} should be > 0.45", i, similarity);
+                assert!(
+                    similarity > 0.45,
+                    "Pattern {} similarity {} should be > 0.45",
+                    i,
+                    similarity
+                );
             }
         }
     }
@@ -1025,16 +1056,32 @@ mod tests {
         let result = sdm.iterative_read(&noisy, 10);
 
         match result {
-            IterativeReadResult::Converged { pattern: retrieved, iterations } => {
+            IterativeReadResult::Converged {
+                pattern: retrieved,
+                iterations,
+            } => {
                 let similarity = hamming_similarity(&retrieved, &pattern);
                 // Convergence indicates successful cleanup
-                assert!(similarity > 0.45, "Iterative read should improve similarity, got {}", similarity);
-                println!("Converged in {} iterations, similarity: {}", iterations, similarity);
+                assert!(
+                    similarity > 0.45,
+                    "Iterative read should improve similarity, got {}",
+                    similarity
+                );
+                println!(
+                    "Converged in {} iterations, similarity: {}",
+                    iterations, similarity
+                );
             }
-            IterativeReadResult::MaxIterations { pattern: retrieved, .. } => {
+            IterativeReadResult::MaxIterations {
+                pattern: retrieved, ..
+            } => {
                 let similarity = hamming_similarity(&retrieved, &pattern);
                 // May not fully converge but should still be reasonable
-                assert!(similarity > 0.35, "Max iterations read similarity {} should be > 0.35", similarity);
+                assert!(
+                    similarity > 0.35,
+                    "Max iterations read similarity {} should be > 0.35",
+                    similarity
+                );
             }
             IterativeReadResult::Failed { .. } => {
                 // Acceptable for small test config with limited hard locations
@@ -1095,7 +1142,10 @@ mod tests {
 
         // Should have roughly equal +1 and -1 (with some variance)
         let ones: usize = vec.iter().filter(|&&x| x == 1).count();
-        assert!(ones > 30 && ones < 70, "Random vector should be roughly balanced");
+        assert!(
+            ones > 30 && ones < 70,
+            "Random vector should be roughly balanced"
+        );
     }
 
     #[test]
@@ -1104,7 +1154,8 @@ mod tests {
         let noisy = add_noise(&original, 0.1);
 
         // Should flip approximately 10% of bits
-        let diff: usize = original.iter()
+        let diff: usize = original
+            .iter()
             .zip(noisy.iter())
             .filter(|(a, b)| a != b)
             .count();
@@ -1205,7 +1256,10 @@ mod tests {
         sdm.write_auto(&pattern);
 
         // At least some locations should have last_write_tick == 1
-        let has_tick_1 = sdm.hard_locations.iter().any(|loc| loc.last_write_tick == 1);
+        let has_tick_1 = sdm
+            .hard_locations
+            .iter()
+            .any(|loc| loc.last_write_tick == 1);
         assert!(has_tick_1, "Some locations should be stamped with tick 1");
     }
 
@@ -1235,7 +1289,10 @@ mod tests {
         assert!(evicted <= 10);
 
         let used_after = sdm.locations_used();
-        assert!(used_after < used_before, "Should have fewer used locations after eviction");
+        assert!(
+            used_after < used_before,
+            "Should have fewer used locations after eviction"
+        );
     }
 
     #[test]
@@ -1265,9 +1322,12 @@ mod tests {
         // what it was before (some were evicted, some re-written)
         // The key assertion: eviction ran without panic and writes still work
         assert_eq!(sdm.stats().writes, 6);
-        assert!(sdm.locations_used() <= used_at_capacity,
+        assert!(
+            sdm.locations_used() <= used_at_capacity,
             "Eviction should keep usage in check: {} vs {}",
-            sdm.locations_used(), used_at_capacity);
+            sdm.locations_used(),
+            used_at_capacity
+        );
     }
 
     #[test]
@@ -1291,14 +1351,18 @@ mod tests {
         assert!(used_before > 0, "Some locations should be used");
 
         // Find the minimum tick among used locations (the "oldest")
-        let min_tick = sdm.hard_locations.iter()
+        let min_tick = sdm
+            .hard_locations
+            .iter()
             .filter(|loc| loc.write_count > 0)
             .map(|loc| loc.last_write_tick)
             .min()
             .unwrap();
 
         // Count how many locations have the minimum tick
-        let oldest_count = sdm.hard_locations.iter()
+        let oldest_count = sdm
+            .hard_locations
+            .iter()
             .filter(|loc| loc.last_write_tick == min_tick && loc.write_count > 0)
             .count();
         assert!(oldest_count > 0);
@@ -1309,11 +1373,15 @@ mod tests {
 
         // After eviction, no location should still have the old minimum tick
         // (because eviction targets lowest ticks, and we evicted exactly that many)
-        let remaining_at_min = sdm.hard_locations.iter()
+        let remaining_at_min = sdm
+            .hard_locations
+            .iter()
             .filter(|loc| loc.last_write_tick == min_tick && loc.write_count > 0)
             .count();
-        assert_eq!(remaining_at_min, 0,
-            "Evicted locations should no longer have the oldest tick");
+        assert_eq!(
+            remaining_at_min, 0,
+            "Evicted locations should no longer have the oldest tick"
+        );
     }
 
     // ====================================================================
@@ -1456,9 +1524,7 @@ mod tests {
         };
         let mut episodic = EpisodicSDM::new(config);
 
-        let contents: Vec<Vec<i8>> = (0..5)
-            .map(|_| random_bipolar_vector(100))
-            .collect();
+        let contents: Vec<Vec<i8>> = (0..5).map(|_| random_bipolar_vector(100)).collect();
 
         for c in &contents {
             episodic.store_episode(c);
@@ -1517,8 +1583,8 @@ mod tests {
         use std::time::Instant;
 
         let config = SDMConfig {
-            dimension: 500,  // Reduced from 1000 for faster test
-            num_hard_locations: 500,  // Reduced for faster test
+            dimension: 500,          // Reduced from 1000 for faster test
+            num_hard_locations: 500, // Reduced for faster test
             activation_radius: 0.42,
             weighted_read: true,
             min_activation_count: 3,
@@ -1547,13 +1613,23 @@ mod tests {
         // Debug mode is ~3-4x slower than release
         // CI environments may add additional overhead
         // Threshold: 20s debug (accounts for CI variance), 2s release
-        let threshold = if cfg!(debug_assertions) { 20_000 } else { 2_000 };
+        let threshold = if cfg!(debug_assertions) {
+            20_000
+        } else {
+            2_000
+        };
 
         let total_ms = (write_time + read_time).as_millis();
-        assert!(total_ms < threshold as u128,
-            "SDM operations took {}ms, should be <{}ms", total_ms, threshold);
+        assert!(
+            total_ms < threshold as u128,
+            "SDM operations took {}ms, should be <{}ms",
+            total_ms,
+            threshold
+        );
 
-        println!("✅ SDM Performance: 30 writes in {:?}, 30 reads in {:?}",
-            write_time, read_time);
+        println!(
+            "✅ SDM Performance: 30 writes in {:?}, 30 reads in {:?}",
+            write_time, read_time
+        );
     }
 }

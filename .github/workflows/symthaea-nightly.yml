@@ -147,11 +147,46 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
+  benchmarks:
+    name: Criterion Benchmarks (smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-nightly-bench-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-nightly-bench-
+      - name: Core HDC benchmarks
+        run: cargo bench --bench hdc_benchmarks -- --quick --output-format=bencher 2>&1 | tee /tmp/bench-hdc.txt
+      - name: Quick benchmarks
+        run: cargo bench --bench quick -- --quick --output-format=bencher 2>&1 | tee /tmp/bench-quick.txt
+      - name: Memory benchmarks
+        run: cargo bench --bench memory_benchmark -- --quick --output-format=bencher 2>&1 | tee /tmp/bench-memory.txt
+      - name: Consciousness benchmarks
+        run: cargo bench --bench consciousness -- --quick --output-format=bencher 2>&1 | tee /tmp/bench-consciousness.txt
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: /tmp/bench-*.txt
+          retention-days: 30
+
   test-health:
     name: Test Health Report
     runs-on: ubuntu-latest
     if: always()
-    needs: [slow-tests, doc-tests, integration-tests, perf-tests]
+    needs: [slow-tests, doc-tests, integration-tests, perf-tests, benchmarks]
     defaults:
       run:
         working-directory: symthaea
@@ -177,3 +212,4 @@ jobs:
           echo "| Doc Tests | ${{ needs.doc-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Perf Tests | ${{ needs.perf-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Benchmarks | ${{ needs.benchmarks.result }} |" >> $GITHUB_STEP_SUMMARY

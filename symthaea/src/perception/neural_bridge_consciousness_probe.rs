@@ -296,8 +296,14 @@ impl ConsciousnessProbe {
     /// # Arguments
     /// * `concept` - The concept being probed
     /// * `activation` - LLM hidden state activation vector
-    pub fn probe_concept(&self, concept: &Concept, activation: &[f32]) -> Result<ConceptProbeResult> {
-        let bridge = self.bridge.as_ref()
+    pub fn probe_concept(
+        &self,
+        concept: &Concept,
+        activation: &[f32],
+    ) -> Result<ConceptProbeResult> {
+        let bridge = self
+            .bridge
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Neural bridge not initialized"))?;
 
         // Project to HDC space
@@ -310,7 +316,11 @@ impl ConsciousnessProbe {
     }
 
     /// Probe a concept from a pre-computed BinaryHV vector
-    pub fn probe_concept_from_hv(&self, concept: &Concept, hv: &BinaryHV) -> Result<ConceptProbeResult> {
+    pub fn probe_concept_from_hv(
+        &self,
+        concept: &Concept,
+        hv: &BinaryHV,
+    ) -> Result<ConceptProbeResult> {
         // For single-concept analysis, we create variations via permutation
         // to build a point cloud for topology analysis
         let mut topology = ConsciousnessTopology::new(self.config.topology_config.clone());
@@ -396,7 +406,8 @@ impl ConsciousnessProbe {
         let observed_diff = phen_stats.mean_unity - func_stats.mean_unity;
 
         // Compute Cohen's d
-        let pooled_std = ((phen_stats.std_unity.powi(2) + func_stats.std_unity.powi(2)) / 2.0).sqrt();
+        let pooled_std =
+            ((phen_stats.std_unity.powi(2) + func_stats.std_unity.powi(2)) / 2.0).sqrt();
         let cohens_d = if pooled_std > 0.0 {
             observed_diff / pooled_std
         } else {
@@ -427,7 +438,8 @@ impl ConsciousnessProbe {
 
             // Split and compute difference
             let perm_phen_mean: f64 = permuted[..n_phen].iter().sum::<f64>() / n_phen as f64;
-            let perm_func_mean: f64 = permuted[n_phen..].iter().sum::<f64>() / (all_unity.len() - n_phen) as f64;
+            let perm_func_mean: f64 =
+                permuted[n_phen..].iter().sum::<f64>() / (all_unity.len() - n_phen) as f64;
             let perm_diff = perm_phen_mean - perm_func_mean;
 
             if perm_diff.abs() >= observed_diff.abs() {
@@ -502,14 +514,22 @@ impl ConsciousnessProbe {
         let avg_persistence_a: f64 = if assessment_a.features.is_empty() {
             0.0
         } else {
-            assessment_a.features.iter().map(|f| f.persistence).sum::<f64>()
+            assessment_a
+                .features
+                .iter()
+                .map(|f| f.persistence)
+                .sum::<f64>()
                 / assessment_a.features.len() as f64
         };
 
         let avg_persistence_b: f64 = if assessment_b.features.is_empty() {
             0.0
         } else {
-            assessment_b.features.iter().map(|f| f.persistence).sum::<f64>()
+            assessment_b
+                .features
+                .iter()
+                .map(|f| f.persistence)
+                .sum::<f64>()
                 / assessment_b.features.len() as f64
         };
 
@@ -580,7 +600,7 @@ impl ConsciousnessProbeV2 {
 
     /// Load with custom probe weights path
     pub fn load_with_probe<P: AsRef<Path>>(probe_path: P) -> Result<Self> {
-        use super::neural_bridge_v2::{NeuralBridgeV2Config, NeuralBridgeV2Builder};
+        use super::neural_bridge_v2::{NeuralBridgeV2Builder, NeuralBridgeV2Config};
 
         let bridge = NeuralBridgeV2Builder::new()
             .probe_path(probe_path.as_ref().to_str().unwrap())
@@ -634,7 +654,11 @@ impl ConsciousnessProbeV2 {
     }
 
     /// Probe a concept from a pre-computed BinaryHV vector
-    pub fn probe_concept_from_hv(&self, concept: &Concept, hv: &BinaryHV) -> Result<ConceptProbeResult> {
+    pub fn probe_concept_from_hv(
+        &self,
+        concept: &Concept,
+        hv: &BinaryHV,
+    ) -> Result<ConceptProbeResult> {
         let mut topology = ConsciousnessTopology::new(self.config.topology_config.clone());
 
         // Add the original state
@@ -670,7 +694,10 @@ impl ConsciousnessProbeV2 {
     /// Probe an entire corpus of concepts from their text
     ///
     /// This is the main batch processing entry point.
-    pub fn probe_corpus_texts(&mut self, corpus: &ConceptCorpus) -> Result<Vec<ConceptProbeResult>> {
+    pub fn probe_corpus_texts(
+        &mut self,
+        corpus: &ConceptCorpus,
+    ) -> Result<Vec<ConceptProbeResult>> {
         let mut results = Vec::with_capacity(corpus.len());
 
         for concept in &corpus.concepts {
@@ -706,7 +733,8 @@ impl ConsciousnessProbeV2 {
 
         let observed_diff = phen_stats.mean_unity - func_stats.mean_unity;
 
-        let pooled_std = ((phen_stats.std_unity.powi(2) + func_stats.std_unity.powi(2)) / 2.0).sqrt();
+        let pooled_std =
+            ((phen_stats.std_unity.powi(2) + func_stats.std_unity.powi(2)) / 2.0).sqrt();
         let cohens_d = if pooled_std > 0.0 {
             observed_diff / pooled_std
         } else {
@@ -733,7 +761,8 @@ impl ConsciousnessProbeV2 {
             }
 
             let perm_phen_mean: f64 = permuted[..n_phen].iter().sum::<f64>() / n_phen as f64;
-            let perm_func_mean: f64 = permuted[n_phen..].iter().sum::<f64>() / (all_unity.len() - n_phen) as f64;
+            let perm_func_mean: f64 =
+                permuted[n_phen..].iter().sum::<f64>() / (all_unity.len() - n_phen) as f64;
             let perm_diff = perm_phen_mean - perm_func_mean;
 
             if perm_diff.abs() >= observed_diff.abs() {
@@ -786,7 +815,8 @@ fn packed_to_hv16(packed: &PackedBipolar) -> BinaryHV {
 /// Simple text hash for generating concept IDs
 #[cfg(feature = "neural-bridge")]
 fn hash_text(text: &str) -> u64 {
-    text.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
+    text.bytes()
+        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
 }
 
 #[cfg(test)]
@@ -842,18 +872,20 @@ mod tests {
 
     #[test]
     fn test_compare_classes() {
-        let probe = ConsciousnessProbe::new_without_bridge()
-            .with_config(ProbeConfig {
-                n_permutations: 100, // Fewer for testing
-                ..Default::default()
-            });
+        let probe = ConsciousnessProbe::new_without_bridge().with_config(ProbeConfig {
+            n_permutations: 100, // Fewer for testing
+            ..Default::default()
+        });
 
         // Create mock results with different distributions
         let phenomenal: Vec<ConceptProbeResult> = (0..10)
             .map(|i| {
                 let hv = BinaryHV::random(1000 + i);
                 let mut result = probe
-                    .probe_concept_from_hv(&make_test_concept(&format!("phen_{}", i), "phenomenal"), &hv)
+                    .probe_concept_from_hv(
+                        &make_test_concept(&format!("phen_{}", i), "phenomenal"),
+                        &hv,
+                    )
                     .unwrap();
                 // Artificially increase unity for phenomenal
                 result.unity_score = 0.8 + (i as f64 * 0.01);
@@ -865,7 +897,10 @@ mod tests {
             .map(|i| {
                 let hv = BinaryHV::random(2000 + i);
                 let mut result = probe
-                    .probe_concept_from_hv(&make_test_concept(&format!("func_{}", i), "functional"), &hv)
+                    .probe_concept_from_hv(
+                        &make_test_concept(&format!("func_{}", i), "functional"),
+                        &hv,
+                    )
                     .unwrap();
                 // Artificially decrease unity for functional
                 result.unity_score = 0.4 + (i as f64 * 0.01);

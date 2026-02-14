@@ -6,12 +6,8 @@
 
 use anyhow::Result;
 
-use super::types::{
-    WebResearchResult, IntegrationResult, EpistemicStatus, VerifiedClaim,
-};
-use super::knowledge_graph::{
-    KnowledgeGraph, NodeType, EdgeType, KnowledgeSource, NodeId,
-};
+use super::knowledge_graph::{EdgeType, KnowledgeGraph, KnowledgeSource, NodeId, NodeType};
+use super::types::{EpistemicStatus, IntegrationResult, VerifiedClaim, WebResearchResult};
 
 /// Configuration for knowledge integration
 #[derive(Debug, Clone)]
@@ -164,7 +160,9 @@ impl KnowledgeIntegrator {
 
         // Determine node type based on epistemic status
         let node_type = match claim.status {
-            EpistemicStatus::HighConfidence | EpistemicStatus::ModerateConfidence => NodeType::Claim,
+            EpistemicStatus::HighConfidence | EpistemicStatus::ModerateConfidence => {
+                NodeType::Claim
+            }
             _ => NodeType::Abstract, // Less certain claims are abstract concepts
         };
 
@@ -176,12 +174,9 @@ impl KnowledgeIntegrator {
             KnowledgeSource::External(claim.supporting_sources[0].clone())
         };
 
-        let claim_id = self.knowledge_graph.add_node_with_config(
-            &claim.text,
-            node_type,
-            confidence,
-            source,
-        );
+        let claim_id =
+            self.knowledge_graph
+                .add_node_with_config(&claim.text, node_type, confidence, source);
 
         // Link to source node if provided
         if let Some(source_id) = source_node {
@@ -230,7 +225,8 @@ impl KnowledgeIntegrator {
             .collect();
 
         // Find nodes with similar content
-        let related_nodes: Vec<NodeId> = self.knowledge_graph
+        let related_nodes: Vec<NodeId> = self
+            .knowledge_graph
             .find_nodes(|node| {
                 if node.id == node_id {
                     return false;
@@ -332,8 +328,8 @@ pub struct IntegratorStats {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::types::ResearchSource;
+    use super::*;
 
     fn make_test_claim(text: &str, confidence: f32, status: EpistemicStatus) -> VerifiedClaim {
         VerifiedClaim {
@@ -361,8 +357,16 @@ mod tests {
             epistemic_status: EpistemicStatus::HighConfidence,
             status: super::super::types::ResearchStatus::Success,
             claims: vec![
-                make_test_claim("Rust provides memory safety", 0.95, EpistemicStatus::HighConfidence),
-                make_test_claim("The borrow checker prevents data races", 0.9, EpistemicStatus::ModerateConfidence),
+                make_test_claim(
+                    "Rust provides memory safety",
+                    0.95,
+                    EpistemicStatus::HighConfidence,
+                ),
+                make_test_claim(
+                    "The borrow checker prevents data races",
+                    0.9,
+                    EpistemicStatus::ModerateConfidence,
+                ),
             ],
         };
 
@@ -378,7 +382,8 @@ mod tests {
         let integrator = KnowledgeIntegrator::new();
 
         // Should integrate high confidence claims
-        let good_claim = make_test_claim("Rust is memory safe", 0.9, EpistemicStatus::HighConfidence);
+        let good_claim =
+            make_test_claim("Rust is memory safe", 0.9, EpistemicStatus::HighConfidence);
         assert!(integrator.should_integrate_claim(&good_claim));
 
         // Should not integrate low confidence
@@ -398,9 +403,21 @@ mod tests {
 
         // Integrate multiple related claims
         let claims = vec![
-            make_test_claim("Rust provides memory safety through ownership", 0.9, EpistemicStatus::HighConfidence),
-            make_test_claim("The ownership system tracks memory at compile time", 0.85, EpistemicStatus::ModerateConfidence),
-            make_test_claim("Borrowing allows temporary access to values", 0.88, EpistemicStatus::ModerateConfidence),
+            make_test_claim(
+                "Rust provides memory safety through ownership",
+                0.9,
+                EpistemicStatus::HighConfidence,
+            ),
+            make_test_claim(
+                "The ownership system tracks memory at compile time",
+                0.85,
+                EpistemicStatus::ModerateConfidence,
+            ),
+            make_test_claim(
+                "Borrowing allows temporary access to values",
+                0.88,
+                EpistemicStatus::ModerateConfidence,
+            ),
         ];
 
         for claim in claims {
@@ -423,6 +440,11 @@ mod tests {
 
         // Phi should increase (or at least not decrease significantly)
         // as we add more connected knowledge
-        assert!(final_phi >= initial_phi, "Phi should not decrease: {} vs {}", final_phi, initial_phi);
+        assert!(
+            final_phi >= initial_phi,
+            "Phi should not decrease: {} vs {}",
+            final_phi,
+            initial_phi
+        );
     }
 }

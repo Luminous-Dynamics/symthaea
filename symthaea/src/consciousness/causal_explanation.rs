@@ -27,11 +27,11 @@
 //! This is **causal transparency** - the system's intelligence is interpretable
 //! because it can articulate the causal chain from input to output!
 
-use crate::consciousness::primitive_reasoning::{
-    ReasoningChain, PrimitiveExecution, TransformationType,
-};
 use crate::consciousness::epistemic_tiers::{
-    EpistemicCoordinate, EmpiricalTier, NormativeTier, MaterialityTier,
+    EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier,
+};
+use crate::consciousness::primitive_reasoning::{
+    PrimitiveExecution, ReasoningChain, TransformationType,
 };
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::{Primitive, PrimitiveSystem};
@@ -72,34 +72,22 @@ pub struct CausalRelation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CausalMechanism {
     /// Increases information integration by combining concepts
-    IntegrationIncrease {
-        reason: String,
-    },
+    IntegrationIncrease { reason: String },
 
     /// Decreases fragmentation by creating coherence
-    FragmentationReduction {
-        reason: String,
-    },
+    FragmentationReduction { reason: String },
 
     /// Enables new connections between concepts
-    ConnectionCreation {
-        reason: String,
-    },
+    ConnectionCreation { reason: String },
 
     /// Refines representation to be more precise
-    RepresentationRefinement {
-        reason: String,
-    },
+    RepresentationRefinement { reason: String },
 
     /// Amplifies relevant patterns
-    PatternAmplification {
-        reason: String,
-    },
+    PatternAmplification { reason: String },
 
     /// Other mechanism with custom explanation
-    Other {
-        description: String,
-    },
+    Other { description: String },
 }
 
 /// Evidence supporting a causal claim
@@ -126,15 +114,15 @@ impl CausalRelation {
     pub fn compute_epistemic_tier(&mut self) {
         // E-AXIS: Based on evidence quantity and verification method
         self.epistemic_tier.empirical = if self.evidence.is_empty() {
-            EmpiricalTier::E0Null  // Inferred only, no evidence
+            EmpiricalTier::E0Null // Inferred only, no evidence
         } else if self.evidence.len() == 1 {
-            EmpiricalTier::E1Testimonial  // Single observation
+            EmpiricalTier::E1Testimonial // Single observation
         } else if self.evidence.len() < 10 {
-            EmpiricalTier::E2PrivatelyVerifiable  // Multiple observations
+            EmpiricalTier::E2PrivatelyVerifiable // Multiple observations
         } else if self.has_counterfactual_proof() {
-            EmpiricalTier::E3CryptographicallyProven  // With statistical proof
+            EmpiricalTier::E3CryptographicallyProven // With statistical proof
         } else {
-            EmpiricalTier::E2PrivatelyVerifiable  // Many observations but no proof
+            EmpiricalTier::E2PrivatelyVerifiable // Many observations but no proof
         };
 
         // N-AXIS: For now, always N0 (personal to this system instance)
@@ -144,13 +132,13 @@ impl CausalRelation {
 
         // M-AXIS: Based on confidence and evidence quantity
         self.epistemic_tier.materiality = if self.confidence < 0.3 {
-            MaterialityTier::M0Ephemeral  // Low confidence = ephemeral
+            MaterialityTier::M0Ephemeral // Low confidence = ephemeral
         } else if self.confidence < 0.7 {
-            MaterialityTier::M1Temporal  // Medium confidence = temporal
+            MaterialityTier::M1Temporal // Medium confidence = temporal
         } else if self.evidence.len() > 50 {
-            MaterialityTier::M2Persistent  // High confidence + lots of evidence = persistent
+            MaterialityTier::M2Persistent // High confidence + lots of evidence = persistent
         } else {
-            MaterialityTier::M1Temporal  // Default to temporal
+            MaterialityTier::M1Temporal // Default to temporal
         };
 
         // M3 (Foundational) would be manually set for core consciousness axioms
@@ -244,11 +232,7 @@ impl CausalModel {
     }
 
     /// Learn causal relation from observation
-    pub fn learn_from_execution(
-        &mut self,
-        execution: &PrimitiveExecution,
-        context: &str,
-    ) {
+    pub fn learn_from_execution(&mut self, execution: &PrimitiveExecution, context: &str) {
         let key = (execution.primitive.name.clone(), execution.transformation);
 
         // Compute mechanism before HashMap operation (avoids borrow checker issue)
@@ -265,14 +249,14 @@ impl CausalModel {
                 confidence: 0.0,
                 mechanism,
                 evidence: Vec::new(),
-                epistemic_tier: EpistemicCoordinate::null(),  // Start with null (E0/N0/M0)
+                epistemic_tier: EpistemicCoordinate::null(), // Start with null (E0/N0/M0)
             }
         });
 
         // Add evidence
         let evidence = CausalEvidence {
             context: context.to_string(),
-            phi_before: 0.0,  // Would be tracked from chain
+            phi_before: 0.0, // Would be tracked from chain
             phi_after: execution.phi_contribution,
             effect_size: execution.phi_contribution,
         };
@@ -284,7 +268,7 @@ impl CausalModel {
         relation.phi_effect = (relation.phi_effect * (n - 1.0) + execution.phi_contribution) / n;
 
         // Update confidence (more evidence = higher confidence)
-        relation.confidence = (n / (n + 5.0)).min(0.95);  // Asymptotically approach 0.95
+        relation.confidence = (n / (n + 5.0)).min(0.95); // Asymptotically approach 0.95
 
         // **NEW (#53)**: Automatically compute epistemic tier from evidence!
         relation.compute_epistemic_tier();
@@ -337,7 +321,8 @@ impl CausalModel {
         primitive_name: &str,
         transformation: TransformationType,
     ) -> Option<&CausalRelation> {
-        self.causal_graph.get(&(primitive_name.to_string(), transformation))
+        self.causal_graph
+            .get(&(primitive_name.to_string(), transformation))
     }
 
     /// Explain why a primitive was chosen
@@ -357,7 +342,7 @@ impl CausalModel {
                 confidence: 0.1,
                 mechanism: self.infer_mechanism(&transformation),
                 evidence: Vec::new(),
-                epistemic_tier: EpistemicCoordinate::null(),  // No evidence = E0/N0/M0
+                epistemic_tier: EpistemicCoordinate::null(), // No evidence = E0/N0/M0
             });
 
         // Generate natural language explanation
@@ -371,7 +356,7 @@ impl CausalModel {
         };
 
         CausalExplanation {
-            step_number: 0,  // Will be set by caller
+            step_number: 0, // Will be set by caller
             primitive: primitive.name.clone(),
             transformation,
             causal_relation: relation.clone(),
@@ -410,9 +395,9 @@ impl CausalModel {
             relation.primitive_name,
             relation.transformation,
             effect_description,
-            relation.epistemic_tier.notation(),  // NEW: Show epistemic coordinate
+            relation.epistemic_tier.notation(), // NEW: Show epistemic coordinate
             relation.confidence * 100.0,
-            relation.epistemic_tier.describe(),  // NEW: Full epistemic description
+            relation.epistemic_tier.describe(), // NEW: Full epistemic description
             mechanism_text,
             relation.evidence.len()
         )
@@ -666,38 +651,68 @@ impl CausalMechanismPrimitiveGrounding {
             // IntegrationIncrease: Making many into one coherent whole
             CausalMechanism::IntegrationIncrease { .. } => (
                 "IntegrationIncrease".into(),
-                vec!["DO".into(), "MAKE".into(), "ALL".into(), "ONE".into(), "BECAUSE".into()],
-                1,  // constructive
+                vec![
+                    "DO".into(),
+                    "MAKE".into(),
+                    "ALL".into(),
+                    "ONE".into(),
+                    "BECAUSE".into(),
+                ],
+                1, // constructive
             ),
             // FragmentationReduction: Stopping separation, creating unity
             CausalMechanism::FragmentationReduction { .. } => (
                 "FragmentationReduction".into(),
-                vec!["DO".into(), "NOT".into(), "APART".into(), "SAME".into(), "NOW".into()],
-                1,  // constructive (reduces negative)
+                vec![
+                    "DO".into(),
+                    "NOT".into(),
+                    "APART".into(),
+                    "SAME".into(),
+                    "NOW".into(),
+                ],
+                1, // constructive (reduces negative)
             ),
             // ConnectionCreation: Making new links between concepts
             CausalMechanism::ConnectionCreation { .. } => (
                 "ConnectionCreation".into(),
-                vec!["DO".into(), "MAKE".into(), "ONE".into(), "NEAR".into(), "OTHER".into()],
-                1,  // constructive
+                vec![
+                    "DO".into(),
+                    "MAKE".into(),
+                    "ONE".into(),
+                    "NEAR".into(),
+                    "OTHER".into(),
+                ],
+                1, // constructive
             ),
             // RepresentationRefinement: Improving knowledge precision
             CausalMechanism::RepresentationRefinement { .. } => (
                 "RepresentationRefinement".into(),
-                vec!["DO".into(), "KNOW".into(), "GOOD".into(), "SAME".into(), "THING".into()],
-                0,  // neutral (refinement)
+                vec![
+                    "DO".into(),
+                    "KNOW".into(),
+                    "GOOD".into(),
+                    "SAME".into(),
+                    "THING".into(),
+                ],
+                0, // neutral (refinement)
             ),
             // PatternAmplification: Making patterns stronger/larger
             CausalMechanism::PatternAmplification { .. } => (
                 "PatternAmplification".into(),
-                vec!["DO".into(), "MAKE".into(), "BIG".into(), "SAME".into(), "KIND".into()],
-                1,  // constructive
+                vec![
+                    "DO".into(),
+                    "MAKE".into(),
+                    "BIG".into(),
+                    "SAME".into(),
+                    "KIND".into(),
+                ],
+                1, // constructive
             ),
             // Other: Generic causal mechanism
             CausalMechanism::Other { .. } => (
                 "Other".into(),
                 vec!["DO".into(), "SOMETHING".into(), "BECAUSE".into()],
-                0,  // neutral
+                0, // neutral
             ),
         }
     }
@@ -733,18 +748,29 @@ impl InteractionTypePrimitiveGrounding {
         match interaction {
             // Synergistic: Together produces more than sum
             InteractionType::Synergistic => (
-                vec!["TOGETHER".into(), "MORE".into(), "GOOD".into(), "BECAUSE".into()],
-                1,  // amplifying
+                vec![
+                    "TOGETHER".into(),
+                    "MORE".into(),
+                    "GOOD".into(),
+                    "BECAUSE".into(),
+                ],
+                1, // amplifying
             ),
             // Antagonistic: Together produces less than sum
             InteractionType::Antagonistic => (
-                vec!["TOGETHER".into(), "LESS".into(), "BECAUSE".into(), "NOT".into(), "SAME".into()],
+                vec![
+                    "TOGETHER".into(),
+                    "LESS".into(),
+                    "BECAUSE".into(),
+                    "NOT".into(),
+                    "SAME".into(),
+                ],
                 -1, // dampening
             ),
             // Additive: Together equals sum of parts
             InteractionType::Additive => (
                 vec!["TOGETHER".into(), "SAME".into(), "ALL".into()],
-                0,  // neutral
+                0, // neutral
             ),
         }
     }
@@ -767,20 +793,33 @@ impl CausalNSMGrounding {
             InteractionType::Antagonistic,
             InteractionType::Additive,
         ] {
-            interactions.insert(*interaction, InteractionTypePrimitiveGrounding::new(*interaction, system));
+            interactions.insert(
+                *interaction,
+                InteractionTypePrimitiveGrounding::new(*interaction, system),
+            );
         }
 
         Self { interactions }
     }
 
     /// Get grounding for a specific causal mechanism
-    pub fn ground_mechanism(&self, mechanism: &CausalMechanism, system: &PrimitiveSystem) -> CausalMechanismPrimitiveGrounding {
+    pub fn ground_mechanism(
+        &self,
+        mechanism: &CausalMechanism,
+        system: &PrimitiveSystem,
+    ) -> CausalMechanismPrimitiveGrounding {
         CausalMechanismPrimitiveGrounding::for_mechanism(mechanism, system)
     }
 
     /// Query interactions by semantic similarity
-    pub fn query_interactions(&self, query: &BinaryHV, threshold: f32) -> Vec<(&InteractionType, f32)> {
-        let mut results: Vec<_> = self.interactions.iter()
+    pub fn query_interactions(
+        &self,
+        query: &BinaryHV,
+        threshold: f32,
+    ) -> Vec<(&InteractionType, f32)> {
+        let mut results: Vec<_> = self
+            .interactions
+            .iter()
             .map(|(t, g)| (t, g.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
             .collect();
@@ -790,7 +829,8 @@ impl CausalNSMGrounding {
 
     /// Get amplifying interactions (synergistic)
     pub fn amplifying_interactions(&self) -> Vec<&InteractionType> {
-        self.interactions.iter()
+        self.interactions
+            .iter()
             .filter(|(_, g)| g.effect_direction > 0)
             .map(|(t, _)| t)
             .collect()
@@ -798,7 +838,8 @@ impl CausalNSMGrounding {
 
     /// Get dampening interactions (antagonistic)
     pub fn dampening_interactions(&self) -> Vec<&InteractionType> {
-        self.interactions.iter()
+        self.interactions
+            .iter()
             .filter(|(_, g)| g.effect_direction < 0)
             .map(|(t, _)| t)
             .collect()
@@ -816,7 +857,9 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
                 p.encoding
             } else {
                 // Fallback: deterministic random for unknown primitives
-                let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                let seed = name
+                    .bytes()
+                    .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
                 BinaryHV::random(seed)
             }
         })
@@ -839,7 +882,7 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::{BinaryHV, primitive_system::PrimitiveTier};
+    use crate::hdc::{primitive_system::PrimitiveTier, BinaryHV};
 
     #[test]
     fn test_causal_model_creation() {
@@ -896,12 +939,12 @@ mod tests {
         let explanation = explainer.causal_model.generate_explanation(&relation);
         assert!(explanation.contains("TEST"));
         assert!(explanation.contains("Bind"));
-        assert!(explanation.contains("Epistemic Status"));  // NEW: Check epistemic info
+        assert!(explanation.contains("Epistemic Status")); // NEW: Check epistemic info
     }
 
     #[test]
     fn test_epistemic_tier_evolution() {
-        use crate::hdc::{BinaryHV, primitive_system::PrimitiveTier};
+        use crate::hdc::{primitive_system::PrimitiveTier, BinaryHV};
 
         let mut model = CausalModel::new();
 
@@ -926,23 +969,41 @@ mod tests {
 
         // Start: No evidence = E0/N0/M0
         model.learn_from_execution(&execution, "test context 1");
-        let relation = model.get_causal_relation("TEST", TransformationType::Bind).unwrap();
-        assert_eq!(relation.epistemic_tier.empirical, EmpiricalTier::E1Testimonial);
+        let relation = model
+            .get_causal_relation("TEST", TransformationType::Bind)
+            .unwrap();
+        assert_eq!(
+            relation.epistemic_tier.empirical,
+            EmpiricalTier::E1Testimonial
+        );
         assert_eq!(relation.epistemic_tier.normative, NormativeTier::N0Personal);
-        assert_eq!(relation.epistemic_tier.materiality, MaterialityTier::M0Ephemeral);
+        assert_eq!(
+            relation.epistemic_tier.materiality,
+            MaterialityTier::M0Ephemeral
+        );
 
         // Add more evidence: Should upgrade to E2
         for i in 2..=10 {
             model.learn_from_execution(&execution, &format!("test context {}", i));
         }
-        let relation = model.get_causal_relation("TEST", TransformationType::Bind).unwrap();
-        assert_eq!(relation.epistemic_tier.empirical, EmpiricalTier::E2PrivatelyVerifiable);
+        let relation = model
+            .get_causal_relation("TEST", TransformationType::Bind)
+            .unwrap();
+        assert_eq!(
+            relation.epistemic_tier.empirical,
+            EmpiricalTier::E2PrivatelyVerifiable
+        );
 
         // High confidence + many observations: Should upgrade materiality
         for i in 11..=60 {
             model.learn_from_execution(&execution, &format!("test context {}", i));
         }
-        let relation = model.get_causal_relation("TEST", TransformationType::Bind).unwrap();
-        assert_eq!(relation.epistemic_tier.materiality, MaterialityTier::M2Persistent);
+        let relation = model
+            .get_causal_relation("TEST", TransformationType::Bind)
+            .unwrap();
+        assert_eq!(
+            relation.epistemic_tier.materiality,
+            MaterialityTier::M2Persistent
+        );
     }
 }

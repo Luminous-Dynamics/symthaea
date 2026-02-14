@@ -1,8 +1,8 @@
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::PrimitiveSystem;
 use crate::hdc::deterministic_seeds::seed_from_name;
 use crate::hdc::integrated_information::IntegratedInformation;
-use serde::{Serialize, Deserialize};
+use crate::hdc::primitive_system::PrimitiveSystem;
+use serde::{Deserialize, Serialize};
 
 /// A number represented in Hyperdimensional space via Peano construction
 ///
@@ -29,8 +29,7 @@ pub struct HdcNumber {
 impl HdcNumber {
     /// Create zero - the base case
     pub fn zero(primitives: &PrimitiveSystem) -> Self {
-        let zero_prim = primitives.get("ZERO")
-            .expect("ZERO primitive must exist");
+        let zero_prim = primitives.get("ZERO").expect("ZERO primitive must exist");
 
         Self {
             encoding: zero_prim.encoding,
@@ -47,8 +46,7 @@ impl HdcNumber {
     /// Falls back to Peano construction for small values (n <= 16) to
     /// preserve detailed proof traces.
     pub fn from_value(n: u64, primitives: &PrimitiveSystem) -> Self {
-        let zero_prim = primitives.get("ZERO")
-            .expect("ZERO primitive must exist");
+        let zero_prim = primitives.get("ZERO").expect("ZERO primitive must exist");
 
         if n == 0 {
             return Self {
@@ -61,7 +59,8 @@ impl HdcNumber {
 
         // For small values, use Peano construction for detailed proof traces
         if n <= 16 {
-            let succ_prim = primitives.get("SUCCESSOR")
+            let succ_prim = primitives
+                .get("SUCCESSOR")
                 .expect("SUCCESSOR primitive must exist");
 
             let mut encoding = zero_prim.encoding;
@@ -120,7 +119,8 @@ impl HdcNumber {
 
     /// Apply successor to get next number: S(n) = n + 1
     pub fn successor(&self, primitives: &PrimitiveSystem) -> Self {
-        let succ_prim = primitives.get("SUCCESSOR")
+        let succ_prim = primitives
+            .get("SUCCESSOR")
             .expect("SUCCESSOR primitive must exist");
 
         let new_encoding = succ_prim.encoding.bind(&self.encoding);

@@ -22,7 +22,8 @@ fn test_multiple_cycles_reduce_error() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         learning_threshold: 0.0, // Always learn
         ..Default::default()
-    }).unwrap();
+    })
+    .unwrap();
 
     // Run multiple cycles with same input
     let mut errors = Vec::new();
@@ -39,8 +40,10 @@ fn test_multiple_cycles_reduce_error() {
     println!("Second half avg error: {}", second_half_avg);
 
     // Second half should be lower or similar
-    assert!(second_half_avg <= first_half_avg + 0.1,
-        "Error should decrease or stabilize over cycles");
+    assert!(
+        second_half_avg <= first_half_avg + 0.1,
+        "Error should decrease or stabilize over cycles"
+    );
 }
 
 #[test]
@@ -52,7 +55,8 @@ fn test_attention_emergence() {
             ..Default::default()
         },
         ..Default::default()
-    }).unwrap();
+    })
+    .unwrap();
 
     // Run many cycles
     for _ in 0..50 {
@@ -64,10 +68,14 @@ fn test_attention_emergence() {
     println!("Attention variance: {}", stats.attention_variance);
 
     // Attention variance should be finite and non-negative
-    assert!(stats.attention_variance.is_finite(),
-            "Attention variance should be finite");
-    assert!(stats.attention_variance >= 0.0,
-            "Attention variance should be non-negative");
+    assert!(
+        stats.attention_variance.is_finite(),
+        "Attention variance should be finite"
+    );
+    assert!(
+        stats.attention_variance >= 0.0,
+        "Attention variance should be non-negative"
+    );
 }
 
 #[test]
@@ -105,7 +113,8 @@ fn test_consolidation() {
         enable_consolidation: true,
         learning_threshold: 0.0,
         ..Default::default()
-    }).unwrap();
+    })
+    .unwrap();
 
     // Fill buffer with experiences
     for i in 0..20 {
@@ -189,9 +198,9 @@ fn test_flow_state_struct() {
     for _ in 0..10 {
         flow.update(
             ConsciousnessPattern::Focused,
-            0.1,  // Low error
-            0.8,  // High coherence
-            0.7,  // Good confidence
+            0.1, // Low error
+            0.8, // High coherence
+            0.7, // Good confidence
         );
     }
 
@@ -444,9 +453,9 @@ fn test_self_reflection_stagnation_detection() {
 
     // Should detect stagnation or overconfidence
     assert!(
-        reflection.self_assessment == SelfAssessment::Stagnating ||
-        reflection.self_assessment == SelfAssessment::Overconfident ||
-        reflection.self_assessment == SelfAssessment::Learning
+        reflection.self_assessment == SelfAssessment::Stagnating
+            || reflection.self_assessment == SelfAssessment::Overconfident
+            || reflection.self_assessment == SelfAssessment::Learning
     );
 }
 
@@ -570,7 +579,10 @@ fn test_consciousness_snapshot_recommended_actions() {
     // Actions should be a valid collection (even if empty)
     // Each action string should be non-empty if present
     for action in &actions {
-        assert!(!action.is_empty(), "Recommended actions should not contain empty strings");
+        assert!(
+            !action.is_empty(),
+            "Recommended actions should not contain empty strings"
+        );
     }
 }
 
@@ -595,8 +607,14 @@ fn test_consciousness_snapshot_needs_attention() {
 
     // Verify needs_attention returns a valid boolean and phi is finite
     let needs = snapshot.needs_attention();
-    assert!(needs || !needs, "needs_attention should return a valid bool");
-    assert!(snapshot.unified_phi.is_finite(), "Snapshot phi should be finite");
+    assert!(
+        needs || !needs,
+        "needs_attention should return a valid bool"
+    );
+    assert!(
+        snapshot.unified_phi.is_finite(),
+        "Snapshot phi should be finite"
+    );
 }
 
 #[test]
@@ -609,7 +627,10 @@ fn test_consciousness_snapshot_dominant_concern() {
     let concern = snapshot.dominant_concern();
     // If a concern is present, it should be a non-empty string
     if let Some(c) = concern {
-        assert!(!c.is_empty(), "Dominant concern should not be an empty string");
+        assert!(
+            !c.is_empty(),
+            "Dominant concern should not be an empty string"
+        );
     }
 }
 
@@ -655,8 +676,14 @@ fn test_adapted_thresholds_wiring() {
 
     // Verify snapshot reflects adapted thresholds
     let snapshot = service.consciousness_snapshot();
-    assert_eq!(snapshot.flow_threshold, service.adapted_thresholds().flow_error);
-    assert_eq!(snapshot.boredom_threshold, service.adapted_thresholds().boredom);
+    assert_eq!(
+        snapshot.flow_threshold,
+        service.adapted_thresholds().flow_error
+    );
+    assert_eq!(
+        snapshot.boredom_threshold,
+        service.adapted_thresholds().boredom
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -739,9 +766,9 @@ fn test_thalamic_router_routing_stats() {
 
     let (reflex, cortical, deep) = router.routing_stats();
 
-    assert_eq!(reflex, 0.5);     // 2 out of 4
-    assert_eq!(cortical, 0.25);  // 1 out of 4
-    assert_eq!(deep, 0.25);      // 1 out of 4
+    assert_eq!(reflex, 0.5); // 2 out of 4
+    assert_eq!(cortical, 0.25); // 1 out of 4
+    assert_eq!(deep, 0.25); // 1 out of 4
 }
 
 #[test]
@@ -754,7 +781,10 @@ fn test_thalamic_router_from_cycle() {
 
     // Low error, focused, neutral emotion → likely Cortical or Reflex
     let depth2 = router.route_from_cycle(0.1, ConsciousnessPattern::Focused, 0.1);
-    assert!(matches!(depth2, CognitiveDepth::Cortical | CognitiveDepth::Reflex));
+    assert!(matches!(
+        depth2,
+        CognitiveDepth::Cortical | CognitiveDepth::Reflex
+    ));
 }
 
 // -------------------- ActiveInferenceBridge Tests --------------------
@@ -878,9 +908,13 @@ fn test_closed_learning_loop_phi_gating_high() {
     for _ in 0..100 {
         let strategy = loop_.select_strategy(0.8, None);
         // High Φ → integrative mode → favors Exploratory/Detailed
-        assert!(!matches!(strategy, ResponseStrategy::Supportive | ResponseStrategy::Concise)
-            || loop_.last_result.is_some(),
-            "High Φ should shift away from Supportive/Concise");
+        assert!(
+            !matches!(
+                strategy,
+                ResponseStrategy::Supportive | ResponseStrategy::Concise
+            ) || loop_.last_result.is_some(),
+            "High Φ should shift away from Supportive/Concise"
+        );
         break; // Just check first selection
     }
 }
@@ -971,11 +1005,26 @@ fn test_response_strategy_opposite() {
     // Check actual implementation:
     // Detailed <-> Concise (symmetric)
     // Clarifying -> Supportive -> Exploratory -> Clarifying (cycle)
-    assert_eq!(ResponseStrategy::Detailed.opposite(), ResponseStrategy::Concise);
-    assert_eq!(ResponseStrategy::Concise.opposite(), ResponseStrategy::Detailed);
-    assert_eq!(ResponseStrategy::Clarifying.opposite(), ResponseStrategy::Supportive);
-    assert_eq!(ResponseStrategy::Supportive.opposite(), ResponseStrategy::Exploratory);
-    assert_eq!(ResponseStrategy::Exploratory.opposite(), ResponseStrategy::Clarifying);
+    assert_eq!(
+        ResponseStrategy::Detailed.opposite(),
+        ResponseStrategy::Concise
+    );
+    assert_eq!(
+        ResponseStrategy::Concise.opposite(),
+        ResponseStrategy::Detailed
+    );
+    assert_eq!(
+        ResponseStrategy::Clarifying.opposite(),
+        ResponseStrategy::Supportive
+    );
+    assert_eq!(
+        ResponseStrategy::Supportive.opposite(),
+        ResponseStrategy::Exploratory
+    );
+    assert_eq!(
+        ResponseStrategy::Exploratory.opposite(),
+        ResponseStrategy::Clarifying
+    );
 }
 
 // -------------------- EpisodicMemoryBridge Tests --------------------
@@ -993,9 +1042,9 @@ fn test_episodic_memory_encode() {
     let id = bridge.encode(
         "test memory",
         vec![0.1, 0.2, 0.3, 0.4],
-        0.5,  // valence
-        0.6,  // phi
-        100,  // cycle
+        0.5, // valence
+        0.6, // phi
+        100, // cycle
     );
 
     assert_eq!(id, 0);
@@ -1027,13 +1076,7 @@ fn test_episodic_memory_consolidation() {
 
     // Fill short-term memory to trigger consolidation
     for i in 0..105 {
-        bridge.encode(
-            format!("memory {}", i),
-            vec![0.1; 4],
-            0.5,
-            0.6,
-            i,
-        );
+        bridge.encode(format!("memory {}", i), vec![0.1; 4], 0.5, 0.6, i);
     }
 
     // Should have consolidated some to long-term
@@ -1238,7 +1281,10 @@ fn test_world_model_level_states() {
     assert!(!level1.is_empty(), "Level 1 should have state");
     // The propagation logic chunks and averages, so sum should be non-zero
     let level1_sum: f32 = level1.iter().sum();
-    assert!(level1_sum > 0.0, "Level 1 should have non-zero sum after propagation");
+    assert!(
+        level1_sum > 0.0,
+        "Level 1 should have non-zero sum after propagation"
+    );
 }
 
 #[test]
@@ -1310,7 +1356,10 @@ fn test_moral_evaluation_runs_each_cycle() {
     }
 
     let stats = service.stats();
-    assert_eq!(stats.moral_evaluations, 5, "Moral evaluation should run every cycle");
+    assert_eq!(
+        stats.moral_evaluations, 5,
+        "Moral evaluation should run every cycle"
+    );
 }
 
 #[test]
@@ -1362,7 +1411,10 @@ fn test_demand_driven_consolidation_trigger() {
 
     // Trigger demand replay
     memory.trigger_demand_replay();
-    assert!(memory.should_replay(), "Demand trigger should enable replay");
+    assert!(
+        memory.should_replay(),
+        "Demand trigger should enable replay"
+    );
 
     // Stats should track demand replays
     assert_eq!(memory.stats().demand_replay_count, 1);
@@ -1375,7 +1427,8 @@ fn test_fep_learning_signal_updates() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         learning_threshold: 0.0, // Always learn
         ..Default::default()
-    }).unwrap();
+    })
+    .unwrap();
 
     // Run enough cycles for FEP to produce learning signals
     for _ in 0..15 {
@@ -1397,7 +1450,8 @@ fn test_stats_comprehensive_after_cycles() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         learning_threshold: 0.0,
         ..Default::default()
-    }).unwrap();
+    })
+    .unwrap();
 
     for i in 0..10 {
         service.cycle(&format!("varied input number {}", i));
@@ -1407,7 +1461,10 @@ fn test_stats_comprehensive_after_cycles() {
 
     // Basic counters
     assert_eq!(stats.total_cycles, 10);
-    assert!(stats.learning_cycles > 0, "With threshold=0.0, some learning should occur");
+    assert!(
+        stats.learning_cycles > 0,
+        "With threshold=0.0, some learning should occur"
+    );
 
     // Prediction error should be tracked
     assert!(stats.avg_prediction_error.is_finite());
@@ -1417,7 +1474,10 @@ fn test_stats_comprehensive_after_cycles() {
     assert!(stats.temporal_coherence.is_finite());
 
     // Semantic memory stats should be tracked
-    assert!(stats.semantic_entries_stored > 0, "Semantic memory should have entries");
+    assert!(
+        stats.semantic_entries_stored > 0,
+        "Semantic memory should have entries"
+    );
     assert!(stats.semantic_lr_factor.is_finite());
 
     // LTC consciousness should be finite
@@ -1431,7 +1491,8 @@ fn test_primitive_belief_bridge_produces_signals() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         learning_threshold: 0.0,
         ..Default::default()
-    }).unwrap();
+    })
+    .unwrap();
 
     // First cycle: initializes prev_primitive_state
     service.cycle("initial state");

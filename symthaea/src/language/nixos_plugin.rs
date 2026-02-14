@@ -17,30 +17,104 @@ use super::domain_plugin::{
 
 /// Keywords that indicate NixOS domain content
 const NIXOS_KEYWORDS: &[&str] = &[
-    "nix", "nixos", "nixpkgs", "flake", "derivation", "overlay",
-    "home-manager", "nix-env", "nix-build", "nix-shell", "nix-store",
-    "nixos-rebuild", "configuration.nix", "flake.nix", "flake.lock",
-    "mkDerivation", "stdenv", "fetchurl", "fetchFromGitHub",
-    "buildInputs", "nativeBuildInputs", "propagatedBuildInputs",
-    "pkgs", "lib", "config", "options", "modules", "imports",
-    "services", "systemd", "boot", "networking", "users",
-    "environment.systemPackages", "programs", "hardware",
-    "fileSystems", "swapDevices", "grub", "systemd-boot",
-    "channel", "generation", "profile", "store path",
-    "let", "in", "with", "inherit", "rec", "builtins",
-    "attrset", "attribute set", "override", "overrideAttrs",
+    "nix",
+    "nixos",
+    "nixpkgs",
+    "flake",
+    "derivation",
+    "overlay",
+    "home-manager",
+    "nix-env",
+    "nix-build",
+    "nix-shell",
+    "nix-store",
+    "nixos-rebuild",
+    "configuration.nix",
+    "flake.nix",
+    "flake.lock",
+    "mkDerivation",
+    "stdenv",
+    "fetchurl",
+    "fetchFromGitHub",
+    "buildInputs",
+    "nativeBuildInputs",
+    "propagatedBuildInputs",
+    "pkgs",
+    "lib",
+    "config",
+    "options",
+    "modules",
+    "imports",
+    "services",
+    "systemd",
+    "boot",
+    "networking",
+    "users",
+    "environment.systemPackages",
+    "programs",
+    "hardware",
+    "fileSystems",
+    "swapDevices",
+    "grub",
+    "systemd-boot",
+    "channel",
+    "generation",
+    "profile",
+    "store path",
+    "let",
+    "in",
+    "with",
+    "inherit",
+    "rec",
+    "builtins",
+    "attrset",
+    "attribute set",
+    "override",
+    "overrideAttrs",
 ];
 
 /// NixOS error patterns for quick recognition
 const NIX_ERROR_PATTERNS: &[(&str, &str, &str)] = &[
-    ("syntax error", "syntax", "Check for missing semicolons, brackets, or typos in your Nix expression"),
-    ("undefined variable", "undefined_variable", "The variable is not in scope; check imports, let bindings, and function arguments"),
-    ("attribute .* missing", "missing_attribute", "The attribute set does not contain the expected key"),
-    ("infinite recursion", "infinite_recursion", "A value depends on itself; break the cycle with lib.mkForce or restructuring"),
-    ("hash mismatch", "hash_mismatch", "The fetched source hash does not match; update the hash or check the URL"),
-    ("builder .* failed", "build_failure", "The package build process failed; check build logs for details"),
-    ("permission denied", "permission", "Insufficient permissions; use sudo for system operations"),
-    ("collision between", "collision", "Two packages provide the same file; use environment.pathsToLink or exclude one"),
+    (
+        "syntax error",
+        "syntax",
+        "Check for missing semicolons, brackets, or typos in your Nix expression",
+    ),
+    (
+        "undefined variable",
+        "undefined_variable",
+        "The variable is not in scope; check imports, let bindings, and function arguments",
+    ),
+    (
+        "attribute .* missing",
+        "missing_attribute",
+        "The attribute set does not contain the expected key",
+    ),
+    (
+        "infinite recursion",
+        "infinite_recursion",
+        "A value depends on itself; break the cycle with lib.mkForce or restructuring",
+    ),
+    (
+        "hash mismatch",
+        "hash_mismatch",
+        "The fetched source hash does not match; update the hash or check the URL",
+    ),
+    (
+        "builder .* failed",
+        "build_failure",
+        "The package build process failed; check build logs for details",
+    ),
+    (
+        "permission denied",
+        "permission",
+        "Insufficient permissions; use sudo for system operations",
+    ),
+    (
+        "collision between",
+        "collision",
+        "Two packages provide the same file; use environment.pathsToLink or exclude one",
+    ),
 ];
 
 // ============================================================================
@@ -65,7 +139,8 @@ impl DomainPlugin for NixOsPlugin {
         // Extract package names (patterns like "pkgs.xyz" or "nixpkgs#xyz")
         for (i, _) in lower.match_indices("pkgs.") {
             let rest = &text[i + 5..];
-            let end = rest.find(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
+            let end = rest
+                .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
                 .unwrap_or(rest.len());
             if end > 0 {
                 let pkg = &rest[..end];
@@ -78,10 +153,19 @@ impl DomainPlugin for NixOsPlugin {
         }
 
         // Extract NixOS options (dotted paths like services.nginx.enable)
-        for keyword in &["services.", "networking.", "boot.", "programs.", "users.", "hardware.", "fileSystems."] {
+        for keyword in &[
+            "services.",
+            "networking.",
+            "boot.",
+            "programs.",
+            "users.",
+            "hardware.",
+            "fileSystems.",
+        ] {
             for (i, _) in lower.match_indices(keyword) {
                 let rest = &text[i..];
-                let end = rest.find(|c: char| c.is_whitespace() || c == ';' || c == '=' || c == '{')
+                let end = rest
+                    .find(|c: char| c.is_whitespace() || c == ';' || c == '=' || c == '{')
                     .unwrap_or(rest.len());
                 if end > keyword.len() {
                     let option = &rest[..end];
@@ -95,13 +179,18 @@ impl DomainPlugin for NixOsPlugin {
         }
 
         // Extract Nix commands (nix-env, nixos-rebuild, etc.)
-        let commands = ["nix-env", "nixos-rebuild", "nix-build", "nix-shell", "nix-store", "nix-collect-garbage"];
+        let commands = [
+            "nix-env",
+            "nixos-rebuild",
+            "nix-build",
+            "nix-shell",
+            "nix-store",
+            "nix-collect-garbage",
+        ];
         for cmd in &commands {
             for (i, _) in lower.match_indices(cmd) {
-                entities.push(
-                    Entity::new("nix_command", *cmd, i, i + cmd.len())
-                        .with_confidence(0.95),
-                );
+                entities
+                    .push(Entity::new("nix_command", *cmd, i, i + cmd.len()).with_confidence(0.95));
             }
         }
 
@@ -109,8 +198,7 @@ impl DomainPlugin for NixOsPlugin {
         if lower.contains("github:") || lower.contains("nixpkgs#") || lower.contains("flake") {
             for (i, _) in lower.match_indices("github:") {
                 let rest = &text[i..];
-                let end = rest.find(|c: char| c.is_whitespace())
-                    .unwrap_or(rest.len());
+                let end = rest.find(|c: char| c.is_whitespace()).unwrap_or(rest.len());
                 entities.push(
                     Entity::new("flake_ref", &rest[..end], i, i + end)
                         .with_confidence(0.9)
@@ -144,15 +232,13 @@ impl DomainPlugin for NixOsPlugin {
         ];
 
         // Collect already-found entity values for deduplication
-        let existing_values: Vec<String> = entities.iter()
-            .map(|e| e.value.to_lowercase())
-            .collect();
+        let existing_values: Vec<String> =
+            entities.iter().map(|e| e.value.to_lowercase()).collect();
 
         for &(keyword, category) in nixos_concepts {
             if let Some(idx) = lower.find(keyword) {
                 // Word boundary check
-                let before_ok = idx == 0
-                    || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
+                let before_ok = idx == 0 || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
                 let after_ok = idx + keyword.len() >= lower.len()
                     || !lower.as_bytes()[idx + keyword.len()].is_ascii_alphanumeric();
                 if before_ok && after_ok && !existing_values.contains(&keyword.to_string()) {
@@ -173,11 +259,28 @@ impl DomainPlugin for NixOsPlugin {
 
         // NixOS-specific command intents
         prototypes.command = vec![
-            "install", "remove", "uninstall", "update", "upgrade",
-            "rebuild", "switch", "rollback", "configure", "enable",
-            "disable", "search", "build", "develop", "shell",
-            "collect-garbage", "optimize-store", "channel",
-        ].into_iter().map(String::from).collect();
+            "install",
+            "remove",
+            "uninstall",
+            "update",
+            "upgrade",
+            "rebuild",
+            "switch",
+            "rollback",
+            "configure",
+            "enable",
+            "disable",
+            "search",
+            "build",
+            "develop",
+            "shell",
+            "collect-garbage",
+            "optimize-store",
+            "channel",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         // NixOS-specific question intents
         prototypes.question.extend(vec![
@@ -200,22 +303,28 @@ impl DomainPlugin for NixOsPlugin {
 
         // Custom intents for NixOS
         let mut custom = HashMap::new();
-        custom.insert("configuration".to_string(), vec![
-            "configuration.nix".to_string(),
-            "flake.nix".to_string(),
-            "home.nix".to_string(),
-            "module".to_string(),
-            "overlay".to_string(),
-        ]);
-        custom.insert("deployment".to_string(), vec![
-            "deploy".to_string(),
-            "rebuild".to_string(),
-            "switch".to_string(),
-            "test".to_string(),
-            "boot".to_string(),
-            "dry-run".to_string(),
-            "generation".to_string(),
-        ]);
+        custom.insert(
+            "configuration".to_string(),
+            vec![
+                "configuration.nix".to_string(),
+                "flake.nix".to_string(),
+                "home.nix".to_string(),
+                "module".to_string(),
+                "overlay".to_string(),
+            ],
+        );
+        custom.insert(
+            "deployment".to_string(),
+            vec![
+                "deploy".to_string(),
+                "rebuild".to_string(),
+                "switch".to_string(),
+                "test".to_string(),
+                "boot".to_string(),
+                "dry-run".to_string(),
+                "generation".to_string(),
+            ],
+        );
         prototypes.custom = custom;
 
         prototypes
@@ -233,8 +342,7 @@ impl DomainPlugin for NixOsPlugin {
             action_confirm: "I'll help you with your NixOS system. To confirm, \
                             I will: {}"
                 .to_string(),
-            error_explain: "I found a NixOS issue: {}. Let me help you resolve it."
-                .to_string(),
+            error_explain: "I found a NixOS issue: {}. Let me help you resolve it.".to_string(),
             out_of_domain: "That doesn't seem to be a NixOS question. \
                            I'm specialized in NixOS system management. {}"
                 .to_string(),
@@ -317,9 +425,17 @@ impl DomainPlugin for NixOsPlugin {
             if lower.contains(keyword) {
                 matches += 1;
                 // Strong indicators get more weight
-                if ["nixos", "nix-env", "nixos-rebuild", "flake.nix", "configuration.nix",
-                    "derivation", "nixpkgs", "home-manager"]
-                    .contains(keyword)
+                if [
+                    "nixos",
+                    "nix-env",
+                    "nixos-rebuild",
+                    "flake.nix",
+                    "configuration.nix",
+                    "derivation",
+                    "nixpkgs",
+                    "home-manager",
+                ]
+                .contains(keyword)
                 {
                     score += 0.4;
                 } else {
@@ -415,10 +531,14 @@ mod tests {
         let plugin = NixOsPlugin;
 
         let entities = plugin.extract_entities("I want to install pkgs.firefox on my system");
-        assert!(entities.iter().any(|e| e.entity_type == "package" && e.value == "firefox"));
+        assert!(entities
+            .iter()
+            .any(|e| e.entity_type == "package" && e.value == "firefox"));
 
         let entities = plugin.extract_entities("run nixos-rebuild switch");
-        assert!(entities.iter().any(|e| e.entity_type == "nix_command" && e.value == "nixos-rebuild"));
+        assert!(entities
+            .iter()
+            .any(|e| e.entity_type == "nix_command" && e.value == "nixos-rebuild"));
     }
 
     #[test]
@@ -434,7 +554,8 @@ mod tests {
     fn test_error_diagnosis() {
         let plugin = NixOsPlugin;
 
-        let diag = plugin.diagnose_error("error: undefined variable 'foo' at /etc/nixos/configuration.nix:42:5");
+        let diag = plugin
+            .diagnose_error("error: undefined variable 'foo' at /etc/nixos/configuration.nix:42:5");
         assert!(diag.is_some());
         let diag = diag.unwrap();
         assert_eq!(diag.category, "nixos");
@@ -460,19 +581,22 @@ mod tests {
         let entities = plugin.extract_entities("How do I enable nginx in NixOS?");
         assert!(
             entities.iter().any(|e| e.value == "nginx"),
-            "Should extract 'nginx' as entity. Got: {:?}", entities,
+            "Should extract 'nginx' as entity. Got: {:?}",
+            entities,
         );
 
         let entities = plugin.extract_entities("How to configure postgresql?");
         assert!(
             entities.iter().any(|e| e.value == "postgresql"),
-            "Should extract 'postgresql' as entity. Got: {:?}", entities,
+            "Should extract 'postgresql' as entity. Got: {:?}",
+            entities,
         );
 
         let entities = plugin.extract_entities("Enable the firewall in my NixOS config");
         assert!(
             entities.iter().any(|e| e.value == "firewall"),
-            "Should extract 'firewall' as entity. Got: {:?}", entities,
+            "Should extract 'firewall' as entity. Got: {:?}",
+            entities,
         );
     }
 }

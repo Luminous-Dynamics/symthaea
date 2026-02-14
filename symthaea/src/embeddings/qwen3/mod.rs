@@ -21,7 +21,7 @@
 //! println!("Embedding dimension: {}", result.dimension);
 //! ```
 
-use super::{EmbeddingResult, Embedder};
+use super::{Embedder, EmbeddingResult};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -161,7 +161,6 @@ pub struct Qwen3Embedder {
 
     /// Statistics
     stats: Qwen3Stats,
-
     // ONNX session would be stored here when `ort` feature is enabled
     // #[cfg(feature = "embeddings")]
     // session: Option<ort::Session>,
@@ -235,8 +234,7 @@ impl Qwen3Embedder {
         // Cache the result
         self.cache.insert(text.to_string(), embedding.clone());
 
-        let mut result = EmbeddingResult::new(embedding, "qwen3-embedding")
-            .with_time(elapsed);
+        let mut result = EmbeddingResult::new(embedding, "qwen3-embedding").with_time(elapsed);
 
         if self.config.use_simulated {
             result = result.simulated();
@@ -314,8 +312,19 @@ impl Qwen3Embedder {
         }
 
         // Feature 4: Command/imperative detection (dimension 12-15)
-        let command_words = ["install", "run", "start", "stop", "create", "delete",
-                            "add", "remove", "update", "build", "configure"];
+        let command_words = [
+            "install",
+            "run",
+            "start",
+            "stop",
+            "create",
+            "delete",
+            "add",
+            "remove",
+            "update",
+            "build",
+            "configure",
+        ];
         let is_command = command_words.iter().any(|w| text_lower.contains(w));
         if is_command {
             for i in 12..16.min(dim) {
@@ -333,8 +342,17 @@ impl Qwen3Embedder {
         }
 
         // Feature 6: Technical content (dimension 20-23)
-        let tech_words = ["nix", "nixos", "flake", "derivation", "package",
-                         "module", "config", "system", "service"];
+        let tech_words = [
+            "nix",
+            "nixos",
+            "flake",
+            "derivation",
+            "package",
+            "module",
+            "config",
+            "system",
+            "service",
+        ];
         let is_tech = tech_words.iter().any(|w| text_lower.contains(w));
         if is_tech {
             for i in 20..24.min(dim) {
@@ -346,8 +364,9 @@ impl Qwen3Embedder {
         // Create signatures from word n-grams for better semantic similarity
         let words: Vec<&str> = text_lower.split_whitespace().collect();
         for (idx, word) in words.iter().take(20).enumerate() {
-            let word_hash: u64 = word.bytes()
-                .fold(0x5974_1AEA_u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            let word_hash: u64 = word.bytes().fold(0x5974_1AEA_u64, |acc, b| {
+                acc.wrapping_mul(31).wrapping_add(b as u64)
+            });
             let dim_offset = 24 + (word_hash as usize % (dim.saturating_sub(24).max(1)));
             if dim_offset < dim {
                 embedding[dim_offset] += 0.1 / (idx + 1) as f32;
@@ -436,13 +455,19 @@ mod tests {
         let emb2 = embedder.embed("Install nginx server").unwrap();
 
         // Compute cosine similarity
-        let dot: f32 = emb1.embedding.iter()
+        let dot: f32 = emb1
+            .embedding
+            .iter()
             .zip(emb2.embedding.iter())
             .map(|(a, b)| a * b)
             .sum();
 
         // Normalized embeddings have norms close to 1
-        assert!(dot > 0.5, "Similar texts should have high similarity, got {}", dot);
+        assert!(
+            dot > 0.5,
+            "Similar texts should have high similarity, got {}",
+            dot
+        );
     }
 
     #[test]

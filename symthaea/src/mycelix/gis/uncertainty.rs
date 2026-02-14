@@ -328,9 +328,9 @@ impl MoralUncertainty {
 
     /// Create from a situation assessment
     pub fn assess(
-        facts_known: f32,        // How well we understand the facts (0 = unknown, 1 = known)
-        values_clear: f32,       // How clear the relevant values are (0 = unclear, 1 = clear)
-        action_clear: f32,       // How clear the right action is (0 = unclear, 1 = clear)
+        facts_known: f32,  // How well we understand the facts (0 = unknown, 1 = known)
+        values_clear: f32, // How clear the relevant values are (0 = unclear, 1 = clear)
+        action_clear: f32, // How clear the right action is (0 = unclear, 1 = clear)
     ) -> Self {
         Self::new(
             1.0 - facts_known.clamp(0.0, 1.0),
@@ -373,11 +373,11 @@ impl MoralUncertainty {
     /// - Total exceeds 0.5, OR
     /// - Axiological uncertainty is high (values unclear)
     pub fn should_pause_for_reflection(&self) -> bool {
-        self.epistemic > 0.7 ||
-        self.axiological > 0.7 ||
-        self.deontic > 0.7 ||
-        self.total() > 0.5 ||
-        self.axiological > 0.5 // Values uncertainty warrants extra caution
+        self.epistemic > 0.7
+            || self.axiological > 0.7
+            || self.deontic > 0.7
+            || self.total() > 0.5
+            || self.axiological > 0.5 // Values uncertainty warrants extra caution
     }
 
     /// Should we seek input from others?
@@ -402,7 +402,8 @@ impl MoralUncertainty {
         if self.epistemic > 0.4 {
             recs.push(MoralRecommendation {
                 dimension: MoralUncertaintyType::Epistemic,
-                action: "Gather more information about consequences and affected parties".to_string(),
+                action: "Gather more information about consequences and affected parties"
+                    .to_string(),
                 priority: (self.epistemic * 10.0) as u8,
             });
         }
@@ -418,7 +419,8 @@ impl MoralUncertainty {
         if self.deontic > 0.4 {
             recs.push(MoralRecommendation {
                 dimension: MoralUncertaintyType::Deontic,
-                action: "Consider multiple ethical frameworks and their recommendations".to_string(),
+                action: "Consider multiple ethical frameworks and their recommendations"
+                    .to_string(),
                 priority: (self.deontic * 10.0) as u8,
             });
         }
@@ -634,8 +636,12 @@ mod tests {
         let u = Uncertainty3D::new(0.8, 0.1, 0.5);
         let recs = u.recommendations();
 
-        assert!(recs.iter().any(|r| r.uncertainty_type == UncertaintyType::Epistemic));
-        assert!(recs.iter().any(|r| r.uncertainty_type == UncertaintyType::Structural));
+        assert!(recs
+            .iter()
+            .any(|r| r.uncertainty_type == UncertaintyType::Epistemic));
+        assert!(recs
+            .iter()
+            .any(|r| r.uncertainty_type == UncertaintyType::Structural));
     }
 
     // === GIS v4.0 Moral Uncertainty Tests ===
@@ -683,7 +689,10 @@ mod tests {
     #[test]
     fn test_moral_action_guidance() {
         let clear = MoralUncertainty::new(0.1, 0.1, 0.1);
-        assert_eq!(clear.action_guidance(), MoralActionGuidance::ProceedConfidently);
+        assert_eq!(
+            clear.action_guidance(),
+            MoralActionGuidance::ProceedConfidently
+        );
 
         let opaque = MoralUncertainty::new(0.9, 0.9, 0.9);
         assert_eq!(opaque.action_guidance(), MoralActionGuidance::AvoidAction);
@@ -695,12 +704,20 @@ mod tests {
         let recs = m.recommendations();
 
         // Should have recommendations for axiological and deontic (both > 0.4)
-        assert!(recs.iter().any(|r| r.dimension == MoralUncertaintyType::Axiological));
-        assert!(recs.iter().any(|r| r.dimension == MoralUncertaintyType::Deontic));
+        assert!(recs
+            .iter()
+            .any(|r| r.dimension == MoralUncertaintyType::Axiological));
+        assert!(recs
+            .iter()
+            .any(|r| r.dimension == MoralUncertaintyType::Deontic));
 
         // Axiological should be higher priority
-        let axio_rec = recs.iter().find(|r| r.dimension == MoralUncertaintyType::Axiological);
-        let deon_rec = recs.iter().find(|r| r.dimension == MoralUncertaintyType::Deontic);
+        let axio_rec = recs
+            .iter()
+            .find(|r| r.dimension == MoralUncertaintyType::Axiological);
+        let deon_rec = recs
+            .iter()
+            .find(|r| r.dimension == MoralUncertaintyType::Deontic);
         assert!(axio_rec.unwrap().priority >= deon_rec.unwrap().priority);
     }
 

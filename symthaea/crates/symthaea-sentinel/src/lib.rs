@@ -38,6 +38,16 @@
 //! // println!("Detected: {} ({:.1}%)", result.detected_pattern, result.confidence * 100.0);
 //! ```
 
+#![allow(rustdoc::broken_intra_doc_links)]
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::manual_clamp)]
+#![allow(clippy::manual_memcpy)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::wrong_self_convention)]
+#![allow(clippy::redundant_guards)]
+#![allow(clippy::duplicated_attributes)]
+#![allow(clippy::sort_unstable)]
+
 pub mod encoding;
 pub mod features;
 pub mod hdc;

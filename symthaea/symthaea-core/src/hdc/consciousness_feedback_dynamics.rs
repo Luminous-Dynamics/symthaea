@@ -41,18 +41,20 @@
 //! └─────────────────────────────────────────────────────────────────────────────┘
 //! ```
 
-use super::emotional_depth::{EmotionalBlend, EmotionalDepthSystem};
-use super::sleep_and_altered_states::DreamScenario;
-use super::counterfactual_dreams::{CounterfactualDreamEngine, CounterfactualDreamScenario, DreamResolution};
+use super::binary_hv::BinaryHV;
+use super::causal_mind::CausalMind;
 use super::consciousness_streaming::{
-    ConsciousnessEvent, ConsciousnessEventType, ConsciousnessEventEmitter, EventPayload,
+    ConsciousnessEvent, ConsciousnessEventEmitter, ConsciousnessEventType, EventPayload,
+};
+use super::counterfactual_dreams::{
+    CounterfactualDreamEngine, CounterfactualDreamScenario, DreamResolution,
 };
 use super::cross_modal_attention_router::CrossModalAttentionRouter;
-use super::causal_mind::CausalMind;
-use super::binary_hv::BinaryHV;
+use super::emotional_depth::{EmotionalBlend, EmotionalDepthSystem};
+use super::sleep_and_altered_states::DreamScenario;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 // =============================================================================
 // 1. BIDIRECTIONAL FEEDBACK LOOPS
@@ -147,9 +149,8 @@ impl FeedbackProcessor {
         let emotional_impact = self.calculate_emotional_impact(dream);
 
         // Calculate consolidation strength based on dream coherence
-        let consolidation_strength = (1.0 - dream.overall_bizarreness()) * 0.5
-            + dream.emotional_valence.abs() * 0.3
-            + 0.2; // Base consolidation
+        let consolidation_strength =
+            (1.0 - dream.overall_bizarreness()) * 0.5 + dream.emotional_valence.abs() * 0.3 + 0.2; // Base consolidation
 
         // Extract causal discoveries from dream themes
         let causal_discoveries = self.extract_causal_discoveries(dream);
@@ -189,7 +190,10 @@ impl FeedbackProcessor {
     }
 
     /// Process a counterfactual dream
-    pub fn process_counterfactual_dream(&mut self, dream: &CounterfactualDreamScenario) -> Option<DreamInsight> {
+    pub fn process_counterfactual_dream(
+        &mut self,
+        dream: &CounterfactualDreamScenario,
+    ) -> Option<DreamInsight> {
         let insight_type = match dream.resolution {
             DreamResolution::InsightGenerated => InsightType::CausalDiscovery,
             DreamResolution::Acceptance => InsightType::EmotionalResolution,
@@ -206,7 +210,8 @@ impl FeedbackProcessor {
         };
 
         // Extract causal discoveries from counterfactual fragments
-        let causal_discoveries: Vec<CausalDiscovery> = dream.counterfactual_fragments
+        let causal_discoveries: Vec<CausalDiscovery> = dream
+            .counterfactual_fragments
             .iter()
             .filter(|f| f.base_fragment.valence.abs() > 0.5)
             .map(|f| CausalDiscovery {
@@ -265,7 +270,10 @@ impl FeedbackProcessor {
     /// Apply attention adjustments to router
     ///
     /// Returns the hints that should be applied (caller applies them)
-    pub fn apply_attention_feedback(&mut self, _router: &mut CrossModalAttentionRouter) -> Vec<AttentionHint> {
+    pub fn apply_attention_feedback(
+        &mut self,
+        _router: &mut CrossModalAttentionRouter,
+    ) -> Vec<AttentionHint> {
         self.get_attention_adjustments()
     }
 
@@ -276,7 +284,11 @@ impl FeedbackProcessor {
 
         if dream.emotional_valence > 0.5 && dream.overall_bizarreness() < 0.3 {
             InsightType::EmotionalResolution
-        } else if dream.themes.iter().any(|t| t.contains("causal") || t.contains("because")) {
+        } else if dream
+            .themes
+            .iter()
+            .any(|t| t.contains("causal") || t.contains("because"))
+        {
             InsightType::CausalDiscovery
         } else if is_lucid {
             InsightType::CreativeSolution
@@ -303,7 +315,8 @@ impl FeedbackProcessor {
 
     fn extract_causal_discoveries(&self, dream: &DreamScenario) -> Vec<CausalDiscovery> {
         // Extract causal relationships from dream themes
-        dream.themes
+        dream
+            .themes
             .iter()
             .filter(|t| t.contains("leads to") || t.contains("causes") || t.contains("because"))
             .map(|t| CausalDiscovery {
@@ -315,7 +328,11 @@ impl FeedbackProcessor {
             .collect()
     }
 
-    fn generate_attention_hints(&self, dream: &DreamScenario, insight_type: &InsightType) -> Vec<AttentionHint> {
+    fn generate_attention_hints(
+        &self,
+        dream: &DreamScenario,
+        insight_type: &InsightType,
+    ) -> Vec<AttentionHint> {
         match insight_type {
             InsightType::Warning => vec![AttentionHint {
                 focus_area: "safety".to_string(),
@@ -484,18 +501,20 @@ impl EmotionalPredictor {
         let current = recent.first()?;
 
         // Linear extrapolation
-        let predicted_valence = (current.valence + valence_trend * self.prediction_horizon as f64)
-            .clamp(-1.0, 1.0);
-        let predicted_arousal = (current.arousal + arousal_trend * self.prediction_horizon as f64)
-            .clamp(0.0, 1.0);
+        let predicted_valence =
+            (current.valence + valence_trend * self.prediction_horizon as f64).clamp(-1.0, 1.0);
+        let predicted_arousal =
+            (current.arousal + arousal_trend * self.prediction_horizon as f64).clamp(0.0, 1.0);
 
         // Calculate confidence based on coherence of trend
         let confidence = self.calculate_prediction_confidence(&recent);
 
         // Determine if intervention is needed
         let intervention = self.recommend_intervention(
-            current.valence, current.arousal,
-            predicted_valence, predicted_arousal
+            current.valence,
+            current.arousal,
+            predicted_valence,
+            predicted_arousal,
         );
 
         let prediction = EmotionalPrediction {
@@ -539,7 +558,8 @@ impl EmotionalPredictor {
         }
 
         // Higher coherence = higher confidence
-        let avg_coherence: f64 = recent.iter().map(|s| s.coherence).sum::<f64>() / recent.len() as f64;
+        let avg_coherence: f64 =
+            recent.iter().map(|s| s.coherence).sum::<f64>() / recent.len() as f64;
 
         // Consistent trends = higher confidence
         let valences: Vec<f64> = recent.iter().map(|s| s.valence).collect();
@@ -683,7 +703,11 @@ impl CausalDreamIntegrator {
     pub fn next_hypothesis(&mut self) -> Option<CausalHypothesis> {
         // Sort by priority and return highest
         let mut sorted: Vec<_> = self.hypotheses_queue.drain(..).collect();
-        sorted.sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let next = sorted.first().cloned();
 
@@ -707,7 +731,10 @@ impl CausalDreamIntegrator {
         hypothesis: &CausalHypothesis,
     ) -> String {
         // Return the counterfactual question for dream exploration
-        format!("What if '{}' didn't cause '{}'?", hypothesis.cause, hypothesis.effect)
+        format!(
+            "What if '{}' didn't cause '{}'?",
+            hypothesis.cause, hypothesis.effect
+        )
     }
 
     /// Process dream result and update causal beliefs
@@ -748,10 +775,12 @@ impl CausalDreamIntegrator {
         let avg_coherence: f64 = if dream.counterfactual_fragments.is_empty() {
             0.5
         } else {
-            dream.counterfactual_fragments
+            dream
+                .counterfactual_fragments
                 .iter()
                 .map(|f| 1.0 - f.divergence) // Higher coherence = lower divergence
-                .sum::<f64>() / dream.counterfactual_fragments.len() as f64
+                .sum::<f64>()
+                / dream.counterfactual_fragments.len() as f64
         };
 
         (resolution_evidence * 0.6 + avg_coherence * 0.4).clamp(0.0, 1.0)
@@ -862,7 +891,12 @@ impl RichEventEmitter {
                 EventPayload::Flow {
                     old_state: old_arousal as f32,
                     new_state: emotional_state.arousal as f32,
-                    trend: if arousal_change > 0.0 { "increasing" } else { "decreasing" }.to_string(),
+                    trend: if arousal_change > 0.0 {
+                        "increasing"
+                    } else {
+                        "decreasing"
+                    }
+                    .to_string(),
                 },
             );
             emitter.emit(event);
@@ -872,11 +906,7 @@ impl RichEventEmitter {
     }
 
     /// Emit dream insight event
-    pub fn emit_dream_insight(
-        &self,
-        emitter: &ConsciousnessEventEmitter,
-        insight: &DreamInsight,
-    ) {
+    pub fn emit_dream_insight(&self, emitter: &ConsciousnessEventEmitter, insight: &DreamInsight) {
         let event = ConsciousnessEvent::new(
             ConsciousnessEventType::CausalInsight,
             EventPayload::Causal {
@@ -963,7 +993,10 @@ impl CollectiveDreamHub {
     pub fn share_insight(&mut self, insight: &DreamInsight) {
         // Extract themes and add to shared pool
         for discovery in &insight.causal_discoveries {
-            *self.shared_themes.entry(discovery.cause.clone()).or_insert(0.0) += discovery.strength;
+            *self
+                .shared_themes
+                .entry(discovery.cause.clone())
+                .or_insert(0.0) += discovery.strength;
         }
 
         self.collective_insights.push_back(insight.clone());
@@ -1168,23 +1201,22 @@ impl AdaptiveDreamScheduler {
             let avg_emotional_improvement: f64 = history
                 .iter()
                 .map(|r| r.emotional_after - r.emotional_before)
-                .sum::<f64>() / history.len() as f64;
+                .sum::<f64>()
+                / history.len() as f64;
 
             let avg_stress_reduction: f64 = history
                 .iter()
                 .map(|r| r.stress_before - r.stress_after)
-                .sum::<f64>() / history.len() as f64;
+                .sum::<f64>()
+                / history.len() as f64;
 
-            let insight_rate: f64 = history
-                .iter()
-                .filter(|r| r.insight_generated)
-                .count() as f64 / history.len() as f64;
+            let insight_rate: f64 = history.iter().filter(|r| r.insight_generated).count() as f64
+                / history.len() as f64;
 
             // Adjust interval based on effectiveness
             // More effective = should happen more often (shorter interval)
-            let effectiveness = avg_emotional_improvement * 0.3
-                + avg_stress_reduction * 0.4
-                + insight_rate * 0.3;
+            let effectiveness =
+                avg_emotional_improvement * 0.3 + avg_stress_reduction * 0.4 + insight_rate * 0.3;
 
             if let Some(interval) = self.optimal_intervals.get_mut(dream_type) {
                 let adjustment = if effectiveness > 0.5 {
@@ -1196,7 +1228,7 @@ impl AdaptiveDreamScheduler {
                 };
 
                 *interval = Duration::from_secs_f64(
-                    (interval.as_secs_f64() * adjustment).clamp(600.0, 28800.0) // 10 min to 8 hours
+                    (interval.as_secs_f64() * adjustment).clamp(600.0, 28800.0), // 10 min to 8 hours
                 );
             }
         }
@@ -1207,7 +1239,8 @@ impl AdaptiveDreamScheduler {
         let mut report = String::from("Dream Scheduling Report:\n");
 
         for (dream_type, interval) in &self.optimal_intervals {
-            let effectiveness = self.effectiveness_history
+            let effectiveness = self
+                .effectiveness_history
                 .get(dream_type)
                 .map(|h| h.len())
                 .unwrap_or(0);
@@ -1304,7 +1337,8 @@ impl FeedbackDynamicsEngine {
 
         // Check for intervention
         if let Some(intervention) = &prediction.intervention {
-            self.events.emit_intervention(emitter, intervention, &prediction);
+            self.events
+                .emit_intervention(emitter, intervention, &prediction);
             return Some(intervention.clone());
         }
 
@@ -1369,6 +1403,17 @@ mod tests {
 
         let prediction = predictor.predict();
         assert!(prediction.is_some());
+        let pred = prediction.unwrap();
+        assert!(
+            pred.predicted_valence >= -1.0 && pred.predicted_valence <= 1.0,
+            "predicted_valence should be in [-1,1], got {}",
+            pred.predicted_valence
+        );
+        assert!(
+            pred.confidence >= 0.1 && pred.confidence <= 0.9,
+            "confidence should be in [0.1,0.9], got {}",
+            pred.confidence
+        );
     }
 
     #[test]
@@ -1393,7 +1438,10 @@ mod tests {
 
         scheduler.update_stress(0.3);
         let recommended = scheduler.recommend_dream_type();
-        assert!(matches!(recommended, DreamType::Regular | DreamType::Counterfactual | DreamType::Consolidation));
+        assert!(matches!(
+            recommended,
+            DreamType::Regular | DreamType::Counterfactual | DreamType::Consolidation
+        ));
 
         scheduler.update_stress(0.9);
         let recommended = scheduler.recommend_dream_type();
@@ -1405,6 +1453,11 @@ mod tests {
         let engine = FeedbackDynamicsEngine::new();
         let report = engine.dynamics_report();
         assert!(report.contains("Feedback Dynamics Report"));
+        assert!(!report.is_empty(), "dynamics report should not be empty");
+        assert!(
+            engine.predictor.prediction_accuracy().is_finite(),
+            "prediction accuracy should be finite"
+        );
     }
 
     // =========================================================================
@@ -1475,7 +1528,10 @@ mod tests {
         let insight = processor.process_dream(&dream).unwrap();
         assert_eq!(insight.insight_type, InsightType::CreativeSolution);
         // Creative solution should generate a "creativity" attention hint
-        assert!(insight.attention_hints.iter().any(|h| h.focus_area == "creativity"));
+        assert!(insight
+            .attention_hints
+            .iter()
+            .any(|h| h.focus_area == "creativity"));
     }
 
     #[test]
@@ -1486,7 +1542,10 @@ mod tests {
         let insight = processor.process_dream(&dream).unwrap();
         assert_eq!(insight.insight_type, InsightType::Warning);
         // Warning should generate a "safety" attention hint
-        assert!(insight.attention_hints.iter().any(|h| h.focus_area == "safety"));
+        assert!(insight
+            .attention_hints
+            .iter()
+            .any(|h| h.focus_area == "safety"));
     }
 
     #[test]
@@ -1567,12 +1626,20 @@ mod tests {
 
         // Apply and verify non-zero adjustment
         let adj = processor.apply_emotional_feedback(&mut emotional_depth);
-        assert!(adj.abs() > 0.001, "First adjustment should be non-zero, got {}", adj);
+        assert!(
+            adj.abs() > 0.001,
+            "First adjustment should be non-zero, got {}",
+            adj
+        );
 
         // After applying, the accumulator was reset to 0.0.
         // A second call without processing more dreams should return ~0.0.
         let adj2 = processor.apply_emotional_feedback(&mut emotional_depth);
-        assert!(adj2.abs() < 0.02, "Second adjustment should be near zero, got {}", adj2);
+        assert!(
+            adj2.abs() < 0.02,
+            "Second adjustment should be near zero, got {}",
+            adj2
+        );
     }
 
     #[test]
@@ -1587,7 +1654,11 @@ mod tests {
 
         let adj = processor.apply_emotional_feedback(&mut emotional_depth);
         // 0.1 (cathartic) * 0.1 = 0.01
-        assert!(adj > 0.0, "Nightmare should have positive cathartic adjustment, got {}", adj);
+        assert!(
+            adj > 0.0,
+            "Nightmare should have positive cathartic adjustment, got {}",
+            adj
+        );
     }
 
     // =========================================================================
@@ -1603,13 +1674,19 @@ mod tests {
         processor.process_dream(&dream);
 
         let hints = processor.get_attention_adjustments();
-        assert!(!hints.is_empty(), "Warning insight should produce attention hints");
+        assert!(
+            !hints.is_empty(),
+            "Warning insight should produce attention hints"
+        );
         assert!(
             hints.iter().any(|h| h.focus_area == "safety"),
             "Warning should produce 'safety' focus area hint, got: {:?}",
             hints.iter().map(|h| &h.focus_area).collect::<Vec<_>>()
         );
-        assert!(hints[0].priority > 0.5, "Safety hint should have high priority");
+        assert!(
+            hints[0].priority > 0.5,
+            "Safety hint should have high priority"
+        );
     }
 
     #[test]
@@ -1621,7 +1698,10 @@ mod tests {
         processor.process_dream(&dream);
 
         let hints = processor.get_attention_adjustments();
-        assert!(!hints.is_empty(), "CreativeSolution should produce attention hints");
+        assert!(
+            !hints.is_empty(),
+            "CreativeSolution should produce attention hints"
+        );
         assert!(
             hints.iter().any(|h| h.focus_area == "creativity"),
             "CreativeSolution should produce 'creativity' focus area hint"
@@ -1637,7 +1717,10 @@ mod tests {
         processor.process_dream(&dream);
 
         let hints = processor.get_attention_adjustments();
-        assert!(hints.is_empty(), "MemoryIntegration should produce no attention hints");
+        assert!(
+            hints.is_empty(),
+            "MemoryIntegration should produce no attention hints"
+        );
     }
 
     // =========================================================================
@@ -1714,7 +1797,11 @@ mod tests {
 
         // Verify it was recorded
         assert_eq!(
-            scheduler.effectiveness_history.get(&DreamType::Regular).unwrap().len(),
+            scheduler
+                .effectiveness_history
+                .get(&DreamType::Regular)
+                .unwrap()
+                .len(),
             1
         );
     }
@@ -1837,13 +1924,34 @@ mod tests {
         let report = engine.dynamics_report();
 
         // Verify expected sections are present
-        assert!(report.contains("Feedback Dynamics Report"), "Missing header");
-        assert!(report.contains("Recent Insights"), "Missing Recent Insights section");
-        assert!(report.contains("Prediction Accuracy"), "Missing Prediction Accuracy section");
-        assert!(report.contains("Causal Discoveries"), "Missing Causal Discoveries section");
-        assert!(report.contains("Collective Dream Hub"), "Missing Collective Dream Hub section");
-        assert!(report.contains("Dream Scheduling Report"), "Missing Dream Scheduling Report section");
-        assert!(report.contains("Current stress"), "Missing current stress info");
+        assert!(
+            report.contains("Feedback Dynamics Report"),
+            "Missing header"
+        );
+        assert!(
+            report.contains("Recent Insights"),
+            "Missing Recent Insights section"
+        );
+        assert!(
+            report.contains("Prediction Accuracy"),
+            "Missing Prediction Accuracy section"
+        );
+        assert!(
+            report.contains("Causal Discoveries"),
+            "Missing Causal Discoveries section"
+        );
+        assert!(
+            report.contains("Collective Dream Hub"),
+            "Missing Collective Dream Hub section"
+        );
+        assert!(
+            report.contains("Dream Scheduling Report"),
+            "Missing Dream Scheduling Report section"
+        );
+        assert!(
+            report.contains("Current stress"),
+            "Missing current stress info"
+        );
         assert!(report.contains("Recommended"), "Missing recommendation");
     }
 
@@ -1858,7 +1966,10 @@ mod tests {
 
         // Predictor starts empty
         let prediction = engine.predictor.predict();
-        assert!(prediction.is_none(), "Predictor should need at least 5 states");
+        assert!(
+            prediction.is_none(),
+            "Predictor should need at least 5 states"
+        );
 
         // Scheduler defaults
         engine.scheduler.update_stress(0.85);
@@ -1882,14 +1993,20 @@ mod tests {
         // Low bizarreness, high valence
         let dream1 = make_dream(0.9, 0.1, 0.05, vec!["calm"]);
         let insight1 = processor.process_dream(&dream1).unwrap();
-        assert!(insight1.consolidation_strength >= 0.0 && insight1.consolidation_strength <= 1.0,
-            "consolidation_strength out of bounds: {}", insight1.consolidation_strength);
+        assert!(
+            insight1.consolidation_strength >= 0.0 && insight1.consolidation_strength <= 1.0,
+            "consolidation_strength out of bounds: {}",
+            insight1.consolidation_strength
+        );
 
         // High bizarreness, low valence
         let dream2 = make_dream(0.0, 0.1, 0.95, vec!["chaos"]);
         let insight2 = processor.process_dream(&dream2).unwrap();
-        assert!(insight2.consolidation_strength >= 0.0 && insight2.consolidation_strength <= 1.0,
-            "consolidation_strength out of bounds: {}", insight2.consolidation_strength);
+        assert!(
+            insight2.consolidation_strength >= 0.0 && insight2.consolidation_strength <= 1.0,
+            "consolidation_strength out of bounds: {}",
+            insight2.consolidation_strength
+        );
     }
 
     #[test]
@@ -1984,11 +2101,17 @@ mod tests {
 
         // Check resonance with matching local themes
         let resonance = hub.calculate_resonance(&["shared_theme".to_string()]);
-        assert!(resonance > 0.0, "Should have positive resonance with shared theme");
+        assert!(
+            resonance > 0.0,
+            "Should have positive resonance with shared theme"
+        );
 
         // Check resonance with non-matching themes
         let no_resonance = hub.calculate_resonance(&["unrelated".to_string()]);
-        assert!((no_resonance - 0.0).abs() < 1e-9, "Should have zero resonance with unrelated theme");
+        assert!(
+            (no_resonance - 0.0).abs() < 1e-9,
+            "Should have zero resonance with unrelated theme"
+        );
 
         // Get resonant themes
         let themes = hub.get_resonant_themes(0.5);

@@ -9,8 +9,8 @@
 //! are written against the structural guarantees of the pipeline rather
 //! than the quality of LLM output.
 
-use symthaea::Symthaea;
 use symthaea::mind::{ContinuousMind, MindConfig};
+use symthaea::Symthaea;
 use symthaea_core::hdc::real_hv::RealHV;
 
 // ---------------------------------------------------------------------------
@@ -126,8 +126,14 @@ async fn test_multiple_queries_epistemic_status() {
     let r2 = sym.process("What will happen tomorrow?").await.unwrap();
 
     // Both should have structured thoughts
-    assert!(r1.structured_thought.is_some(), "r1 should have structured thought");
-    assert!(r2.structured_thought.is_some(), "r2 should have structured thought");
+    assert!(
+        r1.structured_thought.is_some(),
+        "r1 should have structured thought"
+    );
+    assert!(
+        r2.structured_thought.is_some(),
+        "r2 should have structured thought"
+    );
 
     // Both should be safe
     assert!(r1.safe, "r1 should be safe");
@@ -207,7 +213,11 @@ fn test_mind_tick_lifecycle() {
     }
 
     let state = mind.snapshot();
-    assert!(state.tick >= 20, "Should have at least 20 ticks, got {}", state.tick);
+    assert!(
+        state.tick >= 20,
+        "Should have at least 20 ticks, got {}",
+        state.tick
+    );
     assert!(
         !mind.working_memory().is_empty(),
         "Working memory should have at least one entry after perceive + tick"
@@ -290,7 +300,10 @@ fn test_mind_snapshot_fields() {
     // Verify key fields are populated
     assert!(state.is_active, "Should be active");
     assert_eq!(state.tick, 1, "Should have one tick");
-    assert!(state.time_awake_ms < 60_000, "Should not have been awake for a minute");
+    assert!(
+        state.time_awake_ms < 60_000,
+        "Should not have been awake for a minute"
+    );
     // phi and consciousness_level should both be set
     assert_eq!(
         state.phi, state.consciousness_level,
@@ -348,7 +361,10 @@ async fn test_symthaea_long_query() {
     // Very long input should not crash
     let long_input = "a ".repeat(5000);
     let response = sym.process(&long_input).await.unwrap();
-    assert!(!response.content.is_empty(), "Should produce some response for long input");
+    assert!(
+        !response.content.is_empty(),
+        "Should produce some response for long input"
+    );
 }
 
 #[tokio::test]
@@ -381,10 +397,7 @@ fn test_mind_shutdown_lifecycle() {
     assert!(mind.snapshot().is_active, "Should be active after awaken");
 
     mind.request_shutdown();
-    assert!(
-        mind.is_shutdown_requested(),
-        "Shutdown should be requested"
-    );
+    assert!(mind.is_shutdown_requested(), "Shutdown should be requested");
     assert!(
         !mind.snapshot().is_active,
         "Should not be active after shutdown request"

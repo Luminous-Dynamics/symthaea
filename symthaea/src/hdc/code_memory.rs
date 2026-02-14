@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 use symthaea_core::hdc::ContinuousHV;
 
 use super::code_encoder::CodeHDEncoder;
-use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode, CodeRelation};
+use crate::language::code_parser::{CodeEntity, CodeRelation, EntityKind, ParsedCode};
 
 /// A match result from querying the codebase memory
 #[derive(Debug, Clone)]
@@ -148,8 +148,12 @@ impl CodebaseMemory {
                         hv,
                     });
                 }
-                EntityKind::Struct | EntityKind::Class | EntityKind::Enum
-                | EntityKind::Trait | EntityKind::Interface | EntityKind::TypeAlias => {
+                EntityKind::Struct
+                | EntityKind::Class
+                | EntityKind::Enum
+                | EntityKind::Trait
+                | EntityKind::Interface
+                | EntityKind::TypeAlias => {
                     let hv = self.encoder.encode_entity(entity);
                     self.types.push(TypeEntry {
                         path: path_buf.clone(),
@@ -164,9 +168,9 @@ impl CodebaseMemory {
 
         // Index relationships
         for rel in &parsed.structure.relations {
-            let rel_hv = self.encoder.encode_relationship_triple(
-                &rel.source, rel.relation, &rel.target,
-            );
+            let rel_hv =
+                self.encoder
+                    .encode_relationship_triple(&rel.source, rel.relation, &rel.target);
             self.relationships.push(rel_hv);
         }
 
@@ -241,7 +245,9 @@ impl CodebaseMemory {
 
     /// Query only functions
     pub fn query_functions(&self, intent_hv: &ContinuousHV, top_k: usize) -> Vec<CodeMatch> {
-        let mut results: Vec<CodeMatch> = self.functions.iter()
+        let mut results: Vec<CodeMatch> = self
+            .functions
+            .iter()
             .map(|entry| CodeMatch {
                 path: entry.path.clone(),
                 name: entry.name.clone(),
@@ -261,7 +267,9 @@ impl CodebaseMemory {
 
     /// Query only types
     pub fn query_types(&self, intent_hv: &ContinuousHV, top_k: usize) -> Vec<CodeMatch> {
-        let mut results: Vec<CodeMatch> = self.types.iter()
+        let mut results: Vec<CodeMatch> = self
+            .types
+            .iter()
             .map(|entry| CodeMatch {
                 path: entry.path.clone(),
                 name: entry.name.clone(),
@@ -281,14 +289,13 @@ impl CodebaseMemory {
 
     /// Query for the most similar module (file)
     pub fn query_modules(&self, intent_hv: &ContinuousHV, top_k: usize) -> Vec<(PathBuf, f32)> {
-        let mut results: Vec<(PathBuf, f32)> = self.modules.iter()
+        let mut results: Vec<(PathBuf, f32)> = self
+            .modules
+            .iter()
             .map(|(path, hv)| (path.clone(), intent_hv.similarity(hv)))
             .collect();
 
-        results.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(top_k);
         results
     }
@@ -328,17 +335,16 @@ impl CodebaseMemory {
             None => return Vec::new(),
         };
 
-        let mut results: Vec<(PathBuf, f32)> = self.modules.iter()
+        let mut results: Vec<(PathBuf, f32)> = self
+            .modules
+            .iter()
             .map(|(path, hv)| {
                 let surprise = 1.0 - centroid.similarity(hv);
                 (path.clone(), surprise)
             })
             .collect();
 
-        results.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(top_k);
         results
     }
@@ -396,19 +402,26 @@ mod tests {
 
     fn test_span() -> Span {
         Span {
-            start_byte: 0, end_byte: 10,
-            start_line: 0, start_col: 0,
-            end_line: 0, end_col: 10,
+            start_byte: 0,
+            end_byte: 10,
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 10,
         }
     }
 
     fn make_parsed_file(_name: &str, funcs: &[&str], types: &[&str]) -> ParsedCode {
         let mut parsed = ParsedCode::new("", "rust");
         for f in funcs {
-            parsed.entities.push(CodeEntity::new(EntityKind::Function, *f, test_span()));
+            parsed
+                .entities
+                .push(CodeEntity::new(EntityKind::Function, *f, test_span()));
         }
         for t in types {
-            parsed.entities.push(CodeEntity::new(EntityKind::Struct, *t, test_span()));
+            parsed
+                .entities
+                .push(CodeEntity::new(EntityKind::Struct, *t, test_span()));
         }
         parsed
     }
@@ -496,11 +509,7 @@ mod tests {
 
         // Index several similar files
         for i in 0..3 {
-            let parsed = make_parsed_file(
-                &format!("file{i}.rs"),
-                &["sort", "filter"],
-                &[],
-            );
+            let parsed = make_parsed_file(&format!("file{i}.rs"), &["sort", "filter"], &[]);
             memory.index_file(Path::new(&format!("src/file{i}.rs")), &parsed);
         }
 

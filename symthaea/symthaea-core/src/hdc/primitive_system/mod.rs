@@ -48,21 +48,21 @@
 //! ```
 
 // === Type definitions ===
-mod primitive_tier;
 mod primitive;
+mod primitive_tier;
 
 // === Data structures ===
-mod lsh_index;
 mod composition_algebra;
 mod composition_cache;
-mod primitive_graph;
+mod lsh_index;
 mod persistence;
+mod primitive_graph;
 
 // === Initialization (impl PrimitiveSystem) ===
-mod init_tiers;
-mod init_domains;
 mod init_advanced_tiers;
 mod init_derived;
+mod init_domains;
+mod init_tiers;
 
 // === Public API (impl PrimitiveSystem) ===
 mod operations;
@@ -71,17 +71,17 @@ mod operations;
 mod tests;
 
 // Re-exports: all public types remain accessible at this module level
-pub use primitive_tier::*;
-pub use primitive::*;
-pub use lsh_index::*;
 pub use composition_algebra::*;
 pub use composition_cache::*;
-pub use primitive_graph::*;
+pub use lsh_index::*;
 pub use persistence::*;
+pub use primitive::*;
+pub use primitive_graph::*;
+pub use primitive_tier::*;
 
 use crate::hdc::binary_hv::BinaryHV;
-use std::collections::HashMap;
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 /// Global cached instance of PrimitiveSystem.
 ///

@@ -30,19 +30,22 @@ impl CognitiveLoopService {
 
     /// Check if a cognitive capability is allowed at current assurance level
     pub fn check_capability(&self, capability: crate::identity::CognitiveCapability) -> Result<()> {
-        self.mfdi_bridge.check_capability(capability)
+        self.mfdi_bridge
+            .check_capability(capability)
             .map_err(|e| anyhow::anyhow!("MFDI capability denied: {:?}", e))
     }
 
     /// Sign a cycle output
     pub fn sign_output(&mut self, output: &[f32]) -> Result<crate::identity::SignedOutput> {
-        self.mfdi_bridge.sign_output(output.to_vec())
+        self.mfdi_bridge
+            .sign_output(output.to_vec())
             .map_err(|e| anyhow::anyhow!("MFDI signing failed: {:?}", e))
     }
 
     /// Verify a signed request
     pub fn verify_request(&mut self, request: &crate::identity::SignedRequest) -> Result<()> {
-        self.mfdi_bridge.verify_request(request)
+        self.mfdi_bridge
+            .verify_request(request)
             .map_err(|e| anyhow::anyhow!("MFDI verification failed: {:?}", e))
     }
 

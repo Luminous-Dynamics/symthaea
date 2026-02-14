@@ -117,7 +117,9 @@ impl GenerativeModel {
         }
 
         // Precision decreases due to transition uncertainty
-        let next_precision: Vec<f64> = state.precision.iter()
+        let next_precision: Vec<f64> = state
+            .precision
+            .iter()
             .map(|p| (p * self.transition_precision) / (p + self.transition_precision))
             .collect();
 
@@ -132,7 +134,8 @@ impl GenerativeModel {
     /// Compute prediction error (observation - predicted)
     pub fn prediction_error(&self, state: &HiddenState, observation: &Observation) -> Vec<f64> {
         let predicted = self.predict_observation(state);
-        predicted.iter()
+        predicted
+            .iter()
             .zip(observation.values.iter())
             .map(|(pred, obs)| obs - pred)
             .collect()
@@ -167,8 +170,10 @@ impl GenerativeModel {
                 // Increase self-transition probability slightly for active states
                 let state_activity = state.mean[i];
                 if state_activity > 0.5 {
-                    self.transition_matrices[idx][i][i] += self.learning_rate * 0.1 * (state_activity - 0.5);
-                    self.transition_matrices[idx][i][i] = self.transition_matrices[idx][i][i].clamp(0.0, 1.0);
+                    self.transition_matrices[idx][i][i] +=
+                        self.learning_rate * 0.1 * (state_activity - 0.5);
+                    self.transition_matrices[idx][i][i] =
+                        self.transition_matrices[idx][i][i].clamp(0.0, 1.0);
                 }
             }
 
@@ -199,7 +204,9 @@ impl GenerativeModel {
 
         // Compute prediction error for the transition
         let predicted_next = self.predict_next_state(old_state, action);
-        let transition_error: f64 = new_state.mean.iter()
+        let transition_error: f64 = new_state
+            .mean
+            .iter()
             .zip(predicted_next.mean.iter())
             .map(|(actual, predicted)| (actual - predicted).powi(2))
             .sum::<f64>()
@@ -238,7 +245,8 @@ impl GenerativeModel {
         let predicted_obs = self.predict_observation(new_state);
         for i in 0..self.state_dim.min(new_state.mean.len()) {
             for j in 0..self.obs_dim.min(observation.values.len()) {
-                let obs_error = observation.values[j] - predicted_obs.get(j).copied().unwrap_or(0.0);
+                let obs_error =
+                    observation.values[j] - predicted_obs.get(j).copied().unwrap_or(0.0);
                 let gradient = obs_error * new_state.mean[i];
                 self.likelihood_matrix[i][j] += effective_lr * gradient;
                 self.likelihood_matrix[i][j] = self.likelihood_matrix[i][j].clamp(0.0, 1.0);

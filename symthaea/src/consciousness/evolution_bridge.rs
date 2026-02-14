@@ -35,15 +35,13 @@
 //! └─────────────────────────────────────────────────────────────────────┘
 //! ```
 
-use crate::consciousness::primitive_evolution::{
-    PrimitiveEvolution, EvolutionConfig,
-};
+use crate::consciousness::primitive_evolution::{EvolutionConfig, PrimitiveEvolution};
 use crate::consciousness::primitive_reasoning::{
-    AdaptivePrimitiveSelector, TaskType, ReasoningChain,
+    AdaptivePrimitiveSelector, ReasoningChain, TaskType,
 };
-use symthaea_core::hdc::primitive_system::PrimitiveTier;
-use serde::{Serialize, Deserialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use symthaea_core::hdc::primitive_system::PrimitiveTier;
 
 // =============================================================================
 // EVOLUTION COORDINATOR
@@ -76,7 +74,13 @@ pub struct EvolutionCoordinator {
 impl std::fmt::Debug for EvolutionCoordinator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EvolutionCoordinator")
-            .field("primitive_evolver", &self.primitive_evolver.as_ref().map(|_| "<PrimitiveEvolution>"))
+            .field(
+                "primitive_evolver",
+                &self
+                    .primitive_evolver
+                    .as_ref()
+                    .map(|_| "<PrimitiveEvolution>"),
+            )
             .field("active_tier", &self.active_tier)
             .field("selector", &self.selector)
             .field("schedule", &self.schedule)
@@ -206,7 +210,7 @@ impl EvolutionCoordinator {
         self.history.push(EvolutionSnapshot {
             generation: self.generation,
             primitive_phi: self.get_current_primitive_phi(),
-            architecture_phi: 0.0,  // Would be filled by architecture evolution
+            architecture_phi: 0.0, // Would be filled by architecture evolution
             evolved_primitives: result.new_primitives.len(),
             active_tier: self.get_active_evolution_tier(),
             timestamp: std::time::SystemTime::now()
@@ -245,11 +249,14 @@ impl EvolutionCoordinator {
         let evolution_result = evolver.evolve()?;
 
         // Filter by minimum improvement
-        let improved_primitives: Vec<String> = evolution_result.final_primitives
+        let improved_primitives: Vec<String> = evolution_result
+            .final_primitives
             .iter()
             .filter(|p| {
                 // Check if this primitive improved phi
-                let baseline = self.selector.all_stats()
+                let baseline = self
+                    .selector
+                    .all_stats()
                     .iter()
                     .filter(|((name, _), _)| *name == p.name)
                     .map(|(_, stats)| stats.mean_phi())
@@ -273,10 +280,11 @@ impl EvolutionCoordinator {
         // Find tier with lowest average phi
         let tier_stats = self.compute_tier_stats();
 
-        tier_stats.into_iter()
+        tier_stats
+            .into_iter()
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(tier, _)| tier)
-            .unwrap_or(PrimitiveTier::Physical)  // Default to Physical
+            .unwrap_or(PrimitiveTier::Physical) // Default to Physical
     }
 
     /// Compute average phi by tier using adaptive selector statistics
@@ -319,12 +327,13 @@ impl EvolutionCoordinator {
         }
 
         // Compute average phi per tier (lower = needs more evolution)
-        tier_stats.into_iter()
+        tier_stats
+            .into_iter()
             .map(|(tier, (total_phi, count))| {
                 let avg_phi = if count > 0 {
                     total_phi / count as f64
                 } else {
-                    0.5  // Default for unused tiers
+                    0.5 // Default for unused tiers
                 };
                 (tier, avg_phi)
             })
@@ -454,7 +463,8 @@ impl EvolutionCoordinator {
         // High performers get positive observations to increase their Thompson sampling weights
         for (name, phi) in &feedback.high_performers {
             // Record for the General task type (architecture-level feedback applies broadly)
-            self.selector.record_observation(name, TaskType::General, *phi);
+            self.selector
+                .record_observation(name, TaskType::General, *phi);
 
             // Also update task-specific stats based on primitive tier
             if let Some(primitive) = prim_system.get(name) {
@@ -475,7 +485,8 @@ impl EvolutionCoordinator {
         for (name, phi) in &feedback.low_performers {
             // Record negative contribution (or zero if phi was already near zero)
             let penalty = if *phi < 0.1 { -0.1 } else { 0.0 };
-            self.selector.record_observation(name, TaskType::General, penalty);
+            self.selector
+                .record_observation(name, TaskType::General, penalty);
 
             // Also record for tier-specific task type
             if let Some(primitive) = prim_system.get(name) {
@@ -497,8 +508,7 @@ impl EvolutionCoordinator {
         for (name, usage_count) in &feedback.routing_primitive_usage {
             if *usage_count > 10 {
                 // High usage: check if in low performers
-                let is_underperforming = feedback.low_performers.iter()
-                    .any(|(n, _)| n == name);
+                let is_underperforming = feedback.low_performers.iter().any(|(n, _)| n == name);
 
                 if is_underperforming {
                     // High usage + low performance = candidate for evolution
@@ -537,7 +547,8 @@ impl EvolutionCoordinator {
     fn find_worst_tier(&self) -> Option<PrimitiveTier> {
         let tier_phi = self.compute_tier_stats();
 
-        tier_phi.into_iter()
+        tier_phi
+            .into_iter()
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(tier, _)| tier)
     }
@@ -549,7 +560,9 @@ impl EvolutionCoordinator {
     pub fn generate_primitive_feedback(&self) -> PrimitiveFeedback {
         // Find newly discovered high-performing primitives from selector stats
         // (primitives that have been used recently and show positive phi)
-        let new_primitives: Vec<String> = self.selector.all_stats()
+        let new_primitives: Vec<String> = self
+            .selector
+            .all_stats()
             .iter()
             .filter(|((_, _), stats)| {
                 // Recently discovered: few uses but high mean phi
@@ -559,11 +572,11 @@ impl EvolutionCoordinator {
             .collect();
 
         // Find underperforming primitives that might be deprecated
-        let deprecated_primitives: Vec<String> = self.selector.all_stats()
+        let deprecated_primitives: Vec<String> = self
+            .selector
+            .all_stats()
             .iter()
-            .filter(|((_, _), stats)| {
-                stats.use_count > 10 && stats.mean_phi() < 0.1
-            })
+            .filter(|((_, _), stats)| stats.use_count > 10 && stats.mean_phi() < 0.1)
             .map(|((name, _), _)| name.clone())
             .collect();
 
@@ -619,7 +632,9 @@ mod tests {
     #[test]
     fn test_schedule_variants() {
         let interleaved = EvolutionSchedule::Interleaved { frequency: 5 };
-        let _plateau = EvolutionSchedule::OnPlateau { stall_generations: 10 };
+        let _plateau = EvolutionSchedule::OnPlateau {
+            stall_generations: 10,
+        };
         let _parallel = EvolutionSchedule::Parallel;
 
         // Just verify they can be created

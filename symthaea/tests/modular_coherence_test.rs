@@ -5,7 +5,7 @@
 //! after being extracted from a single file into multiple submodules.
 
 use symthaea::physiology::coherence::{
-    CoherenceField, CoherenceConfig, TaskComplexity, ScatterCause, analyze_scatter,
+    analyze_scatter, CoherenceConfig, CoherenceField, ScatterCause, TaskComplexity,
 };
 use symthaea::physiology::endocrine::HormoneState;
 
@@ -62,7 +62,9 @@ fn test_task_performance_solo() {
     field.relational_resonance = 0.3;
 
     let initial = field.coherence;
-    field.perform_task(TaskComplexity::Cognitive, false).unwrap();
+    field
+        .perform_task(TaskComplexity::Cognitive, false)
+        .unwrap();
 
     // Solo work should SCATTER coherence
     assert!(field.coherence < initial);
@@ -129,9 +131,21 @@ fn test_scatter_analysis_delegation() {
 
 #[test]
 fn test_scatter_cause_variants() {
-    let hormones_stress = HormoneState { cortisol: 0.8, dopamine: 0.5, acetylcholine: 0.5 };
-    let hormones_emotional = HormoneState { cortisol: 0.3, dopamine: 0.2, acetylcholine: 0.5 };
-    let hormones_cognitive = HormoneState { cortisol: 0.3, dopamine: 0.5, acetylcholine: 0.2 };
+    let hormones_stress = HormoneState {
+        cortisol: 0.8,
+        dopamine: 0.5,
+        acetylcholine: 0.5,
+    };
+    let hormones_emotional = HormoneState {
+        cortisol: 0.3,
+        dopamine: 0.2,
+        acetylcholine: 0.5,
+    };
+    let hormones_cognitive = HormoneState {
+        cortisol: 0.3,
+        dopamine: 0.5,
+        acetylcholine: 0.2,
+    };
 
     let analysis_stress = analyze_scatter(0.3, 0.5, &hormones_stress);
     let analysis_emotional = analyze_scatter(0.3, 0.5, &hormones_emotional);
@@ -162,7 +176,9 @@ fn test_full_workflow() {
     field.apply_hormone_modulation(&hormones);
 
     // Perform connected work
-    field.perform_task(TaskComplexity::DeepThought, true).unwrap();
+    field
+        .perform_task(TaskComplexity::DeepThought, true)
+        .unwrap();
 
     // Record the successful pattern
     field.record_resonance_pattern(&hormones, "deep_thought_success".to_string());

@@ -6,8 +6,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::super::binary_hv::BinaryHV;
 use super::super::adaptive_topology::CognitiveMode;
+use super::super::binary_hv::BinaryHV;
 use super::super::cross_modal_binding::Modality;
 
 // Re-export SubstrateType from substrate_independence
@@ -105,8 +105,11 @@ pub struct ConsciousnessMetricsReport {
 
 impl std::fmt::Display for ConsciousnessMetricsReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Consciousness Metrics: Phi={:.4} Level={:.4} Embodiment={:.4} Cycles={}",
-            self.phi, self.consciousness_level, self.embodiment_level, self.processing_cycles)
+        writeln!(
+            f,
+            "Consciousness Metrics: Phi={:.4} Level={:.4} Embodiment={:.4} Cycles={}",
+            self.phi, self.consciousness_level, self.embodiment_level, self.processing_cycles
+        )
     }
 }
 
@@ -151,7 +154,11 @@ pub struct OptimizationCycleSummary {
 
 impl std::fmt::Display for OptimizationCycleSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Optimization: Phi {:.4} -> {:.4}", self.phi_before, self.phi_after)
+        write!(
+            f,
+            "Optimization: Phi {:.4} -> {:.4}",
+            self.phi_before, self.phi_after
+        )
     }
 }
 
@@ -233,9 +240,17 @@ impl BoundObject {
         self.conscious
     }
 
-    pub fn new_feature(representation: BinaryHV, synchrony: f64, binding_strength: f64, conscious: bool) -> Self {
+    pub fn new_feature(
+        representation: BinaryHV,
+        synchrony: f64,
+        binding_strength: f64,
+        conscious: bool,
+    ) -> Self {
         Self {
-            representation, synchrony, binding_strength, conscious,
+            representation,
+            synchrony,
+            binding_strength,
+            conscious,
             level: BindingLevel::Feature,
             child_ids: Vec::new(),
             attention_weight: 1.0,
@@ -249,14 +264,19 @@ impl BoundObject {
         if features.is_empty() {
             return Self::new_feature(BinaryHV::random(seed), 0.0, 0.0, false);
         }
-        let bound_repr = features.iter()
+        let bound_repr = features
+            .iter()
             .map(|f| f.representation)
             .reduce(|a, b| a.bind(&b))
             .unwrap_or_else(|| BinaryHV::random(seed));
-        let avg_synchrony = features.iter().map(|f| f.synchrony).sum::<f64>() / features.len() as f64;
-        let avg_strength = features.iter().map(|f| f.binding_strength).sum::<f64>() / features.len() as f64;
-        let avg_attention = features.iter().map(|f| f.attention_weight).sum::<f64>() / features.len() as f64;
-        let avg_stability = features.iter().map(|f| f.temporal_stability).sum::<f64>() / features.len() as f64;
+        let avg_synchrony =
+            features.iter().map(|f| f.synchrony).sum::<f64>() / features.len() as f64;
+        let avg_strength =
+            features.iter().map(|f| f.binding_strength).sum::<f64>() / features.len() as f64;
+        let avg_attention =
+            features.iter().map(|f| f.attention_weight).sum::<f64>() / features.len() as f64;
+        let avg_stability =
+            features.iter().map(|f| f.temporal_stability).sum::<f64>() / features.len() as f64;
         Self {
             representation: bound_repr,
             synchrony: avg_synchrony,
@@ -275,14 +295,18 @@ impl BoundObject {
         if objects.is_empty() {
             return Self::new_feature(BinaryHV::random(seed), 0.0, 0.0, false);
         }
-        let bound_repr = objects.iter()
+        let bound_repr = objects
+            .iter()
             .map(|o| o.representation)
             .reduce(|a, b| a.bind(&b))
             .unwrap_or_else(|| BinaryHV::random(seed));
         let avg_synchrony = objects.iter().map(|o| o.synchrony).sum::<f64>() / objects.len() as f64;
-        let avg_strength = objects.iter().map(|o| o.binding_strength).sum::<f64>() / objects.len() as f64;
-        let avg_attention = objects.iter().map(|o| o.attention_weight).sum::<f64>() / objects.len() as f64;
-        let avg_stability = objects.iter().map(|o| o.temporal_stability).sum::<f64>() / objects.len() as f64;
+        let avg_strength =
+            objects.iter().map(|o| o.binding_strength).sum::<f64>() / objects.len() as f64;
+        let avg_attention =
+            objects.iter().map(|o| o.attention_weight).sum::<f64>() / objects.len() as f64;
+        let avg_stability =
+            objects.iter().map(|o| o.temporal_stability).sum::<f64>() / objects.len() as f64;
         Self {
             representation: bound_repr,
             synchrony: (avg_synchrony * 1.05).min(1.0),
@@ -348,46 +372,73 @@ pub enum PredictiveMode {
 
 /// State view types for structured access to ConsciousnessState fields
 pub struct PhiMetrics {
-    pub phi: f64, pub free_energy: f64, pub topological_unity: f64,
-    pub phi_trend: f64, pub predicted_phi: Option<f64>,
+    pub phi: f64,
+    pub free_energy: f64,
+    pub topological_unity: f64,
+    pub phi_trend: f64,
+    pub predicted_phi: Option<f64>,
 }
 pub struct TemporalStateView {
-    pub temporal_coherence: f64, pub theta_phase: f64,
-    pub narrative_coherence: f64, pub present_window_length: usize,
+    pub temporal_coherence: f64,
+    pub theta_phase: f64,
+    pub narrative_coherence: f64,
+    pub present_window_length: usize,
 }
-pub struct SelfModelStateView { pub confidence: f64, pub accuracy: f64 }
+pub struct SelfModelStateView {
+    pub confidence: f64,
+    pub accuracy: f64,
+}
 pub struct EmotionalStateView {
-    pub valence: f64, pub arousal: Option<f64>, pub uncertainty: f64,
+    pub valence: f64,
+    pub arousal: Option<f64>,
+    pub uncertainty: f64,
 }
-pub struct PredictiveStateView { pub precision: f64, pub surprise: f64 }
+pub struct PredictiveStateView {
+    pub precision: f64,
+    pub surprise: f64,
+}
 pub struct IntegrationMetricsView {
-    pub metacognitive_confidence: f64, pub cross_modal_coherence: f64,
+    pub metacognitive_confidence: f64,
+    pub cross_modal_coherence: f64,
     pub integration_score: f64,
 }
 
 impl ConsciousnessState {
     pub fn phi_metrics(&self) -> PhiMetrics {
         PhiMetrics {
-            phi: self.phi, free_energy: self.free_energy,
+            phi: self.phi,
+            free_energy: self.free_energy,
             topological_unity: self.topological_unity,
-            phi_trend: self.phi_trend, predicted_phi: self.predicted_phi,
+            phi_trend: self.phi_trend,
+            predicted_phi: self.predicted_phi,
         }
     }
     pub fn temporal_state(&self) -> TemporalStateView {
         TemporalStateView {
-            temporal_coherence: self.temporal_coherence, theta_phase: self.theta_phase,
+            temporal_coherence: self.temporal_coherence,
+            theta_phase: self.theta_phase,
             narrative_coherence: self.narrative_coherence,
             present_window_length: self.present_window_length,
         }
     }
     pub fn self_model_state(&self) -> SelfModelStateView {
-        SelfModelStateView { confidence: self.self_model_confidence, accuracy: self.self_model_accuracy }
+        SelfModelStateView {
+            confidence: self.self_model_confidence,
+            accuracy: self.self_model_accuracy,
+        }
     }
     pub fn emotional_state(&self) -> EmotionalStateView {
-        EmotionalStateView { valence: self.emotional_valence, arousal: self.emotional_arousal, uncertainty: self.uncertainty }
+        EmotionalStateView {
+            valence: self.emotional_valence,
+            arousal: self.emotional_arousal,
+            uncertainty: self.uncertainty,
+        }
     }
     pub fn predictive_state(&self) -> PredictiveStateView {
-        PredictiveStateView { precision: self.predictive_precision, surprise: self.surprise_level }
+        PredictiveStateView {
+            precision: self.predictive_precision,
+            surprise: self.surprise_level,
+        }
     }
     pub fn integration_metrics(&self) -> IntegrationMetricsView {
         IntegrationMetricsView {

@@ -397,7 +397,7 @@ mod tests {
         // 20 rounds of NOT being excluded (reformed)
         for _ in 0..20 {
             let updates = make_updates(10, 0); // all honest
-            // Ensure byz_0 is present as an honest node
+                                               // Ensure byz_0 is present as an honest node
             let mut updates_with_reformed = updates;
             updates_with_reformed.push(GradientUpdate::new(
                 "byz_0".to_string(),

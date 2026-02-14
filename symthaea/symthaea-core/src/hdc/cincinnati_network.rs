@@ -29,13 +29,13 @@
 //! └─────────────────────────────────────────────────────────────┘
 //! ```
 
-use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::hdc_ltc_neuron::{HdcLtcNetwork, HdcLtcNetworkConfig};
 use crate::hdc::cincinnati_ltc::{
-    CincinnatiEstimator, LateralBinder, PredictiveBudding, PoGMetrics, BuddingEvent,
+    BuddingEvent, CincinnatiEstimator, LateralBinder, PoGMetrics, PredictiveBudding,
 };
+use crate::hdc::hdc_ltc_neuron::{HdcLtcNetwork, HdcLtcNetworkConfig};
+use crate::hdc::unified_hv::ContinuousHV;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Configuration for Cincinnati-enhanced network
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -132,9 +132,8 @@ impl CincinnatiHdcLtcNetwork {
             .collect();
 
         // Create per-layer lateral binders
-        let lateral_binders: Vec<LateralBinder> = (0..n_layers)
-            .map(|_| LateralBinder::new(dim))
-            .collect();
+        let lateral_binders: Vec<LateralBinder> =
+            (0..n_layers).map(|_| LateralBinder::new(dim)).collect();
 
         // Initialize budding system
         let total_neurons: usize = config.network_config.layer_sizes.iter().sum();
@@ -204,8 +203,8 @@ impl CincinnatiHdcLtcNetwork {
 
         // 6. Update PoG metrics
         if self.config.enable_pog {
-            self.pog.update_latency(dt * 1000.0);  // Convert to ms
-            self.pog.update_energy(0.1, timestamp);  // Estimate
+            self.pog.update_latency(dt * 1000.0); // Convert to ms
+            self.pog.update_energy(0.1, timestamp); // Estimate
         }
 
         // Store prediction for next error computation
@@ -234,7 +233,8 @@ impl CincinnatiHdcLtcNetwork {
                 let delta_hv = ContinuousHV::random(
                     self.layer_weights[layer_idx].dim(),
                     self.timestep + layer_idx as u64 * 100,
-                ).scale(delta * lr * confidence);
+                )
+                .scale(delta * lr * confidence);
 
                 self.layer_weights[layer_idx] = self.layer_weights[layer_idx].add(&delta_hv);
             }
@@ -294,7 +294,8 @@ impl CincinnatiHdcLtcNetwork {
     /// Get all neuron states as a flat list
     fn get_all_neuron_states(&self) -> Vec<ContinuousHV> {
         // Use the network's all_states method and clone the states
-        self.network.all_states()
+        self.network
+            .all_states()
             .iter()
             .map(|s| (*s).clone())
             .collect()
@@ -414,13 +415,19 @@ impl CincinnatiHdcLtcNetwork {
     pub fn stats(&self) -> CincinnatiNetworkStats {
         let network_stats = self.network.stats();
 
-        let avg_confidence: f32 = self.layer_estimators.iter()
+        let avg_confidence: f32 = self
+            .layer_estimators
+            .iter()
             .map(|e| e.confidence())
-            .sum::<f32>() / self.layer_estimators.len() as f32;
+            .sum::<f32>()
+            / self.layer_estimators.len() as f32;
 
-        let avg_length: f32 = self.layer_estimators.iter()
+        let avg_length: f32 = self
+            .layer_estimators
+            .iter()
             .map(|e| e.model.len() as f32)
-            .sum::<f32>() / self.layer_estimators.len() as f32;
+            .sum::<f32>()
+            / self.layer_estimators.len() as f32;
 
         CincinnatiNetworkStats {
             network_neurons: network_stats.n_neurons,
@@ -503,7 +510,7 @@ mod tests {
     fn test_lateral_binding() {
         let mut config = CincinnatiNetworkConfig::default();
         config.enable_lateral_binding = true;
-        config.enable_cincinnati = false;  // Isolate lateral binding
+        config.enable_cincinnati = false; // Isolate lateral binding
 
         let mut network = CincinnatiHdcLtcNetwork::new(config, 42);
         let input = ContinuousHV::random_default(100);
@@ -523,12 +530,18 @@ mod tests {
 
         // Similarity should be finite and in valid range [-1, 1]
         assert!(similarity.is_finite(), "Output similarity should be finite");
-        assert!(similarity >= -1.0 && similarity <= 1.0,
-                "Similarity should be in [-1, 1], got {}", similarity);
+        assert!(
+            similarity >= -1.0 && similarity <= 1.0,
+            "Similarity should be in [-1, 1], got {}",
+            similarity
+        );
 
         // After multiple evolution steps, output should have diverged from initial
         // (lateral binding should cause state changes)
-        assert!(similarity < 1.0, "Output should have changed after lateral binding evolution");
+        assert!(
+            similarity < 1.0,
+            "Output should have changed after lateral binding evolution"
+        );
     }
 
     #[test]

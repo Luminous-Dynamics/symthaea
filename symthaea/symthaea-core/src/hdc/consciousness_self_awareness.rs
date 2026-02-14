@@ -55,14 +55,17 @@ impl ConsciousnessSubsystem for SelfAwarenessSubsystem {
         "self_awareness"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
-        -> Result<(), SubsystemError>
-    {
+    fn process_cycle(
+        &mut self,
+        state: &mut ConsciousnessState,
+        _inputs: &[BinaryHV],
+    ) -> Result<(), SubsystemError> {
         self.cycle_count += 1;
 
         // Compute prediction error
         let error = (state.phi - self.predicted_phi).abs();
-        self.prediction_error_ema = self.ema_alpha * error + (1.0 - self.ema_alpha) * self.prediction_error_ema;
+        self.prediction_error_ema =
+            self.ema_alpha * error + (1.0 - self.ema_alpha) * self.prediction_error_ema;
 
         // Prediction accuracy = inverse of error
         let accuracy = (1.0 - self.prediction_error_ema).clamp(0.0, 1.0);
@@ -75,7 +78,8 @@ impl ConsciousnessSubsystem for SelfAwarenessSubsystem {
         state.self_model_accuracy = accuracy;
 
         // Simple prediction for next cycle: EMA of recent Phi
-        self.predicted_phi = self.ema_alpha * state.phi + (1.0 - self.ema_alpha) * self.predicted_phi;
+        self.predicted_phi =
+            self.ema_alpha * state.phi + (1.0 - self.ema_alpha) * self.predicted_phi;
 
         Ok(())
     }
@@ -90,7 +94,7 @@ impl ConsciousnessSubsystem for SelfAwarenessSubsystem {
 // =============================================================================
 
 use super::temporal_consciousness::{
-    TemporalConsciousness, TemporalConfig as TemporalConsciousnessConfig, TemporalAssessment,
+    TemporalAssessment, TemporalConfig as TemporalConsciousnessConfig, TemporalConsciousness,
 };
 
 /// Engine-backed temporal consciousness subsystem.
@@ -107,7 +111,10 @@ impl TemporalConsciousnessWrapped {
     /// Create with default config.
     pub fn new(num_components: usize) -> Self {
         Self {
-            engine: TemporalConsciousness::new(num_components, TemporalConsciousnessConfig::default()),
+            engine: TemporalConsciousness::new(
+                num_components,
+                TemporalConsciousnessConfig::default(),
+            ),
             cycle_count: 0,
             latest_assessment: None,
         }
@@ -133,9 +140,11 @@ impl ConsciousnessSubsystem for TemporalConsciousnessWrapped {
         "temporal_consciousness"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV])
-        -> Result<(), SubsystemError>
-    {
+    fn process_cycle(
+        &mut self,
+        state: &mut ConsciousnessState,
+        inputs: &[BinaryHV],
+    ) -> Result<(), SubsystemError> {
         self.cycle_count += 1;
         let current_time = self.cycle_count as f64;
         self.engine.add_snapshot(current_time, inputs.to_vec());
@@ -174,8 +183,14 @@ mod tests {
             sub.process_cycle(&mut state, &inputs).unwrap();
         }
 
-        assert!(sub.awareness_level() > 0.0, "Awareness should increase with stable Phi");
-        assert!(state.self_model_confidence > 0.5, "Confidence should be high with stable input");
+        assert!(
+            sub.awareness_level() > 0.0,
+            "Awareness should increase with stable Phi"
+        );
+        assert!(
+            state.self_model_confidence > 0.5,
+            "Confidence should be high with stable input"
+        );
     }
 
     #[test]

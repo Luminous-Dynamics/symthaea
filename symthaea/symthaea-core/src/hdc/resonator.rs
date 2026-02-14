@@ -317,7 +317,11 @@ impl ResonatorNetwork {
     /// 4. Apply momentum and cleanup
     /// 5. Check convergence
     /// 6. Repeat until converged or max iterations
-    pub fn solve(&mut self, constraints: &[Constraint], max_iter: Option<usize>) -> Result<ResonatorSolution> {
+    pub fn solve(
+        &mut self,
+        constraints: &[Constraint],
+        max_iter: Option<usize>,
+    ) -> Result<ResonatorSolution> {
         let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
         self.energy_history.clear();
 
@@ -372,7 +376,7 @@ impl ResonatorNetwork {
             // Apply momentum
             for i in 0..self.dimension {
                 velocity[i] = self.config.momentum * velocity[i]
-                            + self.config.step_size * (update[i] - estimate[i]);
+                    + self.config.step_size * (update[i] - estimate[i]);
             }
 
             // Add noise for exploration
@@ -399,7 +403,8 @@ impl ResonatorNetwork {
                 state.estimate = estimate.clone();
                 state.previous = previous.clone();
                 state.confidence = if !self.codebook.is_empty() {
-                    self.codebook.iter()
+                    self.codebook
+                        .iter()
                         .map(|e| cosine_similarity(&estimate, &e.vector))
                         .fold(f32::NEG_INFINITY, f32::max)
                 } else {
@@ -457,16 +462,22 @@ impl ResonatorNetwork {
             .collect();
 
         // Initialize resonator states for introspection
-        self.states = unknowns.iter().map(|&name| {
-            let est = estimates.get(name).expect("estimates map must contain all unknowns").clone();
-            ResonatorState {
-                estimate: est.clone(),
-                previous: est,
-                confidence: 0.0,
-                name: name.to_string(),
-                converged: false,
-            }
-        }).collect();
+        self.states = unknowns
+            .iter()
+            .map(|&name| {
+                let est = estimates
+                    .get(name)
+                    .expect("estimates map must contain all unknowns")
+                    .clone();
+                ResonatorState {
+                    estimate: est.clone(),
+                    previous: est,
+                    confidence: 0.0,
+                    name: name.to_string(),
+                    converged: false,
+                }
+            })
+            .collect();
 
         // Initialize coupling strengths (pairwise between unknowns)
         let n = unknowns.len();
@@ -497,8 +508,12 @@ impl ResonatorNetwork {
                 // Update the unknown being solved for
                 if let Factor::Unknown(name) = &constraint.unknown {
                     let unbind_update = unbind(&left, &right);
-                    let update = updates.get_mut(name).expect("updates map must contain all unknowns");
-                    let weight = weights.get_mut(name).expect("weights map must contain all unknowns");
+                    let update = updates
+                        .get_mut(name)
+                        .expect("updates map must contain all unknowns");
+                    let weight = weights
+                        .get_mut(name)
+                        .expect("weights map must contain all unknowns");
 
                     for i in 0..self.dimension {
                         update[i] += constraint.weight * unbind_update[i];
@@ -512,13 +527,16 @@ impl ResonatorNetwork {
 
             for name in unknowns {
                 let name = name.to_string();
-                let update = updates.get(&name).expect("updates map must contain all unknowns");
-                let weight = *weights.get(&name).expect("weights map must contain all unknowns");
+                let update = updates
+                    .get(&name)
+                    .expect("updates map must contain all unknowns");
+                let weight = *weights
+                    .get(&name)
+                    .expect("weights map must contain all unknowns");
 
                 if weight > 0.0 {
-                    let mut normalized_update: Vec<f32> = update.iter()
-                        .map(|&x| x / weight)
-                        .collect();
+                    let mut normalized_update: Vec<f32> =
+                        update.iter().map(|&x| x / weight).collect();
 
                     // Cleanup
                     if !self.codebook.is_empty() {
@@ -526,13 +544,17 @@ impl ResonatorNetwork {
                     }
 
                     // Apply momentum
-                    let estimate = estimates.get_mut(&name).expect("estimates map must contain all unknowns");
-                    let velocity = velocities.get_mut(&name).expect("velocities map must contain all unknowns");
+                    let estimate = estimates
+                        .get_mut(&name)
+                        .expect("estimates map must contain all unknowns");
+                    let velocity = velocities
+                        .get_mut(&name)
+                        .expect("velocities map must contain all unknowns");
                     let previous = estimate.clone();
 
                     for i in 0..self.dimension {
                         velocity[i] = self.config.momentum * velocity[i]
-                                    + self.config.step_size * (normalized_update[i] - estimate[i]);
+                            + self.config.step_size * (normalized_update[i] - estimate[i]);
                         estimate[i] += velocity[i];
                     }
                     normalize(estimate);
@@ -552,7 +574,8 @@ impl ResonatorNetwork {
                     if let Some(state) = self.states.get_mut(idx) {
                         state.estimate = est.clone();
                         state.confidence = if !self.codebook.is_empty() {
-                            self.codebook.iter()
+                            self.codebook
+                                .iter()
                                 .map(|e| cosine_similarity(est, &e.vector))
                                 .fold(f32::NEG_INFINITY, f32::max)
                         } else {
@@ -567,7 +590,9 @@ impl ResonatorNetwork {
             for i in 0..n {
                 for j in (i + 1)..n {
                     let ci = i * n - i * (i + 1) / 2 + j - i - 1;
-                    if let (Some(ei), Some(ej)) = (estimates.get(unknowns[i]), estimates.get(unknowns[j])) {
+                    if let (Some(ei), Some(ej)) =
+                        (estimates.get(unknowns[i]), estimates.get(unknowns[j]))
+                    {
                         if ci < self.coupling_strengths.len() {
                             self.coupling_strengths[ci] = cosine_similarity(ei, ej).abs();
                         }
@@ -588,8 +613,13 @@ impl ResonatorNetwork {
         let solutions = unknowns
             .iter()
             .map(|&name| {
-                let estimate = estimates.remove(name).expect("estimates map must contain all unknowns");
-                (name.to_string(), self.create_solution(estimate, max_iterations, true))
+                let estimate = estimates
+                    .remove(name)
+                    .expect("estimates map must contain all unknowns");
+                (
+                    name.to_string(),
+                    self.create_solution(estimate, max_iterations, true),
+                )
             })
             .collect();
 
@@ -606,13 +636,17 @@ impl ResonatorNetwork {
         }
 
         // Compute similarities to all codebook entries
-        let similarities: Vec<f32> = self.codebook
+        let similarities: Vec<f32> = self
+            .codebook
             .iter()
             .map(|entry| cosine_similarity(vector, &entry.vector))
             .collect();
 
         // Apply temperature-scaled softmax
-        let max_sim = similarities.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max_sim = similarities
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         let exp_sims: Vec<f32> = similarities
             .iter()
             .map(|&s| ((s - max_sim) / self.config.temperature).exp())
@@ -656,12 +690,18 @@ impl ResonatorNetwork {
     }
 
     /// Create solution struct from final estimate
-    fn create_solution(&self, estimate: Vec<f32>, iterations: usize, converged: bool) -> ResonatorSolution {
+    fn create_solution(
+        &self,
+        estimate: Vec<f32>,
+        iterations: usize,
+        converged: bool,
+    ) -> ResonatorSolution {
         // Find closest codebook symbol
         let (closest_symbol, symbol_similarity) = if self.codebook.is_empty() {
             (None, 0.0)
         } else {
-            let (idx, sim) = self.codebook
+            let (idx, sim) = self
+                .codebook
                 .iter()
                 .enumerate()
                 .map(|(i, entry)| (i, cosine_similarity(&estimate, &entry.vector)))
@@ -697,20 +737,21 @@ impl ResonatorNetwork {
     }
 
     /// Resolve a factor to its vector representation
-    fn resolve_factor(&self, factor: &Factor, estimates: &HashMap<String, Vec<f32>>) -> Result<Vec<f32>> {
+    fn resolve_factor(
+        &self,
+        factor: &Factor,
+        estimates: &HashMap<String, Vec<f32>>,
+    ) -> Result<Vec<f32>> {
         match factor {
             Factor::Known(vector) => Ok(vector.clone()),
-            Factor::Symbol(name) => {
-                self.get_symbol(name)
-                    .cloned()
-                    .ok_or_else(|| anyhow::anyhow!("Unknown symbol: {}", name))
-            }
-            Factor::Unknown(name) => {
-                estimates
-                    .get(name)
-                    .cloned()
-                    .ok_or_else(|| anyhow::anyhow!("Unknown variable: {}", name))
-            }
+            Factor::Symbol(name) => self
+                .get_symbol(name)
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("Unknown symbol: {}", name)),
+            Factor::Unknown(name) => estimates
+                .get(name)
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("Unknown variable: {}", name)),
         }
     }
 
@@ -783,15 +824,19 @@ impl ResonatorNetwork {
     /// }
     /// ```
     pub fn snapshot(&self) -> ResonatorSnapshot {
-        let convergence_metrics: Vec<ConvergenceMetric> = self.states.iter().map(|s| {
-            let stability = cosine_similarity(&s.estimate, &s.previous);
-            ConvergenceMetric {
-                name: s.name.clone(),
-                confidence: s.confidence,
-                converged: s.converged,
-                stability,
-            }
-        }).collect();
+        let convergence_metrics: Vec<ConvergenceMetric> = self
+            .states
+            .iter()
+            .map(|s| {
+                let stability = cosine_similarity(&s.estimate, &s.previous);
+                ConvergenceMetric {
+                    name: s.name.clone(),
+                    confidence: s.confidence,
+                    converged: s.converged,
+                    stability,
+                }
+            })
+            .collect();
 
         let current_energy = self.energy_history.last().copied().unwrap_or(1.0);
 
@@ -825,15 +870,18 @@ impl ResonatorNetwork {
 
     /// Get per-resonator convergence metrics.
     pub fn convergence_metrics(&self) -> Vec<ConvergenceMetric> {
-        self.states.iter().map(|s| {
-            let stability = cosine_similarity(&s.estimate, &s.previous);
-            ConvergenceMetric {
-                name: s.name.clone(),
-                confidence: s.confidence,
-                converged: s.converged,
-                stability,
-            }
-        }).collect()
+        self.states
+            .iter()
+            .map(|s| {
+                let stability = cosine_similarity(&s.estimate, &s.previous);
+                ConvergenceMetric {
+                    name: s.name.clone(),
+                    confidence: s.confidence,
+                    converged: s.converged,
+                    stability,
+                }
+            })
+            .collect()
     }
 
     /// Get the total number of iterations performed across all solve calls.
@@ -913,10 +961,7 @@ impl MultiConstraint {
 ///
 /// This gives us: if c = bind(a, x), then x ≈ unbind(a, c)
 fn unbind(a: &[f32], b: &[f32]) -> Vec<f32> {
-    a.iter()
-        .zip(b.iter())
-        .map(|(x, y)| x * y)
-        .collect()
+    a.iter().zip(b.iter()).map(|(x, y)| x * y).collect()
 }
 
 /// Cosine similarity between two vectors
@@ -1000,7 +1045,11 @@ mod tests {
         // x' should have positive correlation with x (algebraic relationship preserved)
         // Note: For f32 HDC, we expect moderate correlation, not perfect recovery
         let similarity = cosine_similarity(&x, &x_recovered);
-        assert!(similarity > 0.3, "Unbind should have positive correlation with original: {}", similarity);
+        assert!(
+            similarity > 0.3,
+            "Unbind should have positive correlation with original: {}",
+            similarity
+        );
         println!("✅ Unbind correlation: {:.4} (threshold: 0.3)", similarity);
     }
 
@@ -1014,7 +1063,11 @@ mod tests {
         let x_true = normalized_random_vector(dim);
 
         // Create constraint: A ⊛ X = B where B = A ⊛ X_true
-        let b: Vec<f32> = a.iter().zip(x_true.iter()).map(|(ai, xi)| ai * xi).collect();
+        let b: Vec<f32> = a
+            .iter()
+            .zip(x_true.iter())
+            .map(|(ai, xi)| ai * xi)
+            .collect();
 
         let constraint = Constraint::new(a.clone(), b);
         let solution = network.solve(&[constraint], Some(50)).unwrap();
@@ -1028,13 +1081,23 @@ mod tests {
         let norm: f32 = solution.vector.iter().map(|x| x * x).sum::<f32>().sqrt();
 
         assert!(is_valid, "Solution should have valid finite values");
-        assert_eq!(solution.vector.len(), dim, "Solution should have correct dimensions");
-        assert!(norm > 0.9 && norm < 1.1, "Solution should be approximately normalized: {}", norm);
+        assert_eq!(
+            solution.vector.len(),
+            dim,
+            "Solution should have correct dimensions"
+        );
+        assert!(
+            norm > 0.9 && norm < 1.1,
+            "Solution should be approximately normalized: {}",
+            norm
+        );
         assert!(solution.iterations <= 50);
 
         let similarity = cosine_similarity(&solution.vector, &x_true);
-        println!("✅ Constraint solving: valid output, sim to target={:.4}, {} iterations",
-                 similarity, solution.iterations);
+        println!(
+            "✅ Constraint solving: valid output, sim to target={:.4}, {} iterations",
+            similarity, solution.iterations
+        );
     }
 
     #[test]
@@ -1096,13 +1159,26 @@ mod tests {
         let is_valid = solution.vector.iter().all(|x| x.is_finite());
         let norm: f32 = solution.vector.iter().map(|x| x * x).sum::<f32>().sqrt();
 
-        assert!(is_valid, "Multi-constraint solution should have valid finite values");
-        assert_eq!(solution.vector.len(), dim, "Solution should have correct dimensions");
-        assert!(norm > 0.9 && norm < 1.1, "Solution should be approximately normalized: {}", norm);
+        assert!(
+            is_valid,
+            "Multi-constraint solution should have valid finite values"
+        );
+        assert_eq!(
+            solution.vector.len(),
+            dim,
+            "Solution should have correct dimensions"
+        );
+        assert!(
+            norm > 0.9 && norm < 1.1,
+            "Solution should be approximately normalized: {}",
+            norm
+        );
 
         let similarity = cosine_similarity(&solution.vector, &x_true);
-        println!("✅ Multi-constraint solving: valid output, sim to target={:.4}, {} iterations",
-                 similarity, solution.iterations);
+        println!(
+            "✅ Multi-constraint solving: valid output, sim to target={:.4}, {} iterations",
+            similarity, solution.iterations
+        );
     }
 
     #[test]
@@ -1112,7 +1188,11 @@ mod tests {
 
         let a = normalized_random_vector(dim);
         let x_true = normalized_random_vector(dim);
-        let b: Vec<f32> = a.iter().zip(x_true.iter()).map(|(ai, xi)| ai * xi).collect();
+        let b: Vec<f32> = a
+            .iter()
+            .zip(x_true.iter())
+            .map(|(ai, xi)| ai * xi)
+            .collect();
 
         let constraint = Constraint::new(a, b);
         let _solution = network.solve(&[constraint], Some(50)).unwrap();
@@ -1121,8 +1201,11 @@ mod tests {
         let history = network.energy_history();
         if history.len() >= 5 {
             let early_avg: f32 = history[..5].iter().sum::<f32>() / 5.0;
-            let late_avg: f32 = history[history.len()-5..].iter().sum::<f32>() / 5.0;
-            assert!(late_avg <= early_avg + 0.1, "Energy should decrease over time");
+            let late_avg: f32 = history[history.len() - 5..].iter().sum::<f32>() / 5.0;
+            assert!(
+                late_avg <= early_avg + 0.1,
+                "Energy should decrease over time"
+            );
         }
     }
 
@@ -1157,11 +1240,18 @@ mod tests {
         println!("Analogy similarity to queen: {}", similarity);
 
         // Similarity should be finite
-        assert!(similarity.is_finite(), "Analogy similarity should be finite");
+        assert!(
+            similarity.is_finite(),
+            "Analogy similarity should be finite"
+        );
 
         // The analogy result vector should have the correct dimension
-        assert_eq!(analogy_result.len(), dim,
-                   "Analogy result should have dimension {}", dim);
+        assert_eq!(
+            analogy_result.len(),
+            dim,
+            "Analogy result should have dimension {}",
+            dim
+        );
     }
 
     #[test]
@@ -1170,8 +1260,8 @@ mod tests {
         let config = ResonatorConfig {
             convergence_threshold: 0.99,
             max_iterations: 200,
-            step_size: 0.8,  // Larger step for faster convergence
-            momentum: 0.5,   // Less momentum to stabilize
+            step_size: 0.8, // Larger step for faster convergence
+            momentum: 0.5,  // Less momentum to stabilize
             ..Default::default()
         };
 
@@ -1179,7 +1269,11 @@ mod tests {
 
         let a = normalized_random_vector(dim);
         let x_true = normalized_random_vector(dim);
-        let b: Vec<f32> = a.iter().zip(x_true.iter()).map(|(ai, xi)| ai * xi).collect();
+        let b: Vec<f32> = a
+            .iter()
+            .zip(x_true.iter())
+            .map(|(ai, xi)| ai * xi)
+            .collect();
 
         let constraint = Constraint::new(a, b);
         let solution = network.solve(&[constraint], None).unwrap();
@@ -1187,11 +1281,15 @@ mod tests {
         // Either converges OR completes iterations - both are valid outcomes
         // (stochastic algorithm may or may not converge depending on random init)
         let valid_outcome = solution.iterations <= 200;
-        assert!(valid_outcome,
-                "Should complete within max iterations: {} iterations, converged={}",
-                solution.iterations, solution.converged);
-        println!("✅ Convergence test: {} iterations, converged={}",
-                 solution.iterations, solution.converged);
+        assert!(
+            valid_outcome,
+            "Should complete within max iterations: {} iterations, converged={}",
+            solution.iterations, solution.converged
+        );
+        println!(
+            "✅ Convergence test: {} iterations, converged={}",
+            solution.iterations, solution.converged
+        );
     }
 
     #[test]
@@ -1207,7 +1305,8 @@ mod tests {
         network.add_symbol("sym2", sym2.clone()).unwrap();
 
         // Create noisy version of sym1
-        let mut noisy: Vec<f32> = sym1.iter()
+        let mut noisy: Vec<f32> = sym1
+            .iter()
             .map(|&x| x + 0.3 * (rand::random::<f32>() * 2.0 - 1.0))
             .collect();
         normalize(&mut noisy);
@@ -1218,8 +1317,10 @@ mod tests {
         let sim_to_sym1 = cosine_similarity(&cleaned, &sym1);
         let noisy_sim_to_sym1 = cosine_similarity(&noisy, &sym1);
 
-        assert!(sim_to_sym1 >= noisy_sim_to_sym1 - 0.1,
-                "Cleanup should increase similarity to nearest symbol");
+        assert!(
+            sim_to_sym1 >= noisy_sim_to_sym1 - 0.1,
+            "Cleanup should increase similarity to nearest symbol"
+        );
     }
 
     #[test]
@@ -1240,24 +1341,48 @@ mod tests {
         network.add_symbol("target", target.clone()).unwrap();
 
         let a = normalized_random_vector(dim);
-        let b: Vec<f32> = a.iter().zip(target.iter()).map(|(ai, xi)| ai * xi).collect();
+        let b: Vec<f32> = a
+            .iter()
+            .zip(target.iter())
+            .map(|(ai, xi)| ai * xi)
+            .collect();
         let constraint = Constraint::new(a, b);
         let _solution = network.solve(&[constraint], Some(30)).unwrap();
 
         // After solve: snapshot should have populated state
         let snap = network.snapshot();
-        assert!(snap.iteration_count > 0, "iteration_count should be positive after solve");
-        assert_eq!(snap.oscillator_phases.len(), 1, "should have one resonator phase");
-        assert_eq!(snap.oscillator_phases[0].len(), dim, "phase vector should match dimension");
-        assert!(!snap.energy_history.is_empty(), "energy history should be non-empty");
-        assert!(snap.current_energy.is_finite(), "current energy should be finite");
+        assert!(
+            snap.iteration_count > 0,
+            "iteration_count should be positive after solve"
+        );
+        assert_eq!(
+            snap.oscillator_phases.len(),
+            1,
+            "should have one resonator phase"
+        );
+        assert_eq!(
+            snap.oscillator_phases[0].len(),
+            dim,
+            "phase vector should match dimension"
+        );
+        assert!(
+            !snap.energy_history.is_empty(),
+            "energy history should be non-empty"
+        );
+        assert!(
+            snap.current_energy.is_finite(),
+            "current energy should be finite"
+        );
         assert_eq!(snap.codebook_size, 1);
         assert_eq!(snap.convergence_metrics.len(), 1);
 
         let metric = &snap.convergence_metrics[0];
         assert_eq!(metric.name, "x");
-        assert!(metric.confidence >= 0.0 && metric.confidence <= 1.0,
-                "confidence should be in [0,1], got {}", metric.confidence);
+        assert!(
+            metric.confidence >= 0.0 && metric.confidence <= 1.0,
+            "confidence should be in [0,1], got {}",
+            metric.confidence
+        );
         assert!(metric.stability.is_finite(), "stability should be finite");
     }
 
@@ -1280,7 +1405,11 @@ mod tests {
         assert_eq!(phases[0].len(), dim);
         // Phase should be normalized
         let norm: f32 = phases[0].iter().map(|v| v * v).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 0.15, "phase should be approx normalized, got norm={}", norm);
+        assert!(
+            (norm - 1.0).abs() < 0.15,
+            "phase should be approx normalized, got norm={}",
+            norm
+        );
     }
 
     #[test]
@@ -1299,8 +1428,11 @@ mod tests {
         let m = &metrics[0];
         assert_eq!(m.name, "x");
         // Stability is cosine sim between current and previous estimate
-        assert!(m.stability >= -1.0 && m.stability <= 1.0,
-                "stability should be a valid cosine similarity, got {}", m.stability);
+        assert!(
+            m.stability >= -1.0 && m.stability <= 1.0,
+            "stability should be a valid cosine similarity, got {}",
+            m.stability
+        );
     }
 
     #[test]
@@ -1322,8 +1454,12 @@ mod tests {
         // Second solve accumulates
         let _s2 = network.solve(&[constraint], Some(10)).unwrap();
         let count_after_second = network.total_iteration_count();
-        assert!(count_after_second > count_after_first,
-                "iteration count should accumulate: {} > {}", count_after_second, count_after_first);
+        assert!(
+            count_after_second > count_after_first,
+            "iteration count should accumulate: {} > {}",
+            count_after_second,
+            count_after_first
+        );
     }
 
     #[test]
@@ -1342,7 +1478,11 @@ mod tests {
 
         let energy = network.current_energy();
         assert!(energy.is_finite(), "energy should be finite");
-        assert!(energy >= 0.0, "energy should be non-negative, got {}", energy);
+        assert!(
+            energy >= 0.0,
+            "energy should be non-negative, got {}",
+            energy
+        );
     }
 
     #[test]
@@ -1371,7 +1511,9 @@ mod tests {
         let mut network = ResonatorNetwork::new(dim).unwrap();
 
         // Add a symbol (should survive reset)
-        network.add_symbol("sym", normalized_random_vector(dim)).unwrap();
+        network
+            .add_symbol("sym", normalized_random_vector(dim))
+            .unwrap();
 
         let a = normalized_random_vector(dim);
         let x = normalized_random_vector(dim);
@@ -1429,12 +1571,18 @@ mod tests {
 
         // Add some symbols
         for i in 0..10 {
-            network.add_symbol(&format!("sym{}", i), normalized_random_vector(dim)).unwrap();
+            network
+                .add_symbol(&format!("sym{}", i), normalized_random_vector(dim))
+                .unwrap();
         }
 
         let a = normalized_random_vector(dim);
         let x_true = normalized_random_vector(dim);
-        let b: Vec<f32> = a.iter().zip(x_true.iter()).map(|(ai, xi)| ai * xi).collect();
+        let b: Vec<f32> = a
+            .iter()
+            .zip(x_true.iter())
+            .map(|(ai, xi)| ai * xi)
+            .collect();
 
         let constraint = Constraint::new(a, b);
 
@@ -1448,11 +1596,16 @@ mod tests {
         // - CI/system load variance (can be 20-50% slower under load)
         // Target: <3000ms debug, <300ms release
         let threshold_ms = if cfg!(debug_assertions) { 3000 } else { 300 };
-        assert!(elapsed.as_millis() < threshold_ms,
-                "Should complete 20 iterations in <{}ms, took {}ms",
-                threshold_ms, elapsed.as_millis());
+        assert!(
+            elapsed.as_millis() < threshold_ms,
+            "Should complete 20 iterations in <{}ms, took {}ms",
+            threshold_ms,
+            elapsed.as_millis()
+        );
 
-        println!("✅ Resonator: {} iterations in {:?} ({}D) [target: <{}ms]",
-                 solution.iterations, elapsed, dim, threshold_ms);
+        println!(
+            "✅ Resonator: {} iterations in {:?} ({}D) [target: <{}ms]",
+            solution.iterations, elapsed, dim, threshold_ms
+        );
     }
 }

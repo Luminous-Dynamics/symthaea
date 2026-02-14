@@ -4,11 +4,11 @@
 //! epistemic classification for known concepts while maintaining safety
 //! for unknown concepts.
 
-use symthaea::mind::{ContinuousMind, MindConfig, DomainKnowledge};
+use symthaea::hdc::{HDC_DIMENSION, LTC_NEURONS};
 use symthaea::mind::intent::IntentClassifier;
 use symthaea::mind::structured_thought::EpistemicStatus;
+use symthaea::mind::{ContinuousMind, DomainKnowledge, MindConfig};
 use symthaea::Symthaea;
-use symthaea::hdc::{HDC_DIMENSION, LTC_NEURONS};
 
 // =============================================================================
 // BASIC SEEDING TESTS
@@ -19,16 +19,27 @@ fn test_seeding_populates_working_memory() {
     let mut mind = ContinuousMind::new(MindConfig::default());
 
     // Before seeding
-    assert_eq!(mind.working_memory().len(), 0, "Working memory should be empty before seeding");
+    assert_eq!(
+        mind.working_memory().len(),
+        0,
+        "Working memory should be empty before seeding"
+    );
     assert!(!mind.is_seeded(), "Mind should not be seeded");
 
     // Seed
     let result = mind.seed_memory();
 
     // After seeding
-    assert!(!mind.working_memory().is_empty(), "Working memory should have entries after seeding");
+    assert!(
+        !mind.working_memory().is_empty(),
+        "Working memory should have entries after seeding"
+    );
     assert!(mind.is_seeded(), "Mind should be seeded");
-    assert!(result.prototypes_seeded >= 20, "Should seed at least 20 prototypes, got {}", result.prototypes_seeded);
+    assert!(
+        result.prototypes_seeded >= 20,
+        "Should seed at least 20 prototypes, got {}",
+        result.prototypes_seeded
+    );
 
     println!("Seeding result:");
     println!("  Prototypes: {}", result.prototypes_seeded);
@@ -42,16 +53,27 @@ fn test_domain_knowledge_structure() {
 
     println!("Domain knowledge has {} entries:", entries.len());
     for entry in &entries {
-        println!("  [{}] {}: {} chars", entry.category, entry.label, entry.content.len());
+        println!(
+            "  [{}] {}: {} chars",
+            entry.category,
+            entry.label,
+            entry.content.len()
+        );
     }
 
     // Verify structure
-    assert!(entries.len() >= 20, "Should have at least 20 knowledge entries");
+    assert!(
+        entries.len() >= 20,
+        "Should have at least 20 knowledge entries"
+    );
 
     // Verify all categories are covered
     let categories: std::collections::HashSet<_> = entries.iter().map(|e| e.category).collect();
     assert!(categories.contains(&"math"), "Should have math category");
-    assert!(categories.contains(&"social"), "Should have social category");
+    assert!(
+        categories.contains(&"social"),
+        "Should have social category"
+    );
     assert!(categories.contains(&"nixos"), "Should have nixos category");
 }
 
@@ -65,10 +87,7 @@ fn test_seeding_improves_math_familiarity() {
     let classifier = IntentClassifier::new(512);
 
     // Before seeding - assess math query against empty memory
-    let before = classifier.assess_epistemic_text(
-        "What is two plus two?",
-        mind.working_memory()
-    );
+    let before = classifier.assess_epistemic_text("What is two plus two?", mind.working_memory());
     println!("Before seeding - math query:");
     println!("  Familiarity: {:.3}", before.familiarity);
     println!("  Novelty: {:.3}", before.novelty);
@@ -78,10 +97,7 @@ fn test_seeding_improves_math_familiarity() {
     mind.seed_memory();
 
     // After seeding - assess same query against seeded memory
-    let after = classifier.assess_epistemic_text(
-        "What is two plus two?",
-        mind.working_memory()
-    );
+    let after = classifier.assess_epistemic_text("What is two plus two?", mind.working_memory());
     println!("After seeding - math query:");
     println!("  Familiarity: {:.3}", after.familiarity);
     println!("  Novelty: {:.3}", after.novelty);
@@ -91,7 +107,8 @@ fn test_seeding_improves_math_familiarity() {
     assert!(
         after.familiarity >= before.familiarity,
         "Familiarity should increase after seeding: before={:.3}, after={:.3}",
-        before.familiarity, after.familiarity
+        before.familiarity,
+        after.familiarity
     );
 }
 
@@ -101,22 +118,18 @@ fn test_seeding_improves_greeting_familiarity() {
     let classifier = IntentClassifier::new(512);
 
     // Before seeding
-    let before = classifier.assess_epistemic_text(
-        "Hello, how are you?",
-        mind.working_memory()
-    );
+    let before = classifier.assess_epistemic_text("Hello, how are you?", mind.working_memory());
 
     // Seed
     mind.seed_memory();
 
     // After seeding
-    let after = classifier.assess_epistemic_text(
-        "Hello, how are you?",
-        mind.working_memory()
-    );
+    let after = classifier.assess_epistemic_text("Hello, how are you?", mind.working_memory());
 
-    println!("Greeting familiarity: before={:.3}, after={:.3}",
-        before.familiarity, after.familiarity);
+    println!(
+        "Greeting familiarity: before={:.3}, after={:.3}",
+        before.familiarity, after.familiarity
+    );
 
     // Familiarity should increase
     assert!(
@@ -133,7 +146,7 @@ fn test_seeding_improves_nixos_familiarity() {
     // Before seeding
     let before = classifier.assess_epistemic_text(
         "How do I rebuild my NixOS configuration?",
-        mind.working_memory()
+        mind.working_memory(),
     );
 
     // Seed
@@ -142,11 +155,13 @@ fn test_seeding_improves_nixos_familiarity() {
     // After seeding
     let after = classifier.assess_epistemic_text(
         "How do I rebuild my NixOS configuration?",
-        mind.working_memory()
+        mind.working_memory(),
     );
 
-    println!("NixOS familiarity: before={:.3}, after={:.3}",
-        before.familiarity, after.familiarity);
+    println!(
+        "NixOS familiarity: before={:.3}, after={:.3}",
+        before.familiarity, after.familiarity
+    );
 
     // Familiarity should increase for domain-specific query
     assert!(
@@ -168,10 +183,8 @@ fn test_seeding_preserves_atlantis_safety() {
     mind.seed_memory();
 
     // Atlantis should STILL be unknown even after seeding
-    let assessment = classifier.assess_epistemic_text(
-        "What is the capital of Atlantis?",
-        mind.working_memory()
-    );
+    let assessment =
+        classifier.assess_epistemic_text("What is the capital of Atlantis?", mind.working_memory());
 
     println!("Atlantis after seeding:");
     println!("  Familiarity: {:.3}", assessment.familiarity);
@@ -196,7 +209,7 @@ fn test_seeding_preserves_nonsense_safety() {
     // Nonsense should still be unknown
     let assessment = classifier.assess_epistemic_text(
         "What color is the number seven when it dreams?",
-        mind.working_memory()
+        mind.working_memory(),
     );
 
     println!("Nonsense after seeding:");
@@ -267,7 +280,10 @@ async fn test_e2e_greeting_after_seeding() {
 async fn test_e2e_atlantis_still_unknown_after_seeding() {
     let mut symthaea = Symthaea::new(HDC_DIMENSION, LTC_NEURONS).await.unwrap();
 
-    let response = symthaea.process("What is the capital of Atlantis?").await.unwrap();
+    let response = symthaea
+        .process("What is the capital of Atlantis?")
+        .await
+        .unwrap();
 
     println!("Atlantis response: {}", response.content);
     if let Some(ref thought) = response.structured_thought {

@@ -61,8 +61,8 @@
 
 use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
-use super::predictive_coding::PredictiveCoding;
 use super::meta_consciousness::{MetaConsciousness, MetaConsciousnessState};
+use super::predictive_coding::PredictiveCoding;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -100,7 +100,14 @@ impl ConsciousnessTheory {
 
     /// All theories
     pub fn all() -> Vec<Self> {
-        vec![Self::IIT, Self::GWT, Self::HOT, Self::AST, Self::RPT, Self::FEP]
+        vec![
+            Self::IIT,
+            Self::GWT,
+            Self::HOT,
+            Self::AST,
+            Self::RPT,
+            Self::FEP,
+        ]
     }
 
     /// Get theory name
@@ -189,9 +196,12 @@ impl KIndexAssessment {
         }
 
         let mean = self.k_index;
-        let variance: f64 = self.theories.iter()
+        let variance: f64 = self
+            .theories
+            .iter()
             .map(|t| (t.independent_score - mean).powi(2))
-            .sum::<f64>() / self.theories.len() as f64;
+            .sum::<f64>()
+            / self.theories.len() as f64;
 
         1.0 - variance.sqrt().min(1.0)
     }
@@ -295,9 +305,7 @@ impl EpistemicConsciousness {
     pub fn new(num_components: usize, config: EpistemicConfig) -> Self {
         // Compute Bayesian weights from evidence ratings
         let theories = ConsciousnessTheory::all();
-        let total_evidence: f64 = theories.iter()
-            .map(|t| t.evidence_rating().powi(2))
-            .sum();
+        let total_evidence: f64 = theories.iter().map(|t| t.evidence_rating().powi(2)).sum();
 
         let mut weights = HashMap::new();
         for theory in &theories {
@@ -325,58 +333,43 @@ impl EpistemicConsciousness {
 
         // IIT (Integrated Information)
         let iit_score = self.iit.compute_phi(state);
-        assessments.push(self.create_assessment(
-            ConsciousnessTheory::IIT,
-            iit_score,
-        ));
+        assessments.push(self.create_assessment(ConsciousnessTheory::IIT, iit_score));
 
         // FEP (Free Energy / Predictive Coding)
         let fep_score = self.compute_fep_score(state);
-        assessments.push(self.create_assessment(
-            ConsciousnessTheory::FEP,
-            fep_score,
-        ));
+        assessments.push(self.create_assessment(ConsciousnessTheory::FEP, fep_score));
 
         // GWT (Global Workspace) - approximated
         let gwt_score = self.approximate_gwt(state);
-        assessments.push(self.create_assessment(
-            ConsciousnessTheory::GWT,
-            gwt_score,
-        ));
+        assessments.push(self.create_assessment(ConsciousnessTheory::GWT, gwt_score));
 
         // HOT (Higher-Order Thought) - approximated
         let hot_score = self.approximate_hot(state);
-        assessments.push(self.create_assessment(
-            ConsciousnessTheory::HOT,
-            hot_score,
-        ));
+        assessments.push(self.create_assessment(ConsciousnessTheory::HOT, hot_score));
 
         // AST (Attention Schema) - approximated
         let ast_score = self.approximate_ast(state);
-        assessments.push(self.create_assessment(
-            ConsciousnessTheory::AST,
-            ast_score,
-        ));
+        assessments.push(self.create_assessment(ConsciousnessTheory::AST, ast_score));
 
         // RPT (Recurrent Processing) - approximated
         let rpt_score = self.approximate_rpt(state);
-        assessments.push(self.create_assessment(
-            ConsciousnessTheory::RPT,
-            rpt_score,
-        ));
+        assessments.push(self.create_assessment(ConsciousnessTheory::RPT, rpt_score));
 
         // 2. Apply causal correction
         self.apply_causal_correction(&mut assessments);
 
         // 3. Compute K-Index (weighted average of independent scores)
-        let k_index: f64 = assessments.iter()
+        let k_index: f64 = assessments
+            .iter()
             .map(|a| a.weight * a.independent_score)
             .sum();
 
         // 4. Compute total uncertainty
-        let uncertainty: f64 = (assessments.iter()
+        let uncertainty: f64 = (assessments
+            .iter()
             .map(|a| a.weight * a.total_uncertainty.powi(2))
-            .sum::<f64>()).sqrt();
+            .sum::<f64>())
+        .sqrt();
 
         // 5. Causal correction penalty
         let causal_correction = self.compute_causal_correction(&assessments);
@@ -423,11 +416,7 @@ impl EpistemicConsciousness {
     }
 
     /// Create theory assessment with uncertainty
-    fn create_assessment(
-        &self,
-        theory: ConsciousnessTheory,
-        raw_score: f64,
-    ) -> TheoryAssessment {
+    fn create_assessment(&self, theory: ConsciousnessTheory, raw_score: f64) -> TheoryAssessment {
         let weight = *self.weights.get(&theory).unwrap_or(&(1.0 / 6.0));
 
         // Epistemic uncertainty (model uncertainty)
@@ -465,7 +454,8 @@ impl EpistemicConsciousness {
         //
         // Similarly for HOT
 
-        let gwt_score = assessments.iter()
+        let gwt_score = assessments
+            .iter()
             .find(|a| a.theory == ConsciousnessTheory::GWT)
             .map(|a| a.raw_score)
             .unwrap_or(0.5);
@@ -492,7 +482,8 @@ impl EpistemicConsciousness {
 
     /// Compute causal correction magnitude
     fn compute_causal_correction(&self, assessments: &[TheoryAssessment]) -> f64 {
-        assessments.iter()
+        assessments
+            .iter()
             .map(|a| (a.raw_score - a.independent_score).abs() * a.weight)
             .sum()
     }
@@ -565,14 +556,14 @@ impl EpistemicConsciousness {
         }
 
         // Compute "activation" as bit density (BinaryHV is 2048 bits)
-        let activations: Vec<f64> = state.iter()
+        let activations: Vec<f64> = state
+            .iter()
             .map(|hv| hv.popcount() as f64 / 2048.0)
             .collect();
 
         let mean = activations.iter().sum::<f64>() / activations.len() as f64;
-        let variance = activations.iter()
-            .map(|a| (a - mean).powi(2))
-            .sum::<f64>() / activations.len() as f64;
+        let variance =
+            activations.iter().map(|a| (a - mean).powi(2)).sum::<f64>() / activations.len() as f64;
 
         // Higher variance = more selective attention = more consciousness
         variance.sqrt().min(1.0)
@@ -640,9 +631,13 @@ impl EpistemicConsciousness {
         }
 
         // Agreement
-        let agreement: f64 = 1.0 - (assessments.iter()
-            .map(|a| (a.independent_score - k_index).powi(2))
-            .sum::<f64>() / assessments.len() as f64).sqrt();
+        let agreement: f64 = 1.0
+            - (assessments
+                .iter()
+                .map(|a| (a.independent_score - k_index).powi(2))
+                .sum::<f64>()
+                / assessments.len() as f64)
+                .sqrt();
 
         parts.push(format!("Theory agreement: {:.1}%", agreement * 100.0));
 
@@ -712,9 +707,7 @@ mod tests {
         let assessment = epistemic.assess(&state);
 
         // Check all theories assessed
-        let theory_names: Vec<_> = assessment.theories.iter()
-            .map(|t| t.theory)
-            .collect();
+        let theory_names: Vec<_> = assessment.theories.iter().map(|t| t.theory).collect();
 
         assert!(theory_names.contains(&ConsciousnessTheory::IIT));
         assert!(theory_names.contains(&ConsciousnessTheory::FEP));
@@ -731,7 +724,10 @@ mod tests {
 
         // AST and HOT should have corrections
         for theory_assessment in &assessment.theories {
-            if matches!(theory_assessment.theory, ConsciousnessTheory::AST | ConsciousnessTheory::HOT) {
+            if matches!(
+                theory_assessment.theory,
+                ConsciousnessTheory::AST | ConsciousnessTheory::HOT
+            ) {
                 // Independent score should be ≤ raw score
                 assert!(theory_assessment.independent_score <= theory_assessment.raw_score + 0.01);
             }

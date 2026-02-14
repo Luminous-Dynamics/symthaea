@@ -70,7 +70,12 @@ impl SoftmaxModel {
 
     fn predict(&self, input: &[f32]) -> usize {
         let probs = self.forward(input);
-        probs.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0
+        probs
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .unwrap()
+            .0
     }
 
     fn loss(&self, input: &[f32], label: usize) -> f32 {
@@ -111,8 +116,12 @@ fn generate_class_centroids(rng: &mut StdRng) -> Vec<Vec<f32>> {
                 let idx = r * 28 + col;
                 centroid[idx] = 0.8 + rng.gen_range(-0.1..0.1);
                 // Width: fill adjacent pixels
-                if idx > 0 { centroid[idx - 1] = 0.4; }
-                if idx + 1 < INPUT_DIM { centroid[idx + 1] = 0.4; }
+                if idx > 0 {
+                    centroid[idx - 1] = 0.4;
+                }
+                if idx + 1 < INPUT_DIM {
+                    centroid[idx + 1] = 0.4;
+                }
             }
         }
         centroids.push(centroid);
@@ -159,8 +168,8 @@ fn generate_writer_data(
                     for col in 0..28 {
                         let src_col = (col as i32 - x_shift).clamp(0, 27) as usize;
                         let src_idx = row * 28 + src_col;
-                        sample[row * 28 + col] = centroids[c][src_idx]
-                            + rng.gen_range(-noise_scale..noise_scale);
+                        sample[row * 28 + col] =
+                            centroids[c][src_idx] + rng.gen_range(-noise_scale..noise_scale);
                     }
                 }
                 data.push((sample, c));
@@ -192,7 +201,10 @@ fn evaluate(model: &SoftmaxModel, test_data: &[(Vec<f32>, usize)]) -> (f32, f32)
         }
         total_loss += model.loss(input, *label);
     }
-    (correct as f32 / test_data.len() as f32, total_loss / test_data.len() as f32)
+    (
+        correct as f32 / test_data.len() as f32,
+        total_loss / test_data.len() as f32,
+    )
 }
 
 struct BenchmarkResult {
@@ -237,7 +249,9 @@ fn run_federated_training(
         // Honest writers
         for wid in 0..n_honest {
             let data = &writers[wid];
-            if data.is_empty() { continue; }
+            if data.is_empty() {
+                continue;
+            }
             let samples = data.len().min(32);
             let mut grads = vec![0.0f32; PARAM_COUNT];
             let mut total_loss = 0.0;
@@ -314,7 +328,10 @@ fn main() {
     let n_rounds = 15;
     let lr = 0.05;
 
-    println!("Generating {} writer partitions (non-IID, power-law)...", n_writers);
+    println!(
+        "Generating {} writer partitions (non-IID, power-law)...",
+        n_writers
+    );
     let writers = generate_writer_data(n_writers, &centroids, &mut rng);
 
     // IID test set
@@ -332,8 +349,15 @@ fn main() {
     let total_samples: usize = writers.iter().map(|w| w.len()).sum();
     let max_per_writer = writers.iter().map(|w| w.len()).max().unwrap_or(0);
     let min_per_writer = writers.iter().map(|w| w.len()).min().unwrap_or(0);
-    println!("Total samples: {}, per-writer range: {}-{}", total_samples, min_per_writer, max_per_writer);
-    println!("Test set: {} samples ({} per class)", test_data.len(), test_data.len() / NUM_CLASSES);
+    println!(
+        "Total samples: {}, per-writer range: {}-{}",
+        total_samples, min_per_writer, max_per_writer
+    );
+    println!(
+        "Test set: {} samples ({} per class)",
+        test_data.len(),
+        test_data.len() / NUM_CLASSES
+    );
     println!();
 
     // Presets to test
@@ -365,15 +389,23 @@ fn main() {
     }
 
     // Print results table
-    println!("=== Results ({} rounds, {} writers, lr={}) ===\n", n_rounds, n_writers, lr);
-    println!("{:<15} {:>6} {:>10} {:>10} {:>5} {:>5}",
-        "Preset", "Byz%", "Accuracy", "Loss", "Conv", "LDec");
+    println!(
+        "=== Results ({} rounds, {} writers, lr={}) ===\n",
+        n_rounds, n_writers, lr
+    );
+    println!(
+        "{:<15} {:>6} {:>10} {:>10} {:>5} {:>5}",
+        "Preset", "Byz%", "Accuracy", "Loss", "Conv", "LDec"
+    );
     println!("{:-<60}", "");
 
     for r in &results {
-        println!("{:<15} {:>5}% {:>9.1}% {:>9.3} {:>5} {:>5}",
-            r.preset, r.byzantine_pct,
-            r.final_accuracy * 100.0, r.final_loss,
+        println!(
+            "{:<15} {:>5}% {:>9.1}% {:>9.3} {:>5} {:>5}",
+            r.preset,
+            r.byzantine_pct,
+            r.final_accuracy * 100.0,
+            r.final_loss,
             if r.converged { "Y" } else { "N" },
             if r.loss_decreased { "Y" } else { "N" },
         );
@@ -386,20 +418,30 @@ fn main() {
 
     // Test 1: Default preset converges without Byzantine
     total += 1;
-    let clean = results.iter().find(|r| r.preset == "default" && r.byzantine_pct == 0).unwrap();
+    let clean = results
+        .iter()
+        .find(|r| r.preset == "default" && r.byzantine_pct == 0)
+        .unwrap();
     if clean.converged && clean.loss_decreased {
-        println!("[PASS] Test 1: Default converges clean: {:.1}%", clean.final_accuracy * 100.0);
+        println!(
+            "[PASS] Test 1: Default converges clean: {:.1}%",
+            clean.final_accuracy * 100.0
+        );
         passed += 1;
     } else {
-        println!("[FAIL] Test 1: Default should converge clean: acc={:.1}%, loss_dec={}",
-            clean.final_accuracy * 100.0, clean.loss_decreased);
+        println!(
+            "[FAIL] Test 1: Default should converge clean: acc={:.1}%, loss_dec={}",
+            clean.final_accuracy * 100.0,
+            clean.loss_decreased
+        );
     }
 
     // Test 2: All presets without DP decrease loss at 0% Byzantine.
     // (high_security uses DP noise which can prevent convergence on small data)
     total += 1;
     let non_dp_presets = ["default", "adaptive", "performance"];
-    let non_dp_converge = results.iter()
+    let non_dp_converge = results
+        .iter()
         .filter(|r| r.byzantine_pct == 0 && non_dp_presets.contains(&r.preset.as_str()))
         .all(|r| r.loss_decreased);
     if non_dp_converge {
@@ -411,9 +453,15 @@ fn main() {
 
     // Test 3: Byzantine doesn't destroy default pipeline
     total += 1;
-    let byz20 = results.iter().find(|r| r.preset == "default" && r.byzantine_pct == 20).unwrap();
+    let byz20 = results
+        .iter()
+        .find(|r| r.preset == "default" && r.byzantine_pct == 20)
+        .unwrap();
     if byz20.loss_decreased {
-        println!("[PASS] Test 3: Default survives 20% Byzantine: {:.1}%", byz20.final_accuracy * 100.0);
+        println!(
+            "[PASS] Test 3: Default survives 20% Byzantine: {:.1}%",
+            byz20.final_accuracy * 100.0
+        );
         passed += 1;
     } else {
         println!("[FAIL] Test 3: Default should survive 20% Byzantine");
@@ -421,9 +469,15 @@ fn main() {
 
     // Test 4: Adaptive preset handles 30% Byzantine (gates out low-rep nodes)
     total += 1;
-    let adapt30 = results.iter().find(|r| r.preset == "adaptive" && r.byzantine_pct == 30).unwrap();
+    let adapt30 = results
+        .iter()
+        .find(|r| r.preset == "adaptive" && r.byzantine_pct == 30)
+        .unwrap();
     if adapt30.loss_decreased {
-        println!("[PASS] Test 4: Adaptive survives 30% Byzantine: {:.1}%", adapt30.final_accuracy * 100.0);
+        println!(
+            "[PASS] Test 4: Adaptive survives 30% Byzantine: {:.1}%",
+            adapt30.final_accuracy * 100.0
+        );
         passed += 1;
     } else {
         println!("[FAIL] Test 4: Adaptive should survive 30% Byzantine");
@@ -431,9 +485,15 @@ fn main() {
 
     // Test 5: Performance preset is faster (no detection overhead measured, but converges)
     total += 1;
-    let perf = results.iter().find(|r| r.preset == "performance" && r.byzantine_pct == 0).unwrap();
+    let perf = results
+        .iter()
+        .find(|r| r.preset == "performance" && r.byzantine_pct == 0)
+        .unwrap();
     if perf.loss_decreased {
-        println!("[PASS] Test 5: Performance preset converges: {:.1}%", perf.final_accuracy * 100.0);
+        println!(
+            "[PASS] Test 5: Performance preset converges: {:.1}%",
+            perf.final_accuracy * 100.0
+        );
         passed += 1;
     } else {
         println!("[FAIL] Test 5: Performance preset should converge");
@@ -441,17 +501,25 @@ fn main() {
 
     // Test 6: Non-IID data produces heterogeneous gradients
     total += 1;
-    let class_sets: Vec<usize> = writers.iter().map(|w| {
-        let classes: std::collections::HashSet<usize> = w.iter().map(|(_, l)| *l).collect();
-        classes.len()
-    }).collect();
+    let class_sets: Vec<usize> = writers
+        .iter()
+        .map(|w| {
+            let classes: std::collections::HashSet<usize> = w.iter().map(|(_, l)| *l).collect();
+            classes.len()
+        })
+        .collect();
     let avg_classes = class_sets.iter().sum::<usize>() as f32 / class_sets.len() as f32;
     if avg_classes < (NUM_CLASSES as f32 * 0.3) {
-        println!("[PASS] Test 6: Non-IID verified (avg {:.1} classes/writer, < 30% of {})",
-            avg_classes, NUM_CLASSES);
+        println!(
+            "[PASS] Test 6: Non-IID verified (avg {:.1} classes/writer, < 30% of {})",
+            avg_classes, NUM_CLASSES
+        );
         passed += 1;
     } else {
-        println!("[FAIL] Test 6: Data should be non-IID, avg classes/writer: {:.1}", avg_classes);
+        println!(
+            "[FAIL] Test 6: Data should be non-IID, avg classes/writer: {:.1}",
+            avg_classes
+        );
     }
 
     println!("\n=== RESULTS: {}/{} passed ===", passed, total);

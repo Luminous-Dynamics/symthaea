@@ -134,40 +134,35 @@
 //!   Principle in Mind, Brain, and Behavior.
 //! - Sutton, R.S. & Barto, A.G. (2018). Reinforcement Learning: An Introduction (2nd ed.)
 
-mod types;
-mod td_learning;
-mod generative_model;
-mod free_energy;
 mod agent;
-mod motor;
 mod bridge;
+mod free_energy;
+mod generative_model;
+mod motor;
+mod td_learning;
+mod types;
 
 #[cfg(test)]
 mod tests;
 
 // Re-export all public types to maintain the same external API
 pub use types::{
-    Observation, HiddenState, FreeEnergyComponents, PrecisionSnapshot,
-    PerceptionResult, ActionSelectionResult, ActionOutcome, ActiveInferenceSummary,
-    ActiveInferenceAgentStats, CognitiveLoopFEPResult,
-    ExpectedFreeEnergyResult,
-    MotorCommandType, MotorCommand, MotorOutcome, MotorCommandStats,
-    EnhancedFEPCycleResult,
+    ActionOutcome, ActionSelectionResult, ActiveInferenceAgentStats, ActiveInferenceSummary,
+    CognitiveLoopFEPResult, EnhancedFEPCycleResult, ExpectedFreeEnergyResult, FreeEnergyComponents,
+    HiddenState, MotorCommand, MotorCommandStats, MotorCommandType, MotorOutcome, Observation,
+    PerceptionResult, PrecisionSnapshot,
 };
 
 pub use td_learning::{
-    TemporalDifferenceLearningConfig, StateTransition,
-    EligibilityTraces, ModelConfidenceTracker,
-    TemporalDifferenceLearner, TemporalDifferenceLearningStats,
+    EligibilityTraces, ModelConfidenceTracker, StateTransition, TemporalDifferenceLearner,
+    TemporalDifferenceLearningConfig, TemporalDifferenceLearningStats,
 };
 
 pub use generative_model::GenerativeModel;
 
-pub use free_energy::{
-    FreeEnergyCalculator, PrecisionEstimator, ExpectedFreeEnergyComputer,
-};
+pub use free_energy::{ExpectedFreeEnergyComputer, FreeEnergyCalculator, PrecisionEstimator};
 
-pub use agent::{ActiveInferenceAgentConfig, ActiveInferenceAgent};
+pub use agent::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
 
 pub use motor::MotorSystem;
 

@@ -9,16 +9,15 @@
 
 #![cfg(feature = "shell")]
 
+use serde_json;
 use std::path::PathBuf;
 use std::time::Duration;
-use tokio::net::UnixListener;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use serde_json;
+use tokio::net::UnixListener;
 
 use symthaea::shell::ipc_client::{
-    Request, Response, RequestEnvelope, ResponseEnvelope,
-    ShellIpcClient, IpcClientConfig, WireProtocol,
-    ShellContextData,
+    IpcClientConfig, Request, RequestEnvelope, Response, ResponseEnvelope, ShellContextData,
+    ShellIpcClient, WireProtocol,
 };
 
 /// Generate unique test socket path using PID, thread ID and timestamp
@@ -82,9 +81,13 @@ async fn test_ping_pong() {
     // Start mock server
     let server_path = socket_path.clone();
     let server = tokio::spawn(async move {
-        mock_server(server_path, vec![
-            Response::Pong { timestamp_ms: 12345 },
-        ]).await;
+        mock_server(
+            server_path,
+            vec![Response::Pong {
+                timestamp_ms: 12345,
+            }],
+        )
+        .await;
     });
 
     // Give server time to start
@@ -110,15 +113,17 @@ async fn test_get_status() {
 
     let server_path = socket_path.clone();
     let server = tokio::spawn(async move {
-        mock_server(server_path, vec![
-            Response::Status {
+        mock_server(
+            server_path,
+            vec![Response::Status {
                 phi: 0.85,
                 coherence: 0.92,
                 consciousness_level: 0.88,
                 is_conscious: true,
                 uptime_secs: 3600,
-            },
-        ]).await;
+            }],
+        )
+        .await;
     });
 
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -145,9 +150,13 @@ async fn test_request_with_id() {
 
     let server_path = socket_path.clone();
     let server = tokio::spawn(async move {
-        mock_server(server_path, vec![
-            Response::Pong { timestamp_ms: 12345 },
-        ]).await;
+        mock_server(
+            server_path,
+            vec![Response::Pong {
+                timestamp_ms: 12345,
+            }],
+        )
+        .await;
     });
 
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -156,10 +165,9 @@ async fn test_request_with_id() {
     assert!(client.connect().await.is_ok());
 
     // Send request with correlation ID
-    let response = client.send_request_with_id(
-        Request::Ping,
-        Some("test-123".to_string()),
-    ).await;
+    let response = client
+        .send_request_with_id(Request::Ping, Some("test-123".to_string()))
+        .await;
 
     assert!(response.is_ok());
     let envelope = response.unwrap();
@@ -176,14 +184,16 @@ async fn test_intellisense() {
 
     let server_path = socket_path.clone();
     let server = tokio::spawn(async move {
-        mock_server(server_path, vec![
-            Response::IntelliSenseResult {
+        mock_server(
+            server_path,
+            vec![Response::IntelliSenseResult {
                 completions: vec![],
                 command_preview: None,
                 phi: 0.85,
                 confidence: 0.9,
-            },
-        ]).await;
+            }],
+        )
+        .await;
     });
 
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -210,8 +220,9 @@ async fn test_validate_command() {
 
     let server_path = socket_path.clone();
     let server = tokio::spawn(async move {
-        mock_server(server_path, vec![
-            Response::ValidationResult {
+        mock_server(
+            server_path,
+            vec![Response::ValidationResult {
                 valid: true,
                 safety_level: symthaea::shell::ipc_client::SafetyLevelData {
                     level: "GREEN".to_string(),
@@ -220,8 +231,9 @@ async fn test_validate_command() {
                 },
                 phi_required: 0.5,
                 warnings: vec![],
-            },
-        ]).await;
+            }],
+        )
+        .await;
     });
 
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -247,14 +259,16 @@ async fn test_execute_gated() {
 
     let server_path = socket_path.clone();
     let server = tokio::spawn(async move {
-        mock_server(server_path, vec![
-            Response::ExecutionResult {
+        mock_server(
+            server_path,
+            vec![Response::ExecutionResult {
                 executed: true,
                 output: "Success".to_string(),
                 phi_at_execution: 0.85,
                 gate_reason: None,
-            },
-        ]).await;
+            }],
+        )
+        .await;
     });
 
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -290,9 +304,13 @@ async fn test_connection_retry() {
     // Now start server
     let server_path = socket_path.clone();
     let server = tokio::spawn(async move {
-        mock_server(server_path, vec![
-            Response::Pong { timestamp_ms: 12345 },
-        ]).await;
+        mock_server(
+            server_path,
+            vec![Response::Pong {
+                timestamp_ms: 12345,
+            }],
+        )
+        .await;
     });
 
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -312,11 +330,21 @@ async fn test_heartbeat() {
 
     let server_path = socket_path.clone();
     let server = tokio::spawn(async move {
-        mock_server(server_path, vec![
-            Response::Pong { timestamp_ms: 12345 },
-            Response::Pong { timestamp_ms: 12346 },
-            Response::Pong { timestamp_ms: 12347 },
-        ]).await;
+        mock_server(
+            server_path,
+            vec![
+                Response::Pong {
+                    timestamp_ms: 12345,
+                },
+                Response::Pong {
+                    timestamp_ms: 12346,
+                },
+                Response::Pong {
+                    timestamp_ms: 12347,
+                },
+            ],
+        )
+        .await;
     });
 
     tokio::time::sleep(Duration::from_millis(50)).await;

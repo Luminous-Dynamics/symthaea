@@ -13,8 +13,8 @@
 //! - Verifiable outputs (can check if LLM followed structured thought)
 //! - Energy efficient (CPU reasoning, LLM only for fluency)
 
-use std::fmt;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
 
 // ============================================================================
@@ -25,19 +25,35 @@ use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipSta
 ///
 /// E0 (opinion) → E4 (publicly reproducible proof)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum ETier { E0, E1, E2, E3, E4 }
+pub enum ETier {
+    E0,
+    E1,
+    E2,
+    E3,
+    E4,
+}
 
 /// Normative axis: how binding is the claim?
 ///
 /// N0 (personal) → N3 (axiomatic truth like math)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum NTier { N0, N1, N2, N3 }
+pub enum NTier {
+    N0,
+    N1,
+    N2,
+    N3,
+}
 
 /// Materiality axis: how permanent is the claim?
 ///
 /// M0 (ephemeral) → M3 (foundational)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum MTier { M0, M1, M2, M3 }
+pub enum MTier {
+    M0,
+    M1,
+    M2,
+    M3,
+}
 
 /// Harmonic axis: coherence/alignment with higher purpose
 ///
@@ -165,7 +181,12 @@ impl EpistemicCube {
 
     /// Create a cube with E/N/M/H (LUCID extended format)
     pub fn with_harmonic(e: ETier, n: NTier, m: MTier, h: HTier) -> Self {
-        Self { e, n, m, h: Some(h) }
+        Self {
+            e,
+            n,
+            m,
+            h: Some(h),
+        }
     }
 
     /// Create a cube with H derived from phi and coherence
@@ -211,8 +232,7 @@ impl fmt::Display for EpistemicCube {
 ///
 /// This captures the semantic intent determined by cognitive processing,
 /// not what the LLM decides to say.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum SemanticIntent {
     /// Acknowledge the input ("I heard you")
     Acknowledge,
@@ -233,10 +253,8 @@ pub enum SemanticIntent {
     Unknown,
 }
 
-
 /// The structural form of the response.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ResponseType {
     /// A greeting or social acknowledgment
     Greeting,
@@ -253,13 +271,11 @@ pub enum ResponseType {
     Empathic,
 }
 
-
 /// How certain the mind is about its conclusion.
 ///
 /// This is derived from consciousness metrics (phi, meta-awareness, coherence)
 /// and determines how the translation should express confidence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum EpistemicStatus {
     /// High confidence: p > 0.9
     Certain,
@@ -273,7 +289,6 @@ pub enum EpistemicStatus {
     /// Topic is outside the system's domain of knowledge
     OutOfDomain,
 }
-
 
 /// Emotional coloring of the response.
 ///
@@ -346,8 +361,7 @@ pub struct DomainContext {
 }
 
 /// Structured data that may need to be incorporated.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum StructuredData {
     /// A list of items
     List(Vec<String>),
@@ -361,7 +375,6 @@ pub enum StructuredData {
     #[default]
     None,
 }
-
 
 /// The complete structured thought representation.
 ///
@@ -378,7 +391,6 @@ pub struct StructuredThought {
     // ========================================================================
     // WHAT WAS COMPUTED (Content)
     // ========================================================================
-
     /// What the mind concluded about how to respond
     pub semantic_intent: SemanticIntent,
 
@@ -400,7 +412,6 @@ pub struct StructuredThought {
     // ========================================================================
     // CONFIDENCE SIGNALS (How Sure)
     // ========================================================================
-
     /// Consciousness level (Φ): integrated information measure
     pub phi: f64,
 
@@ -416,7 +427,6 @@ pub struct StructuredThought {
     // ========================================================================
     // RELATIONAL CONTEXT (Who)
     // ========================================================================
-
     /// Current relationship stage with the human partner
     pub relationship_stage: RelationshipStage,
 
@@ -429,7 +439,6 @@ pub struct StructuredThought {
     // ========================================================================
     // CODE CONTEXT (Optional - when code_generation feature is active)
     // ========================================================================
-
     /// Code-specific context for code understanding/generation tasks.
     /// Present when the input involves actual code or code generation requests.
     pub code_context: Option<CodeContext>,
@@ -437,7 +446,6 @@ pub struct StructuredThought {
     // ========================================================================
     // TRANSLATION CONSTRAINTS (How)
     // ========================================================================
-
     /// Constraints for the translation process
     pub constraints: Vec<ResponseConstraint>,
 
@@ -493,10 +501,7 @@ impl StructuredThought {
         ));
 
         // Epistemic status (CRITICAL for faithful translation)
-        prompt.push_str(&format!(
-            "EPISTEMIC_STATUS: {:?}\n",
-            self.epistemic_status
-        ));
+        prompt.push_str(&format!("EPISTEMIC_STATUS: {:?}\n", self.epistemic_status));
 
         // Confidence metrics
         prompt.push_str(&format!(
@@ -507,9 +512,7 @@ impl StructuredThought {
         // Emotional tone
         prompt.push_str(&format!(
             "TONE: valence={:.2}, arousal={:.2}, warmth={:.2}\n",
-            self.emotional_tone.valence,
-            self.emotional_tone.arousal,
-            self.emotional_tone.warmth
+            self.emotional_tone.valence, self.emotional_tone.arousal, self.emotional_tone.warmth
         ));
 
         // Relational context
@@ -521,7 +524,8 @@ impl StructuredThought {
         // Activated concepts
         if !self.activated_concepts.is_empty() {
             prompt.push_str("CONCEPTS: ");
-            let concepts: Vec<String> = self.activated_concepts
+            let concepts: Vec<String> = self
+                .activated_concepts
                 .iter()
                 .take(5)
                 .map(|c| format!("{}({:.2})", c.name, c.activation))
@@ -558,7 +562,10 @@ impl StructuredThought {
                     prompt.push_str(&format!("DATA_NUMERIC: {}{}\n", value, unit_str));
                 }
                 StructuredData::Code { language, content } => {
-                    prompt.push_str(&format!("DATA_CODE ({}):\n```\n{}\n```\n", language, content));
+                    prompt.push_str(&format!(
+                        "DATA_CODE ({}):\n```\n{}\n```\n",
+                        language, content
+                    ));
                 }
                 StructuredData::None => {}
             }
@@ -572,9 +579,7 @@ impl StructuredThought {
             if !ctx.entities.is_empty() {
                 prompt.push_str("ENTITIES:\n");
                 for (etype, value, confidence) in &ctx.entities {
-                    prompt.push_str(&format!(
-                        "  {} = {} ({:.2})\n", etype, value, confidence
-                    ));
+                    prompt.push_str(&format!("  {} = {} ({:.2})\n", etype, value, confidence));
                 }
             }
             if let Some(ref answer) = ctx.computed_answer {
@@ -583,7 +588,8 @@ impl StructuredThought {
             if let Some(ref cube) = ctx.cube {
                 prompt.push_str(&format!(
                     "EPISTEMIC_CUBE: {} — {}\n",
-                    cube, cube.display_rationale()
+                    cube,
+                    cube.display_rationale()
                 ));
             }
         }
@@ -592,7 +598,10 @@ impl StructuredThought {
         if let Some(ref ctx) = self.code_context {
             prompt.push_str(&format!("CODE_LANGUAGE: {}\n", ctx.language));
             if let Some(ref code) = ctx.generated_code {
-                prompt.push_str(&format!("GENERATED_CODE:\n```{}\n{}\n```\n", ctx.language, code));
+                prompt.push_str(&format!(
+                    "GENERATED_CODE:\n```{}\n{}\n```\n",
+                    ctx.language, code
+                ));
             }
             if let Some(phi) = ctx.phi_score {
                 prompt.push_str(&format!("CODE_PHI: {:.3}\n", phi));
@@ -613,7 +622,10 @@ impl StructuredThought {
 
         // Primitive tier grounding
         if !self.primitive_tiers.is_empty() {
-            prompt.push_str(&format!("PRIMITIVE_TIERS: {}\n", self.primitive_tiers.join(", ")));
+            prompt.push_str(&format!(
+                "PRIMITIVE_TIERS: {}\n",
+                self.primitive_tiers.join(", ")
+            ));
         }
 
         // Original input
@@ -710,13 +722,11 @@ mod tests {
             relationship_stage: RelationshipStage::Contact,
             relation_mode: RelationMode::IThou,
             trust: 0.4,
-            activated_concepts: vec![
-                ActivatedConcept {
-                    name: "greeting".to_string(),
-                    activation: 0.9,
-                    relevance: 0.8,
-                },
-            ],
+            activated_concepts: vec![ActivatedConcept {
+                name: "greeting".to_string(),
+                activation: 0.9,
+                relevance: 0.8,
+            }],
             ..Default::default()
         };
 
@@ -812,7 +822,10 @@ mod tests {
             h: None,
         };
         assert_eq!(format!("{}", cube), "(E4, N3, M3)");
-        assert_eq!(cube.display_rationale(), "publicly reproducible, axiomatic, foundational");
+        assert_eq!(
+            cube.display_rationale(),
+            "publicly reproducible, axiomatic, foundational"
+        );
     }
 
     #[test]

@@ -98,10 +98,7 @@ fn softmax(logits: &[f32]) -> Vec<f32> {
 
 /// Generate synthetic clustered data (MNIST-like).
 /// Each class has a centroid in 784-dim space; samples are Gaussian around centroids.
-fn generate_clustered_data(
-    n_per_class: usize,
-    rng: &mut StdRng,
-) -> Vec<(Vec<f32>, usize)> {
+fn generate_clustered_data(n_per_class: usize, rng: &mut StdRng) -> Vec<(Vec<f32>, usize)> {
     let mut data = Vec::new();
     let noise_scale = 0.3;
 
@@ -186,7 +183,10 @@ fn main() {
     let samples_per_class = 50;
 
     // Generate data
-    println!("Generating synthetic data ({} samples/class)...", samples_per_class);
+    println!(
+        "Generating synthetic data ({} samples/class)...",
+        samples_per_class
+    );
     let train_data = generate_clustered_data(samples_per_class, &mut rng);
     let test_data = generate_clustered_data(20, &mut rng);
     let partitions = partition_non_iid(&train_data, n_nodes, &mut rng);
@@ -210,7 +210,11 @@ fn main() {
 
     let mut loss_history = Vec::new();
     let (init_acc, init_loss) = evaluate(&global_model, &test_data);
-    println!("Initial: accuracy={:.1}%, loss={:.3}", init_acc * 100.0, init_loss);
+    println!(
+        "Initial: accuracy={:.1}%, loss={:.3}",
+        init_acc * 100.0,
+        init_loss
+    );
 
     // Training loop
     for round in 0..n_rounds {
@@ -284,10 +288,16 @@ fn main() {
     // Test 2: Loss decreased
     total += 1;
     if final_loss < init_loss {
-        println!("[PASS] Test 2: Loss decreased: {:.3} -> {:.3}", init_loss, final_loss);
+        println!(
+            "[PASS] Test 2: Loss decreased: {:.3} -> {:.3}",
+            init_loss, final_loss
+        );
         passed += 1;
     } else {
-        println!("[FAIL] Test 2: Loss decreased: {:.3} -> {:.3}", init_loss, final_loss);
+        println!(
+            "[FAIL] Test 2: Loss decreased: {:.3} -> {:.3}",
+            init_loss, final_loss
+        );
     }
 
     // Test 3: Loss monotonic (smoothed over 3-round window)
@@ -368,10 +378,16 @@ fn main() {
     }
     let (byz_acc, _) = evaluate(&byz_model, &test_data);
     if byz_acc > 0.40 {
-        println!("[PASS] Test 4: Byzantine accuracy > 40%: {:.1}%", byz_acc * 100.0);
+        println!(
+            "[PASS] Test 4: Byzantine accuracy > 40%: {:.1}%",
+            byz_acc * 100.0
+        );
         passed += 1;
     } else {
-        println!("[FAIL] Test 4: Byzantine accuracy > 40%: {:.1}%", byz_acc * 100.0);
+        println!(
+            "[FAIL] Test 4: Byzantine accuracy > 40%: {:.1}%",
+            byz_acc * 100.0
+        );
     }
 
     // Test 5: DP doesn't destroy accuracy

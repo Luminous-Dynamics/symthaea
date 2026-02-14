@@ -10,14 +10,12 @@
 
 use std::time::Instant;
 
+use symthaea::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator,
-    real_hv::RealHV,
-    HDC_DIMENSION,
+    consciousness_topology_generators::ConsciousnessTopology, real_hv::RealHV,
+    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
-use symthaea::dynamics::cfc::{CfCNetwork, CfCNetworkConfig, CfCConfig};
-use symthaea::inference::{StreamingInference, StreamingConfig};
+use symthaea::inference::{StreamingConfig, StreamingInference};
 use symthaea::perception::semantic_encoder::SemanticEncoder;
 
 // =============================================================================
@@ -171,10 +169,7 @@ fn test_concurrent_cfc_scaling_1_2_4_8() {
         }
 
         let elapsed = start.elapsed();
-        eprintln!(
-            "  {} thread(s), 200 fwd each: {:?}",
-            n_threads, elapsed
-        );
+        eprintln!("  {} thread(s), 200 fwd each: {:?}", n_threads, elapsed);
     }
 }
 
@@ -211,8 +206,7 @@ fn test_concurrent_streaming_pipelines() {
 
                 let mut output_count = 0usize;
                 for i in 0..100 {
-                    let input =
-                        ndarray::Array1::from_shape_fn(32, |j| ((j + i) as f32).cos());
+                    let input = ndarray::Array1::from_shape_fn(32, |j| ((j + i) as f32).cos());
                     streamer.push(input);
                     while let Some(_) = streamer.poll() {
                         output_count += 1;
@@ -310,7 +304,11 @@ fn test_hdc_encoding_throughput() {
     );
 
     // Debug builds are significantly slower than release; adjust threshold accordingly
-    let threshold = if cfg!(debug_assertions) { 100.0 } else { 1000.0 };
+    let threshold = if cfg!(debug_assertions) {
+        100.0
+    } else {
+        1000.0
+    };
     assert!(
         throughput > threshold,
         "Should encode >{:.0} strings/sec, got {:.0}",
@@ -415,8 +413,7 @@ fn test_federated_byzantine_3_of_10() {
 
     // Create aggregator with Byzantine tolerance
     let initial_weights = vec![0.0f32; 100];
-    let mut aggregator = FederatedAggregator::new(initial_weights)
-        .with_byzantine_tolerance(0.3);
+    let mut aggregator = FederatedAggregator::new(initial_weights).with_byzantine_tolerance(0.3);
 
     // 7 honest nodes send similar gradients
     for i in 0..7u8 {
@@ -532,9 +529,8 @@ fn test_mixed_concurrent_workload() {
                 };
                 let mut network = CfCNetwork::new(config);
                 for i in 0..100 {
-                    let input = ndarray::Array1::from_shape_fn(32, |j| {
-                        ((j + i + t * 100) as f32).sin()
-                    });
+                    let input =
+                        ndarray::Array1::from_shape_fn(32, |j| ((j + i + t * 100) as f32).sin());
                     let _ = network.forward(&input, 0.02);
                 }
             })
@@ -594,8 +590,7 @@ fn test_memory_stability_concurrent_allocation() {
             thread::spawn(move || {
                 for i in 0..50 {
                     // Create a topology (allocates HDC_DIMENSION-sized vectors)
-                    let topo =
-                        ConsciousnessTopology::random(8, HDC_DIMENSION, (t * 50 + i) as u64);
+                    let topo = ConsciousnessTopology::random(8, HDC_DIMENSION, (t * 50 + i) as u64);
                     // Do a computation so optimizer doesn't elide
                     let calc = ConnectivityCalculator::new();
                     let result: f64 = calc.algebraic_connectivity(&topo.node_representations);

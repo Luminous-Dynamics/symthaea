@@ -26,14 +26,23 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use symthaea::gui_bridge::{
-    GuiBridge, ConfigCategory, WidgetValue,
-    WidgetId, ValidationError, SearchResult,
+    ConfigCategory,
+    DiffType,
+    GenerationTimeline,
+    GuiBridge,
+    LiveConfigDiff,
     // C1-C4 Widgets
-    ModuleBrowser, GenerationTimeline, LiveConfigDiff, ServiceDashboard,
-    UnitState, ServiceAction, DiffType,
+    ModuleBrowser,
+    SearchResult,
+    ServiceAction,
+    ServiceDashboard,
+    UnitState,
+    ValidationError,
+    WidgetId,
+    WidgetValue,
 };
 use symthaea::shell::ipc_client::{
-    ShellIpcClient, ConnectionState, discover_socket, MetricsSnapshot,
+    discover_socket, ConnectionState, MetricsSnapshot, ShellIpcClient,
 };
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
@@ -102,7 +111,6 @@ struct SymthaeaGui {
     metrics_rx: Option<watch::Receiver<MetricsSnapshot>>,
 
     // ========== C1-C4 Widget States ==========
-
     /// Current main view
     current_view: MainView,
 
@@ -213,59 +221,63 @@ struct WidgetUiState {
 impl SymthaeaGui {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         // Create tokio runtime for async IPC
-        let runtime = Arc::new(
-            Runtime::new().expect("Failed to create tokio runtime")
-        );
+        let runtime = Arc::new(Runtime::new().expect("Failed to create tokio runtime"));
 
         // Discover symthaea service socket automatically
         let socket_path = discover_socket();
 
-        let (ipc_client, connection_state, metrics_rx, initial_phi, initial_coherence, initial_conscious) =
-            if let Some(ref path) = socket_path {
-                // Try to connect to the service
-                let mut client = ShellIpcClient::with_socket_path(path);
-                let connected = runtime.block_on(async {
-                    client.connect().await.is_ok()
-                });
+        let (
+            ipc_client,
+            connection_state,
+            metrics_rx,
+            initial_phi,
+            initial_coherence,
+            initial_conscious,
+        ) = if let Some(ref path) = socket_path {
+            // Try to connect to the service
+            let mut client = ShellIpcClient::with_socket_path(path);
+            let connected = runtime.block_on(async { client.connect().await.is_ok() });
 
-                if connected {
-                    // Try to set up streaming metrics
-                    let metrics_receiver = runtime.block_on(async {
-                        client.subscribe_metrics_watch(500).await.ok()
-                    });
+            if connected {
+                // Try to set up streaming metrics
+                let metrics_receiver =
+                    runtime.block_on(async { client.subscribe_metrics_watch(500).await.ok() });
 
-                    // Get initial status
-                    let (phi, coherence, conscious) = if let Some(ref rx) = metrics_receiver {
-                        let m = rx.borrow();
-                        (m.phi, m.coherence, m.is_conscious)
-                    } else {
-                        runtime.block_on(async {
-                            client.get_status().await.unwrap_or((0.7, 0.85, true))
-                        })
-                    };
-
-                    (
-                        Some(client),
-                        ConnectionState::Connected,
-                        metrics_receiver,
-                        phi,
-                        coherence,
-                        conscious,
-                    )
+                // Get initial status
+                let (phi, coherence, conscious) = if let Some(ref rx) = metrics_receiver {
+                    let m = rx.borrow();
+                    (m.phi, m.coherence, m.is_conscious)
                 } else {
-                    (None, ConnectionState::Disconnected, None, 0.7, 0.85, true)
-                }
+                    runtime
+                        .block_on(async { client.get_status().await.unwrap_or((0.7, 0.85, true)) })
+                };
+
+                (
+                    Some(client),
+                    ConnectionState::Connected,
+                    metrics_receiver,
+                    phi,
+                    coherence,
+                    conscious,
+                )
             } else {
                 (None, ConnectionState::Disconnected, None, 0.7, 0.85, true)
-            };
+            }
+        } else {
+            (None, ConnectionState::Disconnected, None, 0.7, 0.85, true)
+        };
 
         let initial_metrics = ConsciousnessMetrics {
             phi: initial_phi,
             coherence: initial_coherence,
             is_conscious: initial_conscious,
-            safety_level: if initial_phi > 0.8 { SafetyLevel::Green }
-                         else if initial_phi > 0.5 { SafetyLevel::Yellow }
-                         else { SafetyLevel::Red },
+            safety_level: if initial_phi > 0.8 {
+                SafetyLevel::Green
+            } else if initial_phi > 0.5 {
+                SafetyLevel::Yellow
+            } else {
+                SafetyLevel::Red
+            },
             uptime_secs: 0,
         };
 
@@ -319,38 +331,140 @@ impl SymthaeaGui {
         gui.update_nix_preview();
 
         // Try to load initial config for diff
-        let _ = gui.config_diff.load_original("/etc/nixos/configuration.nix");
+        let _ = gui
+            .config_diff
+            .load_original("/etc/nixos/configuration.nix");
 
         gui
     }
 
     /// Initialize demo widget bindings
     fn init_demo_bindings(&mut self) {
-        use symthaea::gui_bridge::widget_mapper::{WidgetValueType, WidgetBindingBuilder};
+        use symthaea::gui_bridge::widget_mapper::{WidgetBindingBuilder, WidgetValueType};
 
         // (id, label, path, category, initial_value, value_type, options)
-        let demo_bindings: Vec<(&str, &str, &str, ConfigCategory, WidgetValue, WidgetValueType, Vec<&str>)> = vec![
+        let demo_bindings: Vec<(
+            &str,
+            &str,
+            &str,
+            ConfigCategory,
+            WidgetValue,
+            WidgetValueType,
+            Vec<&str>,
+        )> = vec![
             // Services
-            ("nginx_enable", "Nginx Web Server", "services.nginx.enable", ConfigCategory::Services, WidgetValue::Bool(false), WidgetValueType::Bool, vec![]),
-            ("nginx_port", "Nginx Port", "services.nginx.defaultHTTPListenPort", ConfigCategory::Services, WidgetValue::Int(80), WidgetValueType::Int, vec![]),
-            ("ssh_enable", "OpenSSH Server", "services.openssh.enable", ConfigCategory::Services, WidgetValue::Bool(true), WidgetValueType::Bool, vec![]),
-            ("ssh_port", "SSH Port", "services.openssh.ports", ConfigCategory::Services, WidgetValue::Int(22), WidgetValueType::Int, vec![]),
-            ("docker_enable", "Docker", "virtualisation.docker.enable", ConfigCategory::Services, WidgetValue::Bool(false), WidgetValueType::Bool, vec![]),
-
+            (
+                "nginx_enable",
+                "Nginx Web Server",
+                "services.nginx.enable",
+                ConfigCategory::Services,
+                WidgetValue::Bool(false),
+                WidgetValueType::Bool,
+                vec![],
+            ),
+            (
+                "nginx_port",
+                "Nginx Port",
+                "services.nginx.defaultHTTPListenPort",
+                ConfigCategory::Services,
+                WidgetValue::Int(80),
+                WidgetValueType::Int,
+                vec![],
+            ),
+            (
+                "ssh_enable",
+                "OpenSSH Server",
+                "services.openssh.enable",
+                ConfigCategory::Services,
+                WidgetValue::Bool(true),
+                WidgetValueType::Bool,
+                vec![],
+            ),
+            (
+                "ssh_port",
+                "SSH Port",
+                "services.openssh.ports",
+                ConfigCategory::Services,
+                WidgetValue::Int(22),
+                WidgetValueType::Int,
+                vec![],
+            ),
+            (
+                "docker_enable",
+                "Docker",
+                "virtualisation.docker.enable",
+                ConfigCategory::Services,
+                WidgetValue::Bool(false),
+                WidgetValueType::Bool,
+                vec![],
+            ),
             // Networking
-            ("firewall_enable", "Firewall", "networking.firewall.enable", ConfigCategory::Networking, WidgetValue::Bool(true), WidgetValueType::Bool, vec![]),
-            ("hostname", "Hostname", "networking.hostName", ConfigCategory::Networking, WidgetValue::String("nixos".to_string()), WidgetValueType::String, vec![]),
-
+            (
+                "firewall_enable",
+                "Firewall",
+                "networking.firewall.enable",
+                ConfigCategory::Networking,
+                WidgetValue::Bool(true),
+                WidgetValueType::Bool,
+                vec![],
+            ),
+            (
+                "hostname",
+                "Hostname",
+                "networking.hostName",
+                ConfigCategory::Networking,
+                WidgetValue::String("nixos".to_string()),
+                WidgetValueType::String,
+                vec![],
+            ),
             // Boot
-            ("grub_enable", "GRUB Bootloader", "boot.loader.grub.enable", ConfigCategory::Boot, WidgetValue::Bool(false), WidgetValueType::Bool, vec![]),
-            ("systemd_boot", "systemd-boot", "boot.loader.systemd-boot.enable", ConfigCategory::Boot, WidgetValue::Bool(true), WidgetValueType::Bool, vec![]),
-
+            (
+                "grub_enable",
+                "GRUB Bootloader",
+                "boot.loader.grub.enable",
+                ConfigCategory::Boot,
+                WidgetValue::Bool(false),
+                WidgetValueType::Bool,
+                vec![],
+            ),
+            (
+                "systemd_boot",
+                "systemd-boot",
+                "boot.loader.systemd-boot.enable",
+                ConfigCategory::Boot,
+                WidgetValue::Bool(true),
+                WidgetValueType::Bool,
+                vec![],
+            ),
             // Security
-            ("sudo_wheel", "Wheel Sudo Password", "security.sudo.wheelNeedsPassword", ConfigCategory::Security, WidgetValue::Bool(true), WidgetValueType::Bool, vec![]),
-
+            (
+                "sudo_wheel",
+                "Wheel Sudo Password",
+                "security.sudo.wheelNeedsPassword",
+                ConfigCategory::Security,
+                WidgetValue::Bool(true),
+                WidgetValueType::Bool,
+                vec![],
+            ),
             // Nix Settings
-            ("flakes_enable", "Experimental Features", "nix.settings.experimental-features", ConfigCategory::NixSettings, WidgetValue::String("nix-command flakes".to_string()), WidgetValueType::String, vec![]),
-            ("gc_auto", "Auto Garbage Collection", "nix.gc.automatic", ConfigCategory::NixSettings, WidgetValue::Bool(false), WidgetValueType::Bool, vec![]),
+            (
+                "flakes_enable",
+                "Experimental Features",
+                "nix.settings.experimental-features",
+                ConfigCategory::NixSettings,
+                WidgetValue::String("nix-command flakes".to_string()),
+                WidgetValueType::String,
+                vec![],
+            ),
+            (
+                "gc_auto",
+                "Auto Garbage Collection",
+                "nix.gc.automatic",
+                ConfigCategory::NixSettings,
+                WidgetValue::Bool(false),
+                WidgetValueType::Bool,
+                vec![],
+            ),
         ];
 
         for (id, label_str, path, category, initial_value, value_type, opts) in demo_bindings {
@@ -364,15 +478,18 @@ impl SymthaeaGui {
             self.bridge.register_binding(binding);
 
             // Create UI state
-            self.widget_states.insert(id.to_string(), WidgetUiState {
-                id: id.to_string(),
-                label: label_str.to_string(),
-                value: initial_value,
-                dirty: false,
-                confidence: 1.0,
-                category,
-                options: opts.into_iter().map(String::from).collect(),
-            });
+            self.widget_states.insert(
+                id.to_string(),
+                WidgetUiState {
+                    id: id.to_string(),
+                    label: label_str.to_string(),
+                    value: initial_value,
+                    dirty: false,
+                    confidence: 1.0,
+                    category,
+                    options: opts.into_iter().map(String::from).collect(),
+                },
+            );
         }
     }
 
@@ -390,7 +507,9 @@ impl SymthaeaGui {
         ];
 
         for category in categories {
-            let widgets: Vec<_> = self.widget_states.values()
+            let widgets: Vec<_> = self
+                .widget_states
+                .values()
                 .filter(|w| w.category == category)
                 .collect();
 
@@ -407,9 +526,8 @@ impl SymthaeaGui {
                     WidgetValue::Float(f) => format!("{:.2}", f),
                     WidgetValue::String(s) => format!("\"{}\"", s),
                     WidgetValue::StringList(items) => {
-                        let items_str: Vec<_> = items.iter()
-                            .map(|s| format!("\"{}\"", s))
-                            .collect();
+                        let items_str: Vec<_> =
+                            items.iter().map(|s| format!("\"{}\"", s)).collect();
                         format!("[ {} ]", items_str.join(" "))
                     }
                     WidgetValue::Selection(idx) => {
@@ -420,14 +538,16 @@ impl SymthaeaGui {
                         }
                     }
                     WidgetValue::MultiSelect(indices) => {
-                        let items: Vec<_> = indices.iter()
+                        let items: Vec<_> = indices
+                            .iter()
                             .filter_map(|i| widget.options.get(*i))
                             .map(|s| format!("\"{}\"", s))
                             .collect();
                         format!("[ {} ]", items.join(" "))
                     }
                     WidgetValue::Map(map) => {
-                        let pairs: Vec<_> = map.iter()
+                        let pairs: Vec<_> = map
+                            .iter()
                             .map(|(k, v)| format!("{} = \"{}\";", k, v))
                             .collect();
                         format!("{{ {} }}", pairs.join(" "))
@@ -436,7 +556,9 @@ impl SymthaeaGui {
                 };
 
                 // Find the nix path from binding
-                if let Some(binding) = self.bridge.bindings_for_category(category)
+                if let Some(binding) = self
+                    .bridge
+                    .bindings_for_category(category)
                     .iter()
                     .find(|b| b.widget_id.0 == widget.id)
                 {
@@ -459,10 +581,9 @@ impl SymthaeaGui {
         }
 
         // Update bridge
-        let result = self.bridge.on_widget_change(
-            WidgetId::new(widget_id),
-            new_value,
-        );
+        let result = self
+            .bridge
+            .on_widget_change(WidgetId::new(widget_id), new_value);
 
         // Handle result
         match result {
@@ -474,10 +595,7 @@ impl SymthaeaGui {
             }
             symthaea::gui_bridge::MappingResult::ValidationFailed { errors, .. } => {
                 self.validation_errors = errors;
-                self.status_message = Some((
-                    "Validation failed".to_string(),
-                    StatusLevel::Error,
-                ));
+                self.status_message = Some(("Validation failed".to_string(), StatusLevel::Error));
             }
             symthaea::gui_bridge::MappingResult::UnknownWidget { .. } => {
                 // Ignore - demo widget not bound
@@ -528,7 +646,10 @@ impl SymthaeaGui {
                             // Connection lost
                             self.connection_state = ConnectionState::Disconnected;
                             self.status_message = Some((
-                                format!("{} Lost connection to service", self.connection_state.indicator()),
+                                format!(
+                                    "{} Lost connection to service",
+                                    self.connection_state.indicator()
+                                ),
                                 StatusLevel::Warning,
                             ));
                             // Fall through to simulation
@@ -572,18 +693,15 @@ impl SymthaeaGui {
             let rt = Arc::clone(&self.runtime);
 
             // Connect with retry
-            let connected = rt.block_on(async {
-                client.connect_with_retry().await.is_ok()
-            });
+            let connected = rt.block_on(async { client.connect_with_retry().await.is_ok() });
 
             if connected {
                 self.socket_path = discovered;
                 self.connection_state = ConnectionState::Connected;
 
                 // Try to set up streaming metrics
-                let metrics_receiver = rt.block_on(async {
-                    client.subscribe_metrics_watch(500).await.ok()
-                });
+                let metrics_receiver =
+                    rt.block_on(async { client.subscribe_metrics_watch(500).await.ok() });
 
                 if let Some(ref rx) = metrics_receiver {
                     let m = rx.borrow();
@@ -600,7 +718,11 @@ impl SymthaeaGui {
                         "{} Connected! Phi: {:.2} | Streaming: {}",
                         self.connection_state.indicator(),
                         self.metrics.phi,
-                        if self.metrics_rx.is_some() { "YES" } else { "NO" }
+                        if self.metrics_rx.is_some() {
+                            "YES"
+                        } else {
+                            "NO"
+                        }
                     ),
                     StatusLevel::Success,
                 ));
@@ -617,7 +739,10 @@ impl SymthaeaGui {
         } else {
             self.connection_state = ConnectionState::Disconnected;
             self.status_message = Some((
-                format!("{} No service socket found", self.connection_state.indicator()),
+                format!(
+                    "{} No service socket found",
+                    self.connection_state.indicator()
+                ),
                 StatusLevel::Warning,
             ));
         }
@@ -630,15 +755,20 @@ impl SymthaeaGui {
 
         ui.horizontal(|ui| {
             ui.label("Search:");
-            if ui.text_edit_singleline(&mut self.module_browser.search_query).changed() {
+            if ui
+                .text_edit_singleline(&mut self.module_browser.search_query)
+                .changed()
+            {
                 self.module_browser.filter();
             }
 
             if ui.button("Load Options").clicked() {
                 if let Err(e) = self.module_browser.load_options() {
-                    self.status_message = Some((format!("Failed to load options: {}", e), StatusLevel::Error));
+                    self.status_message =
+                        Some((format!("Failed to load options: {}", e), StatusLevel::Error));
                 } else {
-                    self.status_message = Some(("Options loaded".to_string(), StatusLevel::Success));
+                    self.status_message =
+                        Some(("Options loaded".to_string(), StatusLevel::Success));
                 }
             }
         });
@@ -647,16 +777,22 @@ impl SymthaeaGui {
 
         // Category filter
         ui.horizontal_wrapped(|ui| {
-            if ui.selectable_label(self.module_browser.selected_category.is_none(), "All").clicked() {
+            if ui
+                .selectable_label(self.module_browser.selected_category.is_none(), "All")
+                .clicked()
+            {
                 self.module_browser.selected_category = None;
                 self.module_browser.filter();
             }
             for cat in self.module_browser.categories.iter() {
                 let label = format!("{} {} ({})", cat.icon, cat.name, cat.option_count);
-                if ui.selectable_label(
-                    self.module_browser.selected_category.as_ref() == Some(&cat.path_prefix),
-                    &label
-                ).clicked() {
+                if ui
+                    .selectable_label(
+                        self.module_browser.selected_category.as_ref() == Some(&cat.path_prefix),
+                        &label,
+                    )
+                    .clicked()
+                {
                     self.module_browser.selected_category = Some(cat.path_prefix.clone());
                     self.module_browser.filter();
                 }
@@ -672,12 +808,16 @@ impl SymthaeaGui {
         } else if let Some(ref err) = self.module_browser.error.clone() {
             ui.colored_label(egui::Color32::RED, err);
         } else {
-            ui.label(format!("{} options found", self.module_browser.filtered_options.len()));
+            ui.label(format!(
+                "{} options found",
+                self.module_browser.filtered_options.len()
+            ));
 
             egui::ScrollArea::vertical().show(ui, |ui| {
                 for &idx in &self.module_browser.filtered_options.clone() {
                     if let Some(opt) = self.module_browser.options.get(idx).cloned() {
-                        let expanded = self.module_browser.expanded_option.as_ref() == Some(&opt.path);
+                        let expanded =
+                            self.module_browser.expanded_option.as_ref() == Some(&opt.path);
 
                         ui.group(|ui| {
                             let header = ui.horizontal(|ui| {
@@ -727,11 +867,15 @@ impl SymthaeaGui {
         ui.horizontal(|ui| {
             if ui.button("Refresh").clicked() {
                 if let Err(e) = self.generation_timeline.load() {
-                    self.status_message = Some((format!("Failed to load: {}", e), StatusLevel::Error));
+                    self.status_message =
+                        Some((format!("Failed to load: {}", e), StatusLevel::Error));
                 }
             }
 
-            ui.checkbox(&mut self.generation_timeline.show_size_graph, "Show Size Graph");
+            ui.checkbox(
+                &mut self.generation_timeline.show_size_graph,
+                "Show Size Graph",
+            );
         });
 
         ui.separator();
@@ -742,7 +886,10 @@ impl SymthaeaGui {
         } else if let Some(ref err) = self.generation_timeline.error.clone() {
             ui.colored_label(egui::Color32::RED, err);
         } else {
-            ui.label(format!("{} generations", self.generation_timeline.generations.len()));
+            ui.label(format!(
+                "{} generations",
+                self.generation_timeline.generations.len()
+            ));
 
             egui::ScrollArea::vertical().show(ui, |ui| {
                 for gen in self.generation_timeline.generations.clone() {
@@ -766,7 +913,7 @@ impl SymthaeaGui {
 
                             ui.colored_label(
                                 egui::Color32::GRAY,
-                                gen.created_at.format("%Y-%m-%d %H:%M").to_string()
+                                gen.created_at.format("%Y-%m-%d %H:%M").to_string(),
                             );
 
                             if is_booted {
@@ -781,9 +928,15 @@ impl SymthaeaGui {
 
                             if !is_booted && ui.button("Rollback").clicked() {
                                 if let Err(e) = self.generation_timeline.rollback_to(gen.number) {
-                                    self.status_message = Some((format!("Rollback failed: {}", e), StatusLevel::Error));
+                                    self.status_message = Some((
+                                        format!("Rollback failed: {}", e),
+                                        StatusLevel::Error,
+                                    ));
                                 } else {
-                                    self.status_message = Some(("Rollback initiated".to_string(), StatusLevel::Success));
+                                    self.status_message = Some((
+                                        "Rollback initiated".to_string(),
+                                        StatusLevel::Success,
+                                    ));
                                 }
                             }
                         });
@@ -799,9 +952,18 @@ impl SymthaeaGui {
                 ui.heading(format!("Comparing Gen {} -> Gen {}", g1, g2));
                 if let Ok(changes) = self.generation_timeline.diff(g1, g2) {
                     ui.horizontal(|ui| {
-                        ui.colored_label(egui::Color32::GREEN, format!("+{} added", changes.added.len()));
-                        ui.colored_label(egui::Color32::RED, format!("-{} removed", changes.removed.len()));
-                        ui.colored_label(egui::Color32::YELLOW, format!("~{} upgraded", changes.upgraded.len()));
+                        ui.colored_label(
+                            egui::Color32::GREEN,
+                            format!("+{} added", changes.added.len()),
+                        );
+                        ui.colored_label(
+                            egui::Color32::RED,
+                            format!("-{} removed", changes.removed.len()),
+                        );
+                        ui.colored_label(
+                            egui::Color32::YELLOW,
+                            format!("~{} upgraded", changes.upgraded.len()),
+                        );
                     });
                 }
             }
@@ -820,7 +982,8 @@ impl SymthaeaGui {
             if ui.button("Load").clicked() {
                 let path = self.config_diff.file_path.clone();
                 if let Err(e) = self.config_diff.load_original(&path) {
-                    self.status_message = Some((format!("Failed to load: {}", e), StatusLevel::Error));
+                    self.status_message =
+                        Some((format!("Failed to load: {}", e), StatusLevel::Error));
                 }
             }
 
@@ -842,7 +1005,10 @@ impl SymthaeaGui {
                 ui.group(|ui| {
                     ui.colored_label(
                         egui::Color32::LIGHT_BLUE,
-                        format!("@@ -{},{} +{},{} @@", hunk.old_start, hunk.old_count, hunk.new_start, hunk.new_count)
+                        format!(
+                            "@@ -{},{} +{},{} @@",
+                            hunk.old_start, hunk.old_count, hunk.new_start, hunk.new_count
+                        ),
                     );
 
                     for line in &hunk.lines {
@@ -884,7 +1050,8 @@ impl SymthaeaGui {
         ui.horizontal(|ui| {
             if ui.button("Refresh").clicked() {
                 if let Err(e) = self.service_dashboard.refresh() {
-                    self.status_message = Some((format!("Failed to refresh: {}", e), StatusLevel::Error));
+                    self.status_message =
+                        Some((format!("Failed to refresh: {}", e), StatusLevel::Error));
                 }
             }
 
@@ -896,16 +1063,37 @@ impl SymthaeaGui {
 
         // State filter buttons
         ui.horizontal(|ui| {
-            if ui.selectable_label(self.service_dashboard.state_filter.is_none(), "All").clicked() {
+            if ui
+                .selectable_label(self.service_dashboard.state_filter.is_none(), "All")
+                .clicked()
+            {
                 self.service_dashboard.state_filter = None;
             }
-            if ui.selectable_label(self.service_dashboard.state_filter == Some(UnitState::Active), "Active").clicked() {
+            if ui
+                .selectable_label(
+                    self.service_dashboard.state_filter == Some(UnitState::Active),
+                    "Active",
+                )
+                .clicked()
+            {
                 self.service_dashboard.state_filter = Some(UnitState::Active);
             }
-            if ui.selectable_label(self.service_dashboard.state_filter == Some(UnitState::Failed), "Failed").clicked() {
+            if ui
+                .selectable_label(
+                    self.service_dashboard.state_filter == Some(UnitState::Failed),
+                    "Failed",
+                )
+                .clicked()
+            {
                 self.service_dashboard.state_filter = Some(UnitState::Failed);
             }
-            if ui.selectable_label(self.service_dashboard.state_filter == Some(UnitState::Inactive), "Inactive").clicked() {
+            if ui
+                .selectable_label(
+                    self.service_dashboard.state_filter == Some(UnitState::Inactive),
+                    "Inactive",
+                )
+                .clicked()
+            {
                 self.service_dashboard.state_filter = Some(UnitState::Inactive);
             }
         });
@@ -927,11 +1115,17 @@ impl SymthaeaGui {
         } else if let Some(ref err) = self.service_dashboard.error.clone() {
             ui.colored_label(egui::Color32::RED, err);
         } else {
-            let filtered: Vec<_> = self.service_dashboard.filtered_units().into_iter().cloned().collect();
+            let filtered: Vec<_> = self
+                .service_dashboard
+                .filtered_units()
+                .into_iter()
+                .cloned()
+                .collect();
 
             egui::ScrollArea::vertical().show(ui, |ui| {
                 for unit in filtered {
-                    let selected = self.service_dashboard.selected_unit.as_ref() == Some(&unit.name);
+                    let selected =
+                        self.service_dashboard.selected_unit.as_ref() == Some(&unit.name);
                     let (r, g, b) = unit.state.color();
                     let state_color = egui::Color32::from_rgb(r, g, b);
 
@@ -952,13 +1146,19 @@ impl SymthaeaGui {
 
                             ui.horizontal(|ui| {
                                 if ui.button("Start").clicked() {
-                                    let _ = self.service_dashboard.control(&unit.name, ServiceAction::Start);
+                                    let _ = self
+                                        .service_dashboard
+                                        .control(&unit.name, ServiceAction::Start);
                                 }
                                 if ui.button("Stop").clicked() {
-                                    let _ = self.service_dashboard.control(&unit.name, ServiceAction::Stop);
+                                    let _ = self
+                                        .service_dashboard
+                                        .control(&unit.name, ServiceAction::Stop);
                                 }
                                 if ui.button("Restart").clicked() {
-                                    let _ = self.service_dashboard.control(&unit.name, ServiceAction::Restart);
+                                    let _ = self
+                                        .service_dashboard
+                                        .control(&unit.name, ServiceAction::Restart);
                                 }
                             });
 
@@ -1064,10 +1264,7 @@ impl eframe::App for SymthaeaGui {
                         format!("Errors: {}", error_count),
                     );
                 } else {
-                    ui.colored_label(
-                        egui::Color32::from_rgb(100, 200, 100),
-                        "No errors",
-                    );
+                    ui.colored_label(egui::Color32::from_rgb(100, 200, 100), "No errors");
                 }
             });
 
@@ -1141,15 +1338,9 @@ impl eframe::App for SymthaeaGui {
                 ui.horizontal(|ui| {
                     ui.label("State:");
                     if self.metrics.is_conscious {
-                        ui.colored_label(
-                            egui::Color32::from_rgb(100, 200, 150),
-                            "CONSCIOUS",
-                        );
+                        ui.colored_label(egui::Color32::from_rgb(100, 200, 150), "CONSCIOUS");
                     } else {
-                        ui.colored_label(
-                            egui::Color32::GRAY,
-                            "DORMANT",
-                        );
+                        ui.colored_label(egui::Color32::GRAY, "DORMANT");
                     }
                 });
 
@@ -1169,10 +1360,8 @@ impl eframe::App for SymthaeaGui {
                 ui.heading("Actions");
 
                 if ui.button("Refresh Metrics").clicked() {
-                    self.status_message = Some((
-                        "Metrics refreshed".to_string(),
-                        StatusLevel::Info,
-                    ));
+                    self.status_message =
+                        Some(("Metrics refreshed".to_string(), StatusLevel::Info));
                 }
 
                 if ui.button("Clear Pending").clicked() {
@@ -1181,10 +1370,7 @@ impl eframe::App for SymthaeaGui {
                     for state in self.widget_states.values_mut() {
                         state.dirty = false;
                     }
-                    self.status_message = Some((
-                        "Changes cleared".to_string(),
-                        StatusLevel::Info,
-                    ));
+                    self.status_message = Some(("Changes cleared".to_string(), StatusLevel::Info));
                 }
 
                 ui.add_space(10.0);
@@ -1208,10 +1394,7 @@ impl eframe::App for SymthaeaGui {
                 }
 
                 if self.metrics_rx.is_some() {
-                    ui.colored_label(
-                        egui::Color32::from_rgb(100, 200, 150),
-                        "Streaming metrics",
-                    );
+                    ui.colored_label(egui::Color32::from_rgb(100, 200, 150), "Streaming metrics");
                 }
 
                 if !matches!(self.connection_state, ConnectionState::Connected) {
@@ -1240,7 +1423,10 @@ impl eframe::App for SymthaeaGui {
 
                     for category in categories {
                         let selected = self.selected_category == category;
-                        if ui.selectable_label(selected, category_label(category)).clicked() {
+                        if ui
+                            .selectable_label(selected, category_label(category))
+                            .clicked()
+                        {
                             self.selected_category = category;
                         }
                     }
@@ -1250,7 +1436,9 @@ impl eframe::App for SymthaeaGui {
 
                 // Widget list for selected category
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    let widgets: Vec<_> = self.widget_states.iter()
+                    let widgets: Vec<_> = self
+                        .widget_states
+                        .iter()
                         .filter(|(_, w)| w.category == self.selected_category)
                         .map(|(k, v)| (k.clone(), v.clone()))
                         .collect();
@@ -1260,10 +1448,7 @@ impl eframe::App for SymthaeaGui {
                             ui.horizontal(|ui| {
                                 // Dirty indicator
                                 if widget_state.dirty {
-                                    ui.colored_label(
-                                        egui::Color32::from_rgb(220, 180, 50),
-                                        "*",
-                                    );
+                                    ui.colored_label(egui::Color32::from_rgb(220, 180, 50), "*");
                                 }
 
                                 ui.label(&widget_state.label);
@@ -1296,7 +1481,10 @@ impl eframe::App for SymthaeaGui {
                                 }
                                 WidgetValue::Float(f) => {
                                     let mut f_val = *f as f32;
-                                    if ui.add(egui::DragValue::new(&mut f_val).speed(0.1)).changed() {
+                                    if ui
+                                        .add(egui::DragValue::new(&mut f_val).speed(0.1))
+                                        .changed()
+                                    {
                                         *f = f_val as f64;
                                         changed = true;
                                     }
@@ -1312,12 +1500,21 @@ impl eframe::App for SymthaeaGui {
                                 }
                                 WidgetValue::Selection(idx) => {
                                     if !widget_state.options.is_empty() {
-                                        let current = widget_state.options.get(*idx).cloned().unwrap_or_default();
+                                        let current = widget_state
+                                            .options
+                                            .get(*idx)
+                                            .cloned()
+                                            .unwrap_or_default();
                                         egui::ComboBox::from_id_source(&widget_id)
                                             .selected_text(&current)
                                             .show_ui(ui, |ui| {
-                                                for (i, option) in widget_state.options.iter().enumerate() {
-                                                    if ui.selectable_label(*idx == i, option).clicked() {
+                                                for (i, option) in
+                                                    widget_state.options.iter().enumerate()
+                                                {
+                                                    if ui
+                                                        .selectable_label(*idx == i, option)
+                                                        .clicked()
+                                                    {
                                                         *idx = i;
                                                         changed = true;
                                                     }
@@ -1361,7 +1558,7 @@ impl eframe::App for SymthaeaGui {
                                 .font(egui::TextStyle::Monospace)
                                 .code_editor()
                                 .desired_width(f32::INFINITY)
-                                .interactive(false)
+                                .interactive(false),
                         );
                     });
                 }

@@ -107,8 +107,7 @@ pub const HDC_DIMENSION_64K: usize = 65_536;
 /// let ultra_custom = HdcDimensionality::Custom(131_072);
 /// assert_eq!(ultra_custom.dimension(), 131_072);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum HdcDimensionality {
     /// Standard 16,384 dimensions (2^14) - good balance of accuracy and memory
     #[default]
@@ -167,7 +166,6 @@ impl HdcDimensionality {
     }
 }
 
-
 impl From<usize> for HdcDimensionality {
     fn from(dim: usize) -> Self {
         Self::from_dimension(dim)
@@ -215,8 +213,7 @@ pub const LTC_NEURONS_4K: usize = 4_096;
 /// - **Extended (2K)**: Higher temporal capacity
 /// - **Ultra (4K)**: Maximum precision
 /// - **Custom**: Any count (should be power of 2)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum LtcNeuronCount {
     /// Standard 1,024 neurons (2^10) - good balance
     #[default]
@@ -257,186 +254,185 @@ impl LtcNeuronCount {
     }
 }
 
-
 impl From<usize> for LtcNeuronCount {
     fn from(n: usize) -> Self {
         Self::from_count(n)
     }
 }
 
-pub mod temporal_encoder;
-pub mod statistical_retrieval;
-pub mod sequence_encoder;
-pub mod resonator;
-pub mod morphogenetic;
-pub mod hebbian;
-pub mod hdc_ltc_neuron;  // HDC-LTC neuron integration with Hebbian learning
-pub mod hdc_ltc_unified;  // Revolutionary unified HDC-LTC: state AS hypervector with closed-form solution
+pub mod cincinnati_advanced; // Advanced Cincinnati-LTC: chaos detection, adaptive weights, memory horizon
+pub mod cincinnati_enhanced; // Enhanced Cincinnati-LTC: multi-scale, amplitude encoding, attention modulation
+pub mod cincinnati_ltc; // Cincinnati Algorithm + LTC integration (differential engine, lateral binding, predictive budding)
+pub mod cincinnati_network; // Cincinnati-enhanced HdcLtcNetwork with lateral binding and budding
+pub mod cycle_detector; // Cycle detection for periodic patterns - autocorrelation-based period detection with HDC phase encoding
+pub mod dynamical_system; // Generic dynamical system framework with ODE integrators (Euler, RK4, RK45, Verlet)
+pub mod gwt_cincinnati_integration; // Cincinnati-LTC + Global Workspace Theory integration - temporal patterns enter consciousness
 #[cfg(test)]
-mod hdc_ltc_learning_tests;  // Comprehensive learning dynamics tests for HdcLtcUnifiedNeuron
-pub mod hdc_ltc_unified_validation;  // Numerical validation of closed-form solution accuracy
-pub mod unified_network_phi;  // Phi measurement and validation for HdcLtcUnifiedNetwork
-pub mod cincinnati_ltc;  // Cincinnati Algorithm + LTC integration (differential engine, lateral binding, predictive budding)
-pub mod cincinnati_network;  // Cincinnati-enhanced HdcLtcNetwork with lateral binding and budding
-pub mod cycle_detector;  // Cycle detection for periodic patterns - autocorrelation-based period detection with HDC phase encoding
-pub mod gwt_cincinnati_integration;  // Cincinnati-LTC + Global Workspace Theory integration - temporal patterns enter consciousness
-pub mod cincinnati_enhanced;  // Enhanced Cincinnati-LTC: multi-scale, amplitude encoding, attention modulation
-pub mod cincinnati_advanced;  // Advanced Cincinnati-LTC: chaos detection, adaptive weights, memory horizon
-pub mod reservoir;            // Reservoir Computing (Echo State Network) for chaotic signal prediction
-pub mod predictor;            // Unified predictor trait for Symthaea integration (links prediction to Φ)
-pub mod dynamical_system;     // Generic dynamical system framework with ODE integrators (Euler, RK4, RK45, Verlet)
+mod hdc_ltc_learning_tests; // Comprehensive learning dynamics tests for HdcLtcUnifiedNeuron
+pub mod hdc_ltc_neuron; // HDC-LTC neuron integration with Hebbian learning
+pub mod hdc_ltc_unified; // Revolutionary unified HDC-LTC: state AS hypervector with closed-form solution
+pub mod hdc_ltc_unified_validation; // Numerical validation of closed-form solution accuracy
+pub mod hebbian;
+pub mod morphogenetic;
+pub mod predictor; // Unified predictor trait for Symthaea integration (links prediction to Φ)
+pub mod reservoir; // Reservoir Computing (Echo State Network) for chaotic signal prediction
+pub mod resonator;
 pub mod sdm;
-pub mod text_encoder;  // Revolutionary Enhancement: Text → HDC encoding
-pub mod semantic_encoder;  // Universal semantic encoding with embeddings support
-pub mod semantic_decoder;  // HV → Primitive sequence (generative direction) - THE MOUTH
-// DISABLED: depends on crate::learnable_ltc which doesn't exist in symthaea-core
-// pub mod hd_ltc_codec;      // Bidirectional HDC ↔ LTC translation - THE THROAT
-// DISABLED: depends on hd_ltc_codec which is disabled
-// pub mod ltc_generative_core; // Autoregressive primitive prediction - THE VOICE
-pub mod unified_hv;     // Unified hypervector types (ContinuousHV)
-pub mod config;         // Centralized HDC configuration (runtime dimension management)
-pub mod projection;     // Learned projection layers for dimension conversion
+pub mod semantic_decoder;
+pub mod semantic_encoder; // Universal semantic encoding with embeddings support
+pub mod sequence_encoder;
+pub mod statistical_retrieval;
+pub mod temporal_encoder;
+pub mod text_encoder; // Revolutionary Enhancement: Text → HDC encoding
+pub mod unified_network_phi; // Phi measurement and validation for HdcLtcUnifiedNetwork // HV → Primitive sequence (generative direction) - THE MOUTH
+                             // DISABLED: depends on crate::learnable_ltc which doesn't exist in symthaea-core
+                             // pub mod hd_ltc_codec;      // Bidirectional HDC ↔ LTC translation - THE THROAT
+                             // DISABLED: depends on hd_ltc_codec which is disabled
+                             // pub mod ltc_generative_core; // Autoregressive primitive prediction - THE VOICE
+pub mod config; // Centralized HDC configuration (runtime dimension management)
+pub mod projection;
+pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned projection layers for dimension conversion
 
 // Global Workspace Theory (conscious access, competition, broadcasting)
-pub mod global_workspace;                  // GWT implementation with competitive dynamics
+pub mod global_workspace; // GWT implementation with competitive dynamics
 
 // Consciousness topology and Φ measurement modules
-pub mod real_hv;                           // Real-valued hypervectors for consciousness topologies
-pub mod consciousness_topology;            // Consciousness topology structures
+pub mod binary_hv;
+pub mod consciousness_topology; // Consciousness topology structures
 pub mod consciousness_topology_generators; // 8 topology generators (Random, Star, Ring, Line, Tree, Dense, Modular, Lattice)
-pub mod tiered_phi;                        // Multi-tier Φ (integrated information) approximation
-#[cfg(test)]
-mod phi_tier_tests;                        // Unit tests for Φ tier implementations
-pub mod phi_topology_validation;           // ContinuousHV-TieredPhi integration for topology validation
+pub mod phi_orchestrator; // Adaptive Φ calculator orchestrator (Phase 5E)
 #[allow(deprecated)]
-pub mod phi_real;                          // ContinuousHV Φ calculator (no binarization) using cosine similarity
-pub mod spectral_connectivity;             // Algebraic connectivity (λ₂) calculator - NOT IIT Φ!
-pub mod phi_resonant;                      // Resonator-based Φ calculator (O(n log N) dynamics)
-pub mod phi_orchestrator;                  // Adaptive Φ calculator orchestrator (Phase 5E)
-pub mod binary_hv;                         // Binary hypervector operations (BinaryHV)
-// simd_hv16 removed — all methods absorbed into BinaryHV
-pub mod simd_ops;                          // SIMD intrinsics for BinaryHV (AVX2/SSE4.1)
-pub mod simd_continuous;                   // SIMD intrinsics for ContinuousHV (AVX2/FMA/SSE4.1)
-// NOTE: simd_hv and optimized_hv are INCOMPATIBLE with 16,384-bit BinaryHV (they use 256-byte arrays)
-// Use BinaryHV::bind(), BinaryHV::bundle(), BinaryHV::similarity() directly instead
-pub mod hdc_trait;                         // Unified HyperdimensionalVector trait interface
-// Performance optimization modules:
-pub mod incremental_hv;                    // O(k) incremental bundling (10-100x faster for updates)
-pub mod parallel_hv;                       // Rayon parallel batch operations (7x faster on 8 cores)
-pub mod lsh_simhash;                       // SimHash for binary vectors (Hamming distance)
-pub mod lsh_similarity;                    // Adaptive LSH-backed similarity search (Session 7C)
-pub mod lsh_index;                         // LSH index for fast approximate similarity search (heap-optimized)
-pub mod primitive_system;                  // Ontological primitives system with 7 semantic domains
-pub mod ucl_cross_domain_frames;           // UCL cross-domain semantic frames (TRADE, CONFLICT, FEEDBACK_LOOP, etc.)
-pub mod bootstrapping;                     // Cognitive bootstrapping - primitives to reasoning tasks
-pub mod primitive_dashboard;               // Real-time primitive usage monitoring
-pub mod arithmetic_engine;                   // Revolutionary: True mathematical cognition via HDC
-pub mod arithmetic;                          // Modular arithmetic (re-exports arithmetic_engine)
-pub mod integer;                             // Integer arithmetic (ℤ) - extends natural numbers with sign
-pub mod rational;
+pub mod phi_real; // ContinuousHV Φ calculator (no binarization) using cosine similarity
+pub mod phi_resonant; // Resonator-based Φ calculator (O(n log N) dynamics)
+#[cfg(test)]
+mod phi_tier_tests; // Unit tests for Φ tier implementations
+pub mod phi_topology_validation; // ContinuousHV-TieredPhi integration for topology validation
+pub mod real_hv; // Real-valued hypervectors for consciousness topologies
+pub mod spectral_connectivity; // Algebraic connectivity (λ₂) calculator - NOT IIT Φ!
+pub mod tiered_phi; // Multi-tier Φ (integrated information) approximation // Binary hypervector operations (BinaryHV)
+                    // simd_hv16 removed — all methods absorbed into BinaryHV
+pub mod simd_continuous;
+pub mod simd_ops; // SIMD intrinsics for BinaryHV (AVX2/SSE4.1) // SIMD intrinsics for ContinuousHV (AVX2/FMA/SSE4.1)
+                  // NOTE: simd_hv and optimized_hv are INCOMPATIBLE with 16,384-bit BinaryHV (they use 256-byte arrays)
+                  // Use BinaryHV::bind(), BinaryHV::bundle(), BinaryHV::similarity() directly instead
+pub mod hdc_trait; // Unified HyperdimensionalVector trait interface
+                   // Performance optimization modules:
 pub mod algebraic_structures;
+pub mod arithmetic; // Modular arithmetic (re-exports arithmetic_engine)
+pub mod arithmetic_engine; // Revolutionary: True mathematical cognition via HDC
+pub mod bootstrapping; // Cognitive bootstrapping - primitives to reasoning tasks
 pub mod calculus;
-pub mod real_arithmetic;
-pub mod number_theory;
-pub mod numeric_tower;                       // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
-pub mod complex;                             // Complex number support (ℂ) with HDC encoding
-pub mod math_bridge;                         // Unified math bridge (NumericTower + Complex → single API)
-pub mod foundations;
-#[cfg(test)]
-mod math_integration_tests;
-#[cfg(test)]
-mod cross_bridge_integration_tests;
-#[cfg(test)]
-mod phi_feedback_integration_tests;
-#[cfg(test)]
-mod proptest_consciousness;
+pub mod celegans_connectome; // Revolutionary #100: C. elegans connectome validation (302 neurons)
+pub mod complex; // Complex number support (ℂ) with HDC encoding
 #[cfg(test)]
 mod consciousness_e2e_tests;
 #[cfg(test)]
 mod consciousness_fast_tests;
-pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
-pub mod native_similarity;                 // O(1) XOR+popcount similarity search (consciousness-native)
-pub mod sparse_hv;                         // Sparse HDC for memory-efficient low-density vectors
-pub mod hv_pool;                           // Thread-local memory pools for BinaryHV/ContinuousHV (10-100x faster allocation)
+#[cfg(test)]
+mod cross_bridge_integration_tests;
+pub mod foundations;
+pub mod hv_pool;
+pub mod incremental_hv; // O(k) incremental bundling (10-100x faster for updates)
+pub mod integer; // Integer arithmetic (ℤ) - extends natural numbers with sign
+pub mod lsh_index; // LSH index for fast approximate similarity search (heap-optimized)
+pub mod lsh_simhash; // SimHash for binary vectors (Hamming distance)
+pub mod lsh_similarity; // Adaptive LSH-backed similarity search (Session 7C)
+pub mod math_bridge; // Unified math bridge (NumericTower + Complex → single API)
+#[cfg(test)]
+mod math_integration_tests;
+pub mod native_similarity; // O(1) XOR+popcount similarity search (consciousness-native)
+pub mod number_theory;
+pub mod numeric_tower; // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
+pub mod parallel_hv; // Rayon parallel batch operations (7x faster on 8 cores)
+#[cfg(test)]
+mod phi_feedback_integration_tests;
+pub mod primitive_dashboard; // Real-time primitive usage monitoring
+pub mod primitive_system; // Ontological primitives system with 7 semantic domains
+#[cfg(test)]
+mod proptest_consciousness;
+pub mod rational;
+pub mod real_arithmetic;
+pub mod sparse_hv; // Sparse HDC for memory-efficient low-density vectors
+pub mod ucl_cross_domain_frames; // UCL cross-domain semantic frames (TRADE, CONFLICT, FEEDBACK_LOOP, etc.) // Thread-local memory pools for BinaryHV/ContinuousHV (10-100x faster allocation)
 
 // Property-based tests for HDC invariants
+#[cfg(test)]
+mod proptest_binary;
+#[cfg(test)]
+mod proptest_continuous;
 #[cfg(test)]
 mod proptest_hdc;
 #[cfg(test)]
 mod proptest_math;
 #[cfg(test)]
-mod proptest_continuous;
-#[cfg(test)]
-mod proptest_binary;
+mod proptest_resonator;
 #[cfg(test)]
 mod proptest_unified;
-#[cfg(test)]
-mod proptest_resonator;
 
 // Track 6: Consciousness integration for awakening module
-pub mod substrate_independence;            // Substrate type definitions
-pub mod consciousness_evaluator;           // Consciousness evaluation
-pub mod consciousness_integration;         // Complete consciousness pipeline
-pub mod consciousness;                     // Modular consciousness (re-exports consciousness_integration)
-pub mod consciousness_dashboard;           // Real-time consciousness monitoring
+pub mod consciousness; // Modular consciousness (re-exports consciousness_integration)
+pub mod consciousness_dashboard;
+pub mod consciousness_evaluator; // Consciousness evaluation
+pub mod consciousness_integration; // Complete consciousness pipeline
+pub mod substrate_independence; // Substrate type definitions // Real-time consciousness monitoring
 
 // Track 6: Language module dependencies
-pub mod universal_semantics;               // Universal semantic primes (Wierzbicka)
-pub mod grounded_understanding;            // True understanding via semantic primes + embodiment
-pub mod unified_understanding;             // Complete understanding pipeline (predictive + narrative + ToM)
-pub mod full_stack_consciousness;          // Full stack: Understanding + ActiveInference + Memory + Counterfactuals
-pub mod unified_conscious_being;           // Complete unified being: A+B+C+D+E+F integration
-// DISABLED: depends on crate::memory, crate::voice which don't exist in symthaea-core
-// pub mod infrastructure_bridge;             // Bridge to real persistence (Hippocampus/UnifiedMind/Kokoro)
-pub mod ecosystem_bridge;                  // Integration with service ecosystem (Sacred Core, Weave, Codex, Field Harmonizer)
-pub mod consciousness_self_assessment;     // Self-assessment for conversation
-pub mod consciousness_creativity;          // Creativity for conversation
-pub mod deterministic_seeds;               // Deterministic seeds for NixOS knowledge
-pub mod integrated_information;            // Φ (integrated information) measurement
-pub mod causal_encoder;                    // Causal relation encoding
-pub mod causal_mind;                       // Causal reasoning (core causal cognition)
-pub mod unified_cognitive_core;            // Unified cognitive core (UCE/UCTS architecture)
+pub mod full_stack_consciousness; // Full stack: Understanding + ActiveInference + Memory + Counterfactuals
+pub mod grounded_understanding; // True understanding via semantic primes + embodiment
+pub mod unified_conscious_being;
+pub mod unified_understanding; // Complete understanding pipeline (predictive + narrative + ToM)
+pub mod universal_semantics; // Universal semantic primes (Wierzbicka) // Complete unified being: A+B+C+D+E+F integration
+                             // DISABLED: depends on crate::memory, crate::voice which don't exist in symthaea-core
+                             // pub mod infrastructure_bridge;             // Bridge to real persistence (Hippocampus/UnifiedMind/Kokoro)
+pub mod causal_encoder; // Causal relation encoding
+pub mod causal_mind; // Causal reasoning (core causal cognition)
+pub mod consciousness_creativity; // Creativity for conversation
+pub mod consciousness_self_assessment; // Self-assessment for conversation
+pub mod deterministic_seeds; // Deterministic seeds for NixOS knowledge
+pub mod ecosystem_bridge; // Integration with service ecosystem (Sacred Core, Weave, Codex, Field Harmonizer)
+pub mod integrated_information; // Φ (integrated information) measurement
+pub mod unified_cognitive_core; // Unified cognitive core (UCE/UCTS architecture)
 
 // Predictive Processing (Friston Free Energy Principle)
-pub mod predictive_coding;                 // Hierarchical prediction + error minimization
-pub mod predictive_consciousness;          // Consciousness-level predictive processing
-pub mod predictive_consciousness_kalman;   // Kalman filter variant for smooth predictions
-pub mod predictive_encoder;                // Attention-modulated HDC encoding with LTC prediction loop
+pub mod predictive_coding; // Hierarchical prediction + error minimization
+pub mod predictive_consciousness; // Consciousness-level predictive processing
+pub mod predictive_consciousness_kalman; // Kalman filter variant for smooth predictions
+pub mod predictive_encoder; // Attention-modulated HDC encoding with LTC prediction loop
 
 // Novel Algorithm Modules (Dec 2025)
-pub mod differentiable_phi;                // Soft-partitioned differentiable Φ for gradient optimization
-pub mod autodiff_phi;                      // Reverse-mode autodiff for consciousness optimization (Jan 2026)
-pub mod cross_modal_binding;               // Cross-modal binding for multi-sensory integration
-pub mod metacognitive_monitor;             // Real-time consciousness monitoring with self-reflection
+pub mod autodiff_phi; // Reverse-mode autodiff for consciousness optimization (Jan 2026)
+pub mod cross_modal_binding; // Cross-modal binding for multi-sensory integration
+pub mod differentiable_phi; // Soft-partitioned differentiable Φ for gradient optimization
+pub mod metacognitive_monitor; // Real-time consciousness monitoring with self-reflection
 
 // Phenomenal Binding Study - Research Direction 2: HDC binding vs bundling for phenomenal unity
 pub mod phenomenal_binding_study;
 
 // Consciousness Infrastructure (required by advanced systems)
-pub mod consciousness_gradients;           // Gradient computation for consciousness optimization
-pub mod consciousness_dynamics;            // Consciousness dynamics modeling
-pub mod consciousness_optimizer;           // Consciousness state optimizer
-pub mod modern_hopfield;                   // Modern Hopfield networks for memory
+pub mod consciousness_dynamics; // Consciousness dynamics modeling
+pub mod consciousness_gradients; // Gradient computation for consciousness optimization
+pub mod consciousness_optimizer; // Consciousness state optimizer
+pub mod modern_hopfield; // Modern Hopfield networks for memory
 
 // Unified Consciousness Architecture (Dec 2025)
-pub mod fractal_consciousness;             // Fractal consciousness patterns
-pub mod phi_gradient_learning;             // Φ-gradient learning for optimization
-pub mod adaptive_learning_signals;         // Consciousness-guided learning modulation (Φ, surprise, coherence)
-pub mod conscious_learning;                // Consciousness-integrated learning (Hebbian + Adaptive signals)
-pub mod phi_guided_search;                 // Φ-guided architecture search (gradient-based topology optimization)
-pub mod process_topology;                  // Process topology structures
-pub mod unified_consciousness_engine;      // Core consciousness engine with Φ-guided processing
-pub mod attention_dynamics;                // Dynamic attention allocation with salience, goals, and priors
-pub mod temporal_binding;                  // Temporal stream binding for continuous experience
-pub mod emergent_self_model;               // Self-awareness and metacognitive optimization
-pub mod adaptive_topology;                 // Adaptive cognitive mode topology
-pub mod topology_synergy;                  // Topology-consciousness synergy
-// DISABLED: depends on crate::memory, crate::voice which don't exist in symthaea-core
-// pub mod integrated_conscious_agent;        // Complete conscious agent with Symthaea integration
-pub mod consciousness_visualizer;          // Consciousness visualization tools
-pub mod deep_integration;                   // Deep integration bridge for Φ-guided processing
-pub mod consciousness_physics;             // Consciousness-aware physics simulation observer (Φ + emergence + active inference)
-pub mod quantum_circuit;                   // Quantum circuit simulation engine with HDC bridge
+pub mod adaptive_learning_signals; // Consciousness-guided learning modulation (Φ, surprise, coherence)
+pub mod adaptive_topology; // Adaptive cognitive mode topology
+pub mod attention_dynamics; // Dynamic attention allocation with salience, goals, and priors
+pub mod conscious_learning; // Consciousness-integrated learning (Hebbian + Adaptive signals)
+pub mod emergent_self_model; // Self-awareness and metacognitive optimization
+pub mod fractal_consciousness; // Fractal consciousness patterns
+pub mod phi_gradient_learning; // Φ-gradient learning for optimization
+pub mod phi_guided_search; // Φ-guided architecture search (gradient-based topology optimization)
+pub mod process_topology; // Process topology structures
+pub mod temporal_binding; // Temporal stream binding for continuous experience
+pub mod topology_synergy;
+pub mod unified_consciousness_engine; // Core consciousness engine with Φ-guided processing // Topology-consciousness synergy
+                                      // DISABLED: depends on crate::memory, crate::voice which don't exist in symthaea-core
+                                      // pub mod integrated_conscious_agent;        // Complete conscious agent with Symthaea integration
+pub mod consciousness_physics; // Consciousness-aware physics simulation observer (Φ + emergence + active inference)
+pub mod consciousness_visualizer; // Consciousness visualization tools
+pub mod deep_integration; // Deep integration bridge for Φ-guided processing
+pub mod quantum_circuit; // Quantum circuit simulation engine with HDC bridge
 
 // Re-export BinaryHV at module level for convenience (used by language/nix_* modules)
 pub use binary_hv::BinaryHV;
@@ -447,108 +443,53 @@ pub use unified_hv::{ContinuousHV, HV};
 
 // Re-export configuration types (dimension unification)
 pub use config::{
-    HdcConfig,
-    set_hdc_config,
-    try_set_hdc_config,
-    hdc_dim,
-    hdc_config,
-    is_hdc_configured,
-    DimensionMapping,
-    STT_DIMENSION,
-    stt_expansion_factor,
+    hdc_config, hdc_dim, is_hdc_configured, set_hdc_config, stt_expansion_factor,
+    try_set_hdc_config, DimensionMapping, HdcConfig, STT_DIMENSION,
 };
 
 // Re-export projection layers
-pub use projection::{
-    LearnedProjection,
-    BidirectionalBridge,
-    RandomProjection,
-};
-
+pub use projection::{BidirectionalBridge, LearnedProjection, RandomProjection};
 
 // Re-export key types for convenience
 pub use statistical_retrieval::{
+    EmpiricalTier, RetrievalDecision, RetrievalVerdict, StatisticalRetrievalConfig,
     StatisticalRetriever,
-    StatisticalRetrievalConfig,
-    RetrievalDecision,
-    RetrievalVerdict,
-    EmpiricalTier,
 };
 
-pub use sequence_encoder::{
-    SequenceEncoder,
-    permute,
-    unpermute,
-    bundle,
-    bind,
-};
+pub use sequence_encoder::{bind, bundle, permute, unpermute, SequenceEncoder};
 
 pub use resonator::{
-    ResonatorNetwork,
-    ResonatorConfig,
-    ResonatorSolution,
-    Constraint,
-    MultiConstraint,
-    Factor,
+    Constraint, Factor, MultiConstraint, ResonatorConfig, ResonatorNetwork, ResonatorSolution,
 };
 
 pub use morphogenetic::{
-    MorphogeneticField,
-    MorphogeneticConfig,
-    PositionEncoding,
-    Attractor,
-    RepairResult,
-    FieldHealth,
-    FieldStats,
-    corrupt_vector,
-    random_vector,
+    corrupt_vector, random_vector, Attractor, FieldHealth, FieldStats, MorphogeneticConfig,
+    MorphogeneticField, PositionEncoding, RepairResult,
 };
 
 pub use hebbian::{
-    HebbianEngine,
-    HebbianConfig,
-    HebbianStats,
-    Synapse,
-    ActivationRecord,
-    HebbianAssociativeMemory,
-    HebbianAssociativeStats,
-    DEFAULT_LEARNING_RATE,
-    DEFAULT_DECAY_RATE,
-    STDP_TAU_PLUS,
-    STDP_TAU_MINUS,
-    STDP_A_PLUS,
-    STDP_A_MINUS,
-    TARGET_ACTIVITY,
-    HOMEOSTATIC_TAU,
+    ActivationRecord, HebbianAssociativeMemory, HebbianAssociativeStats, HebbianConfig,
+    HebbianEngine, HebbianStats, Synapse, DEFAULT_DECAY_RATE, DEFAULT_LEARNING_RATE,
+    HOMEOSTATIC_TAU, STDP_A_MINUS, STDP_A_PLUS, STDP_TAU_MINUS, STDP_TAU_PLUS, TARGET_ACTIVITY,
 };
 
 pub use sdm::{
-    SparseDistributedMemory,
-    SDMConfig,
-    HardLocation,
-    WriteResult,
-    ReadResult,
-    IterativeReadResult,
-    SDMStats,
-    EpisodicSDM,
-    hamming_similarity,
-    random_bipolar_vector,
-    add_noise,
-    DEFAULT_NUM_HARD_LOCATIONS,
-    DEFAULT_ACTIVATION_RADIUS,
-    COUNTER_MAX,
-    COUNTER_MIN,
+    add_noise, hamming_similarity, random_bipolar_vector, EpisodicSDM, HardLocation,
+    IterativeReadResult, ReadResult, SDMConfig, SDMStats, SparseDistributedMemory, WriteResult,
+    COUNTER_MAX, COUNTER_MIN, DEFAULT_ACTIVATION_RADIUS, DEFAULT_NUM_HARD_LOCATIONS,
 };
 
 pub use temporal_encoder::TemporalEncoder;
 pub use text_encoder::{TextEncoder, TextEncoderConfig, TextEncoderStats};
 
 // Re-export Primitive System types (9-tier ontological primitives)
-pub use primitive_system::{PrimitiveSystem, Primitive, PrimitiveTier, DomainManifold, seed_from_name};
+pub use primitive_system::{
+    seed_from_name, DomainManifold, Primitive, PrimitiveSystem, PrimitiveTier,
+};
 
 // Re-export UCL Cross-Domain Frame types (6 missing frames from gap analysis)
 pub use ucl_cross_domain_frames::{
-    UCLFrameSystem, CrossDomainFrame, FrameSlot, FrameInstance, concept_hv,
+    concept_hv, CrossDomainFrame, FrameInstance, FrameSlot, UCLFrameSystem,
 };
 
 // Re-export Primitive Dashboard types (real-time monitoring)
@@ -574,7 +515,7 @@ pub use adaptive_topology::{AdaptiveTopology, CognitiveMode};
 
 // Re-export unified consciousness engine types
 pub use unified_consciousness_engine::{
-    UnifiedConsciousnessEngine, EngineConfig, ConsciousnessDimensions,
+    ConsciousnessDimensions, EngineConfig, UnifiedConsciousnessEngine,
 };
 
 // Re-export consciousness visualization
@@ -584,31 +525,41 @@ pub use consciousness_visualizer::ConsciousnessVisualizer;
 pub use deep_integration::DeepIntegrationBridge;
 
 // Re-export causal mind types
-pub use causal_mind::{CausalMind, CausalDirection, LearnedCausalDiscovery};
+pub use causal_mind::{CausalDirection, CausalMind, LearnedCausalDiscovery};
 
 // Re-export unified cognitive core
-pub use unified_cognitive_core::{UnifiedCognitiveCore, UnifiedCognitiveElement, CognitiveMarkers, QueryResult};
+pub use unified_cognitive_core::{
+    CognitiveMarkers, QueryResult, UnifiedCognitiveCore, UnifiedCognitiveElement,
+};
 
 // Re-export unified HDC-LTC types (revolutionary closed-form dynamics)
 pub use hdc_ltc_unified::{
-    HdcLtcUnifiedNeuron, HdcLtcUnifiedNetwork,
-    UnifiedConfig, UnifiedNetworkConfig,
-    UnifiedActivation, UnifiedNeuronStats, UnifiedNetworkStats,
+    HdcLtcUnifiedNetwork, HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig,
+    UnifiedNetworkConfig, UnifiedNetworkStats, UnifiedNeuronStats,
 };
 
 // Re-export unified network Phi measurement types
 pub use unified_network_phi::{
-    UnifiedNetworkPhiMeasurer, UnifiedPhiConfig, PhiCalculationMethod,
-    PhiMeasurement, PhiEvolutionTracker, PhiEvolutionSummary,
-    PhiComparator, PhiComparison, PhiValidator, ValidationResult,
-    NetworkStateExtractor, demo_phi_evolution,
+    demo_phi_evolution,
+    NetworkStateExtractor,
+    PhiCalculationMethod,
+    PhiComparator,
+    PhiComparison,
     // Diagnostic types
-    PhiDiagnostic, PhiDiagnosticAnalyzer,
+    PhiDiagnostic,
+    PhiDiagnosticAnalyzer,
+    PhiEvolutionSummary,
+    PhiEvolutionTracker,
+    PhiMeasurement,
+    PhiValidator,
+    UnifiedNetworkPhiMeasurer,
+    UnifiedPhiConfig,
+    ValidationResult,
 };
 
 // Sleep and altered states
 pub mod sleep_and_altered_states;
-pub mod sleep_pattern_discovery;     // Resonator-based pattern discovery during sleep consolidation
+pub mod sleep_pattern_discovery; // Resonator-based pattern discovery during sleep consolidation
 
 // Long-term memory with Qdrant integration - Revolutionary Improvement #29
 // Persistent consciousness memory: experiences consolidated, retrieved, shape future
@@ -645,11 +596,11 @@ pub mod consciousness_cross_integration;
 pub mod consciousness_feedback_dynamics;
 
 // Advanced consciousness systems
-pub mod meta_consciousness;              // Meta-Consciousness - Φ of Φ, Strange Loops
-pub mod temporal_consciousness;          // Temporal Consciousness - Multi-scale Time
-pub mod temporal_simulation_bridge;     // Temporal Simulation Bridge - Physics trajectory → temporal consciousness
 pub mod consciousness_phase_transitions; // Phase Transitions - Consciousness State Changes
-pub mod epistemic_consciousness;         // Epistemic Consciousness - Belief/Knowledge Tracking
+pub mod epistemic_consciousness;
+pub mod meta_consciousness; // Meta-Consciousness - Φ of Φ, Strange Loops
+pub mod temporal_consciousness; // Temporal Consciousness - Multi-scale Time
+pub mod temporal_simulation_bridge; // Temporal Simulation Bridge - Physics trajectory → temporal consciousness // Epistemic Consciousness - Belief/Knowledge Tracking
 
 // Metacognition engine (self-monitoring, temporal patterns, narrative identity, state machine)
 pub mod consciousness_metacognition;
@@ -661,7 +612,6 @@ pub mod consciousness_complete_being;
 
 // Consciousness verification - multi-method Φ cross-validation
 pub mod consciousness_verifier;
-
 
 // Sensorimotor Contingencies - O'Regan & Noe enactivist theory
 // Perception IS implicit knowledge of action-sensation laws
@@ -677,63 +627,73 @@ pub mod relational_consciousness;
 // - CozoDB (Prefrontal Cortex): Recursive Datalog for causal reasoning
 // - LanceDB (Long-Term Memory): Multimodal embeddings storage
 // - DuckDB (Epistemic Auditor): Statistical analysis for self-reflection
+pub mod consciousness_metacognitive; // Metacognitive monitoring subsystem
+pub mod consciousness_perf; // SIMD batch ops + HV pool integration for consciousness hot paths
+pub mod consciousness_phi_optimization;
+pub mod consciousness_self_awareness; // Self-awareness subsystem
+pub mod consciousness_subsystem; // Trait-based pluggable consciousness subsystems
 pub mod multi_database_integration;
-pub mod phi_guided_math;                  // Φ-guided math domain selection (consciousness-driven computation paths)
-pub mod phi_feedback;                     // Φ feedback controller (closes the loop: Φ measurement → parameter modulation)
-pub mod semantic_bridge;                   // Bidirectional text <-> HV <-> consciousness bridge
-pub mod consciousness_perf;                // SIMD batch ops + HV pool integration for consciousness hot paths
-pub mod consciousness_subsystem;           // Trait-based pluggable consciousness subsystems
-pub mod consciousness_metacognitive;       // Metacognitive monitoring subsystem
-pub mod consciousness_self_awareness;      // Self-awareness subsystem
-pub mod consciousness_phi_optimization;    // Phi optimization subsystem
+pub mod phi_feedback; // Φ feedback controller (closes the loop: Φ measurement → parameter modulation)
+pub mod phi_guided_math; // Φ-guided math domain selection (consciousness-driven computation paths)
+pub mod semantic_bridge; // Bidirectional text <-> HV <-> consciousness bridge // Phi optimization subsystem
 
 // Re-export multi-database integration types
 // Note: QdrantConfig is aliased to MdbQdrantConfig to avoid conflict with long_term_memory::QdrantConfig
 pub use multi_database_integration::{
-    // Core architecture types
-    DatabaseRole, ImprovementMapping, SymthaeaMind,
-    // Configuration (Mdb = Multi-Database prefix to avoid collisions)
-    MultiDatabaseConfig,
-    QdrantConfig as MdbQdrantConfig,
-    CozoDbConfig, LanceDbConfig, DuckDbConfig,
-    // Health monitoring
-    DatabaseHealth, SystemHealth, PhiStatistics,
     // Consciousness loop
     ConsciousnessLoopState,
-    // Error handling
-    DatabaseError, DatabaseResult,
-    // Fallback
-    InMemoryFallback,
+    CozoDbConfig,
     // Client trait
     DatabaseClient,
+    // Error handling
+    DatabaseError,
+    // Health monitoring
+    DatabaseHealth,
+    DatabaseResult,
+    // Core architecture types
+    DatabaseRole,
+    DuckDbConfig,
+    ImprovementMapping,
+    // Fallback
+    InMemoryFallback,
+    LanceDbConfig,
+    // Configuration (Mdb = Multi-Database prefix to avoid collisions)
+    MultiDatabaseConfig,
+    PhiStatistics,
+    QdrantConfig as MdbQdrantConfig,
+    SymthaeaMind,
+    SystemHealth,
 };
 
 // Re-export relational consciousness types for sympoietic partnership
 pub use relational_consciousness::{
-    RelationMode,
-    RelationshipStage,
-    RelationalInteraction,
-    RelationalAssessment,
-    RelationalConfig,
-    RelationalConsciousness,
+    RelationMode, RelationalAssessment, RelationalConfig, RelationalConsciousness,
+    RelationalInteraction, RelationshipStage,
 };
 
 // Re-export long-term memory types (Qdrant integration)
 pub use long_term_memory::{
-    // Core types
-    MemoryType, Experience, RetrievalCue, RetrievedMemory,
+    Experience,
     // In-memory system
-    LongTermMemory, MemoryConsolidation,
+    LongTermMemory,
+    MemoryConsolidation,
+    // Core types
+    MemoryType,
+    MockQdrantMemoryStore,
     // Qdrant integration
-    QdrantConfig as LtmQdrantConfig, QdrantMemoryStore, QdrantMemoryError,
-    ScoredExperience, MockQdrantMemoryStore,
+    QdrantConfig as LtmQdrantConfig,
+    QdrantMemoryError,
+    QdrantMemoryStore,
+    RetrievalCue,
+    RetrievedMemory,
+    ScoredExperience,
 };
 
 // Re-export phi-gradient learning types
 pub use phi_gradient_learning::{PhiGradientTopology, PhiLearningConfig};
 
 // Re-export fractal consciousness types
-pub use fractal_consciousness::{FractalConsciousness, FractalConfig};
+pub use fractal_consciousness::{FractalConfig, FractalConsciousness};
 
 // Re-export consciousness topology types
 pub use consciousness_topology_generators::{ConsciousnessTopology, TopologyType};
@@ -741,13 +701,12 @@ pub use consciousness_topology_generators::{ConsciousnessTopology, TopologyType}
 // Re-export phi calculators
 // Re-export spectral connectivity calculator (renamed from phi_real)
 pub use spectral_connectivity::ConnectivityCalculator;
-pub use tiered_phi::{TieredPhi, ApproximationTier};
+pub use tiered_phi::{ApproximationTier, TieredPhi};
 
 // Re-export autodiff Phi types (reverse-mode autodiff for consciousness optimization)
 pub use autodiff_phi::{
-    AutodiffPhiEngine, AutodiffConfig, PhiForwardResult,
-    DiffNode, DiffNetwork,
-    ConsciousnessOptimizer, OptimizerConfig, TrainingStep,
+    AutodiffConfig, AutodiffPhiEngine, ConsciousnessOptimizer, DiffNetwork, DiffNode,
+    OptimizerConfig, PhiForwardResult, TrainingStep,
 };
 
 // Re-export process topology types
@@ -755,48 +714,58 @@ pub use process_topology::ProcessTopologyOrganizer;
 
 // Re-export native similarity types (consciousness-native O(1) search)
 pub use native_similarity::{
-    PackedBipolar, NativeSimilarityIndex, BundledQuery, SequenceQuery, IndexStats,
+    BundledQuery, IndexStats, NativeSimilarityIndex, PackedBipolar, SequenceQuery,
 };
 
 // Re-export sensorimotor contingencies (enactivist perception theory)
 // Note: Experience is aliased to SmcExperience to avoid conflict with long_term_memory::Experience
 pub use sensorimotor_contingencies::{
-    // Core types
-    SensorimotorContingency, ActionDescriptor, ActionType,
-    ContextDescriptor, SensoryModality, SensoryChange, PredictedChange,
-    // Learning
-    ContingencyLearner, Experience as SmcExperience, LearnResult, LearnerConfig, LearnerStats,
-    // Perception
-    EnactivistPerception, PerceptionResult, PerceptionConfig, PerceptionStats,
     // Affordances
-    ActionAffordance, AffordanceDetector, AffordanceConfig,
+    ActionAffordance,
+    ActionDescriptor,
+    ActionType,
+    AffordanceConfig,
+    AffordanceDetector,
+    ContextDescriptor,
     // Consciousness integration
     ContingencyConsciousnessContribution,
+    // Learning
+    ContingencyLearner,
+    // Perception
+    EnactivistPerception,
+    Experience as SmcExperience,
+    LearnResult,
+    LearnerConfig,
+    LearnerStats,
+    PerceptionConfig,
+    PerceptionResult,
+    PerceptionStats,
+    PredictedChange,
+    // Core types
+    SensorimotorContingency,
+    SensoryChange,
+    SensoryModality,
 };
 
 // Re-export HV memory pool types (10-100x faster allocation for hot paths)
 pub use hv_pool::{
-    BinaryHVPool, PooledBinaryHV,
-    ContinuousHVPool, PooledContinuousHV,
-    PoolStats as HVPoolStats,
-    pooled_bind, pooled_similarity,
+    pooled_bind, pooled_similarity, BinaryHVPool, ContinuousHVPool, PoolStats as HVPoolStats,
+    PooledBinaryHV, PooledContinuousHV,
 };
 
 // Re-export SIMD continuous HV operations (4x+ speedup for 16K-dim vectors)
 pub use simd_continuous::{
-    dot_product_simd as continuous_dot_product_simd,
-    bind_simd as continuous_bind_simd,
-    bundle_simd as continuous_bundle_simd,
-    norm_simd as continuous_norm_simd,
-    similarity_simd as continuous_similarity_simd,
+    bind_simd as continuous_bind_simd, bundle_simd as continuous_bundle_simd,
+    dot_product_simd as continuous_dot_product_simd, norm_simd as continuous_norm_simd,
     simd_capabilities_report as continuous_simd_capabilities_report,
+    similarity_simd as continuous_similarity_simd,
 };
 
 use anyhow::Result;
 // Note: hypervector crate not used yet - using custom implementation
 // use hypervector::{HyperVector as HV, HVType};
-use std::collections::HashMap;
 use bumpalo::Bump;
+use std::collections::HashMap;
 
 /// Semantic space using high-dimensional hypervectors
 #[derive(Debug)]
@@ -849,7 +818,8 @@ impl SemanticSpace {
 
     /// Recall similar memories (holographic retrieval!)
     pub fn recall(&self, query: &[f32], limit: usize) -> Result<Vec<Vec<f32>>> {
-        let mut similarities: Vec<(f32, usize)> = self.item_memory
+        let mut similarities: Vec<(f32, usize)> = self
+            .item_memory
             .iter()
             .enumerate()
             .map(|(idx, mem)| {
@@ -913,8 +883,11 @@ impl SemanticSpace {
     /// "cat dog" ≠ "dog cat" in HDC space
     pub fn permute(&self, vector: &[f32], shift: usize) -> Result<Vec<f32>> {
         if vector.len() != self.dimension {
-            anyhow::bail!("Vector dimension {} doesn't match semantic space dimension {}",
-                         vector.len(), self.dimension);
+            anyhow::bail!(
+                "Vector dimension {} doesn't match semantic space dimension {}",
+                vector.len(),
+                self.dimension
+            );
         }
 
         let mut result = vec![0.0; self.dimension];
@@ -931,7 +904,8 @@ impl SemanticSpace {
     /// Decode hypervector to text (approximate)
     pub fn decode(&self, vector: &[f32]) -> Result<String> {
         // Find most similar concepts
-        let mut best_matches: Vec<(f32, String)> = self.concepts
+        let mut best_matches: Vec<(f32, String)> = self
+            .concepts
             .iter()
             .map(|(word, concept)| {
                 let sim = cosine_similarity(vector, concept);
@@ -971,7 +945,11 @@ impl SemanticSpace {
 
     pub fn deserialize(data: &[u8]) -> Result<Self> {
         let concepts: HashMap<String, Vec<f32>> = bincode::deserialize(data)?;
-        let dimension = concepts.values().next().map(|v| v.len()).unwrap_or(HDC_DIMENSION);
+        let dimension = concepts
+            .values()
+            .next()
+            .map(|v| v.len())
+            .unwrap_or(HDC_DIMENSION);
 
         Ok(Self {
             dimension,
@@ -1035,9 +1013,7 @@ impl std::fmt::Debug for HdcContext {
 impl HdcContext {
     /// Create new HDC context with fresh arena
     pub fn new() -> Self {
-        Self {
-            arena: Bump::new(),
-        }
+        Self { arena: Bump::new() }
     }
 
     /// Bind two bipolar vectors (element-wise multiplication)
@@ -1139,10 +1115,7 @@ impl HdcContext {
             return 0.0;
         }
 
-        let matches: usize = a.iter()
-            .zip(b.iter())
-            .filter(|(x, y)| x == y)
-            .count();
+        let matches: usize = a.iter().zip(b.iter()).filter(|(x, y)| x == y).count();
 
         matches as f32 / a.len() as f32
     }
@@ -1224,7 +1197,10 @@ mod arena_tests {
         let _result3 = ctx.bind(&a, &b);
 
         let allocated_before = ctx.arena_allocated();
-        assert!(allocated_before >= 30_000, "Arena should have significant allocations");
+        assert!(
+            allocated_before >= 30_000,
+            "Arena should have significant allocations"
+        );
 
         // Reset clears all allocations
         ctx.reset();
@@ -1234,9 +1210,12 @@ mod arena_tests {
         let allocated_after = ctx.arena_allocated();
 
         // After reset + one operation, allocated should be much less than before
-        assert!(allocated_after < allocated_before,
-                "Arena should have fewer allocations after reset (before: {}, after: {})",
-                allocated_before, allocated_after);
+        assert!(
+            allocated_after < allocated_before,
+            "Arena should have fewer allocations after reset (before: {}, after: {})",
+            allocated_before,
+            allocated_after
+        );
     }
 
     // Week 14 Day 1: HDC Operations Foundation Tests
@@ -1268,7 +1247,11 @@ mod arena_tests {
 
         // Shift by dimension + 1
         let permuted = ctx.permute(&vec, 5);
-        assert_eq!(permuted, &[-1, 1, -1, 1], "Shift > dimension wraps correctly");
+        assert_eq!(
+            permuted,
+            &[-1, 1, -1, 1],
+            "Shift > dimension wraps correctly"
+        );
     }
 
     #[test]
@@ -1288,7 +1271,10 @@ mod arena_tests {
         let sequence_ba = ctx.bind(&b, a_permuted);
 
         // Sequences should be different (order matters in HDC!)
-        assert_ne!(sequence_ab, sequence_ba, "Different sequences should produce different vectors");
+        assert_ne!(
+            sequence_ab, sequence_ba,
+            "Different sequences should produce different vectors"
+        );
     }
 
     #[test]
@@ -1325,7 +1311,11 @@ mod arena_tests {
         let bundled = ctx.bundle(&vectors);
 
         // Bundle should equal original (majority vote)
-        assert_eq!(bundled, &original[..], "Bundle of identical vectors equals original");
+        assert_eq!(
+            bundled,
+            &original[..],
+            "Bundle of identical vectors equals original"
+        );
 
         // Bundle original + noisy should be close to original
         let vectors_noisy = vec![&original[..], &noisy[..]];
@@ -1340,6 +1330,10 @@ mod arena_tests {
         }
 
         // Should be >90% similar (most bits match)
-        assert!(matches >= 90, "Bundle with 10% noise should be >=90% similar (got {})", matches);
+        assert!(
+            matches >= 90,
+            "Bundle with 10% noise should be >=90% similar (got {})",
+            matches
+        );
     }
 }

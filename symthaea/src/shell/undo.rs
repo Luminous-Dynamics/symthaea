@@ -95,17 +95,29 @@ impl ActionData {
     /// Get the reverse action data
     pub fn reverse(&self) -> Self {
         match self {
-            ActionData::TextReplace { position, insert, delete } => ActionData::TextReplace {
+            ActionData::TextReplace {
+                position,
+                insert,
+                delete,
+            } => ActionData::TextReplace {
                 position: *position,
                 insert: delete.clone(),
                 delete: insert.clone(),
             },
-            ActionData::FileChange { path, old_content, new_content } => ActionData::FileChange {
+            ActionData::FileChange {
+                path,
+                old_content,
+                new_content,
+            } => ActionData::FileChange {
                 path: path.clone(),
                 old_content: new_content.clone(),
                 new_content: old_content.clone(),
             },
-            ActionData::NixChange { path, old_value, new_value } => ActionData::NixChange {
+            ActionData::NixChange {
+                path,
+                old_value,
+                new_value,
+            } => ActionData::NixChange {
                 path: path.clone(),
                 old_value: new_value.clone(),
                 new_value: old_value.clone(),
@@ -118,9 +130,9 @@ impl ActionData {
                 service: service.clone(),
                 enabled: !enabled,
             },
-            ActionData::Composite(actions) => ActionData::Composite(
-                actions.iter().rev().map(|a| a.reverse()).collect()
-            ),
+            ActionData::Composite(actions) => {
+                ActionData::Composite(actions.iter().rev().map(|a| a.reverse()).collect())
+            }
             ActionData::Noop => ActionData::Noop,
         }
     }
@@ -444,11 +456,14 @@ impl UndoableBuffer {
     /// Insert text at cursor (with undo support)
     pub fn insert(&mut self, text: &str) {
         let action = UndoAction::text_edit(
-            format!("Insert '{}'", if text.len() > 20 {
-                format!("{}...", &text[..20])
-            } else {
-                text.to_string()
-            }),
+            format!(
+                "Insert '{}'",
+                if text.len() > 20 {
+                    format!("{}...", &text[..20])
+                } else {
+                    text.to_string()
+                }
+            ),
             self.cursor,
             text,
             "",
@@ -469,12 +484,7 @@ impl UndoableBuffer {
         let start = self.cursor - delete_count;
         let deleted: String = self.content[start..self.cursor].to_string();
 
-        let action = UndoAction::text_edit(
-            "Delete",
-            start,
-            "",
-            &deleted,
-        );
+        let action = UndoAction::text_edit("Delete", start, "", &deleted);
 
         self.content.replace_range(start..self.cursor, "");
         self.cursor = start;
@@ -491,12 +501,7 @@ impl UndoableBuffer {
         let end = self.cursor + delete_count;
         let deleted: String = self.content[self.cursor..end].to_string();
 
-        let action = UndoAction::text_edit(
-            "Delete",
-            self.cursor,
-            "",
-            &deleted,
-        );
+        let action = UndoAction::text_edit("Delete", self.cursor, "", &deleted);
 
         self.content.replace_range(self.cursor..end, "");
         self.undo.push(action);
@@ -509,12 +514,7 @@ impl UndoableBuffer {
 
         let deleted: String = self.content[start..end].to_string();
 
-        let action = UndoAction::text_edit(
-            "Replace",
-            start,
-            text,
-            &deleted,
-        );
+        let action = UndoAction::text_edit("Replace", start, text, &deleted);
 
         self.content.replace_range(start..end, text);
         self.cursor = start + text.len();
@@ -527,12 +527,7 @@ impl UndoableBuffer {
             return;
         }
 
-        let action = UndoAction::text_edit(
-            "Clear",
-            0,
-            "",
-            &self.content,
-        );
+        let action = UndoAction::text_edit("Clear", 0, "", &self.content);
 
         self.content.clear();
         self.cursor = 0;
@@ -561,7 +556,11 @@ impl UndoableBuffer {
 
     fn apply_action_data(&mut self, data: &ActionData) {
         match data {
-            ActionData::TextReplace { position, insert, delete } => {
+            ActionData::TextReplace {
+                position,
+                insert,
+                delete,
+            } => {
                 let pos = *position;
                 let end = pos + delete.len();
 
@@ -675,15 +674,14 @@ mod tests {
 
     #[test]
     fn test_config_change_action() {
-        let action = UndoAction::config_change(
-            "services.nginx.enable",
-            "false",
-            "true",
-        );
+        let action = UndoAction::config_change("services.nginx.enable", "false", "true");
 
         assert_eq!(action.action_type, ActionType::Option);
 
-        if let ActionData::NixChange { path, new_value, .. } = &action.forward {
+        if let ActionData::NixChange {
+            path, new_value, ..
+        } = &action.forward
+        {
             assert_eq!(path, "services.nginx.enable");
             assert_eq!(new_value, "true");
         } else {

@@ -19,23 +19,23 @@
 //! - Up to 45% when reputation disparity is sufficient (hybrid BFT)
 //! - 45% does NOT converge when all nodes have equal reputation
 
-pub mod types;
 pub mod aggregation;
 pub mod byzantine;
-pub mod hybrid_bft;
-pub mod privacy;
-pub mod pipeline;
 pub mod convert;
-pub mod plugins;
+pub mod hybrid_bft;
 pub mod meta_learning;
+pub mod pipeline;
+pub mod plugins;
+pub mod privacy;
+pub mod types;
 
 #[cfg(feature = "holochain")]
 pub mod holochain_bridge;
 
-pub use types::*;
 pub use aggregation::*;
 pub use byzantine::*;
-pub use hybrid_bft::*;
-pub use privacy::*;
-pub use pipeline::*;
 pub use convert::*;
+pub use hybrid_bft::*;
+pub use pipeline::*;
+pub use privacy::*;
+pub use types::*;

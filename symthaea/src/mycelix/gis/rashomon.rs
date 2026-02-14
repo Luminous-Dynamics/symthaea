@@ -33,9 +33,9 @@
 //! }
 //! ```
 
-use std::time::SystemTime;
 use super::ignorance_types::Harmony;
 use super::uncertainty::MoralUncertainty;
+use std::time::SystemTime;
 
 /// A situation to be analyzed from multiple perspectives
 #[derive(Debug, Clone)]
@@ -415,7 +415,11 @@ impl RashomonEngine {
     }
 
     /// Generate a single perspective from a frame
-    fn generate_perspective(&self, frame: &HarmonicFrame, situation: &Situation) -> HarmonicPerspective {
+    fn generate_perspective(
+        &self,
+        frame: &HarmonicFrame,
+        situation: &Situation,
+    ) -> HarmonicPerspective {
         // In a full implementation, this would use HDC/LLM to generate
         // For now, we create a structured placeholder
         let content = format!(
@@ -436,10 +440,8 @@ impl RashomonEngine {
         perspective.confidence = frame.relevance(situation);
 
         // Inherit moral uncertainty from situation, adjusted by harmony
-        perspective.moral_uncertainty = self.adjust_moral_uncertainty(
-            &situation.moral_uncertainty,
-            frame.harmony,
-        );
+        perspective.moral_uncertainty =
+            self.adjust_moral_uncertainty(&situation.moral_uncertainty, frame.harmony);
 
         perspective
     }
@@ -508,7 +510,8 @@ impl RashomonEngine {
     /// Find agreements across perspectives
     fn find_agreements(&self, perspectives: &[HarmonicPerspective]) -> Vec<String> {
         // Simplified: count insights that appear in multiple perspectives
-        let mut insight_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        let mut insight_counts: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
 
         for p in perspectives {
             for insight in &p.insights {
@@ -559,10 +562,8 @@ impl RashomonEngine {
         perspectives: &[HarmonicPerspective],
         agreements: &[String],
     ) -> String {
-        let harmony_names: Vec<String> = perspectives
-            .iter()
-            .map(|p| p.harmony.to_string())
-            .collect();
+        let harmony_names: Vec<String> =
+            perspectives.iter().map(|p| p.harmony.to_string()).collect();
 
         let agreement_summary = if agreements.is_empty() {
             "No clear agreements identified".to_string()
@@ -601,8 +602,8 @@ impl RashomonEngine {
             return 0.0;
         }
 
-        let avg_confidence: f32 = perspectives.iter().map(|p| p.confidence).sum::<f32>()
-            / perspectives.len() as f32;
+        let avg_confidence: f32 =
+            perspectives.iter().map(|p| p.confidence).sum::<f32>() / perspectives.len() as f32;
 
         // Penalize for disagreements
         let conflict_penalty = perspectives
@@ -667,10 +668,8 @@ mod tests {
 
     #[test]
     fn test_harmonic_frame_relevance() {
-        let situation = Situation::with_domain(
-            "Environmental impact",
-            SituationDomain::Environmental,
-        );
+        let situation =
+            Situation::with_domain("Environmental impact", SituationDomain::Environmental);
 
         let psf_frame = HarmonicFrame::new(Harmony::PanSentientFlourishing);
         let ip_frame = HarmonicFrame::new(Harmony::InfinitePlay);

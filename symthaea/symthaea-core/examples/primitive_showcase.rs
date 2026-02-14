@@ -267,7 +267,10 @@ fn main() {
     let mut compositions: Vec<_> = algebra.list();
     compositions.sort_by_key(|c| c.name.clone());
     for comp in &compositions {
-        println!("  {} = {} (sources: {:?})", comp.name, comp.expression, comp.sources);
+        println!(
+            "  {} = {} (sources: {:?})",
+            comp.name, comp.expression, comp.sources
+        );
     }
     println!();
 
@@ -276,7 +279,10 @@ fn main() {
     for comp in &compositions {
         let similar = system.find_similar_to_encoding(&comp.encoding, 3);
         print!("  {} -> ", comp.name);
-        let matches: Vec<String> = similar.iter().map(|(n, s)| format!("{}({:.3})", n, s)).collect();
+        let matches: Vec<String> = similar
+            .iter()
+            .map(|(n, s)| format!("{}({:.3})", n, s))
+            .collect();
         println!("{}", matches.join(", "));
     }
     println!();

@@ -7,11 +7,12 @@ mod tests {
 
     #[test]
     fn test_direct_cause_identified() {
-        let dag = CausalDAG::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-        );
-        let query = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+        let dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![(0, 1)]);
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
         let reasoner = CounterfactualReasoner::new();
         let result = reasoner.query(&dag, &query);
         assert!(matches!(result, CausalQueryOutcome::Identified { .. }));
@@ -19,11 +20,12 @@ mod tests {
 
     #[test]
     fn test_unconnected_unidentified() {
-        let dag = CausalDAG::new(
-            vec!["X".into(), "Y".into()],
-            vec![],
-        );
-        let query = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+        let dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![]);
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
         let reasoner = CounterfactualReasoner::new();
         let result = reasoner.query(&dag, &query);
         assert!(matches!(result, CausalQueryOutcome::Unidentified { .. }));
@@ -36,7 +38,11 @@ mod tests {
             vec!["X".into(), "Y".into(), "U".into()],
             vec![(2, 0), (2, 1), (0, 1)],
         );
-        let query = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
         let reasoner = CounterfactualReasoner::new();
         let result = reasoner.query(&dag, &query);
         match result {
@@ -61,7 +67,11 @@ mod tests {
             vec!["X".into(), "M".into(), "Y".into()],
             vec![(0, 1), (1, 2)],
         );
-        let query = CausalQuery { treatment: 0, outcome: 2, conditioning: vec![] };
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 2,
+            conditioning: vec![],
+        };
         let reasoner = CounterfactualReasoner::new();
         let result = reasoner.query(&dag, &query);
         match result {
@@ -82,12 +92,19 @@ mod tests {
     fn test_dag_too_large() {
         let nodes: Vec<String> = (0..25).map(|i| format!("N{}", i)).collect();
         let dag = CausalDAG::new(nodes, vec![]);
-        let query = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
         let reasoner = CounterfactualReasoner::new();
         let result = reasoner.query(&dag, &query);
         assert!(matches!(
             result,
-            CausalQueryOutcome::Unidentified { reason: UnidentifiedReason::DagTooLarge { .. }, .. }
+            CausalQueryOutcome::Unidentified {
+                reason: UnidentifiedReason::DagTooLarge { .. },
+                ..
+            }
         ));
     }
 
@@ -111,7 +128,11 @@ mod tests {
             vec!["X".into(), "Y".into(), "U".into()],
             vec![(2, 0), (2, 1), (0, 1)],
         );
-        let query = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
         let reasoner = CounterfactualReasoner::new();
 
         let r1 = reasoner.query(&dag, &query);
@@ -154,10 +175,16 @@ mod tests {
         let b_set: HashSet<usize> = [1].iter().copied().collect();
 
         // Without conditioning: A and C are d-connected
-        assert!(!dag.is_d_separated(0, 2, &empty), "A-C should be d-connected without conditioning");
+        assert!(
+            !dag.is_d_separated(0, 2, &empty),
+            "A-C should be d-connected without conditioning"
+        );
 
         // Conditioning on B: A and C are d-separated
-        assert!(dag.is_d_separated(0, 2, &b_set), "A-C should be d-separated given B");
+        assert!(
+            dag.is_d_separated(0, 2, &b_set),
+            "A-C should be d-separated given B"
+        );
     }
 
     #[test]
@@ -174,10 +201,16 @@ mod tests {
         let b_set: HashSet<usize> = [1].iter().copied().collect();
 
         // Without conditioning: A and C are d-connected via B
-        assert!(!dag.is_d_separated(0, 2, &empty), "A-C should be d-connected without conditioning");
+        assert!(
+            !dag.is_d_separated(0, 2, &empty),
+            "A-C should be d-connected without conditioning"
+        );
 
         // Conditioning on B: A and C are d-separated
-        assert!(dag.is_d_separated(0, 2, &b_set), "A-C should be d-separated given B");
+        assert!(
+            dag.is_d_separated(0, 2, &b_set),
+            "A-C should be d-separated given B"
+        );
     }
 
     #[test]
@@ -194,10 +227,16 @@ mod tests {
         let b_set: HashSet<usize> = [1].iter().copied().collect();
 
         // Without conditioning: A and C are d-separated (collider blocks)
-        assert!(dag.is_d_separated(0, 2, &empty), "A-C should be d-separated without conditioning (collider)");
+        assert!(
+            dag.is_d_separated(0, 2, &empty),
+            "A-C should be d-separated without conditioning (collider)"
+        );
 
         // Conditioning on B: A and C are d-connected (collider opened)
-        assert!(!dag.is_d_separated(0, 2, &b_set), "A-C should be d-connected given B (collider opened)");
+        assert!(
+            !dag.is_d_separated(0, 2, &b_set),
+            "A-C should be d-connected given B (collider opened)"
+        );
     }
 
     #[test]
@@ -213,10 +252,16 @@ mod tests {
         let d_set: HashSet<usize> = [3].iter().copied().collect();
 
         // Without conditioning: A and C are d-separated
-        assert!(dag.is_d_separated(0, 2, &empty), "A-C should be d-separated");
+        assert!(
+            dag.is_d_separated(0, 2, &empty),
+            "A-C should be d-separated"
+        );
 
         // Conditioning on D (descendant of collider): A and C are d-connected
-        assert!(!dag.is_d_separated(0, 2, &d_set), "A-C should be d-connected given D (collider descendant)");
+        assert!(
+            !dag.is_d_separated(0, 2, &d_set),
+            "A-C should be d-connected given D (collider descendant)"
+        );
     }
 
     #[test]
@@ -233,10 +278,16 @@ mod tests {
         let m_set: HashSet<usize> = [2].iter().copied().collect();
 
         // X and Y are d-connected via X → Y
-        assert!(!dag.is_d_separated(0, 1, &empty), "X-Y should be d-connected");
+        assert!(
+            !dag.is_d_separated(0, 1, &empty),
+            "X-Y should be d-connected"
+        );
 
         // Conditioning on M opens a backdoor path
-        assert!(!dag.is_d_separated(0, 1, &m_set), "X-Y should still be d-connected given M");
+        assert!(
+            !dag.is_d_separated(0, 1, &m_set),
+            "X-Y should still be d-connected given M"
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -310,7 +361,10 @@ mod tests {
         let result = reasoner.try_rule2(&dag, 1, 2, 0, &[]);
 
         // Rule 2 should apply: Y ⊥ Z | X in G̅_X,Z_
-        assert!(result.is_some(), "Rule 2 should apply for instrument variable");
+        assert!(
+            result.is_some(),
+            "Rule 2 should apply for instrument variable"
+        );
         if let Some(CausalQueryOutcome::Identified { method, .. }) = result {
             assert_eq!(method, IdentificationMethod::Rule2ActionObservation);
         }
@@ -331,7 +385,10 @@ mod tests {
         let result = reasoner.try_rule3(&dag, 0, 1, 2, &[]);
 
         // Rule 3 should apply: Y ⊥ Z | X in G̅_X,Z(W)
-        assert!(result.is_some(), "Rule 3 should apply for irrelevant intervention");
+        assert!(
+            result.is_some(),
+            "Rule 3 should apply for irrelevant intervention"
+        );
         if let Some(CausalQueryOutcome::Identified { method, .. }) = result {
             assert_eq!(method, IdentificationMethod::Rule3ActionDeletion);
         }
@@ -344,7 +401,10 @@ mod tests {
         let mut harness = CausalReferenceHarness::new();
 
         // Should have at least 6 test cases now
-        assert!(harness.test_count() >= 6, "Harness should have ≥6 test cases");
+        assert!(
+            harness.test_count() >= 6,
+            "Harness should have ≥6 test cases"
+        );
 
         let _result = harness.validate(&reasoner);
         assert!(
@@ -372,13 +432,22 @@ mod tests {
         let bd_set: HashSet<usize> = [1, 3].iter().copied().collect();
 
         // A and E are d-connected without conditioning
-        assert!(!dag.is_d_separated(0, 4, &empty), "A-E should be d-connected");
+        assert!(
+            !dag.is_d_separated(0, 4, &empty),
+            "A-E should be d-connected"
+        );
 
         // Conditioning on C blocks the path
-        assert!(dag.is_d_separated(0, 4, &c_set), "A-E should be d-separated given C");
+        assert!(
+            dag.is_d_separated(0, 4, &c_set),
+            "A-E should be d-separated given C"
+        );
 
         // Conditioning on B and D also blocks
-        assert!(dag.is_d_separated(0, 4, &bd_set), "A-E should be d-separated given B,D");
+        assert!(
+            dag.is_d_separated(0, 4, &bd_set),
+            "A-E should be d-separated given B,D"
+        );
     }
 
     #[test]
@@ -395,13 +464,22 @@ mod tests {
         let d_set: HashSet<usize> = [3].iter().copied().collect();
 
         // B and C are d-connected via A (common cause)
-        assert!(!dag.is_d_separated(1, 2, &empty), "B-C should be d-connected via A");
+        assert!(
+            !dag.is_d_separated(1, 2, &empty),
+            "B-C should be d-connected via A"
+        );
 
         // Conditioning on A blocks the fork path
-        assert!(dag.is_d_separated(1, 2, &a_set), "B-C should be d-separated given A");
+        assert!(
+            dag.is_d_separated(1, 2, &a_set),
+            "B-C should be d-separated given A"
+        );
 
         // Conditioning on D (collider) opens a new path B → D ← C
-        assert!(!dag.is_d_separated(1, 2, &d_set), "B-C should be d-connected given D (collider)");
+        assert!(
+            !dag.is_d_separated(1, 2, &d_set),
+            "B-C should be d-connected given D (collider)"
+        );
     }
 
     #[test]
@@ -418,13 +496,22 @@ mod tests {
         let both_u: HashSet<usize> = [2, 3].iter().copied().collect();
 
         // X and Y are d-connected (two paths via U1 and U2)
-        assert!(!dag.is_d_separated(0, 1, &empty), "X-Y should be d-connected");
+        assert!(
+            !dag.is_d_separated(0, 1, &empty),
+            "X-Y should be d-connected"
+        );
 
         // Conditioning on just U1 still leaves path via U2
-        assert!(!dag.is_d_separated(0, 1, &u1_set), "X-Y should still be d-connected given only U1");
+        assert!(
+            !dag.is_d_separated(0, 1, &u1_set),
+            "X-Y should still be d-connected given only U1"
+        );
 
         // Conditioning on both U1 and U2 blocks all paths
-        assert!(dag.is_d_separated(0, 1, &both_u), "X-Y should be d-separated given U1,U2");
+        assert!(
+            dag.is_d_separated(0, 1, &both_u),
+            "X-Y should be d-separated given U1,U2"
+        );
     }
 
     #[test]
@@ -442,13 +529,22 @@ mod tests {
         let u_set: HashSet<usize> = [3].iter().copied().collect();
 
         // X and Y are d-connected (direct edge X→Y)
-        assert!(!dag.is_d_separated(0, 1, &empty), "X-Y should be d-connected");
+        assert!(
+            !dag.is_d_separated(0, 1, &empty),
+            "X-Y should be d-connected"
+        );
 
         // Conditioning on M doesn't block X→Y direct path
-        assert!(!dag.is_d_separated(0, 1, &m_set), "X-Y still d-connected given M");
+        assert!(
+            !dag.is_d_separated(0, 1, &m_set),
+            "X-Y still d-connected given M"
+        );
 
         // Conditioning on U blocks the backdoor but not the direct path
-        assert!(!dag.is_d_separated(0, 1, &u_set), "X-Y still d-connected given U (direct path)");
+        assert!(
+            !dag.is_d_separated(0, 1, &u_set),
+            "X-Y still d-connected given U (direct path)"
+        );
     }
 
     #[test]
@@ -466,16 +562,28 @@ mod tests {
         let bd_set: HashSet<usize> = [1, 3].iter().copied().collect();
 
         // A and E are d-separated (two colliders block)
-        assert!(dag.is_d_separated(0, 4, &empty), "A-E should be d-separated (colliders block)");
+        assert!(
+            dag.is_d_separated(0, 4, &empty),
+            "A-E should be d-separated (colliders block)"
+        );
 
         // Conditioning on B opens first collider but D still blocks
-        assert!(dag.is_d_separated(0, 4, &b_set), "A-E still d-separated given B (D blocks)");
+        assert!(
+            dag.is_d_separated(0, 4, &b_set),
+            "A-E still d-separated given B (D blocks)"
+        );
 
         // Conditioning on D opens second collider but B still blocks
-        assert!(dag.is_d_separated(0, 4, &d_set), "A-E still d-separated given D (B blocks)");
+        assert!(
+            dag.is_d_separated(0, 4, &d_set),
+            "A-E still d-separated given D (B blocks)"
+        );
 
         // Conditioning on both B and D opens both colliders
-        assert!(!dag.is_d_separated(0, 4, &bd_set), "A-E d-connected given B,D (both colliders open)");
+        assert!(
+            !dag.is_d_separated(0, 4, &bd_set),
+            "A-E d-connected given B,D (both colliders open)"
+        );
     }
 
     #[test]
@@ -494,13 +602,22 @@ mod tests {
         let d_set: HashSet<usize> = [3].iter().copied().collect();
 
         // A and C are d-connected via chain A→B→C
-        assert!(!dag.is_d_separated(0, 2, &empty), "A-C should be d-connected via chain");
+        assert!(
+            !dag.is_d_separated(0, 2, &empty),
+            "A-C should be d-connected via chain"
+        );
 
         // Conditioning on B blocks chain but opens path A→D→C (D not a collider on this path)
-        assert!(!dag.is_d_separated(0, 2, &b_set), "A-C still d-connected given B (via D)");
+        assert!(
+            !dag.is_d_separated(0, 2, &b_set),
+            "A-C still d-connected given B (via D)"
+        );
 
         // Conditioning on D blocks the A→D→C path
-        assert!(!dag.is_d_separated(0, 2, &d_set), "A-C still d-connected given D (via chain)");
+        assert!(
+            !dag.is_d_separated(0, 2, &d_set),
+            "A-C still d-connected given D (via chain)"
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -525,15 +642,12 @@ mod tests {
         let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
         for i in 0..100 {
             let x = i as f64 * 0.1;
-            let y = 2.0 * x + 0.01 * (i % 7) as f64;  // Small noise
+            let y = 2.0 * x + 0.01 * (i % 7) as f64; // Small noise
             data.add_observation(vec![x, y]);
         }
 
         // Simple chain: X → Y (no confounders)
-        let dag = CausalDAG::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-        );
+        let dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![(0, 1)]);
 
         let query = CausalQuery {
             treatment: 0,
@@ -546,7 +660,11 @@ mod tests {
 
         if let CausalQueryOutcome::Identified { estimand, .. } = result {
             // Effect should be approximately 2.0
-            assert!((estimand.effect - 2.0).abs() < 0.1, "Effect should be ~2.0, got {}", estimand.effect);
+            assert!(
+                (estimand.effect - 2.0).abs() < 0.1,
+                "Effect should be ~2.0, got {}",
+                estimand.effect
+            );
         } else {
             panic!("Expected identified effect");
         }
@@ -579,10 +697,17 @@ mod tests {
         let estimator = EffectEstimator::new();
         let result = estimator.estimate(&dag, &query, &data);
 
-        if let CausalQueryOutcome::Identified { estimand, method, .. } = result {
+        if let CausalQueryOutcome::Identified {
+            estimand, method, ..
+        } = result
+        {
             assert_eq!(method, IdentificationMethod::BackdoorAdjustment);
             // After adjusting for Z, effect should be ~2.0
-            assert!((estimand.effect - 2.0).abs() < 0.5, "Effect should be ~2.0, got {}", estimand.effect);
+            assert!(
+                (estimand.effect - 2.0).abs() < 0.5,
+                "Effect should be ~2.0, got {}",
+                estimand.effect
+            );
         } else {
             panic!("Expected identified effect");
         }
@@ -617,7 +742,10 @@ mod tests {
         let estimator = EffectEstimator::new();
         let result = estimator.estimate(&dag, &query, &data);
 
-        if let CausalQueryOutcome::Identified { estimand, method, .. } = result {
+        if let CausalQueryOutcome::Identified {
+            estimand, method, ..
+        } = result
+        {
             // Note: Since CausalDAG doesn't represent the hidden confounder,
             // the algorithm uses backdoor adjustment. The important thing is
             // that the effect is correctly identified and estimated.
@@ -628,7 +756,11 @@ mod tests {
                 method
             );
             // Total effect should be ~1.2 (0.8 * 1.5)
-            assert!((estimand.effect - 1.2).abs() < 0.3, "Effect should be ~1.2, got {}", estimand.effect);
+            assert!(
+                (estimand.effect - 1.2).abs() < 0.3,
+                "Effect should be ~1.2, got {}",
+                estimand.effect
+            );
         } else {
             panic!("Expected identified effect");
         }
@@ -654,11 +786,7 @@ mod tests {
     fn test_id_simple_chain() {
         // Simple chain: X → Y (no confounders)
         // Should be identifiable
-        let graph = CausalGraphWithLatents::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-            vec![],
-        );
+        let graph = CausalGraphWithLatents::new(vec!["X".into(), "Y".into()], vec![(0, 1)], vec![]);
 
         let id = IDAlgorithm::new();
         let result = id.identify(&graph, &[0], &[1]);
@@ -730,8 +858,16 @@ mod tests {
         );
 
         let components = graph.c_components();
-        assert_eq!(components.len(), 1, "Should have 1 C-component (all connected)");
-        assert_eq!(components[0].len(), 3, "Component should contain all 3 nodes");
+        assert_eq!(
+            components.len(),
+            1,
+            "Should have 1 C-component (all connected)"
+        );
+        assert_eq!(
+            components[0].len(),
+            3,
+            "Component should contain all 3 nodes"
+        );
     }
 
     #[test]
@@ -741,24 +877,29 @@ mod tests {
         let expr = CausalExpression::Sum {
             sum_over: vec![2],
             inner: Box::new(CausalExpression::Product(vec![
-                CausalExpression::Probability { outcome: vec![1], conditioning: vec![0, 2] },
-                CausalExpression::Probability { outcome: vec![2], conditioning: vec![] },
+                CausalExpression::Probability {
+                    outcome: vec![1],
+                    conditioning: vec![0, 2],
+                },
+                CausalExpression::Probability {
+                    outcome: vec![2],
+                    conditioning: vec![],
+                },
             ])),
         };
 
         let s = expr.to_string(&nodes);
         assert!(s.contains("Σ"), "Should contain sum symbol");
-        assert!(s.contains("P(Y|X,Z)"), "Should contain conditional probability");
+        assert!(
+            s.contains("P(Y|X,Z)"),
+            "Should contain conditional probability"
+        );
     }
 
     #[test]
     fn test_id_query_interface() {
         // Test the query interface for IDAlgorithm
-        let graph = CausalGraphWithLatents::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-            vec![],
-        );
+        let graph = CausalGraphWithLatents::new(vec!["X".into(), "Y".into()], vec![(0, 1)], vec![]);
 
         let id = IDAlgorithm::new();
         let query = CausalQuery {
@@ -805,7 +946,11 @@ mod tests {
         let ipw = estimator.estimate_ipw(&query, &[2], &data);
 
         // IPW should estimate ~2.0 (true causal effect)
-        assert!((ipw - 2.0).abs() < 1.0, "IPW estimate should be ~2.0, got {}", ipw);
+        assert!(
+            (ipw - 2.0).abs() < 1.0,
+            "IPW estimate should be ~2.0, got {}",
+            ipw
+        );
     }
 
     #[test]
@@ -815,7 +960,11 @@ mod tests {
 
         for i in 0..300 {
             let z = (i % 3) as f64 / 2.0; // Confounder 0, 0.5, or 1
-            let x = if z + 0.1 * (i % 5) as f64 > 0.5 { 1.0 } else { 0.0 };
+            let x = if z + 0.1 * (i % 5) as f64 > 0.5 {
+                1.0
+            } else {
+                0.0
+            };
             let y = 2.0 * x + 1.0 * z + 0.05 * (i % 11) as f64;
             data.add_observation(vec![x, y, z]);
         }
@@ -830,7 +979,11 @@ mod tests {
         let dr = estimator.estimate_doubly_robust(&query, &[2], &data);
 
         // DR should estimate ~2.0
-        assert!((dr - 2.0).abs() < 1.0, "DR estimate should be ~2.0, got {}", dr);
+        assert!(
+            (dr - 2.0).abs() < 1.0,
+            "DR estimate should be ~2.0, got {}",
+            dr
+        );
     }
 
     #[test]
@@ -840,7 +993,11 @@ mod tests {
 
         for i in 0..500 {
             let z = (i % 5) as f64 / 4.0;
-            let x = if z + 0.1 * (i % 3) as f64 > 0.4 { 1.0 } else { 0.0 };
+            let x = if z + 0.1 * (i % 3) as f64 > 0.4 {
+                1.0
+            } else {
+                0.0
+            };
             let y = 1.5 * x + 0.8 * z + 0.02 * (i % 7) as f64;
             data.add_observation(vec![x, y, z]);
         }
@@ -862,10 +1019,16 @@ mod tests {
         assert!(robust.is_identified, "Effect should be identified");
 
         // All estimates should be in reasonable range
-        assert!((robust.regression_estimate - 1.5).abs() < 1.0,
-            "Regression estimate should be ~1.5, got {}", robust.regression_estimate);
-        assert!((robust.dr_estimate - 1.5).abs() < 1.0,
-            "DR estimate should be ~1.5, got {}", robust.dr_estimate);
+        assert!(
+            (robust.regression_estimate - 1.5).abs() < 1.0,
+            "Regression estimate should be ~1.5, got {}",
+            robust.regression_estimate
+        );
+        assert!(
+            (robust.dr_estimate - 1.5).abs() < 1.0,
+            "DR estimate should be ~1.5, got {}",
+            robust.dr_estimate
+        );
 
         // Confidence should be positive
         assert!(robust.confidence() > 0.0, "Confidence should be positive");
@@ -883,8 +1046,14 @@ mod tests {
         };
 
         // Estimates are close, should have high confidence
-        assert!(estimate.confidence() > 0.5, "Close estimates should have high confidence");
-        assert!(estimate.estimates_agree(0.5), "Estimates within 0.5 should agree");
+        assert!(
+            estimate.confidence() > 0.5,
+            "Close estimates should have high confidence"
+        );
+        assert!(
+            estimate.estimates_agree(0.5),
+            "Estimates within 0.5 should agree"
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -899,8 +1068,8 @@ mod tests {
         let n_copy = n;
 
         // Generate edges: only from lower to higher index to ensure DAG property
-        proptest::collection::vec(proptest::bool::weighted(edge_prob), n * n)
-            .prop_map(move |edge_flags| {
+        proptest::collection::vec(proptest::bool::weighted(edge_prob), n * n).prop_map(
+            move |edge_flags| {
                 let mut edges = Vec::new();
                 for i in 0..n_copy {
                     for j in (i + 1)..n_copy {
@@ -910,7 +1079,8 @@ mod tests {
                     }
                 }
                 CausalDAG::new(nodes.clone(), edges)
-            })
+            },
+        )
     }
 
     proptest! {
@@ -1164,7 +1334,9 @@ mod tests {
         let identification = analysis.is_identified();
 
         match identification {
-            MediationIdentification::Identified { has_direct_effect, .. } => {
+            MediationIdentification::Identified {
+                has_direct_effect, ..
+            } => {
                 // There is no direct X → Y edge, but has_path checks reachability.
                 // X can reach Y through M, so the path X→M→Y exists.
                 // But the direct effect means X→Y direct edge, not via M.
@@ -1173,10 +1345,7 @@ mod tests {
                 // The code checks has_path which traverses transitively.
                 // So has_direct_effect will be true (X can reach Y).
                 // This is correct: the "has_direct_effect" field uses has_path.
-                assert!(
-                    true,
-                    "Mediation should be identified for X→M→Y chain"
-                );
+                assert!(true, "Mediation should be identified for X→M→Y chain");
             }
             other => panic!(
                 "Expected MediationIdentification::Identified, got {:?}",
@@ -1188,10 +1357,7 @@ mod tests {
     #[test]
     fn test_mediation_not_mediator() {
         // X → Y only (no path from X to M, M is disconnected)
-        let dag = CausalDAG::new(
-            vec!["X".into(), "M".into(), "Y".into()],
-            vec![(0, 2)],
-        );
+        let dag = CausalDAG::new(vec!["X".into(), "M".into(), "Y".into()], vec![(0, 2)]);
 
         let analysis = MediationAnalysis::new(&dag, 0, 1, 2);
         let identification = analysis.is_identified();
@@ -1224,7 +1390,10 @@ mod tests {
         let result = analysis.analyze(&data);
 
         assert!(result.is_identified, "Mediation should be identified");
-        assert!(result.total_effect.is_finite(), "Total effect should be finite");
+        assert!(
+            result.total_effect.is_finite(),
+            "Total effect should be finite"
+        );
         assert!(
             result.natural_indirect_effect.is_finite(),
             "NIE should be finite"
@@ -1270,7 +1439,10 @@ mod tests {
             result.f_statistic.is_finite(),
             "F-statistic should be finite"
         );
-        assert!(result.f_statistic >= 0.0, "F-statistic should be non-negative");
+        assert!(
+            result.f_statistic >= 0.0,
+            "F-statistic should be non-negative"
+        );
         assert!(
             result.p_value >= 0.0 && result.p_value <= 1.0,
             "p-value should be in [0,1], got {}",
@@ -1318,14 +1490,8 @@ mod tests {
     fn test_transportability_no_selection() {
         // Source and target have the same DAG: X → Y
         // No selection nodes means the effect should be directly transportable.
-        let source_dag = CausalDAG::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-        );
-        let target_dag = CausalDAG::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-        );
+        let source_dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![(0, 1)]);
+        let target_dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![(0, 1)]);
 
         let analyzer = TransportabilityAnalyzer::new(source_dag, target_dag, vec![]);
         let result = analyzer.is_transportable(0, 1);

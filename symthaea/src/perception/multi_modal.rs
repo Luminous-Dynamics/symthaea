@@ -188,7 +188,10 @@ impl MultiModalPerception {
             ModalityType::Temporal,
             ModalityType::Spatial,
         ] {
-            modality_encoders.insert(modality, ContinuousHV::random(dim, (modality as u64 + 1) * 42));
+            modality_encoders.insert(
+                modality,
+                ContinuousHV::random(dim, (modality as u64 + 1) * 42),
+            );
         }
 
         Self {
@@ -202,7 +205,11 @@ impl MultiModalPerception {
     /// Process a single input
     pub fn process_input(&mut self, input: PerceptionInput) -> ContinuousHV {
         self.stats.inputs_processed += 1;
-        *self.stats.modality_counts.entry(input.modality).or_insert(0) += 1;
+        *self
+            .stats
+            .modality_counts
+            .entry(input.modality)
+            .or_insert(0) += 1;
 
         // Use pre-computed embedding or encode
         let embedding = if let Some(emb) = &input.embedding {
@@ -217,7 +224,9 @@ impl MultiModalPerception {
 
     /// Encode raw input to embedding
     fn encode(&self, input: &PerceptionInput) -> ContinuousHV {
-        let modality_basis = self.modality_encoders.get(&input.modality)
+        let modality_basis = self
+            .modality_encoders
+            .get(&input.modality)
             .cloned()
             .unwrap_or_else(|| ContinuousHV::random(self.config.dimension, 999));
 
@@ -254,15 +263,18 @@ impl MultiModalPerception {
 
         self.stats.integrations += 1;
 
-        let modalities: Vec<_> = self.input_buffer.iter()
-            .map(|i| i.modality)
-            .collect();
+        let modalities: Vec<_> = self.input_buffer.iter().map(|i| i.modality).collect();
 
         let mut modality_confidences = HashMap::new();
-        let embeddings: Vec<ContinuousHV> = self.input_buffer.iter()
+        let embeddings: Vec<ContinuousHV> = self
+            .input_buffer
+            .iter()
             .map(|input| {
                 modality_confidences.insert(input.modality, input.confidence);
-                input.embedding.clone().unwrap_or_else(|| self.encode(input))
+                input
+                    .embedding
+                    .clone()
+                    .unwrap_or_else(|| self.encode(input))
             })
             .collect();
 
@@ -270,8 +282,8 @@ impl MultiModalPerception {
         let fused = self.fuse_embeddings(&embeddings);
 
         // Calculate overall confidence
-        let overall_confidence = modality_confidences.values().sum::<f32>()
-            / modality_confidences.len().max(1) as f32;
+        let overall_confidence =
+            modality_confidences.values().sum::<f32>() / modality_confidences.len().max(1) as f32;
 
         // Update stats
         let n = self.stats.integrations as f32;
@@ -394,7 +406,11 @@ impl MultiModalIntegrator {
                     count += 1;
                 }
             }
-            if count > 0 { total_sim / count as f32 } else { 1.0 }
+            if count > 0 {
+                total_sim / count as f32
+            } else {
+                1.0
+            }
         } else {
             1.0
         };
@@ -454,8 +470,16 @@ mod tests {
     fn test_integration() {
         let mut perception = MultiModalPerception::default();
 
-        perception.process_input(PerceptionInput::new("v1", ModalityType::Visual, vec![1, 2, 3]));
-        perception.process_input(PerceptionInput::new("a1", ModalityType::Auditory, vec![4, 5, 6]));
+        perception.process_input(PerceptionInput::new(
+            "v1",
+            ModalityType::Visual,
+            vec![1, 2, 3],
+        ));
+        perception.process_input(PerceptionInput::new(
+            "a1",
+            ModalityType::Auditory,
+            vec![4, 5, 6],
+        ));
 
         let output = perception.integrate();
         assert!(output.is_some());

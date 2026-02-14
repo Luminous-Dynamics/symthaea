@@ -3,7 +3,7 @@
 //! Evaluates ethical alignment of inputs using HDC-based moral algebra,
 //! consent detection, and deontological judgment.
 
-use crate::hdc::moral_algebra::{MoralVerdict, DeontologicalVerdict};
+use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralVerdict};
 
 use super::{CognitiveLoopService, MoralJudgmentSummary};
 
@@ -19,20 +19,27 @@ impl CognitiveLoopService {
     /// Returns a summary of the moral evaluation.
     pub fn evaluate_moral_alignment(&mut self, input: &str) -> MoralJudgmentSummary {
         // Parse and encode the input
-        let encoded = self.moral_parser.parse_and_encode(input, &self.moral_algebra);
+        let encoded = self
+            .moral_parser
+            .parse_and_encode(input, &self.moral_algebra);
 
         // Get basic judgment
-        let (verdict_str, good_sim, bad_sim) = if let Some(judgment) = encoded.judge(&self.moral_algebra) {
-            let v = match judgment.verdict {
-                MoralVerdict::Good => "Good",
-                MoralVerdict::Bad => "Bad",
-                MoralVerdict::Neutral => "Neutral",
-                MoralVerdict::ConsentViolation => "ConsentViolation",
+        let (verdict_str, good_sim, bad_sim) =
+            if let Some(judgment) = encoded.judge(&self.moral_algebra) {
+                let v = match judgment.verdict {
+                    MoralVerdict::Good => "Good",
+                    MoralVerdict::Bad => "Bad",
+                    MoralVerdict::Neutral => "Neutral",
+                    MoralVerdict::ConsentViolation => "ConsentViolation",
+                };
+                (
+                    v.to_string(),
+                    judgment.good_similarity,
+                    judgment.bad_similarity,
+                )
+            } else {
+                ("Neutral".to_string(), 0.0, 0.0)
             };
-            (v.to_string(), judgment.good_similarity, judgment.bad_similarity)
-        } else {
-            ("Neutral".to_string(), 0.0, 0.0)
-        };
 
         // Get deontological judgment
         let deont = self.moral_algebra.judge_deontological(input);
@@ -41,13 +48,18 @@ impl CognitiveLoopService {
             DeontologicalVerdict::WrongPerfectDutyViolated => "Impermissible",
             DeontologicalVerdict::WrongImperfectDutyViolated => "Impermissible",
             DeontologicalVerdict::Neutral => "Neutral",
-        }.to_string();
+        }
+        .to_string();
 
         // Extract violation and satisfaction names
-        let violations: Vec<String> = deont.violations.iter()
+        let violations: Vec<String> = deont
+            .violations
+            .iter()
             .map(|v| v.rule_name.clone())
             .collect();
-        let satisfactions: Vec<String> = deont.satisfactions.iter()
+        let satisfactions: Vec<String> = deont
+            .satisfactions
+            .iter()
             .map(|s| s.rule_name.clone())
             .collect();
 
@@ -90,7 +102,8 @@ impl CognitiveLoopService {
 
     /// Check if the last input had moral concerns
     pub fn has_moral_concerns(&self) -> bool {
-        self.last_moral_judgment.as_ref()
+        self.last_moral_judgment
+            .as_ref()
             .map(|j| j.moral_score < -0.3 || j.consent_violation || !j.violations.is_empty())
             .unwrap_or(false)
     }

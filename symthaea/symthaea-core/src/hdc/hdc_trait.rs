@@ -128,7 +128,10 @@ pub fn encode_sequence<H: HyperdimensionalVector + Permutable>(items: &[H]) -> H
 }
 
 /// Find the most similar vector in a set
-pub fn nearest_neighbor<H: HyperdimensionalVector>(query: &H, candidates: &[H]) -> Option<(usize, f32)> {
+pub fn nearest_neighbor<H: HyperdimensionalVector>(
+    query: &H,
+    candidates: &[H],
+) -> Option<(usize, f32)> {
     candidates
         .iter()
         .enumerate()

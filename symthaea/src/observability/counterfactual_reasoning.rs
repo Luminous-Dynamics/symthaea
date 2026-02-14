@@ -24,9 +24,9 @@
 //! Uses the `Uncertainty3D` model from `mycelix::gis::uncertainty` for
 //! comprehensive uncertainty quantification across all counterfactual inferences.
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use anyhow::Result;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UNCERTAINTY MODEL FOR COUNTERFACTUAL REASONING
@@ -113,16 +113,16 @@ impl CounterfactualUncertainty {
             return Self::certain();
         }
 
-        let epistemic = uncertainties.iter()
+        let epistemic = uncertainties
+            .iter()
             .map(|u| u.epistemic)
             .fold(0.0_f32, |a, b| a.max(b));
 
-        let aleatoric_sq: f32 = uncertainties.iter()
-            .map(|u| u.aleatoric.powi(2))
-            .sum();
+        let aleatoric_sq: f32 = uncertainties.iter().map(|u| u.aleatoric.powi(2)).sum();
         let aleatoric = aleatoric_sq.sqrt().min(1.0);
 
-        let structural = uncertainties.iter()
+        let structural = uncertainties
+            .iter()
             .map(|u| u.structural)
             .fold(0.0_f32, |a, b| a.max(b));
 
@@ -335,12 +335,17 @@ impl CounterfactualEngine {
         let link_idx = self.links.len();
         let from = link.from.clone();
         self.links.push(link);
-        self.adjacency.entry(from).or_insert_with(Vec::new).push(link_idx);
+        self.adjacency
+            .entry(from)
+            .or_insert_with(Vec::new)
+            .push(link_idx);
     }
 
     /// Set an observation (evidence)
     pub fn observe(&mut self, node_id: &str, value: f64) -> Result<()> {
-        let node = self.nodes.get_mut(node_id)
+        let node = self
+            .nodes
+            .get_mut(node_id)
             .ok_or_else(|| anyhow::anyhow!("Node not found: {}", node_id))?;
         node.observe(value);
         Ok(())
@@ -348,7 +353,9 @@ impl CounterfactualEngine {
 
     /// Perform a do-intervention
     pub fn intervene(&mut self, node_id: &str, value: f64) -> Result<()> {
-        let node = self.nodes.get_mut(node_id)
+        let node = self
+            .nodes
+            .get_mut(node_id)
             .ok_or_else(|| anyhow::anyhow!("Node not found: {}", node_id))?;
         node.intervene(value);
         Ok(())
@@ -379,11 +386,13 @@ impl CounterfactualEngine {
 
         // If no path exists, counterfactual = factual (no causal effect)
         if causal_path.is_empty() && intervention_node != target_node {
-            let factual_value = self.nodes.get(target_node)
-                .and_then(|n| n.observed_value);
+            let factual_value = self.nodes.get(target_node).and_then(|n| n.observed_value);
 
             return Ok(CounterfactualResult {
-                query: format!("P({}|do({} = {}))", target_node, intervention_node, intervention_value),
+                query: format!(
+                    "P({}|do({} = {}))",
+                    target_node, intervention_node, intervention_value
+                ),
                 target_node: target_node.to_string(),
                 factual_value,
                 counterfactual_value: factual_value.unwrap_or(0.0),
@@ -395,18 +404,18 @@ impl CounterfactualEngine {
         }
 
         // Propagate counterfactual effect along path with uncertainty
-        let (counterfactual_value, uncertainty) = self.propagate_counterfactual(
-            &causal_path,
-            intervention_value,
-        )?;
+        let (counterfactual_value, uncertainty) =
+            self.propagate_counterfactual(&causal_path, intervention_value)?;
 
-        let factual_value = self.nodes.get(target_node)
-            .and_then(|n| n.observed_value);
+        let factual_value = self.nodes.get(target_node).and_then(|n| n.observed_value);
 
         let confidence = uncertainty.confidence();
 
         Ok(CounterfactualResult {
-            query: format!("P({}|do({} = {}))", target_node, intervention_node, intervention_value),
+            query: format!(
+                "P({}|do({} = {}))",
+                target_node, intervention_node, intervention_value
+            ),
             target_node: target_node.to_string(),
             factual_value,
             counterfactual_value,
@@ -487,7 +496,9 @@ impl CounterfactualEngine {
             let to = &path[i + 1];
 
             // Find the link
-            let link = self.links.iter()
+            let link = self
+                .links
+                .iter()
                 .find(|l| &l.from == from && &l.to == to)
                 .ok_or_else(|| anyhow::anyhow!("Link not found: {} -> {}", from, to))?;
 
@@ -500,10 +511,7 @@ impl CounterfactualEngine {
             current_value = mechanism_effect + noise_contribution * 0.1; // Small noise impact on value
 
             // Propagate uncertainty through this link
-            current_uncertainty = current_uncertainty.propagate(
-                link.confidence,
-                link.noise,
-            );
+            current_uncertainty = current_uncertainty.propagate(link.confidence, link.noise);
 
             // Add structural uncertainty from link confidence
             if link.confidence < 0.8 {
@@ -536,10 +544,8 @@ impl CounterfactualEngine {
         let ate = cf_treated.counterfactual_value - cf_control.counterfactual_value;
 
         // Combined uncertainty (both counterfactuals contribute)
-        let combined_uncertainty = CounterfactualUncertainty::combine(&[
-            cf_treated.uncertainty,
-            cf_control.uncertainty,
-        ]);
+        let combined_uncertainty =
+            CounterfactualUncertainty::combine(&[cf_treated.uncertainty, cf_control.uncertainty]);
 
         Ok((ate, combined_uncertainty))
     }

@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 
 use symthaea_core::hdc::ContinuousHV;
 
-use crate::consciousness::code_primitives::{CodePrimitiveExecutor, CodeOperation};
+use crate::consciousness::code_primitives::{CodeOperation, CodePrimitiveExecutor};
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode};
 
@@ -79,8 +79,12 @@ impl Default for HealthFactors {
 impl HealthFactors {
     /// Compute weighted overall score
     pub fn overall(&self, weights: &HealthWeights) -> f32 {
-        let total_weight = weights.phi + weights.complexity + weights.cohesion
-            + weights.density + weights.structure + weights.primitive_phi;
+        let total_weight = weights.phi
+            + weights.complexity
+            + weights.cohesion
+            + weights.density
+            + weights.structure
+            + weights.primitive_phi;
 
         if total_weight == 0.0 {
             return 0.5;
@@ -262,7 +266,8 @@ impl CodeHealthScanner {
         }
 
         // Encode all entities
-        let hvs: Vec<ContinuousHV> = entities.iter()
+        let hvs: Vec<ContinuousHV> = entities
+            .iter()
             .map(|e| self.encoder.encode_entity(e))
             .collect();
 
@@ -289,12 +294,14 @@ impl CodeHealthScanner {
     /// Estimates based on nesting depth and function count.
     fn compute_complexity_score(&self, parsed: &ParsedCode) -> f32 {
         let entities = parsed.all_entities();
-        let func_count = entities.iter()
+        let func_count = entities
+            .iter()
             .filter(|e| e.kind == EntityKind::Function)
             .count();
 
         // Estimate nesting from child depth
-        let max_depth = entities.iter()
+        let max_depth = entities
+            .iter()
             .map(|e| self.entity_depth(e))
             .max()
             .unwrap_or(0);
@@ -312,7 +319,9 @@ impl CodeHealthScanner {
         if entity.children.is_empty() {
             0
         } else {
-            1 + entity.children.iter()
+            1 + entity
+                .children
+                .iter()
                 .map(|c| self.entity_depth(c))
                 .max()
                 .unwrap_or(0)
@@ -366,7 +375,10 @@ impl CodeHealthScanner {
     }
 
     fn common_prefix_len(&self, a: &str, b: &str) -> usize {
-        a.chars().zip(b.chars()).take_while(|(ca, cb)| ca == cb).count()
+        a.chars()
+            .zip(b.chars())
+            .take_while(|(ca, cb)| ca == cb)
+            .count()
     }
 
     /// Count entity types
@@ -389,7 +401,8 @@ impl CodeHealthScanner {
         let func_ratio = *counts.get(&EntityKind::Function).unwrap_or(&0) as f32 / total as f32;
         let type_ratio = (*counts.get(&EntityKind::Struct).unwrap_or(&0)
             + *counts.get(&EntityKind::Enum).unwrap_or(&0)
-            + *counts.get(&EntityKind::Trait).unwrap_or(&0)) as f32 / total as f32;
+            + *counts.get(&EntityKind::Trait).unwrap_or(&0)) as f32
+            / total as f32;
 
         // Penalize extremes (all functions or all types)
         if func_ratio > 0.9 || type_ratio > 0.9 {
@@ -423,21 +436,27 @@ impl CodeHealthScanner {
         let entities = parsed.all_entities();
 
         // Check for good practices
-        let has_types = entities.iter().any(|e|
-            e.kind == EntityKind::Struct ||
-            e.kind == EntityKind::Enum ||
-            e.kind == EntityKind::Trait
-        );
+        let has_types = entities.iter().any(|e| {
+            e.kind == EntityKind::Struct
+                || e.kind == EntityKind::Enum
+                || e.kind == EntityKind::Trait
+        });
 
         let has_impl = entities.iter().any(|e| e.kind == EntityKind::TraitImpl);
-        let has_tests = entities.iter().any(|e|
-            e.name.contains("test") || e.annotations.contains_key("test")
-        );
+        let has_tests = entities
+            .iter()
+            .any(|e| e.name.contains("test") || e.annotations.contains_key("test"));
 
         let mut score: f32 = 0.5;
-        if has_types { score += 0.2; }
-        if has_impl { score += 0.15; }
-        if has_tests { score += 0.15; }
+        if has_types {
+            score += 0.2;
+        }
+        if has_impl {
+            score += 0.15;
+        }
+        if has_tests {
+            score += 0.15;
+        }
 
         score.min(1.0)
     }
@@ -458,7 +477,10 @@ impl CodeHealthScanner {
             issues.push(HealthIssue {
                 severity: IssueSeverity::Medium,
                 category: IssueCategory::LowIntegration,
-                message: format!("Low integration score ({:.2}) - entities may not belong together", factors.phi),
+                message: format!(
+                    "Low integration score ({:.2}) - entities may not belong together",
+                    factors.phi
+                ),
                 location: None,
             });
         }
@@ -508,7 +530,11 @@ impl CodeHealthScanner {
     }
 
     /// Generate improvement suggestions
-    fn generate_suggestions(&self, issues: &[HealthIssue], factors: &HealthFactors) -> Vec<HealthSuggestion> {
+    fn generate_suggestions(
+        &self,
+        issues: &[HealthIssue],
+        factors: &HealthFactors,
+    ) -> Vec<HealthSuggestion> {
         let mut suggestions = Vec::new();
 
         for issue in issues {
@@ -562,14 +588,17 @@ impl CodeHealthScanner {
 
     /// Scan multiple modules and return sorted by health (worst first)
     pub fn scan_codebase(&self, modules: &[(PathBuf, ParsedCode)]) -> Vec<ModuleHealth> {
-        let mut results: Vec<ModuleHealth> = modules.iter()
+        let mut results: Vec<ModuleHealth> = modules
+            .iter()
             .map(|(path, parsed)| self.scan_module(path, parsed))
             .collect();
 
         // Sort by overall score (lowest/worst first)
-        results.sort_by(|a, b|
-            a.overall_score.partial_cmp(&b.overall_score).unwrap_or(std::cmp::Ordering::Equal)
-        );
+        results.sort_by(|a, b| {
+            a.overall_score
+                .partial_cmp(&b.overall_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         results
     }
@@ -580,15 +609,17 @@ impl CodeHealthScanner {
             return HealthSummary::default();
         }
 
-        let avg_score: f32 = results.iter().map(|r| r.overall_score).sum::<f32>()
-            / results.len() as f32;
+        let avg_score: f32 =
+            results.iter().map(|r| r.overall_score).sum::<f32>() / results.len() as f32;
 
-        let critical_count = results.iter()
+        let critical_count = results
+            .iter()
             .flat_map(|r| &r.issues)
             .filter(|i| i.severity == IssueSeverity::Critical)
             .count();
 
-        let high_count = results.iter()
+        let high_count = results
+            .iter()
             .flat_map(|r| &r.issues)
             .filter(|i| i.severity == IssueSeverity::High)
             .count();
@@ -625,19 +656,26 @@ mod tests {
 
     fn test_span() -> Span {
         Span {
-            start_byte: 0, end_byte: 100,
-            start_line: 0, start_col: 0,
-            end_line: 10, end_col: 0,
+            start_byte: 0,
+            end_byte: 100,
+            start_line: 0,
+            start_col: 0,
+            end_line: 10,
+            end_col: 0,
         }
     }
 
     fn make_parsed(source: &str, funcs: &[&str], types: &[&str]) -> ParsedCode {
         let mut parsed = ParsedCode::new(source, "rust");
         for f in funcs {
-            parsed.entities.push(CodeEntity::new(EntityKind::Function, *f, test_span()));
+            parsed
+                .entities
+                .push(CodeEntity::new(EntityKind::Function, *f, test_span()));
         }
         for t in types {
-            parsed.entities.push(CodeEntity::new(EntityKind::Struct, *t, test_span()));
+            parsed
+                .entities
+                .push(CodeEntity::new(EntityKind::Struct, *t, test_span()));
         }
         parsed
     }
@@ -673,7 +711,11 @@ mod tests {
     fn test_cohesive_naming() {
         let scanner = CodeHealthScanner::new(512);
         // Cohesive: all functions start with "parse_"
-        let parsed = make_parsed("", &["parse_input", "parse_output", "parse_config"], &["ParseResult"]);
+        let parsed = make_parsed(
+            "",
+            &["parse_input", "parse_output", "parse_config"],
+            &["ParseResult"],
+        );
         let factors = scanner.compute_factors(&parsed);
 
         // Should have higher cohesion due to naming patterns

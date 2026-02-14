@@ -49,7 +49,11 @@ fn make_mock_embedding(base_freq: f32, offset: f32) -> Vec<f32> {
 /// Cosine similarity between two packed bipolar vectors (via their bipolar expansions).
 fn cosine_similarity(a: &[i8], b: &[i8]) -> f64 {
     assert_eq!(a.len(), b.len());
-    let dot: i64 = a.iter().zip(b.iter()).map(|(&x, &y)| x as i64 * y as i64).sum();
+    let dot: i64 = a
+        .iter()
+        .zip(b.iter())
+        .map(|(&x, &y)| x as i64 * y as i64)
+        .sum();
     let norm_a: f64 = (a.iter().map(|&x| (x as i64) * (x as i64)).sum::<i64>() as f64).sqrt();
     let norm_b: f64 = (b.iter().map(|&x| (x as i64) * (x as i64)).sum::<i64>() as f64).sqrt();
     dot as f64 / (norm_a * norm_b)
@@ -67,7 +71,11 @@ fn test_e2e_mock_embedding_to_hdc() {
 
     assert_eq!(bridge.input_dim(), INPUT_DIM);
     assert_eq!(bridge.output_dim(), HDC_DIMENSION);
-    println!("Bridge created: {}->dim -> {}-dim", bridge.input_dim(), bridge.output_dim());
+    println!(
+        "Bridge created: {}->dim -> {}-dim",
+        bridge.input_dim(),
+        bridge.output_dim()
+    );
 
     // Step 2: Create a mock 1024-dim embedding (simulating BGE-M3 output)
     let embedding = make_mock_embedding(0.01, 0.0);
@@ -75,33 +83,64 @@ fn test_e2e_mock_embedding_to_hdc() {
 
     // Verify it's L2-normalized
     let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-    assert!((norm - 1.0).abs() < 1e-5, "Embedding should be L2-normalized, got norm={}", norm);
-    println!("Mock embedding: {} dims, L2 norm = {:.6}", embedding.len(), norm);
+    assert!(
+        (norm - 1.0).abs() < 1e-5,
+        "Embedding should be L2-normalized, got norm={}",
+        norm
+    );
+    println!(
+        "Mock embedding: {} dims, L2 norm = {:.6}",
+        embedding.len(),
+        norm
+    );
 
     // Step 3: Project through neural bridge to continuous HDC space
-    let continuous = bridge.project(&embedding).expect("Projection to continuous failed");
+    let continuous = bridge
+        .project(&embedding)
+        .expect("Projection to continuous failed");
     assert_eq!(continuous.len(), HDC_DIMENSION);
-    assert!(continuous.iter().all(|v| v.is_finite()), "All output values must be finite");
+    assert!(
+        continuous.iter().all(|v| v.is_finite()),
+        "All output values must be finite"
+    );
 
     let magnitude: f32 = continuous.iter().map(|x| x * x).sum::<f32>().sqrt();
-    println!("Continuous output: {} dims, magnitude = {:.4}", continuous.len(), magnitude);
+    println!(
+        "Continuous output: {} dims, magnitude = {:.4}",
+        continuous.len(),
+        magnitude
+    );
     assert!(magnitude > 0.0, "Output magnitude must be positive");
 
     // Step 4: Project to packed bipolar HDC
-    let packed = bridge.project_to_packed(&embedding).expect("Packed projection failed");
+    let packed = bridge
+        .project_to_packed(&embedding)
+        .expect("Packed projection failed");
     let bipolar = packed.to_bipolar();
     assert_eq!(bipolar.len(), HDC_DIMENSION);
 
     // All values must be -1 or +1
-    assert!(bipolar.iter().all(|&v| v == 1 || v == -1), "Bipolar values must be -1 or +1");
+    assert!(
+        bipolar.iter().all(|&v| v == 1 || v == -1),
+        "Bipolar values must be -1 or +1"
+    );
 
     let positive = bipolar.iter().filter(|&&v| v == 1).count();
     let negative = bipolar.iter().filter(|&&v| v == -1).count();
-    println!("Bipolar output: {} positive, {} negative (total {})", positive, negative, bipolar.len());
+    println!(
+        "Bipolar output: {} positive, {} negative (total {})",
+        positive,
+        negative,
+        bipolar.len()
+    );
 
     // Distribution should be roughly balanced (within 60/40 split)
     let balance_ratio = positive.min(negative) as f64 / (positive + negative) as f64;
-    assert!(balance_ratio > 0.35, "Bipolar distribution too skewed: {:.1}% minority", balance_ratio * 100.0);
+    assert!(
+        balance_ratio > 0.35,
+        "Bipolar distribution too skewed: {:.1}% minority",
+        balance_ratio * 100.0
+    );
 
     println!("\n--- Basic pipeline: PASS ---\n");
 }
@@ -119,7 +158,11 @@ fn test_e2e_similar_inputs_produce_similar_hdcs() {
     let emb_b = make_mock_embedding(0.01, 0.0001); // Very small phase shift
 
     // Verify the input embeddings are indeed similar
-    let input_cos: f64 = emb_a.iter().zip(emb_b.iter()).map(|(a, b)| (*a as f64) * (*b as f64)).sum();
+    let input_cos: f64 = emb_a
+        .iter()
+        .zip(emb_b.iter())
+        .map(|(a, b)| (*a as f64) * (*b as f64))
+        .sum();
     println!("Input embedding cosine similarity: {:.6}", input_cos);
     assert!(input_cos > 0.99, "Test inputs should be very similar");
 
@@ -136,9 +179,15 @@ fn test_e2e_similar_inputs_produce_similar_hdcs() {
     let xor_sim = packed_a.xor_similarity(&packed_b);
     println!("HDC XOR similarity: {:.6}", xor_sim);
 
-    assert!(cos_sim > 0.8,
-            "Similar inputs should produce similar HDC vectors (cosine > 0.8), got {:.4}", cos_sim);
-    println!("\n--- Similar inputs test: PASS (cosine={:.4}) ---\n", cos_sim);
+    assert!(
+        cos_sim > 0.8,
+        "Similar inputs should produce similar HDC vectors (cosine > 0.8), got {:.4}",
+        cos_sim
+    );
+    println!(
+        "\n--- Similar inputs test: PASS (cosine={:.4}) ---\n",
+        cos_sim
+    );
 }
 
 #[test]
@@ -154,7 +203,11 @@ fn test_e2e_dissimilar_inputs_produce_dissimilar_hdcs() {
     let emb_c = make_mock_embedding(0.07, 2.5); // Very different frequency and phase
 
     // Verify inputs are dissimilar
-    let input_cos: f64 = emb_a.iter().zip(emb_c.iter()).map(|(a, b)| (*a as f64) * (*b as f64)).sum();
+    let input_cos: f64 = emb_a
+        .iter()
+        .zip(emb_c.iter())
+        .map(|(a, b)| (*a as f64) * (*b as f64))
+        .sum();
     println!("Input embedding cosine similarity: {:.6}", input_cos);
 
     let packed_a = bridge.project_to_packed(&emb_a).unwrap();
@@ -174,9 +227,15 @@ fn test_e2e_dissimilar_inputs_produce_dissimilar_hdcs() {
     // HDC vectors with cosine significantly lower than similar pairs.
     // We use a relaxed threshold: |cosine| < 0.5 for dissimilar inputs,
     // acknowledging that sign() binarization can amplify small correlations.
-    assert!(cos_sim.abs() < 0.5,
-            "Dissimilar inputs should produce dissimilar HDC vectors (|cosine| < 0.5), got {:.4}", cos_sim);
-    println!("\n--- Dissimilar inputs test: PASS (cosine={:.4}) ---\n", cos_sim);
+    assert!(
+        cos_sim.abs() < 0.5,
+        "Dissimilar inputs should produce dissimilar HDC vectors (|cosine| < 0.5), got {:.4}",
+        cos_sim
+    );
+    println!(
+        "\n--- Dissimilar inputs test: PASS (cosine={:.4}) ---\n",
+        cos_sim
+    );
 }
 
 #[test]
@@ -190,7 +249,7 @@ fn test_e2e_similarity_ordering_preserved() {
     // Three embeddings: A is very similar to B, A is dissimilar to C
     let emb_a = make_mock_embedding(0.01, 0.0);
     let emb_b = make_mock_embedding(0.01, 0.0001); // Near-identical to A
-    let emb_c = make_mock_embedding(0.07, 2.5);     // Very different from A
+    let emb_c = make_mock_embedding(0.07, 2.5); // Very different from A
 
     let packed_a = bridge.project_to_packed(&emb_a).unwrap();
     let packed_b = bridge.project_to_packed(&emb_b).unwrap();
@@ -202,9 +261,15 @@ fn test_e2e_similarity_ordering_preserved() {
     println!("XOR similarity A<->B (similar): {:.4}", sim_ab);
     println!("XOR similarity A<->C (different): {:.4}", sim_ac);
 
-    assert!(sim_ab > sim_ac,
-            "Similar pairs must have higher similarity than dissimilar pairs: AB={:.4} vs AC={:.4}",
-            sim_ab, sim_ac);
+    assert!(
+        sim_ab > sim_ac,
+        "Similar pairs must have higher similarity than dissimilar pairs: AB={:.4} vs AC={:.4}",
+        sim_ab,
+        sim_ac
+    );
 
-    println!("\n--- Ordering preservation: PASS (AB={:.4} > AC={:.4}) ---\n", sim_ab, sim_ac);
+    println!(
+        "\n--- Ordering preservation: PASS (AB={:.4} > AC={:.4}) ---\n",
+        sim_ab, sim_ac
+    );
 }

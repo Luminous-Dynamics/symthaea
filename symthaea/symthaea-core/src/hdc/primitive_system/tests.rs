@@ -4,7 +4,10 @@ use super::*;
 fn test_primitive_system_creation() {
     let system = PrimitiveSystem::new();
     assert!(system.count() > 0, "Should have primitives");
-    assert!(system.count_tier(PrimitiveTier::Mathematical) > 0, "Should have mathematical primitives");
+    assert!(
+        system.count_tier(PrimitiveTier::Mathematical) > 0,
+        "Should have mathematical primitives"
+    );
 }
 
 #[test]
@@ -15,7 +18,10 @@ fn test_tier1_primitives() {
     assert!(system.get("SET").is_some(), "SET primitive should exist");
     assert!(system.get("NOT").is_some(), "NOT primitive should exist");
     assert!(system.get("ZERO").is_some(), "ZERO primitive should exist");
-    assert!(system.get("ADDITION").is_some(), "ADDITION primitive should exist");
+    assert!(
+        system.get("ADDITION").is_some(),
+        "ADDITION primitive should exist"
+    );
 }
 
 #[test]
@@ -29,8 +35,11 @@ fn test_orthogonality_check() {
     // With 16,384-bit vectors, similarity() returns fraction of matching bits
     // in [0, 1]. Random/orthogonal pairs concentrate around 0.5.
     if let Some(similarity) = sim {
-        assert!((similarity - 0.5).abs() < 0.03,
-            "Cross-domain primitives should be near-orthogonal (sim ≈ 0.5), got {}", similarity);
+        assert!(
+            (similarity - 0.5).abs() < 0.03,
+            "Cross-domain primitives should be near-orthogonal (sim ≈ 0.5), got {}",
+            similarity
+        );
     }
 }
 
@@ -43,8 +52,11 @@ fn test_tier_validation() {
     let violations = system.validate_tier_orthogonality(PrimitiveTier::Mathematical, 0.03);
 
     // Zero violations expected — any violation indicates a seeding collision
-    assert!(violations.is_empty(),
-        "All Tier 1 primitives should be orthogonal (|sim - 0.5| < 0.03), violations: {:?}", violations);
+    assert!(
+        violations.is_empty(),
+        "All Tier 1 primitives should be orthogonal (|sim - 0.5| < 0.03), violations: {:?}",
+        violations
+    );
 }
 
 #[test]
@@ -61,8 +73,11 @@ fn test_domain_manifolds() {
     // similarity() returns [0,1] where 0.5 = random baseline
     if let (Some(m), Some(l)) = (math, logic) {
         let sim = m.rotation.similarity(&l.rotation);
-        assert!((sim - 0.5).abs() < 0.03,
-            "Domain rotations should be near-orthogonal (sim ≈ 0.5), got {}", sim);
+        assert!(
+            (sim - 0.5).abs() < 0.03,
+            "Domain rotations should be near-orthogonal (sim ≈ 0.5), got {}",
+            sim
+        );
     }
 }
 
@@ -78,7 +93,10 @@ fn test_derived_primitives() {
     assert!(!one.is_base, "ONE should be derived");
     assert!(!addition.is_base, "ADDITION should be derived");
 
-    assert!(one.derivation.is_some(), "Derived primitives should have derivation");
+    assert!(
+        one.derivation.is_some(),
+        "Derived primitives should have derivation"
+    );
 }
 
 // ========================================================================
@@ -91,30 +109,66 @@ fn test_tier2_primitives_exist() {
 
     // Physical properties
     assert!(system.get("MASS").is_some(), "MASS primitive should exist");
-    assert!(system.get("CHARGE").is_some(), "CHARGE primitive should exist");
-    assert!(system.get("ENERGY").is_some(), "ENERGY primitive should exist");
+    assert!(
+        system.get("CHARGE").is_some(),
+        "CHARGE primitive should exist"
+    );
+    assert!(
+        system.get("ENERGY").is_some(),
+        "ENERGY primitive should exist"
+    );
 
     // Motion
-    assert!(system.get("VELOCITY").is_some(), "VELOCITY primitive should exist");
-    assert!(system.get("ACCELERATION").is_some(), "ACCELERATION primitive should exist");
-    assert!(system.get("MOMENTUM").is_some(), "MOMENTUM primitive should exist");
+    assert!(
+        system.get("VELOCITY").is_some(),
+        "VELOCITY primitive should exist"
+    );
+    assert!(
+        system.get("ACCELERATION").is_some(),
+        "ACCELERATION primitive should exist"
+    );
+    assert!(
+        system.get("MOMENTUM").is_some(),
+        "MOMENTUM primitive should exist"
+    );
 
     // Causality
-    assert!(system.get("CAUSE").is_some(), "CAUSE primitive should exist");
-    assert!(system.get("EFFECT").is_some(), "EFFECT primitive should exist");
-    assert!(system.get("STATE_CHANGE").is_some(), "STATE_CHANGE primitive should exist");
+    assert!(
+        system.get("CAUSE").is_some(),
+        "CAUSE primitive should exist"
+    );
+    assert!(
+        system.get("EFFECT").is_some(),
+        "EFFECT primitive should exist"
+    );
+    assert!(
+        system.get("STATE_CHANGE").is_some(),
+        "STATE_CHANGE primitive should exist"
+    );
 
     // Thermodynamics
-    assert!(system.get("THERMODYNAMIC_ENTROPY").is_some(), "THERMODYNAMIC_ENTROPY primitive should exist");
-    assert!(system.get("TEMPERATURE").is_some(), "TEMPERATURE primitive should exist");
+    assert!(
+        system.get("THERMODYNAMIC_ENTROPY").is_some(),
+        "THERMODYNAMIC_ENTROPY primitive should exist"
+    );
+    assert!(
+        system.get("TEMPERATURE").is_some(),
+        "TEMPERATURE primitive should exist"
+    );
 }
 
 #[test]
 fn test_tier2_domains() {
     let system = PrimitiveSystem::new();
 
-    assert!(system.domain("physics").is_some(), "Physics domain should exist");
-    assert!(system.domain("causality").is_some(), "Causality domain should exist");
+    assert!(
+        system.domain("physics").is_some(),
+        "Physics domain should exist"
+    );
+    assert!(
+        system.domain("causality").is_some(),
+        "Causality domain should exist"
+    );
 }
 
 #[test]
@@ -124,7 +178,10 @@ fn test_tier2_derived_primitives() {
     // MOMENTUM should be derived (MASS × VELOCITY)
     let momentum = system.get("MOMENTUM").unwrap();
     assert!(!momentum.is_base, "MOMENTUM should be derived");
-    assert!(momentum.derivation.is_some(), "MOMENTUM should have derivation");
+    assert!(
+        momentum.derivation.is_some(),
+        "MOMENTUM should have derivation"
+    );
 
     // ACCELERATION should be derived
     let acceleration = system.get("ACCELERATION").unwrap();
@@ -136,8 +193,11 @@ fn test_tier2_orthogonality() {
     let system = PrimitiveSystem::new();
 
     let violations = system.validate_tier_orthogonality(PrimitiveTier::Physical, 0.03);
-    assert!(violations.is_empty(),
-        "All Tier 2 primitives should be orthogonal (|sim - 0.5| < 0.03), violations: {:?}", violations);
+    assert!(
+        violations.is_empty(),
+        "All Tier 2 primitives should be orthogonal (|sim - 0.5| < 0.03), violations: {:?}",
+        violations
+    );
 }
 
 // ========================================================================
@@ -149,34 +209,79 @@ fn test_tier3_primitives_exist() {
     let system = PrimitiveSystem::new();
 
     // Basic geometry
-    assert!(system.get("POINT").is_some(), "POINT primitive should exist");
+    assert!(
+        system.get("POINT").is_some(),
+        "POINT primitive should exist"
+    );
     assert!(system.get("LINE").is_some(), "LINE primitive should exist");
-    assert!(system.get("PLANE").is_some(), "PLANE primitive should exist");
-    assert!(system.get("ANGLE").is_some(), "ANGLE primitive should exist");
-    assert!(system.get("DISTANCE").is_some(), "DISTANCE primitive should exist");
+    assert!(
+        system.get("PLANE").is_some(),
+        "PLANE primitive should exist"
+    );
+    assert!(
+        system.get("ANGLE").is_some(),
+        "ANGLE primitive should exist"
+    );
+    assert!(
+        system.get("DISTANCE").is_some(),
+        "DISTANCE primitive should exist"
+    );
 
     // Vectors
-    assert!(system.get("VECTOR").is_some(), "VECTOR primitive should exist");
-    assert!(system.get("DOT_PRODUCT").is_some(), "DOT_PRODUCT primitive should exist");
-    assert!(system.get("CROSS_PRODUCT").is_some(), "CROSS_PRODUCT primitive should exist");
+    assert!(
+        system.get("VECTOR").is_some(),
+        "VECTOR primitive should exist"
+    );
+    assert!(
+        system.get("DOT_PRODUCT").is_some(),
+        "DOT_PRODUCT primitive should exist"
+    );
+    assert!(
+        system.get("CROSS_PRODUCT").is_some(),
+        "CROSS_PRODUCT primitive should exist"
+    );
 
     // Differential geometry
-    assert!(system.get("MANIFOLD").is_some(), "MANIFOLD primitive should exist");
-    assert!(system.get("TANGENT_SPACE").is_some(), "TANGENT_SPACE primitive should exist");
-    assert!(system.get("CURVATURE").is_some(), "CURVATURE primitive should exist");
+    assert!(
+        system.get("MANIFOLD").is_some(),
+        "MANIFOLD primitive should exist"
+    );
+    assert!(
+        system.get("TANGENT_SPACE").is_some(),
+        "TANGENT_SPACE primitive should exist"
+    );
+    assert!(
+        system.get("CURVATURE").is_some(),
+        "CURVATURE primitive should exist"
+    );
 
     // Topology
-    assert!(system.get("OPEN_SET").is_some(), "OPEN_SET primitive should exist");
-    assert!(system.get("BOUNDARY").is_some(), "BOUNDARY primitive should exist");
-    assert!(system.get("PART_OF").is_some(), "PART_OF primitive should exist");
+    assert!(
+        system.get("OPEN_SET").is_some(),
+        "OPEN_SET primitive should exist"
+    );
+    assert!(
+        system.get("BOUNDARY").is_some(),
+        "BOUNDARY primitive should exist"
+    );
+    assert!(
+        system.get("PART_OF").is_some(),
+        "PART_OF primitive should exist"
+    );
 }
 
 #[test]
 fn test_tier3_domains() {
     let system = PrimitiveSystem::new();
 
-    assert!(system.domain("geometry").is_some(), "Geometry domain should exist");
-    assert!(system.domain("topology").is_some(), "Topology domain should exist");
+    assert!(
+        system.domain("geometry").is_some(),
+        "Geometry domain should exist"
+    );
+    assert!(
+        system.domain("topology").is_some(),
+        "Topology domain should exist"
+    );
 }
 
 #[test]
@@ -184,8 +289,11 @@ fn test_tier3_orthogonality() {
     let system = PrimitiveSystem::new();
 
     let violations = system.validate_tier_orthogonality(PrimitiveTier::Geometric, 0.03);
-    assert!(violations.is_empty(),
-        "All Tier 3 primitives should be orthogonal (|sim - 0.5| < 0.03), violations: {:?}", violations);
+    assert!(
+        violations.is_empty(),
+        "All Tier 3 primitives should be orthogonal (|sim - 0.5| < 0.03), violations: {:?}",
+        violations
+    );
 }
 
 // ========================================================================
@@ -197,35 +305,86 @@ fn test_tier4_primitives_exist() {
     let system = PrimitiveSystem::new();
 
     // Game theory
-    assert!(system.get("UTILITY").is_some(), "UTILITY primitive should exist");
-    assert!(system.get("STRATEGY").is_some(), "STRATEGY primitive should exist");
-    assert!(system.get("EQUILIBRIUM").is_some(), "EQUILIBRIUM primitive should exist");
-    assert!(system.get("PAYOFF").is_some(), "PAYOFF primitive should exist");
+    assert!(
+        system.get("UTILITY").is_some(),
+        "UTILITY primitive should exist"
+    );
+    assert!(
+        system.get("STRATEGY").is_some(),
+        "STRATEGY primitive should exist"
+    );
+    assert!(
+        system.get("EQUILIBRIUM").is_some(),
+        "EQUILIBRIUM primitive should exist"
+    );
+    assert!(
+        system.get("PAYOFF").is_some(),
+        "PAYOFF primitive should exist"
+    );
 
     // Temporal logic
-    assert!(system.get("BEFORE").is_some(), "BEFORE primitive should exist");
-    assert!(system.get("AFTER").is_some(), "AFTER primitive should exist");
-    assert!(system.get("DURING").is_some(), "DURING primitive should exist");
-    assert!(system.get("MEETS").is_some(), "MEETS primitive should exist");
+    assert!(
+        system.get("BEFORE").is_some(),
+        "BEFORE primitive should exist"
+    );
+    assert!(
+        system.get("AFTER").is_some(),
+        "AFTER primitive should exist"
+    );
+    assert!(
+        system.get("DURING").is_some(),
+        "DURING primitive should exist"
+    );
+    assert!(
+        system.get("MEETS").is_some(),
+        "MEETS primitive should exist"
+    );
 
     // Social coordination
-    assert!(system.get("COOPERATE").is_some(), "COOPERATE primitive should exist");
-    assert!(system.get("DEFECT").is_some(), "DEFECT primitive should exist");
-    assert!(system.get("RECIPROCATE").is_some(), "RECIPROCATE primitive should exist");
-    assert!(system.get("TRUST").is_some(), "TRUST primitive should exist");
+    assert!(
+        system.get("COOPERATE").is_some(),
+        "COOPERATE primitive should exist"
+    );
+    assert!(
+        system.get("DEFECT").is_some(),
+        "DEFECT primitive should exist"
+    );
+    assert!(
+        system.get("RECIPROCATE").is_some(),
+        "RECIPROCATE primitive should exist"
+    );
+    assert!(
+        system.get("TRUST").is_some(),
+        "TRUST primitive should exist"
+    );
 
     // Information
-    assert!(system.get("BELIEF").is_some(), "BELIEF primitive should exist");
-    assert!(system.get("COMMON_KNOWLEDGE").is_some(), "COMMON_KNOWLEDGE primitive should exist");
+    assert!(
+        system.get("BELIEF").is_some(),
+        "BELIEF primitive should exist"
+    );
+    assert!(
+        system.get("COMMON_KNOWLEDGE").is_some(),
+        "COMMON_KNOWLEDGE primitive should exist"
+    );
 }
 
 #[test]
 fn test_tier4_domains() {
     let system = PrimitiveSystem::new();
 
-    assert!(system.domain("game_theory").is_some(), "Game theory domain should exist");
-    assert!(system.domain("temporal").is_some(), "Temporal domain should exist");
-    assert!(system.domain("social").is_some(), "Social domain should exist");
+    assert!(
+        system.domain("game_theory").is_some(),
+        "Game theory domain should exist"
+    );
+    assert!(
+        system.domain("temporal").is_some(),
+        "Temporal domain should exist"
+    );
+    assert!(
+        system.domain("social").is_some(),
+        "Social domain should exist"
+    );
 }
 
 #[test]
@@ -237,8 +396,14 @@ fn test_tier4_harmonic_connections() {
     let cooperate = system.get("COOPERATE").unwrap();
     let trust = system.get("TRUST").unwrap();
 
-    assert!(cooperate.tier == PrimitiveTier::Strategic, "COOPERATE should be Strategic tier");
-    assert!(trust.tier == PrimitiveTier::Strategic, "TRUST should be Strategic tier");
+    assert!(
+        cooperate.tier == PrimitiveTier::Strategic,
+        "COOPERATE should be Strategic tier"
+    );
+    assert!(
+        trust.tier == PrimitiveTier::Strategic,
+        "TRUST should be Strategic tier"
+    );
 }
 
 #[test]
@@ -246,8 +411,11 @@ fn test_tier4_orthogonality() {
     let system = PrimitiveSystem::new();
 
     let violations = system.validate_tier_orthogonality(PrimitiveTier::Strategic, 0.03);
-    assert!(violations.is_empty(),
-        "All Tier 4 primitives should be orthogonal (|sim - 0.5| < 0.03), violations: {:?}", violations);
+    assert!(
+        violations.is_empty(),
+        "All Tier 4 primitives should be orthogonal (|sim - 0.5| < 0.03), violations: {:?}",
+        violations
+    );
 }
 
 // ========================================================================
@@ -260,45 +428,108 @@ fn test_tier5_primitives_exist() {
 
     // Self-awareness
     assert!(system.get("SELF").is_some(), "SELF primitive should exist");
-    assert!(system.get("IDENTITY").is_some(), "IDENTITY primitive should exist");
-    assert!(system.get("META_BELIEF").is_some(), "META_BELIEF primitive should exist");
-    assert!(system.get("INTROSPECTION").is_some(), "INTROSPECTION primitive should exist");
+    assert!(
+        system.get("IDENTITY").is_some(),
+        "IDENTITY primitive should exist"
+    );
+    assert!(
+        system.get("META_BELIEF").is_some(),
+        "META_BELIEF primitive should exist"
+    );
+    assert!(
+        system.get("INTROSPECTION").is_some(),
+        "INTROSPECTION primitive should exist"
+    );
 
     // Homeostasis
-    assert!(system.get("HOMEOSTASIS").is_some(), "HOMEOSTASIS primitive should exist");
-    assert!(system.get("SETPOINT").is_some(), "SETPOINT primitive should exist");
-    assert!(system.get("REGULATION").is_some(), "REGULATION primitive should exist");
-    assert!(system.get("FEEDBACK").is_some(), "FEEDBACK primitive should exist");
+    assert!(
+        system.get("HOMEOSTASIS").is_some(),
+        "HOMEOSTASIS primitive should exist"
+    );
+    assert!(
+        system.get("SETPOINT").is_some(),
+        "SETPOINT primitive should exist"
+    );
+    assert!(
+        system.get("REGULATION").is_some(),
+        "REGULATION primitive should exist"
+    );
+    assert!(
+        system.get("FEEDBACK").is_some(),
+        "FEEDBACK primitive should exist"
+    );
 
     // Repair & adaptation
-    assert!(system.get("REPAIR").is_some(), "REPAIR primitive should exist");
-    assert!(system.get("ADAPT").is_some(), "ADAPT primitive should exist");
-    assert!(system.get("LEARN").is_some(), "LEARN primitive should exist");
+    assert!(
+        system.get("REPAIR").is_some(),
+        "REPAIR primitive should exist"
+    );
+    assert!(
+        system.get("ADAPT").is_some(),
+        "ADAPT primitive should exist"
+    );
+    assert!(
+        system.get("LEARN").is_some(),
+        "LEARN primitive should exist"
+    );
 
     // Epistemic
     assert!(system.get("KNOW").is_some(), "KNOW primitive should exist");
-    assert!(system.get("UNCERTAIN").is_some(), "UNCERTAIN primitive should exist");
-    assert!(system.get("CONFIDENCE").is_some(), "CONFIDENCE primitive should exist");
-    assert!(system.get("EVIDENCE").is_some(), "EVIDENCE primitive should exist");
+    assert!(
+        system.get("UNCERTAIN").is_some(),
+        "UNCERTAIN primitive should exist"
+    );
+    assert!(
+        system.get("CONFIDENCE").is_some(),
+        "CONFIDENCE primitive should exist"
+    );
+    assert!(
+        system.get("EVIDENCE").is_some(),
+        "EVIDENCE primitive should exist"
+    );
 
     // Metabolic
-    assert!(system.get("RESOURCE").is_some(), "RESOURCE primitive should exist");
-    assert!(system.get("ALLOCATE").is_some(), "ALLOCATE primitive should exist");
+    assert!(
+        system.get("RESOURCE").is_some(),
+        "RESOURCE primitive should exist"
+    );
+    assert!(
+        system.get("ALLOCATE").is_some(),
+        "ALLOCATE primitive should exist"
+    );
 
     // Reward
-    assert!(system.get("REWARD").is_some(), "REWARD primitive should exist");
+    assert!(
+        system.get("REWARD").is_some(),
+        "REWARD primitive should exist"
+    );
     assert!(system.get("GOAL").is_some(), "GOAL primitive should exist");
-    assert!(system.get("VALUE").is_some(), "VALUE primitive should exist");
+    assert!(
+        system.get("VALUE").is_some(),
+        "VALUE primitive should exist"
+    );
 }
 
 #[test]
 fn test_tier5_domains() {
     let system = PrimitiveSystem::new();
 
-    assert!(system.domain("metacognition").is_some(), "Metacognition domain should exist");
-    assert!(system.domain("homeostasis").is_some(), "Homeostasis domain should exist");
-    assert!(system.domain("epistemic").is_some(), "Epistemic domain should exist");
-    assert!(system.domain("metabolic").is_some(), "Metabolic domain should exist");
+    assert!(
+        system.domain("metacognition").is_some(),
+        "Metacognition domain should exist"
+    );
+    assert!(
+        system.domain("homeostasis").is_some(),
+        "Homeostasis domain should exist"
+    );
+    assert!(
+        system.domain("epistemic").is_some(),
+        "Epistemic domain should exist"
+    );
+    assert!(
+        system.domain("metabolic").is_some(),
+        "Metabolic domain should exist"
+    );
 }
 
 #[test]
@@ -315,7 +546,10 @@ fn test_tier5_consciousness_primitives() {
 
     // These primitives enable the system to reason about itself
     assert!(self_prim.is_base, "SELF should be a base primitive");
-    assert!(homeostasis.is_base, "HOMEOSTASIS should be a base primitive");
+    assert!(
+        homeostasis.is_base,
+        "HOMEOSTASIS should be a base primitive"
+    );
 }
 
 #[test]
@@ -323,8 +557,11 @@ fn test_tier5_orthogonality() {
     let system = PrimitiveSystem::new();
 
     let violations = system.validate_tier_orthogonality(PrimitiveTier::MetaCognitive, 0.03);
-    assert!(violations.is_empty(),
-        "All Tier 5 primitives should be orthogonal (|sim - 0.5| < 0.03), violations: {:?}", violations);
+    assert!(
+        violations.is_empty(),
+        "All Tier 5 primitives should be orthogonal (|sim - 0.5| < 0.03), violations: {:?}",
+        violations
+    );
 }
 
 // ========================================================================
@@ -351,7 +588,11 @@ fn test_complete_primitive_ecology() {
 
     // Verify total count is substantial
     let total = system.count();
-    assert!(total >= 80, "Should have at least 80 primitives across all tiers (got {})", total);
+    assert!(
+        total >= 80,
+        "Should have at least 80 primitives across all tiers (got {})",
+        total
+    );
 
     println!("Complete Primitive Ecology:");
     println!("  Tier 1 (Mathematical): {} primitives", tier1_count);
@@ -367,16 +608,25 @@ fn test_cross_tier_binding() {
     let system = PrimitiveSystem::new();
 
     // Find cross-tier binding rules
-    let cross_tier_rules: Vec<_> = system.binding_rules()
+    let cross_tier_rules: Vec<_> = system
+        .binding_rules()
         .iter()
         .filter(|rule| {
-            rule.pattern.len() > 1 &&
-            rule.pattern.iter().collect::<std::collections::HashSet<_>>().len() > 1
+            rule.pattern.len() > 1
+                && rule
+                    .pattern
+                    .iter()
+                    .collect::<std::collections::HashSet<_>>()
+                    .len()
+                    > 1
         })
         .collect();
 
     // Should have at least one cross-tier binding rule
-    assert!(!cross_tier_rules.is_empty(), "Should have cross-tier binding rules");
+    assert!(
+        !cross_tier_rules.is_empty(),
+        "Should have cross-tier binding rules"
+    );
 
     // Print cross-tier rules
     for rule in &cross_tier_rules {
@@ -405,7 +655,10 @@ fn test_domain_diversity() {
 
     // Total domain count
     println!("Total domains: {}", system.domains.len());
-    assert!(system.domains.len() >= 13, "Should have at least 13 distinct domains");
+    assert!(
+        system.domains.len() >= 13,
+        "Should have at least 13 distinct domains"
+    );
 }
 
 #[test]
@@ -528,7 +781,9 @@ fn test_probability_derivation_chain() {
 fn test_expected_value_derivation_chain() {
     let system = PrimitiveSystem::new();
 
-    let expected_value = system.get("EXPECTED_VALUE").expect("EXPECTED_VALUE should exist");
+    let expected_value = system
+        .get("EXPECTED_VALUE")
+        .expect("EXPECTED_VALUE should exist");
     let probability = system.get("PROBABILITY").expect("PROBABILITY should exist");
     let value = system.get("VALUE").expect("VALUE should exist");
 
@@ -605,7 +860,9 @@ fn test_derived_primitives_not_random() {
             sim > 0.90,
             "{} should be derived from {:?} (sim={:.3}, expected >0.90). \
              Low similarity suggests random fallback was used.",
-            derived_name, parent_names, sim
+            derived_name,
+            parent_names,
+            sim
         );
     }
 }
@@ -622,7 +879,9 @@ fn test_derivation_chain_transitivity() {
     let expected_value = system.get("EXPECTED_VALUE");
     let deviation = system.get("DEVIATION");
 
-    if let (Some(variance), Some(expected_value), Some(deviation)) = (variance, expected_value, deviation) {
+    if let (Some(variance), Some(expected_value), Some(deviation)) =
+        (variance, expected_value, deviation)
+    {
         // VARIANCE ⊗ EXPECTED_VALUE should recover DEVIATION
         let unbound = variance.encoding.bind(&expected_value.encoding);
         let sim = unbound.similarity(&deviation.encoding);
@@ -703,8 +962,11 @@ fn test_benchmark_derivation_quality() {
         let avg_similarity = total_similarity / derived_count as f32;
         println!("\n=== DERIVATION QUALITY BENCHMARK ===");
         println!("Total derived primitives tested: {}", derived_count);
-        println!("Successfully derived (sim > 0.90): {} ({:.1}%)",
-                 success_count, 100.0 * success_count as f32 / derived_count as f32);
+        println!(
+            "Successfully derived (sim > 0.90): {} ({:.1}%)",
+            success_count,
+            100.0 * success_count as f32 / derived_count as f32
+        );
         println!("Average similarity to expected: {:.3}", avg_similarity);
 
         if !failures.is_empty() {
@@ -720,7 +982,9 @@ fn test_benchmark_derivation_quality() {
         assert!(
             success_rate >= 0.90,
             "Derivation success rate {:.1}% is below 90% threshold. {} of {} primitives failed.",
-            success_rate * 100.0, failures.len(), derived_count
+            success_rate * 100.0,
+            failures.len(),
+            derived_count
         );
     }
 }
@@ -746,7 +1010,11 @@ fn test_bind_primitives() {
     let effect = system.get("EFFECT").unwrap();
     let unbound = result.encoding.bind(&effect.encoding);
     let sim = unbound.similarity(&cause.encoding);
-    assert!(sim > 0.99, "Unbinding should recover original (sim={:.3})", sim);
+    assert!(
+        sim > 0.99,
+        "Unbinding should recover original (sim={:.3})",
+        sim
+    );
 }
 
 #[test]
@@ -779,9 +1047,21 @@ fn test_bundle_primitives() {
     let sim_not = result.encoding.similarity(&not_prim.encoding);
 
     // Bundle should be more similar to inputs than random (~0.5)
-    assert!(sim_and > 0.55, "Bundle should be similar to AND (sim={:.3})", sim_and);
-    assert!(sim_or > 0.55, "Bundle should be similar to OR (sim={:.3})", sim_or);
-    assert!(sim_not > 0.55, "Bundle should be similar to NOT (sim={:.3})", sim_not);
+    assert!(
+        sim_and > 0.55,
+        "Bundle should be similar to AND (sim={:.3})",
+        sim_and
+    );
+    assert!(
+        sim_or > 0.55,
+        "Bundle should be similar to OR (sim={:.3})",
+        sim_or
+    );
+    assert!(
+        sim_not > 0.55,
+        "Bundle should be similar to NOT (sim={:.3})",
+        sim_not
+    );
 }
 
 #[test]
@@ -808,7 +1088,11 @@ fn test_encode_sequence_single() {
     let result = result.unwrap();
     let cause = system.get("CAUSE").unwrap();
     let sim = result.encoding.similarity(&cause.encoding);
-    assert!(sim > 0.99, "Single-element sequence should equal the primitive (sim={:.3})", sim);
+    assert!(
+        sim > 0.99,
+        "Single-element sequence should equal the primitive (sim={:.3})",
+        sim
+    );
 }
 
 #[test]
@@ -870,7 +1154,9 @@ fn test_bundle_weighted_equal_weights() {
 
     // Equal weights should be similar to regular bundle
     let regular = system.bundle_primitives(&["AND", "OR"]).unwrap();
-    let weighted = system.bundle_weighted(&[("AND", 1.0), ("OR", 1.0)]).unwrap();
+    let weighted = system
+        .bundle_weighted(&[("AND", 1.0), ("OR", 1.0)])
+        .unwrap();
 
     let sim = regular.encoding.similarity(&weighted.encoding);
     assert!(
@@ -888,14 +1174,17 @@ fn test_bundle_weighted_dominant() {
     let or_prim = system.get("OR").unwrap();
 
     // Heavily weight AND
-    let and_dominant = system.bundle_weighted(&[("AND", 10.0), ("OR", 1.0)]).unwrap();
+    let and_dominant = system
+        .bundle_weighted(&[("AND", 10.0), ("OR", 1.0)])
+        .unwrap();
     let sim_to_and = and_dominant.encoding.similarity(&and_prim.encoding);
     let sim_to_or = and_dominant.encoding.similarity(&or_prim.encoding);
 
     assert!(
         sim_to_and > sim_to_or,
         "AND-dominant bundle should be more similar to AND ({:.3}) than OR ({:.3})",
-        sim_to_and, sim_to_or
+        sim_to_and,
+        sim_to_or
     );
     assert!(
         sim_to_and > 0.7,
@@ -976,12 +1265,16 @@ fn test_find_similar_primitives() {
     let system = PrimitiveSystem::new();
 
     let similar = system.find_similar("CAUSE", 5);
-    assert_eq!(similar.len(), 5, "Should return requested number of results");
+    assert_eq!(
+        similar.len(),
+        5,
+        "Should return requested number of results"
+    );
 
     // Results should be sorted by similarity (descending)
     for i in 1..similar.len() {
         assert!(
-            similar[i-1].1 >= similar[i].1,
+            similar[i - 1].1 >= similar[i].1,
             "Results should be sorted by similarity"
         );
     }
@@ -1004,7 +1297,10 @@ fn test_find_similar_to_encoding() {
 
     // CAUSE itself should be the top match
     assert_eq!(similar[0].0, "CAUSE");
-    assert!(similar[0].1 > 0.99, "Exact match should have ~1.0 similarity");
+    assert!(
+        similar[0].1 > 0.99,
+        "Exact match should have ~1.0 similarity"
+    );
 }
 
 #[test]
@@ -1080,7 +1376,10 @@ fn test_lsh_candidates_contain_similar() {
 
     // With a good LSH configuration, we should get some candidates
     // (though bound vectors are orthogonal to inputs, some collisions are expected)
-    println!("LSH returned {} candidates for bound(CAUSE, EFFECT)", candidates.len());
+    println!(
+        "LSH returned {} candidates for bound(CAUSE, EFFECT)",
+        candidates.len()
+    );
 }
 
 #[test]
@@ -1176,8 +1475,12 @@ fn test_cache_sequence() {
     let system = PrimitiveSystem::new();
     let mut cache = CompositionCache::new(100);
 
-    let result1 = cache.sequence_cached(&system, &["BEFORE", "DURING", "AFTER"]).unwrap();
-    let result2 = cache.sequence_cached(&system, &["BEFORE", "DURING", "AFTER"]).unwrap();
+    let result1 = cache
+        .sequence_cached(&system, &["BEFORE", "DURING", "AFTER"])
+        .unwrap();
+    let result2 = cache
+        .sequence_cached(&system, &["BEFORE", "DURING", "AFTER"])
+        .unwrap();
 
     let stats = cache.stats();
     assert_eq!(stats.hits, 1);
@@ -1204,7 +1507,10 @@ fn test_cache_hit_rate() {
     let stats = cache.stats();
     assert_eq!(stats.hits, 3);
     assert_eq!(stats.misses, 2);
-    assert!((stats.hit_rate - 0.6).abs() < 0.01, "Hit rate should be 60%");
+    assert!(
+        (stats.hit_rate - 0.6).abs() < 0.01,
+        "Hit rate should be 60%"
+    );
 }
 
 #[test]
@@ -1257,8 +1563,12 @@ fn test_cache_weighted_bundle() {
     let system = PrimitiveSystem::new();
     let mut cache = CompositionCache::new(100);
 
-    let result1 = cache.bundle_weighted_cached(&system, &[("AND", 2.0), ("OR", 1.0)]).unwrap();
-    let result2 = cache.bundle_weighted_cached(&system, &[("AND", 2.0), ("OR", 1.0)]).unwrap();
+    let result1 = cache
+        .bundle_weighted_cached(&system, &[("AND", 2.0), ("OR", 1.0)])
+        .unwrap();
+    let result2 = cache
+        .bundle_weighted_cached(&system, &[("AND", 2.0), ("OR", 1.0)])
+        .unwrap();
 
     let stats = cache.stats();
     assert_eq!(stats.hits, 1);
@@ -1274,8 +1584,12 @@ fn test_cache_analogy() {
     let system = PrimitiveSystem::new();
     let mut cache = CompositionCache::new(100);
 
-    let result1 = cache.analogy_cached(&system, "CAUSE", "EFFECT", "BEFORE").unwrap();
-    let result2 = cache.analogy_cached(&system, "CAUSE", "EFFECT", "BEFORE").unwrap();
+    let result1 = cache
+        .analogy_cached(&system, "CAUSE", "EFFECT", "BEFORE")
+        .unwrap();
+    let result2 = cache
+        .analogy_cached(&system, "CAUSE", "EFFECT", "BEFORE")
+        .unwrap();
 
     let stats = cache.stats();
     assert_eq!(stats.hits, 1);
@@ -1313,7 +1627,9 @@ fn test_algebra_define_bind() {
     let mut algebra = CompositionAlgebra::new();
 
     // Define a bind composition
-    algebra.define("CAUSALITY", "CAUSE \u{2297} EFFECT", &system).unwrap();
+    algebra
+        .define("CAUSALITY", "CAUSE \u{2297} EFFECT", &system)
+        .unwrap();
 
     let comp = algebra.get("CAUSALITY").unwrap();
     assert_eq!(comp.name, "CAUSALITY");
@@ -1322,7 +1638,11 @@ fn test_algebra_define_bind() {
     // Verify it matches direct bind
     let direct = system.bind_primitives("CAUSE", "EFFECT").unwrap();
     let sim = comp.encoding.similarity(&direct.encoding);
-    assert!(sim > 0.99, "Algebra bind should match direct bind (sim={:.3})", sim);
+    assert!(
+        sim > 0.99,
+        "Algebra bind should match direct bind (sim={:.3})",
+        sim
+    );
 }
 
 #[test]
@@ -1330,7 +1650,9 @@ fn test_algebra_define_bundle() {
     let system = PrimitiveSystem::new();
     let mut algebra = CompositionAlgebra::new();
 
-    algebra.define("LOGIC_CORE", "AND + OR + NOT", &system).unwrap();
+    algebra
+        .define("LOGIC_CORE", "AND + OR + NOT", &system)
+        .unwrap();
 
     let comp = algebra.get("LOGIC_CORE").unwrap();
     assert_eq!(comp.sources.len(), 3);
@@ -1338,7 +1660,11 @@ fn test_algebra_define_bundle() {
     // Verify it matches direct bundle
     let direct = system.bundle_primitives(&["AND", "OR", "NOT"]).unwrap();
     let sim = comp.encoding.similarity(&direct.encoding);
-    assert!(sim > 0.99, "Algebra bundle should match direct bundle (sim={:.3})", sim);
+    assert!(
+        sim > 0.99,
+        "Algebra bundle should match direct bundle (sim={:.3})",
+        sim
+    );
 }
 
 #[test]
@@ -1346,15 +1672,27 @@ fn test_algebra_define_sequence() {
     let system = PrimitiveSystem::new();
     let mut algebra = CompositionAlgebra::new();
 
-    algebra.define("TIME_FLOW", "BEFORE \u{2192} DURING \u{2192} AFTER", &system).unwrap();
+    algebra
+        .define(
+            "TIME_FLOW",
+            "BEFORE \u{2192} DURING \u{2192} AFTER",
+            &system,
+        )
+        .unwrap();
 
     let comp = algebra.get("TIME_FLOW").unwrap();
     assert_eq!(comp.sources, vec!["BEFORE", "DURING", "AFTER"]);
 
     // Verify it matches direct sequence
-    let direct = system.encode_sequence(&["BEFORE", "DURING", "AFTER"]).unwrap();
+    let direct = system
+        .encode_sequence(&["BEFORE", "DURING", "AFTER"])
+        .unwrap();
     let sim = comp.encoding.similarity(&direct.encoding);
-    assert!(sim > 0.99, "Algebra sequence should match direct sequence (sim={:.3})", sim);
+    assert!(
+        sim > 0.99,
+        "Algebra sequence should match direct sequence (sim={:.3})",
+        sim
+    );
 }
 
 #[test]
@@ -1362,7 +1700,9 @@ fn test_algebra_define_weighted() {
     let system = PrimitiveSystem::new();
     let mut algebra = CompositionAlgebra::new();
 
-    algebra.define("MOSTLY_CAUSE", "CAUSE:3 + EFFECT:1", &system).unwrap();
+    algebra
+        .define("MOSTLY_CAUSE", "CAUSE:3 + EFFECT:1", &system)
+        .unwrap();
 
     let comp = algebra.get("MOSTLY_CAUSE").unwrap();
 
@@ -1376,7 +1716,8 @@ fn test_algebra_define_weighted() {
     assert!(
         sim_cause > sim_effect,
         "Weighted composition should be more similar to CAUSE ({:.3}) than EFFECT ({:.3})",
-        sim_cause, sim_effect
+        sim_cause,
+        sim_effect
     );
 }
 
@@ -1386,8 +1727,12 @@ fn test_algebra_composition_chaining() {
     let mut algebra = CompositionAlgebra::new();
 
     // Define base compositions
-    algebra.define("AB", "CAUSE \u{2297} EFFECT", &system).unwrap();
-    algebra.define("CD", "BEFORE \u{2297} AFTER", &system).unwrap();
+    algebra
+        .define("AB", "CAUSE \u{2297} EFFECT", &system)
+        .unwrap();
+    algebra
+        .define("CD", "BEFORE \u{2297} AFTER", &system)
+        .unwrap();
 
     // Chain them together
     algebra.define("ABCD", "AB \u{2297} CD", &system).unwrap();
@@ -1406,8 +1751,12 @@ fn test_algebra_ascii_operators() {
     let mut algebra = CompositionAlgebra::new();
 
     // Test ASCII alternatives
-    algebra.define("BIND_ASCII", "CAUSE ^ EFFECT", &system).unwrap();
-    algebra.define("SEQ_ASCII", "BEFORE > DURING > AFTER", &system).unwrap();
+    algebra
+        .define("BIND_ASCII", "CAUSE ^ EFFECT", &system)
+        .unwrap();
+    algebra
+        .define("SEQ_ASCII", "BEFORE > DURING > AFTER", &system)
+        .unwrap();
 
     assert!(algebra.get("BIND_ASCII").is_some());
     assert!(algebra.get("SEQ_ASCII").is_some());
@@ -1420,7 +1769,10 @@ fn test_algebra_not_found() {
 
     let result = algebra.define("BAD", "NONEXISTENT \u{2297} CAUSE", &system);
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), CompositionAlgebraError::NotFound(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        CompositionAlgebraError::NotFound(_)
+    ));
 }
 
 #[test]
@@ -1428,7 +1780,9 @@ fn test_algebra_export_import() {
     let system = PrimitiveSystem::new();
     let mut algebra1 = CompositionAlgebra::new();
 
-    algebra1.define("COMP1", "CAUSE \u{2297} EFFECT", &system).unwrap();
+    algebra1
+        .define("COMP1", "CAUSE \u{2297} EFFECT", &system)
+        .unwrap();
     algebra1.define("COMP2", "AND + OR", &system).unwrap();
 
     // Export
@@ -1452,7 +1806,9 @@ fn test_algebra_list_and_clear() {
     let system = PrimitiveSystem::new();
     let mut algebra = CompositionAlgebra::new();
 
-    algebra.define("A", "CAUSE \u{2297} EFFECT", &system).unwrap();
+    algebra
+        .define("A", "CAUSE \u{2297} EFFECT", &system)
+        .unwrap();
     algebra.define("B", "AND + OR", &system).unwrap();
 
     assert_eq!(algebra.list().len(), 2);
@@ -1472,11 +1828,8 @@ fn test_algebra_list_and_clear() {
 fn test_graph_from_primitives() {
     let system = PrimitiveSystem::new();
 
-    let graph = PrimitiveGraph::from_primitives(
-        &system,
-        &["CAUSE", "EFFECT", "BEFORE", "AFTER"],
-        0.45,
-    );
+    let graph =
+        PrimitiveGraph::from_primitives(&system, &["CAUSE", "EFFECT", "BEFORE", "AFTER"], 0.45);
 
     assert_eq!(graph.nodes.len(), 4);
     // With threshold 0.45, random vectors (~0.5 similarity) should have edges
@@ -1493,7 +1846,10 @@ fn test_graph_from_tier() {
     );
 
     let stats = graph.stats();
-    assert!(stats.node_count > 0, "Should have nodes from Mathematical tier");
+    assert!(
+        stats.node_count > 0,
+        "Should have nodes from Mathematical tier"
+    );
 }
 
 #[test]
@@ -1501,25 +1857,25 @@ fn test_graph_neighborhood() {
     let system = PrimitiveSystem::new();
 
     let graph = PrimitiveGraph::neighborhood(
-        &system,
-        "CAUSE",
-        2, // depth
+        &system, "CAUSE", 2, // depth
         3, // top_k similar at each step
     );
 
-    assert!(graph.nodes.len() >= 1, "Should have at least the center node");
-    assert!(graph.nodes.iter().any(|(n, _, _)| n == "CAUSE"), "Should contain center");
+    assert!(
+        graph.nodes.len() >= 1,
+        "Should have at least the center node"
+    );
+    assert!(
+        graph.nodes.iter().any(|(n, _, _)| n == "CAUSE"),
+        "Should contain center"
+    );
 }
 
 #[test]
 fn test_graph_to_dot() {
     let system = PrimitiveSystem::new();
 
-    let graph = PrimitiveGraph::from_primitives(
-        &system,
-        &["CAUSE", "EFFECT"],
-        0.40,
-    );
+    let graph = PrimitiveGraph::from_primitives(&system, &["CAUSE", "EFFECT"], 0.40);
 
     let dot = graph.to_dot();
 
@@ -1532,11 +1888,7 @@ fn test_graph_to_dot() {
 fn test_graph_to_ascii() {
     let system = PrimitiveSystem::new();
 
-    let graph = PrimitiveGraph::from_primitives(
-        &system,
-        &["AND", "OR", "NOT"],
-        0.45,
-    );
+    let graph = PrimitiveGraph::from_primitives(&system, &["AND", "OR", "NOT"], 0.45);
 
     let ascii = graph.to_ascii();
 
@@ -1548,11 +1900,8 @@ fn test_graph_to_ascii() {
 fn test_graph_stats() {
     let system = PrimitiveSystem::new();
 
-    let graph = PrimitiveGraph::from_primitives(
-        &system,
-        &["CAUSE", "EFFECT", "BEFORE", "AFTER"],
-        0.40,
-    );
+    let graph =
+        PrimitiveGraph::from_primitives(&system, &["CAUSE", "EFFECT", "BEFORE", "AFTER"], 0.40);
 
     let stats = graph.stats();
 
@@ -1603,11 +1952,7 @@ fn test_batch_find_similar_lsh() {
 fn test_batch_bind() {
     let system = PrimitiveSystem::new();
 
-    let pairs = vec![
-        ("CAUSE", "EFFECT"),
-        ("BEFORE", "AFTER"),
-        ("AND", "OR"),
-    ];
+    let pairs = vec![("CAUSE", "EFFECT"), ("BEFORE", "AFTER"), ("AND", "OR")];
 
     let results = system.batch_bind(&pairs);
 
@@ -1621,10 +1966,7 @@ fn test_batch_bind() {
 fn test_batch_bundle() {
     let system = PrimitiveSystem::new();
 
-    let groups: Vec<&[&str]> = vec![
-        &["AND", "OR"],
-        &["CAUSE", "EFFECT", "BEFORE"],
-    ];
+    let groups: Vec<&[&str]> = vec![&["AND", "OR"], &["CAUSE", "EFFECT", "BEFORE"]];
 
     let results = system.batch_bundle(&groups);
 
@@ -1638,10 +1980,7 @@ fn test_batch_bundle() {
 fn test_batch_encode_sequences() {
     let system = PrimitiveSystem::new();
 
-    let sequences: Vec<&[&str]> = vec![
-        &["BEFORE", "DURING", "AFTER"],
-        &["CAUSE", "EFFECT"],
-    ];
+    let sequences: Vec<&[&str]> = vec![&["BEFORE", "DURING", "AFTER"], &["CAUSE", "EFFECT"]];
 
     let results = system.batch_encode_sequences(&sequences);
 
@@ -1683,7 +2022,10 @@ fn test_similarity_matrix() {
 
     // Diagonal should be 1.0 (self-similarity)
     for i in 0..3 {
-        assert!((matrix[i][i] - 1.0).abs() < 0.01, "Self-similarity should be 1.0");
+        assert!(
+            (matrix[i][i] - 1.0).abs() < 0.01,
+            "Self-similarity should be 1.0"
+        );
     }
 
     // Matrix should be symmetric
@@ -1706,22 +2048,24 @@ fn test_persistence_save_load_session() {
     let system = PrimitiveSystem::new();
     let mut algebra = CompositionAlgebra::new();
 
-    algebra.define("TEST_COMP", "CAUSE \u{2297} EFFECT", &system).unwrap();
+    algebra
+        .define("TEST_COMP", "CAUSE \u{2297} EFFECT", &system)
+        .unwrap();
     algebra.define("TEST_BUNDLE", "AND + OR", &system).unwrap();
 
-    let history = vec![
-        HistoryEntry {
-            operation: "bind(CAUSE, EFFECT)".to_string(),
-            result_match: "CAUSALITY".to_string(),
-            similarity: 0.55,
-        },
-    ];
+    let history = vec![HistoryEntry {
+        operation: "bind(CAUSE, EFFECT)".to_string(),
+        result_match: "CAUSALITY".to_string(),
+        similarity: 0.55,
+    }];
 
     let persistence = PrimitivePersistence::new();
     let path = "/tmp/test_primitive_session.json";
 
     // Save
-    persistence.save_session(path, &algebra, &history, Some("Test session")).unwrap();
+    persistence
+        .save_session(path, &algebra, &history, Some("Test session"))
+        .unwrap();
 
     // Load
     let (loaded_algebra, loaded_history) = persistence.load_session(path, &system).unwrap();
@@ -1747,8 +2091,12 @@ fn test_persistence_save_load_compositions() {
     let system = PrimitiveSystem::new();
     let mut algebra = CompositionAlgebra::new();
 
-    algebra.define("COMP_A", "CAUSE \u{2297} EFFECT", &system).unwrap();
-    algebra.define("COMP_B", "BEFORE \u{2192} DURING \u{2192} AFTER", &system).unwrap();
+    algebra
+        .define("COMP_A", "CAUSE \u{2297} EFFECT", &system)
+        .unwrap();
+    algebra
+        .define("COMP_B", "BEFORE \u{2192} DURING \u{2192} AFTER", &system)
+        .unwrap();
 
     let persistence = PrimitivePersistence::new();
     let path = "/tmp/test_compositions.json";
@@ -1770,11 +2118,7 @@ fn test_persistence_save_load_compositions() {
 fn test_persistence_export_graph_dot() {
     let system = PrimitiveSystem::new();
 
-    let graph = PrimitiveGraph::from_primitives(
-        &system,
-        &["CAUSE", "EFFECT"],
-        0.40,
-    );
+    let graph = PrimitiveGraph::from_primitives(&system, &["CAUSE", "EFFECT"], 0.40);
 
     let persistence = PrimitivePersistence::new();
     let path = "/tmp/test_graph.dot";
@@ -1796,7 +2140,9 @@ fn test_persistence_export_similarity_csv() {
     let persistence = PrimitivePersistence::new();
     let path = "/tmp/test_similarity.csv";
 
-    persistence.export_similarity_csv(path, &system, &["CAUSE", "EFFECT", "BEFORE"]).unwrap();
+    persistence
+        .export_similarity_csv(path, &system, &["CAUSE", "EFFECT", "BEFORE"])
+        .unwrap();
 
     // Verify file exists and has correct format
     let content = std::fs::read_to_string(path).unwrap();
@@ -1814,12 +2160,10 @@ fn test_session_data_serialization() {
     let session = SessionData {
         version: 1,
         timestamp: 1234567890,
-        compositions: vec![
-            CompositionExport {
-                name: "TEST".to_string(),
-                expression: "A \u{2297} B".to_string(),
-            },
-        ],
+        compositions: vec![CompositionExport {
+            name: "TEST".to_string(),
+            expression: "A \u{2297} B".to_string(),
+        }],
         history: vec![],
         notes: Some("Test notes".to_string()),
     };

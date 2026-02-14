@@ -205,7 +205,8 @@ impl Attractor {
             return vec![0.0; vector.len()];
         }
 
-        self.prototype.iter()
+        self.prototype
+            .iter()
             .zip(vector.iter())
             .map(|(p, v)| force_magnitude * (p / proto_norm - v / norm))
             .collect()
@@ -364,11 +365,13 @@ impl MorphogeneticField {
 
     /// Create attractor from existing vector
     pub fn create_attractor_from(&mut self, label: &str, attractor_label: String) -> Result<()> {
-        let vector = self.get_vector(label)
+        let vector = self
+            .get_vector(label)
             .ok_or_else(|| anyhow::anyhow!("Vector '{}' not found", label))?
             .clone();
 
-        self.attractors.push(Attractor::new(vector, attractor_label));
+        self.attractors
+            .push(Attractor::new(vector, attractor_label));
         Ok(())
     }
 
@@ -383,7 +386,8 @@ impl MorphogeneticField {
         }
 
         // Find k nearest neighbors
-        let mut similarities: Vec<(f32, usize)> = self.vectors
+        let mut similarities: Vec<(f32, usize)> = self
+            .vectors
             .iter()
             .enumerate()
             .map(|(idx, v)| (cosine_similarity(vector, v), idx))
@@ -401,7 +405,8 @@ impl MorphogeneticField {
             .iter()
             .map(|(_, idx)| {
                 // Binding signature = element-wise product (can be used to "unbind")
-                vector.iter()
+                vector
+                    .iter()
                     .zip(self.vectors[*idx].iter())
                     .map(|(a, b)| a * b)
                     .collect()
@@ -435,26 +440,32 @@ impl MorphogeneticField {
                 encoding.expected_similarities.push(sim);
 
                 // Compute binding signature
-                let sig: Vec<f32> = self.vectors[i].iter()
+                let sig: Vec<f32> = self.vectors[i]
+                    .iter()
                     .zip(new_vector.iter())
                     .map(|(a, b)| a * b)
                     .collect();
                 encoding.binding_signatures.push(sig);
             } else {
                 // Check if new vector is closer than worst neighbor
-                let min_sim = encoding.expected_similarities.iter()
+                let min_sim = encoding
+                    .expected_similarities
+                    .iter()
                     .cloned()
                     .fold(f32::INFINITY, f32::min);
 
                 if sim > min_sim {
                     // Replace worst neighbor
-                    if let Some(worst_idx) = encoding.expected_similarities.iter()
+                    if let Some(worst_idx) = encoding
+                        .expected_similarities
+                        .iter()
                         .position(|&s| (s - min_sim).abs() < 1e-10)
                     {
                         encoding.neighbor_indices[worst_idx] = new_index;
                         encoding.expected_similarities[worst_idx] = sim;
 
-                        let sig: Vec<f32> = self.vectors[i].iter()
+                        let sig: Vec<f32> = self.vectors[i]
+                            .iter()
                             .zip(new_vector.iter())
                             .map(|(a, b)| a * b)
                             .collect();
@@ -520,7 +531,9 @@ impl MorphogeneticField {
         }
 
         // Energy decreases as we get closer to any attractor
-        let max_sim = self.attractors.iter()
+        let max_sim = self
+            .attractors
+            .iter()
             .map(|a| cosine_similarity(vector, &a.prototype))
             .fold(f32::NEG_INFINITY, f32::max);
 
@@ -642,7 +655,9 @@ impl MorphogeneticField {
         }
 
         // Find most similar existing vector
-        let best_idx = self.vectors.iter()
+        let best_idx = self
+            .vectors
+            .iter()
             .enumerate()
             .map(|(idx, v)| (cosine_similarity(vector, v), idx))
             .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
@@ -673,7 +688,9 @@ impl MorphogeneticField {
         }
 
         // Get neighbors
-        let neighbors: Vec<&[f32]> = encoding.neighbor_indices.iter()
+        let neighbors: Vec<&[f32]> = encoding
+            .neighbor_indices
+            .iter()
             .filter_map(|&idx| self.vectors.get(idx).map(|v| v.as_slice()))
             .collect();
 
@@ -687,7 +704,9 @@ impl MorphogeneticField {
         let repair_threshold = 0.8;
         let critical_threshold = 0.5;
 
-        for (i, (vector, encoding)) in self.vectors.iter()
+        for (i, (vector, encoding)) in self
+            .vectors
+            .iter()
             .zip(self.position_encodings.iter())
             .enumerate()
         {
@@ -699,7 +718,8 @@ impl MorphogeneticField {
             }
         }
 
-        let vectors_needing_repair = vector_health.iter()
+        let vectors_needing_repair = vector_health
+            .iter()
             .filter(|&&h| h < repair_threshold)
             .count();
 
@@ -750,7 +770,9 @@ impl MorphogeneticField {
     /// This is a more aggressive repair that reconstructs the vector
     /// entirely from context, like biological tissue regeneration.
     pub fn regenerate_from_context(&self, index: usize) -> Result<Vec<f32>> {
-        let encoding = self.position_encodings.get(index)
+        let encoding = self
+            .position_encodings
+            .get(index)
             .ok_or_else(|| anyhow::anyhow!("Index {} not found", index))?;
 
         if encoding.neighbor_indices.is_empty() {
@@ -808,9 +830,12 @@ impl MorphogeneticField {
             dimensions: self.dimensions,
             overall_health: health.overall_health,
             vectors_needing_repair: health.vectors_needing_repair,
-            avg_neighborhood_size: self.position_encodings.iter()
+            avg_neighborhood_size: self
+                .position_encodings
+                .iter()
                 .map(|e| e.neighbor_indices.len())
-                .sum::<usize>() as f32 / self.vectors.len().max(1) as f32,
+                .sum::<usize>() as f32
+                / self.vectors.len().max(1) as f32,
         }
     }
 }
@@ -873,7 +898,8 @@ pub fn corrupt_vector(vector: &[f32], noise_level: f32) -> Vec<f32> {
     };
 
     // Interpolate: (1 - noise_level) * original + noise_level * random
-    let mut corrupted: Vec<f32> = vector.iter()
+    let mut corrupted: Vec<f32> = vector
+        .iter()
         .zip(normalized_noise.iter())
         .map(|(&orig, &noise)| (1.0 - noise_level) * orig + noise_level * noise)
         .collect();
@@ -894,9 +920,7 @@ pub fn random_vector(dim: usize) -> Vec<f32> {
     use rand::Rng;
     let mut rng = rand::thread_rng();
 
-    let mut vec: Vec<f32> = (0..dim)
-        .map(|_| rng.gen_range(-1.0..1.0))
-        .collect();
+    let mut vec: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
 
     let norm: f32 = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
     if norm > 0.0 {
@@ -927,13 +951,17 @@ mod tests {
         // Similar vectors (neighborhood)
         for i in 0..5 {
             let similar = corrupt_vector(&base, 0.1); // Small noise
-            field.add_vector(&format!("similar_{}", i), similar).unwrap();
+            field
+                .add_vector(&format!("similar_{}", i), similar)
+                .unwrap();
         }
 
         // Dissimilar vectors
         for i in 0..3 {
             let dissimilar = random_vector(1000);
-            field.add_vector(&format!("dissimilar_{}", i), dissimilar).unwrap();
+            field
+                .add_vector(&format!("dissimilar_{}", i), dissimilar)
+                .unwrap();
         }
 
         field
@@ -961,7 +989,10 @@ mod tests {
 
         assert_eq!(field.vectors.len(), 2);
         assert_eq!(field.labels.len(), 2);
-        println!("✅ Vector addition: {} vectors in field", field.vectors.len());
+        println!(
+            "✅ Vector addition: {} vectors in field",
+            field.vectors.len()
+        );
     }
 
     #[test]
@@ -975,18 +1006,34 @@ mod tests {
         // Should have captured the similar vectors (they have high similarity)
         // Note: neighborhood includes top-k vectors, which may include dissimilar ones
         // So we check that AT LEAST some neighbors have high similarity
-        let max_sim = encoding.expected_similarities.iter()
+        let max_sim = encoding
+            .expected_similarities
+            .iter()
             .cloned()
             .fold(f32::NEG_INFINITY, f32::max);
-        let high_sim_count = encoding.expected_similarities.iter()
+        let high_sim_count = encoding
+            .expected_similarities
+            .iter()
             .filter(|&&s| s > 0.7)
             .count();
 
-        assert!(max_sim > 0.8, "Should have at least one high-similarity neighbor, got max_sim={}", max_sim);
-        assert!(high_sim_count >= 3, "Should have at least 3 high-similarity neighbors, got {}", high_sim_count);
+        assert!(
+            max_sim > 0.8,
+            "Should have at least one high-similarity neighbor, got max_sim={}",
+            max_sim
+        );
+        assert!(
+            high_sim_count >= 3,
+            "Should have at least 3 high-similarity neighbors, got {}",
+            high_sim_count
+        );
 
-        println!("✅ Position encoding with {} neighbors, max_sim={:.2}, high_sim_count={}",
-                 encoding.neighbor_indices.len(), max_sim, high_sim_count);
+        println!(
+            "✅ Position encoding with {} neighbors, max_sim={:.2}, high_sim_count={}",
+            encoding.neighbor_indices.len(),
+            max_sim,
+            high_sim_count
+        );
     }
 
     #[test]
@@ -998,8 +1045,10 @@ mod tests {
         assert!(health.overall_health <= 1.0);
         assert_eq!(health.vector_health.len(), field.vectors.len());
 
-        println!("✅ Health assessment: overall={:.2}, needing_repair={}",
-                 health.overall_health, health.vectors_needing_repair);
+        println!(
+            "✅ Health assessment: overall={:.2}, needing_repair={}",
+            health.overall_health, health.vectors_needing_repair
+        );
     }
 
     #[test]
@@ -1015,11 +1064,15 @@ mod tests {
         let corrupted = corrupt_vector(&base, 0.5);
         let energy_corrupted = field.calculate_energy(&corrupted, &encoding);
 
-        assert!(energy_corrupted > energy_healthy,
-                "Corrupted vector should have higher energy");
+        assert!(
+            energy_corrupted > energy_healthy,
+            "Corrupted vector should have higher energy"
+        );
 
-        println!("✅ Energy: healthy={:.4}, corrupted={:.4}",
-                 energy_healthy, energy_corrupted);
+        println!(
+            "✅ Energy: healthy={:.4}, corrupted={:.4}",
+            energy_healthy, energy_corrupted
+        );
     }
 
     #[test]
@@ -1034,11 +1087,15 @@ mod tests {
         let result = field.repair_vector(&corrupted).unwrap();
 
         // Repair should improve health
-        assert!(result.improvement >= 0.0 || result.final_health > 0.8,
-                "Repair should maintain or improve health");
+        assert!(
+            result.improvement >= 0.0 || result.final_health > 0.8,
+            "Repair should maintain or improve health"
+        );
 
-        println!("✅ Mild repair: improvement={:.3}, final_health={:.2}, iterations={}",
-                 result.improvement, result.final_health, result.iterations);
+        println!(
+            "✅ Mild repair: improvement={:.3}, final_health={:.2}, iterations={}",
+            result.improvement, result.final_health, result.iterations
+        );
     }
 
     #[test]
@@ -1055,8 +1112,10 @@ mod tests {
         // Even severe corruption should see some repair attempt
         assert!(result.iterations > 0, "Should attempt repair iterations");
 
-        println!("✅ Severe repair: initial_health={:.2}, final_health={:.2}, iterations={}",
-                 result.initial_health, result.final_health, result.iterations);
+        println!(
+            "✅ Severe repair: initial_health={:.2}, final_health={:.2}, iterations={}",
+            result.initial_health, result.final_health, result.iterations
+        );
     }
 
     #[test]
@@ -1072,14 +1131,17 @@ mod tests {
 
     #[test]
     fn test_attractor_basin() {
-        let attractor = Attractor::new(random_vector(1000), "test".to_string())
-            .with_basin_radius(0.7);
+        let attractor =
+            Attractor::new(random_vector(1000), "test".to_string()).with_basin_radius(0.7);
 
         let prototype = &attractor.prototype;
 
         // Vector very similar to prototype
         let in_basin = corrupt_vector(prototype, 0.1);
-        assert!(attractor.is_in_basin(&in_basin), "Similar vector should be in basin");
+        assert!(
+            attractor.is_in_basin(&in_basin),
+            "Similar vector should be in basin"
+        );
 
         // Random vector unlikely to be in basin
         let out_basin = random_vector(1000);
@@ -1118,7 +1180,11 @@ mod tests {
 
         // Regenerated should be somewhat similar to original
         // (not perfect due to noise in neighbors)
-        assert!(sim > 0.3, "Regenerated should have some similarity: {}", sim);
+        assert!(
+            sim > 0.3,
+            "Regenerated should have some similarity: {}",
+            sim
+        );
 
         println!("✅ Context regeneration similarity: {:.3}", sim);
     }
@@ -1132,8 +1198,10 @@ mod tests {
         assert_eq!(stats.dimensions, 1000);
         assert!(stats.overall_health > 0.0);
 
-        println!("✅ Stats: {} vectors, health={:.2}, avg_neighbors={:.1}",
-                 stats.num_vectors, stats.overall_health, stats.avg_neighborhood_size);
+        println!(
+            "✅ Stats: {} vectors, health={:.2}, avg_neighbors={:.1}",
+            stats.num_vectors, stats.overall_health, stats.avg_neighborhood_size
+        );
     }
 
     #[test]
@@ -1155,14 +1223,21 @@ mod tests {
         println!("✅ Self-heal batch: {} repairs attempted", results.len());
 
         // Repairs should not exceed the number of corrupted vectors
-        assert!(results.len() <= 3,
-                "Should not repair more vectors than were corrupted");
+        assert!(
+            results.len() <= 3,
+            "Should not repair more vectors than were corrupted"
+        );
 
         // Field health should still be valid after healing
-        let stats = field.health_stats();
-        assert!(stats.overall_health.is_finite(), "Health should be finite after healing");
-        assert!(stats.overall_health >= 0.0 && stats.overall_health <= 1.0,
-                "Health should be in [0, 1]");
+        let stats = field.assess_health();
+        assert!(
+            stats.overall_health.is_finite(),
+            "Health should be finite after healing"
+        );
+        assert!(
+            stats.overall_health >= 0.0 && stats.overall_health <= 1.0,
+            "Health should be in [0, 1]"
+        );
     }
 
     #[test]
@@ -1195,7 +1270,9 @@ mod tests {
         // Add 100 vectors
         let start = Instant::now();
         for i in 0..100 {
-            field.add_vector(&format!("vec_{}", i), random_vector(1000)).unwrap();
+            field
+                .add_vector(&format!("vec_{}", i), random_vector(1000))
+                .unwrap();
         }
         let add_time = start.elapsed();
 
@@ -1211,15 +1288,32 @@ mod tests {
         let repair_time = start.elapsed();
 
         // Performance assertions (very relaxed for CI/loaded systems)
-        let threshold = if cfg!(debug_assertions) { 30_000 } else { 5_000 };
-        assert!(add_time.as_millis() < threshold,
-                "Adding 100 vectors should be fast: {}ms", add_time.as_millis());
-        assert!(health_time.as_millis() < threshold / 5,
-                "Health check should be fast: {}ms", health_time.as_millis());
-        assert!(repair_time.as_millis() < threshold,
-                "Single repair should be fast: {}ms", repair_time.as_millis());
+        let threshold = if cfg!(debug_assertions) {
+            30_000
+        } else {
+            5_000
+        };
+        assert!(
+            add_time.as_millis() < threshold,
+            "Adding 100 vectors should be fast: {}ms",
+            add_time.as_millis()
+        );
+        assert!(
+            health_time.as_millis() < threshold / 5,
+            "Health check should be fast: {}ms",
+            health_time.as_millis()
+        );
+        assert!(
+            repair_time.as_millis() < threshold,
+            "Single repair should be fast: {}ms",
+            repair_time.as_millis()
+        );
 
-        println!("✅ Performance: add={}ms, health={}ms, repair={}ms",
-                 add_time.as_millis(), health_time.as_millis(), repair_time.as_millis());
+        println!(
+            "✅ Performance: add={}ms, health={}ms, repair={}ms",
+            add_time.as_millis(),
+            health_time.as_millis(),
+            repair_time.as_millis()
+        );
     }
 }

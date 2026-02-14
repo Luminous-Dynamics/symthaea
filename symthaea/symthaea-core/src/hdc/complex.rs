@@ -28,10 +28,10 @@
 //! a ContinuousHV suitable for gradient-based operations and fine-grained similarity.
 
 use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
 use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
-use serde::{Serialize, Deserialize};
-use std::ops::{Add, Sub, Mul, Div, Neg};
+use serde::{Deserialize, Serialize};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPLEX NUMBER
@@ -99,7 +99,10 @@ impl Complex {
     /// Complex conjugate: conj(a + bi) = a - bi.
     #[inline]
     pub fn conjugate(&self) -> Self {
-        Self { re: self.re, im: -self.im }
+        Self {
+            re: self.re,
+            im: -self.im,
+        }
     }
 
     /// Multiplicative inverse: 1/z = conj(z) / |z|^2.
@@ -184,10 +187,16 @@ impl Complex {
         // Numerically stable sqrt for complex numbers
         let t = ((self.re.abs() + mag) / 2.0).sqrt();
         if self.re >= 0.0 {
-            Self { re: t, im: self.im / (2.0 * t) }
+            Self {
+                re: t,
+                im: self.im / (2.0 * t),
+            }
         } else {
             let im_sign = if self.im >= 0.0 { 1.0 } else { -1.0 };
-            Self { re: self.im.abs() / (2.0 * t), im: im_sign * t }
+            Self {
+                re: self.im.abs() / (2.0 * t),
+                im: im_sign * t,
+            }
         }
     }
 
@@ -371,14 +380,13 @@ impl HdcComplex {
         let imag_hv = Self::encode_f64(value.im, "complex_imag");
 
         // Get or derive the COMPLEX domain rotation vector
-        let complex_domain_hv = system.get("COMPLEX")
+        let complex_domain_hv = system
+            .get("COMPLEX")
             .map(|p| p.encoding)
             .unwrap_or_else(|| BinaryHV::random(seed_from_name("COMPLEX_DOMAIN")));
 
         // Combined: COMPLEX ⊗ real_encoding ⊗ permute(imag_encoding, 1)
-        let encoding = complex_domain_hv
-            .bind(&real_hv)
-            .bind(&imag_hv.permute(1));
+        let encoding = complex_domain_hv.bind(&real_hv).bind(&imag_hv.permute(1));
 
         Self {
             value,
@@ -507,7 +515,8 @@ pub struct ComplexArithmeticEngine {
 impl ComplexArithmeticEngine {
     /// Create a new engine using the given PrimitiveSystem.
     pub fn new(system: &PrimitiveSystem) -> Self {
-        let complex_domain_hv = system.get("COMPLEX")
+        let complex_domain_hv = system
+            .get("COMPLEX")
             .map(|p| p.encoding)
             .unwrap_or_else(|| BinaryHV::random(seed_from_name("COMPLEX_DOMAIN")));
 
@@ -527,7 +536,12 @@ impl ComplexArithmeticEngine {
     }
 
     /// Add two complex numbers with HDC encoding.
-    pub fn add(&mut self, a: &HdcComplex, b: &HdcComplex, system: &PrimitiveSystem) -> ComplexResult {
+    pub fn add(
+        &mut self,
+        a: &HdcComplex,
+        b: &HdcComplex,
+        system: &PrimitiveSystem,
+    ) -> ComplexResult {
         let value = a.value + b.value;
         let result_hdc = HdcComplex::encode(value, system);
 
@@ -548,7 +562,12 @@ impl ComplexArithmeticEngine {
     }
 
     /// Subtract two complex numbers with HDC encoding.
-    pub fn sub(&mut self, a: &HdcComplex, b: &HdcComplex, system: &PrimitiveSystem) -> ComplexResult {
+    pub fn sub(
+        &mut self,
+        a: &HdcComplex,
+        b: &HdcComplex,
+        system: &PrimitiveSystem,
+    ) -> ComplexResult {
         let value = a.value - b.value;
         let result_hdc = HdcComplex::encode(value, system);
 
@@ -570,7 +589,12 @@ impl ComplexArithmeticEngine {
     }
 
     /// Multiply two complex numbers with HDC encoding.
-    pub fn mul(&mut self, a: &HdcComplex, b: &HdcComplex, system: &PrimitiveSystem) -> ComplexResult {
+    pub fn mul(
+        &mut self,
+        a: &HdcComplex,
+        b: &HdcComplex,
+        system: &PrimitiveSystem,
+    ) -> ComplexResult {
         let value = a.value * b.value;
         let result_hdc = HdcComplex::encode(value, system);
 
@@ -590,7 +614,12 @@ impl ComplexArithmeticEngine {
     }
 
     /// Divide two complex numbers with HDC encoding.
-    pub fn div(&mut self, a: &HdcComplex, b: &HdcComplex, system: &PrimitiveSystem) -> ComplexResult {
+    pub fn div(
+        &mut self,
+        a: &HdcComplex,
+        b: &HdcComplex,
+        system: &PrimitiveSystem,
+    ) -> ComplexResult {
         let value = a.value / b.value;
         let result_hdc = HdcComplex::encode(value, system);
 
@@ -705,11 +734,15 @@ mod tests {
 
         assert!(
             (product.re - expected_re).abs() < EPSILON,
-            "Real part: expected {}, got {}", expected_re, product.re
+            "Real part: expected {}, got {}",
+            expected_re,
+            product.re
         );
         assert!(
             (product.im - expected_im).abs() < EPSILON,
-            "Imag part: expected {}, got {}", expected_im, product.im
+            "Imag part: expected {}, got {}",
+            expected_im,
+            product.im
         );
     }
 
@@ -719,13 +752,15 @@ mod tests {
         let z = Complex::new(3.0, 4.0);
         assert!(
             (z.magnitude() - 5.0).abs() < EPSILON,
-            "|3+4i| should be 5, got {}", z.magnitude()
+            "|3+4i| should be 5, got {}",
+            z.magnitude()
         );
 
         let w = Complex::new(0.0, 0.0);
         assert!(
             w.magnitude().abs() < EPSILON,
-            "|0| should be 0, got {}", w.magnitude()
+            "|0| should be 0, got {}",
+            w.magnitude()
         );
     }
 
@@ -738,11 +773,14 @@ mod tests {
 
         assert!(
             (product.re - mag_sq).abs() < EPSILON,
-            "z*conj(z) real part = {}, |z|^2 = {}", product.re, mag_sq
+            "z*conj(z) real part = {}, |z|^2 = {}",
+            product.re,
+            mag_sq
         );
         assert!(
             product.im.abs() < EPSILON,
-            "z*conj(z) should be real, got im = {}", product.im
+            "z*conj(z) should be real, got im = {}",
+            product.im
         );
     }
 
@@ -765,7 +803,9 @@ mod tests {
         assert!(
             z_n.approx_eq(&expected, LOOSE_EPSILON),
             "De Moivre's theorem failed for n={}: got {}, expected {}",
-            n, z_n, expected
+            n,
+            z_n,
+            expected
         );
     }
 
@@ -781,7 +821,9 @@ mod tests {
 
         assert!(
             z_cubed.approx_eq(&expected, LOOSE_EPSILON),
-            "De Moivre via pow: got {}, expected {}", z_cubed, expected
+            "De Moivre via pow: got {}, expected {}",
+            z_cubed,
+            expected
         );
     }
 
@@ -830,7 +872,8 @@ mod tests {
 
         assert!(
             product.approx_eq(&Complex::ONE, EPSILON),
-            "z * z^-1 should be 1, got {}", product
+            "z * z^-1 should be 1, got {}",
+            product
         );
     }
 
@@ -842,7 +885,11 @@ mod tests {
 
         assert!(
             z.approx_eq(&recovered, EPSILON),
-            "Polar roundtrip failed: {} -> ({}, {}) -> {}", z, r, theta, recovered
+            "Polar roundtrip failed: {} -> ({}, {}) -> {}",
+            z,
+            r,
+            theta,
+            recovered
         );
     }
 
@@ -853,7 +900,9 @@ mod tests {
 
         assert!(
             z.approx_eq(&recovered, LOOSE_EPSILON),
-            "exp(ln(z)) should be z: got {}, expected {}", recovered, z
+            "exp(ln(z)) should be z: got {}, expected {}",
+            recovered,
+            z
         );
     }
 
@@ -866,7 +915,9 @@ mod tests {
 
         assert!(
             z.approx_eq(&squared, LOOSE_EPSILON),
-            "sqrt(z)^2 should be z: got {}, expected {}", squared, z
+            "sqrt(z)^2 should be z: got {}, expected {}",
+            squared,
+            z
         );
 
         // sqrt(-1) = i
@@ -874,7 +925,8 @@ mod tests {
         let i = neg_one.sqrt();
         assert!(
             i.approx_eq(&Complex::I, LOOSE_EPSILON),
-            "sqrt(-1) should be i, got {}", i
+            "sqrt(-1) should be i, got {}",
+            i
         );
     }
 
@@ -888,7 +940,8 @@ mod tests {
 
         assert!(
             sum.approx_eq(&Complex::ONE, LOOSE_EPSILON),
-            "sin^2(z) + cos^2(z) should be 1, got {}", sum
+            "sin^2(z) + cos^2(z) should be 1, got {}",
+            sum
         );
     }
 
@@ -936,7 +989,8 @@ mod tests {
         let expected = Complex::new(-1.0, 0.0);
         assert!(
             result.approx_eq(&expected, EPSILON),
-            "i^2 should be -1, got {}", result
+            "i^2 should be -1, got {}",
+            result
         );
     }
 
@@ -991,8 +1045,10 @@ mod tests {
         let chv = hdc.to_continuous_hv();
 
         assert_eq!(
-            chv.dim(), BinaryHV::DIM,
-            "ContinuousHV should have dimension {}", BinaryHV::DIM
+            chv.dim(),
+            BinaryHV::DIM,
+            "ContinuousHV should have dimension {}",
+            BinaryHV::DIM
         );
     }
 
@@ -1078,7 +1134,8 @@ mod tests {
         let expected = Complex::new(-1.0, 0.0);
         assert!(
             result.value.approx_eq(&expected, LOOSE_EPSILON),
-            "Engine exp(i*pi) should be -1, got {}", result.value
+            "Engine exp(i*pi) should be -1, got {}",
+            result.value
         );
     }
 
@@ -1092,7 +1149,8 @@ mod tests {
 
         assert!(
             (mag - 5.0).abs() < EPSILON,
-            "Magnitude of 3+4i should be 5, got {}", mag
+            "Magnitude of 3+4i should be 5, got {}",
+            mag
         );
     }
 

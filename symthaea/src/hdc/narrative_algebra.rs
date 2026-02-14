@@ -93,8 +93,13 @@ impl NarrativePrimitives {
     /// Returns the maximum pairwise similarity.
     pub fn verify_orthogonality(&self) -> f32 {
         let primitives = [
-            &self.protagonist, &self.antagonist, &self.setting,
-            &self.conflict, &self.theme, &self.mood, &self.stakes,
+            &self.protagonist,
+            &self.antagonist,
+            &self.setting,
+            &self.conflict,
+            &self.theme,
+            &self.mood,
+            &self.stakes,
         ];
 
         let mut max_similarity = 0.0f32;
@@ -247,27 +252,51 @@ impl NarrativeAlgebra {
         // Arc phase HVs (seed range 10_000_000+)
         let mut phase_hvs = HashMap::new();
         phase_hvs.insert(ArcPhase::Setup, ContinuousHV::random(dim, 10_000_003));
-        phase_hvs.insert(ArcPhase::RisingAction, ContinuousHV::random(dim, 10_000_017));
+        phase_hvs.insert(
+            ArcPhase::RisingAction,
+            ContinuousHV::random(dim, 10_000_017),
+        );
         phase_hvs.insert(ArcPhase::Climax, ContinuousHV::random(dim, 10_000_029));
-        phase_hvs.insert(ArcPhase::FallingAction, ContinuousHV::random(dim, 10_000_039));
+        phase_hvs.insert(
+            ArcPhase::FallingAction,
+            ContinuousHV::random(dim, 10_000_039),
+        );
         phase_hvs.insert(ArcPhase::Resolution, ContinuousHV::random(dim, 10_000_053));
 
         // Tension level HVs (seed range 11_000_000+)
         let mut tension_hvs = HashMap::new();
         tension_hvs.insert(TensionLevel::Calm, ContinuousHV::random(dim, 11_000_003));
-        tension_hvs.insert(TensionLevel::Building, ContinuousHV::random(dim, 11_000_017));
+        tension_hvs.insert(
+            TensionLevel::Building,
+            ContinuousHV::random(dim, 11_000_017),
+        );
         tension_hvs.insert(TensionLevel::High, ContinuousHV::random(dim, 11_000_029));
         tension_hvs.insert(TensionLevel::Peak, ContinuousHV::random(dim, 11_000_039));
         tension_hvs.insert(TensionLevel::Release, ContinuousHV::random(dim, 11_000_053));
 
         // Mood HVs (seed range 12_000_000+)
         let mut mood_hvs = HashMap::new();
-        mood_hvs.insert(NarrativeMood::Hopeful, ContinuousHV::random(dim, 12_000_003));
+        mood_hvs.insert(
+            NarrativeMood::Hopeful,
+            ContinuousHV::random(dim, 12_000_003),
+        );
         mood_hvs.insert(NarrativeMood::Tense, ContinuousHV::random(dim, 12_000_017));
-        mood_hvs.insert(NarrativeMood::Melancholy, ContinuousHV::random(dim, 12_000_029));
-        mood_hvs.insert(NarrativeMood::Triumphant, ContinuousHV::random(dim, 12_000_039));
-        mood_hvs.insert(NarrativeMood::Mysterious, ContinuousHV::random(dim, 12_000_053));
-        mood_hvs.insert(NarrativeMood::Peaceful, ContinuousHV::random(dim, 12_000_067));
+        mood_hvs.insert(
+            NarrativeMood::Melancholy,
+            ContinuousHV::random(dim, 12_000_029),
+        );
+        mood_hvs.insert(
+            NarrativeMood::Triumphant,
+            ContinuousHV::random(dim, 12_000_039),
+        );
+        mood_hvs.insert(
+            NarrativeMood::Mysterious,
+            ContinuousHV::random(dim, 12_000_053),
+        );
+        mood_hvs.insert(
+            NarrativeMood::Peaceful,
+            ContinuousHV::random(dim, 12_000_067),
+        );
 
         Self {
             primitives,
@@ -313,9 +342,15 @@ impl NarrativeAlgebra {
         conflict_desc: &str,
         mood: NarrativeMood,
     ) -> ContinuousHV {
-        let setting_hv = self.primitives.setting.bind(&self.hash_string(setting_desc));
-        let conflict_hv = self.primitives.conflict.bind(&self.hash_string(conflict_desc));
-        let mood_hv = self.primitives.mood.bind(self.mood_hvs.get(&mood).unwrap());
+        let setting_hv = self
+            .primitives
+            .setting
+            .bind(&self.hash_string(setting_desc));
+        let conflict_hv = self
+            .primitives
+            .conflict
+            .bind(&self.hash_string(conflict_desc));
+        let mood_hv = self.primitives.mood.bind(self.mood_hvs.get(&mood).expect("map covers all variants"));
 
         // Bundle all elements
         let mut components = vec![setting_hv, conflict_hv, mood_hv];
@@ -327,17 +362,17 @@ impl NarrativeAlgebra {
 
     /// Encode an arc phase as a hypervector.
     pub fn encode_arc_phase(&self, phase: ArcPhase) -> ContinuousHV {
-        self.phase_hvs.get(&phase).unwrap().clone()
+        self.phase_hvs.get(&phase).expect("map covers all variants").clone()
     }
 
     /// Encode a tension level as a hypervector.
     pub fn encode_tension(&self, level: TensionLevel) -> ContinuousHV {
-        self.tension_hvs.get(&level).unwrap().clone()
+        self.tension_hvs.get(&level).expect("map covers all variants").clone()
     }
 
     /// Encode a mood as a hypervector.
     pub fn encode_mood(&self, mood: NarrativeMood) -> ContinuousHV {
-        self.mood_hvs.get(&mood).unwrap().clone()
+        self.mood_hvs.get(&mood).expect("map covers all variants").clone()
     }
 
     // ========================================================================
@@ -366,8 +401,7 @@ impl NarrativeAlgebra {
     ///
     /// Non-commutative for consistent representation.
     pub fn contrasts_with(&self, a: &ContinuousHV, b: &ContinuousHV) -> ContinuousHV {
-        a.bind(&self.operators.contrasts_with)
-            .bind(&b.permute(1))
+        a.bind(&self.operators.contrasts_with).bind(&b.permute(1))
     }
 
     /// Compose: EVENT ESCALATES STAKES (raise tension)

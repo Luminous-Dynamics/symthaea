@@ -27,7 +27,7 @@ pub struct CausalVariable {
 
 #[derive(Debug, Clone)]
 pub enum VariableDomain {
-    Binary,                     // 0 or 1
+    Binary, // 0 or 1
     Continuous { min: f64, max: f64 },
     Categorical(Vec<String>),
 }
@@ -87,21 +87,33 @@ impl StructuralCausalModel {
 
     /// Add a variable to the model
     pub fn add_variable(&mut self, name: &str, value: f64, domain: VariableDomain) {
-        self.variables.insert(name.to_string(), CausalVariable {
-            name: name.to_string(),
-            value,
-            domain,
-        });
+        self.variables.insert(
+            name.to_string(),
+            CausalVariable {
+                name: name.to_string(),
+                value,
+                domain,
+            },
+        );
     }
 
     /// Add a structural equation
-    pub fn add_equation(&mut self, target: &str, parents: Vec<&str>, coefficients: Vec<f64>, intercept: f64) {
-        self.equations.insert(target.to_string(), StructuralEquation {
-            target: target.to_string(),
-            parents: parents.into_iter().map(String::from).collect(),
-            coefficients,
-            intercept,
-        });
+    pub fn add_equation(
+        &mut self,
+        target: &str,
+        parents: Vec<&str>,
+        coefficients: Vec<f64>,
+        intercept: f64,
+    ) {
+        self.equations.insert(
+            target.to_string(),
+            StructuralEquation {
+                target: target.to_string(),
+                parents: parents.into_iter().map(String::from).collect(),
+                coefficients,
+                intercept,
+            },
+        );
     }
 
     /// Learn causal structure from understanding
@@ -112,7 +124,10 @@ impl StructuralCausalModel {
                 self.add_variable(
                     &entity.name,
                     entity.valence as f64,
-                    VariableDomain::Continuous { min: -1.0, max: 1.0 }
+                    VariableDomain::Continuous {
+                        min: -1.0,
+                        max: 1.0,
+                    },
                 );
             }
         }
@@ -129,12 +144,7 @@ impl StructuralCausalModel {
 
             // Add structural equation: effect = f(cause)
             let strength = causal.strength;
-            self.add_equation(
-                &causal.effect,
-                vec![&causal.cause],
-                vec![strength],
-                0.0
-            );
+            self.add_equation(&causal.effect, vec![&causal.cause], vec![strength], 0.0);
         }
     }
 
@@ -162,7 +172,11 @@ impl StructuralCausalModel {
         let causal_path = self.trace_causal_path(variable, target);
 
         // Confidence based on how complete the model is
-        let confidence = if self.equations.contains_key(target) { 0.7 } else { 0.3 };
+        let confidence = if self.equations.contains_key(target) {
+            0.7
+        } else {
+            0.3
+        };
 
         InterventionResult {
             intervention: format!("do({} = {})", variable, value),
@@ -179,10 +193,10 @@ impl StructuralCausalModel {
     /// 3. Prediction: Compute outcome in modified model
     pub fn counterfactual(
         &self,
-        evidence: &HashMap<String, f64>,  // What we observed
-        intervention: &str,                // Variable to change
-        new_value: f64,                    // Counterfactual value
-        target: &str,                      // What to predict
+        evidence: &HashMap<String, f64>, // What we observed
+        intervention: &str,              // Variable to change
+        new_value: f64,                  // Counterfactual value
+        target: &str,                    // What to predict
     ) -> CounterfactualResult {
         // Step 1: Abduction - infer exogenous variables from evidence
         let mut model = self.clone();
@@ -204,13 +218,13 @@ impl StructuralCausalModel {
 
         // Compute probabilities of necessity and sufficiency (simplified)
         let prob_necessity = if factual_value > 0.5 && counterfactual_value < 0.5 {
-            0.8  // High: removing cause would remove effect
+            0.8 // High: removing cause would remove effect
         } else {
             0.2
         };
 
         let prob_sufficiency = if factual_value < 0.5 && counterfactual_value > 0.5 {
-            0.8  // High: adding cause would add effect
+            0.8 // High: adding cause would add effect
         } else {
             0.2
         };
@@ -230,9 +244,7 @@ impl StructuralCausalModel {
         if let Some(eq) = self.equations.get(variable) {
             let mut value = eq.intercept;
             for (i, parent) in eq.parents.iter().enumerate() {
-                let parent_val = self.variables.get(parent)
-                    .map(|v| v.value)
-                    .unwrap_or(0.0);
+                let parent_val = self.variables.get(parent).map(|v| v.value).unwrap_or(0.0);
                 value += eq.coefficients.get(i).copied().unwrap_or(0.0) * parent_val;
             }
             value.clamp(-1.0, 1.0)
@@ -247,7 +259,8 @@ impl StructuralCausalModel {
         let mut current = from.to_string();
 
         // Simple BFS to find path (in a real implementation, use proper graph traversal)
-        for _ in 0..10 {  // Max depth
+        for _ in 0..10 {
+            // Max depth
             let mut found_next = false;
             for (target, eq) in &self.equations {
                 if eq.parents.contains(&current) {

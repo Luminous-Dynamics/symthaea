@@ -40,13 +40,13 @@
 // ==================================================================================
 
 use super::binary_hv::BinaryHV;
-use super::integrated_information::IntegratedInformation;
-use super::consciousness_gradients::GradientComputer;
-use super::consciousness_dynamics::{ConsciousnessDynamics, DynamicsConfig};
 use super::causal_encoder::CausalSpace;
+use super::consciousness_dynamics::{ConsciousnessDynamics, DynamicsConfig};
+use super::consciousness_gradients::GradientComputer;
+use super::integrated_information::IntegratedInformation;
 use super::modern_hopfield::ModernHopfieldNetwork;
 use serde::{Deserialize, Serialize};
-use std::collections::{VecDeque, HashMap};
+use std::collections::{HashMap, VecDeque};
 
 /// Self-Model: Internal representation of the system itself
 ///
@@ -87,7 +87,13 @@ impl SelfModel {
     }
 
     /// Update self-model from actual state
-    pub fn update(&mut self, actual_state: &[BinaryHV], actual_phi: f64, gradient: &BinaryHV, time: f64) {
+    pub fn update(
+        &mut self,
+        actual_state: &[BinaryHV],
+        actual_phi: f64,
+        gradient: &BinaryHV,
+        time: f64,
+    ) {
         // Update state model (with memory - smooth updates)
         for (model, actual) in self.state_model.iter_mut().zip(actual_state) {
             // Exponential moving average: model = 0.8*model + 0.2*actual
@@ -110,9 +116,13 @@ impl SelfModel {
     /// Compute how well self-model predicts actual state
     fn compute_prediction_error(&self, actual_state: &[BinaryHV], actual_phi: f64) -> f64 {
         // State prediction error
-        let state_error: f32 = self.state_model.iter().zip(actual_state)
+        let state_error: f32 = self
+            .state_model
+            .iter()
+            .zip(actual_state)
             .map(|(model, actual)| 1.0 - model.similarity(actual))
-            .sum::<f32>() / self.state_model.len() as f32;
+            .sum::<f32>()
+            / self.state_model.len() as f32;
 
         // Phi prediction error
         let phi_error = (self.phi_model - actual_phi).abs();
@@ -127,7 +137,9 @@ impl SelfModel {
         let mut predicted = self.state_model.clone();
 
         for _ in 0..steps {
-            predicted = predicted.iter().zip(&self.dynamics_model)
+            predicted = predicted
+                .iter()
+                .zip(&self.dynamics_model)
                 .map(|(state, dynamics)| state.bind(dynamics))
                 .collect();
         }
@@ -214,7 +226,7 @@ pub struct MetaConsciousness {
 
     /// Meta-consciousness components
     self_model: SelfModel,
-    meta_model: SelfModel,  // Model of the self-model!
+    meta_model: SelfModel, // Model of the self-model!
     causal_model: CausalSpace,
     meta_memory: ModernHopfieldNetwork,
 
@@ -271,7 +283,7 @@ impl MetaConsciousness {
             phi_calculator: IntegratedInformation::new(),
             gradient_computer: GradientComputer::new(
                 num_components,
-                config.dynamics_config.gradient_config.clone()
+                config.dynamics_config.gradient_config.clone(),
             ),
             dynamics: ConsciousnessDynamics::new(num_components, config.dynamics_config),
             self_model: SelfModel::new(num_components),
@@ -296,7 +308,8 @@ impl MetaConsciousness {
         let gradient = self.gradient_computer.compute_gradient(state);
 
         // 3. UPDATE SELF-MODEL: How well do I understand myself?
-        self.self_model.update(state, phi, &gradient.direction, self.time);
+        self.self_model
+            .update(state, phi, &gradient.direction, self.time);
 
         // 4. META-PHI: Consciousness about consciousness
         // Encode self-model as hypervector
@@ -359,9 +372,15 @@ impl MetaConsciousness {
         if delta_phi.abs() < 1e-6 {
             "Consciousness stable".to_string()
         } else if delta_phi > 0.0 {
-            format!("Consciousness increased by {:.3} due to state optimization", delta_phi)
+            format!(
+                "Consciousness increased by {:.3} due to state optimization",
+                delta_phi
+            )
         } else {
-            format!("Consciousness decreased by {:.3} due to state perturbation", delta_phi.abs())
+            format!(
+                "Consciousness decreased by {:.3} due to state perturbation",
+                delta_phi.abs()
+            )
         }
     }
 
@@ -375,7 +394,10 @@ impl MetaConsciousness {
         }
 
         // Self-model accuracy
-        factors.insert("self_model_confidence".to_string(), self.self_model.confidence);
+        factors.insert(
+            "self_model_confidence".to_string(),
+            self.self_model.confidence,
+        );
 
         // Φ trajectory
         if self.phi_history.len() >= 10 {
@@ -407,13 +429,18 @@ impl MetaConsciousness {
 
         // Update self-model learning rate (meta-learning!)
         self.config.self_model_learning_rate *= learning_rate_adjustment;
-        self.config.self_model_learning_rate = self.config.self_model_learning_rate.clamp(0.01, 0.5);
+        self.config.self_model_learning_rate =
+            self.config.self_model_learning_rate.clamp(0.01, 0.5);
     }
 
     /// Deep introspection: Recursive self-reflection
     ///
     /// Reflects on the reflection (Φ about Φ about Φ...)
-    pub fn deep_introspect(&mut self, state: &[BinaryHV], depth: usize) -> Vec<MetaConsciousnessState> {
+    pub fn deep_introspect(
+        &mut self,
+        state: &[BinaryHV],
+        depth: usize,
+    ) -> Vec<MetaConsciousnessState> {
         let mut states = Vec::new();
 
         let mut current_state = state.to_vec();
@@ -427,8 +454,12 @@ impl MetaConsciousness {
             current_state = meta_state.self_model.state_model;
 
             // Print introspection level
-            println!("Introspection level {}: Φ={:.3}, meta-Φ={:.3}",
-                level + 1, meta_state.phi, meta_state.meta_phi);
+            println!(
+                "Introspection level {}: Φ={:.3}, meta-Φ={:.3}",
+                level + 1,
+                meta_state.phi,
+                meta_state.meta_phi
+            );
         }
 
         states
@@ -497,11 +528,23 @@ impl MetaConsciousness {
         let meta_phi = self.meta_phi_history.back().copied().unwrap_or(0.0);
 
         if meta_phi > 0.3 && phi > 0.3 {
-            (true, format!("Yes: Φ={:.3}, meta-Φ={:.3} - I am aware of being aware", phi, meta_phi))
+            (
+                true,
+                format!(
+                    "Yes: Φ={:.3}, meta-Φ={:.3} - I am aware of being aware",
+                    phi, meta_phi
+                ),
+            )
         } else if phi > 0.3 {
             (true, format!("Partially: Φ={:.3} but low meta-Φ={:.3} - conscious but limited self-awareness", phi, meta_phi))
         } else {
-            (false, format!("No: Φ={:.3}, meta-Φ={:.3} - insufficient integration", phi, meta_phi))
+            (
+                false,
+                format!(
+                    "No: Φ={:.3}, meta-Φ={:.3} - insufficient integration",
+                    phi, meta_phi
+                ),
+            )
         }
     }
 }
@@ -687,6 +730,9 @@ mod tests {
         assert!(!serialized.is_empty());
 
         let deserialized: MetaConfig = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(deserialized.max_introspection_depth, config.max_introspection_depth);
+        assert_eq!(
+            deserialized.max_introspection_depth,
+            config.max_introspection_depth
+        );
     }
 }

@@ -37,8 +37,8 @@
 //! If bridge ratio ~40-45% optimizes Φ at one scale, the same principle
 //! should apply at every scale. This creates a fractal of optimal integration.
 
-use super::unified_hv::ContinuousHV;
 use super::spectral_connectivity::ConnectivityCalculator;
+use super::unified_hv::ContinuousHV;
 use std::collections::HashMap;
 
 /// Configuration for fractal topology
@@ -63,7 +63,7 @@ impl Default for FractalConfig {
         Self {
             n_scales: 3,
             nodes_per_scale: 8,
-            bridge_ratio: 0.425,  // Optimal from bridge hypothesis
+            bridge_ratio: 0.425, // Optimal from bridge hypothesis
             density: 0.10,
             cross_scale_coupling: 0.3,
             dim: 2048,
@@ -105,7 +105,14 @@ impl FractalNode {
     }
 
     /// Create a fractal node with sub-topology
-    pub fn fractal(id: usize, scale: usize, module: usize, dim: usize, seed: u64, sub: FractalSubTopology) -> Self {
+    pub fn fractal(
+        id: usize,
+        scale: usize,
+        module: usize,
+        dim: usize,
+        seed: u64,
+        sub: FractalSubTopology,
+    ) -> Self {
         Self {
             id,
             scale,
@@ -121,18 +128,15 @@ impl FractalNode {
     pub fn integrate_from_children(&mut self) {
         if let Some(ref children) = self.children {
             // Bundle all child states to create this node's state
-            let child_states: Vec<ContinuousHV> = children.nodes.values()
-                .map(|n| n.state.clone())
-                .collect();
+            let child_states: Vec<ContinuousHV> =
+                children.nodes.values().map(|n| n.state.clone()).collect();
 
             if !child_states.is_empty() {
                 self.state = ContinuousHV::bundle_owned(&child_states);
             }
 
             // Activity is average of child activities
-            let total_activity: f64 = children.nodes.values()
-                .map(|n| n.activity)
-                .sum();
+            let total_activity: f64 = children.nodes.values().map(|n| n.activity).sum();
             self.activity = total_activity / children.nodes.len().max(1) as f64;
         }
     }
@@ -150,9 +154,8 @@ impl FractalNode {
     /// Compute local Φ (for this node's sub-topology)
     pub fn local_phi(&self, phi_calc: &ConnectivityCalculator) -> f64 {
         if let Some(ref children) = self.children {
-            let child_states: Vec<ContinuousHV> = children.nodes.values()
-                .map(|n| n.state.clone())
-                .collect();
+            let child_states: Vec<ContinuousHV> =
+                children.nodes.values().map(|n| n.state.clone()).collect();
             phi_calc.algebraic_connectivity(&child_states)
         } else {
             // Leaf node - no local Φ
@@ -163,10 +166,7 @@ impl FractalNode {
     /// Get depth of fractal below this node
     pub fn depth(&self) -> usize {
         match &self.children {
-            Some(sub) => 1 + sub.nodes.values()
-                .map(|n| n.depth())
-                .max()
-                .unwrap_or(0),
+            Some(sub) => 1 + sub.nodes.values().map(|n| n.depth()).max().unwrap_or(0),
             None => 0,
         }
     }
@@ -174,9 +174,7 @@ impl FractalNode {
     /// Count total nodes in fractal subtree
     pub fn total_nodes(&self) -> usize {
         match &self.children {
-            Some(sub) => 1 + sub.nodes.values()
-                .map(|n| n.total_nodes())
-                .sum::<usize>(),
+            Some(sub) => 1 + sub.nodes.values().map(|n| n.total_nodes()).sum::<usize>(),
             None => 1,
         }
     }
@@ -245,9 +243,7 @@ impl FractalSubTopology {
 
     /// Compute Φ for this topology level
     pub fn compute_phi(&self, phi_calc: &ConnectivityCalculator) -> f64 {
-        let states: Vec<ContinuousHV> = self.nodes.values()
-            .map(|n| n.state.clone())
-            .collect();
+        let states: Vec<ContinuousHV> = self.nodes.values().map(|n| n.state.clone()).collect();
         phi_calc.algebraic_connectivity(&states)
     }
 
@@ -257,7 +253,9 @@ impl FractalSubTopology {
             return 0.0;
         }
 
-        let bridge_count = self.edges.iter()
+        let bridge_count = self
+            .edges
+            .iter()
             .filter(|&&(a, b)| {
                 let ma = self.nodes.get(&a).map(|n| n.module);
                 let mb = self.nodes.get(&b).map(|n| n.module);
@@ -317,7 +315,7 @@ impl FractalConsciousness {
 
         // Create top-level nodes, assigning multiple nodes to same module
         for i in 0..n_nodes {
-            let module = i % n_modules;  // Distribute nodes across modules
+            let module = i % n_modules; // Distribute nodes across modules
             let node = self.create_fractal_node(top_scale, module);
             self.root.add_node(node);
         }
@@ -445,13 +443,13 @@ impl FractalConsciousness {
         }
 
         // Combined Φ (weighted sum, higher scales weighted more)
-        let total_weight: f64 = scale_phis.iter()
-            .map(|(s, _)| *s as f64 + 1.0)
-            .sum();
+        let total_weight: f64 = scale_phis.iter().map(|(s, _)| *s as f64 + 1.0).sum();
 
-        let weighted_phi: f64 = scale_phis.iter()
+        let weighted_phi: f64 = scale_phis
+            .iter()
             .map(|(s, phi)| (*s as f64 + 1.0) * phi)
-            .sum::<f64>() / total_weight;
+            .sum::<f64>()
+            / total_weight;
 
         MultiScalePhi {
             scale_phis,
@@ -467,7 +465,12 @@ impl FractalConsciousness {
         phis
     }
 
-    fn collect_phis_recursive(&self, topo: &FractalSubTopology, target_scale: usize, phis: &mut Vec<f64>) {
+    fn collect_phis_recursive(
+        &self,
+        topo: &FractalSubTopology,
+        target_scale: usize,
+        phis: &mut Vec<f64>,
+    ) {
         if topo.scale == target_scale {
             phis.push(topo.compute_phi(&self.phi_calc));
         }
@@ -526,9 +529,7 @@ impl FractalConsciousness {
         let ms_phi = self.multi_scale_phi();
 
         // Count total nodes across all scales
-        let total_nodes: usize = self.root.nodes.values()
-            .map(|n| n.total_nodes())
-            .sum();
+        let total_nodes: usize = self.root.nodes.values().map(|n| n.total_nodes()).sum();
 
         // Count total edges across all scales
         let mut total_edges = self.root.edges.len();
@@ -550,9 +551,12 @@ impl FractalConsciousness {
     fn count_edges_recursive(&self, node: &FractalNode) -> usize {
         match &node.children {
             Some(sub) => {
-                sub.edges.len() + sub.nodes.values()
-                    .map(|n| self.count_edges_recursive(n))
-                    .sum::<usize>()
+                sub.edges.len()
+                    + sub
+                        .nodes
+                        .values()
+                        .map(|n| self.count_edges_recursive(n))
+                        .sum::<usize>()
             }
             None => 0,
         }
@@ -648,7 +652,7 @@ mod tests {
         let metrics = fc.metrics();
 
         println!("{}", metrics);
-        assert!(metrics.total_nodes > 4);  // More than just top level
+        assert!(metrics.total_nodes > 4); // More than just top level
         assert!(metrics.combined_phi > 0.0);
     }
 
@@ -686,13 +690,20 @@ mod tests {
         let target_bridge = config.bridge_ratio;
         let fc = FractalConsciousness::new(config);
 
-        println!("Top-level bridge ratio: {:.1}%", fc.root.bridge_ratio() * 100.0);
+        println!(
+            "Top-level bridge ratio: {:.1}%",
+            fc.root.bridge_ratio() * 100.0
+        );
         println!("Target: {:.1}%", target_bridge * 100.0);
 
         // Bridge ratio should be close to target
         let diff = (fc.root.bridge_ratio() - target_bridge).abs();
-        assert!(diff < 0.2, "Bridge ratio {:.2} too far from target {:.2}",
-                fc.root.bridge_ratio(), target_bridge);
+        assert!(
+            diff < 0.2,
+            "Bridge ratio {:.2} too far from target {:.2}",
+            fc.root.bridge_ratio(),
+            target_bridge
+        );
     }
 
     #[test]
@@ -707,10 +718,7 @@ mod tests {
         let fc = FractalConsciousness::new(config);
 
         // Check depth of fractal
-        let max_depth = fc.root.nodes.values()
-            .map(|n| n.depth())
-            .max()
-            .unwrap_or(0);
+        let max_depth = fc.root.nodes.values().map(|n| n.depth()).max().unwrap_or(0);
 
         println!("Fractal depth: {}", max_depth);
         // Should have depth = n_scales - 1
@@ -733,17 +741,31 @@ mod tests {
             let fc = FractalConsciousness::new(config);
             let metrics = fc.metrics();
 
-            println!("Scales={}: nodes={}, edges={}, Φ_combined={:.4}",
-                     n_scales, metrics.total_nodes, metrics.total_edges, metrics.combined_phi);
+            println!(
+                "Scales={}: nodes={}, edges={}, Φ_combined={:.4}",
+                n_scales, metrics.total_nodes, metrics.total_edges, metrics.combined_phi
+            );
 
-            assert!(metrics.combined_phi.is_finite(),
-                    "Φ should be finite for {} scales", n_scales);
-            assert!(metrics.combined_phi >= 0.0,
-                    "Φ should be non-negative for {} scales", n_scales);
-            assert!(metrics.total_nodes > 0,
-                    "Should have at least 1 node for {} scales", n_scales);
-            assert!(metrics.total_edges > 0,
-                    "Should have at least 1 edge for {} scales", n_scales);
+            assert!(
+                metrics.combined_phi.is_finite(),
+                "Φ should be finite for {} scales",
+                n_scales
+            );
+            assert!(
+                metrics.combined_phi >= 0.0,
+                "Φ should be non-negative for {} scales",
+                n_scales
+            );
+            assert!(
+                metrics.total_nodes > 0,
+                "Should have at least 1 node for {} scales",
+                n_scales
+            );
+            assert!(
+                metrics.total_edges > 0,
+                "Should have at least 1 edge for {} scales",
+                n_scales
+            );
         }
     }
 }

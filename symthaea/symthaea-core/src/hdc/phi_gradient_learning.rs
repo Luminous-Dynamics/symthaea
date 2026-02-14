@@ -22,8 +22,8 @@
 //!
 //! This system learns WHICH specific connections maximize Φ.
 
-use super::unified_hv::ContinuousHV;
 use super::spectral_connectivity::ConnectivityCalculator;
+use super::unified_hv::ContinuousHV;
 
 /// Learning configuration for Φ-gradient optimization
 #[derive(Clone, Debug)]
@@ -61,7 +61,7 @@ impl Default for PhiLearningConfig {
             temp_decay: 0.99,
             min_temp: 0.1,
             l1_reg: 0.01,
-            target_density: 0.10,  // ~10% density like ConsciousnessOptimized
+            target_density: 0.10, // ~10% density like ConsciousnessOptimized
             density_penalty: 0.1,
         }
     }
@@ -165,15 +165,26 @@ impl PhiGradientTopology {
     /// Create a new learnable topology
     ///
     /// Initializes with random edge probabilities around target density
-    pub fn new(n_nodes: usize, dim: usize, n_modules: usize, seed: u64, config: PhiLearningConfig) -> Self {
+    pub fn new(
+        n_nodes: usize,
+        dim: usize,
+        n_modules: usize,
+        seed: u64,
+        config: PhiLearningConfig,
+    ) -> Self {
         // Create nodes with module assignments
         let nodes: Vec<LearnableNode> = (0..n_nodes)
             .map(|i| {
                 let module = i % n_modules;
-                let level = if i == 0 { 0 }
-                    else if i < n_modules + 1 { 1 }
-                    else if i < n_modules * 5 + 1 { 2 }
-                    else { 3 };
+                let level = if i == 0 {
+                    0
+                } else if i < n_modules + 1 {
+                    1
+                } else if i < n_modules * 5 + 1 {
+                    2
+                } else {
+                    3
+                };
 
                 LearnableNode {
                     id: i,
@@ -195,7 +206,7 @@ impl PhiGradientTopology {
                     let modules_j = j % n_modules;
                     let is_bridge = modules_i != modules_j;
                     let init_prob = if is_bridge {
-                        target_density * 1.2  // Slight bridge bias
+                        target_density * 1.2 // Slight bridge bias
                     } else {
                         target_density * 0.9
                     };
@@ -217,18 +228,15 @@ impl PhiGradientTopology {
 
     /// Compute Φ for current edge configuration
     pub fn compute_phi(&self) -> f64 {
-        let representations: Vec<ContinuousHV> = self.nodes.iter()
-            .map(|n| n.state.clone())
-            .collect();
+        let representations: Vec<ContinuousHV> =
+            self.nodes.iter().map(|n| n.state.clone()).collect();
         self.phi_calc.algebraic_connectivity(&representations)
     }
 
     /// Compute Φ with a specific edge configuration (for gradient estimation)
     fn compute_phi_with_edges(&self, active_edges: &[bool]) -> f64 {
         // Create temporary states influenced by active edges
-        let mut states: Vec<ContinuousHV> = self.nodes.iter()
-            .map(|n| n.state.clone())
-            .collect();
+        let mut states: Vec<ContinuousHV> = self.nodes.iter().map(|n| n.state.clone()).collect();
 
         // Apply edge influences
         for (i, edge) in self.edges.iter().enumerate() {
@@ -250,7 +258,7 @@ impl PhiGradientTopology {
     ///
     /// Uses finite differences with REINFORCE-style variance reduction
     fn estimate_gradients(&mut self) -> Vec<f64> {
-        let n_samples = 5;  // Number of samples for gradient estimation
+        let n_samples = 5; // Number of samples for gradient estimation
         let temp = self.current_temperature();
 
         let mut gradients = vec![0.0; self.edges.len()];
@@ -258,12 +266,18 @@ impl PhiGradientTopology {
         // Baseline Φ (for variance reduction)
         let baseline: f64 = (0..n_samples)
             .map(|s| {
-                let active: Vec<bool> = self.edges.iter().enumerate()
-                    .map(|(i, e)| e.sample(temp, self.epoch as u64 * 1000 + s as u64 + i as u64 * 100))
+                let active: Vec<bool> = self
+                    .edges
+                    .iter()
+                    .enumerate()
+                    .map(|(i, e)| {
+                        e.sample(temp, self.epoch as u64 * 1000 + s as u64 + i as u64 * 100)
+                    })
                     .collect();
                 self.compute_phi_with_edges(&active)
             })
-            .sum::<f64>() / n_samples as f64;
+            .sum::<f64>()
+            / n_samples as f64;
 
         // Estimate gradient for each edge using log-derivative trick
         for (i, edge) in self.edges.iter().enumerate() {
@@ -274,10 +288,13 @@ impl PhiGradientTopology {
 
             for s in 0..n_samples {
                 // Sample other edges randomly
-                let mut active: Vec<bool> = self.edges.iter().enumerate()
+                let mut active: Vec<bool> = self
+                    .edges
+                    .iter()
+                    .enumerate()
                     .map(|(j, e)| {
                         if j == i {
-                            false  // Will set below
+                            false // Will set below
                         } else {
                             e.sample(temp, self.epoch as u64 * 1000 + s as u64 + j as u64 * 100)
                         }
@@ -331,8 +348,8 @@ impl PhiGradientTopology {
             let l1_grad = -self.config.l1_reg * prob.signum();
 
             // Density penalty (encourage target density)
-            let density_grad = -self.config.density_penalty *
-                (current_density - self.config.target_density);
+            let density_grad =
+                -self.config.density_penalty * (current_density - self.config.target_density);
 
             let total_grad = grad + l1_grad + density_grad;
 
@@ -378,9 +395,7 @@ impl PhiGradientTopology {
     /// Current edge density
     pub fn current_density(&self) -> f64 {
         let temp = self.current_temperature();
-        let active_count: f64 = self.edges.iter()
-            .map(|e| e.probability(temp))
-            .sum();
+        let active_count: f64 = self.edges.iter().map(|e| e.probability(temp)).sum();
         let max_edges = self.nodes.len() * (self.nodes.len() - 1) / 2;
         active_count / max_edges as f64
     }
@@ -412,7 +427,8 @@ impl PhiGradientTopology {
     /// Extract final topology (binarize probabilities)
     pub fn extract_topology(&self) -> Vec<(usize, usize)> {
         let temp = self.current_temperature();
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter(|e| e.is_likely_present(temp))
             .map(|e| (e.from, e.to))
             .collect()
@@ -501,7 +517,9 @@ fn sigmoid(x: f64) -> f64 {
 }
 
 fn rand_f64(seed: u64) -> f64 {
-    let x = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    let x = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (x >> 33) as f64 / (1u64 << 31) as f64
 }
 
@@ -569,7 +587,11 @@ mod tests {
         topology.train(5);
 
         let edges = topology.extract_topology();
-        println!("Extracted {} edges from {} possible", edges.len(), topology.edges.len());
+        println!(
+            "Extracted {} edges from {} possible",
+            edges.len(),
+            topology.edges.len()
+        );
 
         // Should have some edges
         assert!(!edges.is_empty());
@@ -599,12 +621,22 @@ mod tests {
         println!("Final bridge ratio: {:.1}%", final_ratio * 100.0);
 
         // Bridge ratios should be valid (finite and in [0, 1])
-        assert!(initial_ratio.is_finite(), "Initial bridge ratio should be finite");
-        assert!(final_ratio.is_finite(), "Final bridge ratio should be finite");
-        assert!(initial_ratio >= 0.0 && initial_ratio <= 1.0,
-                "Initial bridge ratio should be in [0, 1]");
-        assert!(final_ratio >= 0.0 && final_ratio <= 1.0,
-                "Final bridge ratio should be in [0, 1]");
+        assert!(
+            initial_ratio.is_finite(),
+            "Initial bridge ratio should be finite"
+        );
+        assert!(
+            final_ratio.is_finite(),
+            "Final bridge ratio should be finite"
+        );
+        assert!(
+            initial_ratio >= 0.0 && initial_ratio <= 1.0,
+            "Initial bridge ratio should be in [0, 1]"
+        );
+        assert!(
+            final_ratio >= 0.0 && final_ratio <= 1.0,
+            "Final bridge ratio should be in [0, 1]"
+        );
     }
 
     #[test]
@@ -621,7 +653,11 @@ mod tests {
         println!("\nTemperature Annealing:");
         for _ in 0..10 {
             topology.epoch += 1;
-            println!("Epoch {}: temp={:.3}", topology.epoch, topology.current_temperature());
+            println!(
+                "Epoch {}: temp={:.3}",
+                topology.epoch,
+                topology.current_temperature()
+            );
         }
 
         assert!(topology.current_temperature() >= 0.5);

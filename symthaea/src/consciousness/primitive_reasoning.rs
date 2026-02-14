@@ -3,11 +3,11 @@
 //! Provides foundational reasoning capabilities using hyperdimensional computing.
 //! Based on analogical reasoning and concept binding.
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::{BinaryHV, Primitive, PrimitiveTier};
-use anyhow::Result;
 
 // =============================================================================
 // Types for Primitive-Consciousness Integration
@@ -277,19 +277,23 @@ impl AdaptivePrimitiveSelector {
         affinity: Option<&PrimitiveAffinityGraph>,
     ) -> Vec<&'a Primitive> {
         // Score each primitive
-        let mut scored: Vec<(&'a Primitive, f64)> = primitives.iter().map(|p| {
-            let tier_weight = config.weight_for_tier(p.tier);
-            let task_score = self.stats
-                .get(&(p.name.clone(), task))
-                .map(|s| s.avg_phi)
-                .unwrap_or(0.5);
-            let affinity_score = affinity
-                .map(|g| g.get_tier_affinity(p.tier, p.tier))
-                .unwrap_or(0.5);
+        let mut scored: Vec<(&'a Primitive, f64)> = primitives
+            .iter()
+            .map(|p| {
+                let tier_weight = config.weight_for_tier(p.tier);
+                let task_score = self
+                    .stats
+                    .get(&(p.name.clone(), task))
+                    .map(|s| s.avg_phi)
+                    .unwrap_or(0.5);
+                let affinity_score = affinity
+                    .map(|g| g.get_tier_affinity(p.tier, p.tier))
+                    .unwrap_or(0.5);
 
-            let score = tier_weight * task_score * affinity_score;
-            (*p, score)
-        }).collect();
+                let score = tier_weight * task_score * affinity_score;
+                (*p, score)
+            })
+            .collect();
 
         // Sort by score descending
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -326,8 +330,8 @@ impl AdaptivePrimitiveSelector {
             stats.success_rate = (stats.success_rate * (stats.usage_count - 1) as f64 + 1.0)
                 / stats.usage_count as f64;
         } else {
-            stats.success_rate = (stats.success_rate * (stats.usage_count - 1) as f64)
-                / stats.usage_count as f64;
+            stats.success_rate =
+                (stats.success_rate * (stats.usage_count - 1) as f64) / stats.usage_count as f64;
         }
     }
 }
@@ -402,7 +406,8 @@ impl PrimitiveAffinityGraph {
 
     /// Get best partners for a primitive
     pub fn best_partners(&self, primitive: &str, count: usize) -> Vec<(String, f64)> {
-        let mut partners: Vec<(String, f64)> = self.affinities
+        let mut partners: Vec<(String, f64)> = self
+            .affinities
             .iter()
             .filter_map(|((p1, p2), score)| {
                 if p1 == primitive {
@@ -607,10 +612,11 @@ impl PrimitiveReasoner {
 
         // Update statistics
         let n = self.stats.total_operations as f32;
-        self.stats.avg_confidence =
-            (self.stats.avg_confidence * (n - 1.0) + result.confidence) / n;
-        self.stats.max_depth_reached =
-            self.stats.max_depth_reached.max(result.reasoning_chain.len());
+        self.stats.avg_confidence = (self.stats.avg_confidence * (n - 1.0) + result.confidence) / n;
+        self.stats.max_depth_reached = self
+            .stats
+            .max_depth_reached
+            .max(result.reasoning_chain.len());
 
         result
     }
@@ -622,7 +628,8 @@ impl PrimitiveReasoner {
         let mut alternatives = Vec::new();
 
         // Parse query and identify concepts
-        let query_concepts: Vec<_> = query.split_whitespace()
+        let query_concepts: Vec<_> = query
+            .split_whitespace()
             .filter(|w| self.concepts.contains_key(*w))
             .collect();
 
@@ -658,7 +665,8 @@ impl PrimitiveReasoner {
         }
 
         // Include context
-        let evidence: Vec<String> = context.iter()
+        let evidence: Vec<String> = context
+            .iter()
             .filter(|c| query_concepts.iter().any(|qc| c.contains(qc)))
             .cloned()
             .collect();
@@ -732,7 +740,8 @@ impl PrimitiveReasoner {
 
     /// Find similar concepts
     pub fn find_similar(&self, query_hv: &ContinuousHV, top_k: usize) -> Vec<(String, f32)> {
-        let mut similarities: Vec<(String, f32)> = self.concepts
+        let mut similarities: Vec<(String, f32)> = self
+            .concepts
             .iter()
             .map(|(name, concept)| {
                 let sim = query_hv.similarity(&concept.hv);

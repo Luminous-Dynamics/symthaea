@@ -8,9 +8,9 @@
 //! - Quantum gravity precision (Schwarzschild radius, Planck units)
 //! - Derived constant cross-checks
 
-use super::physics_test_helpers::assert_relative_eq;
 use super::constants::*;
-use super::geophysics::{GeophysicsEncoder, FocalMechanism};
+use super::geophysics::{FocalMechanism, GeophysicsEncoder};
+use super::physics_test_helpers::assert_relative_eq;
 use super::quantum_gravity::QuantumGravityEncoder;
 use super::radiation_damage::FusionReaction;
 use crate::genesis::GenesisSeed;
@@ -23,7 +23,10 @@ use std::f64::consts::PI;
 #[test]
 fn audit_c_exact() {
     // Speed of light is exact in SI (defined value)
-    assert_eq!(C, 299_792_458.0, "C must be exactly 299792458 m/s (SI definition)");
+    assert_eq!(
+        C, 299_792_458.0,
+        "C must be exactly 299792458 m/s (SI definition)"
+    );
 }
 
 #[test]
@@ -35,7 +38,10 @@ fn audit_g_codata() {
 #[test]
 fn audit_avogadro_exact() {
     // Avogadro constant is exact in SI (2019 redefinition)
-    assert_eq!(N_AVOGADRO, 6.022_140_76e23, "N_A must be exactly 6.02214076e23 (SI definition)");
+    assert_eq!(
+        N_AVOGADRO, 6.022_140_76e23,
+        "N_A must be exactly 6.02214076e23 (SI definition)"
+    );
 }
 
 #[test]
@@ -134,8 +140,13 @@ fn audit_energy_units_dimensional() {
     // Verify units: [MeV] × [J/MeV] × [1/mol] / [g/mol] = [J/g]
     // Just check that MEV_TO_J × N_AVOGADRO gives a sensible J/mol
     let j_per_mol_per_mev = MEV_TO_J * N_AVOGADRO; // J/mol per MeV
-    // 1 MeV × N_A = ~9.65×10¹⁰ J/mol
-    assert_relative_eq(j_per_mol_per_mev, 9.65e10, 0.01, "MeV×N_A dimensional check");
+                                                   // 1 MeV × N_A = ~9.65×10¹⁰ J/mol
+    assert_relative_eq(
+        j_per_mol_per_mev,
+        9.65e10,
+        0.01,
+        "MeV×N_A dimensional check",
+    );
 }
 
 #[test]
@@ -148,7 +159,10 @@ fn audit_he3_consumption_reasonable() {
     let he3_g_year = power_w * seconds_per_year / energy_per_g;
     // Should be small — order of ~10 mg/year for 1kW
     assert!(he3_g_year > 0.0, "He-3 consumption must be positive");
-    assert!(he3_g_year < 1.0, "He-3 consumption < 1 g/year for 1kW: got {he3_g_year:.4e}");
+    assert!(
+        he3_g_year < 1.0,
+        "He-3 consumption < 1 g/year for 1kW: got {he3_g_year:.4e}"
+    );
 }
 
 // =========================================================================
@@ -158,30 +172,34 @@ fn audit_he3_consumption_reasonable() {
 /// Compute binding energy: NIST table for known elements, Slater fallback otherwise
 fn binding_energy_ev(z: u8, shell: char) -> f64 {
     let nist: Option<(f64, f64, f64, f64)> = match z {
-        22 => Some((4_966.0,    564.0,    61.0,    6.0)),     // Ti
-        24 => Some((5_989.0,    696.0,    74.0,    7.0)),     // Cr
-        25 => Some((6_539.0,    769.0,    83.0,    7.0)),     // Mn
-        26 => Some((7_112.0,    846.0,   100.0,    8.0)),     // Fe
-        28 => Some((8_333.0,  1_009.0,   112.0,    8.0)),     // Ni
-        29 => Some((8_979.0,  1_097.0,   120.0,    8.0)),     // Cu
-        30 => Some((9_659.0,  1_194.0,   137.0,   10.0)),     // Zn
-        40 => Some((17_998.0, 2_532.0,   430.0,   51.0)),     // Zr
-        42 => Some((20_000.0, 2_866.0,   505.0,   63.0)),     // Mo
-        43 => Some((21_044.0, 3_043.0,   544.0,   68.0)),     // Tc
-        47 => Some((25_514.0, 3_806.0,   719.0,   97.0)),     // Ag
-        50 => Some((29_200.0, 4_465.0,   884.0,  137.0)),     // Sn
-        56 => Some((37_441.0, 5_989.0, 1_293.0,  253.0)),     // Ba
-        74 => Some((69_525.0, 12_100.0, 2_820.0,  595.0)),    // W
-        78 => Some((78_395.0, 13_880.0, 3_296.0,  725.0)),    // Pt
-        79 => Some((80_725.0, 14_353.0, 3_425.0,  762.0)),    // Au
-        82 => Some((88_005.0, 15_861.0, 3_851.0,  894.0)),    // Pb
-        90 => Some((109_651.0, 20_472.0, 5_182.0, 1_330.0)),  // Th
-        92 => Some((115_606.0, 21_757.0, 5_548.0, 1_441.0)),  // U
-        _  => None,
+        22 => Some((4_966.0, 564.0, 61.0, 6.0)),             // Ti
+        24 => Some((5_989.0, 696.0, 74.0, 7.0)),             // Cr
+        25 => Some((6_539.0, 769.0, 83.0, 7.0)),             // Mn
+        26 => Some((7_112.0, 846.0, 100.0, 8.0)),            // Fe
+        28 => Some((8_333.0, 1_009.0, 112.0, 8.0)),          // Ni
+        29 => Some((8_979.0, 1_097.0, 120.0, 8.0)),          // Cu
+        30 => Some((9_659.0, 1_194.0, 137.0, 10.0)),         // Zn
+        40 => Some((17_998.0, 2_532.0, 430.0, 51.0)),        // Zr
+        42 => Some((20_000.0, 2_866.0, 505.0, 63.0)),        // Mo
+        43 => Some((21_044.0, 3_043.0, 544.0, 68.0)),        // Tc
+        47 => Some((25_514.0, 3_806.0, 719.0, 97.0)),        // Ag
+        50 => Some((29_200.0, 4_465.0, 884.0, 137.0)),       // Sn
+        56 => Some((37_441.0, 5_989.0, 1_293.0, 253.0)),     // Ba
+        74 => Some((69_525.0, 12_100.0, 2_820.0, 595.0)),    // W
+        78 => Some((78_395.0, 13_880.0, 3_296.0, 725.0)),    // Pt
+        79 => Some((80_725.0, 14_353.0, 3_425.0, 762.0)),    // Au
+        82 => Some((88_005.0, 15_861.0, 3_851.0, 894.0)),    // Pb
+        90 => Some((109_651.0, 20_472.0, 5_182.0, 1_330.0)), // Th
+        92 => Some((115_606.0, 21_757.0, 5_548.0, 1_441.0)), // U
+        _ => None,
     };
     match nist {
         Some((k, l, m, n)) => match shell {
-            'K' => k, 'L' => l, 'M' => m, 'N' => n, _ => 0.0,
+            'K' => k,
+            'L' => l,
+            'M' => m,
+            'N' => n,
+            _ => 0.0,
         },
         None => {
             let z_eff = z as f64;
@@ -286,7 +304,12 @@ fn audit_planck_units_consistent() {
     assert_relative_eq(encoder.planck.time_s, t_p, 0.001, "Planck time");
     assert_relative_eq(encoder.planck.mass_kg, m_p, 0.001, "Planck mass");
     assert_relative_eq(encoder.planck.energy_j, e_p, 0.001, "Planck energy");
-    assert_relative_eq(encoder.planck.temperature_k, temp_p, 0.001, "Planck temperature");
+    assert_relative_eq(
+        encoder.planck.temperature_k,
+        temp_p,
+        0.001,
+        "Planck temperature",
+    );
 }
 
 // =========================================================================
@@ -297,7 +320,12 @@ fn audit_planck_units_consistent() {
 fn audit_derived_fine_structure() {
     // α = e²/(4πε₀ℏc) ≈ 1/137.036
     let alpha_derived = E_CHARGE * E_CHARGE / (4.0 * PI * EPSILON_0 * HBAR * C);
-    assert_relative_eq(alpha_derived, ALPHA, 1e-6, "Fine structure constant from e, ε₀, ℏ, c");
+    assert_relative_eq(
+        alpha_derived,
+        ALPHA,
+        1e-6,
+        "Fine structure constant from e, ε₀, ℏ, c",
+    );
     assert_relative_eq(1.0 / alpha_derived, 137.036, 1e-4, "1/α ≈ 137.036");
 }
 
@@ -305,14 +333,24 @@ fn audit_derived_fine_structure() {
 fn audit_derived_bohr_radius() {
     // a₀ = 4πε₀ℏ²/(m_e·e²) ≈ 5.292e-11 m
     let a0 = 4.0 * PI * EPSILON_0 * HBAR * HBAR / (M_ELECTRON * E_CHARGE * E_CHARGE);
-    assert_relative_eq(a0, 5.2918e-11, 1e-4, "Bohr radius from fundamental constants");
+    assert_relative_eq(
+        a0,
+        5.2918e-11,
+        1e-4,
+        "Bohr radius from fundamental constants",
+    );
 }
 
 #[test]
 fn audit_derived_rydberg() {
     // R_∞ = m_e·e⁴/(8ε₀²h³c) ≈ 1.0974e7 m⁻¹
     let r_inf = M_ELECTRON * E_CHARGE.powi(4) / (8.0 * EPSILON_0 * EPSILON_0 * H.powi(3) * C);
-    assert_relative_eq(r_inf, 1.0974e7, 1e-4, "Rydberg constant from fundamental constants");
+    assert_relative_eq(
+        r_inf,
+        1.0974e7,
+        1e-4,
+        "Rydberg constant from fundamental constants",
+    );
 }
 
 #[test]
@@ -363,10 +401,30 @@ fn audit_fuel_mass_isotope_sums() {
     let d = 2.01410;
     let t = 3.01605;
     let he3 = 3.01603;
-    assert_relative_eq(FusionReaction::DD.fuel_mass_g_mol(), 2.0 * d, 0.001, "DD mass");
-    assert_relative_eq(FusionReaction::DT.fuel_mass_g_mol(), d + t, 0.001, "DT mass");
-    assert_relative_eq(FusionReaction::DdProton.fuel_mass_g_mol(), 2.0 * d, 0.001, "DdP mass");
-    assert_relative_eq(FusionReaction::DHe3.fuel_mass_g_mol(), d + he3, 0.001, "DHe3 mass");
+    assert_relative_eq(
+        FusionReaction::DD.fuel_mass_g_mol(),
+        2.0 * d,
+        0.001,
+        "DD mass",
+    );
+    assert_relative_eq(
+        FusionReaction::DT.fuel_mass_g_mol(),
+        d + t,
+        0.001,
+        "DT mass",
+    );
+    assert_relative_eq(
+        FusionReaction::DdProton.fuel_mass_g_mol(),
+        2.0 * d,
+        0.001,
+        "DdP mass",
+    );
+    assert_relative_eq(
+        FusionReaction::DHe3.fuel_mass_g_mol(),
+        d + he3,
+        0.001,
+        "DHe3 mass",
+    );
 }
 
 #[test]

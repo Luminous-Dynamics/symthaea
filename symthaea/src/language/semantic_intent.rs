@@ -103,43 +103,58 @@ impl SemanticIntentClassifier {
         let mut encoder = SemanticEncoder::new();
 
         let category_examples: Vec<(IntentCategory, Vec<&str>)> = vec![
-            (IntentCategory::NixOS, vec![
-                "install a package on nixos",
-                "update nix flake",
-                "configure nixos service",
-                "nix-shell environment setup",
-                "nixos-rebuild switch",
-                "add firefox to nixos configuration nix",
-                "nix derivation build package",
-            ]),
-            (IntentCategory::Programming, vec![
-                "write a function in python",
-                "debug this code error",
-                "how to use async await",
-                "implement a linked list",
-                "refactor this class",
-            ]),
-            (IntentCategory::Math, vec![
-                "solve this equation",
-                "calculate the integral",
-                "prove by induction",
-                "matrix multiplication",
-                "find the derivative",
-            ]),
-            (IntentCategory::General, vec![
-                "what is the weather today",
-                "tell me about history",
-                "explain quantum physics",
-                "how do I cook pasta",
-                "what time is it",
-            ]),
-            (IntentCategory::SystemAdmin, vec![
-                "check disk usage linux",
-                "configure firewall rules",
-                "set up ssh keys",
-                "monitor cpu usage",
-                "create cron job",
-            ]),
+            (
+                IntentCategory::NixOS,
+                vec![
+                    "install a package on nixos",
+                    "update nix flake",
+                    "configure nixos service",
+                    "nix-shell environment setup",
+                    "nixos-rebuild switch",
+                    "add firefox to nixos configuration nix",
+                    "nix derivation build package",
+                ],
+            ),
+            (
+                IntentCategory::Programming,
+                vec![
+                    "write a function in python",
+                    "debug this code error",
+                    "how to use async await",
+                    "implement a linked list",
+                    "refactor this class",
+                ],
+            ),
+            (
+                IntentCategory::Math,
+                vec![
+                    "solve this equation",
+                    "calculate the integral",
+                    "prove by induction",
+                    "matrix multiplication",
+                    "find the derivative",
+                ],
+            ),
+            (
+                IntentCategory::General,
+                vec![
+                    "what is the weather today",
+                    "tell me about history",
+                    "explain quantum physics",
+                    "how do I cook pasta",
+                    "what time is it",
+                ],
+            ),
+            (
+                IntentCategory::SystemAdmin,
+                vec![
+                    "check disk usage linux",
+                    "configure firewall rules",
+                    "set up ssh keys",
+                    "monitor cpu usage",
+                    "create cron job",
+                ],
+            ),
         ];
 
         let mut prototypes = Vec::new();
@@ -217,9 +232,18 @@ impl SemanticIntentClassifier {
         const BOOST: f32 = 0.05;
         match category {
             IntentCategory::NixOS => {
-                let nix_keywords = ["nixos", "nix-shell", "nix flake", "nixpkgs",
-                                    "nix develop", "nix build", "nixos-rebuild",
-                                    "flake.nix", "configuration.nix", "home-manager"];
+                let nix_keywords = [
+                    "nixos",
+                    "nix-shell",
+                    "nix flake",
+                    "nixpkgs",
+                    "nix develop",
+                    "nix build",
+                    "nixos-rebuild",
+                    "flake.nix",
+                    "configuration.nix",
+                    "home-manager",
+                ];
                 if nix_keywords.iter().any(|kw| query_lower.contains(kw)) {
                     BOOST
                 } else {
@@ -227,8 +251,15 @@ impl SemanticIntentClassifier {
                 }
             }
             IntentCategory::Math => {
-                let math_keywords = ["integral", "derivative", "equation", "theorem",
-                                     "matrix", "eigenvalue", "polynomial"];
+                let math_keywords = [
+                    "integral",
+                    "derivative",
+                    "equation",
+                    "theorem",
+                    "matrix",
+                    "eigenvalue",
+                    "polynomial",
+                ];
                 if math_keywords.iter().any(|kw| query_lower.contains(kw)) {
                     BOOST
                 } else {
@@ -411,9 +442,6 @@ mod tests {
 
         // A clearly non-NixOS query should not pass
         let is_nix = classifier.is_nixos_query("what is the weather today", 0.6);
-        assert!(
-            !is_nix,
-            "Weather query should not be classified as NixOS"
-        );
+        assert!(!is_nix, "Weather query should not be classified as NixOS");
     }
 }

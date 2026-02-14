@@ -10,8 +10,10 @@
 //! - Linguistic/Semiotic primitives
 //! - Social/Moral primitives
 
+use super::{
+    seed_from_name, BindingRule, DomainManifold, Primitive, PrimitiveSystem, PrimitiveTier,
+};
 use crate::hdc::binary_hv::BinaryHV;
-use super::{PrimitiveSystem, seed_from_name, DomainManifold, PrimitiveTier, Primitive, BindingRule};
 
 impl PrimitiveSystem {
     /// Initialize Biological/Organic Primitives (Gap Analysis Priority 1)
@@ -20,7 +22,7 @@ impl PrimitiveSystem {
         let biology_domain = DomainManifold::new(
             "biology",
             PrimitiveTier::Physical,
-            "Biological processes and organic life principles"
+            "Biological processes and organic life principles",
         );
 
         // === CORE BIOLOGICAL PROCESSES ===
@@ -30,7 +32,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "biology",
             biology_domain.embed(BinaryHV::random(seed_from_name("METABOLISM"))),
-            "Process: energy transformation in living systems (ATP synthesis, glycolysis)"
+            "Process: energy transformation in living systems (ATP synthesis, glycolysis)",
         );
 
         let growth = Primitive::base(
@@ -38,7 +40,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "biology",
             biology_domain.embed(BinaryHV::random(seed_from_name("GROWTH"))),
-            "Process: increase in size, complexity through cell division and development"
+            "Process: increase in size, complexity through cell division and development",
         );
 
         let reproduction = Primitive::base(
@@ -46,7 +48,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "biology",
             biology_domain.embed(BinaryHV::random(seed_from_name("REPRODUCTION"))),
-            "Process: creation of new organisms, transmission of heredity"
+            "Process: creation of new organisms, transmission of heredity",
         );
 
         let evolution = Primitive::base(
@@ -54,7 +56,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "biology",
             biology_domain.embed(BinaryHV::random(seed_from_name("EVOLUTION"))),
-            "Process: change in heritable characteristics over generations"
+            "Process: change in heritable characteristics over generations",
         );
 
         let adaptation = Primitive::derived(
@@ -63,7 +65,7 @@ impl PrimitiveSystem {
             "biology",
             biology_domain.embed(BinaryHV::random(seed_from_name("ADAPTATION"))),
             "Process: adjustment to environment through selection",
-            "EVOLUTION ⊗ ENVIRONMENT"
+            "EVOLUTION ⊗ ENVIRONMENT",
         );
 
         let homeostasis_dynamic = Primitive::base(
@@ -71,7 +73,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "biology",
             biology_domain.embed(BinaryHV::random(seed_from_name("HOMEOSTASIS_DYNAMIC"))),
-            "Process: dynamic self-regulation maintaining stable internal conditions"
+            "Process: dynamic self-regulation maintaining stable internal conditions",
         );
 
         let symbiosis = Primitive::base(
@@ -79,7 +81,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "biology",
             biology_domain.embed(BinaryHV::random(seed_from_name("SYMBIOSIS"))),
-            "Relationship: close interaction between different organisms (mutualism, parasitism)"
+            "Relationship: close interaction between different organisms (mutualism, parasitism)",
         );
 
         let immune_response = Primitive::base(
@@ -87,7 +89,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "biology",
             biology_domain.embed(BinaryHV::random(seed_from_name("IMMUNE_RESPONSE"))),
-            "Process: self/non-self distinction, pathogen recognition and elimination"
+            "Process: self/non-self distinction, pathogen recognition and elimination",
         );
 
         let circadian_rhythm = Primitive::base(
@@ -95,7 +97,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "biology",
             biology_domain.embed(BinaryHV::random(seed_from_name("CIRCADIAN_RHYTHM"))),
-            "Pattern: ~24-hour biological cycles, internal timekeeping"
+            "Pattern: ~24-hour biological cycles, internal timekeeping",
         );
 
         let morphogen = Primitive::base(
@@ -103,7 +105,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "biology",
             biology_domain.embed(BinaryHV::random(seed_from_name("MORPHOGEN"))),
-            "Substance: concentration gradient guiding development and pattern formation"
+            "Substance: concentration gradient guiding development and pattern formation",
         );
 
         let apoptosis = Primitive::base(
@@ -111,16 +113,24 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "biology",
             biology_domain.embed(BinaryHV::random(seed_from_name("APOPTOSIS"))),
-            "Process: programmed cell death, controlled system renewal"
+            "Process: programmed cell death, controlled system renewal",
         );
 
         // Register domain and primitives
         self.domains.insert("biology".to_string(), biology_domain);
 
         for primitive in vec![
-            metabolism, growth, reproduction, evolution, adaptation,
-            homeostasis_dynamic, symbiosis, immune_response,
-            circadian_rhythm, morphogen, apoptosis,
+            metabolism,
+            growth,
+            reproduction,
+            evolution,
+            adaptation,
+            homeostasis_dynamic,
+            symbiosis,
+            immune_response,
+            circadian_rhythm,
+            morphogen,
+            apoptosis,
         ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
@@ -133,7 +143,8 @@ impl PrimitiveSystem {
             name: "biological_regulation".to_string(),
             pattern: vec![PrimitiveTier::Physical, PrimitiveTier::MetaCognitive],
             result_tier: PrimitiveTier::MetaCognitive,
-            example: "HOMEOSTASIS_DYNAMIC ⊗ FEEDBACK → self-regulating biological system".to_string(),
+            example: "HOMEOSTASIS_DYNAMIC ⊗ FEEDBACK → self-regulating biological system"
+                .to_string(),
         });
     }
 
@@ -143,7 +154,7 @@ impl PrimitiveSystem {
         let emotion_domain = DomainManifold::new(
             "emotion",
             PrimitiveTier::MetaCognitive,
-            "Affective states and emotional processing"
+            "Affective states and emotional processing",
         );
 
         // === DIMENSIONAL MODEL ===
@@ -153,7 +164,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "emotion",
             emotion_domain.embed(BinaryHV::random(seed_from_name("AFFECTIVE_VALENCE"))),
-            "Dimension: positive/negative affect, pleasantness/unpleasantness"
+            "Dimension: positive/negative affect, pleasantness/unpleasantness",
         );
 
         let arousal = Primitive::base(
@@ -161,7 +172,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "emotion",
             emotion_domain.embed(BinaryHV::random(seed_from_name("AFFECTIVE_AROUSAL"))),
-            "Dimension: activation level, calm/excited continuum"
+            "Dimension: activation level, calm/excited continuum",
         );
 
         // === BASIC EMOTIONS (Ekman) ===
@@ -172,7 +183,7 @@ impl PrimitiveSystem {
             "emotion",
             emotion_domain.embed(BinaryHV::random(seed_from_name("JOY"))),
             "Emotion: positive valence, high arousal - happiness, pleasure",
-            "VALENCE_POSITIVE ⊗ AROUSAL_MODERATE"
+            "VALENCE_POSITIVE ⊗ AROUSAL_MODERATE",
         );
 
         let sadness = Primitive::derived(
@@ -181,7 +192,7 @@ impl PrimitiveSystem {
             "emotion",
             emotion_domain.embed(BinaryHV::random(seed_from_name("SADNESS"))),
             "Emotion: negative valence, low arousal - loss, disappointment",
-            "VALENCE_NEGATIVE ⊗ AROUSAL_LOW"
+            "VALENCE_NEGATIVE ⊗ AROUSAL_LOW",
         );
 
         let fear = Primitive::derived(
@@ -190,7 +201,7 @@ impl PrimitiveSystem {
             "emotion",
             emotion_domain.embed(BinaryHV::random(seed_from_name("FEAR"))),
             "Emotion: negative valence, high arousal - threat response",
-            "VALENCE_NEGATIVE ⊗ AROUSAL_HIGH"
+            "VALENCE_NEGATIVE ⊗ AROUSAL_HIGH",
         );
 
         let anger = Primitive::derived(
@@ -199,7 +210,7 @@ impl PrimitiveSystem {
             "emotion",
             emotion_domain.embed(BinaryHV::random(seed_from_name("ANGER"))),
             "Emotion: negative valence, high arousal - obstacle response",
-            "VALENCE_NEGATIVE ⊗ AROUSAL_HIGH ⊗ APPROACH"
+            "VALENCE_NEGATIVE ⊗ AROUSAL_HIGH ⊗ APPROACH",
         );
 
         let disgust = Primitive::derived(
@@ -208,7 +219,7 @@ impl PrimitiveSystem {
             "emotion",
             emotion_domain.embed(BinaryHV::random(seed_from_name("DISGUST"))),
             "Emotion: negative valence, rejection response - contamination avoidance",
-            "VALENCE_NEGATIVE ⊗ REJECTION"
+            "VALENCE_NEGATIVE ⊗ REJECTION",
         );
 
         let surprise = Primitive::derived(
@@ -217,7 +228,7 @@ impl PrimitiveSystem {
             "emotion",
             emotion_domain.embed(BinaryHV::random(seed_from_name("SURPRISE"))),
             "Emotion: neutral valence, high arousal - unexpected event response",
-            "AROUSAL_HIGH ⊗ NOVELTY"
+            "AROUSAL_HIGH ⊗ NOVELTY",
         );
 
         // === SOCIAL EMOTIONS ===
@@ -227,7 +238,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "emotion",
             emotion_domain.embed(BinaryHV::random(seed_from_name("EMPATHY"))),
-            "Capacity: shared emotional experience, feeling with others"
+            "Capacity: shared emotional experience, feeling with others",
         );
 
         let attachment = Primitive::base(
@@ -235,7 +246,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "emotion",
             emotion_domain.embed(BinaryHV::random(seed_from_name("ATTACHMENT"))),
-            "Bond: emotional connection, social bonding, relationship formation"
+            "Bond: emotional connection, social bonding, relationship formation",
         );
 
         let awe = Primitive::derived(
@@ -244,15 +255,15 @@ impl PrimitiveSystem {
             "emotion",
             emotion_domain.embed(BinaryHV::random(seed_from_name("AWE"))),
             "Emotion: vastness + accommodation - wonder at something greater",
-            "VASTNESS ⊗ ACCOMMODATION"
+            "VASTNESS ⊗ ACCOMMODATION",
         );
 
         // Register domain and primitives
         self.domains.insert("emotion".to_string(), emotion_domain);
 
         for primitive in vec![
-            valence, arousal, joy, sadness, fear, anger, disgust, surprise,
-            empathy, attachment, awe,
+            valence, arousal, joy, sadness, fear, anger, disgust, surprise, empathy, attachment,
+            awe,
         ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
@@ -275,7 +286,7 @@ impl PrimitiveSystem {
         let ecology_domain = DomainManifold::new(
             "ecology",
             PrimitiveTier::Physical,
-            "Complex adaptive systems and ecosystem dynamics"
+            "Complex adaptive systems and ecosystem dynamics",
         );
 
         // === ECOLOGICAL CONCEPTS ===
@@ -285,7 +296,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "ecology",
             ecology_domain.embed(BinaryHV::random(seed_from_name("NICHE"))),
-            "Concept: environmental role, opportunity and constraint space"
+            "Concept: environmental role, opportunity and constraint space",
         );
 
         let carrying_capacity = Primitive::base(
@@ -293,7 +304,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "ecology",
             ecology_domain.embed(BinaryHV::random(seed_from_name("CARRYING_CAPACITY"))),
-            "Limit: maximum population sustainable by available resources"
+            "Limit: maximum population sustainable by available resources",
         );
 
         let succession = Primitive::base(
@@ -301,7 +312,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "ecology",
             ecology_domain.embed(BinaryHV::random(seed_from_name("SUCCESSION"))),
-            "Process: sequential ecosystem development, progressive change"
+            "Process: sequential ecosystem development, progressive change",
         );
 
         let trophic_level = Primitive::base(
@@ -309,7 +320,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "ecology",
             ecology_domain.embed(BinaryHV::random(seed_from_name("TROPHIC_LEVEL"))),
-            "Structure: position in energy flow chain (producer, consumer, decomposer)"
+            "Structure: position in energy flow chain (producer, consumer, decomposer)",
         );
 
         let resilience = Primitive::base(
@@ -317,7 +328,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "ecology",
             ecology_domain.embed(BinaryHV::random(seed_from_name("RESILIENCE"))),
-            "Property: system capacity to absorb disturbance and reorganize"
+            "Property: system capacity to absorb disturbance and reorganize",
         );
 
         // === SYSTEMS DYNAMICS ===
@@ -327,7 +338,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "ecology",
             ecology_domain.embed(BinaryHV::random(seed_from_name("FEEDBACK_LOOP_POSITIVE"))),
-            "Pattern: amplifying feedback, exponential growth or collapse"
+            "Pattern: amplifying feedback, exponential growth or collapse",
         );
 
         let feedback_loop_negative = Primitive::base(
@@ -335,7 +346,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "ecology",
             ecology_domain.embed(BinaryHV::random(seed_from_name("FEEDBACK_LOOP_NEGATIVE"))),
-            "Pattern: dampening feedback, stabilization, homeostasis"
+            "Pattern: dampening feedback, stabilization, homeostasis",
         );
 
         let emergence_strong = Primitive::base(
@@ -343,7 +354,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "ecology",
             ecology_domain.embed(BinaryHV::random(seed_from_name("EMERGENCE_STRONG"))),
-            "Property: irreducible higher-level properties from component interactions"
+            "Property: irreducible higher-level properties from component interactions",
         );
 
         let attractor = Primitive::base(
@@ -351,7 +362,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "ecology",
             ecology_domain.embed(BinaryHV::random(seed_from_name("ATTRACTOR"))),
-            "State: stable system configuration in phase space"
+            "State: stable system configuration in phase space",
         );
 
         let bifurcation = Primitive::base(
@@ -359,7 +370,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "ecology",
             ecology_domain.embed(BinaryHV::random(seed_from_name("BIFURCATION"))),
-            "Transition: qualitative system change at critical parameter value"
+            "Transition: qualitative system change at critical parameter value",
         );
 
         let phase_transition = Primitive::base(
@@ -367,16 +378,24 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "ecology",
             ecology_domain.embed(BinaryHV::random(seed_from_name("PHASE_TRANSITION"))),
-            "Change: abrupt qualitative state transformation (order/disorder)"
+            "Change: abrupt qualitative state transformation (order/disorder)",
         );
 
         // Register domain and primitives
         self.domains.insert("ecology".to_string(), ecology_domain);
 
         for primitive in vec![
-            niche, carrying_capacity, succession, trophic_level, resilience,
-            feedback_loop_positive, feedback_loop_negative,
-            emergence_strong, attractor, bifurcation, phase_transition,
+            niche,
+            carrying_capacity,
+            succession,
+            trophic_level,
+            resilience,
+            feedback_loop_positive,
+            feedback_loop_negative,
+            emergence_strong,
+            attractor,
+            bifurcation,
+            phase_transition,
         ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
@@ -399,7 +418,7 @@ impl PrimitiveSystem {
         let quantum_domain = DomainManifold::new(
             "quantum",
             PrimitiveTier::Physical,
-            "Quantum mechanics and fundamental physics"
+            "Quantum mechanics and fundamental physics",
         );
 
         // === QUANTUM PHENOMENA ===
@@ -409,7 +428,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "quantum",
             quantum_domain.embed(BinaryHV::random(seed_from_name("SUPERPOSITION"))),
-            "State: system existing in multiple configurations simultaneously"
+            "State: system existing in multiple configurations simultaneously",
         );
 
         let entanglement = Primitive::base(
@@ -417,7 +436,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "quantum",
             quantum_domain.embed(BinaryHV::random(seed_from_name("ENTANGLEMENT"))),
-            "Correlation: non-local quantum correlation between systems"
+            "Correlation: non-local quantum correlation between systems",
         );
 
         let measurement = Primitive::base(
@@ -425,7 +444,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "quantum",
             quantum_domain.embed(BinaryHV::random(seed_from_name("MEASUREMENT"))),
-            "Process: observer-dependent state collapse, wave function reduction"
+            "Process: observer-dependent state collapse, wave function reduction",
         );
 
         let uncertainty_heisenberg = Primitive::base(
@@ -433,7 +452,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "quantum",
             quantum_domain.embed(BinaryHV::random(seed_from_name("UNCERTAINTY_HEISENBERG"))),
-            "Principle: fundamental limit on simultaneous knowledge (DxDp >= h/2)"
+            "Principle: fundamental limit on simultaneous knowledge (DxDp >= h/2)",
         );
 
         let wave_particle_duality = Primitive::base(
@@ -441,7 +460,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "quantum",
             quantum_domain.embed(BinaryHV::random(seed_from_name("WAVE_PARTICLE_DUALITY"))),
-            "Property: complementary wave and particle aspects of quantum objects"
+            "Property: complementary wave and particle aspects of quantum objects",
         );
 
         let planck_constant = Primitive::base(
@@ -449,14 +468,20 @@ impl PrimitiveSystem {
             PrimitiveTier::Physical,
             "quantum",
             quantum_domain.embed(BinaryHV::random(seed_from_name("PLANCK_CONSTANT"))),
-            "Constant: quantum of action (h = 6.626e-34 J*s), fundamental scale"
+            "Constant: quantum of action (h = 6.626e-34 J*s), fundamental scale",
         );
 
         // Register domain and primitives
         self.domains.insert("quantum".to_string(), quantum_domain);
 
-        for primitive in [superposition, entanglement, measurement,
-            uncertainty_heisenberg, wave_particle_duality, planck_constant] {
+        for primitive in [
+            superposition,
+            entanglement,
+            measurement,
+            uncertainty_heisenberg,
+            wave_particle_duality,
+            planck_constant,
+        ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
@@ -468,7 +493,8 @@ impl PrimitiveSystem {
             name: "quantum_consciousness".to_string(),
             pattern: vec![PrimitiveTier::Physical, PrimitiveTier::MetaCognitive],
             result_tier: PrimitiveTier::MetaCognitive,
-            example: "ENTANGLEMENT ⊗ INTEGRATED_INFORMATION → quantum consciousness theories".to_string(),
+            example: "ENTANGLEMENT ⊗ INTEGRATED_INFORMATION → quantum consciousness theories"
+                .to_string(),
         });
     }
 
@@ -478,7 +504,7 @@ impl PrimitiveSystem {
         let economics_domain = DomainManifold::new(
             "economics",
             PrimitiveTier::Strategic,
-            "Value, exchange, and resource allocation"
+            "Value, exchange, and resource allocation",
         );
 
         // === ECONOMIC CONCEPTS ===
@@ -488,7 +514,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "economics",
             economics_domain.embed(BinaryHV::random(seed_from_name("SCARCITY"))),
-            "Condition: limited availability relative to demand"
+            "Condition: limited availability relative to demand",
         );
 
         let supply = Primitive::base(
@@ -496,7 +522,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "economics",
             economics_domain.embed(BinaryHV::random(seed_from_name("SUPPLY"))),
-            "Quantity: amount available at given price"
+            "Quantity: amount available at given price",
         );
 
         let demand = Primitive::base(
@@ -504,7 +530,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "economics",
             economics_domain.embed(BinaryHV::random(seed_from_name("DEMAND"))),
-            "Quantity: amount desired at given price"
+            "Quantity: amount desired at given price",
         );
 
         let exchange = Primitive::base(
@@ -512,7 +538,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "economics",
             economics_domain.embed(BinaryHV::random(seed_from_name("EXCHANGE"))),
-            "Transaction: trading goods/services, reciprocal transfer"
+            "Transaction: trading goods/services, reciprocal transfer",
         );
 
         let value_subjective = Primitive::base(
@@ -520,7 +546,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "economics",
             economics_domain.embed(BinaryHV::random(seed_from_name("VALUE_SUBJECTIVE"))),
-            "Property: preference-dependent worth, individual utility"
+            "Property: preference-dependent worth, individual utility",
         );
 
         let capital = Primitive::base(
@@ -528,7 +554,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "economics",
             economics_domain.embed(BinaryHV::random(seed_from_name("CAPITAL"))),
-            "Resource: accumulated assets for production, stored value"
+            "Resource: accumulated assets for production, stored value",
         );
 
         let debt = Primitive::base(
@@ -536,7 +562,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "economics",
             economics_domain.embed(BinaryHV::random(seed_from_name("DEBT"))),
-            "Obligation: future claim, deferred payment"
+            "Obligation: future claim, deferred payment",
         );
 
         let trust_economic = Primitive::base(
@@ -544,14 +570,23 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "economics",
             economics_domain.embed(BinaryHV::random(seed_from_name("TRUST_ECONOMIC"))),
-            "Property: reliability expectation, reputation, social capital"
+            "Property: reliability expectation, reputation, social capital",
         );
 
         // Register domain and primitives
-        self.domains.insert("economics".to_string(), economics_domain);
+        self.domains
+            .insert("economics".to_string(), economics_domain);
 
-        for primitive in [scarcity, supply, demand, exchange, value_subjective,
-            capital, debt, trust_economic] {
+        for primitive in [
+            scarcity,
+            supply,
+            demand,
+            exchange,
+            value_subjective,
+            capital,
+            debt,
+            trust_economic,
+        ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
@@ -573,7 +608,7 @@ impl PrimitiveSystem {
         let linguistics_domain = DomainManifold::new(
             "linguistics",
             PrimitiveTier::MetaCognitive,
-            "Symbols, meaning, and communication"
+            "Symbols, meaning, and communication",
         );
 
         // === SEMIOTIC CONCEPTS ===
@@ -583,7 +618,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "linguistics",
             linguistics_domain.embed(BinaryHV::random(seed_from_name("SIGN"))),
-            "Structure: signifier + signified, symbol and its meaning"
+            "Structure: signifier + signified, symbol and its meaning",
         );
 
         let reference = Primitive::base(
@@ -591,7 +626,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "linguistics",
             linguistics_domain.embed(BinaryHV::random(seed_from_name("REFERENCE"))),
-            "Relation: symbol -> object mapping, denotation"
+            "Relation: symbol -> object mapping, denotation",
         );
 
         let context_dependency = Primitive::base(
@@ -599,7 +634,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "linguistics",
             linguistics_domain.embed(BinaryHV::random(seed_from_name("CONTEXT_DEPENDENCY"))),
-            "Property: meaning varies with situational context"
+            "Property: meaning varies with situational context",
         );
 
         let metaphor = Primitive::base(
@@ -607,7 +642,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "linguistics",
             linguistics_domain.embed(BinaryHV::random(seed_from_name("METAPHOR"))),
-            "Mapping: cross-domain conceptual transfer, analogical reasoning"
+            "Mapping: cross-domain conceptual transfer, analogical reasoning",
         );
 
         let syntax = Primitive::base(
@@ -615,7 +650,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "linguistics",
             linguistics_domain.embed(BinaryHV::random(seed_from_name("SYNTAX"))),
-            "Structure: compositional rules, grammatical organization"
+            "Structure: compositional rules, grammatical organization",
         );
 
         let semantics = Primitive::base(
@@ -623,7 +658,7 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "linguistics",
             linguistics_domain.embed(BinaryHV::random(seed_from_name("SEMANTICS"))),
-            "Property: meaning relations, truth conditions"
+            "Property: meaning relations, truth conditions",
         );
 
         let pragmatics = Primitive::base(
@@ -631,14 +666,22 @@ impl PrimitiveSystem {
             PrimitiveTier::MetaCognitive,
             "linguistics",
             linguistics_domain.embed(BinaryHV::random(seed_from_name("PRAGMATICS"))),
-            "Use: meaning in communicative context, speaker intention"
+            "Use: meaning in communicative context, speaker intention",
         );
 
         // Register domain and primitives
-        self.domains.insert("linguistics".to_string(), linguistics_domain);
+        self.domains
+            .insert("linguistics".to_string(), linguistics_domain);
 
-        for primitive in [sign, reference, context_dependency, metaphor,
-            syntax, semantics, pragmatics] {
+        for primitive in [
+            sign,
+            reference,
+            context_dependency,
+            metaphor,
+            syntax,
+            semantics,
+            pragmatics,
+        ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
@@ -660,7 +703,7 @@ impl PrimitiveSystem {
         let moral_domain = DomainManifold::new(
             "morality",
             PrimitiveTier::Strategic,
-            "Ethics, norms, and moral reasoning"
+            "Ethics, norms, and moral reasoning",
         );
 
         // === DEONTIC CONCEPTS (Rules) ===
@@ -670,7 +713,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "morality",
             moral_domain.embed(BinaryHV::random(seed_from_name("NORM"))),
-            "Rule: social expectation, behavioral standard"
+            "Rule: social expectation, behavioral standard",
         );
 
         let obligation = Primitive::base(
@@ -678,7 +721,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "morality",
             moral_domain.embed(BinaryHV::random(seed_from_name("OBLIGATION"))),
-            "Duty: moral requirement, what must be done"
+            "Duty: moral requirement, what must be done",
         );
 
         let permission = Primitive::base(
@@ -686,7 +729,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "morality",
             moral_domain.embed(BinaryHV::random(seed_from_name("PERMISSION"))),
-            "Allowance: action that may be done without violation"
+            "Allowance: action that may be done without violation",
         );
 
         let prohibition = Primitive::base(
@@ -694,7 +737,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "morality",
             moral_domain.embed(BinaryHV::random(seed_from_name("PROHIBITION"))),
-            "Restriction: forbidden action, taboo"
+            "Restriction: forbidden action, taboo",
         );
 
         // === MORAL FOUNDATIONS ===
@@ -704,7 +747,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "morality",
             moral_domain.embed(BinaryHV::random(seed_from_name("FAIRNESS"))),
-            "Principle: equitable distribution, reciprocity, justice"
+            "Principle: equitable distribution, reciprocity, justice",
         );
 
         let harm = Primitive::base(
@@ -712,7 +755,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "morality",
             moral_domain.embed(BinaryHV::random(seed_from_name("HARM"))),
-            "Concept: damage, suffering, negative impact on well-being"
+            "Concept: damage, suffering, negative impact on well-being",
         );
 
         let care = Primitive::base(
@@ -720,7 +763,7 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "morality",
             moral_domain.embed(BinaryHV::random(seed_from_name("CARE"))),
-            "Disposition: protection, nurturance, compassion"
+            "Disposition: protection, nurturance, compassion",
         );
 
         let rights = Primitive::base(
@@ -728,14 +771,22 @@ impl PrimitiveSystem {
             PrimitiveTier::Strategic,
             "morality",
             moral_domain.embed(BinaryHV::random(seed_from_name("RIGHTS"))),
-            "Entitlement: claims, protections, freedoms"
+            "Entitlement: claims, protections, freedoms",
         );
 
         // Register domain and primitives
         self.domains.insert("morality".to_string(), moral_domain);
 
-        for primitive in [norm, obligation, permission, prohibition,
-            fairness, harm, care, rights] {
+        for primitive in [
+            norm,
+            obligation,
+            permission,
+            prohibition,
+            fairness,
+            harm,
+            care,
+            rights,
+        ] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);

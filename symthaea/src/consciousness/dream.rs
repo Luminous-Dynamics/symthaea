@@ -174,7 +174,7 @@ impl DreamEngine {
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .map(|d| d.as_secs())
-                        .unwrap_or(0)
+                        .unwrap_or(0),
                 ),
             });
             self.stats.events_recorded += 1;
@@ -314,7 +314,9 @@ impl DreamEngine {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| {
-                a.surprise.partial_cmp(&b.surprise).unwrap_or(std::cmp::Ordering::Equal)
+                a.surprise
+                    .partial_cmp(&b.surprise)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(idx, _)| idx)
             .unwrap_or(0)
@@ -353,7 +355,8 @@ impl DreamEngine {
     fn simulate_outcome(&self, state: &[f32], action: &[f32]) -> Vec<f32> {
         // Simple linear combination as placeholder world model
         // Real implementation would use CfC networks
-        let action_influence: f32 = action.iter().map(|a| a.abs()).sum::<f32>() / action.len() as f32;
+        let action_influence: f32 =
+            action.iter().map(|a| a.abs()).sum::<f32>() / action.len() as f32;
 
         state
             .iter()
@@ -407,7 +410,6 @@ impl DreamEngine {
 
         // Combine into Phi estimate
         // Higher variance + higher integration = higher consciousness
-
 
         (entropy.max(0.0) * 0.5 + integration * 0.5).clamp(0.0, 1.0)
     }
@@ -469,7 +471,10 @@ mod tests {
         // Varied vector should have higher Phi
         let varied_outcome: Vec<f32> = (0..64).map(|i| (i as f32 / 64.0) * 2.0 - 1.0).collect();
         let phi_varied = DreamEngine::estimate_phi(&varied_outcome);
-        assert!(phi_varied > phi_zero, "Varied vector should have higher Phi");
+        assert!(
+            phi_varied > phi_zero,
+            "Varied vector should have higher Phi"
+        );
     }
 
     #[test]
@@ -488,7 +493,11 @@ mod tests {
             engine.record(&state, &action, &outcome, 0.5);
         }
 
-        assert_eq!(engine.memory_size(), 5, "Memory should be capped at max_memory_size");
+        assert_eq!(
+            engine.memory_size(),
+            5,
+            "Memory should be capped at max_memory_size"
+        );
     }
 
     #[test]
@@ -500,11 +509,17 @@ mod tests {
         let alt2 = engine.generate_counterfactual_action(&original, 1);
 
         // Different seeds should produce different actions
-        assert_ne!(alt1, alt2, "Different seeds should produce different counterfactuals");
+        assert_ne!(
+            alt1, alt2,
+            "Different seeds should produce different counterfactuals"
+        );
 
         // Actions should be perturbed but not drastically different
         for (o, a) in original.iter().zip(alt1.iter()) {
-            assert!((o - a).abs() < 0.5, "Counterfactual should not be too different from original");
+            assert!(
+                (o - a).abs() < 0.5,
+                "Counterfactual should not be too different from original"
+            );
         }
     }
 

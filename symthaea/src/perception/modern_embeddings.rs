@@ -58,7 +58,7 @@ use std::time::Instant;
 use candle_core::Device;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION, PackedBipolar};
+use symthaea_core::hdc::{binary_hv::BinaryHV, PackedBipolar, HDC_DIMENSION};
 
 // ============================================================================
 // Core Traits
@@ -211,11 +211,11 @@ impl ModelBackend {
     /// Whether this backend supports full layer extraction
     pub fn supports_layer_extraction(&self) -> bool {
         match self {
-            Self::BgeM3 => true,  // Implemented in our custom XLM-RoBERTa
-            Self::ModernBert | Self::ModernBertLarge => true,  // When implemented
-            Self::NomicEmbed => true,  // When implemented
+            Self::BgeM3 => true, // Implemented in our custom XLM-RoBERTa
+            Self::ModernBert | Self::ModernBertLarge => true, // When implemented
+            Self::NomicEmbed => true, // When implemented
             Self::GteLarge => true,
-            Self::E5LargeV2 => false,  // Instruction-following format makes this complex
+            Self::E5LargeV2 => false, // Instruction-following format makes this complex
             Self::Auto => true,
         }
     }
@@ -341,7 +341,10 @@ impl BgeM3Backend {
                 if candle_core::utils::cuda_is_available() {
                     let device = Device::new_cuda(config.gpu_device)
                         .context("Failed to create CUDA device")?;
-                    super::layer_extractor::LayerExtractor::load_with_device(extractor_config, device)?
+                    super::layer_extractor::LayerExtractor::load_with_device(
+                        extractor_config,
+                        device,
+                    )?
                 } else {
                     super::layer_extractor::LayerExtractor::load(extractor_config)?
                 }
@@ -381,7 +384,11 @@ impl BgeM3Backend {
             if let Ok(mut cache) = self.cache.write() {
                 if cache.len() >= self.config.max_cache_size {
                     // Simple eviction
-                    let keys: Vec<_> = cache.keys().take(self.config.max_cache_size / 2).cloned().collect();
+                    let keys: Vec<_> = cache
+                        .keys()
+                        .take(self.config.max_cache_size / 2)
+                        .cloned()
+                        .collect();
                     for key in keys {
                         cache.remove(&key);
                     }
@@ -432,12 +439,15 @@ impl EmbeddingModel for BgeM3Backend {
         let elapsed = start.elapsed().as_micros() as u64;
         let time_per_layer = elapsed / layer_indices.len().max(1) as u64;
 
-        Ok(activations.into_iter().map(|a| LayerOutput {
-            layer_idx: a.layer_idx,
-            activation: a.activation,
-            token_activations: a.sequence_activations,
-            processing_time_us: time_per_layer,
-        }).collect())
+        Ok(activations
+            .into_iter()
+            .map(|a| LayerOutput {
+                layer_idx: a.layer_idx,
+                activation: a.activation,
+                token_activations: a.sequence_activations,
+                processing_time_us: time_per_layer,
+            })
+            .collect())
     }
 
     fn model_name(&self) -> &str {
@@ -531,7 +541,10 @@ impl UnifiedEmbedder {
                 Arc::new(BgeM3Backend::new(fallback_config)?)
             }
             ModelBackend::GteLarge | ModelBackend::E5LargeV2 => {
-                tracing::warn!("{:?} not yet implemented, falling back to BGE-M3", config.backend);
+                tracing::warn!(
+                    "{:?} not yet implemented, falling back to BGE-M3",
+                    config.backend
+                );
                 let fallback_config = EmbeddingConfig {
                     backend: ModelBackend::BgeM3,
                     ..config.clone()
@@ -568,7 +581,11 @@ impl UnifiedEmbedder {
     }
 
     /// Extract activations from multiple layers
-    pub fn extract_layers(&mut self, text: &str, layer_indices: &[usize]) -> Result<Vec<LayerOutput>> {
+    pub fn extract_layers(
+        &mut self,
+        text: &str,
+        layer_indices: &[usize],
+    ) -> Result<Vec<LayerOutput>> {
         self.stats.layer_extractions += layer_indices.len() as u64;
         self.backend.extract_layers(text, layer_indices)
     }
@@ -781,7 +798,8 @@ impl PhenomenalLayerAnalyzer {
         // Detect corridor
         let peak_depth = peak_layer as f64 / (num_layers - 1) as f64;
         let threshold = max_score * 0.8; // 80% of peak
-        let width = layer_scores.iter()
+        let width = layer_scores
+            .iter()
             .filter(|s| s.phenomenal_score >= threshold)
             .count();
 
@@ -819,9 +837,8 @@ impl PhenomenalLayerAnalyzer {
     fn compute_unity(&self, activation: &[f32]) -> f64 {
         // Simplified unity measure based on activation distribution
         let mean: f32 = activation.iter().sum::<f32>() / activation.len() as f32;
-        let variance: f32 = activation.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f32>() / activation.len() as f32;
+        let variance: f32 =
+            activation.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / activation.len() as f32;
 
         // Lower variance = higher unity (more coherent representation)
         let normalized_var = (variance / 10.0).min(1.0);
@@ -851,7 +868,10 @@ pub fn project_to_hv16(embedding: &[f32]) -> BinaryHV {
 
 /// Project embedding to PackedBipolar via linear probe
 #[cfg(feature = "neural-bridge")]
-pub fn project_to_packed(embedding: &[f32], probe: &super::neural_bridge::NeuralBridge) -> Result<PackedBipolar> {
+pub fn project_to_packed(
+    embedding: &[f32],
+    probe: &super::neural_bridge::NeuralBridge,
+) -> Result<PackedBipolar> {
     probe.project_to_packed(embedding)
 }
 
@@ -935,15 +955,21 @@ pub fn print_model_summary() {
             ModelStatus::NotImplemented => "PENDING",
         };
 
-        let extract_str = if info.supports_layer_extraction { "Yes" } else { "No" };
+        let extract_str = if info.supports_layer_extraction {
+            "Yes"
+        } else {
+            "No"
+        };
 
-        println!("{:18} | {:4} | {:6} | {:13} | {:8} | {}",
-                 info.model_id.split('/').last().unwrap_or(&info.model_id),
-                 info.dimension,
-                 info.num_layers,
-                 extract_str,
-                 info.phenomenal_corridor_layer,
-                 status_str);
+        println!(
+            "{:18} | {:4} | {:6} | {:13} | {:8} | {}",
+            info.model_id.split('/').last().unwrap_or(&info.model_id),
+            info.dimension,
+            info.num_layers,
+            extract_str,
+            info.phenomenal_corridor_layer,
+            status_str
+        );
     }
 
     println!("\n");

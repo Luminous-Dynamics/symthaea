@@ -3,7 +3,7 @@
 //! The `LoopStats` struct accumulates metrics across cognitive cycles.
 //! Extracted from `mod.rs` to reduce file size.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Statistics for the cognitive loop
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -136,7 +136,6 @@ pub struct LoopStats {
     pub novelty_bonus: f32,
 
     // ===== Self-Reflection Stats =====
-
     /// Current self-assessment
     pub self_assessment: String,
 
@@ -161,7 +160,6 @@ pub struct LoopStats {
     // ═══════════════════════════════════════════════════════════════════════════
     // MEGA-UNIFIED ARCHITECTURE STATS
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Current cognitive depth (from Thalamic routing)
     pub cognitive_depth: String,
 
@@ -249,7 +247,6 @@ pub struct LoopStats {
     // ═══════════════════════════════════════════════════════════════════════════
     // SEMANTIC MEMORY STATS (HDC-based similarity lookup for CfC context)
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Semantic Memory: Number of queries that found similar entries
     pub semantic_hits: u64,
 
@@ -268,7 +265,6 @@ pub struct LoopStats {
     // ═══════════════════════════════════════════════════════════════════════════
     // ONLINE LEARNING STATS (Inference-time adaptation)
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Online Learning: Total adaptation calls
     pub online_adaptation_calls: u64,
 
@@ -287,7 +283,6 @@ pub struct LoopStats {
     // ═══════════════════════════════════════════════════════════════════════════
     // MORAL ALGEBRA STATS (Compositional ethical reasoning)
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Moral: Total moral evaluations performed
     pub moral_evaluations: u64,
 

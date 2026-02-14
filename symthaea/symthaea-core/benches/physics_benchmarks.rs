@@ -18,8 +18,8 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::physics::{
-    AcousticsEncoder, Complex64, DensityMatrix, JarzynskiEstimator,
-    LindbladEvolution, MetricTensor, TruePhiCalculator, TunnelingCalculator,
+    AcousticsEncoder, Complex64, DensityMatrix, JarzynskiEstimator, LindbladEvolution,
+    MetricTensor, TruePhiCalculator, TunnelingCalculator,
 };
 
 fn bench_lindblad_single_rk4_step(c: &mut Criterion) {
@@ -67,7 +67,7 @@ fn bench_wkb_eckart_200pt(c: &mut Criterion) {
     let calc = TunnelingCalculator::electron();
     // Electron, 0.6 eV barrier
     let v0 = 0.6 * 1.6e-19; // barrier height in J
-    let a = 1.0e-10;         // barrier width in m
+    let a = 1.0e-10; // barrier width in m
     let energy = 0.3 * 1.6e-19; // sub-barrier energy
 
     c.bench_function("wkb_eckart_200pt", |b| {
@@ -144,10 +144,8 @@ fn bench_jarzynski_10k(c: &mut Criterion) {
 
     c.bench_function("jarzynski_10k_samples", |b| {
         b.iter(|| {
-            let result = jarzynski.free_energy_difference(
-                black_box(&work_samples),
-                black_box(300.0),
-            );
+            let result =
+                jarzynski.free_energy_difference(black_box(&work_samples), black_box(300.0));
             black_box(result)
         });
     });
@@ -170,7 +168,7 @@ fn bench_standard_model_construction(c: &mut Criterion) {
 }
 
 fn bench_hadron_composition(c: &mut Criterion) {
-    use symthaea_core::physics::{StandardModel, Hadrons};
+    use symthaea_core::physics::{Hadrons, StandardModel};
     let genesis = GenesisSeed::from_phrase("bench hadrons");
     let model = StandardModel::from_genesis(&genesis);
 
@@ -183,7 +181,7 @@ fn bench_hadron_composition(c: &mut Criterion) {
 }
 
 fn bench_antimatter_annihilation(c: &mut Criterion) {
-    use symthaea_core::physics::{StandardModel, Hadrons, Antimatter};
+    use symthaea_core::physics::{Antimatter, Hadrons, StandardModel};
     let genesis = GenesisSeed::from_phrase("bench antimatter");
     let model = StandardModel::from_genesis(&genesis);
     let hadrons = Hadrons::from_model(&model, &genesis);

@@ -59,10 +59,18 @@ impl ReasoningCategory {
                 vec![Self::MathematicalReasoning, Self::LogicalDeduction]
             }
             s if s.contains("physics") || s.contains("chemistry") => {
-                vec![Self::ScientificReasoning, Self::CausalInference, Self::MathematicalReasoning]
+                vec![
+                    Self::ScientificReasoning,
+                    Self::CausalInference,
+                    Self::MathematicalReasoning,
+                ]
             }
             s if s.contains("biology") => {
-                vec![Self::ScientificReasoning, Self::CausalInference, Self::AnalogicalReasoning]
+                vec![
+                    Self::ScientificReasoning,
+                    Self::CausalInference,
+                    Self::AnalogicalReasoning,
+                ]
             }
             s if s.contains("computer") || s.contains("programming") => {
                 vec![Self::LogicalDeduction, Self::MathematicalReasoning]
@@ -70,31 +78,59 @@ impl ReasoningCategory {
 
             // Humanities
             s if s.contains("philosophy") || s.contains("logic") => {
-                vec![Self::LogicalDeduction, Self::ModalReasoning, Self::EthicalReasoning]
+                vec![
+                    Self::LogicalDeduction,
+                    Self::ModalReasoning,
+                    Self::EthicalReasoning,
+                ]
             }
             s if s.contains("history") => {
                 vec![Self::TemporalReasoning, Self::CausalInference]
             }
             s if s.contains("psychology") => {
-                vec![Self::TheoryOfMind, Self::CausalInference, Self::AnalogicalReasoning]
+                vec![
+                    Self::TheoryOfMind,
+                    Self::CausalInference,
+                    Self::AnalogicalReasoning,
+                ]
             }
             s if s.contains("ethics") || s.contains("moral") => {
-                vec![Self::EthicalReasoning, Self::ModalReasoning, Self::TheoryOfMind]
+                vec![
+                    Self::EthicalReasoning,
+                    Self::ModalReasoning,
+                    Self::TheoryOfMind,
+                ]
             }
 
             // Social sciences
             s if s.contains("economics") => {
-                vec![Self::MathematicalReasoning, Self::CausalInference, Self::QuantitativeReasoning]
+                vec![
+                    Self::MathematicalReasoning,
+                    Self::CausalInference,
+                    Self::QuantitativeReasoning,
+                ]
             }
             s if s.contains("sociology") || s.contains("political") => {
-                vec![Self::CausalInference, Self::QuantitativeReasoning, Self::TheoryOfMind]
+                vec![
+                    Self::CausalInference,
+                    Self::QuantitativeReasoning,
+                    Self::TheoryOfMind,
+                ]
             }
             s if s.contains("law") => {
-                vec![Self::LogicalDeduction, Self::ModalReasoning, Self::EthicalReasoning]
+                vec![
+                    Self::LogicalDeduction,
+                    Self::ModalReasoning,
+                    Self::EthicalReasoning,
+                ]
             }
 
             // Default: general reasoning
-            _ => vec![Self::LogicalDeduction, Self::CausalInference, Self::AnalogicalReasoning]
+            _ => vec![
+                Self::LogicalDeduction,
+                Self::CausalInference,
+                Self::AnalogicalReasoning,
+            ],
         }
     }
 }
@@ -122,118 +158,178 @@ impl PrimitiveBootstrapper {
     /// Build cache of primitives organized by reasoning category
     fn build_category_cache(&mut self) {
         // Logical deduction primitives
-        self.category_cache.insert(ReasoningCategory::LogicalDeduction, vec![
-            self.get_primitive("AND"),
-            self.get_primitive("OR"),
-            self.get_primitive("NOT"),
-            self.get_primitive("IMPLIES"),
-            self.get_primitive("IFF"),
-            self.get_primitive("TRUE"),
-            self.get_primitive("FALSE"),
-            self.get_primitive("EQUALS"),
-        ].into_iter().flatten().collect());
+        self.category_cache.insert(
+            ReasoningCategory::LogicalDeduction,
+            vec![
+                self.get_primitive("AND"),
+                self.get_primitive("OR"),
+                self.get_primitive("NOT"),
+                self.get_primitive("IMPLIES"),
+                self.get_primitive("IFF"),
+                self.get_primitive("TRUE"),
+                self.get_primitive("FALSE"),
+                self.get_primitive("EQUALS"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+        );
 
         // Mathematical reasoning primitives
-        self.category_cache.insert(ReasoningCategory::MathematicalReasoning, vec![
-            self.get_primitive("ZERO"),
-            self.get_primitive("ONE"),
-            self.get_primitive("SUCCESSOR"),
-            self.get_primitive("ADDITION"),
-            self.get_primitive("MULTIPLICATION"),
-            self.get_primitive("SET"),
-            self.get_primitive("MEMBERSHIP"),
-            self.get_primitive("UNION"),
-            self.get_primitive("INTERSECTION"),
-            self.get_primitive("RATIO"),
-            self.get_primitive("PROBABILITY"),
-        ].into_iter().flatten().collect());
+        self.category_cache.insert(
+            ReasoningCategory::MathematicalReasoning,
+            vec![
+                self.get_primitive("ZERO"),
+                self.get_primitive("ONE"),
+                self.get_primitive("SUCCESSOR"),
+                self.get_primitive("ADDITION"),
+                self.get_primitive("MULTIPLICATION"),
+                self.get_primitive("SET"),
+                self.get_primitive("MEMBERSHIP"),
+                self.get_primitive("UNION"),
+                self.get_primitive("INTERSECTION"),
+                self.get_primitive("RATIO"),
+                self.get_primitive("PROBABILITY"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+        );
 
         // Causal inference primitives
-        self.category_cache.insert(ReasoningCategory::CausalInference, vec![
-            self.get_primitive("CAUSES"),
-            self.get_primitive("ENABLES"),
-            self.get_primitive("PREVENTS"),
-            self.get_primitive("STATE_CHANGE"),
-            self.get_primitive("EFFECT"),
-            self.get_primitive("FORCE"),
-            self.get_primitive("IF_THEN"),
-        ].into_iter().flatten().collect());
+        self.category_cache.insert(
+            ReasoningCategory::CausalInference,
+            vec![
+                self.get_primitive("CAUSES"),
+                self.get_primitive("ENABLES"),
+                self.get_primitive("PREVENTS"),
+                self.get_primitive("STATE_CHANGE"),
+                self.get_primitive("EFFECT"),
+                self.get_primitive("FORCE"),
+                self.get_primitive("IF_THEN"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+        );
 
         // Analogical reasoning primitives
-        self.category_cache.insert(ReasoningCategory::AnalogicalReasoning, vec![
-            self.get_primitive("IS_A"),
-            self.get_primitive("PART_OF"),
-            self.get_primitive("SIMILAR_TO"),
-            self.get_primitive("ABOVE"),
-            self.get_primitive("BELOW"),
-            self.get_primitive("NEAR"),
-            self.get_primitive("INSIDE"),
-        ].into_iter().flatten().collect());
+        self.category_cache.insert(
+            ReasoningCategory::AnalogicalReasoning,
+            vec![
+                self.get_primitive("IS_A"),
+                self.get_primitive("PART_OF"),
+                self.get_primitive("SIMILAR_TO"),
+                self.get_primitive("ABOVE"),
+                self.get_primitive("BELOW"),
+                self.get_primitive("NEAR"),
+                self.get_primitive("INSIDE"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+        );
 
         // Temporal reasoning primitives
-        self.category_cache.insert(ReasoningCategory::TemporalReasoning, vec![
-            self.get_primitive("BEFORE"),
-            self.get_primitive("AFTER"),
-            self.get_primitive("DURING"),
-            self.get_primitive("BEGINS"),
-            self.get_primitive("ENDS"),
-            self.get_primitive("TIME"),
-            self.get_primitive("SEQUENCE"),
-        ].into_iter().flatten().collect());
+        self.category_cache.insert(
+            ReasoningCategory::TemporalReasoning,
+            vec![
+                self.get_primitive("BEFORE"),
+                self.get_primitive("AFTER"),
+                self.get_primitive("DURING"),
+                self.get_primitive("BEGINS"),
+                self.get_primitive("ENDS"),
+                self.get_primitive("TIME"),
+                self.get_primitive("SEQUENCE"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+        );
 
         // Modal reasoning primitives
-        self.category_cache.insert(ReasoningCategory::ModalReasoning, vec![
-            self.get_primitive("POSSIBLE"),
-            self.get_primitive("NECESSARY"),
-            self.get_primitive("MAYBE"),
-            self.get_primitive("OBLIGATORY"),
-            self.get_primitive("PERMITTED"),
-            self.get_primitive("FORBIDDEN"),
-        ].into_iter().flatten().collect());
+        self.category_cache.insert(
+            ReasoningCategory::ModalReasoning,
+            vec![
+                self.get_primitive("POSSIBLE"),
+                self.get_primitive("NECESSARY"),
+                self.get_primitive("MAYBE"),
+                self.get_primitive("OBLIGATORY"),
+                self.get_primitive("PERMITTED"),
+                self.get_primitive("FORBIDDEN"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+        );
 
         // Quantitative reasoning primitives
-        self.category_cache.insert(ReasoningCategory::QuantitativeReasoning, vec![
-            self.get_primitive("ALL"),
-            self.get_primitive("SOME"),
-            self.get_primitive("NONE"),
-            self.get_primitive("MOST"),
-            self.get_primitive("FEW"),
-            self.get_primitive("MORE"),
-            self.get_primitive("LESS"),
-        ].into_iter().flatten().collect());
+        self.category_cache.insert(
+            ReasoningCategory::QuantitativeReasoning,
+            vec![
+                self.get_primitive("ALL"),
+                self.get_primitive("SOME"),
+                self.get_primitive("NONE"),
+                self.get_primitive("MOST"),
+                self.get_primitive("FEW"),
+                self.get_primitive("MORE"),
+                self.get_primitive("LESS"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+        );
 
         // Theory of mind primitives
-        self.category_cache.insert(ReasoningCategory::TheoryOfMind, vec![
-            self.get_primitive("KNOW"),
-            self.get_primitive("BELIEVE"),
-            self.get_primitive("WANT"),
-            self.get_primitive("INTEND"),
-            self.get_primitive("FEEL"),
-            self.get_primitive("THINK"),
-            self.get_primitive("SELF"),
-        ].into_iter().flatten().collect());
+        self.category_cache.insert(
+            ReasoningCategory::TheoryOfMind,
+            vec![
+                self.get_primitive("KNOW"),
+                self.get_primitive("BELIEVE"),
+                self.get_primitive("WANT"),
+                self.get_primitive("INTEND"),
+                self.get_primitive("FEEL"),
+                self.get_primitive("THINK"),
+                self.get_primitive("SELF"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+        );
 
         // Scientific reasoning primitives
-        self.category_cache.insert(ReasoningCategory::ScientificReasoning, vec![
-            self.get_primitive("CAUSES"),
-            self.get_primitive("EVIDENCE"),
-            self.get_primitive("HYPOTHESIS"),
-            self.get_primitive("OBSERVE"),
-            self.get_primitive("PREDICT"),
-            self.get_primitive("ENTROPY"),
-            self.get_primitive("CONSERVATION"),
-        ].into_iter().flatten().collect());
+        self.category_cache.insert(
+            ReasoningCategory::ScientificReasoning,
+            vec![
+                self.get_primitive("CAUSES"),
+                self.get_primitive("EVIDENCE"),
+                self.get_primitive("HYPOTHESIS"),
+                self.get_primitive("OBSERVE"),
+                self.get_primitive("PREDICT"),
+                self.get_primitive("ENTROPY"),
+                self.get_primitive("CONSERVATION"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+        );
 
         // Ethical reasoning primitives
-        self.category_cache.insert(ReasoningCategory::EthicalReasoning, vec![
-            self.get_primitive("GOOD"),
-            self.get_primitive("BAD"),
-            self.get_primitive("OBLIGATORY"),
-            self.get_primitive("PERMITTED"),
-            self.get_primitive("FORBIDDEN"),
-            self.get_primitive("FAIR"),
-            self.get_primitive("HARM"),
-        ].into_iter().flatten().collect());
+        self.category_cache.insert(
+            ReasoningCategory::EthicalReasoning,
+            vec![
+                self.get_primitive("GOOD"),
+                self.get_primitive("BAD"),
+                self.get_primitive("OBLIGATORY"),
+                self.get_primitive("PERMITTED"),
+                self.get_primitive("FORBIDDEN"),
+                self.get_primitive("FAIR"),
+                self.get_primitive("HARM"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+        );
     }
 
     /// Get primitive by name as (name, hv) tuple
@@ -243,7 +339,10 @@ impl PrimitiveBootstrapper {
 
     /// Get primitives for a reasoning category
     pub fn primitives_for_category(&self, category: ReasoningCategory) -> &[(String, BinaryHV)] {
-        self.category_cache.get(&category).map(|v| v.as_slice()).unwrap_or(&[])
+        self.category_cache
+            .get(&category)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 
     /// Get all primitives relevant to an MMLU subject
@@ -275,7 +374,8 @@ impl PrimitiveBootstrapper {
 
         // Bundle question with relevant primitive encodings
         let mut hvs: Vec<BinaryHV> = vec![*question_hv];
-        for (_, hv) in primitives.iter().take(10) { // Limit to top 10 most relevant
+        for (_, hv) in primitives.iter().take(10) {
+            // Limit to top 10 most relevant
             hvs.push(*hv);
         }
 
@@ -291,10 +391,17 @@ impl PrimitiveBootstrapper {
     pub fn summary(&self) -> String {
         let mut s = String::new();
         s.push_str(&format!("Total primitives: {}\n", self.total_primitives()));
-        s.push_str(&format!("Reasoning categories: {}\n\n", self.category_cache.len()));
+        s.push_str(&format!(
+            "Reasoning categories: {}\n\n",
+            self.category_cache.len()
+        ));
 
         for (category, primitives) in &self.category_cache {
-            s.push_str(&format!("{:?}: {} primitives\n", category, primitives.len()));
+            s.push_str(&format!(
+                "{:?}: {} primitives\n",
+                category,
+                primitives.len()
+            ));
         }
 
         s
@@ -314,7 +421,10 @@ mod tests {
     #[test]
     fn test_bootstrapper_creation() {
         let bootstrapper = PrimitiveBootstrapper::new();
-        assert!(bootstrapper.total_primitives() >= 180, "Should have 180+ primitives");
+        assert!(
+            bootstrapper.total_primitives() >= 180,
+            "Should have 180+ primitives"
+        );
     }
 
     #[test]
@@ -350,8 +460,10 @@ mod tests {
 
         // Physics should include causal and mathematical primitives
         let names: Vec<_> = physics_prims.iter().map(|(n, _)| n.as_str()).collect();
-        assert!(names.contains(&"CAUSES") || names.contains(&"PROBABILITY"),
-            "Should have relevant physics primitives");
+        assert!(
+            names.contains(&"CAUSES") || names.contains(&"PROBABILITY"),
+            "Should have relevant physics primitives"
+        );
     }
 
     #[test]
@@ -362,8 +474,17 @@ mod tests {
         let bootstrapped = bootstrapper.bootstrap_working_memory("mathematics", &question_hv);
 
         // Bootstrapped HV should be different from original (bundled with primitives)
-        assert_ne!(bootstrapped.popcount(), question_hv.popcount() + 0, // Allow some variance
-            "Bootstrapped HV should differ from original");
+        assert_ne!(
+            bootstrapped.popcount(),
+            question_hv.popcount() + 0, // Allow some variance
+            "Bootstrapped HV should differ from original"
+        );
+        // The bootstrapped HV should have a valid popcount (not all zeros or all ones)
+        assert!(
+            bootstrapped.popcount() > 0 && bootstrapped.popcount() < 16384,
+            "Bootstrapped HV popcount should be between 0 and 16384 exclusive, got {}",
+            bootstrapped.popcount()
+        );
     }
 
     #[test]

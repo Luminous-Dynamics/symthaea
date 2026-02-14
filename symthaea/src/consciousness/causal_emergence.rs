@@ -55,7 +55,8 @@ use std::collections::HashMap;
 
 /// Compute entropy of a probability distribution
 fn entropy(probs: &[f64]) -> f64 {
-    probs.iter()
+    probs
+        .iter()
         .filter(|&&p| p > 1e-10)
         .map(|&p| -p * p.log2())
         .sum()
@@ -144,9 +145,7 @@ pub fn determinism(tpm: &[Vec<f64>]) -> f64 {
     }
 
     // Average entropy of each row (conditional entropy of output given input)
-    let avg_row_entropy: f64 = tpm.iter()
-        .map(|row| entropy(row))
-        .sum::<f64>() / num_states as f64;
+    let avg_row_entropy: f64 = tpm.iter().map(|row| entropy(row)).sum::<f64>() / num_states as f64;
 
     // Determinism = 1 - (avg_row_entropy / max_entropy)
     (1.0 - avg_row_entropy / max_entropy).clamp(0.0, 1.0)
@@ -170,9 +169,8 @@ pub fn degeneracy(tpm: &[Vec<f64>]) -> f64 {
         // Get column j (probability of reaching state j from each input)
         let column: Vec<f64> = tpm.iter().map(|row| row[j]).collect();
         let mean = column.iter().sum::<f64>() / num_states as f64;
-        let variance: f64 = column.iter()
-            .map(|&p| (p - mean).powi(2))
-            .sum::<f64>() / num_states as f64;
+        let variance: f64 =
+            column.iter().map(|&p| (p - mean).powi(2)).sum::<f64>() / num_states as f64;
         total_variance += variance;
     }
 
@@ -329,7 +327,8 @@ impl CausalEmergenceAnalyzer {
     /// * `macro_state` - Consciousness level [0, 1]
     pub fn observe(&mut self, micro_state: &[f64], macro_state: f64) {
         // Discretize current states
-        let micro_discrete: Vec<usize> = micro_state.iter()
+        let micro_discrete: Vec<usize> = micro_state
+            .iter()
             .map(|&v| self.discretizer.to_micro(v))
             .collect();
         let macro_discrete = self.discretizer.to_macro(macro_state);
@@ -337,19 +336,32 @@ impl CausalEmergenceAnalyzer {
         // Record transitions from previous state
         if !self.micro_history.is_empty() {
             // For micro: use aggregate state (sum of discrete values)
-            let prev_micro: usize = self.micro_history.last().unwrap().iter()
+            let prev_micro: usize = self
+                .micro_history
+                .last()
+                .unwrap()
+                .iter()
                 .map(|&v| self.discretizer.to_micro(v))
-                .sum::<usize>() % self.discretizer.micro_states;
-            let curr_micro: usize = micro_discrete.iter().sum::<usize>()
+                .sum::<usize>()
                 % self.discretizer.micro_states;
+            let curr_micro: usize =
+                micro_discrete.iter().sum::<usize>() % self.discretizer.micro_states;
 
-            *self.micro_transitions.entry((prev_micro, curr_micro)).or_insert(0) += 1;
+            *self
+                .micro_transitions
+                .entry((prev_micro, curr_micro))
+                .or_insert(0) += 1;
             self.micro_total += 1;
         }
 
         if !self.macro_history.is_empty() {
-            let prev_macro = self.discretizer.to_macro(*self.macro_history.last().unwrap());
-            *self.macro_transitions.entry((prev_macro, macro_discrete)).or_insert(0) += 1;
+            let prev_macro = self
+                .discretizer
+                .to_macro(*self.macro_history.last().unwrap());
+            *self
+                .macro_transitions
+                .entry((prev_macro, macro_discrete))
+                .or_insert(0) += 1;
             self.macro_total += 1;
         }
 
@@ -365,7 +377,11 @@ impl CausalEmergenceAnalyzer {
     }
 
     /// Build transition probability matrix from counts
-    fn build_tpm(&self, transitions: &HashMap<(usize, usize), usize>, num_states: usize) -> Vec<Vec<f64>> {
+    fn build_tpm(
+        &self,
+        transitions: &HashMap<(usize, usize), usize>,
+        num_states: usize,
+    ) -> Vec<Vec<f64>> {
         let mut tpm = vec![vec![0.0; num_states]; num_states];
         let mut row_sums = vec![0usize; num_states];
 
@@ -420,19 +436,24 @@ impl CausalEmergenceAnalyzer {
         let interpretation = if emergence > 0.5 {
             "Strong causal emergence: Consciousness has significantly more causal power \
              than the underlying neurons. The macro-level description is genuinely \
-             better than the micro-level - consciousness is REAL.".to_string()
+             better than the micro-level - consciousness is REAL."
+                .to_string()
         } else if emergence > 0.1 {
             "Moderate causal emergence: Consciousness shows some irreducible causal \
-             power beyond neural activity. The macro-level has explanatory advantage.".to_string()
+             power beyond neural activity. The macro-level has explanatory advantage."
+                .to_string()
         } else if emergence > 0.0 {
             "Weak causal emergence: Slight advantage for macro-level description. \
-             Consciousness may have marginal causal efficacy.".to_string()
+             Consciousness may have marginal causal efficacy."
+                .to_string()
         } else if emergence > -0.1 {
             "Causal equivalence: Macro and micro descriptions have similar causal power. \
-             Consciousness is neither more nor less causally effective than neurons.".to_string()
+             Consciousness is neither more nor less causally effective than neurons."
+                .to_string()
         } else {
             "Causal reduction: Micro-level has MORE causal power than macro. \
-             Consciousness may be epiphenomenal - a passive side-effect.".to_string()
+             Consciousness may be epiphenomenal - a passive side-effect."
+                .to_string()
         };
 
         CausalEmergenceResult {
@@ -483,7 +504,10 @@ mod tests {
         // Uniform distribution
         let uniform = vec![0.25, 0.25, 0.25, 0.25];
         let h = entropy(&uniform);
-        assert!((h - 2.0).abs() < 0.01, "Uniform over 4 states should have entropy 2");
+        assert!(
+            (h - 2.0).abs() < 0.01,
+            "Uniform over 4 states should have entropy 2"
+        );
 
         // Deterministic
         let deterministic = vec![1.0, 0.0, 0.0, 0.0];
@@ -514,7 +538,10 @@ mod tests {
         println!("Deterministic EI: {:.3}", ei_det);
         println!("Random EI: {:.3}", ei_rand);
 
-        assert!(ei_det > ei_rand, "Deterministic TPM should have higher EI than random");
+        assert!(
+            ei_det > ei_rand,
+            "Deterministic TPM should have higher EI than random"
+        );
     }
 
     #[test]
@@ -524,11 +551,13 @@ mod tests {
         // Simulate a system where macro state has clearer dynamics than micro
         for i in 0..1000 {
             // Micro: noisy neuron activations
-            let micro: Vec<f64> = (0..10).map(|j| {
-                let base = (i as f64 * 0.1 + j as f64 * 0.3).sin() * 0.5 + 0.5;
-                let noise = ((i * 17 + j * 23) % 100) as f64 / 200.0 - 0.25;
-                (base + noise).clamp(0.0, 1.0)
-            }).collect();
+            let micro: Vec<f64> = (0..10)
+                .map(|j| {
+                    let base = (i as f64 * 0.1 + j as f64 * 0.3).sin() * 0.5 + 0.5;
+                    let noise = ((i * 17 + j * 23) % 100) as f64 / 200.0 - 0.25;
+                    (base + noise).clamp(0.0, 1.0)
+                })
+                .collect();
 
             // Macro: cleaner consciousness level (average with less noise)
             let macro_state = (i as f64 * 0.1).sin() * 0.3 + 0.5;
@@ -543,15 +572,27 @@ mod tests {
         println!("  Macro EI: {:.3} bits", result.macro_ei);
         println!("  Emergence: {:.3} bits", result.emergence);
         // EI values should be finite and non-negative
-        assert!(result.micro_ei >= 0.0 && result.micro_ei.is_finite(),
-            "Micro EI must be finite non-negative: {}", result.micro_ei);
-        assert!(result.macro_ei >= 0.0 && result.macro_ei.is_finite(),
-            "Macro EI must be finite non-negative: {}", result.macro_ei);
+        assert!(
+            result.micro_ei >= 0.0 && result.micro_ei.is_finite(),
+            "Micro EI must be finite non-negative: {}",
+            result.micro_ei
+        );
+        assert!(
+            result.macro_ei >= 0.0 && result.macro_ei.is_finite(),
+            "Macro EI must be finite non-negative: {}",
+            result.macro_ei
+        );
         // Determinism should be in [0, 1]
-        assert!((0.0..=1.0).contains(&result.micro_determinism),
-            "Micro determinism must be in [0,1]: {}", result.micro_determinism);
-        assert!((0.0..=1.0).contains(&result.macro_determinism),
-            "Macro determinism must be in [0,1]: {}", result.macro_determinism);
+        assert!(
+            (0.0..=1.0).contains(&result.micro_determinism),
+            "Micro determinism must be in [0,1]: {}",
+            result.micro_determinism
+        );
+        assert!(
+            (0.0..=1.0).contains(&result.macro_determinism),
+            "Macro determinism must be in [0,1]: {}",
+            result.macro_determinism
+        );
         // Interpretation should not be empty
         assert!(!result.interpretation.is_empty());
     }
@@ -565,9 +606,9 @@ mod tests {
         // - Macro is deterministic
         for i in 0..500 {
             // Micro: random-looking
-            let micro: Vec<f64> = (0..5).map(|j| {
-                ((i * 13 + j * 37) % 100) as f64 / 100.0
-            }).collect();
+            let micro: Vec<f64> = (0..5)
+                .map(|j| ((i * 13 + j * 37) % 100) as f64 / 100.0)
+                .collect();
 
             // Macro: perfectly cycling through 4 states
             let macro_state = (i % 4) as f64 / 4.0 + 0.125;
@@ -581,7 +622,9 @@ mod tests {
         println!("  Emergence: {:.3} bits", result.emergence);
 
         // With deterministic macro and noisy micro, we should see positive emergence
-        assert!(result.macro_determinism > result.micro_determinism,
-            "Macro should be more deterministic");
+        assert!(
+            result.macro_determinism > result.micro_determinism,
+            "Macro should be more deterministic"
+        );
     }
 }

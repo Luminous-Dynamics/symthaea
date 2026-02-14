@@ -123,8 +123,8 @@ mod tests {
     fn test_f64_f32_precision_edge_cases() {
         // Typical gradient magnitudes (1e-6 to 1e2)
         let typical_gradients: Vec<f64> = vec![
-            1e-6, 1e-5, 1e-4, 1e-3, 0.01, 0.1, 0.5, 1.0, 10.0, 100.0,
-            -1e-6, -1e-4, -0.01, -0.5, -10.0, -100.0,
+            1e-6, 1e-5, 1e-4, 1e-3, 0.01, 0.1, 0.5, 1.0, 10.0, 100.0, -1e-6, -1e-4, -0.01, -0.5,
+            -10.0, -100.0,
         ];
         let f32_vec = gradients_to_f32(&typical_gradients);
         let back = gradients_to_f64(&f32_vec);
@@ -137,7 +137,9 @@ mod tests {
             assert!(
                 relative_error < 1e-6,
                 "Typical gradient precision loss: {} vs {} (rel err: {:.2e})",
-                orig, back_val, relative_error
+                orig,
+                back_val,
+                relative_error
             );
         }
     }
@@ -165,7 +167,9 @@ mod tests {
             assert!(
                 relative_error < 1e-6,
                 "Large value precision loss: {:.2e} vs {:.2e} (rel err: {:.2e})",
-                orig, back_val, relative_error
+                orig,
+                back_val,
+                relative_error
             );
         }
     }
@@ -209,10 +213,8 @@ mod tests {
         ];
 
         // Convert to f32 (as the SDK does before calling core)
-        let f32_updates: Vec<Vec<f32>> = sdk_gradients
-            .iter()
-            .map(|g| gradients_to_f32(g))
-            .collect();
+        let f32_updates: Vec<Vec<f32>> =
+            sdk_gradients.iter().map(|g| gradients_to_f32(g)).collect();
 
         // Simulate FedAvg in f32 (what core does)
         let dim = f32_updates[0].len();
@@ -244,7 +246,10 @@ mod tests {
             assert!(
                 relative_error < 1e-5,
                 "SDK roundtrip dim {}: expected {:.8e}, got {:.8e} (rel err: {:.2e})",
-                i, expected, actual, relative_error
+                i,
+                expected,
+                actual,
+                relative_error
             );
         }
     }

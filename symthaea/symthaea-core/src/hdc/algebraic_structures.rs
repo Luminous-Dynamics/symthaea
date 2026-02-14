@@ -356,10 +356,7 @@ impl RingVerifier {
         result
     }
 
-    fn check_commutativity(
-        elements: &[AlgebraicElement],
-        op: &dyn BinaryOperation,
-    ) -> AxiomCheck {
+    fn check_commutativity(elements: &[AlgebraicElement], op: &dyn BinaryOperation) -> AxiomCheck {
         let mut total_sim = 0.0f32;
         let mut count = 0;
         let mut holds = true;
@@ -413,7 +410,8 @@ impl RingVerifier {
         for a in elements {
             for b in elements {
                 let result = op.apply(a, b);
-                let (_closest_idx, sim) = GroupVerifier::find_closest_element(&result.encoding, elements);
+                let (_closest_idx, sim) =
+                    GroupVerifier::find_closest_element(&result.encoding, elements);
 
                 total_sim += sim;
                 count += 1;
@@ -626,12 +624,8 @@ impl FieldVerifier {
         if let Some(zero_elem) = zero {
             let mul_identity = Self::find_identity(elements, mul_op);
             if let Some(one_elem) = mul_identity {
-                let inverse_check = Self::check_multiplicative_inverses(
-                    elements,
-                    mul_op,
-                    &zero_elem,
-                    &one_elem,
-                );
+                let inverse_check =
+                    Self::check_multiplicative_inverses(elements, mul_op, &zero_elem, &one_elem);
                 result.add_check(inverse_check);
             }
         }
@@ -873,8 +867,7 @@ mod tests {
         let identity_map = |e: &AlgebraicElement| e.clone();
         let op = XorOp;
 
-        let result =
-            HomomorphismVerifier::verify(&domain, &codomain, &identity_map, &op, &op);
+        let result = HomomorphismVerifier::verify(&domain, &codomain, &identity_map, &op, &op);
         assert!(!result.axioms_checked.is_empty());
     }
 
@@ -920,7 +913,9 @@ mod tests {
                 encoding: BinaryHV::bundle(&[a.encoding.clone(), b.encoding.clone()]),
             }
         }
-        fn name(&self) -> &str { "bundle_add" }
+        fn name(&self) -> &str {
+            "bundle_add"
+        }
     }
 
     struct BindMulOp;
@@ -931,7 +926,9 @@ mod tests {
                 encoding: a.encoding.bind(&b.encoding),
             }
         }
-        fn name(&self) -> &str { "bind_mul" }
+        fn name(&self) -> &str {
+            "bind_mul"
+        }
     }
 
     #[test]
@@ -945,7 +942,11 @@ mod tests {
 
         let result = RingVerifier::verify(&elements, &BundleAddOp, &BindMulOp);
         // Should have axioms from group + ring checks including distributivity
-        let axiom_names: Vec<&str> = result.axioms_checked.iter().map(|a| a.axiom.as_str()).collect();
+        let axiom_names: Vec<&str> = result
+            .axioms_checked
+            .iter()
+            .map(|a| a.axiom.as_str())
+            .collect();
         assert!(
             axiom_names.iter().any(|n| n.contains("Distribut")),
             "Ring verification should check distributivity, got: {:?}",
@@ -981,9 +982,18 @@ mod tests {
             .collect();
 
         let result = GroupVerifier::verify(&elements, &XorOp);
-        assert!(result.total_phi >= 0.0, "Total Phi should be non-negative: {}", result.total_phi);
+        assert!(
+            result.total_phi >= 0.0,
+            "Total Phi should be non-negative: {}",
+            result.total_phi
+        );
         for check in &result.axioms_checked {
-            assert!(check.phi >= 0.0, "Axiom Phi should be non-negative: {} = {}", check.axiom, check.phi);
+            assert!(
+                check.phi >= 0.0,
+                "Axiom Phi should be non-negative: {} = {}",
+                check.axiom,
+                check.phi
+            );
         }
     }
 

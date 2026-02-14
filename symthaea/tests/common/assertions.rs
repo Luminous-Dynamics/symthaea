@@ -52,9 +52,15 @@ pub const F64_EPSILON: f64 = 0.0001;
 pub fn assert_memory_eq(actual: &MemoryRecord, expected: &MemoryRecord) {
     assert_eq!(actual.id, expected.id, "ID mismatch");
     assert_eq!(actual.content, expected.content, "Content mismatch");
-    assert_eq!(actual.memory_type, expected.memory_type, "Memory type mismatch");
+    assert_eq!(
+        actual.memory_type, expected.memory_type,
+        "Memory type mismatch"
+    );
     assert_eq!(actual.topics, expected.topics, "Topics mismatch");
-    assert_eq!(actual.timestamp_ms, expected.timestamp_ms, "Timestamp mismatch");
+    assert_eq!(
+        actual.timestamp_ms, expected.timestamp_ms,
+        "Timestamp mismatch"
+    );
 
     assert_f32_eq(actual.valence, expected.valence, F32_EPSILON, "Valence");
     assert_f32_eq(actual.arousal, expected.arousal, F32_EPSILON, "Arousal");
@@ -86,12 +92,7 @@ pub fn assert_memory_phi(record: &MemoryRecord, expected_phi: f64, epsilon: f64)
 
 /// Assert two BinaryHV encodings are identical
 pub fn assert_encoding_eq(actual: &BinaryHV, expected: &BinaryHV, msg: &str) {
-    assert_eq!(
-        actual.0,
-        expected.0,
-        "{}: Encoding mismatch",
-        msg
-    );
+    assert_eq!(actual.0, expected.0, "{}: Encoding mismatch", msg);
 }
 
 /// Assert encoding roundtrip integrity

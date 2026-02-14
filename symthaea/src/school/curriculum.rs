@@ -3,7 +3,7 @@
 //! A `Curriculum` is a structured set of learning objectives with
 //! prerequisite relationships, enabling coherent learning progressions.
 
-use super::objective::{LearningObjective, Difficulty, Domain};
+use super::objective::{Difficulty, Domain, LearningObjective};
 use std::collections::HashSet;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -69,15 +69,23 @@ impl CurriculumType {
     pub fn description(&self) -> &str {
         match self {
             CurriculumType::NixOS => "Learn NixOS system administration from basics to advanced",
-            CurriculumType::Flakes => "Master the Nix Flakes ecosystem for reproducible development",
+            CurriculumType::Flakes => {
+                "Master the Nix Flakes ecosystem for reproducible development"
+            }
             CurriculumType::HomeManager => "Configure your user environment with Home Manager",
             CurriculumType::NixOSMastery => "Complete NixOS mastery combining all core skills",
             CurriculumType::Consciousness => "Explore consciousness, IIT, and philosophy of mind",
-            CurriculumType::ConsciousnessAdvanced => "Deep dive into IIT 4.0, phenomenology, and computational consciousness",
+            CurriculumType::ConsciousnessAdvanced => {
+                "Deep dive into IIT 4.0, phenomenology, and computational consciousness"
+            }
             CurriculumType::HDC => "Learn hyperdimensional computing for AI and cognition",
-            CurriculumType::HDCAdvanced => "Master sparse codes, sequence learning, and HDC applications",
+            CurriculumType::HDCAdvanced => {
+                "Master sparse codes, sequence learning, and HDC applications"
+            }
             CurriculumType::Rust => "Learn Rust programming from basics to proficiency",
-            CurriculumType::RustAdvanced => "Master async Rust, macros, unsafe, and systems programming",
+            CurriculumType::RustAdvanced => {
+                "Master async Rust, macros, unsafe, and systems programming"
+            }
             CurriculumType::Holochain => "Build distributed applications on Holochain",
         }
     }
@@ -134,14 +142,16 @@ impl Curriculum {
 
     /// Get objectives that have no prerequisites
     pub fn entry_points(&self) -> Vec<&LearningObjective> {
-        self.objectives.iter()
+        self.objectives
+            .iter()
             .filter(|obj| obj.prerequisites.is_empty())
             .collect()
     }
 
     /// Get objectives that depend on a given objective
     pub fn dependents(&self, objective_id: &str) -> Vec<&LearningObjective> {
-        self.objectives.iter()
+        self.objectives
+            .iter()
             .filter(|obj| obj.requires(objective_id))
             .collect()
     }
@@ -182,7 +192,12 @@ impl Curriculum {
         Ok(())
     }
 
-    fn has_cycle(&self, id: &str, visited: &mut HashSet<String>, rec_stack: &mut HashSet<String>) -> bool {
+    fn has_cycle(
+        &self,
+        id: &str,
+        visited: &mut HashSet<String>,
+        rec_stack: &mut HashSet<String>,
+    ) -> bool {
         if rec_stack.contains(id) {
             return true;
         }
@@ -217,7 +232,12 @@ impl Curriculum {
         result
     }
 
-    fn topo_visit<'a>(&'a self, id: &str, visited: &mut HashSet<String>, result: &mut Vec<&'a LearningObjective>) {
+    fn topo_visit<'a>(
+        &'a self,
+        id: &str,
+        visited: &mut HashSet<String>,
+        result: &mut Vec<&'a LearningObjective>,
+    ) {
         if visited.contains(id) {
             return;
         }
@@ -245,7 +265,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Beginner)
                     .with_description("Learn the fundamentals of the Nix expression language")
                     .with_tags(&["nix", "language", "basics"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .with_objective(
                 LearningObjective::new("derivations", "Understanding Derivations")
@@ -254,7 +274,7 @@ impl Curriculum {
                     .with_description("Learn how Nix derivations work")
                     .with_prerequisite("nix-basics")
                     .with_tags(&["nix", "derivations", "build"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("nixos-config", "NixOS Configuration Structure")
@@ -263,7 +283,7 @@ impl Curriculum {
                     .with_description("Understand the structure of NixOS configuration")
                     .with_prerequisite("nix-basics")
                     .with_tags(&["nixos", "configuration"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .with_objective(
                 LearningObjective::new("nixos-modules", "NixOS Module System")
@@ -272,7 +292,7 @@ impl Curriculum {
                     .with_description("Create and use NixOS modules")
                     .with_prerequisites(&["nixos-config", "derivations"])
                     .with_tags(&["nixos", "modules", "advanced"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .with_objective(
                 LearningObjective::new("nixos-services", "Systemd Services in NixOS")
@@ -281,7 +301,7 @@ impl Curriculum {
                     .with_description("Configure and manage systemd services")
                     .with_prerequisite("nixos-config")
                     .with_tags(&["nixos", "systemd", "services"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("nixos-networking", "NixOS Networking")
@@ -290,7 +310,7 @@ impl Curriculum {
                     .with_description("Configure networking in NixOS")
                     .with_prerequisite("nixos-config")
                     .with_tags(&["nixos", "networking"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .with_objective(
                 LearningObjective::new("nixos-security", "NixOS Security Hardening")
@@ -299,7 +319,7 @@ impl Curriculum {
                     .with_description("Secure and harden your NixOS installation")
                     .with_prerequisites(&["nixos-services", "nixos-networking"])
                     .with_tags(&["nixos", "security", "hardening"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .with_objective(
                 LearningObjective::new("overlays", "Creating Nix Overlays")
@@ -308,7 +328,7 @@ impl Curriculum {
                     .with_description("Create overlays to customize packages")
                     .with_prerequisite("derivations")
                     .with_tags(&["nix", "overlays", "customization"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .build()
     }
@@ -322,7 +342,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Beginner)
                     .with_description("Understand what Flakes are and why they matter")
                     .with_tags(&["flakes", "intro"])
-                    .with_estimated_minutes(20)
+                    .with_estimated_minutes(20),
             )
             .with_objective(
                 LearningObjective::new("flakes-structure", "Flake Structure")
@@ -331,7 +351,7 @@ impl Curriculum {
                     .with_description("Learn the structure of a flake.nix file")
                     .with_prerequisite("flakes-intro")
                     .with_tags(&["flakes", "structure"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .with_objective(
                 LearningObjective::new("flakes-inputs", "Flake Inputs and Outputs")
@@ -340,7 +360,7 @@ impl Curriculum {
                     .with_description("Master flake inputs, outputs, and dependencies")
                     .with_prerequisite("flakes-structure")
                     .with_tags(&["flakes", "inputs", "outputs"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("flakes-devshells", "Development Shells with Flakes")
@@ -349,7 +369,7 @@ impl Curriculum {
                     .with_description("Create reproducible development environments")
                     .with_prerequisite("flakes-inputs")
                     .with_tags(&["flakes", "devshells", "development"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .with_objective(
                 LearningObjective::new("flakes-templates", "Flake Templates")
@@ -358,7 +378,7 @@ impl Curriculum {
                     .with_description("Create and use flake templates")
                     .with_prerequisite("flakes-inputs")
                     .with_tags(&["flakes", "templates"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .with_objective(
                 LearningObjective::new("flakes-nixos", "NixOS with Flakes")
@@ -367,7 +387,7 @@ impl Curriculum {
                     .with_description("Configure NixOS using flakes")
                     .with_prerequisite("flakes-inputs")
                     .with_tags(&["flakes", "nixos"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .build()
     }
@@ -381,7 +401,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Beginner)
                     .with_description("Understand Home Manager and its purpose")
                     .with_tags(&["home-manager", "intro"])
-                    .with_estimated_minutes(20)
+                    .with_estimated_minutes(20),
             )
             .with_objective(
                 LearningObjective::new("hm-installation", "Installing Home Manager")
@@ -390,7 +410,7 @@ impl Curriculum {
                     .with_description("Install Home Manager standalone or with NixOS")
                     .with_prerequisite("hm-intro")
                     .with_tags(&["home-manager", "installation"])
-                    .with_estimated_minutes(15)
+                    .with_estimated_minutes(15),
             )
             .with_objective(
                 LearningObjective::new("hm-config", "Home Manager Configuration")
@@ -399,7 +419,7 @@ impl Curriculum {
                     .with_description("Write your first home.nix configuration")
                     .with_prerequisite("hm-installation")
                     .with_tags(&["home-manager", "configuration"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .with_objective(
                 LearningObjective::new("hm-programs", "Managing Programs with Home Manager")
@@ -408,7 +428,7 @@ impl Curriculum {
                     .with_description("Configure programs like git, neovim, zsh")
                     .with_prerequisite("hm-config")
                     .with_tags(&["home-manager", "programs"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("hm-dotfiles", "Dotfile Management")
@@ -417,7 +437,7 @@ impl Curriculum {
                     .with_description("Manage dotfiles declaratively")
                     .with_prerequisite("hm-config")
                     .with_tags(&["home-manager", "dotfiles"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .build()
     }
@@ -438,11 +458,13 @@ impl Curriculum {
             LearningObjective::new("mastery-integration", "Integrated NixOS System")
                 .with_domain(Domain::NixOS)
                 .with_difficulty(Difficulty::Expert)
-                .with_description("Create a fully integrated NixOS system with flakes and Home Manager")
+                .with_description(
+                    "Create a fully integrated NixOS system with flakes and Home Manager",
+                )
                 .with_prerequisites(&["nixos-modules", "flakes-nixos", "hm-programs"])
                 .with_tags(&["mastery", "integration"])
                 .with_estimated_minutes(120)
-                .build()
+                .build(),
         );
 
         Curriculum {
@@ -451,7 +473,11 @@ impl Curriculum {
             description: "Complete NixOS mastery combining all core skills".to_string(),
             objectives,
             prerequisite_curricula: Vec::new(),
-            tags: vec!["nixos".to_string(), "mastery".to_string(), "complete".to_string()],
+            tags: vec![
+                "nixos".to_string(),
+                "mastery".to_string(),
+                "complete".to_string(),
+            ],
         }
     }
 
@@ -464,7 +490,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Beginner)
                     .with_description("Introduction to the study of consciousness")
                     .with_tags(&["consciousness", "philosophy", "intro"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .with_objective(
                 LearningObjective::new("iit-basics", "Integrated Information Theory Basics")
@@ -473,7 +499,7 @@ impl Curriculum {
                     .with_description("Learn the fundamentals of IIT and Φ")
                     .with_prerequisite("consciousness-intro")
                     .with_tags(&["iit", "phi", "theory"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("phi-computation", "Computing Φ")
@@ -482,7 +508,7 @@ impl Curriculum {
                     .with_description("Understand how Φ is computed and approximated")
                     .with_prerequisite("iit-basics")
                     .with_tags(&["phi", "computation", "algorithms"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .with_objective(
                 LearningObjective::new("gwt", "Global Workspace Theory")
@@ -491,7 +517,7 @@ impl Curriculum {
                     .with_description("Understand Baars' Global Workspace Theory")
                     .with_prerequisite("consciousness-intro")
                     .with_tags(&["gwt", "attention", "workspace"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("autopoiesis", "Autopoiesis and Self-Organization")
@@ -500,7 +526,7 @@ impl Curriculum {
                     .with_description("Learn about self-creating, self-maintaining systems")
                     .with_prerequisite("consciousness-intro")
                     .with_tags(&["autopoiesis", "self-organization", "emergence"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .build()
     }
@@ -514,7 +540,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Beginner)
                     .with_description("Understand the principles of hyperdimensional computing")
                     .with_tags(&["hdc", "intro", "vectors"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .with_objective(
                 LearningObjective::new("hdc-operations", "HDC Operations")
@@ -523,7 +549,7 @@ impl Curriculum {
                     .with_description("Learn bind, bundle, and similarity operations")
                     .with_prerequisite("hdc-intro")
                     .with_tags(&["hdc", "operations", "algebra"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("hdc-memory", "Associative Memory with HDC")
@@ -532,7 +558,7 @@ impl Curriculum {
                     .with_description("Build associative memory systems")
                     .with_prerequisite("hdc-operations")
                     .with_tags(&["hdc", "memory", "associative"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("hdc-learning", "Learning with HDC")
@@ -541,14 +567,16 @@ impl Curriculum {
                     .with_description("Implement learning algorithms in hyperdimensional space")
                     .with_prerequisite("hdc-memory")
                     .with_tags(&["hdc", "learning", "classification"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .build()
     }
 
     fn builtin_consciousness_advanced() -> Self {
         Curriculum::new("consciousness-advanced", "Advanced Consciousness Studies")
-            .with_description("Deep dive into IIT 4.0, phenomenology, and computational consciousness")
+            .with_description(
+                "Deep dive into IIT 4.0, phenomenology, and computational consciousness",
+            )
             .with_prerequisite_curriculum("consciousness")
             .with_objective(
                 LearningObjective::new("iit-4", "Integrated Information Theory 4.0")
@@ -556,7 +584,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Advanced)
                     .with_description("Master the latest IIT formulation with unfolded TPM")
                     .with_tags(&["iit", "phi", "tpm", "advanced"])
-                    .with_estimated_minutes(90)
+                    .with_estimated_minutes(90),
             )
             .with_objective(
                 LearningObjective::new("phi-mechanisms", "Φ Mechanisms and Complexes")
@@ -565,24 +593,28 @@ impl Curriculum {
                     .with_description("Understand mechanism-level Φ and system complexes")
                     .with_prerequisite("iit-4")
                     .with_tags(&["phi", "mechanisms", "complexes"])
-                    .with_estimated_minutes(120)
+                    .with_estimated_minutes(120),
             )
             .with_objective(
                 LearningObjective::new("phenomenology", "Computational Phenomenology")
                     .with_domain(Domain::Consciousness)
                     .with_difficulty(Difficulty::Advanced)
-                    .with_description("Bridge phenomenological experience with information structures")
+                    .with_description(
+                        "Bridge phenomenological experience with information structures",
+                    )
                     .with_prerequisite("iit-4")
                     .with_tags(&["phenomenology", "qualia", "experience"])
-                    .with_estimated_minutes(75)
+                    .with_estimated_minutes(75),
             )
             .with_objective(
                 LearningObjective::new("fep", "Free Energy Principle")
                     .with_domain(Domain::Consciousness)
                     .with_difficulty(Difficulty::Expert)
-                    .with_description("Understand Friston's Free Energy Principle and active inference")
+                    .with_description(
+                        "Understand Friston's Free Energy Principle and active inference",
+                    )
                     .with_tags(&["fep", "active-inference", "prediction"])
-                    .with_estimated_minutes(90)
+                    .with_estimated_minutes(90),
             )
             .with_objective(
                 LearningObjective::new("consciousness-topologies", "Consciousness Topologies")
@@ -591,7 +623,7 @@ impl Curriculum {
                     .with_description("Study how network topology affects Φ and consciousness")
                     .with_prerequisites(&["phi-mechanisms", "phenomenology"])
                     .with_tags(&["topology", "networks", "emergence"])
-                    .with_estimated_minutes(90)
+                    .with_estimated_minutes(90),
             )
             .build()
     }
@@ -606,7 +638,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Advanced)
                     .with_description("Implement and utilize sparse binary hypervectors")
                     .with_tags(&["hdc", "sparse", "efficiency"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .with_objective(
                 LearningObjective::new("sequence-learning", "Sequence Learning in HDC")
@@ -615,7 +647,7 @@ impl Curriculum {
                     .with_description("Encode and reason about temporal sequences")
                     .with_prerequisite("sparse-hdc")
                     .with_tags(&["hdc", "sequences", "temporal"])
-                    .with_estimated_minutes(75)
+                    .with_estimated_minutes(75),
             )
             .with_objective(
                 LearningObjective::new("hdc-graphs", "Graph Reasoning with HDC")
@@ -624,7 +656,7 @@ impl Curriculum {
                     .with_description("Represent and query graph structures in hyperspace")
                     .with_prerequisite("sparse-hdc")
                     .with_tags(&["hdc", "graphs", "reasoning"])
-                    .with_estimated_minutes(75)
+                    .with_estimated_minutes(75),
             )
             .with_objective(
                 LearningObjective::new("hdc-neuromorphic", "Neuromorphic HDC")
@@ -633,7 +665,7 @@ impl Curriculum {
                     .with_description("Implement HDC on neuromorphic hardware")
                     .with_prerequisites(&["sequence-learning", "hdc-graphs"])
                     .with_tags(&["hdc", "neuromorphic", "hardware"])
-                    .with_estimated_minutes(90)
+                    .with_estimated_minutes(90),
             )
             .with_objective(
                 LearningObjective::new("hdc-consciousness", "HDC for Consciousness Models")
@@ -642,7 +674,7 @@ impl Curriculum {
                     .with_description("Apply HDC to build computational consciousness models")
                     .with_prerequisite("hdc-neuromorphic")
                     .with_tags(&["hdc", "consciousness", "phi"])
-                    .with_estimated_minutes(120)
+                    .with_estimated_minutes(120),
             )
             .build()
     }
@@ -656,7 +688,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Beginner)
                     .with_description("Understand Rust's goals, toolchain, and ecosystem")
                     .with_tags(&["rust", "intro", "cargo"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .with_objective(
                 LearningObjective::new("rust-ownership", "Ownership and Borrowing")
@@ -665,7 +697,7 @@ impl Curriculum {
                     .with_description("Master Rust's ownership model and borrow checker")
                     .with_prerequisite("rust-intro")
                     .with_tags(&["rust", "ownership", "borrowing"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .with_objective(
                 LearningObjective::new("rust-types", "Structs, Enums, and Pattern Matching")
@@ -674,7 +706,7 @@ impl Curriculum {
                     .with_description("Define custom types and use pattern matching")
                     .with_prerequisite("rust-intro")
                     .with_tags(&["rust", "types", "patterns"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("rust-traits", "Traits and Generics")
@@ -683,7 +715,7 @@ impl Curriculum {
                     .with_description("Write polymorphic code with traits and generics")
                     .with_prerequisites(&["rust-ownership", "rust-types"])
                     .with_tags(&["rust", "traits", "generics"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .with_objective(
                 LearningObjective::new("rust-errors", "Error Handling")
@@ -692,7 +724,7 @@ impl Curriculum {
                     .with_description("Handle errors idiomatically with Result and Option")
                     .with_prerequisite("rust-types")
                     .with_tags(&["rust", "errors", "result"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("rust-iterators", "Iterators and Closures")
@@ -701,7 +733,7 @@ impl Curriculum {
                     .with_description("Use functional programming patterns in Rust")
                     .with_prerequisite("rust-traits")
                     .with_tags(&["rust", "iterators", "closures"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("rust-lifetimes", "Lifetimes")
@@ -710,7 +742,7 @@ impl Curriculum {
                     .with_description("Annotate and understand lifetime parameters")
                     .with_prerequisite("rust-ownership")
                     .with_tags(&["rust", "lifetimes", "references"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .build()
     }
@@ -725,7 +757,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Advanced)
                     .with_description("Write asynchronous code with async/await and tokio")
                     .with_tags(&["rust", "async", "tokio"])
-                    .with_estimated_minutes(90)
+                    .with_estimated_minutes(90),
             )
             .with_objective(
                 LearningObjective::new("rust-macros", "Declarative Macros")
@@ -733,7 +765,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Advanced)
                     .with_description("Write macro_rules! macros for code generation")
                     .with_tags(&["rust", "macros", "metaprogramming"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .with_objective(
                 LearningObjective::new("rust-proc-macros", "Procedural Macros")
@@ -742,7 +774,7 @@ impl Curriculum {
                     .with_description("Write derive macros and attribute macros")
                     .with_prerequisite("rust-macros")
                     .with_tags(&["rust", "proc-macros", "derive"])
-                    .with_estimated_minutes(90)
+                    .with_estimated_minutes(90),
             )
             .with_objective(
                 LearningObjective::new("rust-unsafe", "Unsafe Rust")
@@ -750,7 +782,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Expert)
                     .with_description("Use unsafe code safely and correctly")
                     .with_tags(&["rust", "unsafe", "ffi"])
-                    .with_estimated_minutes(75)
+                    .with_estimated_minutes(75),
             )
             .with_objective(
                 LearningObjective::new("rust-ffi", "FFI and Interop")
@@ -759,7 +791,7 @@ impl Curriculum {
                     .with_description("Interface Rust with C, Python, and other languages")
                     .with_prerequisite("rust-unsafe")
                     .with_tags(&["rust", "ffi", "c", "python"])
-                    .with_estimated_minutes(75)
+                    .with_estimated_minutes(75),
             )
             .with_objective(
                 LearningObjective::new("rust-perf", "Performance Optimization")
@@ -768,7 +800,7 @@ impl Curriculum {
                     .with_description("Profile and optimize Rust programs for maximum performance")
                     .with_prerequisites(&["rust-async", "rust-unsafe"])
                     .with_tags(&["rust", "performance", "simd"])
-                    .with_estimated_minutes(90)
+                    .with_estimated_minutes(90),
             )
             .build()
     }
@@ -782,7 +814,7 @@ impl Curriculum {
                     .with_difficulty(Difficulty::Beginner)
                     .with_description("Understand Holochain's agent-centric architecture")
                     .with_tags(&["holochain", "intro", "distributed"])
-                    .with_estimated_minutes(30)
+                    .with_estimated_minutes(30),
             )
             .with_objective(
                 LearningObjective::new("holo-dht", "Holochain DHT")
@@ -791,7 +823,7 @@ impl Curriculum {
                     .with_description("Understand the distributed hash table and gossip protocol")
                     .with_prerequisite("holo-intro")
                     .with_tags(&["holochain", "dht", "gossip"])
-                    .with_estimated_minutes(45)
+                    .with_estimated_minutes(45),
             )
             .with_objective(
                 LearningObjective::new("hdk-basics", "HDK Basics")
@@ -800,7 +832,7 @@ impl Curriculum {
                     .with_description("Write Holochain zomes with the HDK")
                     .with_prerequisite("holo-dht")
                     .with_tags(&["holochain", "hdk", "rust"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .with_objective(
                 LearningObjective::new("holo-entries", "Entries and Links")
@@ -809,7 +841,7 @@ impl Curriculum {
                     .with_description("Create, validate, and link entries in Holochain")
                     .with_prerequisite("hdk-basics")
                     .with_tags(&["holochain", "entries", "links"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .with_objective(
                 LearningObjective::new("holo-validation", "Validation Rules")
@@ -818,7 +850,7 @@ impl Curriculum {
                     .with_description("Write validation rules for data integrity")
                     .with_prerequisite("holo-entries")
                     .with_tags(&["holochain", "validation", "integrity"])
-                    .with_estimated_minutes(75)
+                    .with_estimated_minutes(75),
             )
             .with_objective(
                 LearningObjective::new("holo-signals", "Signals and Remote Calls")
@@ -827,7 +859,7 @@ impl Curriculum {
                     .with_description("Implement real-time communication and cross-zome calls")
                     .with_prerequisite("holo-entries")
                     .with_tags(&["holochain", "signals", "remote"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .with_objective(
                 LearningObjective::new("happ-deployment", "hApp Deployment")
@@ -836,7 +868,7 @@ impl Curriculum {
                     .with_description("Package and deploy a complete hApp")
                     .with_prerequisites(&["holo-validation", "holo-signals"])
                     .with_tags(&["holochain", "happ", "deployment"])
-                    .with_estimated_minutes(60)
+                    .with_estimated_minutes(60),
             )
             .with_objective(
                 LearningObjective::new("holo-capabilities", "Capability-Based Security")
@@ -845,7 +877,7 @@ impl Curriculum {
                     .with_description("Implement fine-grained access control with capabilities")
                     .with_prerequisite("happ-deployment")
                     .with_tags(&["holochain", "capabilities", "security"])
-                    .with_estimated_minutes(75)
+                    .with_estimated_minutes(75),
             )
             .build()
     }
@@ -936,16 +968,21 @@ pub enum CurriculumError {
     },
 
     /// The curriculum has a cyclic dependency
-    CyclicDependency {
-        objective: String,
-    },
+    CyclicDependency { objective: String },
 }
 
 impl std::fmt::Display for CurriculumError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CurriculumError::MissingPrerequisite { objective, prerequisite } => {
-                write!(f, "Objective '{}' requires missing prerequisite '{}'", objective, prerequisite)
+            CurriculumError::MissingPrerequisite {
+                objective,
+                prerequisite,
+            } => {
+                write!(
+                    f,
+                    "Objective '{}' requires missing prerequisite '{}'",
+                    objective, prerequisite
+                )
             }
             CurriculumError::CyclicDependency { objective } => {
                 write!(f, "Cyclic dependency detected at objective '{}'", objective)
@@ -994,7 +1031,12 @@ mod tests {
         let mut seen = std::collections::HashSet::new();
         for obj in order {
             for prereq in &obj.prerequisites {
-                assert!(seen.contains(prereq), "Prerequisite {} not seen before {}", prereq, obj.id);
+                assert!(
+                    seen.contains(prereq),
+                    "Prerequisite {} not seen before {}",
+                    prereq,
+                    obj.id
+                );
             }
             seen.insert(obj.id.clone());
         }
@@ -1005,13 +1047,12 @@ mod tests {
         let curriculum = Curriculum::new("custom", "Custom Curriculum")
             .with_description("A test curriculum")
             .with_objective(
-                LearningObjective::new("step1", "Step 1")
-                    .with_difficulty(Difficulty::Beginner)
+                LearningObjective::new("step1", "Step 1").with_difficulty(Difficulty::Beginner),
             )
             .with_objective(
                 LearningObjective::new("step2", "Step 2")
                     .with_prerequisite("step1")
-                    .with_difficulty(Difficulty::Intermediate)
+                    .with_difficulty(Difficulty::Intermediate),
             )
             .build();
 
@@ -1023,8 +1064,7 @@ mod tests {
     fn test_invalid_prerequisite() {
         let curriculum = Curriculum::new("invalid", "Invalid")
             .with_objective(
-                LearningObjective::new("obj1", "Obj 1")
-                    .with_prerequisite("nonexistent")
+                LearningObjective::new("obj1", "Obj 1").with_prerequisite("nonexistent"),
             )
             .build();
 

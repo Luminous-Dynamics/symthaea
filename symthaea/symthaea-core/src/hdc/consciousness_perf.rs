@@ -19,9 +19,9 @@
 //! - Report SIMD capability and pool statistics
 
 use super::binary_hv::BinaryHV;
+use super::hv_pool::{BinaryHVPool, ContinuousHVPool, PoolStats, PooledContinuousHV};
 #[allow(unused_imports)]
 use super::unified_hv::ContinuousHV;
-use super::hv_pool::{BinaryHVPool, ContinuousHVPool, PooledContinuousHV, PoolStats};
 
 // =============================================================================
 // SIMD BATCH OPERATIONS
@@ -71,8 +71,13 @@ pub fn similarity_index(n: usize, i: usize, j: usize) -> usize {
 ///
 /// Returns indices and similarity values, sorted by descending similarity.
 /// Useful for temporal memory search in the consciousness pipeline.
-pub fn find_similar(query: &BinaryHV, candidates: &[BinaryHV], threshold: f32) -> Vec<(usize, f32)> {
-    let mut results: Vec<(usize, f32)> = candidates.iter()
+pub fn find_similar(
+    query: &BinaryHV,
+    candidates: &[BinaryHV],
+    threshold: f32,
+) -> Vec<(usize, f32)> {
+    let mut results: Vec<(usize, f32)> = candidates
+        .iter()
         .enumerate()
         .map(|(i, hv)| (i, query.similarity(hv)))
         .filter(|(_, sim)| *sim > threshold)
@@ -90,7 +95,8 @@ pub fn mean_similarity(reference: &BinaryHV, others: &[&BinaryHV]) -> f64 {
     if others.is_empty() {
         return 0.0;
     }
-    let sum: f64 = others.iter()
+    let sum: f64 = others
+        .iter()
         .map(|hv| reference.similarity(hv) as f64)
         .sum();
     sum / others.len() as f64
@@ -109,15 +115,19 @@ pub fn batch_find_similar(
     candidates: &[&BinaryHV],
     threshold: f32,
 ) -> Vec<Vec<(usize, f32)>> {
-    queries.iter().map(|query| {
-        let mut results: Vec<(usize, f32)> = candidates.iter()
-            .enumerate()
-            .map(|(i, hv)| (i, query.similarity(hv)))
-            .filter(|(_, sim)| *sim > threshold)
-            .collect();
-        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        results
-    }).collect()
+    queries
+        .iter()
+        .map(|query| {
+            let mut results: Vec<(usize, f32)> = candidates
+                .iter()
+                .enumerate()
+                .map(|(i, hv)| (i, query.similarity(hv)))
+                .filter(|(_, sim)| *sim > threshold)
+                .collect();
+            results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            results
+        })
+        .collect()
 }
 
 // =============================================================================
@@ -199,11 +209,20 @@ impl SimdCapabilities {
             [
                 if self.avx512f { "AVX-512F" } else { "" },
                 if self.avx512bw { "AVX-512BW" } else { "" },
-                if self.avx512_vpopcntdq { "VPOPCNTDQ" } else { "" },
+                if self.avx512_vpopcntdq {
+                    "VPOPCNTDQ"
+                } else {
+                    ""
+                },
                 if self.avx2 { "AVX2" } else { "" },
                 if self.sse41 { "SSE4.1" } else { "" },
                 if self.popcnt { "POPCNT" } else { "" },
-            ].iter().filter(|s| !s.is_empty()).copied().collect::<Vec<_>>().join(", ")
+            ]
+            .iter()
+            .filter(|s| !s.is_empty())
+            .copied()
+            .collect::<Vec<_>>()
+            .join(", ")
         )
     }
 }
@@ -380,7 +399,11 @@ mod tests {
 
         let mean = mean_similarity(&reference, &refs);
         // Random HVs: mean similarity should be near 0.5
-        assert!(mean > 0.45 && mean < 0.55, "Mean similarity {} should be near 0.5", mean);
+        assert!(
+            mean > 0.45 && mean < 0.55,
+            "Mean similarity {} should be near 0.5",
+            mean
+        );
     }
 
     #[test]
@@ -421,13 +444,21 @@ mod tests {
 
         // All values should be -1.0 or +1.0
         for &val in continuous.as_slice() {
-            assert!(val == -1.0 || val == 1.0, "Expected -1.0 or 1.0, got {}", val);
+            assert!(
+                val == -1.0 || val == 1.0,
+                "Expected -1.0 or 1.0, got {}",
+                val
+            );
         }
 
         // Verify bit mapping: check first byte
         let first_byte = hv.0[0];
         for bit in 0..8u8 {
-            let expected = if first_byte & (1 << bit) != 0 { 1.0 } else { -1.0 };
+            let expected = if first_byte & (1 << bit) != 0 {
+                1.0
+            } else {
+                -1.0
+            };
             assert_eq!(continuous.as_slice()[bit as usize], expected);
         }
     }
@@ -447,7 +478,11 @@ mod tests {
         // The first 3 should be in one cluster (sim=1.0 > 0.9)
         assert!(!clusters.is_empty());
         let first_cluster = &clusters[0];
-        assert_eq!(first_cluster.len(), 3, "First 3 identical HVs should cluster together");
+        assert_eq!(
+            first_cluster.len(),
+            3,
+            "First 3 identical HVs should cluster together"
+        );
         assert!(first_cluster.contains(&0));
         assert!(first_cluster.contains(&1));
         assert!(first_cluster.contains(&2));
@@ -464,8 +499,8 @@ mod tests {
         let q1 = BinaryHV::random(1);
         let q2 = BinaryHV::random(2);
         let candidates = vec![
-            q1,           // exact match for q1
-            q2,           // exact match for q2
+            q1, // exact match for q1
+            q2, // exact match for q2
             BinaryHV::random(100),
             BinaryHV::random(200),
         ];
@@ -493,8 +528,12 @@ mod tests {
         let batch = batch_find_similar(&query_refs, &cand_refs, 0.55);
         for (i, query) in queries.iter().enumerate() {
             let individual = find_similar(query, &candidates, 0.55);
-            assert_eq!(batch[i].len(), individual.len(),
-                "batch and individual should find same count for query {}", i);
+            assert_eq!(
+                batch[i].len(),
+                individual.len(),
+                "batch and individual should find same count for query {}",
+                i
+            );
         }
     }
 

@@ -57,7 +57,7 @@ impl QuarkFlavor {
     /// Electric charge in units of e/3
     pub fn charge_thirds(&self) -> i8 {
         match self {
-            QuarkFlavor::Up | QuarkFlavor::Charm | QuarkFlavor::Top => 2,      // +2/3
+            QuarkFlavor::Up | QuarkFlavor::Charm | QuarkFlavor::Top => 2, // +2/3
             QuarkFlavor::Down | QuarkFlavor::Strange | QuarkFlavor::Bottom => -1, // -1/3
         }
     }
@@ -322,7 +322,8 @@ impl StandardModel {
         let bottom_quark_base = genesis.hv(QuarkFlavor::Bottom.domain_label(), PHYSICS_DIM);
 
         let electron_base = genesis.hv(LeptonFlavor::Electron.domain_label(), PHYSICS_DIM);
-        let electron_neutrino_base = genesis.hv(LeptonFlavor::ElectronNeutrino.domain_label(), PHYSICS_DIM);
+        let electron_neutrino_base =
+            genesis.hv(LeptonFlavor::ElectronNeutrino.domain_label(), PHYSICS_DIM);
         let muon_base = genesis.hv(LeptonFlavor::Muon.domain_label(), PHYSICS_DIM);
         let muon_neutrino_base = genesis.hv(LeptonFlavor::MuonNeutrino.domain_label(), PHYSICS_DIM);
         let tau_base = genesis.hv(LeptonFlavor::Tau.domain_label(), PHYSICS_DIM);

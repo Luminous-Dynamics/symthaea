@@ -91,15 +91,33 @@ pub enum ExtendedTriggerMethod {
 pub struct TRL(pub u8);
 
 impl TRL {
-    pub fn basic_principles() -> Self { TRL(1) }
-    pub fn technology_concept() -> Self { TRL(2) }
-    pub fn proof_of_concept() -> Self { TRL(3) }
-    pub fn lab_validation() -> Self { TRL(4) }
-    pub fn lab_demonstration() -> Self { TRL(5) }
-    pub fn prototype_demo() -> Self { TRL(6) }
-    pub fn system_demo() -> Self { TRL(7) }
-    pub fn qualified() -> Self { TRL(8) }
-    pub fn proven() -> Self { TRL(9) }
+    pub fn basic_principles() -> Self {
+        TRL(1)
+    }
+    pub fn technology_concept() -> Self {
+        TRL(2)
+    }
+    pub fn proof_of_concept() -> Self {
+        TRL(3)
+    }
+    pub fn lab_validation() -> Self {
+        TRL(4)
+    }
+    pub fn lab_demonstration() -> Self {
+        TRL(5)
+    }
+    pub fn prototype_demo() -> Self {
+        TRL(6)
+    }
+    pub fn system_demo() -> Self {
+        TRL(7)
+    }
+    pub fn qualified() -> Self {
+        TRL(8)
+    }
+    pub fn proven() -> Self {
+        TRL(9)
+    }
 
     pub fn description(&self) -> &'static str {
         match self.0 {
@@ -234,14 +252,15 @@ impl TriggerSystemLibrary {
             method: ExtendedTriggerMethod::XfelXRay,
             name: "XFEL Hard X-ray".to_string(),
             description: "Free-electron laser producing coherent, femtosecond X-ray pulses. \
-                         Current reference design but requires billion-dollar facilities.".to_string(),
+                         Current reference design but requires billion-dollar facilities."
+                .to_string(),
             trl: TRL::proven(),
             cost: CostCategory::NationalFacility,
             cost_estimate_usd: 1_000_000_000.0,
-            max_rep_rate_hz: 27_000.0, // European XFEL
+            max_rep_rate_hz: 27_000.0,   // European XFEL
             energy_per_trigger_j: 0.001, // ~1 mJ per pulse
-            wall_plug_efficiency: 1e-6, // Extremely inefficient
-            footprint_m3: 1_000_000.0, // 3.4 km tunnel
+            wall_plug_efficiency: 1e-6,  // Extremely inefficient
+            footprint_m3: 1_000_000.0,   // 3.4 km tunnel
             advantages: vec![
                 "Highest peak brilliance".to_string(),
                 "Tunable wavelength".to_string(),
@@ -258,8 +277,8 @@ impl TriggerSystemLibrary {
                 mechanism: EnergyDepositionMechanism::Photoelectric,
                 penetration_depth_um: 10.0, // ~10 keV X-rays in Pd
                 deposition_profile_um: 5.0,
-                phonon_efficiency: 0.3, // Good coupling to lattice
-                screening_factor: 50.0, // High due to coherent excitation
+                phonon_efficiency: 0.3,      // Good coupling to lattice
+                screening_factor: 50.0,      // High due to coherent excitation
                 conversion_efficiency: 1e-6, // Theoretical
             },
         });
@@ -270,14 +289,15 @@ impl TriggerSystemLibrary {
             name: "Compact Electron Beam".to_string(),
             description: "Desktop-scale electron gun (10-100 keV) directly irradiating \
                          deuterated target. Electrons deposit energy via electronic stopping, \
-                         generating phonons and local heating.".to_string(),
+                         generating phonons and local heating."
+                .to_string(),
             trl: TRL::system_demo(),
             cost: CostCategory::LabScale,
             cost_estimate_usd: 50_000.0,
             max_rep_rate_hz: 1_000_000.0, // MHz pulsing possible
-            energy_per_trigger_j: 1e-6, // μJ per pulse
-            wall_plug_efficiency: 0.3, // Reasonable efficiency
-            footprint_m3: 0.1, // Desktop
+            energy_per_trigger_j: 1e-6,   // μJ per pulse
+            wall_plug_efficiency: 0.3,    // Reasonable efficiency
+            footprint_m3: 0.1,            // Desktop
             advantages: vec![
                 "Compact and affordable".to_string(),
                 "High rep rate (MHz)".to_string(),
@@ -307,14 +327,15 @@ impl TriggerSystemLibrary {
             name: "Laser-Driven Bremsstrahlung X-ray".to_string(),
             description: "High-intensity laser (>10^18 W/cm²) focused on high-Z target \
                          generates hot electrons that produce Bremsstrahlung X-rays. \
-                         Compact alternative to synchrotrons.".to_string(),
+                         Compact alternative to synchrotrons."
+                .to_string(),
             trl: TRL::lab_demonstration(),
             cost: CostCategory::Research,
             cost_estimate_usd: 300_000.0,
-            max_rep_rate_hz: 1000.0, // kHz lasers available
+            max_rep_rate_hz: 1000.0,    // kHz lasers available
             energy_per_trigger_j: 0.01, // 10 mJ X-ray yield
             wall_plug_efficiency: 1e-4, // Low conversion
-            footprint_m3: 5.0, // Optical table + laser
+            footprint_m3: 5.0,          // Optical table + laser
             advantages: vec![
                 "Desktop X-ray source".to_string(),
                 "Tunable spectrum".to_string(),
@@ -344,14 +365,15 @@ impl TriggerSystemLibrary {
             description: "Uses Thorium-229m's uniquely low nuclear transition (8.28 eV, VUV) \
                          as an intermediary. VUV laser excites Th-229m, which then transfers \
                          energy to nearby D nuclei through lattice phonons. Requires Th-doped \
-                         deuteride target.".to_string(),
+                         deuteride target."
+                .to_string(),
             trl: TRL::proof_of_concept(),
             cost: CostCategory::Research,
             cost_estimate_usd: 500_000.0,
-            max_rep_rate_hz: 10_000.0, // Limited by Th-229m lifetime
+            max_rep_rate_hz: 10_000.0,  // Limited by Th-229m lifetime
             energy_per_trigger_j: 1e-9, // nJ photon, amplified by nuclear
             wall_plug_efficiency: 0.01, // Potentially high
-            footprint_m3: 1.0, // VUV laser system
+            footprint_m3: 1.0,          // VUV laser system
             advantages: vec![
                 "Nuclear-scale energy from optical photon".to_string(),
                 "Highly selective excitation".to_string(),
@@ -368,8 +390,8 @@ impl TriggerSystemLibrary {
                 mechanism: EnergyDepositionMechanism::NuclearRecoil,
                 penetration_depth_um: 1000.0, // VUV absorbed at surface, energy propagates
                 deposition_profile_um: 100.0,
-                phonon_efficiency: 0.8, // High if coupling works
-                screening_factor: 100.0, // Potentially very high
+                phonon_efficiency: 0.8,      // High if coupling works
+                screening_factor: 100.0,     // Potentially very high
                 conversion_efficiency: 1e-5, // Speculative but promising
             },
         });
@@ -380,14 +402,15 @@ impl TriggerSystemLibrary {
             name: "Piezoelectric Phonon Injection".to_string(),
             description: "High-frequency piezoelectric transducers (MHz-GHz) mechanically \
                          coupled to deuteride lattice. Generates coherent phonon waves that \
-                         create transient D-D proximity enhancement.".to_string(),
+                         create transient D-D proximity enhancement."
+                .to_string(),
             trl: TRL::prototype_demo(),
             cost: CostCategory::Maker,
             cost_estimate_usd: 5_000.0,
             max_rep_rate_hz: 1_000_000_000.0, // GHz
-            energy_per_trigger_j: 1e-9, // nJ acoustic energy
-            wall_plug_efficiency: 0.5, // Piezo efficiency
-            footprint_m3: 0.001, // Tiny
+            energy_per_trigger_j: 1e-9,       // nJ acoustic energy
+            wall_plug_efficiency: 0.5,        // Piezo efficiency
+            footprint_m3: 0.001,              // Tiny
             advantages: vec![
                 "Extremely simple and cheap".to_string(),
                 "No vacuum required".to_string(),
@@ -405,8 +428,8 @@ impl TriggerSystemLibrary {
                 mechanism: EnergyDepositionMechanism::PhononInjection,
                 penetration_depth_um: 1000.0, // Acoustic waves propagate
                 deposition_profile_um: 500.0,
-                phonon_efficiency: 1.0, // Direct phonon generation
-                screening_factor: 5.0, // Lower than ionizing radiation
+                phonon_efficiency: 1.0,       // Direct phonon generation
+                screening_factor: 5.0,        // Lower than ionizing radiation
                 conversion_efficiency: 1e-10, // Low but compensated by rate
             },
         });
@@ -417,14 +440,15 @@ impl TriggerSystemLibrary {
             name: "Pulsed Electrolysis Loading".to_string(),
             description: "Refined Fleischmann-Pons approach: Pulsed electrolysis in D2O \
                          creates dynamic deuterium loading/unloading cycles in Pd cathode. \
-                         Pulsing creates transient high-loading states with enhanced screening.".to_string(),
+                         Pulsing creates transient high-loading states with enhanced screening."
+                .to_string(),
             trl: TRL::system_demo(),
             cost: CostCategory::Maker,
             cost_estimate_usd: 2_000.0,
-            max_rep_rate_hz: 100.0, // Limited by electrochemistry
-            energy_per_trigger_j: 0.1, // 100 mJ electrical
+            max_rep_rate_hz: 100.0,     // Limited by electrochemistry
+            energy_per_trigger_j: 0.1,  // 100 mJ electrical
             wall_plug_efficiency: 0.01, // Most goes to electrolysis
-            footprint_m3: 0.01, // Benchtop
+            footprint_m3: 0.01,         // Benchtop
             advantages: vec![
                 "Simplest possible setup".to_string(),
                 "Self-loading of deuterium".to_string(),
@@ -453,7 +477,8 @@ impl TriggerSystemLibrary {
             name: "Ultrasonic Cavitation".to_string(),
             description: "High-power ultrasound in deuterated liquid (D2O or organic) creates \
                          collapsing cavitation bubbles with extreme transient temperatures and \
-                         pressures. Sonofusion-inspired but with solid target immersed.".to_string(),
+                         pressures. Sonofusion-inspired but with solid target immersed."
+                .to_string(),
             trl: TRL::lab_validation(),
             cost: CostCategory::LabScale,
             cost_estimate_usd: 20_000.0,
@@ -489,7 +514,8 @@ impl TriggerSystemLibrary {
             name: "Glow Discharge Plasma".to_string(),
             description: "Low-pressure D2 gas plasma with Pd cathode. Energetic D+ ions \
                          (100 eV - 1 keV) implant into cathode while cathode heating drives \
-                         loading. Combines ion implantation with thermal effects.".to_string(),
+                         loading. Combines ion implantation with thermal effects."
+                .to_string(),
             trl: TRL::prototype_demo(),
             cost: CostCategory::LabScale,
             cost_estimate_usd: 15_000.0,
@@ -525,14 +551,15 @@ impl TriggerSystemLibrary {
             name: "Muon-Catalyzed Fusion Hybrid".to_string(),
             description: "Muons replace electrons in D-D molecules, reducing internuclear \
                          distance by factor of 207. Enables fusion at room temperature. \
-                         Limited by muon sticking and production cost.".to_string(),
+                         Limited by muon sticking and production cost."
+                .to_string(),
             trl: TRL::lab_validation(),
             cost: CostCategory::MajorFacility,
             cost_estimate_usd: 10_000_000.0,
-            max_rep_rate_hz: 1.0, // Muon lifetime limited
+            max_rep_rate_hz: 1.0,                   // Muon lifetime limited
             energy_per_trigger_j: 17.6e6 * 1.6e-19, // D-T fusion energy
-            wall_plug_efficiency: 1e-6, // Muon production expensive
-            footprint_m3: 100.0, // Accelerator + target
+            wall_plug_efficiency: 1e-6,             // Muon production expensive
+            footprint_m3: 100.0,                    // Accelerator + target
             advantages: vec![
                 "Proven fusion mechanism".to_string(),
                 "Room temperature operation".to_string(),
@@ -549,8 +576,8 @@ impl TriggerSystemLibrary {
                 mechanism: EnergyDepositionMechanism::NuclearRecoil,
                 penetration_depth_um: 1000.0, // Muons penetrate deeply
                 deposition_profile_um: 500.0,
-                phonon_efficiency: 0.1, // Not phonon-mediated
-                screening_factor: 207.0, // Mass ratio screening
+                phonon_efficiency: 0.1,     // Not phonon-mediated
+                screening_factor: 207.0,    // Mass ratio screening
                 conversion_efficiency: 1.0, // Near-certain fusion per capture
             },
         });
@@ -561,12 +588,13 @@ impl TriggerSystemLibrary {
             name: "Compact X-ray Tube".to_string(),
             description: "Standard medical/industrial X-ray tube (30-150 kVp) producing \
                          Bremsstrahlung + characteristic X-rays. Not coherent or ultrafast \
-                         but readily available and well-understood.".to_string(),
+                         but readily available and well-understood."
+                .to_string(),
             trl: TRL::proven(),
             cost: CostCategory::LabScale,
             cost_estimate_usd: 30_000.0,
-            max_rep_rate_hz: 1000.0, // Pulsed tubes
-            energy_per_trigger_j: 0.1, // Integrated pulse energy
+            max_rep_rate_hz: 1000.0,    // Pulsed tubes
+            energy_per_trigger_j: 0.1,  // Integrated pulse energy
             wall_plug_efficiency: 0.01, // X-ray generation efficiency
             footprint_m3: 0.1,
             advantages: vec![
@@ -597,11 +625,12 @@ impl TriggerSystemLibrary {
             name: "Rapid Thermal Cycling".to_string(),
             description: "Cyclic heating/cooling of deuterated metal creates expansion/ \
                          contraction that modulates D-D spacing and generates thermal phonons. \
-                         Simplest possible trigger but low energy density.".to_string(),
+                         Simplest possible trigger but low energy density."
+                .to_string(),
             trl: TRL::system_demo(),
             cost: CostCategory::Maker,
             cost_estimate_usd: 1_000.0,
-            max_rep_rate_hz: 10.0, // Thermal mass limited
+            max_rep_rate_hz: 10.0,     // Thermal mass limited
             energy_per_trigger_j: 1.0, // Heating energy
             wall_plug_efficiency: 0.9, // Resistive heating efficient
             footprint_m3: 0.01,
@@ -622,7 +651,7 @@ impl TriggerSystemLibrary {
                 penetration_depth_um: 10000.0, // Bulk heating
                 deposition_profile_um: 5000.0,
                 phonon_efficiency: 0.9, // Thermal = phonons
-                screening_factor: 2.0, // Minimal enhancement
+                screening_factor: 2.0,  // Minimal enhancement
                 conversion_efficiency: 1e-12,
             },
         });
@@ -632,37 +661,52 @@ impl TriggerSystemLibrary {
 
     /// Find systems meeting specific criteria
     pub fn filter(&self, criteria: &TriggerCriteria) -> Vec<&TriggerSystemSpec> {
-        self.systems.iter().filter(|sys| {
-            // TRL filter
-            if let Some(min_trl) = criteria.min_trl {
-                if sys.trl.0 < min_trl { return false; }
-            }
+        self.systems
+            .iter()
+            .filter(|sys| {
+                // TRL filter
+                if let Some(min_trl) = criteria.min_trl {
+                    if sys.trl.0 < min_trl {
+                        return false;
+                    }
+                }
 
-            // Cost filter
-            if let Some(max_cost) = criteria.max_cost_usd {
-                if sys.cost_estimate_usd > max_cost { return false; }
-            }
+                // Cost filter
+                if let Some(max_cost) = criteria.max_cost_usd {
+                    if sys.cost_estimate_usd > max_cost {
+                        return false;
+                    }
+                }
 
-            // Rep rate filter
-            if let Some(min_rate) = criteria.min_rep_rate_hz {
-                if sys.max_rep_rate_hz < min_rate { return false; }
-            }
+                // Rep rate filter
+                if let Some(min_rate) = criteria.min_rep_rate_hz {
+                    if sys.max_rep_rate_hz < min_rate {
+                        return false;
+                    }
+                }
 
-            // Footprint filter
-            if let Some(max_footprint) = criteria.max_footprint_m3 {
-                if sys.footprint_m3 > max_footprint { return false; }
-            }
+                // Footprint filter
+                if let Some(max_footprint) = criteria.max_footprint_m3 {
+                    if sys.footprint_m3 > max_footprint {
+                        return false;
+                    }
+                }
 
-            true
-        }).collect()
+                true
+            })
+            .collect()
     }
 
     /// Rank systems by a weighted score
     pub fn rank(&self, weights: &TriggerWeights) -> Vec<(&TriggerSystemSpec, f64)> {
-        let mut scored: Vec<_> = self.systems.iter().map(|sys| {
-            let score = self.compute_score(sys, weights);
-            (sys, score)
-        }).collect();
+        let mut scored: Vec<_> = self
+            .systems
+            .iter()
+            .map(|sys| {
+                let score = self.compute_score(sys, weights);
+                (sys, score)
+            })
+            .collect();
 
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         scored
@@ -708,22 +752,26 @@ impl TriggerSystemLibrary {
         // Different triggers optimal at different scales
         if target_power_w < 100.0 {
             // Sub-100W: piezo or thermal cycling
-            self.systems.iter()
+            self.systems
+                .iter()
                 .find(|s| s.method == ExtendedTriggerMethod::PiezoPhonon)
                 .unwrap_or(&self.systems[0])
         } else if target_power_w < 10_000.0 {
             // 100W - 10kW: electron beam or glow discharge
-            self.systems.iter()
+            self.systems
+                .iter()
                 .find(|s| s.method == ExtendedTriggerMethod::ElectronBeam)
                 .unwrap_or(&self.systems[0])
         } else if target_power_w < 1_000_000.0 {
             // 10kW - 1MW: laser bremsstrahlung or compact X-ray
-            self.systems.iter()
+            self.systems
+                .iter()
                 .find(|s| s.method == ExtendedTriggerMethod::LaserBremsstrahlung)
                 .unwrap_or(&self.systems[0])
         } else {
             // >1MW: NEEC or muon catalysis for theoretical high gain
-            self.systems.iter()
+            self.systems
+                .iter()
                 .find(|s| s.method == ExtendedTriggerMethod::NeecCascade)
                 .unwrap_or(&self.systems[0])
         }
@@ -761,10 +809,10 @@ impl Default for TriggerWeights {
     fn default() -> Self {
         Self {
             trl: 1.0,
-            cost: 1.5,      // Cost is important
+            cost: 1.5, // Cost is important
             rep_rate: 0.8,
             efficiency: 1.0,
-            footprint: 1.2, // Compactness important
+            footprint: 1.2,  // Compactness important
             conversion: 1.5, // Conversion critical
             phonon: 1.0,
         }
@@ -775,8 +823,8 @@ impl TriggerWeights {
     /// Weights optimized for desktop/maker scale
     pub fn desktop() -> Self {
         Self {
-            trl: 1.5,       // Want proven tech
-            cost: 2.0,      // Cost critical
+            trl: 1.5,  // Want proven tech
+            cost: 2.0, // Cost critical
             rep_rate: 0.5,
             efficiency: 0.8,
             footprint: 2.0, // Must be small
@@ -788,7 +836,7 @@ impl TriggerWeights {
     /// Weights for research/prototype
     pub fn research() -> Self {
         Self {
-            trl: 0.5,       // OK with less proven
+            trl: 0.5, // OK with less proven
             cost: 0.8,
             rep_rate: 1.0,
             efficiency: 1.0,
@@ -801,9 +849,9 @@ impl TriggerWeights {
     /// Weights for industrial/power generation
     pub fn industrial() -> Self {
         Self {
-            trl: 2.0,       // Must be reliable
+            trl: 2.0, // Must be reliable
             cost: 1.0,
-            rep_rate: 1.5,  // Throughput matters
+            rep_rate: 1.5,   // Throughput matters
             efficiency: 2.0, // Efficiency critical at scale
             footprint: 0.3,
             conversion: 1.5,
@@ -833,7 +881,7 @@ pub struct FusionYieldEstimate {
 pub fn estimate_fusion_yield(
     sys: &TriggerSystemSpec,
     target_mass_g: f64,
-    d_loading_ratio: f64,  // D/Pd ratio
+    d_loading_ratio: f64, // D/Pd ratio
 ) -> FusionYieldEstimate {
     // Number of D atoms in target
     // Assume Pd: 106.4 g/mol, so moles = mass / 106.4
@@ -844,8 +892,10 @@ pub fn estimate_fusion_yield(
     let d_pairs = d_atoms * d_loading_ratio / 2.0;
 
     // Trigger volume fraction
-    let trigger_volume = PI * (sys.physics.penetration_depth_um * 1e-4).powi(2)
-                        * sys.physics.deposition_profile_um * 1e-4; // cm³
+    let trigger_volume = PI
+        * (sys.physics.penetration_depth_um * 1e-4).powi(2)
+        * sys.physics.deposition_profile_um
+        * 1e-4; // cm³
     let target_volume = target_mass_g / 12.0; // Pd density ~12 g/cm³
     let volume_fraction = (trigger_volume / target_volume).min(1.0);
 
@@ -873,8 +923,7 @@ pub fn estimate_fusion_yield(
     let thermal_power_w = fusions_per_second * j_per_fusion;
 
     // Input power estimate
-    let input_power_w = sys.energy_per_trigger_j * sys.max_rep_rate_hz
-                       / sys.wall_plug_efficiency;
+    let input_power_w = sys.energy_per_trigger_j * sys.max_rep_rate_hz / sys.wall_plug_efficiency;
 
     let q_factor = if input_power_w > 0.0 {
         thermal_power_w / input_power_w
@@ -909,12 +958,16 @@ pub fn estimate_fusion_yield(
 /// Compare all trigger systems for a given configuration
 pub fn compare_triggers(target_mass_g: f64, d_loading: f64) -> Vec<FusionYieldEstimate> {
     let library = TriggerSystemLibrary::new();
-    let mut estimates: Vec<_> = library.systems.iter()
+    let mut estimates: Vec<_> = library
+        .systems
+        .iter()
         .map(|sys| estimate_fusion_yield(sys, target_mass_g, d_loading))
         .collect();
 
     estimates.sort_by(|a, b| {
-        b.q_factor.partial_cmp(&a.q_factor).unwrap_or(std::cmp::Ordering::Equal)
+        b.q_factor
+            .partial_cmp(&a.q_factor)
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
 
     estimates
@@ -1068,7 +1121,9 @@ impl LcfPhysicsConstants {
         let e_kev = e_cm_ev / 1000.0;
         let ue_kev = ue_ev / 1000.0;
 
-        if e_kev <= 0.01 { return 1.0; } // Below validity range
+        if e_kev <= 0.01 {
+            return 1.0;
+        } // Below validity range
 
         // Gamow constant for D-D: B_G = π α √(2 μ c²) ≈ 31.38 keV^(1/2)
         let b_gamow = 31.38_f64;
@@ -1165,16 +1220,17 @@ impl LcfPhysicsConstants {
     /// Estimated from WKB approximation with Ue = 309 eV
     pub fn dd_tunneling_probability(e_cm_ev: f64) -> f64 {
         let e_kev = e_cm_ev / 1000.0;
-        if e_kev <= 0.0 { return 0.0; }
+        if e_kev <= 0.0 {
+            return 0.0;
+        }
 
         // Gamow factor: exp(-B_G / √E) where B_G ≈ 31.38 for D-D
         let b_gamow = 31.38_f64;
         let bare_prob = (-b_gamow / e_kev.sqrt()).exp();
 
         // Apply screening enhancement
-        let screened_prob = bare_prob * Self::screening_enhancement_at_energy(
-            Self::SCREENING_UE_PD_EV, e_cm_ev
-        );
+        let screened_prob =
+            bare_prob * Self::screening_enhancement_at_energy(Self::SCREENING_UE_PD_EV, e_cm_ev);
 
         screened_prob.min(1.0)
     }
@@ -1190,7 +1246,9 @@ impl LcfPhysicsConstants {
     ///   σ(10 keV) ≈ 2.8 × 10⁻⁴ barn
     ///   σ(100 keV) ≈ 2.0 × 10⁻² barn
     pub fn dd_cross_section_barn(e_cm_kev: f64) -> f64 {
-        if e_cm_kev <= 0.0 { return 0.0; }
+        if e_cm_kev <= 0.0 {
+            return 0.0;
+        }
 
         // Gamow constant for D-D
         let b_gamow = 31.38_f64;
@@ -1350,8 +1408,8 @@ impl LcfPhysicsConstants {
 
             // Log of cross-section: log(S/(E+Ue)) - B_G/√(E+Ue)
             let e_screened = e_eff + ue_kev;
-            let log_sigma = (Self::DD_S_FACTOR_KEV_BARN / e_screened).ln()
-                - b_g / e_screened.sqrt();
+            let log_sigma =
+                (Self::DD_S_FACTOR_KEV_BARN / e_screened).ln() - b_g / e_screened.sqrt();
 
             // Log of integrand: log(σ) + log(E) - E/kT
             let log_val = log_sigma + e_kev.ln() - e_kev / kt_kev;
@@ -1361,7 +1419,8 @@ impl LcfPhysicsConstants {
         }
 
         // Find maximum log value for numerical stability
-        let log_max = log_integrand_values.iter()
+        let log_max = log_integrand_values
+            .iter()
             .cloned()
             .fold(f64::NEG_INFINITY, f64::max);
 
@@ -1400,12 +1459,14 @@ impl LcfPhysicsConstants {
             let mut log_bare_vals: Vec<f64> = Vec::with_capacity(n_points + 1);
             for i in 0..=n_points {
                 let e_kev = energies[i];
-                let log_sigma = (Self::DD_S_FACTOR_KEV_BARN / e_kev).ln()
-                    - b_g / e_kev.sqrt();
+                let log_sigma = (Self::DD_S_FACTOR_KEV_BARN / e_kev).ln() - b_g / e_kev.sqrt();
                 let log_val = log_sigma + e_kev.ln() - e_kev / kt_kev;
                 log_bare_vals.push(log_val);
             }
-            let log_max_b = log_bare_vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let log_max_b = log_bare_vals
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
             let mut int_b = 0.0;
             for i in 0..n_points {
                 let f0 = (log_bare_vals[i] - log_max_b).exp();
@@ -1447,10 +1508,7 @@ impl LcfPhysicsConstants {
     /// Energy-dependent branching: R_n(E) = 0.5·(1 - 0.003·E_keV) for E < 100 keV
     ///
     /// Reference: Bosch & Hale, Nucl. Fusion 32 (1992) 611-631
-    pub fn dd_branched_yield(
-        total_reaction_rate_s: f64,
-        e_cm_kev: f64,
-    ) -> DDChannelResult {
+    pub fn dd_branched_yield(total_reaction_rate_s: f64, e_cm_kev: f64) -> DDChannelResult {
         // Energy-dependent branching ratio for neutron channel
         let e_clamped = e_cm_kev.clamp(0.0, 100.0);
         let r_neutron = 0.5 * (1.0 - 0.003 * e_clamped);
@@ -1518,12 +1576,10 @@ impl CalibratedTriggerPhysics {
         // 1/e depth = 1/(μ * ρ) where μ is mass attenuation coefficient
         let mu = if energy_kev < LcfPhysicsConstants::PD_K_EDGE_KEV {
             // Below K-edge: μ ∝ E^-3 (photoelectric)
-            LcfPhysicsConstants::PD_MASS_ATTEN_10KEV
-                * (10.0 / energy_kev).powi(3)
+            LcfPhysicsConstants::PD_MASS_ATTEN_10KEV * (10.0 / energy_kev).powi(3)
         } else {
             // Above K-edge
-            LcfPhysicsConstants::PD_MASS_ATTEN_30KEV
-                * (30.0 / energy_kev).powi(3)
+            LcfPhysicsConstants::PD_MASS_ATTEN_30KEV * (30.0 / energy_kev).powi(3)
         };
 
         // Convert to μm: depth = 1/(μ * ρ) in cm, then * 10⁴ for μm
@@ -1562,7 +1618,10 @@ mod tests {
     #[test]
     fn test_library_creation() {
         let lib = TriggerSystemLibrary::new();
-        assert!(lib.systems.len() >= 10, "Should have multiple trigger systems");
+        assert!(
+            lib.systems.len() >= 10,
+            "Should have multiple trigger systems"
+        );
     }
 
     #[test]
@@ -1609,7 +1668,9 @@ mod tests {
     #[test]
     fn test_fusion_yield_estimate() {
         let lib = TriggerSystemLibrary::new();
-        let ebeam = lib.systems.iter()
+        let ebeam = lib
+            .systems
+            .iter()
             .find(|s| s.method == ExtendedTriggerMethod::ElectronBeam)
             .unwrap();
 
@@ -1640,7 +1701,7 @@ mod tests {
 
         // Should be sorted by Q factor
         for i in 1..estimates.len() {
-            assert!(estimates[i-1].q_factor >= estimates[i].q_factor);
+            assert!(estimates[i - 1].q_factor >= estimates[i].q_factor);
         }
     }
 
@@ -1712,15 +1773,21 @@ mod tests {
     fn test_screening_increases_with_ue() {
         // At 1 keV, higher Ue should give higher enhancement
         let enh_pd = LcfPhysicsConstants::screening_enhancement_at_energy(
-            LcfPhysicsConstants::SCREENING_UE_PD_EV, 1000.0);
+            LcfPhysicsConstants::SCREENING_UE_PD_EV,
+            1000.0,
+        );
         let enh_ti = LcfPhysicsConstants::screening_enhancement_at_energy(
-            LcfPhysicsConstants::SCREENING_UE_TI_EV, 1000.0);
+            LcfPhysicsConstants::SCREENING_UE_TI_EV,
+            1000.0,
+        );
 
         assert!(
             enh_ti > enh_pd,
             "Ti (Ue={} eV, enh={:.1}×) should screen more than Pd (Ue={} eV, enh={:.1}×)",
-            LcfPhysicsConstants::SCREENING_UE_TI_EV, enh_ti,
-            LcfPhysicsConstants::SCREENING_UE_PD_EV, enh_pd
+            LcfPhysicsConstants::SCREENING_UE_TI_EV,
+            enh_ti,
+            LcfPhysicsConstants::SCREENING_UE_PD_EV,
+            enh_pd
         );
     }
 
@@ -1735,7 +1802,9 @@ mod tests {
         assert!(
             error < 0.5,
             "K-O range at 50 keV ({:.1} μm) vs NIST ({:.1} μm): {:.0}% error",
-            range_50, nist_50, error * 100.0
+            range_50,
+            nist_50,
+            error * 100.0
         );
     }
 
@@ -1752,9 +1821,19 @@ mod tests {
     #[test]
     fn test_lcf_rate_scales_with_area() {
         let rate_1cm2 = LcfPhysicsConstants::estimate_lcf_rate(
-            1.0, 25.0, 12.0, 1e12, LcfPhysicsConstants::SCREENING_UE_PD_EV);
+            1.0,
+            25.0,
+            12.0,
+            1e12,
+            LcfPhysicsConstants::SCREENING_UE_PD_EV,
+        );
         let rate_10cm2 = LcfPhysicsConstants::estimate_lcf_rate(
-            10.0, 25.0, 12.0, 1e12, LcfPhysicsConstants::SCREENING_UE_PD_EV);
+            10.0,
+            25.0,
+            12.0,
+            1e12,
+            LcfPhysicsConstants::SCREENING_UE_PD_EV,
+        );
 
         assert!(
             (rate_10cm2 / rate_1cm2 - 10.0).abs() < 0.1,
@@ -1766,7 +1845,7 @@ mod tests {
     fn test_lcf_rate_matches_nasa_baseline() {
         // With NASA parameters, should reproduce ~10³ n/s
         let rate = LcfPhysicsConstants::estimate_lcf_rate(
-            1.0,  // 1 cm²
+            1.0, // 1 cm²
             LcfPhysicsConstants::NASA_TARGET_THICKNESS_UM,
             LcfPhysicsConstants::NASA_XRAY_ENERGY_KEV,
             1e12, // estimated flux
@@ -1775,9 +1854,11 @@ mod tests {
 
         assert!(
             (rate - LcfPhysicsConstants::NASA_NEUTRON_RATE_PER_CM2).abs()
-                / LcfPhysicsConstants::NASA_NEUTRON_RATE_PER_CM2 < 0.01,
+                / LcfPhysicsConstants::NASA_NEUTRON_RATE_PER_CM2
+                < 0.01,
             "Should reproduce NASA baseline: got {:.0} vs expected {:.0}",
-            rate, LcfPhysicsConstants::NASA_NEUTRON_RATE_PER_CM2
+            rate,
+            LcfPhysicsConstants::NASA_NEUTRON_RATE_PER_CM2
         );
     }
 
@@ -1786,9 +1867,12 @@ mod tests {
         // Phonon generation should be between 0 and 1
         for energy in [1.0, 10.0, 50.0, 100.0] {
             let eff = CalibratedTriggerPhysics::ebeam_phonon_efficiency(energy);
-            assert!(eff > 0.0 && eff < 1.0,
-                    "Phonon efficiency at {} keV = {}, should be in (0,1)",
-                    energy, eff);
+            assert!(
+                eff > 0.0 && eff < 1.0,
+                "Phonon efficiency at {} keV = {}, should be in (0,1)",
+                energy,
+                eff
+            );
         }
     }
 
@@ -1805,16 +1889,18 @@ mod tests {
         assert!(
             LcfPhysicsConstants::MUON_FUSIONS_PER_MUON < upper_bound,
             "Observed fusions ({:.0}) should be below sticking limit ({:.0})",
-            LcfPhysicsConstants::MUON_FUSIONS_PER_MUON, upper_bound
+            LcfPhysicsConstants::MUON_FUSIONS_PER_MUON,
+            upper_bound
         );
 
         // Cycling rate × lifetime gives max possible cycles
-        let max_cycles = LcfPhysicsConstants::MUON_CYCLING_RATE
-            * LcfPhysicsConstants::MUON_LIFETIME_US;
+        let max_cycles =
+            LcfPhysicsConstants::MUON_CYCLING_RATE * LcfPhysicsConstants::MUON_LIFETIME_US;
         assert!(
             max_cycles > LcfPhysicsConstants::MUON_FUSIONS_PER_MUON,
             "Max cycles ({:.0}) should exceed observed fusions ({:.0})",
-            max_cycles, LcfPhysicsConstants::MUON_FUSIONS_PER_MUON
+            max_cycles,
+            LcfPhysicsConstants::MUON_FUSIONS_PER_MUON
         );
     }
 
@@ -1837,12 +1923,16 @@ mod tests {
         let mut prev_rate = 0.0_f64;
         for &t in &temps {
             let result = LcfPhysicsConstants::dd_reaction_rate_integrated(
-                t, LcfPhysicsConstants::SCREENING_UE_PD_EV, 0,
+                t,
+                LcfPhysicsConstants::SCREENING_UE_PD_EV,
+                0,
             );
             assert!(
                 result.sigma_v_cm3_s >= prev_rate,
                 "<σv> at {}K ({:.2e}) should be >= at lower T ({:.2e})",
-                t, result.sigma_v_cm3_s, prev_rate
+                t,
+                result.sigma_v_cm3_s,
+                prev_rate
             );
             prev_rate = result.sigma_v_cm3_s;
         }
@@ -1853,12 +1943,15 @@ mod tests {
         // Screened rate should exceed bare rate
         let bare = LcfPhysicsConstants::dd_reaction_rate_integrated(5000.0, 0.0, 0);
         let screened = LcfPhysicsConstants::dd_reaction_rate_integrated(
-            5000.0, LcfPhysicsConstants::SCREENING_UE_PD_EV, 0,
+            5000.0,
+            LcfPhysicsConstants::SCREENING_UE_PD_EV,
+            0,
         );
         assert!(
             screened.sigma_v_cm3_s >= bare.sigma_v_cm3_s,
             "Screened rate ({:.2e}) should >= bare ({:.2e})",
-            screened.sigma_v_cm3_s, bare.sigma_v_cm3_s
+            screened.sigma_v_cm3_s,
+            bare.sigma_v_cm3_s
         );
         assert!(screened.screening_enhancement >= 1.0);
     }
@@ -1867,15 +1960,20 @@ mod tests {
     fn test_gamow_integration_phonon_enhancement() {
         // Adding phonon modes should increase reaction rate
         let no_phonon = LcfPhysicsConstants::dd_reaction_rate_integrated(
-            5000.0, LcfPhysicsConstants::SCREENING_UE_PD_EV, 0,
+            5000.0,
+            LcfPhysicsConstants::SCREENING_UE_PD_EV,
+            0,
         );
         let with_phonon = LcfPhysicsConstants::dd_reaction_rate_integrated(
-            5000.0, LcfPhysicsConstants::SCREENING_UE_PD_EV, 3,
+            5000.0,
+            LcfPhysicsConstants::SCREENING_UE_PD_EV,
+            3,
         );
         assert!(
             with_phonon.sigma_v_cm3_s >= no_phonon.sigma_v_cm3_s,
             "Phonon-enhanced rate ({:.2e}) should >= bare ({:.2e})",
-            with_phonon.sigma_v_cm3_s, no_phonon.sigma_v_cm3_s
+            with_phonon.sigma_v_cm3_s,
+            no_phonon.sigma_v_cm3_s
         );
         assert!(with_phonon.phonon_enhancement >= 1.0);
     }
@@ -1884,13 +1982,15 @@ mod tests {
     fn test_screening_at_room_temperature() {
         // At 300K, screening_energy_at_temperature should return ~measured value
         let ue = LcfPhysicsConstants::screening_energy_at_temperature(
-            LcfPhysicsConstants::SCREENING_UE_PD_EV, 300.0,
+            LcfPhysicsConstants::SCREENING_UE_PD_EV,
+            300.0,
         );
         // Should be very close to measured (Gaussian f ≈ 1 at 300K)
         assert!(
             (ue - LcfPhysicsConstants::SCREENING_UE_PD_EV).abs() < 1.0,
             "Ue at 300K ({:.1} eV) should match measured ({:.1} eV)",
-            ue, LcfPhysicsConstants::SCREENING_UE_PD_EV
+            ue,
+            LcfPhysicsConstants::SCREENING_UE_PD_EV
         );
     }
 
@@ -1898,14 +1998,16 @@ mod tests {
     fn test_screening_debye_at_high_temperature() {
         // At very high T, should transition toward Debye scaling
         let ue_1500k = LcfPhysicsConstants::screening_energy_at_temperature(
-            LcfPhysicsConstants::SCREENING_UE_PD_EV, 1500.0,
+            LcfPhysicsConstants::SCREENING_UE_PD_EV,
+            1500.0,
         );
         // At 1500K, Debye model gives Ue × √(1500/300) ≈ Ue × 2.24
         // The Gaussian crossover means we're mostly in Debye regime
         assert!(
             ue_1500k > LcfPhysicsConstants::SCREENING_UE_PD_EV,
             "Ue at 1500K ({:.1} eV) should exceed room-temperature value ({:.1} eV)",
-            ue_1500k, LcfPhysicsConstants::SCREENING_UE_PD_EV
+            ue_1500k,
+            LcfPhysicsConstants::SCREENING_UE_PD_EV
         );
     }
 
@@ -1928,7 +2030,8 @@ mod tests {
             assert!(
                 (channel.branching_ratio - 0.5).abs() < 0.01,
                 "Channel '{}' branching {:.4} should be near 0.5 at low energy",
-                channel.name, channel.branching_ratio
+                channel.name,
+                channel.branching_ratio
             );
         }
     }

@@ -136,20 +136,13 @@ pub enum SwarmMessage {
     },
 
     /// Acknowledgment of join
-    JoinAck {
-        assigned_role: String,
-    },
+    JoinAck { assigned_role: String },
 
     /// Heartbeat to maintain connection
-    Heartbeat {
-        phi: f64,
-        peer_count: usize,
-    },
+    Heartbeat { phi: f64, peer_count: usize },
 
     /// Request for trust verification
-    TrustChallenge {
-        nonce: Vec<u8>,
-    },
+    TrustChallenge { nonce: Vec<u8> },
 
     /// Response to trust challenge (signed nonce)
     TrustResponse {
@@ -161,14 +154,10 @@ pub enum SwarmMessage {
     TicketRequest,
 
     /// Iroh connection ticket
-    TicketResponse {
-        ticket: String,
-    },
+    TicketResponse { ticket: String },
 
     /// Graceful disconnect
-    Goodbye {
-        reason: String,
-    },
+    Goodbye { reason: String },
 }
 
 impl SwarmMessage {
@@ -374,7 +363,10 @@ mod tests {
 
     #[test]
     fn test_message_types() {
-        let msg = SwarmMessage::Heartbeat { phi: 0.5, peer_count: 3 };
+        let msg = SwarmMessage::Heartbeat {
+            phi: 0.5,
+            peer_count: 3,
+        };
         assert_eq!(msg.message_type(), "Heartbeat");
     }
 }

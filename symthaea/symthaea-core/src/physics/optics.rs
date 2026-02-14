@@ -20,18 +20,18 @@
 //! - Optical communications
 //! - Quantum information with photons
 
+use super::constants::{C, H};
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::{C, H};
 use serde::{Deserialize, Serialize};
 
 /// Optical regime
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OpticalRegime {
-    Geometric,    // Ray optics, λ << feature size
-    Wave,         // Diffraction important
-    Quantum,      // Single photon effects
+    Geometric, // Ray optics, λ << feature size
+    Wave,      // Diffraction important
+    Quantum,   // Single photon effects
 }
 
 /// Nonlinear process
@@ -50,11 +50,11 @@ pub enum NonlinearProcess {
 /// Photon statistics type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PhotonStatistics {
-    Coherent,     // Poissonian (laser)
-    Thermal,      // Super-Poissonian (chaotic)
-    Squeezed,     // Sub-Poissonian
-    Fock,         // Number state
-    Entangled,    // Two-photon correlations
+    Coherent,  // Poissonian (laser)
+    Thermal,   // Super-Poissonian (chaotic)
+    Squeezed,  // Sub-Poissonian
+    Fock,      // Number state
+    Entangled, // Two-photon correlations
 }
 
 /// An optical beam
@@ -229,7 +229,7 @@ impl OpticsEncoder {
         // Coherence length depends on source bandwidth
         let coherence_length = match statistics {
             PhotonStatistics::Coherent => wavelength_nm * 1e-9 * 1e6, // ~1m for laser
-            PhotonStatistics::Thermal => wavelength_nm * 1e-9 * 10.0,  // ~μm for thermal
+            PhotonStatistics::Thermal => wavelength_nm * 1e-9 * 10.0, // ~μm for thermal
             PhotonStatistics::Squeezed => wavelength_nm * 1e-9 * 1e6,
             PhotonStatistics::Fock => wavelength_nm * 1e-9 * 1e3,
             PhotonStatistics::Entangled => wavelength_nm * 1e-9 * 100.0,
@@ -245,7 +245,8 @@ impl OpticsEncoder {
 
         // Use log10(power + 1e-10) to avoid zero scaling at 1W
         let power_scale = (1.0 + power_w.abs()).log10() as f32;
-        let vector = self.light
+        let vector = self
+            .light
             .bind(&self.wavelength.scale((1000.0 / wavelength_nm) as f32))
             .bind(stat_vec)
             .bind(&self.intensity.scale(power_scale));
@@ -305,18 +306,14 @@ impl OpticsEncoder {
 
     /// Create Fock state |n⟩
     pub fn fock_state_vec(&self, n: u32) -> ContinuousHV {
-        self.fock_state
-            .bind(&self.photon)
-            .scale(n as f32)
+        self.fock_state.bind(&self.photon).scale(n as f32)
     }
 
     /// Coherent state |α⟩
     pub fn coherent_state_vec(&self, alpha: f64) -> ContinuousHV {
         // Mean photon number = |α|²
         let n_mean = alpha * alpha;
-        self.coherent_state
-            .bind(&self.photon)
-            .scale(n_mean as f32)
+        self.coherent_state.bind(&self.photon).scale(n_mean as f32)
     }
 
     /// Squeezed state
@@ -336,11 +333,11 @@ impl OpticsEncoder {
     /// Second-order correlation g²(0)
     pub fn g2_zero(&self, statistics: PhotonStatistics) -> f64 {
         match statistics {
-            PhotonStatistics::Coherent => 1.0,      // Poissonian
-            PhotonStatistics::Thermal => 2.0,       // Bunched
-            PhotonStatistics::Squeezed => 0.5,      // Antibunched (approximate)
-            PhotonStatistics::Fock => 0.0,          // Perfect antibunching for n=1
-            PhotonStatistics::Entangled => 0.0,     // Depends on state
+            PhotonStatistics::Coherent => 1.0,  // Poissonian
+            PhotonStatistics::Thermal => 2.0,   // Bunched
+            PhotonStatistics::Squeezed => 0.5,  // Antibunched (approximate)
+            PhotonStatistics::Fock => 0.0,      // Perfect antibunching for n=1
+            PhotonStatistics::Entangled => 0.0, // Depends on state
         }
     }
 
@@ -367,9 +364,7 @@ impl OpticsEncoder {
     /// Gain bandwidth product
     pub fn gain_bandwidth(&self, gain: f64, bandwidth_thz: f64) -> ContinuousHV {
         let gbp = gain * bandwidth_thz;
-        self.gain_medium
-            .bind(&self.frequency)
-            .scale(gbp as f32)
+        self.gain_medium.bind(&self.frequency).scale(gbp as f32)
     }
 
     // ============================================================
@@ -386,7 +381,8 @@ impl OpticsEncoder {
         dispersion: f64,
         nonlinear: f64,
     ) -> OpticalFiber {
-        let vector = self.fiber
+        let vector = self
+            .fiber
             .bind(&self.guided_mode)
             .bind(&self.dispersion.scale(dispersion.abs() as f32));
 

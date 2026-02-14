@@ -27,10 +27,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone)]
 pub enum CompositionNode {
     /// An atomic (leaf) vector with a label
-    Atomic {
-        label: String,
-        vector: ContinuousHV,
-    },
+    Atomic { label: String, vector: ContinuousHV },
     /// Binding of two nodes: left ⊗ right
     Bind {
         left: Box<CompositionNode>,
@@ -156,9 +153,11 @@ impl BindingDepthAnalyzer {
             CompositionNode::Bind { left, right, .. } => {
                 1 + self.max_depth(left).max(self.max_depth(right))
             }
-            CompositionNode::Bundle { children, .. } => {
-                children.iter().map(|c| self.max_depth(c)).max().unwrap_or(0)
-            }
+            CompositionNode::Bundle { children, .. } => children
+                .iter()
+                .map(|c| self.max_depth(c))
+                .max()
+                .unwrap_or(0),
             CompositionNode::Permute { child, .. } => self.max_depth(child),
         }
     }
@@ -346,8 +345,14 @@ impl RecoverabilityAnalyzer {
         }
 
         let avg = recoverabilities.iter().sum::<f32>() / recoverabilities.len() as f32;
-        let min = recoverabilities.iter().cloned().fold(f32::INFINITY, f32::min);
-        let max = recoverabilities.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let min = recoverabilities
+            .iter()
+            .cloned()
+            .fold(f32::INFINITY, f32::min);
+        let max = recoverabilities
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         let recoverable_count = recoverabilities
             .iter()
             .filter(|&&r| r >= self.success_threshold)
@@ -899,7 +904,11 @@ mod tests {
 
         // For random vectors, bind should create structure very different from bundle
         // So coherence should be high
-        assert!(result.coherence > 0.5, "Random vectors should have high coherence: {}", result.coherence);
+        assert!(
+            result.coherence > 0.5,
+            "Random vectors should have high coherence: {}",
+            result.coherence
+        );
     }
 
     #[test]
@@ -936,7 +945,10 @@ mod tests {
         let b = create_atomic("B", 2);
         let bound = CompositionNode::bind(a, b);
         let entropy_mixed = analyzer.structural_entropy(&bound);
-        assert!(entropy_mixed > 0.0, "Mixed structure should have positive entropy");
+        assert!(
+            entropy_mixed > 0.0,
+            "Mixed structure should have positive entropy"
+        );
     }
 
     #[test]
@@ -976,9 +988,12 @@ mod tests {
         let score_shallow = metrics.emergence_score(&shallow);
         let score_deep = metrics.emergence_score(&deep);
 
-        assert!(score_deep > score_shallow,
+        assert!(
+            score_deep > score_shallow,
             "Deeper structure should have higher emergence: shallow={}, deep={}",
-            score_shallow, score_deep);
+            score_shallow,
+            score_deep
+        );
     }
 
     #[test]
@@ -1020,7 +1035,11 @@ mod tests {
         let score = metrics.emergence_score(&atomic);
 
         // Single atomic node should have very low emergence
-        assert!(score < 0.3, "Atomic node should have low emergence score: {}", score);
+        assert!(
+            score < 0.3,
+            "Atomic node should have low emergence score: {}",
+            score
+        );
     }
 
     #[test]

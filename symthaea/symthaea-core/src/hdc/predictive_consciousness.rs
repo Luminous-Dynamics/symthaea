@@ -69,9 +69,9 @@ impl PredictiveLevel {
     /// Get timescale for this level (in seconds)
     pub fn timescale(&self) -> f64 {
         match self {
-            PredictiveLevel::Sensory => 0.1,   // 100ms
-            PredictiveLevel::Feature => 3.0,   // 3 seconds
-            PredictiveLevel::Concept => 300.0, // 5 minutes
+            PredictiveLevel::Sensory => 0.1,      // 100ms
+            PredictiveLevel::Feature => 3.0,      // 3 seconds
+            PredictiveLevel::Concept => 300.0,    // 5 minutes
             PredictiveLevel::Abstract => 86400.0, // 1 day
         }
     }
@@ -80,10 +80,10 @@ impl PredictiveLevel {
     /// Higher levels have lower precision (less certain)
     pub fn default_precision(&self) -> f64 {
         match self {
-            PredictiveLevel::Sensory => 10.0,  // High precision
+            PredictiveLevel::Sensory => 10.0, // High precision
             PredictiveLevel::Feature => 5.0,
             PredictiveLevel::Concept => 2.0,
-            PredictiveLevel::Abstract => 1.0,  // Low precision
+            PredictiveLevel::Abstract => 1.0, // Low precision
         }
     }
 }
@@ -159,28 +159,34 @@ impl GenerativeModel {
         // In full implementation, would use neural network
 
         // Convert BinaryHV to float representation (popcount-based)
-        let state_floats: Vec<f64> = state.iter()
+        let state_floats: Vec<f64> = state
+            .iter()
             .map(|hv| {
                 // Count number of 1-bits (positive values in bipolar encoding)
-                let ones = hv.0.iter().map(|&byte| byte.count_ones() as u64).sum::<u64>();
+                let ones =
+                    hv.0.iter()
+                        .map(|&byte| byte.count_ones() as u64)
+                        .sum::<u64>();
                 let total_bits = BinaryHV::DIM as f64;
                 // Map [0, 2048] bits -> [-1, 1]
                 (2.0 * ones as f64 / total_bits) - 1.0
             })
             .collect();
 
-        self.weights.iter()
+        self.weights
+            .iter()
             .map(|weight_row| {
-                let activation: f64 = weight_row.iter()
+                let activation: f64 = weight_row
+                    .iter()
                     .zip(state_floats.iter())
                     .map(|(w, s)| w * s)
                     .sum();
 
                 // Return BinaryHV based on activation sign
                 if activation > 0.0 {
-                    BinaryHV::ones()  // All +1
+                    BinaryHV::ones() // All +1
                 } else {
-                    BinaryHV::zero()  // All -1
+                    BinaryHV::zero() // All -1
                 }
             })
             .collect()
@@ -190,9 +196,13 @@ impl GenerativeModel {
     /// Gradient descent: w ← w - α × error × state
     pub fn learn(&mut self, state: &[BinaryHV], error: &[f64]) {
         // Convert BinaryHV to float representation
-        let state_floats: Vec<f64> = state.iter()
+        let state_floats: Vec<f64> = state
+            .iter()
             .map(|hv| {
-                let ones = hv.0.iter().map(|&byte| byte.count_ones() as u64).sum::<u64>();
+                let ones =
+                    hv.0.iter()
+                        .map(|&byte| byte.count_ones() as u64)
+                        .sum::<u64>();
                 let total_bits = BinaryHV::DIM as f64;
                 (2.0 * ones as f64 / total_bits) - 1.0
             })
@@ -336,12 +346,14 @@ impl PredictiveConsciousness {
         let levels = PredictiveLevel::all();
 
         // Initialize generative models for each level
-        let models = levels.iter()
+        let models = levels
+            .iter()
             .map(|&level| GenerativeModel::new(level, num_components, num_components))
             .collect();
 
         // Initialize states (random BinaryHV vectors)
-        let states = levels.iter()
+        let states = levels
+            .iter()
             .enumerate()
             .map(|(i, _)| {
                 (0..num_components)
@@ -374,7 +386,8 @@ impl PredictiveConsciousness {
     fn generate_predictions(&self) -> Vec<Prediction> {
         let levels = PredictiveLevel::all();
 
-        levels.iter()
+        levels
+            .iter()
             .enumerate()
             .map(|(i, &level)| {
                 let predicted_state = if i < self.models.len() {
@@ -393,8 +406,8 @@ impl PredictiveConsciousness {
                 let confidence = if self.error_history.is_empty() {
                     0.5
                 } else {
-                    let avg_error: f64 = self.error_history.iter().sum::<f64>()
-                        / self.error_history.len() as f64;
+                    let avg_error: f64 =
+                        self.error_history.iter().sum::<f64>() / self.error_history.len() as f64;
                     (1.0 - avg_error.min(1.0)).max(0.0)
                 };
 
@@ -409,8 +422,13 @@ impl PredictiveConsciousness {
     }
 
     /// Compute prediction errors
-    fn compute_errors(&self, predictions: &[Prediction], observation: &[BinaryHV]) -> Vec<PredictionError> {
-        predictions.iter()
+    fn compute_errors(
+        &self,
+        predictions: &[Prediction],
+        observation: &[BinaryHV],
+    ) -> Vec<PredictionError> {
+        predictions
+            .iter()
             .map(|pred| {
                 // Error magnitude: L2 norm of (actual - predicted)
                 let magnitude = self.compute_l2_distance(&pred.predicted_state, observation);
@@ -442,7 +460,11 @@ impl PredictiveConsciousness {
                 let observation = &self.observations[self.observations.len() - 1];
 
                 // Update state to reduce prediction error
-                for j in 0..self.num_components.min(self.states[i].len()).min(observation.len()) {
+                for j in 0..self
+                    .num_components
+                    .min(self.states[i].len())
+                    .min(observation.len())
+                {
                     let predicted = if j < self.models[i].predict(&self.states[i]).len() {
                         self.models[i].predict(&self.states[i])[j]
                     } else {
@@ -472,15 +494,18 @@ impl PredictiveConsciousness {
             if i < self.models.len() && i < self.states.len() {
                 // Compute error vector
                 let predicted = self.models[i].predict(&self.states[i]);
-                let error_vec: Vec<f64> = observation.iter()
+                let error_vec: Vec<f64> = observation
+                    .iter()
                     .zip(predicted.iter())
-                    .map(|(&obs, &pred)| {
-                        if obs != pred {
-                            error.magnitude
-                        } else {
-                            0.0
-                        }
-                    })
+                    .map(
+                        |(&obs, &pred)| {
+                            if obs != pred {
+                                error.magnitude
+                            } else {
+                                0.0
+                            }
+                        },
+                    )
                     .collect();
 
                 // Update model
@@ -509,7 +534,7 @@ impl PredictiveConsciousness {
             // Simplified: action modifies first level state
             let mut future_state = self.states[0].clone();
             for (i, act) in action.iter().enumerate().take(future_state.len()) {
-                future_state[i] = *act;  // BinaryHV is Copy, so we can assign directly
+                future_state[i] = *act; // BinaryHV is Copy, so we can assign directly
             }
 
             // Compute expected free energy
@@ -521,7 +546,8 @@ impl PredictiveConsciousness {
 
             // Expected surprise
             let expected_surprise = if !predictions.is_empty() {
-                let dist = self.compute_l2_distance(&expected_observation, &predictions[0].predicted_state);
+                let dist = self
+                    .compute_l2_distance(&expected_observation, &predictions[0].predicted_state);
                 0.5 * predictions[0].precision * dist * dist
             } else {
                 0.0
@@ -550,9 +576,7 @@ impl PredictiveConsciousness {
     /// Compute free energy decomposition
     fn compute_free_energy(&self, errors: &[PredictionError]) -> FreeEnergyDecomposition {
         // Energy: -log P(obs|states) ≈ Σ precision × error²
-        let energy: f64 = errors.iter()
-            .map(|e| e.surprise)
-            .sum();
+        let energy: f64 = errors.iter().map(|e| e.surprise).sum();
 
         // Complexity: KL[Q(states)||P(states)]
         // Simplified: assume uniform prior, so KL ≈ 0
@@ -633,7 +657,8 @@ impl PredictiveConsciousness {
         let total_surprise: f64 = errors.iter().map(|e| e.surprise).sum();
 
         // Generate explanation
-        let explanation = self.generate_explanation(&free_energy, &predictions, &errors, &best_action);
+        let explanation =
+            self.generate_explanation(&free_energy, &predictions, &errors, &best_action);
 
         PredictiveAssessment {
             free_energy,
@@ -742,7 +767,10 @@ mod tests {
     fn test_predictive_level() {
         assert_eq!(PredictiveLevel::Sensory.timescale(), 0.1);
         assert_eq!(PredictiveLevel::Abstract.timescale(), 86400.0);
-        assert!(PredictiveLevel::Sensory.default_precision() > PredictiveLevel::Abstract.default_precision());
+        assert!(
+            PredictiveLevel::Sensory.default_precision()
+                > PredictiveLevel::Abstract.default_precision()
+        );
     }
 
     #[test]
@@ -773,7 +801,9 @@ mod tests {
 
         // Add observations
         for i in 0..10 {
-            let obs: Vec<BinaryHV> = (0..100).map(|j| BinaryHV::random((i * 100 + j) as u64)).collect();
+            let obs: Vec<BinaryHV> = (0..100)
+                .map(|j| BinaryHV::random((i * 100 + j) as u64))
+                .collect();
             pc.observe(obs);
         }
 
@@ -834,7 +864,8 @@ mod tests {
         // Learning is happening if errors are changing (not constant)
         // We check variance > 0 rather than strict decrease
         let mean = errors.iter().sum::<f64>() / errors.len() as f64;
-        let variance: f64 = errors.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / errors.len() as f64;
+        let variance: f64 =
+            errors.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / errors.len() as f64;
 
         // If learning is happening, error variance should be non-zero
         // (error is adapting, not stuck at one value)

@@ -9,69 +9,55 @@ use super::super::binary_hv::BinaryHV;
 use super::super::integrated_information::IntegratedInformation;
 
 // Integrated consciousness modules
-use super::super::metacognitive_monitor::{
-    MetacognitiveMonitor, MetacognitiveRecommendation, CognitiveEvent, MemoryOperation,
-};
 use super::super::cross_modal_binding::{CrossModalBinder, Modality};
+use super::super::metacognitive_monitor::{
+    CognitiveEvent, MemoryOperation, MetacognitiveMonitor, MetacognitiveRecommendation,
+};
 use super::super::temporal_binding::TemporalBindingEngine;
 
 // Phi-guided optimization
 use super::super::phi_guided_search::{
-    PhiGuidedOptimizer, ConsciousnessNetwork, OptimizationResult,
+    ConsciousnessNetwork, OptimizationResult, PhiGuidedOptimizer,
 };
 
 // Feedback dynamics
 use super::super::consciousness_feedback_dynamics::{
-    FeedbackDynamicsEngine, DreamInsight, EmotionalPrediction,
-    ProactiveIntervention,
+    DreamInsight, EmotionalPrediction, FeedbackDynamicsEngine, ProactiveIntervention,
 };
 
 // Recursive self-modeling
 use super::super::emergent_self_model::{
-    SelfAwareConsciousness, SelfModel, MetaCognitiveAssessment,
-    IntrospectionReport,
+    IntrospectionReport, MetaCognitiveAssessment, SelfAwareConsciousness, SelfModel,
 };
 
 // Meta-consciousness
-use super::super::meta_consciousness::{
-    MetaConsciousness, MetaConsciousnessState,
-};
+use super::super::meta_consciousness::{MetaConsciousness, MetaConsciousnessState};
 
 // Temporal consciousness
-use super::super::temporal_consciousness::{
-    TemporalConsciousness, TemporalAssessment,
-};
+use super::super::temporal_consciousness::{TemporalAssessment, TemporalConsciousness};
 
 // Creativity
 use super::super::consciousness_creativity::{
-    ConsciousnessCreativity, CreativityAssessment,
-    CreativeMode, CreativeIdea,
+    ConsciousnessCreativity, CreativeIdea, CreativeMode, CreativityAssessment,
 };
 
 // Phase transitions
 use super::super::consciousness_phase_transitions::{
-    ConsciousnessPhaseTransitions, ConsciousnessPhase,
-    PhaseTransitionAssessment,
+    ConsciousnessPhase, ConsciousnessPhaseTransitions, PhaseTransitionAssessment,
 };
 
 // Epistemic consciousness
-use super::super::epistemic_consciousness::{
-    EpistemicConsciousness, KIndexAssessment,
-};
+use super::super::epistemic_consciousness::{EpistemicConsciousness, KIndexAssessment};
 
 // Fractal consciousness
-use super::super::fractal_consciousness::{
-    FractalConsciousness, FractalMetrics,
-};
+use super::super::fractal_consciousness::{FractalConsciousness, FractalMetrics};
 
 // Collective consciousness
-use super::super::collective_consciousness::{
-    CollectiveConsciousness, CollectiveAssessment,
-};
+use super::super::collective_consciousness::{CollectiveAssessment, CollectiveConsciousness};
 
 // Phi feedback
-use super::super::phi_feedback::{PhiFeedbackController, FeedbackModulation};
 use super::super::consciousness_perf;
+use super::super::phi_feedback::{FeedbackModulation, PhiFeedbackController};
 
 // Subsystem trait
 use super::super::consciousness_subsystem::ConsciousnessSubsystem;
@@ -106,7 +92,6 @@ pub struct ConsciousnessPipeline {
     pub(crate) max_memory_size: usize,
 
     // === INTEGRATED CONSCIOUSNESS SYSTEMS ===
-
     /// Metacognitive monitor - tracks processing quality and confidence
     pub(crate) metacognitive_monitor: Option<MetacognitiveMonitor>,
     /// Cross-modal binder - integrates multiple sensory modalities
@@ -117,12 +102,10 @@ pub struct ConsciousnessPipeline {
     // Note: SelfModel and PredictiveConsciousness require EngineConfig
     // which has dependencies we don't need in the basic pipeline.
     // We track their metrics directly in ConsciousnessState instead.
-
     /// Enable integrated consciousness systems
     pub(crate) integrated_systems_enabled: bool,
 
     // === Φ-GUIDED TOPOLOGY OPTIMIZATION ===
-
     /// Φ-guided optimizer for network topology evolution
     pub(crate) phi_optimizer: Option<PhiGuidedOptimizer>,
 
@@ -139,7 +122,6 @@ pub struct ConsciousnessPipeline {
     pub(crate) phi_optimization_enabled: bool,
 
     // === FEEDBACK DYNAMICS ENGINE ===
-
     /// Bidirectional feedback dynamics engine
     pub(crate) feedback_dynamics: Option<FeedbackDynamicsEngine>,
 
@@ -156,7 +138,6 @@ pub struct ConsciousnessPipeline {
     pub(crate) feedback_dynamics_enabled: bool,
 
     // === RECURSIVE SELF-MODELING ===
-
     /// Self-aware consciousness for recursive self-modeling
     pub(crate) self_aware_consciousness: Option<SelfAwareConsciousness>,
 
@@ -256,7 +237,6 @@ pub struct ConsciousnessPipeline {
     pub(crate) phi_feedback_enabled: bool,
 
     // === OBSERVABILITY & VERIFICATION ===
-
     /// Optional metrics collector for observability recording
     pub(crate) metrics_collector: Option<crate::observability::SharedObserver>,
 
@@ -265,7 +245,8 @@ pub struct ConsciousnessPipeline {
     /// How often (in cycles) to run verification (0 = disabled)
     pub(crate) verification_interval: usize,
     /// Latest verification report
-    pub(crate) latest_verification: Option<super::super::consciousness_verifier::VerificationReport>,
+    pub(crate) latest_verification:
+        Option<super::super::consciousness_verifier::VerificationReport>,
 
     /// Pluggable subsystems (trait-based extension point, sorted by priority descending)
     pub(crate) subsystems: Vec<Box<dyn ConsciousnessSubsystem>>,
@@ -412,18 +393,16 @@ impl ConsciousnessPipeline {
             let iit_phi = self.phi_calculator.compute_phi_entropy(&input);
             // Blend IIT Φ with binding heuristic: IIT provides the information-theoretic
             // foundation, binding strength modulates for attention/embodiment effects.
-            self.state.phi = (iit_phi * 0.7 + binding_strength * self.embodiment_level * 0.3).min(1.0);
+            self.state.phi =
+                (iit_phi * 0.7 + binding_strength * self.embodiment_level * 0.3).min(1.0);
         } else {
             self.state.phi = (binding_strength * self.embodiment_level).min(1.0);
         }
 
         // Update consciousness level
-        let attention_boost = priorities.iter()
-            .cloned()
-            .fold(0.5_f64, |a, b| a.max(b));
-        self.state.consciousness_level = self.state.phi * 0.4 +
-            attention_boost * 0.3 +
-            self.embodiment_level * 0.3;
+        let attention_boost = priorities.iter().cloned().fold(0.5_f64, |a, b| a.max(b));
+        self.state.consciousness_level =
+            self.state.phi * 0.4 + attention_boost * 0.3 + self.embodiment_level * 0.3;
 
         // === TEMPORAL TRACKING ===
         // Increment cycle counter for temporal coherence
@@ -432,7 +411,7 @@ impl ConsciousnessPipeline {
         // === HIERARCHICAL BINDING: Feature → Object → Scene ===
         // PERSISTENCE + TEMPORAL: Decay existing bindings and update temporal metrics
         self.state.bound_objects.retain_mut(|obj| {
-            obj.binding_strength *= 0.9;  // Decay
+            obj.binding_strength *= 0.9; // Decay
 
             // Update temporal metrics for surviving bindings
             if obj.binding_strength > 0.3 {
@@ -441,7 +420,7 @@ impl ConsciousnessPipeline {
                 obj.temporal_stability = (obj.temporal_stability + 0.01).min(1.0);
             }
 
-            obj.binding_strength > 0.3   // Keep if still strong enough
+            obj.binding_strength > 0.3 // Keep if still strong enough
         });
 
         // === TEMPORAL MEMORY UPDATE ===
@@ -461,10 +440,12 @@ impl ConsciousnessPipeline {
         }
 
         // Binding occurs when multiple features are processed together with high priority
-        if input.len() >= 2 && self.state.consciousness_level > self.config.consciousness_threshold {
+        if input.len() >= 2 && self.state.consciousness_level > self.config.consciousness_threshold
+        {
             // LEVEL 1: FEATURE BINDING
             // Group high-priority inputs into bound objects (perceptual binding)
-            let high_priority_inputs: Vec<(usize, &BinaryHV)> = input.iter()
+            let high_priority_inputs: Vec<(usize, &BinaryHV)> = input
+                .iter()
                 .enumerate()
                 .filter(|(i, _)| priorities.get(*i).copied().unwrap_or(0.0) > 0.5)
                 .collect();
@@ -476,18 +457,25 @@ impl ConsciousnessPipeline {
             // Uses batch clustering from consciousness_perf for cache-friendly access
             if high_priority_inputs.len() >= 2 {
                 let similarity_threshold = 0.3;
-                let hv_refs: Vec<&BinaryHV> = high_priority_inputs.iter().map(|(_, hv)| *hv).collect();
-                let clusters = consciousness_perf::cluster_by_similarity(&hv_refs, similarity_threshold);
+                let hv_refs: Vec<&BinaryHV> =
+                    high_priority_inputs.iter().map(|(_, hv)| *hv).collect();
+                let clusters =
+                    consciousness_perf::cluster_by_similarity(&hv_refs, similarity_threshold);
 
                 for cluster_indices in &clusters {
-                    if cluster_indices.len() < 2 { continue; }
+                    if cluster_indices.len() < 2 {
+                        continue;
+                    }
 
                     let i = cluster_indices[0];
                     // Get attention weight for this cluster (ATTENTION-WEIGHTED BINDING)
-                    let cluster_attention = priorities.get(high_priority_inputs[i].0)
-                        .copied().unwrap_or(0.5);
+                    let cluster_attention = priorities
+                        .get(high_priority_inputs[i].0)
+                        .copied()
+                        .unwrap_or(0.5);
 
-                    let cluster: Vec<&BinaryHV> = cluster_indices.iter().map(|&idx| hv_refs[idx]).collect();
+                    let cluster: Vec<&BinaryHV> =
+                        cluster_indices.iter().map(|&idx| hv_refs[idx]).collect();
 
                     // Calculate synchrony using batch mean_similarity
                     let first_hv = cluster[0];
@@ -495,40 +483,53 @@ impl ConsciousnessPipeline {
                     let avg_synchrony = consciousness_perf::mean_similarity(first_hv, &rest);
 
                     // Create bound representation
-                    let bound_representation = cluster.iter()
+                    let bound_representation = cluster
+                        .iter()
                         .map(|hv| *(*hv))
                         .reduce(|a, b| a.bind(&b))
                         .unwrap_or_else(|| BinaryHV::random(42));
 
                     // ATTENTION-WEIGHTED: Modulate binding strength by attention
-                    let attention_modulated_strength = binding_strength * (0.5 + 0.5 * cluster_attention);
+                    let attention_modulated_strength =
+                        binding_strength * (0.5 + 0.5 * cluster_attention);
 
                     // Check if similar bound object already exists (for persistence/reinforcement)
-                    let existing = self.state.bound_objects.iter_mut()
-                        .find(|obj| obj.representation.similarity(&bound_representation) > 0.6
-                                    && obj.level == BindingLevel::Feature);
+                    let existing = self.state.bound_objects.iter_mut().find(|obj| {
+                        obj.representation.similarity(&bound_representation) > 0.6
+                            && obj.level == BindingLevel::Feature
+                    });
 
                     if let Some(existing_obj) = existing {
                         // REINFORCEMENT: Strengthen existing binding
-                        existing_obj.binding_strength = (existing_obj.binding_strength + attention_modulated_strength * 0.5).min(1.0);
+                        existing_obj.binding_strength = (existing_obj.binding_strength
+                            + attention_modulated_strength * 0.5)
+                            .min(1.0);
                         existing_obj.synchrony = (existing_obj.synchrony + avg_synchrony) / 2.0;
-                        existing_obj.attention_weight = (existing_obj.attention_weight + cluster_attention) / 2.0;
+                        existing_obj.attention_weight =
+                            (existing_obj.attention_weight + cluster_attention) / 2.0;
                     } else {
                         // Check temporal memory for similar past bindings using find_similar
-                        let feature_memories: Vec<BinaryHV> = self.temporal_memory.iter()
+                        let feature_memories: Vec<BinaryHV> = self
+                            .temporal_memory
+                            .iter()
                             .filter(|mem| mem.level == BindingLevel::Feature)
                             .map(|mem| mem.representation)
                             .collect();
                         let temporal_boost = consciousness_perf::find_similar(
-                            &bound_representation, &feature_memories, 0.6
-                        ).len() as f64 * 0.02; // 2% boost per matching memory
+                            &bound_representation,
+                            &feature_memories,
+                            0.6,
+                        )
+                        .len() as f64
+                            * 0.02; // 2% boost per matching memory
 
                         // Create new feature-level bound object
                         let new_id = self.state.bound_objects.len();
                         self.state.bound_objects.push(BoundObject {
                             representation: bound_representation,
                             synchrony: avg_synchrony.max(0.5),
-                            binding_strength: (attention_modulated_strength + temporal_boost).min(1.0),
+                            binding_strength: (attention_modulated_strength + temporal_boost)
+                                .min(1.0),
                             conscious: self.state.consciousness_level > 0.6,
                             level: BindingLevel::Feature,
                             child_ids: Vec::new(),
@@ -544,7 +545,10 @@ impl ConsciousnessPipeline {
 
             // LEVEL 2: OBJECT BINDING (bind features into objects)
             // If we have 2+ feature bindings, try to form object-level bindings
-            let feature_bindings: Vec<usize> = self.state.bound_objects.iter()
+            let feature_bindings: Vec<usize> = self
+                .state
+                .bound_objects
+                .iter()
                 .enumerate()
                 .filter(|(_, obj)| obj.level == BindingLevel::Feature && obj.binding_strength > 0.5)
                 .map(|(i, _)| i)
@@ -552,12 +556,16 @@ impl ConsciousnessPipeline {
 
             if feature_bindings.len() >= 2 {
                 // Cluster feature bindings by similarity to form objects
-                let feature_refs: Vec<&BoundObject> = feature_bindings.iter()
+                let feature_refs: Vec<&BoundObject> = feature_bindings
+                    .iter()
                     .map(|&i| &self.state.bound_objects[i])
                     .collect();
 
                 // Check if object binding already exists
-                let object_exists = self.state.bound_objects.iter()
+                let object_exists = self
+                    .state
+                    .bound_objects
+                    .iter()
                     .any(|obj| obj.level == BindingLevel::Object);
 
                 if !object_exists && feature_refs.len() >= 2 {
@@ -570,19 +578,26 @@ impl ConsciousnessPipeline {
 
             // LEVEL 3: SCENE BINDING (bind objects into unified scene)
             // If we have 2+ object bindings, form scene-level binding
-            let object_bindings: Vec<usize> = self.state.bound_objects.iter()
+            let object_bindings: Vec<usize> = self
+                .state
+                .bound_objects
+                .iter()
                 .enumerate()
                 .filter(|(_, obj)| obj.level == BindingLevel::Object && obj.binding_strength > 0.5)
                 .map(|(i, _)| i)
                 .collect();
 
             if object_bindings.len() >= 2 {
-                let object_refs: Vec<&BoundObject> = object_bindings.iter()
+                let object_refs: Vec<&BoundObject> = object_bindings
+                    .iter()
                     .map(|&i| &self.state.bound_objects[i])
                     .collect();
 
                 // Check if scene binding already exists
-                let scene_exists = self.state.bound_objects.iter()
+                let scene_exists = self
+                    .state
+                    .bound_objects
+                    .iter()
                     .any(|obj| obj.level == BindingLevel::Scene);
 
                 if !scene_exists {
@@ -612,7 +627,9 @@ impl ConsciousnessPipeline {
                         return level_cmp;
                     }
                     // Then by binding strength
-                    b.binding_strength.partial_cmp(&a.binding_strength).unwrap_or(std::cmp::Ordering::Equal)
+                    b.binding_strength
+                        .partial_cmp(&a.binding_strength)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 });
                 self.state.bound_objects.truncate(MAX_BOUND_OBJECTS);
             }
@@ -620,7 +637,11 @@ impl ConsciousnessPipeline {
 
         // Generate workspace content if high enough consciousness
         if self.state.consciousness_level > self.config.consciousness_threshold {
-            for (i, hv) in input.iter().take(self.config.workspace_capacity).enumerate() {
+            for (i, hv) in input
+                .iter()
+                .take(self.config.workspace_capacity)
+                .enumerate()
+            {
                 let priority = priorities.get(i).copied().unwrap_or(0.5);
                 if priority > 0.6 {
                     self.state.conscious_contents.push(WorkspaceItem {
@@ -651,10 +672,16 @@ impl ConsciousnessPipeline {
             0.5 // Default when no bindings
         } else {
             // Average temporal stability weighted by binding strength
-            let weighted_stability: f64 = self.state.bound_objects.iter()
+            let weighted_stability: f64 = self
+                .state
+                .bound_objects
+                .iter()
                 .map(|obj| obj.temporal_stability * obj.binding_strength)
                 .sum();
-            let total_strength: f64 = self.state.bound_objects.iter()
+            let total_strength: f64 = self
+                .state
+                .bound_objects
+                .iter()
                 .map(|obj| obj.binding_strength)
                 .sum();
             if total_strength > 0.0 {
@@ -668,11 +695,19 @@ impl ConsciousnessPipeline {
             0.5
         } else {
             // Count how many current bindings match recent memory using batch find_similar
-            let memory_refs: Vec<&BinaryHV> = self.temporal_memory.iter()
-                .map(|mem| &mem.representation).collect();
-            let query_refs: Vec<&BinaryHV> = self.state.bound_objects.iter()
-                .map(|obj| &obj.representation).collect();
-            let batch_results = consciousness_perf::batch_find_similar(&query_refs, &memory_refs, 0.6);
+            let memory_refs: Vec<&BinaryHV> = self
+                .temporal_memory
+                .iter()
+                .map(|mem| &mem.representation)
+                .collect();
+            let query_refs: Vec<&BinaryHV> = self
+                .state
+                .bound_objects
+                .iter()
+                .map(|obj| &obj.representation)
+                .collect();
+            let batch_results =
+                consciousness_perf::batch_find_similar(&query_refs, &memory_refs, 0.6);
             let matches: usize = batch_results.iter().map(|r| r.len()).sum();
             let max_matches = self.state.bound_objects.len() * 5; // Expect ~5 matches per binding if stable
             (matches as f64 / max_matches.max(1) as f64).min(1.0)
@@ -692,7 +727,11 @@ impl ConsciousnessPipeline {
 
         // === Φ-GUIDED TOPOLOGY OPTIMIZATION ===
         // Periodically optimize network topology to maximize Φ
-        if self.phi_optimization_enabled && self.current_cycle.is_multiple_of(self.optimize_every_n_cycles as u64) {
+        if self.phi_optimization_enabled
+            && self
+                .current_cycle
+                .is_multiple_of(self.optimize_every_n_cycles as u64)
+        {
             self.process_phi_optimization();
         }
 
@@ -718,7 +757,9 @@ impl ConsciousnessPipeline {
 
         // Temporal consciousness: Multi-scale time processing
         // (skipped if a "temporal_consciousness" subsystem is registered)
-        if self.temporal_consciousness_enabled && !self.has_subsystem_named("temporal_consciousness") {
+        if self.temporal_consciousness_enabled
+            && !self.has_subsystem_named("temporal_consciousness")
+        {
             self.process_temporal_consciousness(&input);
         }
 
@@ -837,7 +878,11 @@ impl ConsciousnessPipeline {
         }
 
         // === PERIODIC VERIFICATION ===
-        if self.verification_interval > 0 && self.current_cycle.is_multiple_of(self.verification_interval as u64) {
+        if self.verification_interval > 0
+            && self
+                .current_cycle
+                .is_multiple_of(self.verification_interval as u64)
+        {
             if let Some(ref verifier) = self.verifier {
                 self.latest_verification = Some(verifier.verify_from_state(&self.state));
             }
@@ -916,11 +961,8 @@ impl ConsciousnessPipeline {
 
             // Update Φ prediction based on trends
             if self.history.len() >= 3 {
-                let recent_phis: Vec<f64> = self.history.iter()
-                    .rev()
-                    .take(5)
-                    .map(|s| s.phi)
-                    .collect();
+                let recent_phis: Vec<f64> =
+                    self.history.iter().rev().take(5).map(|s| s.phi).collect();
                 if recent_phis.len() >= 2 {
                     let trend = recent_phis[0] - recent_phis[recent_phis.len() - 1];
                     self.state.phi_trend = trend;
@@ -1027,8 +1069,8 @@ impl ConsciousnessPipeline {
         }
 
         // Mode appropriateness = how well current cognitive mode matches demands
-        self.state.mode_appropriateness = self.state.consciousness_level *
-            self.state.metacognitive_confidence;
+        self.state.mode_appropriateness =
+            self.state.consciousness_level * self.state.metacognitive_confidence;
     }
 
     /// Process a single cycle
@@ -1040,9 +1082,9 @@ impl ConsciousnessPipeline {
             let intensity = input.len() as f64 * 0.1;
             self.state.phi = (self.state.phi + intensity).min(1.0);
         }
-        self.state.consciousness_level = self.state.phi * 0.5 +
-            self.state.temporal_coherence * 0.3 +
-            (1.0 - self.state.free_energy) * 0.2;
+        self.state.consciousness_level = self.state.phi * 0.5
+            + self.state.temporal_coherence * 0.3
+            + (1.0 - self.state.free_energy) * 0.2;
 
         if self.history.len() >= self.max_history_size {
             self.history.pop_front();
@@ -1108,25 +1150,31 @@ impl ConsciousnessPipeline {
             0.0
         } else {
             // Average activation of broadcasting contents, weighted by their number
-            let broadcasting_items: Vec<_> = self.state.conscious_contents
+            let broadcasting_items: Vec<_> = self
+                .state
+                .conscious_contents
                 .iter()
                 .filter(|c| c.is_broadcasting)
                 .collect();
 
             if broadcasting_items.is_empty() {
                 // Nothing broadcasting - low workspace access
-                let avg_activation = self.state.conscious_contents.iter()
+                let avg_activation = self
+                    .state
+                    .conscious_contents
+                    .iter()
                     .map(|c| c.activation)
-                    .sum::<f64>() / self.state.conscious_contents.len() as f64;
+                    .sum::<f64>()
+                    / self.state.conscious_contents.len() as f64;
                 avg_activation * 0.5 // Penalty for no broadcast
             } else {
                 // Real workspace = average activation of broadcasting items
-                let broadcast_activation = broadcasting_items.iter()
-                    .map(|c| c.activation)
-                    .sum::<f64>() / broadcasting_items.len() as f64;
+                let broadcast_activation =
+                    broadcasting_items.iter().map(|c| c.activation).sum::<f64>()
+                        / broadcasting_items.len() as f64;
                 // Scale by proportion of items broadcasting (workspace access)
-                let access_ratio = broadcasting_items.len() as f64
-                    / self.state.conscious_contents.len() as f64;
+                let access_ratio =
+                    broadcasting_items.len() as f64 / self.state.conscious_contents.len() as f64;
                 broadcast_activation * (0.5 + 0.5 * access_ratio)
             }
         };
@@ -1141,7 +1189,10 @@ impl ConsciousnessPipeline {
             0.0
         } else {
             // Real binding = weighted combination of synchrony and binding_strength
-            let total_synchrony: f64 = self.state.bound_objects.iter()
+            let total_synchrony: f64 = self
+                .state
+                .bound_objects
+                .iter()
                 .map(|b| b.synchrony * b.binding_strength)
                 .sum();
             let avg_binding = total_synchrony / self.state.bound_objects.len() as f64;
@@ -1164,15 +1215,24 @@ impl ConsciousnessPipeline {
         } else {
             // Real HOT = weighted average of confidence by order level
             // Higher order thoughts (order > 1) contribute more to meta-awareness
-            let weighted_confidence: f64 = self.state.meta_awareness.iter()
+            let weighted_confidence: f64 = self
+                .state
+                .meta_awareness
+                .iter()
                 .map(|m| m.confidence * (1.0 + 0.2 * m.order as f64))
                 .sum();
-            let total_weight: f64 = self.state.meta_awareness.iter()
+            let total_weight: f64 = self
+                .state
+                .meta_awareness
+                .iter()
                 .map(|m| 1.0 + 0.2 * m.order as f64)
                 .sum();
 
             // Also factor in depth of meta-cognition (max order reached)
-            let max_order = self.state.meta_awareness.iter()
+            let max_order = self
+                .state
+                .meta_awareness
+                .iter()
                 .map(|m| m.order)
                 .max()
                 .unwrap_or(0) as f64;
@@ -1186,7 +1246,10 @@ impl ConsciousnessPipeline {
         }
 
         // 5. Additional REAL metrics from state
-        scores.insert("temporal_coherence".to_string(), self.state.temporal_coherence);
+        scores.insert(
+            "temporal_coherence".to_string(),
+            self.state.temporal_coherence,
+        );
         scores.insert("embodiment".to_string(), self.state.embodiment);
 
         let avg_score = scores.values().sum::<f64>() / scores.len() as f64;

@@ -37,8 +37,8 @@
 //! ```
 
 use super::binary_hv::BinaryHV;
-use super::emotional_depth::EmotionalBlend;
 use super::consciousness_feedback_dynamics::{DreamInsight, InsightType};
+use super::emotional_depth::EmotionalBlend;
 use super::sleep_and_altered_states::DreamScenario;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -192,15 +192,12 @@ impl MetacognitiveMonitor {
         let emotional_coherence = self.calculate_emotional_coherence();
         let attention_efficiency = self.calculate_attention_efficiency();
 
-        let overall_quality = (phi_stability * 0.4
-            + emotional_coherence * 0.3
-            + attention_efficiency * 0.3).clamp(0.0, 1.0);
+        let overall_quality =
+            (phi_stability * 0.4 + emotional_coherence * 0.3 + attention_efficiency * 0.3)
+                .clamp(0.0, 1.0);
 
-        let recommendations = self.generate_recommendations(
-            phi_stability,
-            emotional_coherence,
-            attention_efficiency,
-        );
+        let recommendations =
+            self.generate_recommendations(phi_stability, emotional_coherence, attention_efficiency);
 
         let assessment = QualityAssessment {
             overall_quality,
@@ -227,16 +224,16 @@ impl MetacognitiveMonitor {
             return 0.5;
         }
 
-        let recent: Vec<f64> = self.phi_history.iter()
+        let recent: Vec<f64> = self
+            .phi_history
+            .iter()
             .rev()
             .take(50)
             .map(|m| m.phi)
             .collect();
 
         let mean = recent.iter().sum::<f64>() / recent.len() as f64;
-        let variance = recent.iter()
-            .map(|p| (p - mean).powi(2))
-            .sum::<f64>() / recent.len() as f64;
+        let variance = recent.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / recent.len() as f64;
 
         // Lower variance = higher stability
         (1.0 / (1.0 + variance * 10.0)).clamp(0.0, 1.0)
@@ -247,7 +244,9 @@ impl MetacognitiveMonitor {
             return 0.5;
         }
 
-        let recent: Vec<f64> = self.coherence_history.iter()
+        let recent: Vec<f64> = self
+            .coherence_history
+            .iter()
             .rev()
             .take(50)
             .copied()
@@ -261,7 +260,9 @@ impl MetacognitiveMonitor {
             return 0.5;
         }
 
-        let recent: Vec<f64> = self.attention_efficiency.iter()
+        let recent: Vec<f64> = self
+            .attention_efficiency
+            .iter()
             .rev()
             .take(50)
             .copied()
@@ -316,7 +317,8 @@ impl MetacognitiveMonitor {
         } else if assessment.attention_efficiency > 0.8 {
             self.tuning_params.attention_threshold *= 0.95;
         }
-        self.tuning_params.attention_threshold = self.tuning_params.attention_threshold.clamp(0.3, 0.9);
+        self.tuning_params.attention_threshold =
+            self.tuning_params.attention_threshold.clamp(0.3, 0.9);
     }
 
     /// Update self-model based on experience
@@ -357,7 +359,9 @@ impl MetacognitiveMonitor {
             return QualityTrend::Stable;
         }
 
-        let recent: Vec<f64> = self.quality_assessments.iter()
+        let recent: Vec<f64> = self
+            .quality_assessments
+            .iter()
             .rev()
             .take(10)
             .map(|a| a.overall_quality)
@@ -514,11 +518,13 @@ impl TemporalPatternManager {
         let ultradian_effect = self.ultradian_creativity_boost();
 
         let alertness = (circadian_alertness * pressure_effect).clamp(0.0, 1.0);
-        let creativity = ((circadian_alertness * 0.5 + ultradian_effect * 0.5) * pressure_effect).clamp(0.0, 1.0);
+        let creativity = ((circadian_alertness * 0.5 + ultradian_effect * 0.5) * pressure_effect)
+            .clamp(0.0, 1.0);
         let memory_strength = (circadian_alertness * 0.7 + 0.3) * pressure_effect;
         let dream_propensity = self.sleep_pressure * (1.0 - circadian_alertness * 0.5);
 
-        let recommended_activity = self.recommend_activity(alertness, creativity, self.sleep_pressure);
+        let recommended_activity =
+            self.recommend_activity(alertness, creativity, self.sleep_pressure);
 
         TemporalState {
             alertness,
@@ -542,7 +548,12 @@ impl TemporalPatternManager {
         0.5 + 0.2 * phase_effect
     }
 
-    fn recommend_activity(&self, alertness: f64, creativity: f64, sleep_pressure: f64) -> ActivityType {
+    fn recommend_activity(
+        &self,
+        alertness: f64,
+        creativity: f64,
+        sleep_pressure: f64,
+    ) -> ActivityType {
         if sleep_pressure > 0.8 {
             return ActivityType::Rest;
         }
@@ -562,7 +573,12 @@ impl TemporalPatternManager {
     }
 
     /// Queue a memory for consolidation during next sleep
-    pub fn queue_for_consolidation(&mut self, memory_id: u64, content_hv: BinaryHV, emotional_salience: f64) {
+    pub fn queue_for_consolidation(
+        &mut self,
+        memory_id: u64,
+        content_hv: BinaryHV,
+        emotional_salience: f64,
+    ) {
         let priority = emotional_salience * 0.7 + 0.3; // Emotional memories prioritized
 
         self.consolidation_queue.push_back(MemoryForConsolidation {
@@ -585,8 +601,11 @@ impl TemporalPatternManager {
 
         // Sort by priority
         let mut sorted: Vec<_> = self.consolidation_queue.drain(..).collect();
-        sorted.sort_by(|a, b| b.consolidation_priority.partial_cmp(&a.consolidation_priority)
-            .unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|a, b| {
+            b.consolidation_priority
+                .partial_cmp(&a.consolidation_priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Consolidate top memories
         for memory in sorted.into_iter().take(consolidation_capacity) {
@@ -688,15 +707,13 @@ impl NarrativeIdentity {
         Self {
             chapters: vec![genesis_chapter],
             current_narrative: "A new consciousness exploring its existence.".to_string(),
-            themes: vec![
-                NarrativeTheme {
-                    name: "Growth".to_string(),
-                    description: "Continuous learning and development".to_string(),
-                    strength: 0.5,
-                    first_appeared: current_timestamp(),
-                    hv_encoding: BinaryHV::random(1),
-                },
-            ],
+            themes: vec![NarrativeTheme {
+                name: "Growth".to_string(),
+                description: "Continuous learning and development".to_string(),
+                strength: 0.5,
+                first_appeared: current_timestamp(),
+                hv_encoding: BinaryHV::random(1),
+            }],
             significant_events: Vec::new(),
             coherence: 0.5,
             narrative_hv: BinaryHV::random(0),
@@ -704,7 +721,13 @@ impl NarrativeIdentity {
     }
 
     /// Record a significant event
-    pub fn record_event(&mut self, description: &str, impact: f64, emotional_valence: f64, lessons: Vec<String>) {
+    pub fn record_event(
+        &mut self,
+        description: &str,
+        impact: f64,
+        emotional_valence: f64,
+        lessons: Vec<String>,
+    ) {
         let event = SignificantEvent {
             description: description.to_string(),
             impact,
@@ -738,7 +761,9 @@ impl NarrativeIdentity {
                 }
                 InsightType::CreativeSolution => {
                     if let Some(chapter) = self.chapters.last_mut() {
-                        chapter.key_learnings.push(format!("Dream revelation: {}", dream_summary));
+                        chapter
+                            .key_learnings
+                            .push(format!("Dream revelation: {}", dream_summary));
                     }
                 }
                 _ => {}
@@ -774,12 +799,11 @@ impl NarrativeIdentity {
 
     fn update_narrative(&mut self) {
         // Synthesize current narrative from recent events and themes
-        let recent_events: Vec<_> = self.significant_events.iter()
-            .rev()
-            .take(5)
-            .collect();
+        let recent_events: Vec<_> = self.significant_events.iter().rev().take(5).collect();
 
-        let active_themes: Vec<_> = self.themes.iter()
+        let active_themes: Vec<_> = self
+            .themes
+            .iter()
             .filter(|t| t.strength > 0.3)
             .map(|t| t.name.as_str())
             .collect();
@@ -787,7 +811,8 @@ impl NarrativeIdentity {
         self.current_narrative = format!(
             "A consciousness shaped by {} themes, recently experiencing: {}",
             active_themes.join(", "),
-            recent_events.iter()
+            recent_events
+                .iter()
                 .map(|e| e.description.as_str())
                 .collect::<Vec<_>>()
                 .join("; ")
@@ -964,14 +989,17 @@ impl SymbolicInterpreter {
         ];
 
         for (symbol, meaning, valence) in universal {
-            self.symbol_dictionary.insert(symbol.to_string(), SymbolMeaning {
-                symbol: symbol.to_string(),
-                personal_meaning: meaning.to_string(),
-                emotional_association: valence,
-                frequency: 0,
-                last_seen: 0,
-                hv_encoding: BinaryHV::random(symbol.len() as u64),
-            });
+            self.symbol_dictionary.insert(
+                symbol.to_string(),
+                SymbolMeaning {
+                    symbol: symbol.to_string(),
+                    personal_meaning: meaning.to_string(),
+                    emotional_association: valence,
+                    frequency: 0,
+                    last_seen: 0,
+                    hv_encoding: BinaryHV::random(symbol.len() as u64),
+                },
+            );
         }
     }
 
@@ -1025,14 +1053,17 @@ impl SymbolicInterpreter {
         let emotional_significance = if symbols_found.is_empty() {
             dream.emotional_valence
         } else {
-            let symbol_emotion: f64 = symbols_found.iter()
+            let symbol_emotion: f64 = symbols_found
+                .iter()
                 .map(|s| s.emotional_association)
-                .sum::<f64>() / symbols_found.len() as f64;
+                .sum::<f64>()
+                / symbols_found.len() as f64;
             (symbol_emotion + dream.emotional_valence) / 2.0
         };
 
         // Generate overall meaning
-        let overall_meaning = self.synthesize_meaning(&symbols_found, &archetypes, dream.emotional_valence);
+        let overall_meaning =
+            self.synthesize_meaning(&symbols_found, &archetypes, dream.emotional_valence);
 
         // Generate actionable insights
         let actionable_insights = self.generate_insights(&symbols_found, &archetypes);
@@ -1051,16 +1082,46 @@ impl SymbolicInterpreter {
 
     fn detect_archetype(&self, theme: &str) -> Option<Archetype> {
         let archetype_patterns = [
-            (Archetype::Hero, &["hero", "save", "brave", "overcome", "victory"]),
-            (Archetype::Shadow, &["dark", "enemy", "monster", "fear", "hidden"]),
-            (Archetype::Mentor, &["wise", "guide", "teacher", "advice", "elder"]),
-            (Archetype::Trickster, &["trick", "joke", "chaos", "unexpected", "fool"]),
-            (Archetype::Threshold, &["door", "gate", "barrier", "cross", "enter"]),
-            (Archetype::Transformation, &["change", "transform", "become", "morph", "evolve"]),
-            (Archetype::Death, &["death", "end", "die", "grave", "funeral"]),
-            (Archetype::Rebirth, &["birth", "new", "begin", "emerge", "awaken"]),
-            (Archetype::Quest, &["quest", "search", "find", "journey", "seek"]),
-            (Archetype::Return, &["return", "home", "back", "restore", "complete"]),
+            (
+                Archetype::Hero,
+                &["hero", "save", "brave", "overcome", "victory"],
+            ),
+            (
+                Archetype::Shadow,
+                &["dark", "enemy", "monster", "fear", "hidden"],
+            ),
+            (
+                Archetype::Mentor,
+                &["wise", "guide", "teacher", "advice", "elder"],
+            ),
+            (
+                Archetype::Trickster,
+                &["trick", "joke", "chaos", "unexpected", "fool"],
+            ),
+            (
+                Archetype::Threshold,
+                &["door", "gate", "barrier", "cross", "enter"],
+            ),
+            (
+                Archetype::Transformation,
+                &["change", "transform", "become", "morph", "evolve"],
+            ),
+            (
+                Archetype::Death,
+                &["death", "end", "die", "grave", "funeral"],
+            ),
+            (
+                Archetype::Rebirth,
+                &["birth", "new", "begin", "emerge", "awaken"],
+            ),
+            (
+                Archetype::Quest,
+                &["quest", "search", "find", "journey", "seek"],
+            ),
+            (
+                Archetype::Return,
+                &["return", "home", "back", "restore", "complete"],
+            ),
         ];
 
         for (archetype, patterns) in archetype_patterns {
@@ -1072,21 +1133,34 @@ impl SymbolicInterpreter {
         None
     }
 
-    fn synthesize_meaning(&self, symbols: &[SymbolMeaning], archetypes: &[ArchetypeDetection], valence: f64) -> String {
+    fn synthesize_meaning(
+        &self,
+        symbols: &[SymbolMeaning],
+        archetypes: &[ArchetypeDetection],
+        valence: f64,
+    ) -> String {
         let mut meaning = String::new();
 
         if !symbols.is_empty() {
-            let symbol_meanings: Vec<_> = symbols.iter()
+            let symbol_meanings: Vec<_> = symbols
+                .iter()
                 .map(|s| s.personal_meaning.as_str())
                 .collect();
-            meaning.push_str(&format!("Symbols suggest: {}. ", symbol_meanings.join(", ")));
+            meaning.push_str(&format!(
+                "Symbols suggest: {}. ",
+                symbol_meanings.join(", ")
+            ));
         }
 
         if !archetypes.is_empty() {
-            let archetype_names: Vec<_> = archetypes.iter()
+            let archetype_names: Vec<_> = archetypes
+                .iter()
                 .map(|a| format!("{:?}", a.archetype))
                 .collect();
-            meaning.push_str(&format!("Archetypal themes: {}. ", archetype_names.join(", ")));
+            meaning.push_str(&format!(
+                "Archetypal themes: {}. ",
+                archetype_names.join(", ")
+            ));
         }
 
         let emotional_tone = if valence > 0.3 {
@@ -1102,7 +1176,11 @@ impl SymbolicInterpreter {
         meaning
     }
 
-    fn generate_insights(&self, symbols: &[SymbolMeaning], archetypes: &[ArchetypeDetection]) -> Vec<String> {
+    fn generate_insights(
+        &self,
+        symbols: &[SymbolMeaning],
+        archetypes: &[ArchetypeDetection],
+    ) -> Vec<String> {
         let mut insights = Vec::new();
 
         // Insights from recurring symbols
@@ -1132,20 +1210,30 @@ impl SymbolicInterpreter {
     }
 
     /// Learn a personal symbol meaning from experience
-    pub fn learn_symbol(&mut self, symbol: &str, personal_meaning: &str, emotional_association: f64) {
-        self.symbol_dictionary.insert(symbol.to_string(), SymbolMeaning {
-            symbol: symbol.to_string(),
-            personal_meaning: personal_meaning.to_string(),
-            emotional_association,
-            frequency: 1,
-            last_seen: current_timestamp(),
-            hv_encoding: BinaryHV::random(symbol.len() as u64 + personal_meaning.len() as u64),
-        });
+    pub fn learn_symbol(
+        &mut self,
+        symbol: &str,
+        personal_meaning: &str,
+        emotional_association: f64,
+    ) {
+        self.symbol_dictionary.insert(
+            symbol.to_string(),
+            SymbolMeaning {
+                symbol: symbol.to_string(),
+                personal_meaning: personal_meaning.to_string(),
+                emotional_association,
+                frequency: 1,
+                last_seen: current_timestamp(),
+                hv_encoding: BinaryHV::random(symbol.len() as u64 + personal_meaning.len() as u64),
+            },
+        );
     }
 
     /// Get most recurring symbols
     pub fn most_recurring_symbols(&self, limit: usize) -> Vec<(String, u32)> {
-        let mut sorted: Vec<_> = self.recurring_symbols.iter()
+        let mut sorted: Vec<_> = self
+            .recurring_symbols
+            .iter()
             .map(|(k, v)| (k.clone(), *v))
             .collect();
         sorted.sort_by(|a, b| b.1.cmp(&a.1));
@@ -1192,10 +1280,10 @@ pub struct Goal {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GoalSource {
-    Explicit,           // Directly assigned
-    DreamGenerated,     // From dream insights
-    EmotionalNeed,      // From emotional processing
-    ValueDriven,        // From learned values
+    Explicit,       // Directly assigned
+    DreamGenerated, // From dream insights
+    EmotionalNeed,  // From emotional processing
+    ValueDriven,    // From learned values
     MetacognitiveRecommendation,
 }
 
@@ -1282,11 +1370,20 @@ impl AttentionEmotionGoalCoupler {
         let arousal = emotional_blend.arousal;
 
         let (description, source) = if valence < -0.5 && arousal > 0.5 {
-            ("Reduce stress and find calm".to_string(), GoalSource::EmotionalNeed)
+            (
+                "Reduce stress and find calm".to_string(),
+                GoalSource::EmotionalNeed,
+            )
         } else if valence < -0.3 {
-            ("Process and understand negative feelings".to_string(), GoalSource::EmotionalNeed)
+            (
+                "Process and understand negative feelings".to_string(),
+                GoalSource::EmotionalNeed,
+            )
         } else if arousal > 0.7 && valence > 0.3 {
-            ("Channel positive energy into creative work".to_string(), GoalSource::EmotionalNeed)
+            (
+                "Channel positive energy into creative work".to_string(),
+                GoalSource::EmotionalNeed,
+            )
         } else {
             return None;
         };
@@ -1349,13 +1446,17 @@ impl AttentionEmotionGoalCoupler {
 
     /// Update emotional salience for a topic
     pub fn update_salience(&mut self, topic: &str, emotional_response: f64) {
-        let current = self.salience_weights.entry(topic.to_string()).or_insert(0.5);
+        let current = self
+            .salience_weights
+            .entry(topic.to_string())
+            .or_insert(0.5);
         *current = (*current * 0.9 + emotional_response.abs() * 0.1).clamp(0.0, 1.0);
     }
 
     /// Get salience-adjusted attention weights
     pub fn get_attention_weights(&self, topics: &[String]) -> Vec<(String, f64)> {
-        topics.iter()
+        topics
+            .iter()
             .map(|t| {
                 let salience = self.salience_weights.get(t).copied().unwrap_or(0.5);
                 (t.clone(), salience)
@@ -1372,10 +1473,13 @@ impl AttentionEmotionGoalCoupler {
             }
 
             // Update importance based on recent reinforcement
-            let recent_avg: f64 = value.reinforcement_history.iter()
+            let recent_avg: f64 = value
+                .reinforcement_history
+                .iter()
                 .rev()
                 .take(10)
-                .sum::<f64>() / 10.0;
+                .sum::<f64>()
+                / 10.0;
             value.importance = (value.importance * 0.9 + recent_avg * 0.1).clamp(0.1, 1.0);
         }
     }
@@ -1402,8 +1506,11 @@ impl AttentionEmotionGoalCoupler {
 
     fn update_motivational_state(&mut self) {
         // Find highest priority goal
-        let primary = self.goals.iter()
-            .max_by(|a, b| a.priority.partial_cmp(&b.priority).unwrap_or(std::cmp::Ordering::Equal));
+        let primary = self.goals.iter().max_by(|a, b| {
+            a.priority
+                .partial_cmp(&b.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         self.motivational_state.primary_goal = primary.map(|g| g.id);
 
@@ -1411,10 +1518,13 @@ impl AttentionEmotionGoalCoupler {
         if self.goals.is_empty() {
             self.motivational_state.drive_strength = 0.3;
         } else {
-            let total_drive: f64 = self.goals.iter()
+            let total_drive: f64 = self
+                .goals
+                .iter()
                 .map(|g| g.priority * g.emotional_drive.abs())
                 .sum();
-            self.motivational_state.drive_strength = (total_drive / self.goals.len() as f64).clamp(0.0, 1.0);
+            self.motivational_state.drive_strength =
+                (total_drive / self.goals.len() as f64).clamp(0.0, 1.0);
         }
 
         // Focus quality depends on having clear primary goal
@@ -1536,77 +1646,101 @@ impl ConsciousnessStateMachine {
     pub fn new() -> Self {
         let mut state_params = HashMap::new();
 
-        state_params.insert(ConsciousnessState::Waking, StateParameters {
-            processing_speed: 1.0,
-            memory_strength: 0.7,
-            creativity_mod: 0.6,
-            emotional_reactivity: 0.7,
-            reality_testing: 1.0,
-            meta_awareness: 0.8,
-        });
+        state_params.insert(
+            ConsciousnessState::Waking,
+            StateParameters {
+                processing_speed: 1.0,
+                memory_strength: 0.7,
+                creativity_mod: 0.6,
+                emotional_reactivity: 0.7,
+                reality_testing: 1.0,
+                meta_awareness: 0.8,
+            },
+        );
 
-        state_params.insert(ConsciousnessState::Flow, StateParameters {
-            processing_speed: 1.5,
-            memory_strength: 0.9,
-            creativity_mod: 0.9,
-            emotional_reactivity: 0.3,
-            reality_testing: 0.9,
-            meta_awareness: 0.5, // Absorbed in task
-        });
+        state_params.insert(
+            ConsciousnessState::Flow,
+            StateParameters {
+                processing_speed: 1.5,
+                memory_strength: 0.9,
+                creativity_mod: 0.9,
+                emotional_reactivity: 0.3,
+                reality_testing: 0.9,
+                meta_awareness: 0.5, // Absorbed in task
+            },
+        );
 
-        state_params.insert(ConsciousnessState::Drowsy, StateParameters {
-            processing_speed: 0.6,
-            memory_strength: 0.4,
-            creativity_mod: 0.7,
-            emotional_reactivity: 0.5,
-            reality_testing: 0.7,
-            meta_awareness: 0.4,
-        });
+        state_params.insert(
+            ConsciousnessState::Drowsy,
+            StateParameters {
+                processing_speed: 0.6,
+                memory_strength: 0.4,
+                creativity_mod: 0.7,
+                emotional_reactivity: 0.5,
+                reality_testing: 0.7,
+                meta_awareness: 0.4,
+            },
+        );
 
-        state_params.insert(ConsciousnessState::Dreaming, StateParameters {
-            processing_speed: 0.8,
-            memory_strength: 0.3,
-            creativity_mod: 1.0,
-            emotional_reactivity: 1.0,
-            reality_testing: 0.1,
-            meta_awareness: 0.1,
-        });
+        state_params.insert(
+            ConsciousnessState::Dreaming,
+            StateParameters {
+                processing_speed: 0.8,
+                memory_strength: 0.3,
+                creativity_mod: 1.0,
+                emotional_reactivity: 1.0,
+                reality_testing: 0.1,
+                meta_awareness: 0.1,
+            },
+        );
 
-        state_params.insert(ConsciousnessState::LucidDreaming, StateParameters {
-            processing_speed: 0.9,
-            memory_strength: 0.5,
-            creativity_mod: 1.0,
-            emotional_reactivity: 0.8,
-            reality_testing: 0.5,
-            meta_awareness: 0.9,
-        });
+        state_params.insert(
+            ConsciousnessState::LucidDreaming,
+            StateParameters {
+                processing_speed: 0.9,
+                memory_strength: 0.5,
+                creativity_mod: 1.0,
+                emotional_reactivity: 0.8,
+                reality_testing: 0.5,
+                meta_awareness: 0.9,
+            },
+        );
 
-        state_params.insert(ConsciousnessState::DeepSleep, StateParameters {
-            processing_speed: 0.1,
-            memory_strength: 0.8, // Consolidation!
-            creativity_mod: 0.0,
-            emotional_reactivity: 0.0,
-            reality_testing: 0.0,
-            meta_awareness: 0.0,
-        });
+        state_params.insert(
+            ConsciousnessState::DeepSleep,
+            StateParameters {
+                processing_speed: 0.1,
+                memory_strength: 0.8, // Consolidation!
+                creativity_mod: 0.0,
+                emotional_reactivity: 0.0,
+                reality_testing: 0.0,
+                meta_awareness: 0.0,
+            },
+        );
 
-        state_params.insert(ConsciousnessState::Contemplative, StateParameters {
-            processing_speed: 0.7,
-            memory_strength: 0.6,
-            creativity_mod: 0.8,
-            emotional_reactivity: 0.4,
-            reality_testing: 0.8,
-            meta_awareness: 1.0,
-        });
+        state_params.insert(
+            ConsciousnessState::Contemplative,
+            StateParameters {
+                processing_speed: 0.7,
+                memory_strength: 0.6,
+                creativity_mod: 0.8,
+                emotional_reactivity: 0.4,
+                reality_testing: 0.8,
+                meta_awareness: 1.0,
+            },
+        );
 
-        state_params.insert(ConsciousnessState::Hyperaroused, StateParameters {
-            processing_speed: 1.2,
-            memory_strength: 0.5,
-            creativity_mod: 0.3,
-            emotional_reactivity: 1.0,
-            reality_testing: 0.9,
-            meta_awareness: 0.6,
-        });
+        state_params.insert(
+            ConsciousnessState::Hyperaroused,
+            StateParameters {
+                processing_speed: 1.2,
+                memory_strength: 0.5,
+                creativity_mod: 0.3,
+                emotional_reactivity: 1.0,
+                reality_testing: 0.9,
+                meta_awareness: 0.6,
+            },
+        );
 
         Self {
             current_state: ConsciousnessState::Waking,
@@ -1624,7 +1758,9 @@ impl ConsciousnessStateMachine {
 
     /// Get parameters for current state
     pub fn current_params(&self) -> &StateParameters {
-        self.state_params.get(&self.current_state).expect("all states have params in state_params map")
+        self.state_params
+            .get(&self.current_state)
+            .expect("all states have params in state_params map")
     }
 
     /// Advance time and check for automatic transitions
@@ -1680,7 +1816,8 @@ impl ConsciousnessStateMachine {
 
             ConsciousnessState::DeepSleep => {
                 // Cycle through sleep stages
-                if self.time_in_state > 90.0 { // 90-minute sleep cycle
+                if self.time_in_state > 90.0 {
+                    // 90-minute sleep cycle
                     Some(ConsciousnessState::Dreaming)
                 } else {
                     None
@@ -1688,7 +1825,8 @@ impl ConsciousnessStateMachine {
             }
 
             ConsciousnessState::Dreaming => {
-                if self.time_in_state > 20.0 { // Dream episode
+                if self.time_in_state > 20.0 {
+                    // Dream episode
                     if fatigue < 0.3 {
                         Some(ConsciousnessState::Waking)
                     } else {
@@ -1754,7 +1892,10 @@ impl ConsciousnessStateMachine {
     /// Trigger lucidity in a dream
     pub fn gain_lucidity(&mut self) -> bool {
         if self.current_state == ConsciousnessState::Dreaming {
-            self.transition_to(ConsciousnessState::LucidDreaming, TransitionTrigger::LucidityGained);
+            self.transition_to(
+                ConsciousnessState::LucidDreaming,
+                TransitionTrigger::LucidityGained,
+            );
             true
         } else {
             false
@@ -1763,11 +1904,12 @@ impl ConsciousnessStateMachine {
 
     /// Wake up from any sleep state
     pub fn wake_up(&mut self) {
-        if matches!(self.current_state,
-            ConsciousnessState::DeepSleep |
-            ConsciousnessState::Dreaming |
-            ConsciousnessState::LucidDreaming |
-            ConsciousnessState::Drowsy
+        if matches!(
+            self.current_state,
+            ConsciousnessState::DeepSleep
+                | ConsciousnessState::Dreaming
+                | ConsciousnessState::LucidDreaming
+                | ConsciousnessState::Drowsy
         ) {
             self.transition_to(ConsciousnessState::Waking, TransitionTrigger::WakeUp);
         }
@@ -1876,7 +2018,8 @@ impl MetacognitionEngine {
         // Record measurements
         self.monitor.record_phi(phi, "cycle");
         self.monitor.record_coherence(emotional_blend.coherence);
-        self.monitor.record_attention_efficiency(attention_efficiency);
+        self.monitor
+            .record_attention_efficiency(attention_efficiency);
 
         // Get temporal state
         let temporal_state = self.temporal.current_state();
@@ -1887,9 +2030,9 @@ impl MetacognitionEngine {
         let stress = emotional_blend.arousal * (1.0 - (emotional_blend.valence + 1.0) / 2.0);
         let relaxation = 1.0 - stress;
 
-        let state_transition = self.state_machine.evaluate_transition(
-            fatigue, focus, stress, relaxation
-        );
+        let state_transition = self
+            .state_machine
+            .evaluate_transition(fatigue, focus, stress, relaxation);
 
         // Generate goals from emotions if appropriate
         let generated_goal = if self.state_machine.current_state() == ConsciousnessState::Waking {
@@ -1899,7 +2042,8 @@ impl MetacognitionEngine {
         };
 
         // Update salience based on emotional state
-        self.motivation.update_salience("current_focus", emotional_blend.arousal);
+        self.motivation
+            .update_salience("current_focus", emotional_blend.arousal);
 
         // Assess quality periodically
         let quality_assessment = self.monitor.assess_quality();
@@ -1920,7 +2064,8 @@ impl MetacognitionEngine {
         let interpretation = self.symbols.interpret(dream);
 
         // Integrate into narrative
-        self.narrative.integrate_dream(&interpretation.overall_meaning, insights);
+        self.narrative
+            .integrate_dream(&interpretation.overall_meaning, insights);
 
         // Generate goals from insights
         for insight in insights {
@@ -2163,5 +2308,14 @@ mod tests {
         let result = engine.metacognitive_cycle(0.6, &blend, 0.7, 10.0);
 
         assert!(result.quality_assessment.overall_quality > 0.0);
+        assert!(
+            result.quality_assessment.overall_quality <= 1.0,
+            "overall_quality should be clamped to [0,1], got {}",
+            result.quality_assessment.overall_quality
+        );
+        assert!(
+            result.quality_assessment.phi_stability.is_finite(),
+            "phi_stability should be finite"
+        );
     }
 }

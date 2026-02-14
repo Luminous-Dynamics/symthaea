@@ -1,5 +1,5 @@
-use super::*;
 use super::tcp_backend::TcpBackend;
+use super::*;
 use crate::swarm::federated_cfc::{DifferentialPrivacyConfig, GradientMessage};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -676,10 +676,7 @@ async fn test_tcp_two_node_send_receive() {
         trust_score: 0.5,
         timestamp: 42,
     };
-    backend1
-        .send(&backend2.local_address(), msg)
-        .await
-        .unwrap();
+    backend1.send(&backend2.local_address(), msg).await.unwrap();
 
     // Receive on backend2
     let (_addr, received) = backend2.receive(Duration::from_secs(5)).await.unwrap();
@@ -762,10 +759,7 @@ async fn test_tcp_large_message() {
         timestamp: 999,
     };
 
-    backend1
-        .send(&backend2.local_address(), msg)
-        .await
-        .unwrap();
+    backend1.send(&backend2.local_address(), msg).await.unwrap();
 
     let (_addr, received) = backend2.receive(Duration::from_secs(5)).await.unwrap();
     match received {
@@ -835,11 +829,7 @@ async fn test_tcp_concurrent_sends() {
 
     assert_eq!(received_rounds.len(), num_tasks);
     for i in 0..num_tasks {
-        assert!(
-            received_rounds.contains(&(i as u64)),
-            "Missing round {}",
-            i
-        );
+        assert!(received_rounds.contains(&(i as u64)), "Missing round {}", i);
     }
 }
 

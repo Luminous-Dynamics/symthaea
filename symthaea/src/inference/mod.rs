@@ -113,12 +113,7 @@
 pub mod streaming;
 
 // Re-export main types
-pub use streaming::{
-    StreamingInference,
-    StreamingConfig,
-    StreamingOutput,
-    StreamingStats,
-};
+pub use streaming::{StreamingConfig, StreamingInference, StreamingOutput, StreamingStats};
 
 pub use streaming::AsyncStreamingInference;
 
@@ -130,7 +125,7 @@ use ndarray::Array1;
 
 /// Create a streaming inference with default configuration
 pub fn default_streaming(input_dim: usize, output_dim: usize) -> StreamingInference {
-    use crate::dynamics::cfc::{CfCNetwork, CfCNetworkConfig, CfCConfig};
+    use crate::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
 
     let config = CfCNetworkConfig {
         input_dim,
@@ -150,7 +145,7 @@ pub fn default_streaming(input_dim: usize, output_dim: usize) -> StreamingInfere
 
 /// Create a low-latency streaming inference
 pub fn low_latency_streaming(input_dim: usize, output_dim: usize) -> StreamingInference {
-    use crate::dynamics::cfc::{CfCNetwork, CfCNetworkConfig, CfCConfig};
+    use crate::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
 
     let config = CfCNetworkConfig {
         input_dim,
@@ -171,7 +166,7 @@ pub fn low_latency_streaming(input_dim: usize, output_dim: usize) -> StreamingIn
 
 /// Create a high-capacity streaming inference
 pub fn high_capacity_streaming(input_dim: usize, output_dim: usize) -> StreamingInference {
-    use crate::dynamics::cfc::{CfCNetwork, CfCNetworkConfig, CfCConfig};
+    use crate::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
 
     let config = CfCNetworkConfig {
         input_dim,

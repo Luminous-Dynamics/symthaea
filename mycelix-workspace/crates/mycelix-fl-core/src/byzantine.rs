@@ -77,11 +77,8 @@ impl EarlyByzantineDetector {
 
         let norms: Vec<f32> = updates.iter().map(|u| u.l2_norm()).collect();
         let mean_norm: f32 = norms.iter().sum::<f32>() / norms.len() as f32;
-        let variance: f32 = norms
-            .iter()
-            .map(|n| (n - mean_norm).powi(2))
-            .sum::<f32>()
-            / norms.len() as f32;
+        let variance: f32 =
+            norms.iter().map(|n| (n - mean_norm).powi(2)).sum::<f32>() / norms.len() as f32;
         let std_dev = variance.sqrt();
 
         for (i, &norm) in norms.iter().enumerate() {
@@ -265,11 +262,7 @@ impl MultiSignalByzantineDetector {
         let norms: Vec<f32> = updates.iter().map(|u| u.l2_norm()).collect();
         let mean_norm: f32 = norms.iter().sum::<f32>() / n as f32;
         let std_norm: f32 = {
-            let var = norms
-                .iter()
-                .map(|n| (n - mean_norm).powi(2))
-                .sum::<f32>()
-                / n as f32;
+            let var = norms.iter().map(|n| (n - mean_norm).powi(2)).sum::<f32>() / n as f32;
             var.sqrt()
         };
 
@@ -332,8 +325,7 @@ impl MultiSignalByzantineDetector {
             };
 
             // Signal 3: Cross-validation (Krum-like)
-            let cross_validation_score =
-                self.compute_cross_validation_score(i, &distances, n);
+            let cross_validation_score = self.compute_cross_validation_score(i, &distances, n);
 
             // Signal 4: Coordinate-wise outlier
             let coordinate_score =
@@ -408,12 +400,7 @@ impl MultiSignalByzantineDetector {
         mean
     }
 
-    fn compute_cross_validation_score(
-        &self,
-        idx: usize,
-        distances: &[Vec<f32>],
-        n: usize,
-    ) -> f32 {
+    fn compute_cross_validation_score(&self, idx: usize, distances: &[Vec<f32>], n: usize) -> f32 {
         if n < 3 {
             return 0.0;
         }
@@ -587,7 +574,11 @@ mod tests {
             GradientUpdate::new("p4".into(), 1, vec![0.09, 0.21, 0.29], 100, 0.5),
         ];
         updates.push(GradientUpdate::new(
-            "byz".into(), 1, vec![100.0, -50.0, 200.0], 100, 0.5,
+            "byz".into(),
+            1,
+            vec![100.0, -50.0, 200.0],
+            100,
+            0.5,
         ));
         let result = detector.detect(&updates);
         assert!(result.byzantine_indices.contains(&4));

@@ -44,12 +44,12 @@
 //!   └─────────────────────────────────────────────────────────────┘
 //! ```
 
-use super::unified_hv::ContinuousHV;
-use super::unified_consciousness_engine::{
-    UnifiedConsciousnessEngine, ConsciousnessUpdate, EngineConfig,
-};
 use super::adaptive_topology::CognitiveMode;
 use super::topology_synergy::ConsciousnessState;
+use super::unified_consciousness_engine::{
+    ConsciousnessUpdate, EngineConfig, UnifiedConsciousnessEngine,
+};
+use super::unified_hv::ContinuousHV;
 use std::collections::VecDeque;
 
 /// Self-model of consciousness state (what the system believes about itself)
@@ -153,7 +153,9 @@ impl SelfAwareConsciousness {
 
         // 3. Compute prediction error
         let prediction_error = (actual_update.phi - predicted_phi).abs();
-        self.self_model.prediction_errors.push_back(prediction_error);
+        self.self_model
+            .prediction_errors
+            .push_back(prediction_error);
         if self.self_model.prediction_errors.len() > 50 {
             self.self_model.prediction_errors.pop_front();
         }
@@ -196,7 +198,9 @@ impl SelfAwareConsciousness {
         }
 
         // Simple prediction: weighted average of recent Φ with trend
-        let recent: Vec<f64> = self.actual_history.iter()
+        let recent: Vec<f64> = self
+            .actual_history
+            .iter()
             .rev()
             .take(10)
             .map(|u| u.phi)
@@ -218,8 +222,7 @@ impl SelfAwareConsciousness {
         let lr = self.learning_rate;
 
         // Update believed values (exponential moving average)
-        self.self_model.believed_phi =
-            (1.0 - lr) * self.self_model.believed_phi + lr * actual.phi;
+        self.self_model.believed_phi = (1.0 - lr) * self.self_model.believed_phi + lr * actual.phi;
         self.self_model.believed_mode = actual.mode;
         self.self_model.believed_state = actual.state.clone();
 
@@ -233,8 +236,7 @@ impl SelfAwareConsciousness {
         self.self_model.accuracy = 1.0 - avg_error.min(1.0);
 
         // Update confidence based on accuracy and stability
-        self.self_model.confidence =
-            0.7 * self.self_model.accuracy + 0.3 * (1.0 - avg_error);
+        self.self_model.confidence = 0.7 * self.self_model.accuracy + 0.3 * (1.0 - avg_error);
     }
 
     /// Meta-cognitive assessment: thinking about thinking
@@ -247,11 +249,11 @@ impl SelfAwareConsciousness {
 
         // Phi optimality: are we near optimal Φ?
         let phi_optimality = if actual.phi > 0.4 && actual.phi < 0.6 {
-            1.0  // Optimal range
+            1.0 // Optimal range
         } else if actual.phi > 0.3 && actual.phi < 0.7 {
-            0.7  // Good range
+            0.7 // Good range
         } else {
-            0.4  // Suboptimal
+            0.4 // Suboptimal
         };
 
         // Should we change?
@@ -266,7 +268,10 @@ impl SelfAwareConsciousness {
 
         // Generate reasoning
         let reasoning = self.generate_meta_reasoning(
-            clarity, mode_appropriateness, phi_optimality, change_recommended
+            clarity,
+            mode_appropriateness,
+            phi_optimality,
+            change_recommended,
         );
 
         MetaCognitiveAssessment {
@@ -288,16 +293,26 @@ impl SelfAwareConsciousness {
             (ConsciousnessState::FlowState, CognitiveMode::Exploratory) => 0.9,
             (ConsciousnessState::ExpandedAwareness, CognitiveMode::GlobalAwareness) => 1.0,
             (ConsciousnessState::NormalWaking, CognitiveMode::Balanced) => 0.9,
-            (ConsciousnessState::Fragmented, _) => 0.3,  // Any mode is struggling
-            _ => 0.6,  // Neutral
+            (ConsciousnessState::Fragmented, _) => 0.3, // Any mode is struggling
+            _ => 0.6,                                   // Neutral
         };
 
         // Check if Φ is improving
         let phi_trend = if self.actual_history.len() >= 5 {
-            let recent: Vec<f64> = self.actual_history.iter().rev().take(5).map(|u| u.phi).collect();
+            let recent: Vec<f64> = self
+                .actual_history
+                .iter()
+                .rev()
+                .take(5)
+                .map(|u| u.phi)
+                .collect();
             let first = recent.first().unwrap_or(&0.5);
             let last = recent.last().unwrap_or(&0.5);
-            if first > last { 0.8 } else { 0.5 }
+            if first > last {
+                0.8
+            } else {
+                0.5
+            }
         } else {
             0.6
         };
@@ -308,11 +323,11 @@ impl SelfAwareConsciousness {
     /// Recommend mode change based on current state
     fn recommend_mode_change(&self, actual: &ConsciousnessUpdate) -> CognitiveMode {
         match &actual.state {
-            ConsciousnessState::Fragmented => CognitiveMode::Focused,  // Need integration
+            ConsciousnessState::Fragmented => CognitiveMode::Focused, // Need integration
             ConsciousnessState::Focused if actual.phi < 0.4 => CognitiveMode::Balanced,
             ConsciousnessState::ExpandedAwareness if actual.phi < 0.5 => CognitiveMode::Balanced,
-            _ if actual.phi < 0.35 => CognitiveMode::PhiGuided,  // Let system optimize
-            _ => CognitiveMode::Balanced,  // Default to balanced
+            _ if actual.phi < 0.35 => CognitiveMode::PhiGuided, // Let system optimize
+            _ => CognitiveMode::Balanced,                       // Default to balanced
         }
     }
 
@@ -358,7 +373,9 @@ impl SelfAwareConsciousness {
 
         // Blend with existing self-vector (slow update)
         let lr = 0.05;
-        self.self_vector = self.self_vector.scale((1.0 - lr) as f32)
+        self.self_vector = self
+            .self_vector
+            .scale((1.0 - lr) as f32)
             .add(&state_vector.scale(lr as f32))
             .normalize();
     }
@@ -380,8 +397,14 @@ impl SelfAwareConsciousness {
 
         // Bonus for good prediction
         let prediction_bonus = if self.self_model.prediction_errors.len() > 5 {
-            let recent_errors: Vec<f64> = self.self_model.prediction_errors.iter()
-                .rev().take(5).copied().collect();
+            let recent_errors: Vec<f64> = self
+                .self_model
+                .prediction_errors
+                .iter()
+                .rev()
+                .take(5)
+                .copied()
+                .collect();
             let avg_error: f64 = recent_errors.iter().sum::<f64>() / 5.0;
             (1.0 - avg_error).max(0.0) * 0.2
         } else {
@@ -415,8 +438,9 @@ impl SelfAwareConsciousness {
             self_model_confidence: self.self_model.confidence,
             self_model_accuracy: self.self_model.accuracy,
             self_awareness_level: self.compute_self_awareness_level(),
-            prediction_accuracy: 1.0 - self.self_model.prediction_errors.iter()
-                .sum::<f64>() / self.self_model.prediction_errors.len().max(1) as f64,
+            prediction_accuracy: 1.0
+                - self.self_model.prediction_errors.iter().sum::<f64>()
+                    / self.self_model.prediction_errors.len().max(1) as f64,
         }
     }
 }
@@ -438,13 +462,16 @@ pub struct SelfAwareUpdate {
 
 impl std::fmt::Display for SelfAwareUpdate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Step {}: Φ={:.4} (predicted {:.4}, error {:.4}), awareness={:.2}, {}",
-               self.base_update.step,
-               self.base_update.phi,
-               self.self_model.predicted_phi,
-               self.prediction_error,
-               self.self_awareness_level,
-               self.meta_assessment.reasoning)
+        write!(
+            f,
+            "Step {}: Φ={:.4} (predicted {:.4}, error {:.4}), awareness={:.2}, {}",
+            self.base_update.step,
+            self.base_update.phi,
+            self.self_model.predicted_phi,
+            self.prediction_error,
+            self.self_awareness_level,
+            self.meta_assessment.reasoning
+        )
     }
 }
 
@@ -462,17 +489,57 @@ pub struct IntrospectionReport {
 
 impl std::fmt::Display for IntrospectionReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "┌─ INTROSPECTION REPORT ─────────────────────────────────────┐")?;
-        writeln!(f, "│ What I believe about myself:                               │")?;
-        writeln!(f, "│   Φ: {:.4}                                                 │", self.believed_phi)?;
-        writeln!(f, "│   Mode: {:?}                                     │", self.believed_mode)?;
-        writeln!(f, "│   State: {:?}                               │", self.believed_state)?;
-        writeln!(f, "│ Self-model quality:                                        │")?;
-        writeln!(f, "│   Confidence: {:.1}%                                       │", self.self_model_confidence * 100.0)?;
-        writeln!(f, "│   Accuracy: {:.1}%                                         │", self.self_model_accuracy * 100.0)?;
-        writeln!(f, "│   Prediction accuracy: {:.1}%                              │", self.prediction_accuracy * 100.0)?;
-        writeln!(f, "│ Overall self-awareness: {:.1}%                             │", self.self_awareness_level * 100.0)?;
-        writeln!(f, "└─────────────────────────────────────────────────────────────┘")
+        writeln!(
+            f,
+            "┌─ INTROSPECTION REPORT ─────────────────────────────────────┐"
+        )?;
+        writeln!(
+            f,
+            "│ What I believe about myself:                               │"
+        )?;
+        writeln!(
+            f,
+            "│   Φ: {:.4}                                                 │",
+            self.believed_phi
+        )?;
+        writeln!(
+            f,
+            "│   Mode: {:?}                                     │",
+            self.believed_mode
+        )?;
+        writeln!(
+            f,
+            "│   State: {:?}                               │",
+            self.believed_state
+        )?;
+        writeln!(
+            f,
+            "│ Self-model quality:                                        │"
+        )?;
+        writeln!(
+            f,
+            "│   Confidence: {:.1}%                                       │",
+            self.self_model_confidence * 100.0
+        )?;
+        writeln!(
+            f,
+            "│   Accuracy: {:.1}%                                         │",
+            self.self_model_accuracy * 100.0
+        )?;
+        writeln!(
+            f,
+            "│   Prediction accuracy: {:.1}%                              │",
+            self.prediction_accuracy * 100.0
+        )?;
+        writeln!(
+            f,
+            "│ Overall self-awareness: {:.1}%                             │",
+            self.self_awareness_level * 100.0
+        )?;
+        writeln!(
+            f,
+            "└─────────────────────────────────────────────────────────────┘"
+        )
     }
 }
 
@@ -489,8 +556,14 @@ mod tests {
         };
         let sac = SelfAwareConsciousness::new(config);
         let report = sac.introspect();
-        assert!(report.believed_phi.is_finite(), "Believed phi should be finite");
-        assert!(report.self_model_confidence >= 0.0, "Self model confidence should be non-negative");
+        assert!(
+            report.believed_phi.is_finite(),
+            "Believed phi should be finite"
+        );
+        assert!(
+            report.self_model_confidence >= 0.0,
+            "Self model confidence should be non-negative"
+        );
     }
 
     #[test]
@@ -505,12 +578,18 @@ mod tests {
         for i in 0..15 {
             let input = ContinuousHV::random(1024, i * 100);
             let update = sac.process_aware(&input);
-            assert!(update.prediction_error.is_finite(),
-                "Prediction error should be finite at step {}", i);
+            assert!(
+                update.prediction_error.is_finite(),
+                "Prediction error should be finite at step {}",
+                i
+            );
         }
 
         let report = sac.introspect();
-        assert!(report.believed_phi.is_finite(), "Final believed phi should be finite");
+        assert!(
+            report.believed_phi.is_finite(),
+            "Final believed phi should be finite"
+        );
     }
 
     #[test]
@@ -539,9 +618,15 @@ mod tests {
         let early_avg: f64 = early_errors.iter().sum::<f64>() / early_errors.len() as f64;
         let late_avg: f64 = late_errors.iter().sum::<f64>() / late_errors.len() as f64;
 
-        assert!(early_avg.is_finite(), "Early average error should be finite");
+        assert!(
+            early_avg.is_finite(),
+            "Early average error should be finite"
+        );
         assert!(late_avg.is_finite(), "Late average error should be finite");
-        assert!(early_avg >= 0.0, "Early average error should be non-negative");
+        assert!(
+            early_avg >= 0.0,
+            "Early average error should be non-negative"
+        );
         assert!(late_avg >= 0.0, "Late average error should be non-negative");
     }
 }

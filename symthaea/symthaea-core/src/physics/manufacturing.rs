@@ -193,14 +193,12 @@ impl JoiningMethod {
     pub fn mechanical_seal() -> Self {
         Self {
             name: "Mechanical Seal".to_string(),
-            efficiency: 1.0, // No strength reduction
+            efficiency: 1.0,   // No strength reduction
             max_temp_k: 500.0, // Limited by elastomers
             hermetic: true,
             radiation_resistance: 0.3, // Elastomers degrade
             relative_cost: 0.5,
-            compatible_pairs: vec![
-                ("Any".to_string(), "Any".to_string()),
-            ],
+            compatible_pairs: vec![("Any".to_string(), "Any".to_string())],
         }
     }
 
@@ -213,9 +211,7 @@ impl JoiningMethod {
             hermetic: false, // Requires gasket
             radiation_resistance: 0.9,
             relative_cost: 1.0,
-            compatible_pairs: vec![
-                ("Any".to_string(), "Any".to_string()),
-            ],
+            compatible_pairs: vec![("Any".to_string(), "Any".to_string())],
         }
     }
 }
@@ -247,35 +243,80 @@ impl MaterialCompatibility {
         let mut notes = HashMap::new();
 
         // Galinstan compatibility (critical - attacks Al, Cu, Zn)
-        matrix.insert(("Galinstan".to_string(), "Aluminum".to_string()), Compatibility::Incompatible);
-        matrix.insert(("Galinstan".to_string(), "Copper".to_string()), Compatibility::Incompatible);
-        matrix.insert(("Galinstan".to_string(), "Zinc".to_string()), Compatibility::Incompatible);
-        matrix.insert(("Galinstan".to_string(), "Steel".to_string()), Compatibility::Compatible);
-        matrix.insert(("Galinstan".to_string(), "Stainless".to_string()), Compatibility::Compatible);
-        matrix.insert(("Galinstan".to_string(), "Titanium".to_string()), Compatibility::Compatible);
-        matrix.insert(("Galinstan".to_string(), "Tungsten".to_string()), Compatibility::Compatible);
-        matrix.insert(("Galinstan".to_string(), "HEA".to_string()), Compatibility::Conditional);
+        matrix.insert(
+            ("Galinstan".to_string(), "Aluminum".to_string()),
+            Compatibility::Incompatible,
+        );
+        matrix.insert(
+            ("Galinstan".to_string(), "Copper".to_string()),
+            Compatibility::Incompatible,
+        );
+        matrix.insert(
+            ("Galinstan".to_string(), "Zinc".to_string()),
+            Compatibility::Incompatible,
+        );
+        matrix.insert(
+            ("Galinstan".to_string(), "Steel".to_string()),
+            Compatibility::Compatible,
+        );
+        matrix.insert(
+            ("Galinstan".to_string(), "Stainless".to_string()),
+            Compatibility::Compatible,
+        );
+        matrix.insert(
+            ("Galinstan".to_string(), "Titanium".to_string()),
+            Compatibility::Compatible,
+        );
+        matrix.insert(
+            ("Galinstan".to_string(), "Tungsten".to_string()),
+            Compatibility::Compatible,
+        );
+        matrix.insert(
+            ("Galinstan".to_string(), "HEA".to_string()),
+            Compatibility::Conditional,
+        );
         notes.insert(
             ("Galinstan".to_string(), "HEA".to_string()),
-            "Verify HEA composition excludes Al/Cu/Zn".to_string()
+            "Verify HEA composition excludes Al/Cu/Zn".to_string(),
         );
 
         // HEA compatibility
-        matrix.insert(("HEA".to_string(), "Zr/Nb".to_string()), Compatibility::Compatible);
-        matrix.insert(("HEA".to_string(), "Steel".to_string()), Compatibility::Conditional);
+        matrix.insert(
+            ("HEA".to_string(), "Zr/Nb".to_string()),
+            Compatibility::Compatible,
+        );
+        matrix.insert(
+            ("HEA".to_string(), "Steel".to_string()),
+            Compatibility::Conditional,
+        );
         notes.insert(
             ("HEA".to_string(), "Steel".to_string()),
-            "Use diffusion barrier at high temperatures".to_string()
+            "Use diffusion barrier at high temperatures".to_string(),
         );
 
         // Zr/Nb nano-laminate
-        matrix.insert(("Zr/Nb".to_string(), "Galinstan".to_string()), Compatibility::Compatible);
-        matrix.insert(("Zr/Nb".to_string(), "Steel".to_string()), Compatibility::Compatible);
+        matrix.insert(
+            ("Zr/Nb".to_string(), "Galinstan".to_string()),
+            Compatibility::Compatible,
+        );
+        matrix.insert(
+            ("Zr/Nb".to_string(), "Steel".to_string()),
+            Compatibility::Compatible,
+        );
 
         // Shielding materials
-        matrix.insert(("Borated PE".to_string(), "Steel".to_string()), Compatibility::Compatible);
-        matrix.insert(("Borated PE".to_string(), "Concrete".to_string()), Compatibility::Compatible);
-        matrix.insert(("Lead".to_string(), "Steel".to_string()), Compatibility::Compatible);
+        matrix.insert(
+            ("Borated PE".to_string(), "Steel".to_string()),
+            Compatibility::Compatible,
+        );
+        matrix.insert(
+            ("Borated PE".to_string(), "Concrete".to_string()),
+            Compatibility::Compatible,
+        );
+        matrix.insert(
+            ("Lead".to_string(), "Steel".to_string()),
+            Compatibility::Compatible,
+        );
 
         Self { matrix, notes }
     }
@@ -286,12 +327,16 @@ impl MaterialCompatibility {
         let key1 = (mat1.to_string(), mat2.to_string());
         let key2 = (mat2.to_string(), mat1.to_string());
 
-        let compat = self.matrix.get(&key1)
+        let compat = self
+            .matrix
+            .get(&key1)
             .or_else(|| self.matrix.get(&key2))
             .copied()
             .unwrap_or(Compatibility::Compatible); // Default to compatible if not specified
 
-        let note = self.notes.get(&key1)
+        let note = self
+            .notes
+            .get(&key1)
             .or_else(|| self.notes.get(&key2))
             .map(|s| s.as_str());
 
@@ -338,12 +383,14 @@ impl ToleranceStackup {
         spec_limit_mm: f64,
     ) -> Self {
         // Worst case: sum of all tolerances
-        let worst_case: f64 = contributors.iter()
+        let worst_case: f64 = contributors
+            .iter()
             .map(|c| c.tolerance_mm * c.sensitivity.abs())
             .sum();
 
         // RSS: root sum of squares
-        let rss: f64 = contributors.iter()
+        let rss: f64 = contributors
+            .iter()
             .map(|c| (c.tolerance_mm * c.sensitivity).powi(2))
             .sum::<f64>()
             .sqrt();
@@ -413,10 +460,7 @@ impl NdeMethod {
         Self {
             name: "Dye Penetrant (PT)".to_string(),
             min_flaw_size_mm: 0.1,
-            applicable_to: vec![
-                "Surface cracks".to_string(),
-                "Porosity".to_string(),
-            ],
+            applicable_to: vec!["Surface cracks".to_string(), "Porosity".to_string()],
             relative_cost: 0.5,
             time_hours: 1.0,
         }
@@ -427,10 +471,7 @@ impl NdeMethod {
         Self {
             name: "Helium Leak Testing".to_string(),
             min_flaw_size_mm: 0.001, // Can detect molecular leaks
-            applicable_to: vec![
-                "Hermetic seals".to_string(),
-                "Pressure vessels".to_string(),
-            ],
+            applicable_to: vec!["Hermetic seals".to_string(), "Pressure vessels".to_string()],
             relative_cost: 2.5,
             time_hours: 3.0,
         }
@@ -529,11 +570,10 @@ impl ManufacturingEngine {
         // HEA Shell - requires powder metallurgy or AM
         processes.insert(
             "HEA Shell".to_string(),
-            ProcessCapability::powder_metallurgy()
+            ProcessCapability::powder_metallurgy(),
         );
-        recommendations.push(
-            "HEA shell: Use HIP (Hot Isostatic Pressing) for full density".to_string()
-        );
+        recommendations
+            .push("HEA shell: Use HIP (Hot Isostatic Pressing) for full density".to_string());
 
         // Zr/Nb interface - sputtering/PVD
         processes.insert(
@@ -545,19 +585,19 @@ impl ManufacturingEngine {
                 relative_cost: 4.0,
                 lead_time_weeks: 4.0,
                 compatible_materials: vec!["Zr".to_string(), "Nb".to_string()],
-            }
+            },
         );
 
         // Containment vessel - CNC machined stainless
         processes.insert(
             "Containment Vessel".to_string(),
-            ProcessCapability::cnc_machining()
+            ProcessCapability::cnc_machining(),
         );
 
         // Shielding - standard processes
         processes.insert(
             "Neutron Shield".to_string(),
-            ProcessCapability::sheet_forming()
+            ProcessCapability::sheet_forming(),
         );
 
         // Check material compatibility
@@ -573,12 +613,12 @@ impl ManufacturingEngine {
         joints.push((
             "HEA Shell".to_string(),
             "Containment".to_string(),
-            JoiningMethod::electron_beam_welding()
+            JoiningMethod::electron_beam_welding(),
         ));
         joints.push((
             "Containment".to_string(),
             "Shield".to_string(),
-            JoiningMethod::bolted_flange()
+            JoiningMethod::bolted_flange(),
         ));
 
         // Tolerance stackup for critical gap
@@ -640,7 +680,11 @@ impl ManufacturingEngine {
                 components: vec!["HEA Shell".to_string()],
                 joining: None,
                 nde_required: vec!["PT".to_string()],
-                critical_dims: vec!["ID".to_string(), "OD".to_string(), "Wall thickness".to_string()],
+                critical_dims: vec![
+                    "ID".to_string(),
+                    "OD".to_string(),
+                    "Wall thickness".to_string(),
+                ],
                 time_hours: 16.0,
             },
             AssemblyStep {
@@ -694,7 +738,8 @@ impl ManufacturingEngine {
         let total_cost: f64 = processes.values().map(|p| p.relative_cost).sum::<f64>()
             + joints.iter().map(|(_, _, j)| j.relative_cost).sum::<f64>();
 
-        let lead_time_weeks: f64 = processes.values()
+        let lead_time_weeks: f64 = processes
+            .values()
             .map(|p| p.lead_time_weeks)
             .fold(0.0f64, |a, b| a.max(b))
             + 2.0; // Assembly time
@@ -715,9 +760,8 @@ impl ManufacturingEngine {
         }
         // HEA processing adds risk
         risk_score += 0.15;
-        recommendations.push(
-            "HEA processing: Establish supplier qualification program".to_string()
-        );
+        recommendations
+            .push("HEA processing: Establish supplier qualification program".to_string());
 
         ManufacturingAssessment {
             design_name: "Consumer Spark Engine (5 kW)".to_string(),
@@ -739,23 +783,27 @@ impl ManufacturingEngine {
         println!("\n");
         println!("┌────────────────────────────────────────────────────────────────────┐");
         println!("│              MANUFACTURING ASSESSMENT                              │");
-        println!("│              {}                              │", assessment.design_name);
+        println!(
+            "│              {}                              │",
+            assessment.design_name
+        );
         println!("├────────────────────────────────────────────────────────────────────┤");
 
         println!("│                                                                    │");
         println!("│  PROCESSES BY COMPONENT                                            │");
         println!("│  ─────────────────────────────────────────────────────────────     │");
         for (component, process) in &assessment.processes {
-            println!("│  {:20} → {:25} (±{:.2}mm)  │",
-                     component, process.name, process.tolerance_mm);
+            println!(
+                "│  {:20} → {:25} (±{:.2}mm)  │",
+                component, process.name, process.tolerance_mm
+            );
         }
 
         println!("│                                                                    │");
         println!("│  JOINTS                                                            │");
         println!("│  ─────────────────────────────────────────────────────────────     │");
         for (comp1, comp2, method) in &assessment.joints {
-            println!("│  {} ─── {} : {}        │",
-                     comp1, comp2, method.name);
+            println!("│  {} ─── {} : {}        │", comp1, comp2, method.name);
         }
 
         if !assessment.compatibility_issues.is_empty() {
@@ -772,16 +820,27 @@ impl ManufacturingEngine {
         println!("│  ─────────────────────────────────────────────────────────────     │");
         for stackup in &assessment.stackups {
             let status = if stackup.within_spec { "✓" } else { "✗" };
-            println!("│  {} {}: RSS={:.2}mm (spec={:.2}mm)            │",
-                     status, stackup.feature, stackup.rss_mm, stackup.spec_limit_mm);
+            println!(
+                "│  {} {}: RSS={:.2}mm (spec={:.2}mm)            │",
+                status, stackup.feature, stackup.rss_mm, stackup.spec_limit_mm
+            );
         }
 
         println!("│                                                                    │");
         println!("│  SUMMARY                                                           │");
         println!("│  ─────────────────────────────────────────────────────────────     │");
-        println!("│  Relative cost factor:  {:.1}x                                      │", assessment.total_cost);
-        println!("│  Lead time:             {:.0} weeks                                  │", assessment.lead_time_weeks);
-        println!("│  Risk score:            {:.0}%                                       │", assessment.risk_score * 100.0);
+        println!(
+            "│  Relative cost factor:  {:.1}x                                      │",
+            assessment.total_cost
+        );
+        println!(
+            "│  Lead time:             {:.0} weeks                                  │",
+            assessment.lead_time_weeks
+        );
+        println!(
+            "│  Risk score:            {:.0}%                                       │",
+            assessment.risk_score * 100.0
+        );
 
         if !assessment.recommendations.is_empty() {
             println!("│                                                                    │");

@@ -14,42 +14,42 @@ use std::path::Path;
 /// EGI 128-channel to 10-20 channel mapping
 /// Based on HydroCel Geodesic Sensor Net layout
 struct EgiMapping {
-    f3: usize,   // E24 -> F3 (left frontal)
-    f4: usize,   // E124 -> F4 (right frontal)
-    f7: usize,   // E22 -> F7 (left temporal-frontal)
-    f8: usize,   // E9 -> F8 (right temporal-frontal)
-    fz: usize,   // E11 -> Fz (frontal midline)
-    fp1: usize,  // E18 -> Fp1 (left prefrontal)
-    fp2: usize,  // E15 -> Fp2 (right prefrontal)
-    c3: usize,   // E36 -> C3 (left central)
-    c4: usize,   // E104 -> C4 (right central)
-    cz: usize,   // E65 -> Cz (central midline)
-    p3: usize,   // E52 -> P3 (left parietal)
-    p4: usize,   // E92 -> P4 (right parietal)
-    pz: usize,   // E62 -> Pz (parietal midline)
-    o1: usize,   // E70 -> O1 (left occipital)
-    o2: usize,   // E83 -> O2 (right occipital)
+    f3: usize,  // E24 -> F3 (left frontal)
+    f4: usize,  // E124 -> F4 (right frontal)
+    f7: usize,  // E22 -> F7 (left temporal-frontal)
+    f8: usize,  // E9 -> F8 (right temporal-frontal)
+    fz: usize,  // E11 -> Fz (frontal midline)
+    fp1: usize, // E18 -> Fp1 (left prefrontal)
+    fp2: usize, // E15 -> Fp2 (right prefrontal)
+    c3: usize,  // E36 -> C3 (left central)
+    c4: usize,  // E104 -> C4 (right central)
+    cz: usize,  // E65 -> Cz (central midline)
+    p3: usize,  // E52 -> P3 (left parietal)
+    p4: usize,  // E92 -> P4 (right parietal)
+    pz: usize,  // E62 -> Pz (parietal midline)
+    o1: usize,  // E70 -> O1 (left occipital)
+    o2: usize,  // E83 -> O2 (right occipital)
 }
 
 impl Default for EgiMapping {
     fn default() -> Self {
         // 0-indexed channel numbers (E24 = index 23)
         Self {
-            f3: 23,    // E24
-            f4: 123,   // E124
-            f7: 21,    // E22
-            f8: 8,     // E9
-            fz: 10,    // E11
-            fp1: 17,   // E18
-            fp2: 14,   // E15
-            c3: 35,    // E36
-            c4: 103,   // E104
-            cz: 64,    // E65
-            p3: 51,    // E52
-            p4: 91,    // E92
-            pz: 61,    // E62
-            o1: 69,    // E70
-            o2: 82,    // E83
+            f3: 23,  // E24
+            f4: 123, // E124
+            f7: 21,  // E22
+            f8: 8,   // E9
+            fz: 10,  // E11
+            fp1: 17, // E18
+            fp2: 14, // E15
+            c3: 35,  // E36
+            c4: 103, // E104
+            cz: 64,  // E65
+            p3: 51,  // E52
+            p4: 91,  // E92
+            pz: 61,  // E62
+            o1: 69,  // E70
+            o2: 82,  // E83
         }
     }
 }
@@ -59,7 +59,7 @@ struct DensEegData {
     n_channels: usize,
     n_samples: usize,
     sampling_rate: f64,
-    data: Vec<f32>,  // Flat array: channels * samples (row-major)
+    data: Vec<f32>, // Flat array: channels * samples (row-major)
 }
 
 impl DensEegData {
@@ -91,7 +91,7 @@ impl DensEegData {
         reader.read_exact(&mut raw)?;
 
         for i in 0..total {
-            let bytes = [raw[i*4], raw[i*4+1], raw[i*4+2], raw[i*4+3]];
+            let bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
             data[i] = f32::from_le_bytes(bytes);
         }
 
@@ -124,15 +124,15 @@ impl DensEegData {
 
         // 1. Apply a simple moving average to smooth
         let window = (self.sampling_rate / 10.0) as usize; // 100ms window
-        let smoothed: Vec<f64> = segment.windows(window.max(1))
+        let smoothed: Vec<f64> = segment
+            .windows(window.max(1))
             .map(|w| w.iter().map(|&x| x as f64).sum::<f64>() / w.len() as f64)
             .collect();
 
         // 2. Calculate variance (proxy for power)
         let mean = smoothed.iter().sum::<f64>() / smoothed.len() as f64;
-        let variance = smoothed.iter()
-            .map(|&x| (x - mean).powi(2))
-            .sum::<f64>() / smoothed.len() as f64;
+        let variance =
+            smoothed.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / smoothed.len() as f64;
 
         // 3. Approximate alpha band power using spectral analysis
         // For now, use variance as power proxy (a real implementation would use FFT)
@@ -148,14 +148,10 @@ impl DensEegData {
 
         // Higher frequency = more "jitter" in the signal
         // Compute variance of first differences
-        let diffs: Vec<f64> = segment.windows(2)
-            .map(|w| (w[1] - w[0]) as f64)
-            .collect();
+        let diffs: Vec<f64> = segment.windows(2).map(|w| (w[1] - w[0]) as f64).collect();
 
         let mean = diffs.iter().sum::<f64>() / diffs.len() as f64;
-        let variance = diffs.iter()
-            .map(|&x| (x - mean).powi(2))
-            .sum::<f64>() / diffs.len() as f64;
+        let variance = diffs.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / diffs.len() as f64;
 
         variance.sqrt() * 1e6
     }
@@ -165,15 +161,15 @@ impl DensEegData {
 #[derive(Debug, Clone)]
 struct EmotionRating {
     stimulus: String,
-    valence: f64,      // 1-9 scale (unpleasant-pleasant)
-    arousal: f64,      // 1-9 scale (calm-excited)
-    dominance: f64,    // 1-9 scale
+    valence: f64,   // 1-9 scale (unpleasant-pleasant)
+    arousal: f64,   // 1-9 scale (calm-excited)
+    dominance: f64, // 1-9 scale
 }
 
 impl EmotionRating {
     /// Convert 1-9 scale to -1 to +1 scale
     fn normalized_valence(&self) -> f64 {
-        (self.valence - 5.0) / 4.0  // Maps 1->-1, 5->0, 9->+1
+        (self.valence - 5.0) / 4.0 // Maps 1->-1, 5->0, 9->+1
     }
 
     fn normalized_arousal(&self) -> f64 {
@@ -203,9 +199,9 @@ fn compute_arousal_ratio(beta: f64, alpha: f64) -> f64 {
 /// Predicted emotional state from EEG
 #[derive(Debug)]
 struct PredictedEmotion {
-    valence: f64,   // -1 to +1
-    arousal: f64,   // -1 to +1
-    fai: f64,       // Raw FAI value
+    valence: f64,    // -1 to +1
+    arousal: f64,    // -1 to +1
+    fai: f64,        // Raw FAI value
     beta_alpha: f64, // Raw beta/alpha ratio
 }
 
@@ -239,9 +235,14 @@ fn main() {
         }
     };
 
-    println!("✓ Loaded {} channels × {} samples @ {} Hz",
-        eeg.n_channels, eeg.n_samples, eeg.sampling_rate);
-    println!("  Duration: {:.1} seconds", eeg.n_samples as f64 / eeg.sampling_rate);
+    println!(
+        "✓ Loaded {} channels × {} samples @ {} Hz",
+        eeg.n_channels, eeg.n_samples, eeg.sampling_rate
+    );
+    println!(
+        "  Duration: {:.1} seconds",
+        eeg.n_samples as f64 / eeg.sampling_rate
+    );
     println!();
 
     // Setup channel mapping
@@ -254,23 +255,78 @@ fn main() {
 
     // Ground truth ratings for sub-mit003 (from behavioral file)
     let ground_truth = vec![
-        EmotionRating { stimulus: "neutral_1.mp4".into(), valence: 8.97, arousal: 7.95, dominance: 7.04 },
-        EmotionRating { stimulus: "12.m4v".into(), valence: 9.0, arousal: 9.0, dominance: 8.07 },       // High V, High A (Joyous)
-        EmotionRating { stimulus: "8.m4v".into(), valence: 7.01, arousal: 6.0, dominance: 6.5 },
-        EmotionRating { stimulus: "4.mp4".into(), valence: 1.05, arousal: 7.1, dominance: 5.04 },       // Low V, High A
-        EmotionRating { stimulus: "15.mp4".into(), valence: 1.0, arousal: 7.95, dominance: 6.02 },      // Low V, High A
-        EmotionRating { stimulus: "17.mp4".into(), valence: 4.42, arousal: 7.53, dominance: 6.2 },      // Afraid
-        EmotionRating { stimulus: "16.mp4".into(), valence: 1.0, arousal: 8.03, dominance: 7.95 },      // Angry/Hate
-        EmotionRating { stimulus: "neutral_2.mp4".into(), valence: 6.06, arousal: 7.01, dominance: 5.81 },
-        EmotionRating { stimulus: "7.mp4".into(), valence: 3.07, arousal: 6.87, dominance: 5.81 },      // Alarmed
-        EmotionRating { stimulus: "2.m4v".into(), valence: 1.0, arousal: 9.0, dominance: 6.83 },        // Low V, Very High A (Hate)
-        EmotionRating { stimulus: "24.mp4".into(), valence: 1.0, arousal: 8.86, dominance: 6.0 },       // Low V, High A (Sad)
+        EmotionRating {
+            stimulus: "neutral_1.mp4".into(),
+            valence: 8.97,
+            arousal: 7.95,
+            dominance: 7.04,
+        },
+        EmotionRating {
+            stimulus: "12.m4v".into(),
+            valence: 9.0,
+            arousal: 9.0,
+            dominance: 8.07,
+        }, // High V, High A (Joyous)
+        EmotionRating {
+            stimulus: "8.m4v".into(),
+            valence: 7.01,
+            arousal: 6.0,
+            dominance: 6.5,
+        },
+        EmotionRating {
+            stimulus: "4.mp4".into(),
+            valence: 1.05,
+            arousal: 7.1,
+            dominance: 5.04,
+        }, // Low V, High A
+        EmotionRating {
+            stimulus: "15.mp4".into(),
+            valence: 1.0,
+            arousal: 7.95,
+            dominance: 6.02,
+        }, // Low V, High A
+        EmotionRating {
+            stimulus: "17.mp4".into(),
+            valence: 4.42,
+            arousal: 7.53,
+            dominance: 6.2,
+        }, // Afraid
+        EmotionRating {
+            stimulus: "16.mp4".into(),
+            valence: 1.0,
+            arousal: 8.03,
+            dominance: 7.95,
+        }, // Angry/Hate
+        EmotionRating {
+            stimulus: "neutral_2.mp4".into(),
+            valence: 6.06,
+            arousal: 7.01,
+            dominance: 5.81,
+        },
+        EmotionRating {
+            stimulus: "7.mp4".into(),
+            valence: 3.07,
+            arousal: 6.87,
+            dominance: 5.81,
+        }, // Alarmed
+        EmotionRating {
+            stimulus: "2.m4v".into(),
+            valence: 1.0,
+            arousal: 9.0,
+            dominance: 6.83,
+        }, // Low V, Very High A (Hate)
+        EmotionRating {
+            stimulus: "24.mp4".into(),
+            valence: 1.0,
+            arousal: 8.86,
+            dominance: 6.0,
+        }, // Low V, High A (Sad)
     ];
 
     // Analyze segments of the EEG
     // For this 60-second test file, we'll analyze multiple windows
-    let window_samples = (5.0 * eeg.sampling_rate) as usize;  // 5-second windows
-    let step_samples = (2.5 * eeg.sampling_rate) as usize;    // 2.5-second steps
+    let window_samples = (5.0 * eeg.sampling_rate) as usize; // 5-second windows
+    let step_samples = (2.5 * eeg.sampling_rate) as usize; // 2.5-second steps
 
     println!("╔════════════════════════════════════════════════════════════════╗");
     println!("║                    EEG Analysis Results                        ║");
@@ -279,7 +335,10 @@ fn main() {
 
     let mut predictions: Vec<PredictedEmotion> = Vec::new();
 
-    for (i, start) in (0..eeg.n_samples - window_samples).step_by(step_samples).enumerate() {
+    for (i, start) in (0..eeg.n_samples - window_samples)
+        .step_by(step_samples)
+        .enumerate()
+    {
         // Compute alpha power for F3 and F4
         let f3_alpha = eeg.alpha_power(mapping.f3, start, window_samples);
         let f4_alpha = eeg.alpha_power(mapping.f4, start, window_samples);
@@ -303,15 +362,26 @@ fn main() {
 
         let time_s = start as f64 / eeg.sampling_rate;
 
-        if i % 4 == 0 {  // Print every 10 seconds
-            println!("Window {:2} | {:.1}s-{:.1}s",
-                i, time_s, time_s + window_samples as f64 / eeg.sampling_rate);
-            println!("  F3 α: {:.2} µV²  |  F4 α: {:.2} µV²  |  FAI: {:+.4}",
-                f3_alpha, f4_alpha, fai);
-            println!("  Fz β: {:.2} µV²  |  Fz α: {:.2} µV²  |  β/α: {:.3}",
-                fz_beta, fz_alpha, beta_alpha);
-            println!("  Predicted: Valence={:+.2}, Arousal={:+.2}",
-                predicted_valence, predicted_arousal);
+        if i % 4 == 0 {
+            // Print every 10 seconds
+            println!(
+                "Window {:2} | {:.1}s-{:.1}s",
+                i,
+                time_s,
+                time_s + window_samples as f64 / eeg.sampling_rate
+            );
+            println!(
+                "  F3 α: {:.2} µV²  |  F4 α: {:.2} µV²  |  FAI: {:+.4}",
+                f3_alpha, f4_alpha, fai
+            );
+            println!(
+                "  Fz β: {:.2} µV²  |  Fz α: {:.2} µV²  |  β/α: {:.3}",
+                fz_beta, fz_alpha, beta_alpha
+            );
+            println!(
+                "  Predicted: Valence={:+.2}, Arousal={:+.2}",
+                predicted_valence, predicted_arousal
+            );
             println!();
         }
 
@@ -332,21 +402,35 @@ fn main() {
     let avg_fai = predictions.iter().map(|p| p.fai).sum::<f64>() / predictions.len() as f64;
     let avg_ba = predictions.iter().map(|p| p.beta_alpha).sum::<f64>() / predictions.len() as f64;
 
-    println!("Over {} analysis windows ({:.1}s each):", predictions.len(),
-        window_samples as f64 / eeg.sampling_rate);
+    println!(
+        "Over {} analysis windows ({:.1}s each):",
+        predictions.len(),
+        window_samples as f64 / eeg.sampling_rate
+    );
     println!();
-    println!("  Mean FAI:        {:+.4} (positive = approach/pleasant)", avg_fai);
+    println!(
+        "  Mean FAI:        {:+.4} (positive = approach/pleasant)",
+        avg_fai
+    );
     println!("  Mean β/α ratio:  {:.3} (higher = more aroused)", avg_ba);
     println!();
 
     // Interpret overall emotional state
-    let overall_valence = if avg_fai > 0.1 { "Positive (Pleasant)" }
-        else if avg_fai < -0.1 { "Negative (Unpleasant)" }
-        else { "Neutral" };
+    let overall_valence = if avg_fai > 0.1 {
+        "Positive (Pleasant)"
+    } else if avg_fai < -0.1 {
+        "Negative (Unpleasant)"
+    } else {
+        "Neutral"
+    };
 
-    let overall_arousal = if avg_ba > 1.2 { "High (Excited/Alert)" }
-        else if avg_ba < 0.8 { "Low (Calm/Relaxed)" }
-        else { "Moderate" };
+    let overall_arousal = if avg_ba > 1.2 {
+        "High (Excited/Alert)"
+    } else if avg_ba < 0.8 {
+        "Low (Calm/Relaxed)"
+    } else {
+        "Moderate"
+    };
 
     println!("Interpreted Emotional State:");
     println!("  Valence: {}", overall_valence);
@@ -364,10 +448,15 @@ fn main() {
         let valence_label = if rating.valence > 5.0 { "+" } else { "-" };
         let arousal_label = if rating.arousal > 5.0 { "High" } else { "Low" };
 
-        println!("  {:2}. {} | V={:.1} ({}) | A={:.1} ({})",
-            i + 1, rating.stimulus,
-            rating.valence, valence_label,
-            rating.arousal, arousal_label);
+        println!(
+            "  {:2}. {} | V={:.1} ({}) | A={:.1} ({})",
+            i + 1,
+            rating.stimulus,
+            rating.valence,
+            valence_label,
+            rating.arousal,
+            arousal_label
+        );
     }
     println!();
 
@@ -395,7 +484,10 @@ fn main() {
         println!("╚════════════════════════════════════════════════════════════════╝");
         println!();
         println!("Successfully processed real EEG data from DENS dataset!");
-        println!("EmotionSentinel detected {} analysis windows.", predictions.len());
+        println!(
+            "EmotionSentinel detected {} analysis windows.",
+            predictions.len()
+        );
         println!();
         println!("Next steps:");
         println!("  • Process full recording (45 minutes)");

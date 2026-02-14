@@ -203,40 +203,38 @@
 //! - [`shell::ipc`](crate::shell::ipc_client): Remote service connectivity
 //! - `observability`: Telemetry and causal tracing
 
-use std::time::{Duration, Instant};
 use std::collections::VecDeque;
+use std::time::{Duration, Instant};
 
-use anyhow::{Result, Context as AnyhowContext};
-use serde::{Serialize, Deserialize};
+use anyhow::{Context as AnyhowContext, Result};
+use serde::{Deserialize, Serialize};
 
 // Core cognitive components
 use crate::cognitive_loop::{
-    CognitiveLoopService, CognitiveLoopConfig, ConsciousnessSnapshot,
-    CycleResult, TemporalBackend,
+    CognitiveLoopConfig, CognitiveLoopService, ConsciousnessSnapshot, CycleResult, TemporalBackend,
 };
 
 // Language processing (Broca's Area)
-use crate::language::{LLMOrgan, LLMOrganConfig, llm_backend};
+use crate::language::{llm_backend, LLMOrgan, LLMOrganConfig};
 
 // Motor cortex (action execution)
 use crate::action::{
-    ActionIR, PolicyBundle, SandboxRoot, SimpleExecutor, ExecutionMode,
-    ActionOutcome,
+    ActionIR, ActionOutcome, ExecutionMode, PolicyBundle, SandboxRoot, SimpleExecutor,
 };
 
 // Voice output (optional larynx)
-use crate::voice::{VoiceOutput, VoiceOutputConfig, LTCPacing};
+use crate::voice::{LTCPacing, VoiceOutput, VoiceOutputConfig};
 
 // Shell/IPC infrastructure
 use crate::shell::ipc_client::{ConnectionState, MetricsSnapshot};
 
-pub mod orchestrator;
 pub mod io_bridge;
 pub mod observability_hooks;
+pub mod orchestrator;
 
-pub use orchestrator::{ReplOrchestrator, OrchestratorConfig, OrchestratorMode};
-pub use io_bridge::{InputBridge, OutputBridge, IOEvent};
-pub use observability_hooks::{ObservabilityHook, ConsciousnessTracer};
+pub use io_bridge::{IOEvent, InputBridge, OutputBridge};
+pub use observability_hooks::{ConsciousnessTracer, ObservabilityHook};
+pub use orchestrator::{OrchestratorConfig, OrchestratorMode, ReplOrchestrator};
 
 /// Re-export key types for ergonomic use
 pub use crate::cognitive_loop::ConsciousnessSnapshot as ConsciousnessState;
@@ -704,7 +702,13 @@ impl ReplSession {
         let snapshot = self.cognitive.consciousness_snapshot();
 
         // Update flow stats
-        if snapshot.in_flow && !self.history.back().map(|t| t.consciousness.in_flow).unwrap_or(false) {
+        if snapshot.in_flow
+            && !self
+                .history
+                .back()
+                .map(|t| t.consciousness.in_flow)
+                .unwrap_or(false)
+        {
             self.stats.flow_periods += 1;
         }
         self.stats.total_flow_time_secs = snapshot.total_flow_time_secs;
@@ -733,12 +737,11 @@ impl ReplSession {
         // Voice output if enabled
         if let Some(ref mut voice) = self.voice {
             // Update pacing from consciousness state
-            let pacing = LTCPacing::default()
-                .apply_adaptive_behavior(
-                    snapshot.speech_rate_multiplier,
-                    snapshot.pause_multiplier,
-                    1.0, // attention sensitivity
-                );
+            let pacing = LTCPacing::default().apply_adaptive_behavior(
+                snapshot.speech_rate_multiplier,
+                snapshot.pause_multiplier,
+                1.0, // attention sensitivity
+            );
             voice.set_pacing(pacing);
 
             if voice.synthesize(&response).is_ok() {
@@ -800,7 +803,11 @@ impl ReplSession {
     }
 
     /// Execute an action through motor cortex
-    fn execute_action(&mut self, input: &str, consciousness: &ConsciousnessSnapshot) -> Result<ActionResult> {
+    fn execute_action(
+        &mut self,
+        input: &str,
+        consciousness: &ConsciousnessSnapshot,
+    ) -> Result<ActionResult> {
         // Parse command
         let command = input
             .trim_start_matches("run ")
@@ -877,7 +884,9 @@ impl ReplSession {
         }
 
         // Check if confirmation required
-        if destructiveness.requires_confirmation() && self.executor.mode() == ExecutionMode::Simulated {
+        if destructiveness.requires_confirmation()
+            && self.executor.mode() == ExecutionMode::Simulated
+        {
             return Ok(ActionResult {
                 command: command.clone(),
                 destructiveness: format!("{:?}", destructiveness),
@@ -889,28 +898,32 @@ impl ReplSession {
                      Risk: {:?}, Destructiveness: {:?}\n\
                      This action requires explicit confirmation.\n\
                      Rollback hint: {:?}",
-                    command, risk, destructiveness, action.rollback_hint()
+                    command,
+                    risk,
+                    destructiveness,
+                    action.rollback_hint()
                 ),
             });
         }
 
         // Execute through motor cortex
         match self.executor.mode() {
-            ExecutionMode::Simulated => {
-                Ok(ActionResult {
-                    command: command.clone(),
-                    destructiveness: format!("{:?}", destructiveness),
-                    executed: false,
-                    output: None,
-                    blocked_reason: None,
-                    display_output: format!(
-                        "[DRY-RUN] Would execute: {}\n\
+            ExecutionMode::Simulated => Ok(ActionResult {
+                command: command.clone(),
+                destructiveness: format!("{:?}", destructiveness),
+                executed: false,
+                output: None,
+                blocked_reason: None,
+                display_output: format!(
+                    "[DRY-RUN] Would execute: {}\n\
                          Risk: {:?}, Destructiveness: {:?}\n\
                          Rollback hint: {:?}",
-                        command, risk, destructiveness, action.rollback_hint()
-                    ),
-                })
-            }
+                    command,
+                    risk,
+                    destructiveness,
+                    action.rollback_hint()
+                ),
+            }),
             ExecutionMode::Real => {
                 // Real execution through sandbox
                 if let Some(ref sandbox) = self.sandbox {
@@ -918,7 +931,11 @@ impl ReplSession {
                         Ok(outcome) => {
                             self.stats.actions_executed += 1;
                             let output_str = match &outcome.outcome {
-                                ActionOutcome::CommandOutput { stdout, stderr, exit_code } => {
+                                ActionOutcome::CommandOutput {
+                                    stdout,
+                                    stderr,
+                                    exit_code,
+                                } => {
                                     let stdout_str = String::from_utf8_lossy(stdout);
                                     let stderr_str = String::from_utf8_lossy(stderr);
                                     format!(
@@ -934,26 +951,21 @@ impl ReplSession {
                                 executed: true,
                                 output: Some(output_str.clone()),
                                 blocked_reason: None,
-                                display_output: format!(
-                                    "[EXECUTED] {}\n\n{}",
-                                    command, output_str
-                                ),
+                                display_output: format!("[EXECUTED] {}\n\n{}", command, output_str),
                             })
                         }
-                        Err(e) => {
-                            Ok(ActionResult {
-                                command: command.clone(),
-                                destructiveness: format!("{:?}", destructiveness),
-                                executed: false,
-                                output: None,
-                                blocked_reason: Some(format!("Execution error: {}", e)),
-                                display_output: format!(
-                                    "[ERROR] Failed to execute: {}\n\
+                        Err(e) => Ok(ActionResult {
+                            command: command.clone(),
+                            destructiveness: format!("{:?}", destructiveness),
+                            executed: false,
+                            output: None,
+                            blocked_reason: Some(format!("Execution error: {}", e)),
+                            display_output: format!(
+                                "[ERROR] Failed to execute: {}\n\
                                      Error: {}",
-                                    command, e
-                                ),
-                            })
-                        }
+                                command, e
+                            ),
+                        }),
                     }
                 } else {
                     Ok(ActionResult {
@@ -1040,7 +1052,8 @@ impl ReplSession {
         let uptime = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_millis() as u64 - self.stats.start_time_ms;
+            .as_millis() as u64
+            - self.stats.start_time_ms;
 
         MetricsSnapshot {
             phi: snapshot.unified_phi as f64,

@@ -20,10 +20,10 @@
 //! - Electromagnetic induction in conductors
 //! - Wave propagation in layered media
 
+use super::constants::G;
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::G;
 use serde::{Deserialize, Serialize};
 
 /// Earth's average density
@@ -64,10 +64,10 @@ impl EarthLayer {
 /// An earthquake
 #[derive(Debug, Clone)]
 pub struct Earthquake {
-    pub magnitude: f64,       // Moment magnitude
+    pub magnitude: f64, // Moment magnitude
     pub depth_km: f64,
     pub focal_mechanism: FocalMechanism,
-    pub moment_nm: f64,       // Seismic moment in N·m
+    pub moment_nm: f64, // Seismic moment in N·m
     pub vector: ContinuousHV,
 }
 
@@ -99,8 +99,8 @@ pub struct GeophysicsEncoder {
     pub crust: ContinuousHV,
     pub mantle: ContinuousHV,
     pub core: ContinuousHV,
-    pub moho: ContinuousHV,           // Mohorovičić discontinuity
-    pub cmb: ContinuousHV,            // Core-mantle boundary
+    pub moho: ContinuousHV, // Mohorovičić discontinuity
+    pub cmb: ContinuousHV,  // Core-mantle boundary
     pub lithosphere: ContinuousHV,
     pub asthenosphere: ContinuousHV,
 
@@ -206,7 +206,12 @@ impl GeophysicsEncoder {
     }
 
     /// Create an earthquake
-    pub fn create_earthquake(&self, magnitude: f64, depth_km: f64, mechanism: FocalMechanism) -> Earthquake {
+    pub fn create_earthquake(
+        &self,
+        magnitude: f64,
+        depth_km: f64,
+        mechanism: FocalMechanism,
+    ) -> Earthquake {
         // Seismic moment from magnitude: log₁₀(M₀) = 1.5M + 9.1
         let moment = 10.0_f64.powf(1.5 * magnitude + 9.1);
 
@@ -217,7 +222,8 @@ impl GeophysicsEncoder {
             FocalMechanism::Oblique => self.fault.clone(),
         };
 
-        let vector = self.earthquake
+        let vector = self
+            .earthquake
             .bind(&self.rupture)
             .bind(&mech_vec)
             .scale(magnitude as f32);
@@ -266,15 +272,15 @@ impl GeophysicsEncoder {
     pub fn velocity_at_depth(&self, depth_km: f64) -> (f64, f64) {
         // Simplified PREM velocities
         let (vp, vs) = if depth_km < 35.0 {
-            (6.5, 3.7)  // Crust
+            (6.5, 3.7) // Crust
         } else if depth_km < 670.0 {
-            (8.0 + depth_km * 0.002, 4.5 + depth_km * 0.001)  // Upper mantle
+            (8.0 + depth_km * 0.002, 4.5 + depth_km * 0.001) // Upper mantle
         } else if depth_km < 2890.0 {
-            (13.0, 7.0)  // Lower mantle
+            (13.0, 7.0) // Lower mantle
         } else if depth_km < 5150.0 {
-            (10.0, 0.0)  // Outer core (no S-waves)
+            (10.0, 0.0) // Outer core (no S-waves)
         } else {
-            (11.2, 3.6)  // Inner core
+            (11.2, 3.6) // Inner core
         };
         (vp, vs)
     }
@@ -295,9 +301,7 @@ impl GeophysicsEncoder {
 
     /// Mantle convection encoding
     pub fn mantle_convection(&self) -> ContinuousHV {
-        self.convection
-            .bind(&self.mantle)
-            .bind(&self.viscous)
+        self.convection.bind(&self.mantle).bind(&self.viscous)
     }
 
     /// Plate velocity (typical: 2-10 cm/yr)
@@ -321,18 +325,14 @@ impl GeophysicsEncoder {
 
     /// Magnetic field reversal
     pub fn magnetic_reversal(&self) -> ContinuousHV {
-        self.reversal
-            .bind(&self.dipole)
-            .bind(&self.dynamo)
+        self.reversal.bind(&self.dipole).bind(&self.dynamo)
     }
 
     /// Dipole moment encoding
     pub fn dipole_moment(&self, moment_am2: f64) -> ContinuousHV {
         // Earth's dipole: ~8×10²² A·m²
         let normalized = (moment_am2 / 8e22) as f32;
-        self.dipole
-            .bind(&self.magnetic_field)
-            .scale(normalized)
+        self.dipole.bind(&self.magnetic_field).scale(normalized)
     }
 
     // ============================================================
@@ -341,9 +341,7 @@ impl GeophysicsEncoder {
 
     /// Gravity anomaly encoding
     pub fn gravity_anomaly(&self, mgal: f64) -> ContinuousHV {
-        self.gravity
-            .bind(&self.geoid)
-            .scale((mgal / 100.0) as f32)  // Normalize to typical range
+        self.gravity.bind(&self.geoid).scale((mgal / 100.0) as f32) // Normalize to typical range
     }
 
     /// Isostatic compensation
@@ -356,9 +354,7 @@ impl GeophysicsEncoder {
 
     /// Tidal potential
     pub fn tidal_encoding(&self) -> ContinuousHV {
-        self.tides
-            .bind(&self.gravity)
-            .bind(&self.rotation)
+        self.tides.bind(&self.gravity).bind(&self.rotation)
     }
 
     /// Surface gravity from mass and radius
@@ -426,7 +422,7 @@ mod tests {
         let eq = encoder.create_earthquake(7.0, 20.0, FocalMechanism::Thrust);
 
         assert_eq!(eq.magnitude, 7.0);
-        assert!(eq.moment_nm > 1e18);  // M7 has moment ~3×10¹⁹ N·m
+        assert!(eq.moment_nm > 1e18); // M7 has moment ~3×10¹⁹ N·m
     }
 
     #[test]
@@ -444,7 +440,7 @@ mod tests {
     fn test_no_s_waves_in_outer_core() {
         let encoder = setup();
 
-        let (vp, vs) = encoder.velocity_at_depth(3500.0);  // Outer core
+        let (vp, vs) = encoder.velocity_at_depth(3500.0); // Outer core
 
         // S-waves don't propagate in liquid outer core
         assert!(vs == 0.0);

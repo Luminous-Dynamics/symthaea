@@ -32,8 +32,8 @@
 //! ```
 
 use super::binary_hv::BinaryHV;
-use super::lsh_simhash::{SimHashIndex, SimHashConfig};
-use rayon::prelude::*;  // Session 8: Parallel query processing
+use super::lsh_simhash::{SimHashConfig, SimHashIndex};
+use rayon::prelude::*; // Session 8: Parallel query processing
 
 /// Threshold for switching from naive to LSH search (dataset size)
 ///
@@ -160,11 +160,11 @@ fn naive_find_most_similar(query: &BinaryHV, targets: &[BinaryHV]) -> Option<(us
 fn lsh_find_most_similar(query: &BinaryHV, targets: &[BinaryHV]) -> Option<(usize, f32)> {
     // Choose SimHash configuration based on dataset size
     let config = if targets.len() < 1000 {
-        SimHashConfig::fast()        // 5 tables, ~80% recall, fastest
+        SimHashConfig::fast() // 5 tables, ~80% recall, fastest
     } else if targets.len() < 5000 {
-        SimHashConfig::balanced()    // 10 tables, ~95% recall (default)
+        SimHashConfig::balanced() // 10 tables, ~95% recall (default)
     } else {
-        SimHashConfig::accurate()    // 20 tables, ~99% recall, large datasets
+        SimHashConfig::accurate() // 20 tables, ~99% recall, large datasets
     };
 
     // Build LSH index (amortized cost)
@@ -198,7 +198,7 @@ pub fn adaptive_find_top_k(query: &BinaryHV, targets: &[BinaryHV], k: usize) -> 
         return Vec::new();
     }
 
-    let k = k.min(targets.len());  // Clamp k to dataset size
+    let k = k.min(targets.len()); // Clamp k to dataset size
 
     if targets.len() < LSH_THRESHOLD {
         // Small dataset: Naive approach with sorting
@@ -280,13 +280,13 @@ pub fn adaptive_batch_find_most_similar(
         if queries.len() < PARALLEL_THRESHOLD {
             // Sequential for small query batches (parallel overhead too high)
             queries
-                .iter()  // Sequential - parallel overhead > benefit
+                .iter() // Sequential - parallel overhead > benefit
                 .map(|q| naive_find_most_similar(q, targets))
                 .collect()
         } else {
             // Parallel for large query batches
             queries
-                .par_iter()  // Parallel! 2-8x speedup on 50+ queries
+                .par_iter() // Parallel! 2-8x speedup on 50+ queries
                 .map(|q| naive_find_most_similar(q, targets))
                 .collect()
         }
@@ -296,13 +296,13 @@ pub fn adaptive_batch_find_most_similar(
         if queries.len() < PARALLEL_THRESHOLD {
             // Sequential for <50 queries (4.3x faster than parallel!)
             queries
-                .iter()  // Sequential - parallel overhead too high
+                .iter() // Sequential - parallel overhead too high
                 .map(|q| naive_find_most_similar(q, targets))
                 .collect()
         } else {
             // Parallel for 50+ queries
             queries
-                .par_iter()  // Parallel! 2x+ speedup
+                .par_iter() // Parallel! 2x+ speedup
                 .map(|q| naive_find_most_similar(q, targets))
                 .collect()
         }
@@ -376,12 +376,12 @@ pub fn adaptive_batch_find_top_k(
         // Level 1: Small dataset - always use naive
         if queries.len() < PARALLEL_THRESHOLD {
             queries
-                .iter()  // Sequential for <50 queries
+                .iter() // Sequential for <50 queries
                 .map(|q| naive_find_top_k(q, targets, k))
                 .collect()
         } else {
             queries
-                .par_iter()  // Parallel for 50+ queries
+                .par_iter() // Parallel for 50+ queries
                 .map(|q| naive_find_top_k(q, targets, k))
                 .collect()
         }
@@ -389,12 +389,12 @@ pub fn adaptive_batch_find_top_k(
         // Level 2: Large dataset, FEW queries - naive is faster
         if queries.len() < PARALLEL_THRESHOLD {
             queries
-                .iter()  // Sequential for <50 queries
+                .iter() // Sequential for <50 queries
                 .map(|q| naive_find_top_k(q, targets, k))
                 .collect()
         } else {
             queries
-                .par_iter()  // Parallel for 50+ queries
+                .par_iter() // Parallel for 50+ queries
                 .map(|q| naive_find_top_k(q, targets, k))
                 .collect()
         }
@@ -427,12 +427,12 @@ fn batch_lsh_find_top_k(
     // Session 8: Conditional parallelization
     if queries.len() < PARALLEL_THRESHOLD {
         queries
-            .iter()  // Sequential for <50 queries
+            .iter() // Sequential for <50 queries
             .map(|q| index.query_approximate(q, k, targets))
             .collect()
     } else {
         queries
-            .par_iter()  // Parallel for 50+ queries
+            .par_iter() // Parallel for 50+ queries
             .map(|q| index.query_approximate(q, k, targets))
             .collect()
     }
@@ -547,7 +547,10 @@ mod tests {
 
         // Both should find the very similar vector (idx=42)
         // LSH might occasionally miss due to hash collisions, but should be rare
-        assert_eq!(naive_result.0, 42, "Naive should find most similar at idx 42");
+        assert_eq!(
+            naive_result.0, 42,
+            "Naive should find most similar at idx 42"
+        );
 
         // LSH should find either idx 42 or something very close in similarity
         let lsh_sim_to_most_similar = query.similarity(&targets[42]);

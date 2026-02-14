@@ -18,8 +18,8 @@
 use crate::hdc::cincinnati_ltc::CincinnatiEstimator;
 use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::HDC_DIMENSION;
-use serde::{Serialize, Deserialize};
-use std::f32::consts::PI;  // Used by FftConvolver
+use serde::{Deserialize, Serialize};
+use std::f32::consts::PI; // Used by FftConvolver
 
 // =============================================================================
 // AMPLITUDE LEVEL ENCODING
@@ -55,7 +55,7 @@ impl AmplitudeLevel {
 
     /// Convert to binary for Cincinnati estimator (above/below median)
     pub fn to_binary(&self) -> bool {
-        (*self as u8) >= 2  // Medium and above = true
+        (*self as u8) >= 2 // Medium and above = true
     }
 
     /// Get numeric value for weighted computations
@@ -98,12 +98,11 @@ impl AmplitudeEncoder {
         if self.history.len() > 10 {
             // Compute running statistics
             let mean: f64 = self.history.iter().sum::<f64>() / self.history.len() as f64;
-            let var: f64 = self.history.iter()
-                .map(|x| (x - mean).powi(2))
-                .sum::<f64>() / self.history.len() as f64;
+            let var: f64 = self.history.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
+                / self.history.len() as f64;
 
             self.running_mean = mean;
-            self.running_var = var.max(0.01);  // Prevent division by zero
+            self.running_var = var.max(0.01); // Prevent division by zero
         }
 
         // Normalize amplitude relative to recent history
@@ -188,7 +187,7 @@ impl MultiScaleCincinnatiLTC {
             fast_buffer: Vec::with_capacity(2),
             medium_buffer: Vec::with_capacity(12),
             slow_buffer: Vec::with_capacity(50),
-            weights: [0.33, 0.34, 0.33],  // Start equal
+            weights: [0.33, 0.34, 0.33], // Start equal
             errors: [Vec::new(), Vec::new(), Vec::new()],
             sample_rate,
             observations: 0,
@@ -206,7 +205,11 @@ impl MultiScaleCincinnatiLTC {
 
         // Compute prediction errors
         let fast_error = if fast_pred.0 != observation { 1.0 } else { 0.0 };
-        let medium_error = if medium_pred.0 != observation { 1.0 } else { 0.0 };
+        let medium_error = if medium_pred.0 != observation {
+            1.0
+        } else {
+            0.0
+        };
         let slow_error = if slow_pred.0 != observation { 1.0 } else { 0.0 };
 
         // Track errors
@@ -253,10 +256,24 @@ impl MultiScaleCincinnatiLTC {
         }
 
         // Weighted ensemble prediction
-        let weighted_vote =
-            self.weights[0] * if fast_pred.0 { fast_pred.1 } else { -fast_pred.1 } +
-            self.weights[1] * if medium_pred.0 { medium_pred.1 } else { -medium_pred.1 } +
-            self.weights[2] * if slow_pred.0 { slow_pred.1 } else { -slow_pred.1 };
+        let weighted_vote = self.weights[0]
+            * if fast_pred.0 {
+                fast_pred.1
+            } else {
+                -fast_pred.1
+            }
+            + self.weights[1]
+                * if medium_pred.0 {
+                    medium_pred.1
+                } else {
+                    -medium_pred.1
+                }
+            + self.weights[2]
+                * if slow_pred.0 {
+                    slow_pred.1
+                } else {
+                    -slow_pred.1
+                };
 
         let ensemble_prediction = weighted_vote > 0.0;
         let ensemble_confidence = weighted_vote.abs().min(1.0);
@@ -277,18 +294,20 @@ impl MultiScaleCincinnatiLTC {
 
     /// Update branch weights based on recent error rates
     fn update_weights(&mut self) {
-        let error_rates: Vec<f32> = self.errors.iter()
+        let error_rates: Vec<f32> = self
+            .errors
+            .iter()
             .map(|e| {
-                if e.is_empty() { 0.5 } else {
+                if e.is_empty() {
+                    0.5
+                } else {
                     e.iter().sum::<f32>() / e.len() as f32
                 }
             })
             .collect();
 
         // Convert error rates to weights (lower error = higher weight)
-        let accuracies: Vec<f32> = error_rates.iter()
-            .map(|e| 1.0 - e)
-            .collect();
+        let accuracies: Vec<f32> = error_rates.iter().map(|e| 1.0 - e).collect();
 
         let total: f32 = accuracies.iter().sum();
         if total > 0.01 {
@@ -369,7 +388,11 @@ impl FftConvolver {
             twiddle_sin.push(angle.sin());
         }
 
-        Self { dim, twiddle_cos, twiddle_sin }
+        Self {
+            dim,
+            twiddle_cos,
+            twiddle_sin,
+        }
     }
 
     /// Compute circular convolution using element-wise multiplication in frequency domain
@@ -447,7 +470,7 @@ impl AttentionState {
 
         // High error → increase attention
         // Low error → decrease attention (we've got this)
-        let target_intensity = 0.3 + 0.7 * avg_error;  // Range [0.3, 1.0]
+        let target_intensity = 0.3 + 0.7 * avg_error; // Range [0.3, 1.0]
 
         // Smooth update
         self.intensity = 0.9 * self.intensity + 0.1 * target_intensity;
@@ -458,7 +481,7 @@ impl AttentionState {
 
     /// Get learning rate multiplier based on attention
     pub fn learning_rate_multiplier(&self) -> f32 {
-        0.5 + self.intensity * 0.5  // Range [0.5, 1.0]
+        0.5 + self.intensity * 0.5 // Range [0.5, 1.0]
     }
 }
 
@@ -548,7 +571,7 @@ impl EnhancedCycleDetector {
     /// Enhanced period detection with fixed harmonic filter
     fn detect_period_enhanced(&mut self) {
         let mut best_period = 0;
-        let mut best_score = 0.3;  // Minimum threshold
+        let mut best_score = 0.3; // Minimum threshold
 
         // First pass: find all local maxima with scores above threshold
         let mut candidates: Vec<(usize, f32)> = Vec::new();
@@ -558,9 +581,9 @@ impl EnhancedCycleDetector {
 
             // Must be above threshold and a local maximum
             if score > 0.3 {
-                let is_local_max =
-                    (period == 2 || score >= self.autocorr_scores[period - 1]) &&
-                    (period + 1 >= self.autocorr_scores.len() || score >= self.autocorr_scores[period + 1]);
+                let is_local_max = (period == 2 || score >= self.autocorr_scores[period - 1])
+                    && (period + 1 >= self.autocorr_scores.len()
+                        || score >= self.autocorr_scores[period + 1]);
 
                 if is_local_max {
                     candidates.push((period, score));
@@ -593,12 +616,12 @@ impl EnhancedCycleDetector {
             if !is_harmonic && *score > best_score {
                 best_score = *score;
                 best_period = *period;
-                break;  // Take the first non-harmonic candidate
+                break; // Take the first non-harmonic candidate
             }
         }
 
         self.detected_period = best_period;
-        self.confidence = (best_score + 1.0) / 2.0;  // Map [-1,1] to [0,1]
+        self.confidence = (best_score + 1.0) / 2.0; // Map [-1,1] to [0,1]
     }
 
     /// Check if signal looks like a square wave
@@ -629,13 +652,15 @@ impl EnhancedCycleDetector {
 
         // Check for consistent run lengths (characteristic of square waves)
         let avg_run: f32 = run_lengths.iter().sum::<usize>() as f32 / run_lengths.len() as f32;
-        let variance: f32 = run_lengths.iter()
+        let variance: f32 = run_lengths
+            .iter()
             .map(|&r| (r as f32 - avg_run).powi(2))
-            .sum::<f32>() / run_lengths.len() as f32;
+            .sum::<f32>()
+            / run_lengths.len() as f32;
 
         // Low variance in run lengths → likely square wave
-        let cv = variance.sqrt() / avg_run.max(1.0);  // Coefficient of variation
-        cv < 0.5  // If CV < 50%, likely square wave
+        let cv = variance.sqrt() / avg_run.max(1.0); // Coefficient of variation
+        cv < 0.5 // If CV < 50%, likely square wave
     }
 
     /// Get current cycle state
@@ -722,8 +747,8 @@ impl EnhancedCincinnatiEngine {
             convolver: FftConvolver::new(HDC_DIMENSION),
             steps: 0,
             correct_predictions: 0,
-            fixed_threshold: 0.0,  // Same as baseline for fair comparison
-            warmup_steps: 50,       // Skip first 50 samples like baseline
+            fixed_threshold: 0.0, // Same as baseline for fair comparison
+            warmup_steps: 50,     // Skip first 50 samples like baseline
         }
     }
 
@@ -736,7 +761,7 @@ impl EnhancedCincinnatiEngine {
 
         // 2. Encode amplitude to level (for information, but use fixed truth for accuracy)
         let level = self.amplitude_encoder.encode(amplitude);
-        let _adaptive_binary = level.to_binary();  // Not used for accuracy comparison
+        let _adaptive_binary = level.to_binary(); // Not used for accuracy comparison
 
         // 3. Update cycle detector with fixed threshold binary
         self.cycle_detector.observe(ground_truth);
@@ -753,7 +778,11 @@ impl EnhancedCincinnatiEngine {
             if cycle_state.confidence > 0.6 {
                 // High confidence cycle → weight cycle prediction heavily
                 let cycle_vote = if cp { 0.7 } else { -0.7 };
-                let ms_vote = if ms_pred.prediction { ms_pred.confidence * 0.3 } else { -ms_pred.confidence * 0.3 };
+                let ms_vote = if ms_pred.prediction {
+                    ms_pred.confidence * 0.3
+                } else {
+                    -ms_pred.confidence * 0.3
+                };
                 (cycle_vote + ms_vote) > 0.0
             } else {
                 // Lower confidence → trust multi-scale more
@@ -777,7 +806,7 @@ impl EnhancedCincinnatiEngine {
         EnhancedPrediction {
             prediction: final_prediction,
             amplitude_level: level,
-            binary_value: ground_truth,  // Use fixed threshold value
+            binary_value: ground_truth, // Use fixed threshold value
             multi_scale: ms_pred,
             cycle_state,
             cycle_prediction: cycle_pred,
@@ -891,15 +920,18 @@ mod tests {
 
         // Feed square wave (period 4)
         for i in 0..100 {
-            let val = (i / 2) % 2 == 0;  // 2 true, 2 false, repeat
+            let val = (i / 2) % 2 == 0; // 2 true, 2 false, repeat
             detector.observe(val);
         }
 
         let state = detector.state();
         // Should detect period 4, not period 2
-        assert!(state.detected_period == 4 || state.confidence < 0.3,
-                "Expected period 4, got {} with confidence {}",
-                state.detected_period, state.confidence);
+        assert!(
+            state.detected_period == 4 || state.confidence < 0.3,
+            "Expected period 4, got {} with confidence {}",
+            state.detected_period,
+            state.confidence
+        );
     }
 
     #[test]
@@ -916,7 +948,10 @@ mod tests {
         let stats = engine.stats();
         println!("Enhanced engine accuracy: {:.1}%", stats.accuracy * 100.0);
         println!("Branch weights: {:?}", stats.branch_weights);
-        println!("Cycle period: {}, confidence: {:.2}", stats.cycle_period, stats.cycle_confidence);
+        println!(
+            "Cycle period: {}, confidence: {:.2}",
+            stats.cycle_period, stats.cycle_confidence
+        );
     }
 
     #[test]
@@ -925,19 +960,22 @@ mod tests {
 
         // High errors should increase attention
         for _ in 0..10 {
-            attention.update(1.0);  // All wrong
+            attention.update(1.0); // All wrong
         }
         let high_attention = attention.intensity;
 
         // Reset and use low errors
         attention = AttentionState::default();
         for _ in 0..10 {
-            attention.update(0.0);  // All correct
+            attention.update(0.0); // All correct
         }
         let low_attention = attention.intensity;
 
-        assert!(high_attention > low_attention,
-                "High errors ({:.2}) should produce more attention than low errors ({:.2})",
-                high_attention, low_attention);
+        assert!(
+            high_attention > low_attention,
+            "High errors ({:.2}) should produce more attention than low errors ({:.2})",
+            high_attention,
+            low_attention
+        );
     }
 }

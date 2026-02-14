@@ -21,8 +21,8 @@ use super::{
     SearchResult,
 };
 use arrow_array::{
-    builder::FixedSizeBinaryBuilder, FixedSizeBinaryArray, Float32Array, Float64Array,
-    Int32Array, Int64Array, RecordBatch, RecordBatchIterator, StringArray,
+    builder::FixedSizeBinaryBuilder, FixedSizeBinaryArray, Float32Array, Float64Array, Int32Array,
+    Int64Array, RecordBatch, RecordBatchIterator, StringArray,
 };
 use arrow_schema::{ArrowError, DataType, Field, Schema};
 use async_trait::async_trait;
@@ -124,7 +124,11 @@ fn batch_to_records(batch: &RecordBatch) -> Vec<MemoryRecord> {
     let Some(id_col) = batch.column(0).as_any().downcast_ref::<StringArray>() else {
         return Vec::new();
     };
-    let Some(enc_col) = batch.column(1).as_any().downcast_ref::<FixedSizeBinaryArray>() else {
+    let Some(enc_col) = batch
+        .column(1)
+        .as_any()
+        .downcast_ref::<FixedSizeBinaryArray>()
+    else {
         return Vec::new();
     };
     let Some(ts_col) = batch.column(2).as_any().downcast_ref::<Int64Array>() else {
@@ -166,8 +170,7 @@ fn batch_to_records(batch: &RecordBatch) -> Vec<MemoryRecord> {
                 arr.copy_from_slice(&encoding_bytes[..BinaryHV::BYTES]);
             }
 
-            let topics: Vec<String> =
-                serde_json::from_str(topics_col.value(i)).unwrap_or_default();
+            let topics: Vec<String> = serde_json::from_str(topics_col.value(i)).unwrap_or_default();
 
             let ts = ts_col.value(i);
 
@@ -233,8 +236,9 @@ impl LanceMemory {
             std::process::id(),
             rand::random::<u32>()
         ));
-        std::fs::create_dir_all(&dir)
-            .map_err(|e| DatabaseError::ConnectionFailed(format!("Temp dir creation failed: {e}")))?;
+        std::fs::create_dir_all(&dir).map_err(|e| {
+            DatabaseError::ConnectionFailed(format!("Temp dir creation failed: {e}"))
+        })?;
 
         Self::new(&dir.to_string_lossy()).await
     }
@@ -360,13 +364,9 @@ impl LanceMemory {
             }
 
             let reader = RecordBatchIterator::new(batches, schema.clone());
-            table
-                .add(reader)
-                .execute()
-                .await
-                .map_err(|e| {
-                    DatabaseError::InsertFailed(format!("Migration batch insert failed: {e}"))
-                })?;
+            table.add(reader).execute().await.map_err(|e| {
+                DatabaseError::InsertFailed(format!("Migration batch insert failed: {e}"))
+            })?;
         }
 
         tracing::info!(count = total, "Migrated records from SQLite to LanceDB");
@@ -422,11 +422,7 @@ impl ConsciousnessDatabase for LanceMemory {
         Ok(())
     }
 
-    async fn search_similar(
-        &self,
-        query: &BinaryHV,
-        top_k: usize,
-    ) -> DbResult<Vec<SearchResult>> {
+    async fn search_similar(&self, query: &BinaryHV, top_k: usize) -> DbResult<Vec<SearchResult>> {
         let table = self.table().await?;
         let query = *query;
 
@@ -812,16 +808,15 @@ mod tests {
         }
 
         // Unfiltered: all 5
-        let all = db.search_similar_filtered(&BinaryHV::random(0), 10, None).await.unwrap();
+        let all = db
+            .search_similar_filtered(&BinaryHV::random(0), 10, None)
+            .await
+            .unwrap();
         assert_eq!(all.len(), 5);
 
         // Filtered: only episodic (i=0,2,4)
         let episodic = db
-            .search_similar_filtered(
-                &BinaryHV::random(0),
-                10,
-                Some("memory_type = 'episodic'"),
-            )
+            .search_similar_filtered(&BinaryHV::random(0), 10, Some("memory_type = 'episodic'"))
             .await
             .unwrap();
         assert_eq!(episodic.len(), 3);
@@ -837,7 +832,9 @@ mod tests {
         let db = LanceMemory::in_memory().await.unwrap();
 
         for i in 0..3u64 {
-            db.store(test_record(&format!("list-{i}"), i)).await.unwrap();
+            db.store(test_record(&format!("list-{i}"), i))
+                .await
+                .unwrap();
         }
 
         let all = db.list_all().await.unwrap();

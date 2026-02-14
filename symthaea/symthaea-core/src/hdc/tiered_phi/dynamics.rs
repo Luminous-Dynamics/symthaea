@@ -170,7 +170,11 @@ impl PhiDynamics {
     pub fn record_with_timestamp(&mut self, phi: f64, timestamp_ns: u64) -> PhiDynamicsSnapshot {
         // Get previous value for rate calculation
         let prev_phi = if self.count > 0 {
-            let prev_idx = if self.head == 0 { self.config.history_size - 1 } else { self.head - 1 };
+            let prev_idx = if self.head == 0 {
+                self.config.history_size - 1
+            } else {
+                self.head - 1
+            };
             self.history[prev_idx].1
         } else {
             phi
@@ -199,7 +203,12 @@ impl PhiDynamics {
     }
 
     /// Compute dynamics snapshot based on current state
-    fn compute_snapshot(&mut self, current_phi: f64, prev_phi: f64, timestamp: u64) -> PhiDynamicsSnapshot {
+    fn compute_snapshot(
+        &mut self,
+        current_phi: f64,
+        prev_phi: f64,
+        timestamp: u64,
+    ) -> PhiDynamicsSnapshot {
         let n = self.count as f64;
 
         // Mean and variance
@@ -216,8 +225,8 @@ impl PhiDynamics {
 
         // Smoothed rate (EMA)
         let smoothed_rate = if let Some(ref trans) = self.last_transition {
-            self.config.smoothing_alpha * rate_of_change +
-                (1.0 - self.config.smoothing_alpha) * (trans.phi_after - trans.phi_before)
+            self.config.smoothing_alpha * rate_of_change
+                + (1.0 - self.config.smoothing_alpha) * (trans.phi_after - trans.phi_before)
         } else {
             rate_of_change
         };
@@ -283,18 +292,25 @@ impl PhiDynamics {
 
         // R² for trend strength
         let ss_tot: f64 = recent.iter().map(|y| (y - mean_y).powi(2)).sum();
-        let ss_res: f64 = recent.iter().enumerate()
+        let ss_res: f64 = recent
+            .iter()
+            .enumerate()
             .map(|(i, y)| {
                 let predicted = mean_y + slope * (i as f64 - (n - 1.0) / 2.0);
                 (y - predicted).powi(2)
             })
             .sum();
-        let r_squared = if ss_tot > 0.0 { 1.0 - (ss_res / ss_tot) } else { 0.0 };
+        let r_squared = if ss_tot > 0.0 {
+            1.0 - (ss_res / ss_tot)
+        } else {
+            0.0
+        };
 
         // Determine direction
         let direction = if r_squared < 0.1 {
             // Check for oscillation
-            let sign_changes: usize = recent.windows(2)
+            let sign_changes: usize = recent
+                .windows(2)
                 .filter(|w| (w[1] - w[0]) * (if w.len() > 2 { w[2] - w[1] } else { 0.0 }) < 0.0)
                 .count();
             if sign_changes > recent.len() / 3 {
@@ -319,7 +335,13 @@ impl PhiDynamics {
     }
 
     /// Detect phase transitions using z-score
-    fn detect_transition(&self, current: f64, mean: f64, std: f64, timestamp: u64) -> Option<PhaseTransition> {
+    fn detect_transition(
+        &self,
+        current: f64,
+        mean: f64,
+        std: f64,
+        timestamp: u64,
+    ) -> Option<PhaseTransition> {
         if self.count < self.config.min_samples_for_transition || std < 1e-10 {
             return None;
         }
@@ -415,7 +437,6 @@ impl Default for PhiDynamics {
         Self::new()
     }
 }
-
 
 // ============================================================================
 // REVOLUTIONARY #97: Φ ATTRACTOR DYNAMICS
@@ -583,18 +604,23 @@ pub struct AttractorResult {
 impl AttractorResult {
     /// Check if consciousness is in a stable state
     pub fn is_stable(&self) -> bool {
-        matches!(self.attractor_type, AttractorType::FixedPoint)
-            && self.lyapunov_exponent < 0.0
+        matches!(self.attractor_type, AttractorType::FixedPoint) && self.lyapunov_exponent < 0.0
     }
 
     /// Check if consciousness is in transition
     pub fn is_transitioning(&self) -> bool {
-        matches!(self.attractor_type, AttractorType::SaddlePoint | AttractorType::Transient)
+        matches!(
+            self.attractor_type,
+            AttractorType::SaddlePoint | AttractorType::Transient
+        )
     }
 
     /// Check if consciousness shows complex dynamics
     pub fn is_complex(&self) -> bool {
-        matches!(self.attractor_type, AttractorType::LimitCycle | AttractorType::StrangeAttractor)
+        matches!(
+            self.attractor_type,
+            AttractorType::LimitCycle | AttractorType::StrangeAttractor
+        )
     }
 
     /// Get stability score (0 = chaotic, 1 = maximally stable)
@@ -725,9 +751,7 @@ impl PhiAttractor {
         for i in (check_window..n).rev() {
             let window = &trajectory[i - check_window..i];
             let mean = window.iter().sum::<f64>() / window.len() as f64;
-            let max_deviation = window.iter()
-                .map(|&x| (x - mean).abs())
-                .fold(0.0, f64::max);
+            let max_deviation = window.iter().map(|&x| (x - mean).abs()).fold(0.0, f64::max);
 
             if max_deviation < threshold {
                 return (true, i - check_window);
@@ -795,9 +819,11 @@ impl PhiAttractor {
         }
 
         let mean_period = periods.iter().sum::<usize>() as f64 / periods.len() as f64;
-        let variance = periods.iter()
+        let variance = periods
+            .iter()
             .map(|&p| (p as f64 - mean_period).powi(2))
-            .sum::<f64>() / periods.len() as f64;
+            .sum::<f64>()
+            / periods.len() as f64;
 
         // Low variance indicates regular oscillation
         let is_periodic = variance.sqrt() / mean_period < 0.3;
@@ -862,12 +888,13 @@ impl PhiAttractor {
         // Find neighboring values (local extrema)
         let mut neighbors = Vec::new();
         for i in 1..trajectory.len() - 1 {
-            let is_local_min = trajectory[i] < trajectory[i - 1] && trajectory[i] < trajectory[i + 1];
-            let is_local_max = trajectory[i] > trajectory[i - 1] && trajectory[i] > trajectory[i + 1];
-            if (is_local_min || is_local_max)
-                && (trajectory[i] - final_phi).abs() > tolerance {
-                    neighbors.push(trajectory[i]);
-                }
+            let is_local_min =
+                trajectory[i] < trajectory[i - 1] && trajectory[i] < trajectory[i + 1];
+            let is_local_max =
+                trajectory[i] > trajectory[i - 1] && trajectory[i] > trajectory[i + 1];
+            if (is_local_min || is_local_max) && (trajectory[i] - final_phi).abs() > tolerance {
+                neighbors.push(trajectory[i]);
+            }
         }
 
         neighbors.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -896,8 +923,8 @@ impl PhiAttractor {
 
             // Add noise
             rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
-            let noise = ((rng_state as f64) / u64::MAX as f64 - 0.5) * 2.0
-                * self.config.noise_amplitude;
+            let noise =
+                ((rng_state as f64) / u64::MAX as f64 - 0.5) * 2.0 * self.config.noise_amplitude;
 
             // Euler step
             phi += gradient * self.config.time_step + noise;
@@ -932,8 +959,9 @@ impl PhiAttractor {
 
             if let Some(&final_phi) = trajectory.last() {
                 // Check if this is a new attractor
-                let is_new = attractors.iter()
-                    .all(|&a: &f64| (a - final_phi).abs() > self.config.convergence_threshold * 10.0);
+                let is_new = attractors.iter().all(|&a: &f64| {
+                    (a - final_phi).abs() > self.config.convergence_threshold * 10.0
+                });
 
                 if is_new {
                     attractors.push(final_phi);

@@ -98,7 +98,7 @@ impl CognitiveResources {
         resource: CognitiveResourceType,
         amount: f64,
     ) -> bool {
-        let available = self.available.get_mut(&resource).unwrap();
+        let available = self.available.get_mut(&resource).expect("resource must be registered");
         if *available >= amount {
             *available -= amount;
             let subsystem_alloc = self.allocations.entry(subsystem).or_default();
@@ -110,12 +110,17 @@ impl CognitiveResources {
     }
 
     /// Release resources from a subsystem
-    pub fn release(&mut self, subsystem: SubsystemId, resource: CognitiveResourceType, amount: f64) {
+    pub fn release(
+        &mut self,
+        subsystem: SubsystemId,
+        resource: CognitiveResourceType,
+        amount: f64,
+    ) {
         if let Some(subsystem_alloc) = self.allocations.get_mut(&subsystem) {
             if let Some(allocated) = subsystem_alloc.get_mut(&resource) {
                 let to_release = amount.min(*allocated);
                 *allocated -= to_release;
-                *self.available.get_mut(&resource).unwrap() += to_release;
+                *self.available.get_mut(&resource).expect("resource must be registered") += to_release;
             }
         }
     }
@@ -124,7 +129,7 @@ impl CognitiveResources {
     pub fn release_all(&mut self, subsystem: SubsystemId) {
         if let Some(allocs) = self.allocations.remove(&subsystem) {
             for (resource, amount) in allocs {
-                *self.available.get_mut(&resource).unwrap() += amount;
+                *self.available.get_mut(&resource).expect("resource must be registered") += amount;
             }
         }
     }
@@ -132,9 +137,9 @@ impl CognitiveResources {
     /// Regenerate resources over time
     pub fn regenerate(&mut self) {
         for &resource in CognitiveResourceType::all() {
-            let available = self.available.get_mut(&resource).unwrap();
-            let max = *self.max_capacity.get(&resource).unwrap();
-            let rate = *self.regen_rates.get(&resource).unwrap();
+            let available = self.available.get_mut(&resource).expect("resource must be registered");
+            let max = *self.max_capacity.get(&resource).expect("resource must be registered");
+            let rate = *self.regen_rates.get(&resource).expect("resource must be registered");
 
             *available = (*available + rate * max).min(max);
         }
@@ -600,7 +605,11 @@ impl MetaCognitiveController {
                 .meta_goals
                 .iter()
                 .enumerate()
-                .min_by(|(_, a), (_, b)| a.priority.partial_cmp(&b.priority).unwrap_or(std::cmp::Ordering::Equal))
+                .min_by(|(_, a), (_, b)| {
+                    a.priority
+                        .partial_cmp(&b.priority)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|(i, _)| i);
 
             if let Some(idx) = min_priority_idx {
@@ -655,8 +664,10 @@ impl MetaCognitiveController {
             }
 
             // Allocate minimal resources for recovery
-            self.resources.allocate(subsystem, CognitiveResourceType::Computation, 0.1);
-            self.resources.allocate(subsystem, CognitiveResourceType::Energy, 0.1);
+            self.resources
+                .allocate(subsystem, CognitiveResourceType::Computation, 0.1);
+            self.resources
+                .allocate(subsystem, CognitiveResourceType::Energy, 0.1);
 
             self.stats.successful_recoveries += 1;
         }
@@ -760,7 +771,11 @@ impl MetaCognitiveController {
     fn process_workspace(&mut self) {
         // Process high-priority broadcasts first
         let mut broadcasts: Vec<_> = self.global_workspace.iter().cloned().collect();
-        broadcasts.sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal));
+        broadcasts.sort_by(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         for broadcast in broadcasts.iter().take(5) {
             match broadcast.content_type {
@@ -824,7 +839,8 @@ impl MetaCognitiveController {
             return 1.0;
         }
 
-        let mean = self.target_allocation.values().sum::<f64>() / self.target_allocation.len() as f64;
+        let mean =
+            self.target_allocation.values().sum::<f64>() / self.target_allocation.len() as f64;
         let variance: f64 = self
             .target_allocation
             .values()
@@ -894,7 +910,11 @@ mod tests {
         let mut resources = CognitiveResources::default();
 
         // Allocate resources
-        assert!(resources.allocate(SubsystemId::SelfModel, CognitiveResourceType::Computation, 0.5));
+        assert!(resources.allocate(
+            SubsystemId::SelfModel,
+            CognitiveResourceType::Computation,
+            0.5
+        ));
         assert_eq!(resources.available(CognitiveResourceType::Computation), 0.5);
 
         // Can't over-allocate
@@ -909,8 +929,16 @@ mod tests {
     fn test_resource_release() {
         let mut resources = CognitiveResources::default();
 
-        resources.allocate(SubsystemId::SelfModel, CognitiveResourceType::Computation, 0.5);
-        resources.release(SubsystemId::SelfModel, CognitiveResourceType::Computation, 0.3);
+        resources.allocate(
+            SubsystemId::SelfModel,
+            CognitiveResourceType::Computation,
+            0.5,
+        );
+        resources.release(
+            SubsystemId::SelfModel,
+            CognitiveResourceType::Computation,
+            0.3,
+        );
 
         assert_eq!(resources.available(CognitiveResourceType::Computation), 0.8);
     }
@@ -919,7 +947,11 @@ mod tests {
     fn test_resource_regeneration() {
         let mut resources = CognitiveResources::default();
 
-        resources.allocate(SubsystemId::SelfModel, CognitiveResourceType::Computation, 0.5);
+        resources.allocate(
+            SubsystemId::SelfModel,
+            CognitiveResourceType::Computation,
+            0.5,
+        );
         resources.regenerate();
 
         // Should regenerate 10% of max (0.1) up to max
@@ -1061,7 +1093,10 @@ mod tests {
             controller.report_error(SubsystemId::WorldModel);
         }
 
-        assert!(!controller.get_health(SubsystemId::WorldModel).unwrap().is_healthy());
+        assert!(!controller
+            .get_health(SubsystemId::WorldModel)
+            .unwrap()
+            .is_healthy());
 
         // Run cycle to trigger recovery
         controller.cycle();

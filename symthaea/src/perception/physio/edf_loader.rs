@@ -58,7 +58,8 @@ impl SleepStage {
             "SLEEP STAGE W" | "SLEEP-S0" | "W" | "STAGE W" => SleepStage::Wake,
             "SLEEP STAGE 1" | "SLEEP-S1" | "N1" | "STAGE 1" => SleepStage::N1,
             "SLEEP STAGE 2" | "SLEEP-S2" | "N2" | "STAGE 2" => SleepStage::N2,
-            "SLEEP STAGE 3" | "SLEEP STAGE 4" | "SLEEP-S3" | "SLEEP-S4" | "N3" | "STAGE 3" | "STAGE 4" => SleepStage::N3,
+            "SLEEP STAGE 3" | "SLEEP STAGE 4" | "SLEEP-S3" | "SLEEP-S4" | "N3" | "STAGE 3"
+            | "STAGE 4" => SleepStage::N3,
             "SLEEP STAGE R" | "SLEEP-REM" | "R" | "REM" | "STAGE R" => SleepStage::REM,
             "MOVEMENT TIME" | "MOVEMENT" | "MT" => SleepStage::Movement,
             _ => SleepStage::Unknown,
@@ -187,8 +188,11 @@ impl EdfSignal {
     /// Is this an EEG channel?
     pub fn is_eeg(&self) -> bool {
         let label = self.label.to_uppercase();
-        label.contains("EEG") || label.contains("FPZ") || label.contains("PZ")
-            || label.contains("CZ") || label.contains("OZ")
+        label.contains("EEG")
+            || label.contains("FPZ")
+            || label.contains("PZ")
+            || label.contains("CZ")
+            || label.contains("OZ")
     }
 
     /// Is this the frontal EEG channel (Fpz-Cz)?
@@ -236,26 +240,32 @@ pub struct EdfFile {
 impl EdfFile {
     /// Load EDF file from path
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let file = File::open(path.as_ref())
-            .map_err(|e| format!("Cannot open file: {}", e))?;
+        let file = File::open(path.as_ref()).map_err(|e| format!("Cannot open file: {}", e))?;
         let mut reader = BufReader::new(file);
 
         // Read fixed header (256 bytes)
         let mut header = [0u8; 256];
-        reader.read_exact(&mut header)
+        reader
+            .read_exact(&mut header)
             .map_err(|e| format!("Cannot read header: {}", e))?;
 
         // Parse header fields
         let version = String::from_utf8_lossy(&header[0..8]).trim().to_string();
         let patient_id = String::from_utf8_lossy(&header[8..88]).trim().to_string();
         let recording_id = String::from_utf8_lossy(&header[88..168]).trim().to_string();
-        let start_date = String::from_utf8_lossy(&header[168..176]).trim().to_string();
-        let start_time = String::from_utf8_lossy(&header[176..184]).trim().to_string();
+        let start_date = String::from_utf8_lossy(&header[168..176])
+            .trim()
+            .to_string();
+        let start_time = String::from_utf8_lossy(&header[176..184])
+            .trim()
+            .to_string();
         let header_bytes: usize = String::from_utf8_lossy(&header[184..192])
             .trim()
             .parse()
             .unwrap_or(256);
-        let reserved = String::from_utf8_lossy(&header[192..236]).trim().to_string();
+        let reserved = String::from_utf8_lossy(&header[192..236])
+            .trim()
+            .to_string();
         let num_records: i64 = String::from_utf8_lossy(&header[236..244])
             .trim()
             .parse()
@@ -276,7 +286,8 @@ impl EdfFile {
         // Read signal headers (256 bytes per signal)
         let signal_header_size = 256 * num_signals;
         let mut signal_header = vec![0u8; signal_header_size];
-        reader.read_exact(&mut signal_header)
+        reader
+            .read_exact(&mut signal_header)
             .map_err(|e| format!("Cannot read signal headers: {}", e))?;
 
         // Parse each signal's header fields
@@ -356,7 +367,8 @@ impl EdfFile {
         }
 
         // Seek to data start
-        reader.seek(SeekFrom::Start(header_bytes as u64))
+        reader
+            .seek(SeekFrom::Start(header_bytes as u64))
             .map_err(|e| format!("Cannot seek to data: {}", e))?;
 
         // Read data records
@@ -365,7 +377,8 @@ impl EdfFile {
             let metadata = std::fs::metadata(path.as_ref())
                 .map_err(|e| format!("Cannot get file size: {}", e))?;
             let data_bytes = metadata.len() as i64 - header_bytes as i64;
-            let bytes_per_record: i64 = signals.iter()
+            let bytes_per_record: i64 = signals
+                .iter()
                 .map(|s| s.samples_per_record as i64 * 2)
                 .sum();
             (data_bytes / bytes_per_record) as usize
@@ -375,7 +388,9 @@ impl EdfFile {
 
         // Pre-allocate signal data
         for signal in &mut signals {
-            signal.data.reserve(signal.samples_per_record * actual_records);
+            signal
+                .data
+                .reserve(signal.samples_per_record * actual_records);
         }
 
         // Read and convert data
@@ -417,13 +432,14 @@ impl EdfFile {
 
     /// Load hypnogram annotations from EDF+ annotation file
     pub fn load_hypnogram<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
-        let file = File::open(path.as_ref())
-            .map_err(|e| format!("Cannot open hypnogram: {}", e))?;
+        let file =
+            File::open(path.as_ref()).map_err(|e| format!("Cannot open hypnogram: {}", e))?;
         let mut reader = BufReader::new(file);
 
         // Read entire file (hypnograms are small)
         let mut contents = Vec::new();
-        reader.read_to_end(&mut contents)
+        reader
+            .read_to_end(&mut contents)
             .map_err(|e| format!("Cannot read hypnogram: {}", e))?;
 
         // Parse EDF+ annotations
@@ -525,12 +541,17 @@ impl EdfFile {
         for signal in &self.signals {
             s.push_str(&format!(
                 "  - {} ({:.1} Hz, {} samples)\n",
-                signal.label, signal.sample_rate, signal.data.len()
+                signal.label,
+                signal.sample_rate,
+                signal.data.len()
             ));
         }
 
         if !self.annotations.is_empty() {
-            s.push_str(&format!("\nAnnotations: {} epochs\n", self.annotations.len()));
+            s.push_str(&format!(
+                "\nAnnotations: {} epochs\n",
+                self.annotations.len()
+            ));
 
             // Count stages
             let mut counts = [0usize; 7];
@@ -549,7 +570,8 @@ impl EdfFile {
                         5 => SleepStage::Movement,
                         _ => SleepStage::Unknown,
                     };
-                    s.push_str(&format!("  {}: {} ({:.1}%)\n",
+                    s.push_str(&format!(
+                        "  {}: {} ({:.1}%)\n",
                         stage.name(),
                         count,
                         100.0 * count as f64 / self.annotations.len() as f64
@@ -568,13 +590,22 @@ mod tests {
 
     #[test]
     fn test_sleep_stage_parsing() {
-        assert_eq!(SleepStage::from_annotation("Sleep stage W"), SleepStage::Wake);
+        assert_eq!(
+            SleepStage::from_annotation("Sleep stage W"),
+            SleepStage::Wake
+        );
         assert_eq!(SleepStage::from_annotation("Sleep stage 1"), SleepStage::N1);
         assert_eq!(SleepStage::from_annotation("Sleep stage 2"), SleepStage::N2);
         assert_eq!(SleepStage::from_annotation("Sleep stage 3"), SleepStage::N3);
         assert_eq!(SleepStage::from_annotation("Sleep stage 4"), SleepStage::N3); // 3&4 merged
-        assert_eq!(SleepStage::from_annotation("Sleep stage R"), SleepStage::REM);
-        assert_eq!(SleepStage::from_annotation("Movement time"), SleepStage::Movement);
+        assert_eq!(
+            SleepStage::from_annotation("Sleep stage R"),
+            SleepStage::REM
+        );
+        assert_eq!(
+            SleepStage::from_annotation("Movement time"),
+            SleepStage::Movement
+        );
     }
 
     #[test]

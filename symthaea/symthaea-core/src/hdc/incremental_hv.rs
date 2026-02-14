@@ -327,7 +327,7 @@ impl SimilarityCache {
             self.cache.insert(key, similarity);
             similarity
         } else {
-            0.0  // Unknown query
+            0.0 // Unknown query
         }
     }
 
@@ -461,7 +461,12 @@ impl IncrementalBind {
 
         // Return cached results in order
         (0..self.queries.len())
-            .map(|idx| *self.cached_results.get(&idx).expect("all query indices populated in loop above"))
+            .map(|idx| {
+                *self
+                    .cached_results
+                    .get(&idx)
+                    .expect("all query indices populated in loop above")
+            })
             .collect()
     }
 
@@ -515,7 +520,10 @@ mod tests {
         let traditional = simd_bundle(&vectors);
         let incremental = inc_bundle.get_bundle();
 
-        assert_eq!(traditional.0, incremental.0, "Incremental bundle must match traditional");
+        assert_eq!(
+            traditional.0, incremental.0,
+            "Incremental bundle must match traditional"
+        );
     }
 
     #[test]
@@ -526,7 +534,10 @@ mod tests {
 
         // Single vector bundle: majority vote means bit=1 if count>0 (count=1 for each 1-bit, -1 for each 0-bit)
         let result = bundle.get_bundle();
-        assert_eq!(result.0, v.0, "Bundle of single vector should return that vector");
+        assert_eq!(
+            result.0, v.0,
+            "Bundle of single vector should return that vector"
+        );
     }
 
     #[test]
@@ -537,10 +548,17 @@ mod tests {
 
         assert_eq!(bundle.len(), 3);
 
-        let all_vectors = vec![BinaryHV::random(0), BinaryHV::random(1), BinaryHV::random(2)];
+        let all_vectors = vec![
+            BinaryHV::random(0),
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+        ];
         let expected = simd_bundle(&all_vectors);
         let actual = bundle.get_bundle();
-        assert_eq!(actual.0, expected.0, "Incremental add should match batch bundle");
+        assert_eq!(
+            actual.0, expected.0,
+            "Incremental add should match batch bundle"
+        );
     }
 
     // ===== IncrementalBundle Update =====
@@ -548,7 +566,11 @@ mod tests {
     #[test]
     fn test_incremental_bundle_update() {
         let mut bundle = IncrementalBundle::new();
-        bundle.add(vec![BinaryHV::random(0), BinaryHV::random(1), BinaryHV::random(2)]);
+        bundle.add(vec![
+            BinaryHV::random(0),
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+        ]);
 
         let before = bundle.get_bundle();
         bundle.update(1, BinaryHV::random(10));
@@ -599,7 +621,10 @@ mod tests {
 
         let expected = simd_bundle(bundle.vectors());
         let actual = bundle.get_bundle();
-        assert_eq!(expected.0, actual.0, "Bundle after removal should be correct");
+        assert_eq!(
+            expected.0, actual.0,
+            "Bundle after removal should be correct"
+        );
     }
 
     #[test]
@@ -673,7 +698,11 @@ mod tests {
 
         assert_eq!(cache.stats().cache_size, 1);
         cache.invalidate_query(qid);
-        assert_eq!(cache.stats().cache_size, 0, "Invalidation should clear entries");
+        assert_eq!(
+            cache.stats().cache_size,
+            0,
+            "Invalidation should clear entries"
+        );
     }
 
     #[test]
@@ -685,7 +714,11 @@ mod tests {
         let _sim = cache.get_similarity(qid, 0, &target);
 
         cache.invalidate_target(0);
-        assert_eq!(cache.stats().cache_size, 0, "Target invalidation should clear entries");
+        assert_eq!(
+            cache.stats().cache_size,
+            0,
+            "Target invalidation should clear entries"
+        );
     }
 
     #[test]
@@ -716,7 +749,11 @@ mod tests {
 
     #[test]
     fn test_incremental_bind_correctness() {
-        let queries = vec![BinaryHV::random(0), BinaryHV::random(1), BinaryHV::random(2)];
+        let queries = vec![
+            BinaryHV::random(0),
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+        ];
         let key = BinaryHV::random(999);
 
         let mut inc_bind = IncrementalBind::new(key);
@@ -726,7 +763,10 @@ mod tests {
 
         for (i, result) in results.iter().enumerate() {
             let expected = simd_bind(&queries[i], &key);
-            assert_eq!(expected.0, result.0, "Incremental bind must match traditional");
+            assert_eq!(
+                expected.0, result.0,
+                "Incremental bind must match traditional"
+            );
         }
     }
 
@@ -744,8 +784,14 @@ mod tests {
         inc_bind.update_query(0, new_query);
         let after = inc_bind.get_bound_results();
 
-        assert_ne!(before[0].0, after[0].0, "Updated query should produce different result");
-        assert_eq!(before[1].0, after[1].0, "Unchanged query should produce same result");
+        assert_ne!(
+            before[0].0, after[0].0,
+            "Updated query should produce different result"
+        );
+        assert_eq!(
+            before[1].0, after[1].0,
+            "Unchanged query should produce same result"
+        );
         assert_eq!(after[0].0, simd_bind(&new_query, &key).0);
     }
 

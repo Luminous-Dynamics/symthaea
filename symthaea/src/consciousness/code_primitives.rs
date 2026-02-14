@@ -33,14 +33,16 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use symthaea_core::hdc::{BinaryHV, Primitive, PrimitiveTier, ContinuousHV};
+use symthaea_core::hdc::{BinaryHV, ContinuousHV, Primitive, PrimitiveTier};
 
 #[cfg(feature = "code_understanding")]
 use crate::hdc::code_encoder::CodeHDEncoder;
 #[cfg(feature = "code_generation")]
 use crate::language::code_intent::{CodeIntent, CodeIntentCategory};
 
-use super::primitive_reasoning::{TaskType, TierAwareConfig, PrimitiveExecution, TransformationType};
+use super::primitive_reasoning::{
+    PrimitiveExecution, TaskType, TierAwareConfig, TransformationType,
+};
 
 /// Convert BinaryHV binary hypervector to ContinuousHV.
 /// Maps each bit to -1.0 (0) or +1.0 (1) in bipolar encoding.
@@ -214,8 +216,15 @@ impl CodePrimitiveRouter {
 
         // Also cache commonly used cross-tier primitives
         let cross_tier = [
-            "ATTEND", "INTEND", "CAUSE", "EFFECT", "FUNCTION",
-            "SEQUENCE_OP", "ANALOGY", "PATTERN", "MEANING"
+            "ATTEND",
+            "INTEND",
+            "CAUSE",
+            "EFFECT",
+            "FUNCTION",
+            "SEQUENCE_OP",
+            "ANALOGY",
+            "PATTERN",
+            "MEANING",
         ];
 
         for name in cross_tier {
@@ -242,7 +251,11 @@ impl CodePrimitiveRouter {
 
         // Add supporting primitives up to limit
         let remaining = self.config.max_primitives.saturating_sub(primitives.len());
-        for name in operation.supporting_primitives().into_iter().take(remaining) {
+        for name in operation
+            .supporting_primitives()
+            .into_iter()
+            .take(remaining)
+        {
             if let Some(p) = system.get(name) {
                 primitives.push(p.clone());
             }
@@ -251,7 +264,11 @@ impl CodePrimitiveRouter {
         // Add cross-tier if enabled
         if self.config.cross_tier_enabled {
             let remaining = self.config.max_primitives.saturating_sub(primitives.len());
-            for name in operation.cross_tier_primitives().into_iter().take(remaining) {
+            for name in operation
+                .cross_tier_primitives()
+                .into_iter()
+                .take(remaining)
+            {
                 if let Some(p) = system.get(name) {
                     primitives.push(p.clone());
                 }
@@ -313,13 +330,13 @@ impl CodePrimitiveRouter {
     pub fn code_optimized_config() -> TierAwareConfig {
         TierAwareConfig {
             code_weight: 2.0,          // Boost code tier
-            compositional_weight: 1.5,  // Composition is important
-            metacognitive_weight: 1.2,  // Self-reflection helps
+            compositional_weight: 1.5, // Composition is important
+            metacognitive_weight: 1.2, // Self-reflection helps
             consciousness_weight: 1.0,
             temporal_weight: 1.0,
-            nsm_weight: 0.8,           // Less emphasis on natural language
+            nsm_weight: 0.8, // Less emphasis on natural language
             math_weight: 1.0,
-            physical_weight: 0.5,       // Physical reasoning less relevant
+            physical_weight: 0.5, // Physical reasoning less relevant
             geometric_weight: 0.5,
             strategic_weight: 0.8,
         }
@@ -360,7 +377,10 @@ impl CodePrimitiveExecutor {
             .map(|(i, p)| PrimitiveExecution {
                 primitive: p.clone(),
                 input: p.encoding,
-                output: primitives.first().map(|f| f.encoding).unwrap_or_else(|| p.encoding),
+                output: primitives
+                    .first()
+                    .map(|f| f.encoding)
+                    .unwrap_or_else(|| p.encoding),
                 transformation: TransformationType::Bundle,
                 phi_contribution: 1.0 / (i + 1) as f64, // Decaying contribution
                 timestamp: i as f64 * 0.1,
@@ -378,7 +398,11 @@ impl CodePrimitiveExecutor {
             success: true,
             generated_code: None,
             diagnostics: vec![
-                format!("Selected {} primitives for {:?}", primitives.len(), operation),
+                format!(
+                    "Selected {} primitives for {:?}",
+                    primitives.len(),
+                    operation
+                ),
                 format!("Estimated Phi: {:.3}", phi),
             ],
         }
@@ -472,7 +496,8 @@ impl CodePrimitiveExecutor {
 
         // Get Consciousness tier primitives
         let system = PrimitiveSystem::new();
-        let consciousness_prims: Vec<Primitive> = system.get_tier(PrimitiveTier::Consciousness)
+        let consciousness_prims: Vec<Primitive> = system
+            .get_tier(PrimitiveTier::Consciousness)
             .into_iter()
             .take(3) // Top 3 consciousness primitives
             .cloned()
@@ -489,7 +514,8 @@ impl CodePrimitiveExecutor {
 
         // Get Metacognitive tier primitives
         let system = PrimitiveSystem::new();
-        let meta_prims: Vec<Primitive> = system.get_tier(PrimitiveTier::MetaCognitive)
+        let meta_prims: Vec<Primitive> = system
+            .get_tier(PrimitiveTier::MetaCognitive)
             .into_iter()
             .take(3)
             .cloned()
@@ -559,7 +585,12 @@ mod tests {
         // If empty (Code-tier primitives not registered), fallback is router dim (512).
         let expected_dim = if primitives.is_empty() { 512 } else { 16384 };
         assert_eq!(composed.dim(), expected_dim);
-        let norm: f32 = composed.as_slice().iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm: f32 = composed
+            .as_slice()
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
         assert!(norm > 0.0, "Composed HV should have non-zero norm");
     }
 
@@ -597,7 +628,11 @@ mod tests {
         ];
 
         for op in operations {
-            assert!(!op.primary_primitives().is_empty(), "{:?} has no primitives", op);
+            assert!(
+                !op.primary_primitives().is_empty(),
+                "{:?} has no primitives",
+                op
+            );
         }
     }
 }

@@ -8,7 +8,7 @@
 //!
 //! Run with: cargo bench --bench hdc_improvements
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::sparse_hv::SparseHV;
 
@@ -22,23 +22,17 @@ fn bench_hv16_bundle(c: &mut Criterion) {
     for n in [10, 50, 100, 500] {
         let vectors: Vec<BinaryHV> = (0..n).map(|i| BinaryHV::random(i)).collect();
 
-        group.bench_with_input(
-            BenchmarkId::new("original", n),
-            &vectors,
-            |b, vecs| b.iter(|| black_box(BinaryHV::bundle(vecs)))
-        );
+        group.bench_with_input(BenchmarkId::new("original", n), &vectors, |b, vecs| {
+            b.iter(|| black_box(BinaryHV::bundle(vecs)))
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("safe", n),
-            &vectors,
-            |b, vecs| b.iter(|| black_box(BinaryHV::bundle_safe(vecs)))
-        );
+        group.bench_with_input(BenchmarkId::new("safe", n), &vectors, |b, vecs| {
+            b.iter(|| black_box(BinaryHV::bundle_safe(vecs)))
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("normalized", n),
-            &vectors,
-            |b, vecs| b.iter(|| black_box(BinaryHV::bundle_normalized(vecs)))
-        );
+        group.bench_with_input(BenchmarkId::new("normalized", n), &vectors, |b, vecs| {
+            b.iter(|| black_box(BinaryHV::bundle_normalized(vecs)))
+        });
     }
 
     group.finish();
@@ -55,18 +49,14 @@ fn bench_hv16_permute(c: &mut Criterion) {
 
     for shift in [1, 8, 64, 128, 1000] {
         // permute_legacy: original bit-by-bit implementation
-        group.bench_with_input(
-            BenchmarkId::new("legacy", shift),
-            &shift,
-            |b, &s| b.iter(|| black_box(v.permute_legacy(s)))
-        );
+        group.bench_with_input(BenchmarkId::new("legacy", shift), &shift, |b, &s| {
+            b.iter(|| black_box(v.permute_legacy(s)))
+        });
 
         // permute: now uses fast word-level rotation (13-22x faster)
-        group.bench_with_input(
-            BenchmarkId::new("fast", shift),
-            &shift,
-            |b, &s| b.iter(|| black_box(v.permute(s)))
-        );
+        group.bench_with_input(BenchmarkId::new("fast", shift), &shift, |b, &s| {
+            b.iter(|| black_box(v.permute(s)))
+        });
     }
 
     group.finish();
@@ -82,9 +72,7 @@ fn bench_hv16_density(c: &mut Criterion) {
     let random = BinaryHV::random(42);
     let ones = BinaryHV::ones();
 
-    group.bench_function("density_random", |b| {
-        b.iter(|| black_box(random.density()))
-    });
+    group.bench_function("density_random", |b| b.iter(|| black_box(random.density())));
 
     group.bench_function("ensure_density_balanced", |b| {
         b.iter(|| black_box(random.ensure_density(0.4, 0.6)))
@@ -112,25 +100,25 @@ fn bench_sparse_hv(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("jaccard_similarity", format!("{:.0}%", density * 100.0)),
             &(&sparse_a, &sparse_b),
-            |b, (a, bb)| b.iter(|| black_box(a.similarity_jaccard(bb)))
+            |b, (a, bb)| b.iter(|| black_box(a.similarity_jaccard(bb))),
         );
 
         group.bench_with_input(
             BenchmarkId::new("lsh_similarity", format!("{:.0}%", density * 100.0)),
             &(&sparse_a, &sparse_b),
-            |b, (a, bb)| b.iter(|| black_box(a.similarity_lsh(bb)))
+            |b, (a, bb)| b.iter(|| black_box(a.similarity_lsh(bb))),
         );
 
         group.bench_with_input(
             BenchmarkId::new("bind", format!("{:.0}%", density * 100.0)),
             &(&sparse_a, &sparse_b),
-            |b, (a, bb)| b.iter(|| black_box(a.bind(bb)))
+            |b, (a, bb)| b.iter(|| black_box(a.bind(bb))),
         );
 
         group.bench_with_input(
             BenchmarkId::new("permute", format!("{:.0}%", density * 100.0)),
             &sparse_a,
-            |b, a| b.iter(|| black_box(a.permute(100)))
+            |b, a| b.iter(|| black_box(a.permute(100))),
         );
     }
 
@@ -147,9 +135,7 @@ fn bench_sparse_conversion(c: &mut Criterion) {
         b.iter(|| black_box(SparseHV::from_hv16(&dense)))
     });
 
-    group.bench_function("to_hv16", |b| {
-        b.iter(|| black_box(sparse.to_hv16()))
-    });
+    group.bench_function("to_hv16", |b| b.iter(|| black_box(sparse.to_hv16())));
 
     group.finish();
 }
@@ -160,11 +146,9 @@ fn bench_sparse_bundle(c: &mut Criterion) {
     for n in [5, 10, 20] {
         let vectors: Vec<SparseHV> = (0..n).map(|i| SparseHV::random(i, 0.3)).collect();
 
-        group.bench_with_input(
-            BenchmarkId::new("bundle", n),
-            &vectors,
-            |b, vecs| b.iter(|| black_box(SparseHV::bundle(vecs)))
-        );
+        group.bench_with_input(BenchmarkId::new("bundle", n), &vectors, |b, vecs| {
+            b.iter(|| black_box(SparseHV::bundle(vecs)))
+        });
     }
 
     group.finish();
@@ -182,9 +166,7 @@ fn bench_bind_comparison(c: &mut Criterion) {
     let sparse_a = SparseHV::from_hv16(&a);
     let sparse_b = SparseHV::from_hv16(&b);
 
-    group.bench_function("BinaryHV", |bench| {
-        bench.iter(|| black_box(a.bind(&b)))
-    });
+    group.bench_function("BinaryHV", |bench| bench.iter(|| black_box(a.bind(&b))));
 
     group.bench_function("SparseHV_50%", |bench| {
         bench.iter(|| black_box(sparse_a.bind(&sparse_b)))

@@ -110,7 +110,11 @@ impl DreamSynthesizer {
             // Deterministic "random" selection
             self.counter = self.counter.wrapping_add(1);
             let idx_a = (self.counter.wrapping_mul(2_654_435_761) as usize) % pool_len;
-            let idx_b = (self.counter.wrapping_mul(1_618_033_989).wrapping_add(iter as u64) as usize) % pool_len;
+            let idx_b = (self
+                .counter
+                .wrapping_mul(1_618_033_989)
+                .wrapping_add(iter as u64) as usize)
+                % pool_len;
 
             if idx_a == idx_b {
                 continue;
@@ -149,11 +153,7 @@ impl DreamSynthesizer {
     }
 
     /// Run multiple dream cycles and return the best insights
-    pub fn dream_session(
-        &mut self,
-        memory: &CodebaseMemory,
-        cycles: usize,
-    ) -> Vec<DreamInsight> {
+    pub fn dream_session(&mut self, memory: &CodebaseMemory, cycles: usize) -> Vec<DreamInsight> {
         let mut all_insights = Vec::new();
 
         for _ in 0..cycles {
@@ -182,14 +182,17 @@ impl Default for DreamSynthesizer {
 mod tests {
     use super::*;
     use crate::hdc::code_encoder::CodeHDEncoder;
-    use crate::language::code_parser::{ParsedCode, CodeEntity, EntityKind, Span};
+    use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode, Span};
     use std::path::Path;
 
     fn test_span() -> Span {
         Span {
-            start_byte: 0, end_byte: 10,
-            start_line: 0, start_col: 0,
-            end_line: 0, end_col: 10,
+            start_byte: 0,
+            end_byte: 10,
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 10,
         }
     }
 
@@ -197,11 +200,21 @@ mod tests {
         let mut memory = CodebaseMemory::new(CodeHDEncoder::new(512));
 
         let mut parsed = ParsedCode::new("", "rust");
-        parsed.entities.push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
-        parsed.entities.push(CodeEntity::new(EntityKind::Function, "filter", test_span()));
-        parsed.entities.push(CodeEntity::new(EntityKind::Function, "map", test_span()));
-        parsed.entities.push(CodeEntity::new(EntityKind::Struct, "Config", test_span()));
-        parsed.entities.push(CodeEntity::new(EntityKind::Struct, "Parser", test_span()));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "filter", test_span()));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "map", test_span()));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Struct, "Config", test_span()));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Struct, "Parser", test_span()));
         memory.index_file(Path::new("src/lib.rs"), &parsed);
 
         memory
@@ -210,8 +223,7 @@ mod tests {
     #[test]
     fn test_dream_cycle() {
         let memory = make_memory();
-        let mut dreamer = DreamSynthesizer::new()
-            .with_iterations(20);
+        let mut dreamer = DreamSynthesizer::new().with_iterations(20);
 
         let result = dreamer.dream_cycle(&memory);
         assert_eq!(result.attempts, 20);

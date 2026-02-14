@@ -9,8 +9,8 @@
 //! - Pattern completion accuracy vs speed
 //! - Sequence learning convergence
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig, UnifiedActivation};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -191,7 +191,12 @@ fn bench_triplet_update(c: &mut Criterion) {
 
         group.bench_with_input(
             BenchmarkId::new("single_update", dim),
-            &(neuron.clone(), anchor.clone(), positive.clone(), negative.clone()),
+            &(
+                neuron.clone(),
+                anchor.clone(),
+                positive.clone(),
+                negative.clone(),
+            ),
             |b, (n, anc, pos, neg)| {
                 let mut neuron = n.clone();
                 b.iter(|| {
@@ -216,7 +221,7 @@ fn bench_triplet_update(c: &mut Criterion) {
 
 fn bench_learning_convergence(c: &mut Criterion) {
     let mut group = c.benchmark_group("Learning_Convergence");
-    group.sample_size(20);  // Reduce samples for longer benchmarks
+    group.sample_size(20); // Reduce samples for longer benchmarks
 
     let config = bench_config(BENCH_DIM);
     let patterns: Vec<ContinuousHV> = (0..10)

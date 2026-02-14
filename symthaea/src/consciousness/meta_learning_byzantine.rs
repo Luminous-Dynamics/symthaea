@@ -38,9 +38,7 @@
 //! - Achieves superhuman defense through experience
 //! - Closes the attacker-defender capability gap
 
-use super::byzantine_collective::{
-    ByzantineResistantCollective, ContributionOutcome,
-};
+use super::byzantine_collective::{ByzantineResistantCollective, ContributionOutcome};
 use super::primitive_evolution::CandidatePrimitive;
 use anyhow::Result;
 
@@ -293,10 +291,9 @@ impl MetaLearningByzantineDefense {
         }
 
         // Contribute using Byzantine-resistant system
-        let outcome = self.byzantine_collective.byzantine_resistant_contribute(
-            instance_id,
-            primitive,
-        )?;
+        let outcome = self
+            .byzantine_collective
+            .byzantine_resistant_contribute(instance_id, primitive)?;
 
         // Record attack for learning
         let was_malicious = matches!(outcome, ContributionOutcome::Malicious);
@@ -338,10 +335,10 @@ impl MetaLearningByzantineDefense {
         // Discover pattern if enough similar attacks
         if self.attack_history.len() >= 5 {
             // Simple pattern: Check if multiple attacks with similar features
-            let similar_attacks: Vec<_> = self.attack_history.iter()
-                .filter(|(f, malicious)| {
-                    *malicious && self.features_similar(features, f)
-                })
+            let similar_attacks: Vec<_> = self
+                .attack_history
+                .iter()
+                .filter(|(f, malicious)| *malicious && self.features_similar(features, f))
                 .collect();
 
             if similar_attacks.len() >= 3 {
@@ -378,13 +375,18 @@ impl MetaLearningByzantineDefense {
         let mut characteristic_features = Vec::new();
 
         if features.phi_suspicion > 0.5 {
-            characteristic_features.push(format!("High Φ suspicion: {:.2}", features.phi_suspicion));
+            characteristic_features
+                .push(format!("High Φ suspicion: {:.2}", features.phi_suspicion));
         }
         if features.name_suspicion > 0.5 {
-            characteristic_features.push(format!("Suspicious name length: {}", features.name_length));
+            characteristic_features
+                .push(format!("Suspicious name length: {}", features.name_length));
         }
         if features.definition_suspicion > 0.5 {
-            characteristic_features.push(format!("Suspicious definition length: {}", features.definition_length));
+            characteristic_features.push(format!(
+                "Suspicious definition length: {}",
+                features.definition_length
+            ));
         }
 
         // Create pattern
@@ -408,7 +410,9 @@ impl MetaLearningByzantineDefense {
     /// Recommend defense adjustment based on attack features
     fn recommend_defense_adjustment(&self, features: &AttackFeatures) -> DefenseAdjustment {
         // Determine which feature is most suspicious
-        if features.phi_suspicion > features.name_suspicion && features.phi_suspicion > features.definition_suspicion {
+        if features.phi_suspicion > features.name_suspicion
+            && features.phi_suspicion > features.definition_suspicion
+        {
             // Φ-based attack - tighten Φ thresholds
             DefenseAdjustment {
                 adjustment_type: AdjustmentType::IncreaseSensitivity,
@@ -453,7 +457,9 @@ impl MetaLearningByzantineDefense {
         }
 
         // Adapt definition length if definition-based attack
-        if features.definition_suspicion > 0.5 && features.definition_length < self.definition_min_length {
+        if features.definition_suspicion > 0.5
+            && features.definition_length < self.definition_min_length
+        {
             self.definition_min_length += 1;
         }
 
@@ -470,7 +476,9 @@ impl MetaLearningByzantineDefense {
 
         // Calculate detection accuracy
         let total = self.attack_history.len();
-        let malicious_count = self.attack_history.iter()
+        let malicious_count = self
+            .attack_history
+            .iter()
             .filter(|(_, malicious)| *malicious)
             .count();
 
@@ -534,11 +542,17 @@ impl MetaLearningByzantineDefense {
         // Check against learned patterns
         for pattern in &self.attack_patterns {
             // Simple matching: If features similar to known pattern
-            let matches_pattern = if pattern.characteristic_features.iter()
-                .any(|f| f.contains("Φ suspicion")) {
+            let matches_pattern = if pattern
+                .characteristic_features
+                .iter()
+                .any(|f| f.contains("Φ suspicion"))
+            {
                 features.phi_suspicion > 0.5
-            } else if pattern.characteristic_features.iter()
-                .any(|f| f.contains("name length")) {
+            } else if pattern
+                .characteristic_features
+                .iter()
+                .any(|f| f.contains("name length"))
+            {
                 features.name_suspicion > 0.5
             } else {
                 features.definition_suspicion > 0.5
@@ -550,12 +564,11 @@ impl MetaLearningByzantineDefense {
         }
 
         // Check against adaptive thresholds
-        let violates_threshold =
-            features.phi > self.phi_upper_threshold ||
-            features.phi < self.phi_lower_threshold ||
-            features.name_length < self.name_min_length ||
-            features.name_length > self.name_max_length ||
-            features.definition_length < self.definition_min_length;
+        let violates_threshold = features.phi > self.phi_upper_threshold
+            || features.phi < self.phi_lower_threshold
+            || features.name_length < self.name_min_length
+            || features.name_length > self.name_max_length
+            || features.definition_length < self.definition_min_length;
 
         if violates_threshold {
             return (true, 0.6); // Medium confidence
@@ -577,9 +590,9 @@ pub struct AdaptiveThresholds {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::super::primitive_evolution::EvolutionConfig;
     use super::super::meta_reasoning::MetaReasoningConfig;
+    use super::super::primitive_evolution::EvolutionConfig;
+    use super::*;
     use crate::hdc::primitive_system::PrimitiveTier;
 
     #[test]
@@ -618,11 +631,8 @@ mod tests {
         let evolution_config = EvolutionConfig::default();
         let meta_config = MetaReasoningConfig::default();
 
-        let mlbd = MetaLearningByzantineDefense::new(
-            "test".to_string(),
-            evolution_config,
-            meta_config,
-        );
+        let mlbd =
+            MetaLearningByzantineDefense::new("test".to_string(), evolution_config, meta_config);
 
         let thresholds = mlbd.get_adaptive_thresholds();
 
