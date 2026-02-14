@@ -253,3 +253,640 @@ fn validate_create_link(
         LinkTypes::CircleToBalances => Ok(ValidateCallbackResult::Valid),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =============================================================================
+    // FACTORY FUNCTIONS
+    // =============================================================================
+
+    fn agent1() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xdb; 36])
+    }
+
+    fn agent2() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xdc; 36])
+    }
+
+    fn action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0xab; 36])
+    }
+
+    fn timestamp() -> Timestamp {
+        Timestamp::from_micros(1_000_000)
+    }
+
+    fn valid_credit_circle() -> CreditCircle {
+        CreditCircle {
+            id: "circle-1".to_string(),
+            name: "Community Credits".to_string(),
+            description: "A local credit circle".to_string(),
+            currency_name: "Credits".to_string(),
+            currency_symbol: "CR".to_string(),
+            default_credit_limit: 1000,
+            max_credit_limit: 5000,
+            transaction_fee_percent: 0.5,
+            demurrage_rate_percent: 1.0,
+            geographic_scope: Some("Local".to_string()),
+            founders: vec![agent1()],
+            rules_hash: None,
+            created_at: timestamp(),
+            active: true,
+        }
+    }
+
+    fn valid_credit_line() -> CreditLine {
+        CreditLine {
+            circle_hash: action_hash(),
+            member: agent1(),
+            credit_limit: 1000,
+            balance: 0,
+            total_credit_extended: 0,
+            total_credit_received: 0,
+            joined_at: timestamp(),
+            status: mutualaid_common::CreditLineStatus::Active,
+            last_activity: timestamp(),
+        }
+    }
+
+    fn valid_credit_transaction() -> CreditTransaction {
+        CreditTransaction {
+            id: "tx-1".to_string(),
+            circle_hash: action_hash(),
+            from: agent1(),
+            to: agent2(),
+            amount: 100,
+            transaction_type: mutualaid_common::TransactionType::Payment,
+            memo: "Payment for service".to_string(),
+            related_exchange_hash: None,
+            created_at: timestamp(),
+            confirmed: false,
+        }
+    }
+
+    fn valid_balance() -> Balance {
+        Balance {
+            member: agent1(),
+            circle_hash: action_hash(),
+            balance: 0,
+            credit_available: 1000,
+            as_of: timestamp(),
+        }
+    }
+
+    // =============================================================================
+    // CREDIT CIRCLE VALIDATION TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_valid_credit_circle() {
+        let circle = valid_credit_circle();
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_circle_empty_id() {
+        let mut circle = valid_credit_circle();
+        circle.id = "".to_string();
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_empty_name() {
+        let mut circle = valid_credit_circle();
+        circle.name = "".to_string();
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_name_too_long() {
+        let mut circle = valid_credit_circle();
+        circle.name = "a".repeat(101);
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_name_exactly_100() {
+        let mut circle = valid_credit_circle();
+        circle.name = "a".repeat(100);
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_circle_description_too_long() {
+        let mut circle = valid_credit_circle();
+        circle.description = "a".repeat(2001);
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_description_exactly_2000() {
+        let mut circle = valid_credit_circle();
+        circle.description = "a".repeat(2000);
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_circle_empty_description() {
+        let mut circle = valid_credit_circle();
+        circle.description = "".to_string();
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_circle_empty_currency_name() {
+        let mut circle = valid_credit_circle();
+        circle.currency_name = "".to_string();
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_empty_currency_symbol() {
+        let mut circle = valid_credit_circle();
+        circle.currency_symbol = "".to_string();
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_zero_default_limit() {
+        let mut circle = valid_credit_circle();
+        circle.default_credit_limit = 0;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_negative_default_limit() {
+        let mut circle = valid_credit_circle();
+        circle.default_credit_limit = -100;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_default_limit_one() {
+        let mut circle = valid_credit_circle();
+        circle.default_credit_limit = 1;
+        circle.max_credit_limit = 1;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_circle_max_less_than_default() {
+        let mut circle = valid_credit_circle();
+        circle.default_credit_limit = 1000;
+        circle.max_credit_limit = 999;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_max_equals_default() {
+        let mut circle = valid_credit_circle();
+        circle.default_credit_limit = 1000;
+        circle.max_credit_limit = 1000;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_circle_negative_fee() {
+        let mut circle = valid_credit_circle();
+        circle.transaction_fee_percent = -0.1;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_fee_zero() {
+        let mut circle = valid_credit_circle();
+        circle.transaction_fee_percent = 0.0;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_circle_fee_exactly_10() {
+        let mut circle = valid_credit_circle();
+        circle.transaction_fee_percent = 10.0;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_circle_fee_over_10() {
+        let mut circle = valid_credit_circle();
+        circle.transaction_fee_percent = 10.001;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_fee_exactly_10_plus_epsilon() {
+        let mut circle = valid_credit_circle();
+        circle.transaction_fee_percent = 10.1;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_negative_demurrage() {
+        let mut circle = valid_credit_circle();
+        circle.demurrage_rate_percent = -0.1;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_demurrage_zero() {
+        let mut circle = valid_credit_circle();
+        circle.demurrage_rate_percent = 0.0;
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_circle_no_founders() {
+        let mut circle = valid_credit_circle();
+        circle.founders = vec![];
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_multiple_founders() {
+        let mut circle = valid_credit_circle();
+        circle.founders = vec![agent1(), agent2()];
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    // =============================================================================
+    // CREDIT LINE VALIDATION TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_valid_credit_line() {
+        let line = valid_credit_line();
+        let result = validate_credit_line(line).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_line_zero_limit() {
+        let mut line = valid_credit_line();
+        line.credit_limit = 0;
+        let result = validate_credit_line(line).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_line_negative_limit() {
+        let mut line = valid_credit_line();
+        line.credit_limit = -100;
+        let result = validate_credit_line(line).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_line_limit_one() {
+        let mut line = valid_credit_line();
+        line.credit_limit = 1;
+        line.balance = 0;
+        let result = validate_credit_line(line).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_line_positive_balance() {
+        let mut line = valid_credit_line();
+        line.balance = 500;
+        let result = validate_credit_line(line).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_line_negative_balance_within_limit() {
+        let mut line = valid_credit_line();
+        line.balance = -500;
+        line.credit_limit = 1000;
+        let result = validate_credit_line(line).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_line_balance_exactly_at_limit() {
+        let mut line = valid_credit_line();
+        line.balance = -1000;
+        line.credit_limit = 1000;
+        let result = validate_credit_line(line).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_line_balance_exceeds_limit() {
+        let mut line = valid_credit_line();
+        line.balance = -1001;
+        line.credit_limit = 1000;
+        let result = validate_credit_line(line).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_line_balance_exceeds_limit_by_one() {
+        let mut line = valid_credit_line();
+        line.balance = -1000 - 1;
+        line.credit_limit = 1000;
+        let result = validate_credit_line(line).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_line_very_negative_balance() {
+        let mut line = valid_credit_line();
+        line.balance = -10000;
+        line.credit_limit = 1000;
+        let result = validate_credit_line(line).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =============================================================================
+    // CREDIT TRANSACTION VALIDATION TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_valid_credit_transaction() {
+        let tx = valid_credit_transaction();
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_transaction_empty_id() {
+        let mut tx = valid_credit_transaction();
+        tx.id = "".to_string();
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_transaction_zero_amount() {
+        let mut tx = valid_credit_transaction();
+        tx.amount = 0;
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_transaction_negative_amount() {
+        let mut tx = valid_credit_transaction();
+        tx.amount = -100;
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_transaction_amount_one() {
+        let mut tx = valid_credit_transaction();
+        tx.amount = 1;
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_transaction_self_transfer() {
+        let mut tx = valid_credit_transaction();
+        tx.from = agent1();
+        tx.to = agent1();
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_transaction_different_agents() {
+        let mut tx = valid_credit_transaction();
+        tx.from = agent1();
+        tx.to = agent2();
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_transaction_empty_memo() {
+        let mut tx = valid_credit_transaction();
+        tx.memo = "".to_string();
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_transaction_memo_too_long() {
+        let mut tx = valid_credit_transaction();
+        tx.memo = "a".repeat(501);
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_transaction_memo_exactly_500() {
+        let mut tx = valid_credit_transaction();
+        tx.memo = "a".repeat(500);
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_transaction_large_amount() {
+        let mut tx = valid_credit_transaction();
+        tx.amount = i64::MAX;
+        let result = validate_credit_transaction(tx).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    // =============================================================================
+    // BALANCE VALIDATION TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_valid_balance() {
+        let balance = valid_balance();
+        let result = validate_balance(balance).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_balance_negative_credit_available() {
+        let mut balance = valid_balance();
+        balance.credit_available = -1;
+        let result = validate_balance(balance).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_balance_zero_credit_available() {
+        let mut balance = valid_balance();
+        balance.credit_available = 0;
+        let result = validate_balance(balance).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_balance_large_credit_available() {
+        let mut balance = valid_balance();
+        balance.credit_available = i64::MAX;
+        let result = validate_balance(balance).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_balance_negative_balance_positive_credit() {
+        let mut balance = valid_balance();
+        balance.balance = -500;
+        balance.credit_available = 500;
+        let result = validate_balance(balance).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_balance_positive_balance() {
+        let mut balance = valid_balance();
+        balance.balance = 1000;
+        balance.credit_available = 2000;
+        let result = validate_balance(balance).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    // =============================================================================
+    // EDGE CASE AND BOUNDARY TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_credit_circle_minimum_valid() {
+        let circle = CreditCircle {
+            id: "x".to_string(),
+            name: "x".to_string(),
+            description: "".to_string(),
+            currency_name: "x".to_string(),
+            currency_symbol: "x".to_string(),
+            default_credit_limit: 1,
+            max_credit_limit: 1,
+            transaction_fee_percent: 0.0,
+            demurrage_rate_percent: 0.0,
+            geographic_scope: None,
+            founders: vec![agent1()],
+            rules_hash: None,
+            created_at: timestamp(),
+            active: true,
+        };
+        let result = validate_credit_circle(circle).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_transaction_reversed_agents() {
+        let tx1 = valid_credit_transaction();
+
+        let mut tx2 = valid_credit_transaction();
+        tx2.from = agent2();
+        tx2.to = agent1();
+
+        let result1 = validate_credit_transaction(tx1).unwrap();
+        let result2 = validate_credit_transaction(tx2).unwrap();
+
+        assert!(matches!(result1, ValidateCallbackResult::Valid));
+        assert!(matches!(result2, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_credit_line_extreme_negative_balance() {
+        let mut line = valid_credit_line();
+        line.balance = i64::MIN;
+        line.credit_limit = 1000;
+        let result = validate_credit_line(line).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_circle_fee_boundary_values() {
+        // Test 0.0
+        let mut circle = valid_credit_circle();
+        circle.transaction_fee_percent = 0.0;
+        assert!(matches!(validate_credit_circle(circle.clone()).unwrap(), ValidateCallbackResult::Valid));
+
+        // Test 5.0 (mid-range)
+        circle.transaction_fee_percent = 5.0;
+        assert!(matches!(validate_credit_circle(circle.clone()).unwrap(), ValidateCallbackResult::Valid));
+
+        // Test 9.9999
+        circle.transaction_fee_percent = 9.9999;
+        assert!(matches!(validate_credit_circle(circle.clone()).unwrap(), ValidateCallbackResult::Valid));
+
+        // Test 10.0 (exactly at limit)
+        circle.transaction_fee_percent = 10.0;
+        assert!(matches!(validate_credit_circle(circle.clone()).unwrap(), ValidateCallbackResult::Valid));
+
+        // Test 10.0001 (just over limit)
+        circle.transaction_fee_percent = 10.0001;
+        assert!(matches!(validate_credit_circle(circle).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_credit_line_various_balances() {
+        let mut line = valid_credit_line();
+        line.credit_limit = 1000;
+
+        // Zero balance
+        line.balance = 0;
+        assert!(matches!(validate_credit_line(line.clone()).unwrap(), ValidateCallbackResult::Valid));
+
+        // Positive balance
+        line.balance = 500;
+        assert!(matches!(validate_credit_line(line.clone()).unwrap(), ValidateCallbackResult::Valid));
+
+        // Max positive
+        line.balance = i64::MAX;
+        assert!(matches!(validate_credit_line(line.clone()).unwrap(), ValidateCallbackResult::Valid));
+
+        // At limit (negative)
+        line.balance = -1000;
+        assert!(matches!(validate_credit_line(line.clone()).unwrap(), ValidateCallbackResult::Valid));
+
+        // Just over limit
+        line.balance = -1001;
+        assert!(matches!(validate_credit_line(line).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_balance_credit_available_edge_cases() {
+        let mut balance = valid_balance();
+
+        // Exactly zero
+        balance.credit_available = 0;
+        assert!(matches!(validate_balance(balance.clone()).unwrap(), ValidateCallbackResult::Valid));
+
+        // Small positive
+        balance.credit_available = 1;
+        assert!(matches!(validate_balance(balance.clone()).unwrap(), ValidateCallbackResult::Valid));
+
+        // Large positive
+        balance.credit_available = 1_000_000_000;
+        assert!(matches!(validate_balance(balance.clone()).unwrap(), ValidateCallbackResult::Valid));
+
+        // Small negative
+        balance.credit_available = -1;
+        assert!(matches!(validate_balance(balance).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+}

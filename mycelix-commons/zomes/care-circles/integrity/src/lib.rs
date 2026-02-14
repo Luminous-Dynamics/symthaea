@@ -219,3 +219,649 @@ fn validate_create_membership(
     // (checking circle exists, member count, etc.)
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use hdi::prelude::*;
+    use super::*;
+
+    // Factory functions
+
+    fn valid_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xdb; 36])
+    }
+
+    fn valid_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0xab; 36])
+    }
+
+    fn valid_timestamp() -> Timestamp {
+        Timestamp::from_micros(1000000)
+    }
+
+    fn valid_create_action() -> Create {
+        Create {
+            author: valid_agent(),
+            timestamp: valid_timestamp(),
+            action_seq: 0,
+            prev_action: ActionHash::from_raw_36(vec![0xac; 36]),
+            entry_type: EntryType::App(AppEntryDef {
+                entry_index: 0.into(),
+                zome_index: 0.into(),
+                visibility: EntryVisibility::Public,
+            }),
+            entry_hash: EntryHash::from_raw_36(vec![0xad; 36]),
+            weight: Default::default(),
+        }
+    }
+
+    fn valid_circle() -> CareCircle {
+        CareCircle {
+            name: "Community Care Circle".to_string(),
+            description: "A local neighborhood care circle for mutual aid and support".to_string(),
+            location: "Downtown Portland, OR".to_string(),
+            max_members: 20,
+            created_by: valid_agent(),
+            circle_type: CircleType::Neighborhood,
+            active: true,
+            created_at: valid_timestamp(),
+        }
+    }
+
+    fn valid_membership() -> CircleMembership {
+        CircleMembership {
+            circle_hash: valid_action_hash(),
+            member: valid_agent(),
+            role: MemberRole::Member,
+            joined_at: valid_timestamp(),
+            active: true,
+        }
+    }
+
+    // CircleType tests
+
+    #[test]
+    fn test_circle_type_serde_neighborhood() {
+        let ct = CircleType::Neighborhood;
+        let serialized = serde_json::to_string(&ct).unwrap();
+        let deserialized: CircleType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(ct, deserialized);
+    }
+
+    #[test]
+    fn test_circle_type_serde_workplace() {
+        let ct = CircleType::Workplace;
+        let serialized = serde_json::to_string(&ct).unwrap();
+        let deserialized: CircleType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(ct, deserialized);
+    }
+
+    #[test]
+    fn test_circle_type_serde_faith() {
+        let ct = CircleType::Faith;
+        let serialized = serde_json::to_string(&ct).unwrap();
+        let deserialized: CircleType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(ct, deserialized);
+    }
+
+    #[test]
+    fn test_circle_type_serde_family() {
+        let ct = CircleType::Family;
+        let serialized = serde_json::to_string(&ct).unwrap();
+        let deserialized: CircleType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(ct, deserialized);
+    }
+
+    #[test]
+    fn test_circle_type_serde_school() {
+        let ct = CircleType::School;
+        let serialized = serde_json::to_string(&ct).unwrap();
+        let deserialized: CircleType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(ct, deserialized);
+    }
+
+    #[test]
+    fn test_circle_type_serde_custom() {
+        let ct = CircleType::Custom("Hobby Group".to_string());
+        let serialized = serde_json::to_string(&ct).unwrap();
+        let deserialized: CircleType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(ct, deserialized);
+    }
+
+    #[test]
+    fn test_circle_type_anchor_key_neighborhood() {
+        assert_eq!(CircleType::Neighborhood.anchor_key(), "neighborhood");
+    }
+
+    #[test]
+    fn test_circle_type_anchor_key_workplace() {
+        assert_eq!(CircleType::Workplace.anchor_key(), "workplace");
+    }
+
+    #[test]
+    fn test_circle_type_anchor_key_faith() {
+        assert_eq!(CircleType::Faith.anchor_key(), "faith");
+    }
+
+    #[test]
+    fn test_circle_type_anchor_key_family() {
+        assert_eq!(CircleType::Family.anchor_key(), "family");
+    }
+
+    #[test]
+    fn test_circle_type_anchor_key_school() {
+        assert_eq!(CircleType::School.anchor_key(), "school");
+    }
+
+    #[test]
+    fn test_circle_type_anchor_key_custom_simple() {
+        assert_eq!(
+            CircleType::Custom("Hobby".to_string()).anchor_key(),
+            "custom_hobby"
+        );
+    }
+
+    #[test]
+    fn test_circle_type_anchor_key_custom_with_spaces() {
+        assert_eq!(
+            CircleType::Custom("Book Club".to_string()).anchor_key(),
+            "custom_book_club"
+        );
+    }
+
+    #[test]
+    fn test_circle_type_anchor_key_custom_mixed_case() {
+        assert_eq!(
+            CircleType::Custom("Gaming Group".to_string()).anchor_key(),
+            "custom_gaming_group"
+        );
+    }
+
+    // MemberRole tests
+
+    #[test]
+    fn test_member_role_serde_organizer() {
+        let role = MemberRole::Organizer;
+        let serialized = serde_json::to_string(&role).unwrap();
+        let deserialized: MemberRole = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(role, deserialized);
+    }
+
+    #[test]
+    fn test_member_role_serde_member() {
+        let role = MemberRole::Member;
+        let serialized = serde_json::to_string(&role).unwrap();
+        let deserialized: MemberRole = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(role, deserialized);
+    }
+
+    #[test]
+    fn test_member_role_serde_observer() {
+        let role = MemberRole::Observer;
+        let serialized = serde_json::to_string(&role).unwrap();
+        let deserialized: MemberRole = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(role, deserialized);
+    }
+
+    // validate_create_circle tests
+
+    #[test]
+    fn test_create_circle_valid() {
+        let circle = valid_circle();
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_name_empty() {
+        let mut circle = valid_circle();
+        circle.name = "".to_string();
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle name cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_create_circle_name_at_max_length() {
+        let mut circle = valid_circle();
+        circle.name = "a".repeat(128);
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_name_exceeds_max_length() {
+        let mut circle = valid_circle();
+        circle.name = "a".repeat(129);
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle name must be 128 characters or fewer");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_create_circle_description_empty() {
+        let mut circle = valid_circle();
+        circle.description = "".to_string();
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle description cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_create_circle_description_at_max_length() {
+        let mut circle = valid_circle();
+        circle.description = "a".repeat(2048);
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_description_exceeds_max_length() {
+        let mut circle = valid_circle();
+        circle.description = "a".repeat(2049);
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle description must be 2048 characters or fewer");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_create_circle_max_members_at_minimum() {
+        let mut circle = valid_circle();
+        circle.max_members = 2;
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_max_members_below_minimum() {
+        let mut circle = valid_circle();
+        circle.max_members = 1;
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle must allow at least 2 members");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_create_circle_max_members_at_maximum() {
+        let mut circle = valid_circle();
+        circle.max_members = 500;
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_max_members_exceeds_maximum() {
+        let mut circle = valid_circle();
+        circle.max_members = 501;
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle cannot have more than 500 members");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_create_circle_location_empty() {
+        let mut circle = valid_circle();
+        circle.location = "".to_string();
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Location cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_create_circle_location_at_max_length() {
+        let mut circle = valid_circle();
+        circle.location = "a".repeat(512);
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_location_exceeds_max_length() {
+        let mut circle = valid_circle();
+        circle.location = "a".repeat(513);
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Location must be 512 characters or fewer");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_create_circle_all_circle_types() {
+        let types = vec![
+            CircleType::Neighborhood,
+            CircleType::Workplace,
+            CircleType::Faith,
+            CircleType::Family,
+            CircleType::School,
+            CircleType::Custom("Test".to_string()),
+        ];
+
+        for circle_type in types {
+            let mut circle = valid_circle();
+            circle.circle_type = circle_type;
+            let action = valid_create_action();
+            let result = validate_create_circle(action, circle).unwrap();
+            assert_eq!(result, ValidateCallbackResult::Valid);
+        }
+    }
+
+    #[test]
+    fn test_create_circle_active_true() {
+        let mut circle = valid_circle();
+        circle.active = true;
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_active_false() {
+        let mut circle = valid_circle();
+        circle.active = false;
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    // validate_update_circle tests
+
+    #[test]
+    fn test_update_circle_valid() {
+        let circle = valid_circle();
+        let result = validate_update_circle(circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_circle_name_empty() {
+        let mut circle = valid_circle();
+        circle.name = "".to_string();
+        let result = validate_update_circle(circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle name cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_update_circle_max_members_at_minimum() {
+        let mut circle = valid_circle();
+        circle.max_members = 2;
+        let result = validate_update_circle(circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_circle_max_members_below_minimum() {
+        let mut circle = valid_circle();
+        circle.max_members = 1;
+        let result = validate_update_circle(circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle must allow at least 2 members");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_update_circle_allows_name_over_128_chars() {
+        // Update validation doesn't check name length
+        let mut circle = valid_circle();
+        circle.name = "a".repeat(200);
+        let result = validate_update_circle(circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_circle_allows_max_members_over_500() {
+        // Update validation doesn't check max_members upper bound
+        let mut circle = valid_circle();
+        circle.max_members = 1000;
+        let result = validate_update_circle(circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_circle_allows_empty_description() {
+        // Update validation doesn't check description
+        let mut circle = valid_circle();
+        circle.description = "".to_string();
+        let result = validate_update_circle(circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_circle_allows_empty_location() {
+        // Update validation doesn't check location
+        let mut circle = valid_circle();
+        circle.location = "".to_string();
+        let result = validate_update_circle(circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    // validate_create_membership tests
+
+    #[test]
+    fn test_create_membership_valid() {
+        let membership = valid_membership();
+        let action = valid_create_action();
+        let result = validate_create_membership(action, membership).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_membership_all_roles() {
+        let roles = vec![
+            MemberRole::Organizer,
+            MemberRole::Member,
+            MemberRole::Observer,
+        ];
+
+        for role in roles {
+            let mut membership = valid_membership();
+            membership.role = role;
+            let action = valid_create_action();
+            let result = validate_create_membership(action, membership).unwrap();
+            assert_eq!(result, ValidateCallbackResult::Valid);
+        }
+    }
+
+    #[test]
+    fn test_create_membership_active_true() {
+        let mut membership = valid_membership();
+        membership.active = true;
+        let action = valid_create_action();
+        let result = validate_create_membership(action, membership).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_membership_active_false() {
+        let mut membership = valid_membership();
+        membership.active = false;
+        let action = valid_create_action();
+        let result = validate_create_membership(action, membership).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    // Entry type serde tests
+
+    #[test]
+    fn test_care_circle_serde_roundtrip() {
+        let circle = valid_circle();
+        let serialized = serde_json::to_string(&circle).unwrap();
+        let deserialized: CareCircle = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(circle, deserialized);
+    }
+
+    #[test]
+    fn test_circle_membership_serde_roundtrip() {
+        let membership = valid_membership();
+        let serialized = serde_json::to_string(&membership).unwrap();
+        let deserialized: CircleMembership = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(membership, deserialized);
+    }
+
+    #[test]
+    fn test_anchor_serde_roundtrip() {
+        let anchor = crate::Anchor("test_anchor".to_string());
+        let serialized = serde_json::to_string(&anchor).unwrap();
+        let deserialized: crate::Anchor = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(anchor, deserialized);
+    }
+
+    // Boundary value tests
+
+    #[test]
+    fn test_create_circle_name_one_char() {
+        let mut circle = valid_circle();
+        circle.name = "A".to_string();
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_description_one_char() {
+        let mut circle = valid_circle();
+        circle.description = "A".to_string();
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_location_one_char() {
+        let mut circle = valid_circle();
+        circle.location = "X".to_string();
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_max_members_typical_values() {
+        let values = vec![3, 10, 50, 100, 250, 499];
+        for max_members in values {
+            let mut circle = valid_circle();
+            circle.max_members = max_members;
+            let action = valid_create_action();
+            let result = validate_create_circle(action, circle).unwrap();
+            assert_eq!(result, ValidateCallbackResult::Valid);
+        }
+    }
+
+    #[test]
+    fn test_create_circle_unicode_in_name() {
+        let mut circle = valid_circle();
+        circle.name = "Círculo de Cuidado 🌟".to_string();
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_unicode_in_description() {
+        let mut circle = valid_circle();
+        circle.description = "A circle for mutual aid and support 💙🤝".to_string();
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_create_circle_unicode_in_location() {
+        let mut circle = valid_circle();
+        circle.location = "東京、日本".to_string();
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_circle_type_custom_empty_string() {
+        let ct = CircleType::Custom("".to_string());
+        assert_eq!(ct.anchor_key(), "custom_");
+    }
+
+    #[test]
+    fn test_circle_type_custom_multiple_spaces() {
+        let ct = CircleType::Custom("Multiple   Spaces   Here".to_string());
+        assert_eq!(ct.anchor_key(), "custom_multiple___spaces___here");
+    }
+
+    #[test]
+    fn test_create_circle_max_members_zero() {
+        let mut circle = valid_circle();
+        circle.max_members = 0;
+        let action = valid_create_action();
+        let result = validate_create_circle(action, circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle must allow at least 2 members");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_update_circle_max_members_zero() {
+        let mut circle = valid_circle();
+        circle.max_members = 0;
+        let result = validate_update_circle(circle).unwrap();
+        match result {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Circle must allow at least 2 members");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+}

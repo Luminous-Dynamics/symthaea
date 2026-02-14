@@ -236,3 +236,926 @@ fn validate_create_link(
         LinkTypes::EmergencyNeeds => Ok(ValidateCallbackResult::Valid),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // Factory Functions
+    // =========================================================================
+
+    fn agent_1() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xdb; 36])
+    }
+
+    fn agent_2() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xdc; 36])
+    }
+
+    fn action_hash_1() -> ActionHash {
+        ActionHash::from_raw_36(vec![0xab; 36])
+    }
+
+    fn action_hash_2() -> ActionHash {
+        ActionHash::from_raw_36(vec![0xac; 36])
+    }
+
+    fn valid_need() -> Need {
+        Need {
+            id: "need_001".to_string(),
+            requester: agent_1(),
+            category: NeedCategory::Food,
+            title: "Need groceries".to_string(),
+            description: "Looking for food assistance".to_string(),
+            urgency: UrgencyLevel::Medium,
+            emergency: false,
+            quantity: Some(5),
+            location: LocationConstraint::Remote,
+            needed_by: None,
+            reciprocity_offers: vec!["Can help with gardening".to_string()],
+            status: NeedStatus::Open,
+            created_at: Timestamp::from_micros(1000000),
+        }
+    }
+
+    fn valid_offer() -> Offer {
+        Offer {
+            id: "offer_001".to_string(),
+            offerer: agent_1(),
+            category: NeedCategory::Food,
+            title: "Offering groceries".to_string(),
+            description: "Have extra produce to share".to_string(),
+            quantity: Some(10),
+            condition: Some("Fresh".to_string()),
+            location: LocationConstraint::Remote,
+            available_until: None,
+            asking_for: vec!["Gardening help".to_string()],
+            status: OfferStatus::Available,
+            created_at: Timestamp::from_micros(1000000),
+        }
+    }
+
+    fn valid_match() -> Match {
+        Match {
+            id: "match_001".to_string(),
+            need_hash: action_hash_1(),
+            offer_hash: action_hash_2(),
+            requester: agent_1(),
+            offerer: agent_2(),
+            status: MatchStatus::Proposed,
+            quantity: Some(5),
+            notes: "Looks like a good match".to_string(),
+            matched_at: Timestamp::from_micros(1000000),
+            scheduled_handoff: None,
+            handoff_location: None,
+        }
+    }
+
+    fn valid_fulfillment() -> Fulfillment {
+        Fulfillment {
+            match_hash: action_hash_1(),
+            quantity_given: Some(5),
+            notes: "Successfully completed".to_string(),
+            requester_confirmed: true,
+            offerer_confirmed: true,
+            fulfilled_at: Timestamp::from_micros(1000000),
+            gratitude_message: Some("Thank you so much!".to_string()),
+        }
+    }
+
+    // =========================================================================
+    // Need Validation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_valid_need() {
+        let need = valid_need();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_empty_id() {
+        let mut need = valid_need();
+        need.id = "".to_string();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_need_empty_title() {
+        let mut need = valid_need();
+        need.title = "".to_string();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_need_title_at_boundary() {
+        let mut need = valid_need();
+        need.title = "a".repeat(200);
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_title_exceeds_limit() {
+        let mut need = valid_need();
+        need.title = "a".repeat(201);
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_need_title_one_char() {
+        let mut need = valid_need();
+        need.title = "a".to_string();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_description_at_boundary() {
+        let mut need = valid_need();
+        need.description = "b".repeat(3000);
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_description_exceeds_limit() {
+        let mut need = valid_need();
+        need.description = "b".repeat(3001);
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_need_description_empty() {
+        let mut need = valid_need();
+        need.description = "".to_string();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_reciprocity_offers_at_boundary() {
+        let mut need = valid_need();
+        need.reciprocity_offers = (0..10).map(|i| format!("offer_{}", i)).collect();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_reciprocity_offers_exceeds_limit() {
+        let mut need = valid_need();
+        need.reciprocity_offers = (0..11).map(|i| format!("offer_{}", i)).collect();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_need_reciprocity_offers_empty() {
+        let mut need = valid_need();
+        need.reciprocity_offers = vec![];
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_emergency_flag() {
+        let mut need = valid_need();
+        need.emergency = true;
+        need.urgency = UrgencyLevel::Emergency;
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // =========================================================================
+    // Offer Validation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_valid_offer() {
+        let offer = valid_offer();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_empty_id() {
+        let mut offer = valid_offer();
+        offer.id = "".to_string();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_offer_empty_title() {
+        let mut offer = valid_offer();
+        offer.title = "".to_string();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_offer_title_at_boundary() {
+        let mut offer = valid_offer();
+        offer.title = "c".repeat(200);
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_title_exceeds_limit() {
+        let mut offer = valid_offer();
+        offer.title = "c".repeat(201);
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_offer_title_one_char() {
+        let mut offer = valid_offer();
+        offer.title = "x".to_string();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_description_at_boundary() {
+        let mut offer = valid_offer();
+        offer.description = "d".repeat(3000);
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_description_exceeds_limit() {
+        let mut offer = valid_offer();
+        offer.description = "d".repeat(3001);
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_offer_description_empty() {
+        let mut offer = valid_offer();
+        offer.description = "".to_string();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_asking_for_at_boundary() {
+        let mut offer = valid_offer();
+        offer.asking_for = (0..10).map(|i| format!("item_{}", i)).collect();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_asking_for_exceeds_limit() {
+        let mut offer = valid_offer();
+        offer.asking_for = (0..11).map(|i| format!("item_{}", i)).collect();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_offer_asking_for_empty() {
+        let mut offer = valid_offer();
+        offer.asking_for = vec![];
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // =========================================================================
+    // Match Validation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_valid_match() {
+        let m = valid_match();
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_match_empty_id() {
+        let mut m = valid_match();
+        m.id = "".to_string();
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_match_same_requester_and_offerer() {
+        let mut m = valid_match();
+        m.requester = agent_1();
+        m.offerer = agent_1();
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_match_different_requester_and_offerer() {
+        let mut m = valid_match();
+        m.requester = agent_1();
+        m.offerer = agent_2();
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_match_notes_at_boundary() {
+        let mut m = valid_match();
+        m.notes = "e".repeat(1000);
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_match_notes_exceeds_limit() {
+        let mut m = valid_match();
+        m.notes = "e".repeat(1001);
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_match_notes_empty() {
+        let mut m = valid_match();
+        m.notes = "".to_string();
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // =========================================================================
+    // Fulfillment Validation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_valid_fulfillment() {
+        let fulfillment = valid_fulfillment();
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_fulfillment_notes_at_boundary() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.notes = "f".repeat(1000);
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_fulfillment_notes_exceeds_limit() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.notes = "f".repeat(1001);
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fulfillment_notes_empty() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.notes = "".to_string();
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_fulfillment_gratitude_message_at_boundary() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.gratitude_message = Some("g".repeat(500));
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_fulfillment_gratitude_message_exceeds_limit() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.gratitude_message = Some("g".repeat(501));
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_fulfillment_gratitude_message_none() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.gratitude_message = None;
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_fulfillment_gratitude_message_empty_string() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.gratitude_message = Some("".to_string());
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // =========================================================================
+    // Enum Serde Tests
+    // =========================================================================
+
+    #[test]
+    fn test_need_category_serde_roundtrip() {
+        let categories = vec![
+            NeedCategory::Food,
+            NeedCategory::Clothing,
+            NeedCategory::Housing,
+            NeedCategory::Healthcare,
+            NeedCategory::Transportation,
+            NeedCategory::Custom("CustomCategory".to_string()),
+        ];
+
+        for category in categories {
+            let json = serde_json::to_string(&category).unwrap();
+            let parsed: NeedCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(category, parsed);
+        }
+    }
+
+    #[test]
+    fn test_need_status_serde_roundtrip() {
+        let statuses = vec![
+            NeedStatus::Open,
+            NeedStatus::PartiallyMet,
+            NeedStatus::Matched,
+            NeedStatus::Fulfilled,
+            NeedStatus::Withdrawn,
+            NeedStatus::Expired,
+        ];
+
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let parsed: NeedStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(status, parsed);
+        }
+    }
+
+    #[test]
+    fn test_offer_status_serde_roundtrip() {
+        let statuses = vec![
+            OfferStatus::Available,
+            OfferStatus::Reserved,
+            OfferStatus::Claimed,
+            OfferStatus::Completed,
+            OfferStatus::Withdrawn,
+            OfferStatus::Expired,
+        ];
+
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let parsed: OfferStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(status, parsed);
+        }
+    }
+
+    #[test]
+    fn test_match_status_serde_roundtrip() {
+        let statuses = vec![
+            MatchStatus::Proposed,
+            MatchStatus::Accepted,
+            MatchStatus::Scheduled,
+            MatchStatus::InProgress,
+            MatchStatus::Completed,
+            MatchStatus::Cancelled,
+        ];
+
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let parsed: MatchStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(status, parsed);
+        }
+    }
+
+    #[test]
+    fn test_urgency_level_serde_roundtrip() {
+        let levels = vec![
+            UrgencyLevel::Low,
+            UrgencyLevel::Medium,
+            UrgencyLevel::High,
+            UrgencyLevel::Urgent,
+            UrgencyLevel::Emergency,
+        ];
+
+        for level in levels {
+            let json = serde_json::to_string(&level).unwrap();
+            let parsed: UrgencyLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(level, parsed);
+        }
+    }
+
+    // =========================================================================
+    // Complex Scenario Tests
+    // =========================================================================
+
+    #[test]
+    fn test_need_all_fields_at_boundaries() {
+        let mut need = valid_need();
+        need.title = "t".repeat(200);
+        need.description = "d".repeat(3000);
+        need.reciprocity_offers = (0..10).map(|i| format!("offer_{}", i)).collect();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_all_fields_at_boundaries() {
+        let mut offer = valid_offer();
+        offer.title = "t".repeat(200);
+        offer.description = "d".repeat(3000);
+        offer.asking_for = (0..10).map(|i| format!("item_{}", i)).collect();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_match_all_fields_at_boundaries() {
+        let mut m = valid_match();
+        m.notes = "n".repeat(1000);
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_fulfillment_all_fields_at_boundaries() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.notes = "n".repeat(1000);
+        fulfillment.gratitude_message = Some("g".repeat(500));
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // =========================================================================
+    // Edge Case Tests
+    // =========================================================================
+
+    #[test]
+    fn test_need_with_unicode_title() {
+        let mut need = valid_need();
+        need.title = "需要食物 🍞".to_string();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_with_unicode_description() {
+        let mut offer = valid_offer();
+        offer.description = "新鮮的蔬菜 🥕🥬".to_string();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_match_with_unicode_notes() {
+        let mut m = valid_match();
+        m.notes = "良好的匹配 👍".to_string();
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_fulfillment_with_unicode_gratitude() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.gratitude_message = Some("非常感謝！🙏".to_string());
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // =========================================================================
+    // Validation Result Message Tests
+    // =========================================================================
+
+    #[test]
+    fn test_need_empty_id_error_message() {
+        let mut need = valid_need();
+        need.id = "".to_string();
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_need(need) {
+            assert_eq!(msg, "Need ID cannot be empty");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    #[test]
+    fn test_offer_title_exceeds_error_message() {
+        let mut offer = valid_offer();
+        offer.title = "x".repeat(201);
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_offer(offer) {
+            assert_eq!(msg, "Offer title cannot exceed 200 characters");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    #[test]
+    fn test_match_same_agents_error_message() {
+        let mut m = valid_match();
+        m.requester = agent_1();
+        m.offerer = agent_1();
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_match(m) {
+            assert_eq!(msg, "Requester and offerer must be different");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    #[test]
+    fn test_fulfillment_gratitude_exceeds_error_message() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.gratitude_message = Some("g".repeat(501));
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_fulfillment(fulfillment) {
+            assert_eq!(msg, "Gratitude message cannot exceed 500 characters");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    // =========================================================================
+    // Additional Validation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_need_minimal_valid() {
+        let need = Need {
+            id: "n".to_string(),
+            requester: agent_1(),
+            category: NeedCategory::Food,
+            title: "x".to_string(),
+            description: "".to_string(),
+            urgency: UrgencyLevel::Low,
+            emergency: false,
+            quantity: None,
+            location: LocationConstraint::Remote,
+            needed_by: None,
+            reciprocity_offers: vec![],
+            status: NeedStatus::Open,
+            created_at: Timestamp::from_micros(1000000),
+        };
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_minimal_valid() {
+        let offer = Offer {
+            id: "o".to_string(),
+            offerer: agent_1(),
+            category: NeedCategory::Food,
+            title: "x".to_string(),
+            description: "".to_string(),
+            quantity: None,
+            condition: None,
+            location: LocationConstraint::Remote,
+            available_until: None,
+            asking_for: vec![],
+            status: OfferStatus::Available,
+            created_at: Timestamp::from_micros(1000000),
+        };
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_match_minimal_valid() {
+        let m = Match {
+            id: "m".to_string(),
+            need_hash: action_hash_1(),
+            offer_hash: action_hash_2(),
+            requester: agent_1(),
+            offerer: agent_2(),
+            status: MatchStatus::Proposed,
+            quantity: None,
+            notes: "".to_string(),
+            matched_at: Timestamp::from_micros(1000000),
+            scheduled_handoff: None,
+            handoff_location: None,
+        };
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_fulfillment_minimal_valid() {
+        let fulfillment = Fulfillment {
+            match_hash: action_hash_1(),
+            quantity_given: None,
+            notes: "".to_string(),
+            requester_confirmed: false,
+            offerer_confirmed: false,
+            fulfilled_at: Timestamp::from_micros(1000000),
+            gratitude_message: None,
+        };
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_with_all_custom_categories() {
+        let mut need = valid_need();
+        need.category = NeedCategory::Custom("SpecialNeed".to_string());
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_with_custom_category() {
+        let mut offer = valid_offer();
+        offer.category = NeedCategory::Custom("SpecialOffer".to_string());
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_title_exactly_199_chars() {
+        let mut need = valid_need();
+        need.title = "x".repeat(199);
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_title_exactly_199_chars() {
+        let mut offer = valid_offer();
+        offer.title = "y".repeat(199);
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_description_exactly_2999_chars() {
+        let mut need = valid_need();
+        need.description = "z".repeat(2999);
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_description_exactly_2999_chars() {
+        let mut offer = valid_offer();
+        offer.description = "w".repeat(2999);
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_match_notes_exactly_999_chars() {
+        let mut m = valid_match();
+        m.notes = "v".repeat(999);
+        let result = validate_match(m);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_fulfillment_notes_exactly_999_chars() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.notes = "u".repeat(999);
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_fulfillment_gratitude_exactly_499_chars() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.gratitude_message = Some("t".repeat(499));
+        let result = validate_fulfillment(fulfillment);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_reciprocity_offers_exactly_9_items() {
+        let mut need = valid_need();
+        need.reciprocity_offers = (0..9).map(|i| format!("offer_{}", i)).collect();
+        let result = validate_need(need);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_offer_asking_for_exactly_9_items() {
+        let mut offer = valid_offer();
+        offer.asking_for = (0..9).map(|i| format!("item_{}", i)).collect();
+        let result = validate_offer(offer);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_need_description_exceeds_error_message() {
+        let mut need = valid_need();
+        need.description = "x".repeat(3001);
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_need(need) {
+            assert_eq!(msg, "Need description cannot exceed 3000 characters");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    #[test]
+    fn test_need_title_empty_error_message() {
+        let mut need = valid_need();
+        need.title = "".to_string();
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_need(need) {
+            assert_eq!(msg, "Need title cannot be empty");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    #[test]
+    fn test_offer_empty_id_error_message() {
+        let mut offer = valid_offer();
+        offer.id = "".to_string();
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_offer(offer) {
+            assert_eq!(msg, "Offer ID cannot be empty");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    #[test]
+    fn test_match_empty_id_error_message() {
+        let mut m = valid_match();
+        m.id = "".to_string();
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_match(m) {
+            assert_eq!(msg, "Match ID cannot be empty");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    #[test]
+    fn test_match_notes_exceeds_error_message() {
+        let mut m = valid_match();
+        m.notes = "x".repeat(1001);
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_match(m) {
+            assert_eq!(msg, "Match notes cannot exceed 1000 characters");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    #[test]
+    fn test_fulfillment_notes_exceeds_error_message() {
+        let mut fulfillment = valid_fulfillment();
+        fulfillment.notes = "x".repeat(1001);
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_fulfillment(fulfillment) {
+            assert_eq!(msg, "Fulfillment notes cannot exceed 1000 characters");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    #[test]
+    fn test_need_reciprocity_exceeds_error_message() {
+        let mut need = valid_need();
+        need.reciprocity_offers = (0..11).map(|i| format!("offer_{}", i)).collect();
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_need(need) {
+            assert_eq!(msg, "Cannot have more than 10 reciprocity offers");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    #[test]
+    fn test_offer_asking_for_exceeds_error_message() {
+        let mut offer = valid_offer();
+        offer.asking_for = (0..11).map(|i| format!("item_{}", i)).collect();
+        if let Ok(ValidateCallbackResult::Invalid(msg)) = validate_offer(offer) {
+            assert_eq!(msg, "Cannot have more than 10 asking for items");
+        } else {
+            panic!("Expected Invalid result");
+        }
+    }
+
+    // =========================================================================
+    // Location Constraint Tests
+    // =========================================================================
+
+    #[test]
+    fn test_need_with_various_locations() {
+        let locations = vec![
+            LocationConstraint::Remote,
+            LocationConstraint::FixedLocation("123 Main St".to_string()),
+            LocationConstraint::WithinRadius {
+                geohash: "u4pruyd".to_string(),
+                radius_km: 5.0,
+            },
+            LocationConstraint::AtRequester,
+            LocationConstraint::AtProvider,
+            LocationConstraint::ToBeArranged,
+        ];
+
+        for location in locations {
+            let mut need = valid_need();
+            need.location = location;
+            let result = validate_need(need);
+            assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+        }
+    }
+}

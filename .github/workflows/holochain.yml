@@ -1082,7 +1082,7 @@ jobs:
           echo "| **Sweettest Commons** | 14 | Property, housing, care, mutualaid, water, food, transport, bridge, cross-domain |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest Civic** | 14 | Justice, emergency, media, bridge, cross-domain |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest Cross-Cluster** | 12 | OtherRole dispatch, allowlist, typed helpers, bidirectional health |" >> $GITHUB_STEP_SUMMARY
-          echo "| Commons unit tests | 1,695 | Bridge + domain zome unit tests (includes cross-cluster dispatch + rate limiting + audit trail + integrity validation) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commons unit tests | 2,588 | Bridge + domain zome unit tests (includes cross-cluster dispatch + rate limiting + audit trail + integrity validation, 35/35 integrity zomes tested) |" >> $GITHUB_STEP_SUMMARY
           echo "| Civic unit tests | 1,320 | Bridge + domain zome unit tests (includes cross-cluster dispatch + rate limiting + audit trail + integrity validation) |" >> $GITHUB_STEP_SUMMARY
           echo "| Bridge-common unit tests | 29 | Dispatch validation, serde roundtrips, rate limiting, typed helpers, audit trail |" >> $GITHUB_STEP_SUMMARY
           echo "| SDK cluster integration | 49 | CommonsBridgeClient + CivicBridgeClient + typed convenience + cross-cluster + audit trail |" >> $GITHUB_STEP_SUMMARY

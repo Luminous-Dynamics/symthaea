@@ -235,3 +235,739 @@ fn validate_update_unit(unit: Unit) -> ExternResult<ValidateCallbackResult> {
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hdi::prelude::*;
+
+    // ========== Factory Functions ==========
+
+    fn valid_building() -> Building {
+        Building {
+            id: "building-001".into(),
+            name: "Community Commons".into(),
+            address: "123 Cooperative Way".into(),
+            location_lat: 42.3601,
+            location_lon: -71.0589,
+            total_units: 24,
+            year_built: Some(2020),
+            building_type: BuildingType::Apartment,
+            cooperative_hash: None,
+        }
+    }
+
+    fn valid_unit() -> Unit {
+        Unit {
+            building_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            unit_number: "101".into(),
+            unit_type: UnitType::OneBedroom,
+            square_meters: 65,
+            floor: 1,
+            bedrooms: 1,
+            bathrooms: 1,
+            accessibility_features: vec![],
+            current_occupant: None,
+            status: UnitStatus::Available,
+        }
+    }
+
+    fn mock_create_action() -> Create {
+        Create {
+            author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            timestamp: Timestamp::now(),
+            action_seq: 0,
+            prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+            entry_type: EntryType::App(AppEntryDef {
+                entry_index: 0.into(),
+                zome_index: 0.into(),
+                visibility: EntryVisibility::Public,
+            }),
+            entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
+            weight: Default::default(),
+        }
+    }
+
+    // ========== Building Create Validation Tests ==========
+
+    #[test]
+    fn test_valid_building() {
+        let building = valid_building();
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_empty_id() {
+        let mut building = valid_building();
+        building.id = "".into();
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Building ID cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_building_empty_name() {
+        let mut building = valid_building();
+        building.name = "".into();
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Building name cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_building_empty_address() {
+        let mut building = valid_building();
+        building.address = "".into();
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Building address cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_building_lat_min_valid() {
+        let mut building = valid_building();
+        building.location_lat = -90.0;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_lat_max_valid() {
+        let mut building = valid_building();
+        building.location_lat = 90.0;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_lat_below_min() {
+        let mut building = valid_building();
+        building.location_lat = -90.001;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Latitude must be between -90 and 90");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_building_lat_above_max() {
+        let mut building = valid_building();
+        building.location_lat = 90.001;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Latitude must be between -90 and 90");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_building_lon_min_valid() {
+        let mut building = valid_building();
+        building.location_lon = -180.0;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_lon_max_valid() {
+        let mut building = valid_building();
+        building.location_lon = 180.0;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_lon_below_min() {
+        let mut building = valid_building();
+        building.location_lon = -180.001;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Longitude must be between -180 and 180");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_building_lon_above_max() {
+        let mut building = valid_building();
+        building.location_lon = 180.001;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Longitude must be between -180 and 180");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_building_zero_units() {
+        let mut building = valid_building();
+        building.total_units = 0;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Building must have at least one unit");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_building_one_unit_valid() {
+        let mut building = valid_building();
+        building.total_units = 1;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_year_built_none() {
+        let mut building = valid_building();
+        building.year_built = None;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_year_built_min_valid() {
+        let mut building = valid_building();
+        building.year_built = Some(1800);
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_year_built_max_valid() {
+        let mut building = valid_building();
+        building.year_built = Some(2100);
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_year_built_below_min() {
+        let mut building = valid_building();
+        building.year_built = Some(1799);
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Year built must be between 1800 and 2100");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_building_year_built_above_max() {
+        let mut building = valid_building();
+        building.year_built = Some(2101);
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Year built must be between 1800 and 2100");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    // ========== Unit Create Validation Tests ==========
+
+    #[test]
+    fn test_valid_unit() {
+        let unit = valid_unit();
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_unit_empty_number() {
+        let mut unit = valid_unit();
+        unit.unit_number = "".into();
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Unit number cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_unit_zero_square_meters() {
+        let mut unit = valid_unit();
+        unit.square_meters = 0;
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Square meters must be greater than 0");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_unit_one_square_meter_valid() {
+        let mut unit = valid_unit();
+        unit.square_meters = 1;
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_unit_zero_bathrooms() {
+        let mut unit = valid_unit();
+        unit.bathrooms = 0;
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Unit must have at least one bathroom");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_unit_one_bathroom_valid() {
+        let mut unit = valid_unit();
+        unit.bathrooms = 1;
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_unit_zero_bedrooms_valid() {
+        let mut unit = valid_unit();
+        unit.bedrooms = 0;
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_unit_with_accessibility_features() {
+        let mut unit = valid_unit();
+        unit.accessibility_features = vec![
+            AccessFeature::WheelchairAccessible,
+            AccessFeature::GrabBars,
+        ];
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_unit_with_occupant() {
+        let mut unit = valid_unit();
+        unit.current_occupant = Some(AgentPubKey::from_raw_36(vec![1u8; 36]));
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    // ========== Unit Update Validation Tests ==========
+
+    #[test]
+    fn test_update_unit_valid() {
+        let unit = valid_unit();
+        let result = validate_update_unit(unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_unit_empty_number() {
+        let mut unit = valid_unit();
+        unit.unit_number = "".into();
+        let result = validate_update_unit(unit);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Unit number cannot be empty");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_update_unit_zero_square_meters() {
+        let mut unit = valid_unit();
+        unit.square_meters = 0;
+        let result = validate_update_unit(unit);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert_eq!(msg, "Square meters must be greater than 0");
+            }
+            _ => panic!("Expected Invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_update_unit_zero_bathrooms_allowed() {
+        let mut unit = valid_unit();
+        unit.bathrooms = 0;
+        let result = validate_update_unit(unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    // ========== Enum Serde Roundtrip Tests ==========
+
+    #[test]
+    fn test_building_type_serde_apartment() {
+        let bt = BuildingType::Apartment;
+        let json = serde_json::to_string(&bt).unwrap();
+        let deserialized: BuildingType = serde_json::from_str(&json).unwrap();
+        assert_eq!(bt, deserialized);
+    }
+
+    #[test]
+    fn test_building_type_serde_townhouse() {
+        let bt = BuildingType::Townhouse;
+        let json = serde_json::to_string(&bt).unwrap();
+        let deserialized: BuildingType = serde_json::from_str(&json).unwrap();
+        assert_eq!(bt, deserialized);
+    }
+
+    #[test]
+    fn test_building_type_serde_single_family() {
+        let bt = BuildingType::SingleFamily;
+        let json = serde_json::to_string(&bt).unwrap();
+        let deserialized: BuildingType = serde_json::from_str(&json).unwrap();
+        assert_eq!(bt, deserialized);
+    }
+
+    #[test]
+    fn test_building_type_serde_duplex() {
+        let bt = BuildingType::Duplex;
+        let json = serde_json::to_string(&bt).unwrap();
+        let deserialized: BuildingType = serde_json::from_str(&json).unwrap();
+        assert_eq!(bt, deserialized);
+    }
+
+    #[test]
+    fn test_building_type_serde_co_housing() {
+        let bt = BuildingType::CoHousing;
+        let json = serde_json::to_string(&bt).unwrap();
+        let deserialized: BuildingType = serde_json::from_str(&json).unwrap();
+        assert_eq!(bt, deserialized);
+    }
+
+    #[test]
+    fn test_building_type_serde_mixed_use() {
+        let bt = BuildingType::MixedUse;
+        let json = serde_json::to_string(&bt).unwrap();
+        let deserialized: BuildingType = serde_json::from_str(&json).unwrap();
+        assert_eq!(bt, deserialized);
+    }
+
+    #[test]
+    fn test_unit_type_serde_studio() {
+        let ut = UnitType::Studio;
+        let json = serde_json::to_string(&ut).unwrap();
+        let deserialized: UnitType = serde_json::from_str(&json).unwrap();
+        assert_eq!(ut, deserialized);
+    }
+
+    #[test]
+    fn test_unit_type_serde_one_bedroom() {
+        let ut = UnitType::OneBedroom;
+        let json = serde_json::to_string(&ut).unwrap();
+        let deserialized: UnitType = serde_json::from_str(&json).unwrap();
+        assert_eq!(ut, deserialized);
+    }
+
+    #[test]
+    fn test_unit_type_serde_two_bedroom() {
+        let ut = UnitType::TwoBedroom;
+        let json = serde_json::to_string(&ut).unwrap();
+        let deserialized: UnitType = serde_json::from_str(&json).unwrap();
+        assert_eq!(ut, deserialized);
+    }
+
+    #[test]
+    fn test_unit_type_serde_three_bedroom() {
+        let ut = UnitType::ThreeBedroom;
+        let json = serde_json::to_string(&ut).unwrap();
+        let deserialized: UnitType = serde_json::from_str(&json).unwrap();
+        assert_eq!(ut, deserialized);
+    }
+
+    #[test]
+    fn test_unit_type_serde_four_plus() {
+        let ut = UnitType::FourPlus;
+        let json = serde_json::to_string(&ut).unwrap();
+        let deserialized: UnitType = serde_json::from_str(&json).unwrap();
+        assert_eq!(ut, deserialized);
+    }
+
+    #[test]
+    fn test_unit_type_serde_accessible() {
+        let ut = UnitType::Accessible;
+        let json = serde_json::to_string(&ut).unwrap();
+        let deserialized: UnitType = serde_json::from_str(&json).unwrap();
+        assert_eq!(ut, deserialized);
+    }
+
+    #[test]
+    fn test_unit_type_serde_family() {
+        let ut = UnitType::Family;
+        let json = serde_json::to_string(&ut).unwrap();
+        let deserialized: UnitType = serde_json::from_str(&json).unwrap();
+        assert_eq!(ut, deserialized);
+    }
+
+    #[test]
+    fn test_access_feature_serde_wheelchair_accessible() {
+        let af = AccessFeature::WheelchairAccessible;
+        let json = serde_json::to_string(&af).unwrap();
+        let deserialized: AccessFeature = serde_json::from_str(&json).unwrap();
+        assert_eq!(af, deserialized);
+    }
+
+    #[test]
+    fn test_access_feature_serde_elevator() {
+        let af = AccessFeature::Elevator;
+        let json = serde_json::to_string(&af).unwrap();
+        let deserialized: AccessFeature = serde_json::from_str(&json).unwrap();
+        assert_eq!(af, deserialized);
+    }
+
+    #[test]
+    fn test_access_feature_serde_grab_bars() {
+        let af = AccessFeature::GrabBars;
+        let json = serde_json::to_string(&af).unwrap();
+        let deserialized: AccessFeature = serde_json::from_str(&json).unwrap();
+        assert_eq!(af, deserialized);
+    }
+
+    #[test]
+    fn test_access_feature_serde_wide_doorways() {
+        let af = AccessFeature::WideDoorways;
+        let json = serde_json::to_string(&af).unwrap();
+        let deserialized: AccessFeature = serde_json::from_str(&json).unwrap();
+        assert_eq!(af, deserialized);
+    }
+
+    #[test]
+    fn test_access_feature_serde_low_counters() {
+        let af = AccessFeature::LowCounters;
+        let json = serde_json::to_string(&af).unwrap();
+        let deserialized: AccessFeature = serde_json::from_str(&json).unwrap();
+        assert_eq!(af, deserialized);
+    }
+
+    #[test]
+    fn test_access_feature_serde_visual_alerts() {
+        let af = AccessFeature::VisualAlerts;
+        let json = serde_json::to_string(&af).unwrap();
+        let deserialized: AccessFeature = serde_json::from_str(&json).unwrap();
+        assert_eq!(af, deserialized);
+    }
+
+    #[test]
+    fn test_access_feature_serde_hearing_loop() {
+        let af = AccessFeature::HearingLoop;
+        let json = serde_json::to_string(&af).unwrap();
+        let deserialized: AccessFeature = serde_json::from_str(&json).unwrap();
+        assert_eq!(af, deserialized);
+    }
+
+    #[test]
+    fn test_unit_status_serde_available() {
+        let us = UnitStatus::Available;
+        let json = serde_json::to_string(&us).unwrap();
+        let deserialized: UnitStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(us, deserialized);
+    }
+
+    #[test]
+    fn test_unit_status_serde_occupied() {
+        let us = UnitStatus::Occupied;
+        let json = serde_json::to_string(&us).unwrap();
+        let deserialized: UnitStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(us, deserialized);
+    }
+
+    #[test]
+    fn test_unit_status_serde_under_maintenance() {
+        let us = UnitStatus::UnderMaintenance;
+        let json = serde_json::to_string(&us).unwrap();
+        let deserialized: UnitStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(us, deserialized);
+    }
+
+    #[test]
+    fn test_unit_status_serde_reserved() {
+        let us = UnitStatus::Reserved;
+        let json = serde_json::to_string(&us).unwrap();
+        let deserialized: UnitStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(us, deserialized);
+    }
+
+    #[test]
+    fn test_unit_status_serde_renovation() {
+        let us = UnitStatus::Renovation;
+        let json = serde_json::to_string(&us).unwrap();
+        let deserialized: UnitStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(us, deserialized);
+    }
+
+    // ========== Additional Edge Case Tests ==========
+
+    #[test]
+    fn test_building_all_types() {
+        let types = vec![
+            BuildingType::Apartment,
+            BuildingType::Townhouse,
+            BuildingType::SingleFamily,
+            BuildingType::Duplex,
+            BuildingType::CoHousing,
+            BuildingType::MixedUse,
+        ];
+        for bt in types {
+            let mut building = valid_building();
+            building.building_type = bt;
+            let result = validate_create_building(mock_create_action(), building);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+        }
+    }
+
+    #[test]
+    fn test_unit_all_types() {
+        let types = vec![
+            UnitType::Studio,
+            UnitType::OneBedroom,
+            UnitType::TwoBedroom,
+            UnitType::ThreeBedroom,
+            UnitType::FourPlus,
+            UnitType::Accessible,
+            UnitType::Family,
+        ];
+        for ut in types {
+            let mut unit = valid_unit();
+            unit.unit_type = ut;
+            let result = validate_create_unit(mock_create_action(), unit);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+        }
+    }
+
+    #[test]
+    fn test_unit_all_statuses() {
+        let statuses = vec![
+            UnitStatus::Available,
+            UnitStatus::Occupied,
+            UnitStatus::UnderMaintenance,
+            UnitStatus::Reserved,
+            UnitStatus::Renovation,
+        ];
+        for status in statuses {
+            let mut unit = valid_unit();
+            unit.status = status;
+            let result = validate_create_unit(mock_create_action(), unit);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+        }
+    }
+
+    #[test]
+    fn test_building_with_cooperative_hash() {
+        let mut building = valid_building();
+        building.cooperative_hash = Some(ActionHash::from_raw_36(vec![42u8; 36]));
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_unit_max_floor() {
+        let mut unit = valid_unit();
+        unit.floor = u8::MAX;
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_unit_max_square_meters() {
+        let mut unit = valid_unit();
+        unit.square_meters = u32::MAX;
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_building_max_units() {
+        let mut building = valid_building();
+        building.total_units = u16::MAX;
+        let result = validate_create_building(mock_create_action(), building);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_unit_all_accessibility_features() {
+        let mut unit = valid_unit();
+        unit.accessibility_features = vec![
+            AccessFeature::WheelchairAccessible,
+            AccessFeature::Elevator,
+            AccessFeature::GrabBars,
+            AccessFeature::WideDoorways,
+            AccessFeature::LowCounters,
+            AccessFeature::VisualAlerts,
+            AccessFeature::HearingLoop,
+        ];
+        let result = validate_create_unit(mock_create_action(), unit);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+}
