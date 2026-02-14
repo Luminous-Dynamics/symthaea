@@ -842,4 +842,287 @@ mod tests {
         let decoded: WaterRightsCheckResult = serde_json::from_str(&json).unwrap();
         assert!(decoded.error.is_some());
     }
+
+    // ── Transfer entry full serde roundtrip ─────────────────────────
+
+    #[test]
+    fn transfer_entry_full_serde_roundtrip() {
+        let transfer = Transfer {
+            id: "transfer:prop-001:1000".to_string(),
+            property_id: "prop-001".to_string(),
+            from_did: "did:key:z6MkSeller".to_string(),
+            to_did: "did:key:z6MkBuyer".to_string(),
+            transfer_type: TransferType::Sale,
+            price: Some(350_000.0),
+            currency: Some("EUR".to_string()),
+            conditions: vec![
+                TransferCondition {
+                    condition_type: ConditionType::PaymentReceived,
+                    description: "Bank transfer confirmed".to_string(),
+                    satisfied: false,
+                    verified_by: None,
+                },
+                TransferCondition {
+                    condition_type: ConditionType::Custom("Zoning approval".to_string()),
+                    description: "City zoning board approval".to_string(),
+                    satisfied: true,
+                    verified_by: Some("did:key:z6MkZoningOfficer".to_string()),
+                },
+            ],
+            status: TransferStatus::ConditionsPending,
+            initiated: Timestamp::from_micros(1_000_000),
+            completed: None,
+        };
+        let json = serde_json::to_string(&transfer).unwrap();
+        let decoded: Transfer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, transfer.id);
+        assert_eq!(decoded.from_did, "did:key:z6MkSeller");
+        assert_eq!(decoded.to_did, "did:key:z6MkBuyer");
+        assert_eq!(decoded.conditions.len(), 2);
+        assert!(!decoded.conditions[0].satisfied);
+        assert!(decoded.conditions[1].satisfied);
+        assert_eq!(decoded.status, TransferStatus::ConditionsPending);
+        assert!(decoded.completed.is_none());
+    }
+
+    // ── Escrow entry full serde roundtrip ───────────────────────────
+
+    #[test]
+    fn escrow_entry_full_serde_roundtrip() {
+        let escrow = Escrow {
+            id: "escrow:transfer-001:2000".to_string(),
+            transfer_id: "transfer-001".to_string(),
+            escrow_agent_did: Some("did:key:z6MkEscrowAgent".to_string()),
+            amount: 250_000.50,
+            currency: "USD".to_string(),
+            funded: true,
+            release_conditions: vec![
+                "Title search clear".to_string(),
+                "Inspection passed".to_string(),
+                "Loan approved".to_string(),
+            ],
+            created: Timestamp::from_micros(2_000_000),
+            released: Some(Timestamp::from_micros(3_000_000)),
+        };
+        let json = serde_json::to_string(&escrow).unwrap();
+        let decoded: Escrow = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, escrow.id);
+        assert!(decoded.funded);
+        assert!((decoded.amount - 250_000.50).abs() < f64::EPSILON);
+        assert_eq!(decoded.release_conditions.len(), 3);
+        assert!(decoded.released.is_some());
+    }
+
+    // ── TransferCondition serde with all condition types ────────────
+
+    #[test]
+    fn transfer_condition_all_types_serde() {
+        let types_and_descs = vec![
+            (ConditionType::PaymentReceived, "Full payment"),
+            (ConditionType::InspectionComplete, "Home inspection"),
+            (ConditionType::TitleClear, "Title search"),
+            (ConditionType::DocumentsSigned, "All documents"),
+            (ConditionType::TaxesPaid, "Property taxes current"),
+            (ConditionType::Custom("Environmental review".to_string()), "Environmental review"),
+        ];
+        for (ct, desc) in types_and_descs {
+            let condition = TransferCondition {
+                condition_type: ct.clone(),
+                description: desc.to_string(),
+                satisfied: false,
+                verified_by: None,
+            };
+            let json = serde_json::to_string(&condition).unwrap();
+            let decoded: TransferCondition = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.condition_type, ct);
+            assert_eq!(decoded.description, desc);
+            assert!(!decoded.satisfied);
+        }
+    }
+
+    // ── Transfer status lifecycle transitions ───────────────────────
+
+    #[test]
+    fn transfer_status_initiated_to_conditions_pending_serde() {
+        // Simulate the status transition that accept_transfer produces
+        let transfer_before = Transfer {
+            id: "transfer:lifecycle:1".to_string(),
+            property_id: "prop-lc-01".to_string(),
+            from_did: "did:key:z6MkSeller".to_string(),
+            to_did: "did:key:z6MkBuyer".to_string(),
+            transfer_type: TransferType::Sale,
+            price: Some(100_000.0),
+            currency: Some("USD".to_string()),
+            conditions: vec![],
+            status: TransferStatus::Initiated,
+            initiated: Timestamp::from_micros(1000),
+            completed: None,
+        };
+        // Transition to ConditionsPending (as accept_transfer does)
+        let transfer_after = Transfer {
+            status: TransferStatus::ConditionsPending,
+            ..transfer_before.clone()
+        };
+        let json = serde_json::to_string(&transfer_after).unwrap();
+        let decoded: Transfer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, TransferStatus::ConditionsPending);
+        // Verify all other fields unchanged
+        assert_eq!(decoded.id, transfer_before.id);
+        assert_eq!(decoded.from_did, transfer_before.from_did);
+    }
+
+    #[test]
+    fn transfer_status_completed_with_timestamp_serde() {
+        let completed_ts = Timestamp::from_micros(5_000_000);
+        let transfer = Transfer {
+            id: "transfer:complete:1".to_string(),
+            property_id: "prop-001".to_string(),
+            from_did: "did:key:z6MkSeller".to_string(),
+            to_did: "did:key:z6MkBuyer".to_string(),
+            transfer_type: TransferType::Inheritance,
+            price: None,
+            currency: None,
+            conditions: vec![],
+            status: TransferStatus::Completed,
+            initiated: Timestamp::from_micros(1_000_000),
+            completed: Some(completed_ts),
+        };
+        let json = serde_json::to_string(&transfer).unwrap();
+        let decoded: Transfer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, TransferStatus::Completed);
+        assert_eq!(decoded.completed, Some(completed_ts));
+        assert!(decoded.price.is_none());
+        assert!(decoded.currency.is_none());
+    }
+
+    #[test]
+    fn transfer_cancelled_preserves_all_fields_serde() {
+        let transfer = Transfer {
+            id: "transfer:cancel:1".to_string(),
+            property_id: "prop-002".to_string(),
+            from_did: "did:key:z6MkSeller".to_string(),
+            to_did: "did:key:z6MkBuyer".to_string(),
+            transfer_type: TransferType::Exchange,
+            price: Some(1.0),
+            currency: Some("BTC".to_string()),
+            conditions: vec![
+                TransferCondition {
+                    condition_type: ConditionType::PaymentReceived,
+                    description: "Crypto transfer".to_string(),
+                    satisfied: false,
+                    verified_by: None,
+                },
+            ],
+            status: TransferStatus::Cancelled,
+            initiated: Timestamp::from_micros(1000),
+            completed: None,
+        };
+        let json = serde_json::to_string(&transfer).unwrap();
+        let decoded: Transfer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, TransferStatus::Cancelled);
+        assert_eq!(decoded.conditions.len(), 1);
+        assert!(!decoded.conditions[0].satisfied);
+    }
+
+    // ── Cross-domain internal type serde roundtrips ──────────────────
+
+    #[test]
+    fn transfer_ownership_input_serde_roundtrip() {
+        let input = TransferOwnershipInput {
+            property_id: "prop-xdomain-01".to_string(),
+            from_did: "did:key:z6MkOldOwner".to_string(),
+            to_did: "did:key:z6MkNewOwner".to_string(),
+            transfer_type: "Sale".to_string(),
+            transfer_id: Some("transfer:xdomain:1".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferOwnershipInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "prop-xdomain-01");
+        assert_eq!(decoded.transfer_type, "Sale");
+        assert!(decoded.transfer_id.is_some());
+    }
+
+    #[test]
+    fn transfer_ownership_result_serde_roundtrip() {
+        let result = TransferOwnershipResult {
+            property_action_hash: ActionHash::from_raw_36(vec![0xaa; 36]),
+            new_deed_id: "deed:new:001".to_string(),
+            deed_action_hash: ActionHash::from_raw_36(vec![0xbb; 36]),
+            previous_deed_id: "deed:old:001".to_string(),
+            encumbrances_carried: 3,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: TransferOwnershipResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_deed_id, "deed:new:001");
+        assert_eq!(decoded.previous_deed_id, "deed:old:001");
+        assert_eq!(decoded.encumbrances_carried, 3);
+    }
+
+    #[test]
+    fn broadcast_ownership_change_input_serde_roundtrip() {
+        let input = BroadcastOwnershipChangeInput {
+            property_id: "prop-broadcast-01".to_string(),
+            from_did: "did:key:z6MkFrom".to_string(),
+            to_did: "did:key:z6MkTo".to_string(),
+            transfer_type: "Gift".to_string(),
+            new_deed_id: "deed:gift:001".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: BroadcastOwnershipChangeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "prop-broadcast-01");
+        assert_eq!(decoded.transfer_type, "Gift");
+        assert_eq!(decoded.new_deed_id, "deed:gift:001");
+    }
+
+    // ── Edge cases: gift transfer without price ─────────────────────
+
+    #[test]
+    fn initiate_gift_transfer_no_price_no_currency_serde() {
+        let input = InitiateTransferInput {
+            property_id: "prop-gift-01".to_string(),
+            from_did: "did:key:z6MkGifter".to_string(),
+            to_did: "did:key:z6MkRecipient".to_string(),
+            transfer_type: TransferType::Gift,
+            price: None,
+            currency: None,
+            conditions: vec![],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: InitiateTransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.transfer_type, TransferType::Gift);
+        assert!(decoded.price.is_none());
+        assert!(decoded.currency.is_none());
+        assert!(decoded.conditions.is_empty());
+    }
+
+    // ── Edge case: escrow without agent ──────────────────────────────
+
+    #[test]
+    fn create_escrow_input_no_agent_serde() {
+        let input = CreateEscrowInput {
+            transfer_id: "transfer-no-agent".to_string(),
+            escrow_agent_did: None,
+            amount: 50_000.0,
+            currency: "GBP".to_string(),
+            release_conditions: vec!["All conditions met".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateEscrowInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.escrow_agent_did.is_none());
+        assert_eq!(decoded.currency, "GBP");
+    }
+
+    // ── Edge case: satisfy condition at large index ──────────────────
+
+    #[test]
+    fn satisfy_condition_large_index_serde() {
+        let input = SatisfyConditionInput {
+            transfer_id: "transfer-many-conds".to_string(),
+            condition_index: usize::MAX,
+            verifier_did: "did:key:z6MkVerifier".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SatisfyConditionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.condition_index, usize::MAX);
+    }
 }

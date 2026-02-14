@@ -466,4 +466,257 @@ mod tests {
         assert!(decoded.tasks_completed.is_empty());
         assert!(decoded.notes.is_empty());
     }
+
+    // ── PlanStatus transition serde tests ─────────────────────────────────
+
+    #[test]
+    fn plan_status_draft_to_active_serde() {
+        let input_draft = UpdatePlanStatusInput {
+            plan_hash: fake_action_hash(),
+            new_status: PlanStatus::Draft,
+        };
+        let input_active = UpdatePlanStatusInput {
+            plan_hash: fake_action_hash(),
+            new_status: PlanStatus::Active,
+        };
+        let json_draft = serde_json::to_string(&input_draft).unwrap();
+        let json_active = serde_json::to_string(&input_active).unwrap();
+        let decoded_draft: UpdatePlanStatusInput = serde_json::from_str(&json_draft).unwrap();
+        let decoded_active: UpdatePlanStatusInput = serde_json::from_str(&json_active).unwrap();
+        assert_eq!(decoded_draft.new_status, PlanStatus::Draft);
+        assert_eq!(decoded_active.new_status, PlanStatus::Active);
+    }
+
+    #[test]
+    fn plan_status_active_to_paused_serde() {
+        let input = UpdatePlanStatusInput {
+            plan_hash: fake_action_hash(),
+            new_status: PlanStatus::Paused,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdatePlanStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, PlanStatus::Paused);
+    }
+
+    #[test]
+    fn plan_status_active_to_completed_serde() {
+        let input = UpdatePlanStatusInput {
+            plan_hash: fake_action_hash(),
+            new_status: PlanStatus::Completed,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdatePlanStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, PlanStatus::Completed);
+    }
+
+    #[test]
+    fn plan_status_active_to_cancelled_serde() {
+        let input = UpdatePlanStatusInput {
+            plan_hash: fake_action_hash(),
+            new_status: PlanStatus::Cancelled,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdatePlanStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, PlanStatus::Cancelled);
+    }
+
+    // ── CarePlan with multiple caregivers ─────────────────────────────────
+
+    #[test]
+    fn care_plan_multiple_caregivers_serde_roundtrip() {
+        let cg1 = AgentPubKey::from_raw_36(vec![2u8; 36]);
+        let cg2 = AgentPubKey::from_raw_36(vec![3u8; 36]);
+        let cg3 = AgentPubKey::from_raw_36(vec![4u8; 36]);
+        let plan = CarePlan {
+            recipient: fake_agent(),
+            title: "Team Care Plan".to_string(),
+            description: "Multiple caregivers assigned".to_string(),
+            care_type: CareType::DisabilitySupport,
+            schedule: "Daily 8am-8pm".to_string(),
+            caregivers: vec![cg1.clone(), cg2.clone(), cg3.clone()],
+            status: PlanStatus::Active,
+            created_at: Timestamp::from_micros(1000),
+            updated_at: Timestamp::from_micros(2000),
+            hours_per_week: 84.0,
+            special_instructions: "Wheelchair accessible".to_string(),
+        };
+        let json = serde_json::to_string(&plan).unwrap();
+        let decoded: CarePlan = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.caregivers.len(), 3);
+        assert_eq!(decoded.caregivers[0], cg1);
+        assert_eq!(decoded.caregivers[1], cg2);
+        assert_eq!(decoded.caregivers[2], cg3);
+    }
+
+    // ── CarePlan status field values ──────────────────────────────────────
+
+    #[test]
+    fn care_plan_all_statuses_serde() {
+        let statuses = vec![
+            PlanStatus::Draft,
+            PlanStatus::Active,
+            PlanStatus::Paused,
+            PlanStatus::Completed,
+            PlanStatus::Cancelled,
+        ];
+        for status in statuses {
+            let plan = CarePlan {
+                recipient: fake_agent(),
+                title: "Status Test".to_string(),
+                description: "Testing status field".to_string(),
+                care_type: CareType::Childcare,
+                schedule: "Weekdays".to_string(),
+                caregivers: vec![AgentPubKey::from_raw_36(vec![2u8; 36])],
+                status: status.clone(),
+                created_at: Timestamp::from_micros(0),
+                updated_at: Timestamp::from_micros(0),
+                hours_per_week: 10.0,
+                special_instructions: String::new(),
+            };
+            let json = serde_json::to_string(&plan).unwrap();
+            let decoded: CarePlan = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.status, status);
+        }
+    }
+
+    // ── CarePlan hours boundary values ────────────────────────────────────
+
+    #[test]
+    fn care_plan_fractional_hours_serde() {
+        let plan = CarePlan {
+            recipient: fake_agent(),
+            title: "Fractional Hours Plan".to_string(),
+            description: "Testing edge case hours".to_string(),
+            care_type: CareType::Respite,
+            schedule: "As needed".to_string(),
+            caregivers: vec![AgentPubKey::from_raw_36(vec![2u8; 36])],
+            status: PlanStatus::Active,
+            created_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+            hours_per_week: 0.25,
+            special_instructions: String::new(),
+        };
+        let json = serde_json::to_string(&plan).unwrap();
+        let decoded: CarePlan = serde_json::from_str(&json).unwrap();
+        assert!((decoded.hours_per_week - 0.25).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn care_plan_max_hours_168_serde() {
+        let plan = CarePlan {
+            recipient: fake_agent(),
+            title: "24/7 Care".to_string(),
+            description: "Around the clock".to_string(),
+            care_type: CareType::Eldercare,
+            schedule: "24/7".to_string(),
+            caregivers: vec![AgentPubKey::from_raw_36(vec![2u8; 36])],
+            status: PlanStatus::Active,
+            created_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+            hours_per_week: 168.0,
+            special_instructions: String::new(),
+        };
+        let json = serde_json::to_string(&plan).unwrap();
+        let decoded: CarePlan = serde_json::from_str(&json).unwrap();
+        assert!((decoded.hours_per_week - 168.0).abs() < f32::EPSILON);
+    }
+
+    // ── CareSession with many tasks ──────────────────────────────────────
+
+    #[test]
+    fn care_session_many_tasks_serde() {
+        let tasks: Vec<String> = (0..10).map(|i| format!("Task {}", i)).collect();
+        let session = CareSession {
+            plan_hash: fake_action_hash(),
+            caregiver: fake_agent(),
+            started_at: Timestamp::from_micros(1000),
+            ended_at: Timestamp::from_micros(5000),
+            hours: 4.0,
+            notes: "Productive session".to_string(),
+            tasks_completed: tasks.clone(),
+        };
+        let json = serde_json::to_string(&session).unwrap();
+        let decoded: CareSession = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.tasks_completed.len(), 10);
+        assert_eq!(decoded.tasks_completed, tasks);
+    }
+
+    // ── PlanSessionSummary boundary values ────────────────────────────────
+
+    #[test]
+    fn plan_session_summary_large_values_roundtrip() {
+        let summary = PlanSessionSummary {
+            plan_hash: fake_action_hash(),
+            total_sessions: u32::MAX,
+            total_hours: f32::MAX,
+            caregivers_active: u32::MAX,
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        let decoded: PlanSessionSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_sessions, u32::MAX);
+        assert_eq!(decoded.caregivers_active, u32::MAX);
+    }
+
+    #[test]
+    fn plan_session_summary_fractional_hours_roundtrip() {
+        let summary = PlanSessionSummary {
+            plan_hash: fake_action_hash(),
+            total_sessions: 5,
+            total_hours: 12.75,
+            caregivers_active: 2,
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        let decoded: PlanSessionSummary = serde_json::from_str(&json).unwrap();
+        assert!((decoded.total_hours - 12.75).abs() < f32::EPSILON);
+    }
+
+    // ── CareType::anchor_key edge cases ──────────────────────────────────
+
+    #[test]
+    fn care_type_anchor_key_other_multiple_spaces() {
+        let ct = CareType::Other("Post   Op   Care".to_string());
+        let key = ct.anchor_key();
+        assert_eq!(key, "other_post___op___care");
+    }
+
+    #[test]
+    fn care_type_anchor_key_other_unicode() {
+        let ct = CareType::Other("Soins Intensifs".to_string());
+        let key = ct.anchor_key();
+        assert_eq!(key, "other_soins_intensifs");
+    }
+
+    // ── CareSession hours boundary ───────────────────────────────────────
+
+    #[test]
+    fn care_session_max_hours_24_serde() {
+        let session = CareSession {
+            plan_hash: fake_action_hash(),
+            caregiver: fake_agent(),
+            started_at: Timestamp::from_micros(0),
+            ended_at: Timestamp::from_micros(86_400_000_000),
+            hours: 24.0,
+            notes: "Full day".to_string(),
+            tasks_completed: vec![],
+        };
+        let json = serde_json::to_string(&session).unwrap();
+        let decoded: CareSession = serde_json::from_str(&json).unwrap();
+        assert!((decoded.hours - 24.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn care_session_fractional_hours_serde() {
+        let session = CareSession {
+            plan_hash: fake_action_hash(),
+            caregiver: fake_agent(),
+            started_at: Timestamp::from_micros(0),
+            ended_at: Timestamp::from_micros(1800_000_000),
+            hours: 0.5,
+            notes: "Quick check-in".to_string(),
+            tasks_completed: vec!["Blood pressure check".to_string()],
+        };
+        let json = serde_json::to_string(&session).unwrap();
+        let decoded: CareSession = serde_json::from_str(&json).unwrap();
+        assert!((decoded.hours - 0.5).abs() < f32::EPSILON);
+    }
 }

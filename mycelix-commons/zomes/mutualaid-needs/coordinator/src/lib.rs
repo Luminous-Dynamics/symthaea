@@ -1067,4 +1067,111 @@ mod tests {
             assert_eq!(&decoded, variant);
         }
     }
+
+    // ── Boundary and edge case tests ─────────────────────────────────
+
+    #[test]
+    fn search_offers_input_all_none_filters_serde() {
+        let input = SearchOffersInput {
+            category: None,
+            query: None,
+            limit: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SearchOffersInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.category, None);
+        assert_eq!(decoded.query, None);
+        assert_eq!(decoded.limit, None);
+    }
+
+    #[test]
+    fn propose_match_input_all_none_optionals_serde() {
+        let need_hash = ActionHash::from_raw_36(vec![0xAA; 36]);
+        let offer_hash = ActionHash::from_raw_36(vec![0xBB; 36]);
+        let input = ProposeMatchInput {
+            need_hash: need_hash.clone(),
+            offer_hash: offer_hash.clone(),
+            quantity: None,
+            notes: "".to_string(),
+            scheduled_handoff: None,
+            handoff_location: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ProposeMatchInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.need_hash, need_hash);
+        assert_eq!(decoded.quantity, None);
+        assert_eq!(decoded.scheduled_handoff, None);
+        assert_eq!(decoded.handoff_location, None);
+        assert_eq!(decoded.notes, "");
+    }
+
+    #[test]
+    fn create_need_input_many_reciprocity_offers_serde() {
+        let offers: Vec<String> = (0..50).map(|i| format!("Reciprocity offer #{}", i)).collect();
+        let input = CreateNeedInput {
+            title: "Large request".to_string(),
+            description: "Needs many things in return".to_string(),
+            category: NeedCategory::Equipment,
+            urgency: UrgencyLevel::Low,
+            emergency: false,
+            quantity: Some(u32::MAX),
+            location: LocationConstraint::Remote,
+            needed_by: Some(Timestamp::from_micros(1800000000000000)),
+            reciprocity_offers: offers.clone(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateNeedInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.reciprocity_offers.len(), 50);
+        assert_eq!(decoded.quantity, Some(u32::MAX));
+    }
+
+    #[test]
+    fn create_offer_input_with_available_until_serde() {
+        let input = CreateOfferInput {
+            title: "Limited time offer".to_string(),
+            description: "Available only this weekend".to_string(),
+            category: NeedCategory::Furniture,
+            quantity: Some(1),
+            condition: Some("Must pick up".to_string()),
+            location: LocationConstraint::FixedLocation("456 Elm St".to_string()),
+            available_until: Some(Timestamp::from_micros(1700500000000000)),
+            asking_for: vec!["Help moving".to_string(), "Baked goods".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateOfferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.available_until, Some(Timestamp::from_micros(1700500000000000)));
+        assert_eq!(decoded.asking_for.len(), 2);
+    }
+
+    #[test]
+    fn fulfill_match_input_empty_notes_serde() {
+        let match_hash = ActionHash::from_raw_36(vec![0xEE; 36]);
+        let input = FulfillMatchInput {
+            match_hash: match_hash.clone(),
+            quantity_given: Some(u32::MAX),
+            notes: "".to_string(),
+            gratitude_message: Some("".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FulfillMatchInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.match_hash, match_hash);
+        assert_eq!(decoded.notes, "");
+        assert_eq!(decoded.gratitude_message, Some("".to_string()));
+        assert_eq!(decoded.quantity_given, Some(u32::MAX));
+    }
+
+    #[test]
+    fn schedule_handoff_input_empty_location_serde() {
+        let match_hash = ActionHash::from_raw_36(vec![0xFF; 36]);
+        let input = ScheduleHandoffInput {
+            match_hash: match_hash.clone(),
+            scheduled_time: Timestamp::from_micros(0),
+            location: "".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ScheduleHandoffInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.match_hash, match_hash);
+        assert_eq!(decoded.location, "");
+        assert_eq!(decoded.scheduled_time, Timestamp::from_micros(0));
+    }
 }

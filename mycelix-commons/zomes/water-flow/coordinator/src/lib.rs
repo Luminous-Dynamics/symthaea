@@ -651,4 +651,408 @@ mod tests {
             assert_eq!(variant, back);
         }
     }
+
+    // ========================================================================
+    // WATER SOURCE SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn water_source_serde_roundtrip() {
+        let source = WaterSource {
+            id: "well-42".to_string(),
+            name: "Deep Well Alpha".to_string(),
+            source_type: WaterSourceType::Well,
+            max_capacity_liters: 100_000,
+            recharge_rate_liters_per_day: 5_000,
+            location_lat: 35.6762,
+            location_lon: 139.6503,
+            steward: fake_agent(),
+            status: SourceStatus::Active,
+        };
+        let json = serde_json::to_string(&source).unwrap();
+        let decoded: WaterSource = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, source);
+    }
+
+    #[test]
+    fn water_source_all_types_serde_roundtrip() {
+        for source_type in [
+            WaterSourceType::Municipal,
+            WaterSourceType::Well,
+            WaterSourceType::Spring,
+            WaterSourceType::Rainwater,
+            WaterSourceType::Aquifer,
+            WaterSourceType::River,
+            WaterSourceType::Lake,
+            WaterSourceType::Recycled,
+            WaterSourceType::Desalinated,
+        ] {
+            let source = WaterSource {
+                id: "src-x".to_string(),
+                name: "Test Source".to_string(),
+                source_type: source_type.clone(),
+                max_capacity_liters: 1000,
+                recharge_rate_liters_per_day: 100,
+                location_lat: 0.0,
+                location_lon: 0.0,
+                steward: fake_agent(),
+                status: SourceStatus::Active,
+            };
+            let json = serde_json::to_string(&source).unwrap();
+            let decoded: WaterSource = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.source_type, source_type);
+        }
+    }
+
+    #[test]
+    fn water_source_all_statuses_serde_roundtrip() {
+        for status in [
+            SourceStatus::Active,
+            SourceStatus::Seasonal,
+            SourceStatus::Depleted,
+            SourceStatus::Contaminated,
+            SourceStatus::UnderMaintenance,
+        ] {
+            let source = WaterSource {
+                id: "src-s".to_string(),
+                name: "Status Source".to_string(),
+                source_type: WaterSourceType::Lake,
+                max_capacity_liters: 50_000,
+                recharge_rate_liters_per_day: 0,
+                location_lat: 45.0,
+                location_lon: -90.0,
+                steward: fake_agent(),
+                status: status.clone(),
+            };
+            let json = serde_json::to_string(&source).unwrap();
+            let decoded: WaterSource = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.status, status);
+        }
+    }
+
+    // ========================================================================
+    // WATER SOURCE BOUNDARY VALUES
+    // ========================================================================
+
+    #[test]
+    fn water_source_lat_lon_boundary_values_serde() {
+        let source = WaterSource {
+            id: "boundary".to_string(),
+            name: "Boundary Test".to_string(),
+            source_type: WaterSourceType::Spring,
+            max_capacity_liters: 1,
+            recharge_rate_liters_per_day: 0,
+            location_lat: 90.0,
+            location_lon: -180.0,
+            steward: fake_agent(),
+            status: SourceStatus::Active,
+        };
+        let json = serde_json::to_string(&source).unwrap();
+        let decoded: WaterSource = serde_json::from_str(&json).unwrap();
+        assert!((decoded.location_lat - 90.0).abs() < f64::EPSILON);
+        assert!((decoded.location_lon - (-180.0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn water_source_zero_recharge_serde() {
+        let source = WaterSource {
+            id: "stagnant".to_string(),
+            name: "Stagnant Reservoir".to_string(),
+            source_type: WaterSourceType::Lake,
+            max_capacity_liters: 1_000_000,
+            recharge_rate_liters_per_day: 0,
+            location_lat: -33.8688,
+            location_lon: 151.2093,
+            steward: fake_agent(),
+            status: SourceStatus::Seasonal,
+        };
+        let json = serde_json::to_string(&source).unwrap();
+        let decoded: WaterSource = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.recharge_rate_liters_per_day, 0);
+    }
+
+    // ========================================================================
+    // WATER SHARE SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn water_share_serde_roundtrip() {
+        let share = WaterShare {
+            source_hash: fake_action_hash(),
+            holder: fake_agent(),
+            allocation_type: AllocationType::Proportional,
+            volume_per_period_liters: 5_000,
+            period_days: 7,
+            priority: 2,
+            usage_category: WaterClassification::Hygiene,
+        };
+        let json = serde_json::to_string(&share).unwrap();
+        let decoded: WaterShare = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, share);
+    }
+
+    #[test]
+    fn water_share_all_allocation_types_serde() {
+        for alloc in [
+            AllocationType::Fixed,
+            AllocationType::Proportional,
+            AllocationType::Priority,
+            AllocationType::Emergency,
+        ] {
+            let share = WaterShare {
+                source_hash: fake_action_hash(),
+                holder: fake_agent(),
+                allocation_type: alloc.clone(),
+                volume_per_period_liters: 100,
+                period_days: 30,
+                priority: 0,
+                usage_category: WaterClassification::Potable,
+            };
+            let json = serde_json::to_string(&share).unwrap();
+            let decoded: WaterShare = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.allocation_type, alloc);
+        }
+    }
+
+    #[test]
+    fn water_share_priority_boundary_serde() {
+        for priority in [0u8, 1, 127, 255] {
+            let share = WaterShare {
+                source_hash: fake_action_hash(),
+                holder: fake_agent(),
+                allocation_type: AllocationType::Priority,
+                volume_per_period_liters: 500,
+                period_days: 14,
+                priority,
+                usage_category: WaterClassification::Irrigation,
+            };
+            let json = serde_json::to_string(&share).unwrap();
+            let decoded: WaterShare = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.priority, priority);
+        }
+    }
+
+    // ========================================================================
+    // H2O CREDIT SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn h2o_credit_serde_roundtrip() {
+        let credit = H2OCredit {
+            holder: fake_agent(),
+            balance_liters: 5_000,
+            total_earned: 10_000,
+            total_spent: 5_000,
+        };
+        let json = serde_json::to_string(&credit).unwrap();
+        let decoded: H2OCredit = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, credit);
+    }
+
+    #[test]
+    fn h2o_credit_negative_balance_serde() {
+        let credit = H2OCredit {
+            holder: fake_agent(),
+            balance_liters: -500,
+            total_earned: 1000,
+            total_spent: 1500,
+        };
+        let json = serde_json::to_string(&credit).unwrap();
+        let decoded: H2OCredit = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.balance_liters, -500);
+    }
+
+    #[test]
+    fn h2o_credit_zero_balance_serde() {
+        let credit = H2OCredit {
+            holder: fake_agent(),
+            balance_liters: 0,
+            total_earned: 0,
+            total_spent: 0,
+        };
+        let json = serde_json::to_string(&credit).unwrap();
+        let decoded: H2OCredit = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.balance_liters, 0);
+        assert_eq!(decoded.total_earned, 0);
+        assert_eq!(decoded.total_spent, 0);
+    }
+
+    // ========================================================================
+    // WATER TRANSACTION SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn water_transaction_serde_roundtrip() {
+        let tx = WaterTransaction {
+            from_agent: fake_agent(),
+            to_agent: fake_agent_2(),
+            liters: 250,
+            credit_type: TransactionType::Donation,
+            timestamp: Timestamp::from_micros(42_000),
+            source_hash: Some(fake_action_hash()),
+        };
+        let json = serde_json::to_string(&tx).unwrap();
+        let decoded: WaterTransaction = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, tx);
+    }
+
+    #[test]
+    fn water_transaction_no_source_hash_serde() {
+        let tx = WaterTransaction {
+            from_agent: fake_agent(),
+            to_agent: fake_agent_2(),
+            liters: 100,
+            credit_type: TransactionType::Transfer,
+            timestamp: Timestamp::from_micros(0),
+            source_hash: None,
+        };
+        let json = serde_json::to_string(&tx).unwrap();
+        let decoded: WaterTransaction = serde_json::from_str(&json).unwrap();
+        assert!(decoded.source_hash.is_none());
+    }
+
+    // ========================================================================
+    // USAGE RECORD SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn usage_record_serde_roundtrip() {
+        let usage = UsageRecord {
+            agent: fake_agent(),
+            source_hash: fake_action_hash(),
+            liters_used: 75,
+            usage_category: WaterClassification::Cooking,
+            recorded_at: Timestamp::from_micros(123_456),
+            meter_reference: Some("METER-XYZ-99".to_string()),
+        };
+        let json = serde_json::to_string(&usage).unwrap();
+        let decoded: UsageRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, usage);
+    }
+
+    #[test]
+    fn usage_record_no_meter_serde() {
+        let usage = UsageRecord {
+            agent: fake_agent(),
+            source_hash: fake_action_hash(),
+            liters_used: 10,
+            usage_category: WaterClassification::Greywater,
+            recorded_at: Timestamp::from_micros(0),
+            meter_reference: None,
+        };
+        let json = serde_json::to_string(&usage).unwrap();
+        let decoded: UsageRecord = serde_json::from_str(&json).unwrap();
+        assert!(decoded.meter_reference.is_none());
+    }
+
+    #[test]
+    fn usage_record_all_classifications_serde() {
+        for cat in [
+            WaterClassification::Potable,
+            WaterClassification::Cooking,
+            WaterClassification::Hygiene,
+            WaterClassification::Irrigation,
+            WaterClassification::Industrial,
+            WaterClassification::Recreation,
+            WaterClassification::Greywater,
+        ] {
+            let usage = UsageRecord {
+                agent: fake_agent(),
+                source_hash: fake_action_hash(),
+                liters_used: 50,
+                usage_category: cat.clone(),
+                recorded_at: Timestamp::from_micros(0),
+                meter_reference: None,
+            };
+            let json = serde_json::to_string(&usage).unwrap();
+            let decoded: UsageRecord = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.usage_category, cat);
+        }
+    }
+
+    // ========================================================================
+    // TRANSFER CREDITS INPUT EDGE CASES
+    // ========================================================================
+
+    #[test]
+    fn transfer_credits_input_zero_liters_serde() {
+        let input = TransferCreditsInput {
+            to_agent: fake_agent_2(),
+            liters: 0,
+            transaction_type: TransactionType::Transfer,
+            source_hash: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferCreditsInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.liters, 0);
+    }
+
+    #[test]
+    fn transfer_credits_input_u64_max_liters_serde() {
+        let input = TransferCreditsInput {
+            to_agent: fake_agent_2(),
+            liters: u64::MAX,
+            transaction_type: TransactionType::Emergency,
+            source_hash: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferCreditsInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.liters, u64::MAX);
+    }
+
+    // ========================================================================
+    // RECORD USAGE INPUT EDGE CASES
+    // ========================================================================
+
+    #[test]
+    fn record_usage_input_zero_liters_serde() {
+        let input = RecordUsageInput {
+            source_hash: fake_action_hash(),
+            liters_used: 0,
+            usage_category: WaterClassification::Potable,
+            meter_reference: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordUsageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.liters_used, 0);
+    }
+
+    #[test]
+    fn record_usage_input_u64_max_liters_serde() {
+        let input = RecordUsageInput {
+            source_hash: fake_action_hash(),
+            liters_used: u64::MAX,
+            usage_category: WaterClassification::Industrial,
+            meter_reference: Some("INDUSTRIAL-MAX".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordUsageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.liters_used, u64::MAX);
+    }
+
+    // ========================================================================
+    // UPDATE SOURCE STATUS INPUT EDGE CASES
+    // ========================================================================
+
+    #[test]
+    fn update_source_status_contaminated_serde() {
+        let input = UpdateSourceStatusInput {
+            source_hash: fake_action_hash(),
+            new_status: SourceStatus::Contaminated,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateSourceStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, SourceStatus::Contaminated);
+    }
+
+    #[test]
+    fn update_source_status_under_maintenance_serde() {
+        let input = UpdateSourceStatusInput {
+            source_hash: fake_action_hash(),
+            new_status: SourceStatus::UnderMaintenance,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateSourceStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_status, SourceStatus::UnderMaintenance);
+    }
 }

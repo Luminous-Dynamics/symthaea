@@ -468,4 +468,128 @@ mod tests {
         assert_eq!(decoded.planned_crops, vec!["Garlic"]);
         assert_eq!(decoded.rotation_notes, None);
     }
+
+    // ── Additional edge-case and boundary tests ─────────────────────────
+
+    #[test]
+    fn bridge_event_signal_unicode_payload() {
+        let signal = BridgeEventSignal {
+            event_type: "harvest_recorded".to_string(),
+            source_zome: "food_production".to_string(),
+            payload: "{\"notes\":\"\u{5c3e}\u{5f35}\u{5927}\u{6839}\"}".to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let decoded: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert!(decoded.payload.contains("\u{5c3e}"));
+    }
+
+    #[test]
+    fn bridge_event_signal_clone_is_equal() {
+        let signal = BridgeEventSignal {
+            event_type: "test".to_string(),
+            source_zome: "food_production".to_string(),
+            payload: "{}".to_string(),
+        };
+        let cloned = signal.clone();
+        assert_eq!(cloned.event_type, signal.event_type);
+        assert_eq!(cloned.source_zome, signal.source_zome);
+        assert_eq!(cloned.payload, signal.payload);
+    }
+
+    #[test]
+    fn plot_zero_area_serde_roundtrip() {
+        // Zero area is invalid for validation but serde must still roundtrip
+        let plot = Plot {
+            id: "plot-0".to_string(),
+            name: "Tiny".to_string(),
+            area_sqm: 0.0,
+            soil_type: SoilType::Sandy,
+            location_lat: 0.0,
+            location_lon: 0.0,
+            steward: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            status: PlotStatus::Preparing,
+        };
+        let json = serde_json::to_string(&plot).unwrap();
+        let decoded: Plot = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.area_sqm, 0.0);
+        assert_eq!(decoded.status, PlotStatus::Preparing);
+    }
+
+    #[test]
+    fn plot_extreme_coordinates_serde_roundtrip() {
+        let plot = Plot {
+            id: "plot-extreme".to_string(),
+            name: "Pole Garden".to_string(),
+            area_sqm: 1.0,
+            soil_type: SoilType::Peat,
+            location_lat: 90.0,
+            location_lon: -180.0,
+            steward: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            status: PlotStatus::Active,
+        };
+        let json = serde_json::to_string(&plot).unwrap();
+        let decoded: Plot = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.location_lat, 90.0);
+        assert_eq!(decoded.location_lon, -180.0);
+    }
+
+    #[test]
+    fn crop_zero_timestamps_serde_roundtrip() {
+        let crop = Crop {
+            plot_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            name: "Winter Wheat".to_string(),
+            variety: "Hard Red".to_string(),
+            planted_at: 0,
+            expected_harvest: 0,
+            status: CropStatus::Planned,
+        };
+        let json = serde_json::to_string(&crop).unwrap();
+        let decoded: Crop = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.planted_at, 0);
+        assert_eq!(decoded.expected_harvest, 0);
+    }
+
+    #[test]
+    fn yield_record_tiny_quantity_serde_roundtrip() {
+        let yr = YieldRecord {
+            crop_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            quantity_kg: 0.001,
+            quality_grade: QualityGrade::Processing,
+            harvested_at: u64::MAX,
+            notes: Some("Very small harvest".to_string()),
+        };
+        let json = serde_json::to_string(&yr).unwrap();
+        let decoded: YieldRecord = serde_json::from_str(&json).unwrap();
+        assert!((decoded.quantity_kg - 0.001).abs() < 1e-9);
+        assert_eq!(decoded.harvested_at, u64::MAX);
+    }
+
+    #[test]
+    fn season_plan_many_crops_serde_roundtrip() {
+        let sp = SeasonPlan {
+            plot_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            year: u32::MAX,
+            season: "All seasons".to_string(),
+            planned_crops: (0..100).map(|i| format!("crop-{}", i)).collect(),
+            rotation_notes: Some("Extensive rotation plan".to_string()),
+        };
+        let json = serde_json::to_string(&sp).unwrap();
+        let decoded: SeasonPlan = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.planned_crops.len(), 100);
+        assert_eq!(decoded.year, u32::MAX);
+    }
+
+    #[test]
+    fn season_plan_year_zero_serde_roundtrip() {
+        let sp = SeasonPlan {
+            plot_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            year: 0,
+            season: "Prehistoric".to_string(),
+            planned_crops: vec!["Wild grass".to_string()],
+            rotation_notes: None,
+        };
+        let json = serde_json::to_string(&sp).unwrap();
+        let decoded: SeasonPlan = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.year, 0);
+    }
 }

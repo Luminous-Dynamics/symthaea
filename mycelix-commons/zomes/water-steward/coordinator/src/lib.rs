@@ -757,4 +757,104 @@ mod tests {
             assert_eq!(variant, back);
         }
     }
+
+    // ========================================================================
+    // INTEGRITY ENTRY STRUCT SERDE ROUNDTRIP TESTS (via coordinator re-export)
+    // ========================================================================
+
+    #[test]
+    fn watershed_serde_roundtrip() {
+        let ws = Watershed {
+            id: "ws-test".to_string(),
+            name: "Test Watershed".to_string(),
+            huc_code: Some("17110006".to_string()),
+            boundary: vec![(45.5, -122.6), (45.6, -122.5), (45.4, -122.4)],
+            area_sq_km: 150.0,
+            stewardship_type: StewardshipType::Commons,
+            governing_body: None,
+            primary_source_type: WaterSourceType::River,
+        };
+        let json = serde_json::to_string(&ws).unwrap();
+        let decoded: Watershed = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "ws-test");
+        assert_eq!(decoded.name, "Test Watershed");
+        assert_eq!(decoded.huc_code, Some("17110006".to_string()));
+        assert_eq!(decoded.boundary.len(), 3);
+        assert_eq!(decoded.stewardship_type, StewardshipType::Commons);
+        assert_eq!(decoded.primary_source_type, WaterSourceType::River);
+    }
+
+    #[test]
+    fn water_right_serde_roundtrip() {
+        let right = WaterRight {
+            watershed_hash: fake_action_hash(),
+            holder: fake_agent(),
+            right_type: RightType::Aboriginal,
+            volume_authorized_liters: u64::MAX,
+            priority_date: Some(Timestamp::from_micros(1_500_000_000)),
+            conditions: vec!["Seasonal only".to_string(), "No commercial use".to_string()],
+            status: RightStatus::Active,
+            transferable: false,
+        };
+        let json = serde_json::to_string(&right).unwrap();
+        let decoded: WaterRight = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.right_type, RightType::Aboriginal);
+        assert_eq!(decoded.volume_authorized_liters, u64::MAX);
+        assert_eq!(decoded.conditions.len(), 2);
+        assert_eq!(decoded.transferable, false);
+    }
+
+    #[test]
+    fn water_dispute_serde_roundtrip() {
+        let dispute = WaterDispute {
+            watershed_hash: fake_action_hash(),
+            complainant: fake_agent(),
+            respondent: fake_agent_2(),
+            dispute_type: DisputeType::Quality,
+            description: "Upstream pollution affecting downstream users".to_string(),
+            evidence: vec![fake_action_hash()],
+            status: DisputeStatus::Mediation,
+            resolution: None,
+        };
+        let json = serde_json::to_string(&dispute).unwrap();
+        let decoded: WaterDispute = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.dispute_type, DisputeType::Quality);
+        assert_eq!(decoded.status, DisputeStatus::Mediation);
+        assert_eq!(decoded.evidence.len(), 1);
+        assert!(decoded.resolution.is_none());
+    }
+
+    #[test]
+    fn right_transfer_serde_roundtrip() {
+        let transfer = RightTransfer {
+            right_hash: fake_action_hash(),
+            from_holder: fake_agent(),
+            to_holder: fake_agent_2(),
+            volume_liters: 10_000,
+            transfer_type: TransferType::Inheritance,
+            approved_by: Some(fake_agent()),
+            transferred_at: Timestamp::from_micros(1_700_000_000),
+        };
+        let json = serde_json::to_string(&transfer).unwrap();
+        let decoded: RightTransfer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.volume_liters, 10_000);
+        assert_eq!(decoded.transfer_type, TransferType::Inheritance);
+        assert!(decoded.approved_by.is_some());
+    }
+
+    #[test]
+    fn property_check_result_owner_mismatch_and_encumbered() {
+        let result = PropertyCheckResult {
+            property_exists: true,
+            has_clear_title: false,
+            owner_matches: false,
+            error: Some("Property ownership does not match expected holder".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: PropertyCheckResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_exists, true);
+        assert_eq!(decoded.has_clear_title, false);
+        assert_eq!(decoded.owner_matches, false);
+        assert!(decoded.error.is_some());
+    }
 }

@@ -463,4 +463,74 @@ mod tests {
         let decoded: StorageUnit = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.capacity_kg, f64::MAX);
     }
+
+    // ========================================================================
+    // Additional boundary and edge case tests
+    // ========================================================================
+
+    #[test]
+    fn preservation_method_many_equipment_items_serde() {
+        let equipment: Vec<String> = (0..100).map(|i| format!("Equipment item #{}", i)).collect();
+        let method = PreservationMethod {
+            name: "Complex method".to_string(),
+            description: "Requires many tools and supplies".to_string(),
+            shelf_life_days: 180,
+            equipment_needed: equipment.clone(),
+            skill_level: SkillLevel::Advanced,
+        };
+        let json = serde_json::to_string(&method).unwrap();
+        let decoded: PreservationMethod = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.equipment_needed.len(), 100);
+        assert_eq!(decoded.equipment_needed[0], "Equipment item #0");
+        assert_eq!(decoded.equipment_needed[99], "Equipment item #99");
+    }
+
+    #[test]
+    fn preservation_batch_ne_different_id() {
+        let a = PreservationBatch {
+            id: "batch-a".to_string(),
+            source_crop_hash: None,
+            method: "Drying".to_string(),
+            quantity_kg: 1.0,
+            started_at: 0,
+            expected_ready: 1,
+            status: BatchStatus::InProgress,
+            notes: None,
+        };
+        let mut b = a.clone();
+        b.id = "batch-b".to_string();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn storage_unit_ne_different_type() {
+        let a = StorageUnit {
+            id: "s-1".to_string(),
+            name: "Unit A".to_string(),
+            capacity_kg: 100.0,
+            storage_type: StorageType::Freezer,
+            steward: fake_agent(),
+        };
+        let mut b = a.clone();
+        b.storage_type = StorageType::Pantry;
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn preservation_batch_long_notes_serde() {
+        let long_notes = "A".repeat(10_000);
+        let batch = PreservationBatch {
+            id: "batch-long".to_string(),
+            source_crop_hash: None,
+            method: "Salt curing".to_string(),
+            quantity_kg: 25.0,
+            started_at: 1700000000,
+            expected_ready: 1702000000,
+            status: BatchStatus::InProgress,
+            notes: Some(long_notes.clone()),
+        };
+        let json = serde_json::to_string(&batch).unwrap();
+        let decoded: PreservationBatch = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.notes.unwrap().len(), 10_000);
+    }
 }

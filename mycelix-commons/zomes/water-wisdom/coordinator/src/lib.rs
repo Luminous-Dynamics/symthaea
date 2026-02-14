@@ -615,4 +615,82 @@ mod tests {
         assert_eq!(back.indicators.len(), 20);
         assert_eq!(back.pattern_type, PatternType::LevelChange);
     }
+
+    // ========================================================================
+    // BOUNDARY AND EDGE CASE TESTS
+    // ========================================================================
+
+    #[test]
+    fn traditional_practice_max_effectiveness_rating_serde() {
+        let practice = TraditionalPractice {
+            id: "tp-max".to_string(),
+            title: "Perfect technique".to_string(),
+            description: "Achieves maximum effectiveness".to_string(),
+            practice_type: PracticeType::Conservation,
+            region: "Global".to_string(),
+            culture_or_community: "Universal".to_string(),
+            recorded_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            access_level: AccessLevel::Public,
+            effectiveness_rating: Some(u8::MAX),
+        };
+        let json = serde_json::to_string(&practice).unwrap();
+        let back: TraditionalPractice = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.effectiveness_rating, Some(u8::MAX));
+        assert_eq!(back.practice_type, PracticeType::Conservation);
+    }
+
+    #[test]
+    fn conservation_method_empty_applicable_to_serde() {
+        let method = ConservationMethod {
+            id: "cm-empty".to_string(),
+            title: "Theoretical Method".to_string(),
+            description: "Not yet applied to any classification".to_string(),
+            water_saved_percent: Some(0),
+            applicable_to: vec![],
+            cost_level: CostLevel::Free,
+            difficulty: DifficultyLevel::Beginner,
+        };
+        let json = serde_json::to_string(&method).unwrap();
+        let back: ConservationMethod = serde_json::from_str(&json).unwrap();
+        assert!(back.applicable_to.is_empty());
+        assert_eq!(back.water_saved_percent, Some(0));
+    }
+
+    #[test]
+    fn climate_water_pattern_quality_change_type_serde() {
+        let pattern = ClimateWaterPattern {
+            region: "Great Lakes".to_string(),
+            season: "Spring".to_string(),
+            pattern_type: PatternType::QualityChange,
+            description: "Algal bloom affecting water quality in nearshore areas".to_string(),
+            observed_by: AgentPubKey::from_raw_36(vec![0xcd; 36]),
+            observed_at: Timestamp::from_micros(1_750_000_000),
+            indicators: vec![
+                "Elevated phosphorus".to_string(),
+                "Cyanobacteria detected".to_string(),
+            ],
+        };
+        let json = serde_json::to_string(&pattern).unwrap();
+        let back: ClimateWaterPattern = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.pattern_type, PatternType::QualityChange);
+        assert_eq!(back.region, "Great Lakes");
+        assert_eq!(back.indicators.len(), 2);
+    }
+
+    #[test]
+    fn conservation_method_max_water_saved_percent_serde() {
+        let method = ConservationMethod {
+            id: "cm-max".to_string(),
+            title: "Perfect Conservation".to_string(),
+            description: "Saves maximum percentage of water".to_string(),
+            water_saved_percent: Some(u8::MAX),
+            applicable_to: vec![WaterClassification::Irrigation],
+            cost_level: CostLevel::High,
+            difficulty: DifficultyLevel::Expert,
+        };
+        let json = serde_json::to_string(&method).unwrap();
+        let back: ConservationMethod = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.water_saved_percent, Some(u8::MAX));
+        assert_eq!(back.difficulty, DifficultyLevel::Expert);
+    }
 }

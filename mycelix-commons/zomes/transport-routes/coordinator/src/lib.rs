@@ -429,4 +429,126 @@ mod tests {
             assert_eq!(decoded.status, *vs);
         }
     }
+
+    // ── Additional edge-case and boundary tests ─────────────────────────
+
+    #[test]
+    fn update_vehicle_status_input_serde_all_statuses() {
+        for status in [
+            VehicleStatus::Available,
+            VehicleStatus::InUse,
+            VehicleStatus::Maintenance,
+            VehicleStatus::Retired,
+        ] {
+            let input = UpdateVehicleStatusInput {
+                vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdateVehicleStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+
+    #[test]
+    fn vehicle_zero_capacity_and_passengers_roundtrip() {
+        let vehicle = Vehicle {
+            id: "v-empty".to_string(),
+            owner: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            vehicle_type: VehicleType::ElectricScooter,
+            capacity_kg: 0.0,
+            capacity_passengers: 0,
+            status: VehicleStatus::Available,
+        };
+        let json = serde_json::to_string(&vehicle).unwrap();
+        let decoded: Vehicle = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.capacity_kg, 0.0);
+        assert_eq!(decoded.capacity_passengers, 0);
+    }
+
+    #[test]
+    fn vehicle_large_capacity_roundtrip() {
+        let vehicle = Vehicle {
+            id: "v-cargo-ship".to_string(),
+            owner: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            vehicle_type: VehicleType::Cargo,
+            capacity_kg: 100_000.0,
+            capacity_passengers: u32::MAX,
+            status: VehicleStatus::InUse,
+        };
+        let json = serde_json::to_string(&vehicle).unwrap();
+        let decoded: Vehicle = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.capacity_kg, 100_000.0);
+        assert_eq!(decoded.capacity_passengers, u32::MAX);
+    }
+
+    #[test]
+    fn route_empty_waypoints_serde_roundtrip() {
+        // Empty waypoints is invalid for validation but serde must still roundtrip
+        let route = Route {
+            id: "rt-empty".to_string(),
+            name: "Empty Route".to_string(),
+            waypoints: vec![],
+            distance_km: 0.0,
+            estimated_minutes: 0,
+            mode: TransportMode::Walking,
+        };
+        let json = serde_json::to_string(&route).unwrap();
+        let decoded: Route = serde_json::from_str(&json).unwrap();
+        assert!(decoded.waypoints.is_empty());
+        assert_eq!(decoded.distance_km, 0.0);
+        assert_eq!(decoded.estimated_minutes, 0);
+    }
+
+    #[test]
+    fn route_many_waypoints_serde_roundtrip() {
+        let waypoints: Vec<Waypoint> = (0..200).map(|i| Waypoint {
+            lat: -90.0 + (i as f64) * 0.9,
+            lon: -180.0 + (i as f64) * 1.8,
+            label: if i % 2 == 0 { Some(format!("wp-{}", i)) } else { None },
+        }).collect();
+        let route = Route {
+            id: "rt-long".to_string(),
+            name: "Cross-Country".to_string(),
+            waypoints,
+            distance_km: 5000.0,
+            estimated_minutes: u32::MAX,
+            mode: TransportMode::Mixed,
+        };
+        let json = serde_json::to_string(&route).unwrap();
+        let decoded: Route = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.waypoints.len(), 200);
+        assert_eq!(decoded.estimated_minutes, u32::MAX);
+    }
+
+    #[test]
+    fn stop_extreme_coordinates_serde_roundtrip() {
+        let stop = Stop {
+            route_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            name: "South Pole Stop".to_string(),
+            location_lat: -90.0,
+            location_lon: 180.0,
+            scheduled_time: Some(u64::MAX),
+            stop_type: StopType::Transfer,
+        };
+        let json = serde_json::to_string(&stop).unwrap();
+        let decoded: Stop = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.location_lat, -90.0);
+        assert_eq!(decoded.location_lon, 180.0);
+        assert_eq!(decoded.scheduled_time, Some(u64::MAX));
+    }
+
+    #[test]
+    fn waypoint_extreme_coordinates_serde_roundtrip() {
+        let wp = Waypoint {
+            lat: -90.0,
+            lon: -180.0,
+            label: Some("Edge of the world".to_string()),
+        };
+        let json = serde_json::to_string(&wp).unwrap();
+        let decoded: Waypoint = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.lat, -90.0);
+        assert_eq!(decoded.lon, -180.0);
+        assert_eq!(decoded.label, Some("Edge of the world".to_string()));
+    }
 }

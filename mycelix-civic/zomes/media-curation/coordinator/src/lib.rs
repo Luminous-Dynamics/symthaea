@@ -587,4 +587,113 @@ mod tests {
         let parsed: UnfeatureInput = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(parsed.featured_id, "feat-1");
     }
+
+    // ========================================================================
+    // Additional edge-case and boundary tests
+    // ========================================================================
+
+    #[test]
+    fn endorse_input_serde_award_type() {
+        let input = EndorseInput {
+            publication_id: "pub-award".into(),
+            endorser_did: "did:example:judge".into(),
+            endorsement_type: EndorsementType::Award("Best Investigative Piece".into()),
+            comment: Some("Exceptional depth of research".into()),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: EndorseInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.endorsement_type, EndorsementType::Award("Best Investigative Piece".into()));
+        assert_eq!(parsed.comment.as_deref(), Some("Exceptional depth of research"));
+    }
+
+    #[test]
+    fn endorsement_type_all_variants_serde() {
+        let variants = vec![
+            EndorsementType::Upvote,
+            EndorsementType::Bookmark,
+            EndorsementType::Share,
+            EndorsementType::Recommend,
+            EndorsementType::Award("Gold Medal".into()),
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).expect("serialize");
+            let parsed: EndorsementType = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(parsed, variant, "Failed for {:?}", variant);
+        }
+    }
+
+    #[test]
+    fn create_collection_input_empty_publications() {
+        let input = CreateCollectionInput {
+            name: "Empty Collection".into(),
+            description: "Will be filled later".into(),
+            curator_did: "did:example:curator".into(),
+            visibility: Visibility::Private,
+            publication_ids: vec![],
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: CreateCollectionInput = serde_json::from_str(&json).expect("deserialize");
+        assert!(parsed.publication_ids.is_empty());
+        assert_eq!(parsed.visibility, Visibility::Private);
+    }
+
+    #[test]
+    fn update_collection_input_all_none_fields() {
+        let input = UpdateCollectionInput {
+            collection_id: "col-unchanged".into(),
+            requester_did: "did:example:curator".into(),
+            name: None,
+            description: None,
+            visibility: None,
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateCollectionInput = serde_json::from_str(&json).expect("deserialize");
+        assert!(parsed.name.is_none());
+        assert!(parsed.description.is_none());
+        assert!(parsed.visibility.is_none());
+    }
+
+    #[test]
+    fn visibility_all_variants_serde() {
+        let variants = vec![
+            Visibility::Public,
+            Visibility::Private,
+            Visibility::Unlisted,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).expect("serialize");
+            let parsed: Visibility = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(parsed, variant);
+        }
+    }
+
+    #[test]
+    fn feature_input_serde_with_featured_until() {
+        let input = FeatureInput {
+            publication_id: "pub-featured".into(),
+            featured_by: "did:example:editor".into(),
+            reason: "Weekly highlight".into(),
+            featured_until: Some(Timestamp::from_micros(9_999_999)),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: FeatureInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.featured_until, Some(Timestamp::from_micros(9_999_999)));
+    }
+
+    #[test]
+    fn quality_score_boundary_just_below_clamp() {
+        // 99 endorsements = 0.99, not yet clamped
+        let score = compute_quality_base_score(99);
+        assert!(score < 1.0);
+        assert!((score - 0.99).abs() < 1e-10);
+    }
+
+    #[test]
+    fn quality_score_boundary_exactly_at_clamp() {
+        // 100 endorsements = exactly 1.0
+        let score_at = compute_quality_base_score(100);
+        let score_above = compute_quality_base_score(101);
+        assert!((score_at - 1.0).abs() < 1e-10);
+        assert!((score_above - 1.0).abs() < 1e-10);
+    }
 }

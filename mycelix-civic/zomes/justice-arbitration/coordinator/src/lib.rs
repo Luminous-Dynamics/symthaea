@@ -514,6 +514,132 @@ mod tests {
             assert_eq!(decoded, variant);
         }
     }
+
+    // ========================================================================
+    // Additional edge-case and boundary tests
+    // ========================================================================
+
+    #[test]
+    fn arbitrator_response_both_accepted_and_recused() {
+        // Edge case: logically inconsistent but serde should still work
+        let input = ArbitratorResponseInput {
+            arbitration_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            arbitrator_did: "did:example:confused".to_string(),
+            accepted: true,
+            recused: true,
+            recusal_reason: Some("Changed my mind".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ArbitratorResponseInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.accepted);
+        assert!(decoded.recused);
+        assert!(decoded.recusal_reason.is_some());
+    }
+
+    #[test]
+    fn update_arb_status_input_all_statuses_serde() {
+        let statuses = vec![
+            ArbitrationStatus::PanelFormation,
+            ArbitrationStatus::EvidenceReview,
+            ArbitrationStatus::Hearing,
+            ArbitrationStatus::Deliberation,
+            ArbitrationStatus::DecisionDrafting,
+            ArbitrationStatus::DecisionRendered,
+            ArbitrationStatus::Appealed,
+        ];
+        for status in statuses {
+            let input = UpdateArbStatusInput {
+                arbitration_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdateArbStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+
+    #[test]
+    fn update_appeal_status_all_statuses_serde() {
+        let statuses = vec![
+            AppealStatus::Filed,
+            AppealStatus::UnderReview,
+            AppealStatus::Granted,
+            AppealStatus::Denied,
+            AppealStatus::Remanded,
+            AppealStatus::Resolved,
+        ];
+        for status in statuses {
+            let input = UpdateAppealStatusInput {
+                appeal_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdateAppealStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+
+    #[test]
+    fn emergency_context_result_all_none_fields() {
+        let result = EmergencyContextResult {
+            has_active_emergencies: false,
+            active_emergency_count: 0,
+            matching_disaster: None,
+            matching_severity: None,
+            recommendation: None,
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: EmergencyContextResult = serde_json::from_str(&json).unwrap();
+        assert!(!decoded.has_active_emergencies);
+        assert_eq!(decoded.active_emergency_count, 0);
+        assert!(decoded.matching_disaster.is_none());
+        assert!(decoded.matching_severity.is_none());
+        assert!(decoded.recommendation.is_none());
+        assert!(decoded.error.is_none());
+    }
+
+    #[test]
+    fn emergency_context_result_all_some_fields() {
+        let result = EmergencyContextResult {
+            has_active_emergencies: true,
+            active_emergency_count: 5,
+            matching_disaster: Some("Earthquake Omega".to_string()),
+            matching_severity: Some("Level5".to_string()),
+            recommendation: Some("Evacuate immediately".to_string()),
+            error: Some("Partial data".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: EmergencyContextResult = serde_json::from_str(&json).unwrap();
+        assert!(decoded.has_active_emergencies);
+        assert_eq!(decoded.active_emergency_count, 5);
+        assert_eq!(decoded.matching_disaster.as_deref(), Some("Earthquake Omega"));
+        assert_eq!(decoded.matching_severity.as_deref(), Some("Level5"));
+        assert_eq!(decoded.recommendation.as_deref(), Some("Evacuate immediately"));
+        assert_eq!(decoded.error.as_deref(), Some("Partial data"));
+    }
+
+    #[test]
+    fn check_emergency_context_input_empty_case_id() {
+        let input = CheckEmergencyContextInput {
+            case_id: "".to_string(),
+            keyword: Some("flood".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CheckEmergencyContextInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.case_id.is_empty());
+        assert_eq!(decoded.keyword, Some("flood".to_string()));
+    }
+
+    #[test]
+    fn arbitrator_selection_expertise_domain_unicode() {
+        let variant = ArbitratorSelection::ExpertiseBased {
+            domain: "Recht und Ordnung".to_string(),
+        };
+        let json = serde_json::to_string(&variant).unwrap();
+        let decoded: ArbitratorSelection = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, variant);
+    }
 }
 
 // ============================================================================

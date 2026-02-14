@@ -641,4 +641,143 @@ mod tests {
         let decoded: BudgetCategory = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, cat);
     }
+
+    // ── Additional edge-case and boundary tests ─────────────────────────
+
+    #[test]
+    fn member_charge_info_all_zeros_roundtrip() {
+        let info = MemberChargeInfo {
+            member: fake_agent(),
+            unit_hash: fake_action_hash(),
+            base_rent_cents: 0,
+            maintenance_fee_cents: 0,
+            utilities_cents: 0,
+            reserve_contribution_cents: 0,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let decoded: MemberChargeInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.base_rent_cents, 0);
+        assert_eq!(decoded.maintenance_fee_cents, 0);
+        assert_eq!(decoded.utilities_cents, 0);
+        assert_eq!(decoded.reserve_contribution_cents, 0);
+    }
+
+    #[test]
+    fn deposit_to_reserve_input_max_amount_roundtrip() {
+        let input = DepositToReserveInput {
+            fund_hash: fake_action_hash(),
+            amount_cents: u64::MAX,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: DepositToReserveInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.amount_cents, u64::MAX);
+    }
+
+    #[test]
+    fn financial_summary_input_boundary_month_values() {
+        for month in [1u8, 6, 12] {
+            let input = FinancialSummaryInput {
+                period_year: 2026,
+                period_month: month,
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: FinancialSummaryInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.period_month, month);
+        }
+    }
+
+    #[test]
+    fn payment_no_charge_no_reference_roundtrip() {
+        let payment = Payment {
+            member: fake_agent(),
+            charge_hash: None,
+            amount_cents: 1,
+            payment_method: PaymentMethod::Cash,
+            paid_at: Timestamp::from_micros(0),
+            reference: None,
+        };
+        let json = serde_json::to_string(&payment).unwrap();
+        let decoded: Payment = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.charge_hash, None);
+        assert_eq!(decoded.reference, None);
+        assert_eq!(decoded.amount_cents, 1);
+    }
+
+    #[test]
+    fn budget_unapproved_no_timestamp_roundtrip() {
+        let budget = Budget {
+            fiscal_year: 2026,
+            income_projected_cents: 0,
+            expenses_projected_cents: 0,
+            categories: vec![BudgetCategory {
+                name: "Placeholder".to_string(),
+                allocated_cents: 0,
+                spent_cents: 0,
+            }],
+            approved: false,
+            approved_at: None,
+        };
+        let json = serde_json::to_string(&budget).unwrap();
+        let decoded: Budget = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.approved, false);
+        assert_eq!(decoded.approved_at, None);
+        assert_eq!(decoded.fiscal_year, 2026);
+    }
+
+    #[test]
+    fn reserve_fund_summary_zero_target_zero_percent() {
+        let summary = ReserveFundSummary {
+            name: "Empty Fund".to_string(),
+            fund_type: FundType::OperatingReserve,
+            balance_cents: 0,
+            target_cents: 0,
+            percent_funded: 0.0,
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        let decoded: ReserveFundSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.balance_cents, 0);
+        assert_eq!(decoded.target_cents, 0);
+        assert!((decoded.percent_funded - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn monthly_charge_max_u64_total_roundtrip() {
+        let charge = MonthlyCharge {
+            member: fake_agent(),
+            unit_hash: fake_action_hash(),
+            period_year: 2025,
+            period_month: 1,
+            base_rent_cents: u64::MAX,
+            maintenance_fee_cents: 0,
+            utilities_cents: 0,
+            reserve_contribution_cents: 0,
+            total_cents: u64::MAX,
+        };
+        let json = serde_json::to_string(&charge).unwrap();
+        let decoded: MonthlyCharge = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.base_rent_cents, u64::MAX);
+        assert_eq!(decoded.total_cents, u64::MAX);
+    }
+
+    #[test]
+    fn generate_charges_input_many_members_roundtrip() {
+        let members: Vec<MemberChargeInfo> = (0..10)
+            .map(|i| MemberChargeInfo {
+                member: AgentPubKey::from_raw_36(vec![i as u8; 36]),
+                unit_hash: fake_action_hash(),
+                base_rent_cents: 100_000,
+                maintenance_fee_cents: 20_000,
+                utilities_cents: 15_000,
+                reserve_contribution_cents: 5_000,
+            })
+            .collect();
+        let input = GenerateChargesInput {
+            members,
+            period_year: 2026,
+            period_month: 2,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: GenerateChargesInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.members.len(), 10);
+    }
 }

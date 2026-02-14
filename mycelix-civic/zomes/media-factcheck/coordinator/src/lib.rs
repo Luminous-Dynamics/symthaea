@@ -827,4 +827,137 @@ mod tests {
         assert_eq!(parsed.reason, "Outdated evidence");
         assert!(parsed.counter_evidence.is_empty());
     }
+
+    // ========================================================================
+    // Additional edge-case and boundary tests
+    // ========================================================================
+
+    #[test]
+    fn submit_fact_check_input_empty_evidence() {
+        let input = SubmitFactCheckInput {
+            publication_id: "pub-no-evidence".into(),
+            claim_text: "Unsubstantiated claim".into(),
+            claim_location: "header".into(),
+            epistemic_position: EpistemicPosition {
+                empirical: 0.0,
+                normative: 0.0,
+                mythic: 0.0,
+            },
+            verdict: FactCheckVerdict::Unverifiable,
+            evidence: vec![],
+            checker_did: "did:example:checker".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: SubmitFactCheckInput = serde_json::from_str(&json).expect("deserialize");
+        assert!(parsed.evidence.is_empty());
+        assert_eq!(parsed.verdict, FactCheckVerdict::Unverifiable);
+    }
+
+    #[test]
+    fn epistemic_position_boundary_values() {
+        let positions = vec![
+            EpistemicPosition { empirical: 0.0, normative: 0.0, mythic: 0.0 },
+            EpistemicPosition { empirical: 1.0, normative: 1.0, mythic: 1.0 },
+            EpistemicPosition { empirical: 0.5, normative: 0.5, mythic: 0.5 },
+        ];
+        for pos in positions {
+            let json = serde_json::to_string(&pos).expect("serialize");
+            let parsed: EpistemicPosition = serde_json::from_str(&json).expect("deserialize");
+            assert!((parsed.empirical - pos.empirical).abs() < 1e-10);
+            assert!((parsed.normative - pos.normative).abs() < 1e-10);
+            assert!((parsed.mythic - pos.mythic).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn verify_disaster_claim_input_serde_roundtrip() {
+        let input = VerifyDisasterClaimInput {
+            disaster_id: Some("DISASTER-42".into()),
+            claim_keyword: "hurricane".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: VerifyDisasterClaimInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.disaster_id, Some("DISASTER-42".into()));
+        assert_eq!(parsed.claim_keyword, "hurricane");
+    }
+
+    #[test]
+    fn verify_disaster_claim_input_no_disaster_id() {
+        let input = VerifyDisasterClaimInput {
+            disaster_id: None,
+            claim_keyword: "earthquake".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: VerifyDisasterClaimInput = serde_json::from_str(&json).expect("deserialize");
+        assert!(parsed.disaster_id.is_none());
+        assert_eq!(parsed.claim_keyword, "earthquake");
+    }
+
+    #[test]
+    fn source_type_all_variants_serde() {
+        let variants = vec![
+            SourceType::PrimarySource,
+            SourceType::SecondarySource,
+            SourceType::ExpertOpinion,
+            SourceType::OfficialDocument,
+            SourceType::ScientificStudy,
+            SourceType::EyewitnessAccount,
+            SourceType::DataAnalysis,
+            SourceType::Other("social_media_post".into()),
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).expect("serialize");
+            let parsed: SourceType = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(parsed, variant, "Failed for {:?}", variant);
+        }
+    }
+
+    #[test]
+    fn aggregate_only_other_verdicts() {
+        // All verdicts that fall into "other" (not counted in true/false/mixed)
+        let verdicts = vec![
+            FactCheckVerdict::MostlyTrue,
+            FactCheckVerdict::HalfTrue,
+            FactCheckVerdict::MostlyFalse,
+            FactCheckVerdict::Unverifiable,
+            FactCheckVerdict::OutOfContext,
+            FactCheckVerdict::Satire,
+            FactCheckVerdict::Opinion,
+        ];
+        let stats = aggregate_checker_stats("did:example:other-only".into(), &verdicts);
+        assert_eq!(stats.total_checks, 7);
+        assert_eq!(stats.true_count, 0);
+        assert_eq!(stats.false_count, 0);
+        assert_eq!(stats.mixed_count, 0);
+    }
+
+    #[test]
+    fn dispute_fact_check_input_with_counter_evidence() {
+        let input = DisputeFactCheckInput {
+            fact_check_id: "fc-2".into(),
+            disputer_did: "did:example:disputer2".into(),
+            reason: "Newer study contradicts".into(),
+            counter_evidence: vec![
+                EvidenceItem {
+                    source_type: SourceType::ScientificStudy,
+                    source_url: Some("https://example.com/study".into()),
+                    source_did: None,
+                    description: "2026 meta-analysis".into(),
+                    supports_claim: false,
+                },
+                EvidenceItem {
+                    source_type: SourceType::ExpertOpinion,
+                    source_url: None,
+                    source_did: Some("did:example:expert".into()),
+                    description: "Expert testimony".into(),
+                    supports_claim: false,
+                },
+            ],
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: DisputeFactCheckInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.counter_evidence.len(), 2);
+        assert!(!parsed.counter_evidence[0].supports_claim);
+        assert_eq!(parsed.counter_evidence[1].source_did.as_deref(), Some("did:example:expert"));
+    }
 }

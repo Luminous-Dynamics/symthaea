@@ -681,4 +681,142 @@ mod tests {
             assert_eq!(s, s2);
         }
     }
+
+    // ========================================================================
+    // Additional edge-case and boundary tests
+    // ========================================================================
+
+    #[test]
+    fn case_verification_result_equality() {
+        let a = CaseVerificationResult {
+            case_found: true,
+            case_id: Some("CASE-1".into()),
+            phase: Some("Enforcement".into()),
+            status: Some("Active".into()),
+            error: None,
+        };
+        let b = CaseVerificationResult {
+            case_found: true,
+            case_id: Some("CASE-1".into()),
+            phase: Some("Enforcement".into()),
+            status: Some("Active".into()),
+            error: None,
+        };
+        assert_eq!(a, b);
+
+        let c = CaseVerificationResult {
+            case_found: false,
+            case_id: Some("CASE-1".into()),
+            phase: Some("Enforcement".into()),
+            status: Some("Active".into()),
+            error: None,
+        };
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn case_verification_result_with_phase_no_status() {
+        let r = CaseVerificationResult {
+            case_found: true,
+            case_id: Some("CASE-PARTIAL".into()),
+            phase: Some("Arbitration".into()),
+            status: None,
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: CaseVerificationResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.case_found);
+        assert_eq!(r2.phase.as_deref(), Some("Arbitration"));
+        assert!(r2.status.is_none());
+    }
+
+    #[test]
+    fn enforcement_action_all_optional_fields_present() {
+        let action = EnforcementAction {
+            action_type: EnforcementActionType::FundsTransfer,
+            target_happ: Some("mycelix-commons".into()),
+            target_entry: Some("transfer-entry-789".into()),
+            executed_at: Timestamp::from_micros(999_999),
+            result: "Transfer of 500 tokens completed".into(),
+        };
+        let json = serde_json::to_string(&action).unwrap();
+        let action2: EnforcementAction = serde_json::from_str(&json).unwrap();
+        assert_eq!(action2.action_type, EnforcementActionType::FundsTransfer);
+        assert_eq!(action2.target_happ.as_deref(), Some("mycelix-commons"));
+        assert_eq!(action2.target_entry.as_deref(), Some("transfer-entry-789"));
+        assert_eq!(action2.result, "Transfer of 500 tokens completed");
+    }
+
+    #[test]
+    fn failed_enforcement_input_unicode_reason() {
+        let input = FailedEnforcementInput {
+            enforcement_hash: fake_action_hash(),
+            reason: "Ziel-Konto wurde geschlossen".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: FailedEnforcementInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.reason, "Ziel-Konto wurde geschlossen");
+    }
+
+    #[test]
+    fn cross_happ_action_input_long_result() {
+        let long_result = "x".repeat(10_000);
+        let input = CrossHappActionInput {
+            enforcement_hash: fake_action_hash(),
+            target_happ: "mycelix-economic".into(),
+            target_entry: Some("entry-long".into()),
+            result: long_result.clone(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: CrossHappActionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.result.len(), 10_000);
+    }
+
+    #[test]
+    fn complete_enforcement_input_with_cross_happ_final_action() {
+        let input = CompleteEnforcementInput {
+            enforcement_hash: fake_action_hash(),
+            final_action: Some(EnforcementAction {
+                action_type: EnforcementActionType::CrossHappAction,
+                target_happ: Some("mycelix-civic".into()),
+                target_entry: Some("media-ban-xyz".into()),
+                executed_at: Timestamp::from_micros(2_000_000),
+                result: "Media access revoked for respondent".into(),
+            }),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: CompleteEnforcementInput = serde_json::from_str(&json).unwrap();
+        let action = input2.final_action.unwrap();
+        assert_eq!(action.action_type, EnforcementActionType::CrossHappAction);
+        assert_eq!(action.target_happ.as_deref(), Some("mycelix-civic"));
+        assert_eq!(action.target_entry.as_deref(), Some("media-ban-xyz"));
+    }
+
+    #[test]
+    fn verify_case_input_empty_case_id() {
+        let input = VerifyCaseForEnforcementInput {
+            case_id: "".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: VerifyCaseForEnforcementInput = serde_json::from_str(&json).unwrap();
+        assert!(input2.case_id.is_empty());
+    }
+
+    #[test]
+    fn enforcement_action_type_serde_all_variants() {
+        let types = vec![
+            EnforcementActionType::FundsTransfer,
+            EnforcementActionType::AssetFreeze,
+            EnforcementActionType::ReputationUpdate,
+            EnforcementActionType::AccessRevocation,
+            EnforcementActionType::Notification,
+            EnforcementActionType::ManualRequired,
+            EnforcementActionType::CrossHappAction,
+        ];
+        for t in types {
+            let json = serde_json::to_string(&t).unwrap();
+            let t2: EnforcementActionType = serde_json::from_str(&json).unwrap();
+            assert_eq!(t, t2, "Failed for {:?}", t);
+        }
+    }
 }

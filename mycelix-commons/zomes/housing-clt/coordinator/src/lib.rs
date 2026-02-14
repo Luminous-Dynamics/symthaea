@@ -690,4 +690,327 @@ mod tests {
         let decoded: AffordabilityReport = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, report);
     }
+
+    // ── VerifyPropertyForLeaseInput edge cases ──────────────────────
+
+    #[test]
+    fn verify_property_input_no_expected_owner_serde() {
+        let input = VerifyPropertyForLeaseInput {
+            property_id: "PROP-NO-OWNER".to_string(),
+            expected_owner_did: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: VerifyPropertyForLeaseInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.property_id, "PROP-NO-OWNER");
+        assert!(decoded.expected_owner_did.is_none());
+    }
+
+    #[test]
+    fn verify_property_input_empty_property_id_serde() {
+        let input = VerifyPropertyForLeaseInput {
+            property_id: "".to_string(),
+            expected_owner_did: Some("did:key:z6MkOwner".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: VerifyPropertyForLeaseInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.property_id.is_empty());
+        assert!(decoded.expected_owner_did.is_some());
+    }
+
+    // ── PropertyVerificationResult edge cases ───────────────────────
+
+    #[test]
+    fn property_verification_result_encumbrance_error_serde() {
+        let result = PropertyVerificationResult {
+            verified: false,
+            owner_did: Some("did:key:z6MkOwner".to_string()),
+            has_clear_title: false,
+            error: Some("Property has encumbrances \u{2014} clear title required for CLT lease".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: PropertyVerificationResult = serde_json::from_str(&json).unwrap();
+        assert!(!decoded.verified);
+        assert!(!decoded.has_clear_title);
+        assert!(decoded.error.as_ref().unwrap().contains("encumbrances"));
+        assert!(decoded.owner_did.is_some());
+    }
+
+    #[test]
+    fn property_verification_result_equality() {
+        let a = PropertyVerificationResult {
+            verified: true,
+            owner_did: Some("did:key:z6MkA".to_string()),
+            has_clear_title: true,
+            error: None,
+        };
+        let b = PropertyVerificationResult {
+            verified: true,
+            owner_did: Some("did:key:z6MkA".to_string()),
+            has_clear_title: true,
+            error: None,
+        };
+        assert_eq!(a, b);
+
+        let c = PropertyVerificationResult {
+            verified: false,
+            owner_did: Some("did:key:z6MkA".to_string()),
+            has_clear_title: true,
+            error: None,
+        };
+        assert_ne!(a, c);
+    }
+
+    // ── Trust board composition ─────────────────────────────────────
+
+    #[test]
+    fn update_trust_board_many_members_serde() {
+        let board: Vec<AgentPubKey> = (0..25)
+            .map(|i| AgentPubKey::from_raw_36(vec![i; 36]))
+            .collect();
+        let input = UpdateTrustBoardInput {
+            trust_hash: fake_action_hash(),
+            new_board: board.clone(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTrustBoardInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_board.len(), 25);
+        assert_eq!(decoded.new_board[0], board[0]);
+        assert_eq!(decoded.new_board[24], board[24]);
+    }
+
+    #[test]
+    fn update_trust_board_duplicate_members_serde() {
+        // The coordinator doesn't prevent duplicates, just requires non-empty
+        let agent = fake_agent();
+        let input = UpdateTrustBoardInput {
+            trust_hash: fake_action_hash(),
+            new_board: vec![agent.clone(), agent.clone(), agent.clone()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateTrustBoardInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_board.len(), 3);
+        assert_eq!(decoded.new_board[0], decoded.new_board[1]);
+    }
+
+    // ── Ground lease with zero rent serde ───────────────────────────
+
+    #[test]
+    fn ground_lease_zero_rent_serde_roundtrip() {
+        let lease = GroundLease {
+            trust_hash: fake_action_hash(),
+            unit_hash: fake_action_hash(),
+            leaseholder: fake_agent(),
+            lease_term_years: 99,
+            ground_rent_monthly_cents: 0,
+            resale_formula: ResaleFormula {
+                formula_type: FormulaType::ConsumerPriceIndex,
+                max_appreciation_percent_annual: None,
+                ami_cap_percent: None,
+                improvement_credit_percent: None,
+            },
+            started_at: Timestamp::from_micros(1000),
+            expires_at: Timestamp::from_micros(2000000),
+        };
+        let json = serde_json::to_string(&lease).unwrap();
+        let decoded: GroundLease = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.ground_rent_monthly_cents, 0);
+        assert_eq!(decoded.resale_formula.formula_type, FormulaType::ConsumerPriceIndex);
+        assert!(decoded.resale_formula.max_appreciation_percent_annual.is_none());
+    }
+
+    // ── Land trust with all optional fields ─────────────────────────
+
+    #[test]
+    fn land_trust_no_charter_serde_roundtrip() {
+        let trust = LandTrust {
+            id: "trust-no-charter".to_string(),
+            name: "Nascent Trust".to_string(),
+            mission: "Building community".to_string(),
+            boundary: vec![(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)],
+            charter_hash: None,
+            stewardship_board: vec![fake_agent()],
+            affordability_target_ami_percent: 120,
+            created_at: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&trust).unwrap();
+        let decoded: LandTrust = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, trust);
+        assert!(decoded.charter_hash.is_none());
+        assert_eq!(decoded.affordability_target_ami_percent, 120);
+    }
+
+    // ── CalculateResaleInput boundary values ────────────────────────
+
+    #[test]
+    fn calculate_resale_input_zero_years_zero_improvements_serde() {
+        let input = CalculateResaleInput {
+            lease_hash: fake_action_hash(),
+            original_price_cents: 20000000,
+            years_held: 0,
+            improvements_value_cents: 0,
+            ami_at_purchase: None,
+            current_ami: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CalculateResaleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.years_held, 0);
+        assert_eq!(decoded.improvements_value_cents, 0);
+        assert_eq!(decoded.original_price_cents, 20000000);
+    }
+
+    #[test]
+    fn calculate_resale_input_large_values_serde() {
+        let input = CalculateResaleInput {
+            lease_hash: fake_action_hash(),
+            original_price_cents: u64::MAX,
+            years_held: u32::MAX,
+            improvements_value_cents: u64::MAX,
+            ami_at_purchase: Some(u64::MAX),
+            current_ami: Some(u64::MAX),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CalculateResaleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_price_cents, u64::MAX);
+        assert_eq!(decoded.years_held, u32::MAX);
+        assert_eq!(decoded.ami_at_purchase, Some(u64::MAX));
+    }
+
+    // ── GenerateAffordabilityInput boundary values ──────────────────
+
+    #[test]
+    fn generate_affordability_input_single_unit_serde() {
+        let input = GenerateAffordabilityInput {
+            trust_hash: fake_action_hash(),
+            total_units: 1,
+            affordable_units: 1,
+            average_monthly_cost_cents: 80000,
+            median_area_income_cents: 5000000,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: GenerateAffordabilityInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_units, 1);
+        assert_eq!(decoded.affordable_units, 1);
+    }
+
+    #[test]
+    fn generate_affordability_input_zero_affordable_serde() {
+        let input = GenerateAffordabilityInput {
+            trust_hash: fake_action_hash(),
+            total_units: 500,
+            affordable_units: 0,
+            average_monthly_cost_cents: 300000,
+            median_area_income_cents: 4000000,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: GenerateAffordabilityInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.affordable_units, 0);
+        assert_eq!(decoded.total_units, 500);
+    }
+
+    // ── TransferLeaseInput with distinct hashes ─────────────────────
+
+    #[test]
+    fn transfer_lease_input_distinct_agent_serde() {
+        let new_leaseholder = AgentPubKey::from_raw_36(vec![0xAB; 36]);
+        let input = TransferLeaseInput {
+            lease_hash: ActionHash::from_raw_36(vec![0xCD; 36]),
+            new_leaseholder: new_leaseholder.clone(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferLeaseInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_leaseholder, new_leaseholder);
+    }
+
+    // ── Resale formula all variants serde ───────────────────────────
+
+    #[test]
+    fn resale_formula_all_variants_serde_from_coordinator() {
+        let formulas = vec![
+            ResaleFormula {
+                formula_type: FormulaType::AppreciationCap,
+                max_appreciation_percent_annual: Some(2),
+                ami_cap_percent: None,
+                improvement_credit_percent: Some(75),
+            },
+            ResaleFormula {
+                formula_type: FormulaType::AreaMedianIncome,
+                max_appreciation_percent_annual: None,
+                ami_cap_percent: Some(80),
+                improvement_credit_percent: Some(100),
+            },
+            ResaleFormula {
+                formula_type: FormulaType::ConsumerPriceIndex,
+                max_appreciation_percent_annual: None,
+                ami_cap_percent: None,
+                improvement_credit_percent: None,
+            },
+            ResaleFormula {
+                formula_type: FormulaType::Hybrid,
+                max_appreciation_percent_annual: Some(3),
+                ami_cap_percent: Some(120),
+                improvement_credit_percent: Some(50),
+            },
+        ];
+        for formula in formulas {
+            let json = serde_json::to_string(&formula).unwrap();
+            let decoded: ResaleFormula = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, formula);
+        }
+    }
+
+    // ── AffordabilityReport boundary ratio values ───────────────────
+
+    #[test]
+    fn affordability_report_ratio_thirty_percent_rule() {
+        // 30% rule: ratio = 0.30 means housing is at the threshold of affordable
+        let report = AffordabilityReport {
+            trust_hash: fake_action_hash(),
+            report_date: Timestamp::from_micros(3000),
+            total_units: 200,
+            affordable_units: 180,
+            average_monthly_cost_cents: 150000,
+            median_area_income_cents: 6000000,
+            affordability_ratio: 0.30,
+        };
+        let json = serde_json::to_string(&report).unwrap();
+        let decoded: AffordabilityReport = serde_json::from_str(&json).unwrap();
+        assert!((decoded.affordability_ratio - 0.30).abs() < f32::EPSILON);
+        assert_eq!(decoded.affordable_units, 180);
+    }
+
+    #[test]
+    fn affordability_report_zero_ratio_serde() {
+        let report = AffordabilityReport {
+            trust_hash: fake_action_hash(),
+            report_date: Timestamp::from_micros(4000),
+            total_units: 50,
+            affordable_units: 50,
+            average_monthly_cost_cents: 0,
+            median_area_income_cents: 6000000,
+            affordability_ratio: 0.0,
+        };
+        let json = serde_json::to_string(&report).unwrap();
+        let decoded: AffordabilityReport = serde_json::from_str(&json).unwrap();
+        assert!((decoded.affordability_ratio - 0.0).abs() < f32::EPSILON);
+    }
+
+    // ── ResaleCalculation with no AMI data ──────────────────────────
+
+    #[test]
+    fn resale_calculation_no_ami_serde_roundtrip() {
+        let calc = ResaleCalculation {
+            lease_hash: fake_action_hash(),
+            original_price_cents: 25000000,
+            years_held: 10,
+            improvements_value_cents: 5000000,
+            calculated_max_price_cents: 32000000,
+            ami_at_purchase: None,
+            current_ami: None,
+        };
+        let json = serde_json::to_string(&calc).unwrap();
+        let decoded: ResaleCalculation = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, calc);
+        assert!(decoded.ami_at_purchase.is_none());
+        assert!(decoded.current_ami.is_none());
+    }
 }

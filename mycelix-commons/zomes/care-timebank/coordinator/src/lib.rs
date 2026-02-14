@@ -762,4 +762,152 @@ mod tests {
         let decoded: TimeCredit = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.balance, -3.0);
     }
+
+    // ── Additional edge-case and boundary tests ─────────────────────────
+
+    #[test]
+    fn complete_exchange_input_zero_hours_roundtrip() {
+        let input = CompleteExchangeInput {
+            offer_id: fake_action_hash(),
+            request_id: fake_action_hash_b(),
+            provider: fake_agent(),
+            recipient: fake_agent_b(),
+            hours: 0.0,
+            category: ServiceCategory::Other("Zero-hour test".to_string()),
+            notes: "Edge case".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CompleteExchangeInput = serde_json::from_str(&json).unwrap();
+        assert!((decoded.hours - 0.0).abs() < f32::EPSILON);
+        assert_eq!(decoded.category, ServiceCategory::Other("Zero-hour test".to_string()));
+    }
+
+    #[test]
+    fn rate_exchange_input_boundary_rating_one() {
+        let input = RateExchangeInput {
+            exchange_hash: fake_action_hash(),
+            rating: 1,
+            is_provider_rating: true,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RateExchangeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.rating, 1);
+    }
+
+    #[test]
+    fn rate_exchange_input_zero_rating_serde_roundtrip() {
+        // Zero is not valid for the business logic but serde must still roundtrip
+        let input = RateExchangeInput {
+            exchange_hash: fake_action_hash(),
+            rating: 0,
+            is_provider_rating: false,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RateExchangeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.rating, 0);
+    }
+
+    #[test]
+    fn service_offer_inactive_with_empty_skills_roundtrip() {
+        let offer = ServiceOffer {
+            provider: fake_agent(),
+            category: ServiceCategory::Administrative,
+            title: "Filing".to_string(),
+            description: "Help with paperwork.".to_string(),
+            hours_available: 0.5,
+            availability: String::new(),
+            location: "Remote".to_string(),
+            skills_required: vec![],
+            active: false,
+            created_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&offer).unwrap();
+        let decoded: ServiceOffer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.active, false);
+        assert!(decoded.skills_required.is_empty());
+        assert!(decoded.availability.is_empty());
+    }
+
+    #[test]
+    fn service_request_closed_critical_roundtrip() {
+        let request = ServiceRequest {
+            requester: fake_agent_b(),
+            category: ServiceCategory::HealthSupport,
+            title: "Urgent care".to_string(),
+            description: "Medical appointment transport needed.".to_string(),
+            hours_needed: 168.0,
+            preferred_schedule: "Immediately".to_string(),
+            location: "Hospital district".to_string(),
+            urgency: UrgencyLevel::Critical,
+            open: false,
+            created_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let decoded: ServiceRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.urgency, UrgencyLevel::Critical);
+        assert_eq!(decoded.open, false);
+        assert!((decoded.hours_needed - 168.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn time_exchange_mixed_rating_one_set_one_none() {
+        let exchange = TimeExchange {
+            offer_id: fake_action_hash(),
+            request_id: fake_action_hash_b(),
+            provider: fake_agent(),
+            recipient: fake_agent_b(),
+            hours: 0.5,
+            category: ServiceCategory::PetCare,
+            completed_at: Timestamp::from_micros(5000),
+            rating_provider: Some(3),
+            rating_recipient: None,
+            notes: "Dog walking".to_string(),
+        };
+        let json = serde_json::to_string(&exchange).unwrap();
+        let decoded: TimeExchange = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.rating_provider, Some(3));
+        assert_eq!(decoded.rating_recipient, None);
+    }
+
+    #[test]
+    fn time_credit_large_values_roundtrip() {
+        let credit = TimeCredit {
+            agent: fake_agent_b(),
+            balance: 999_999.99,
+            total_earned: 1_000_000.0,
+            total_spent: 0.01,
+            updated_at: Timestamp::from_micros(i64::MAX / 2),
+        };
+        let json = serde_json::to_string(&credit).unwrap();
+        let decoded: TimeCredit = serde_json::from_str(&json).unwrap();
+        assert!((decoded.balance - 999_999.99).abs() < 0.001);
+        assert!((decoded.total_earned - 1_000_000.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn service_category_other_with_special_chars_anchor_key() {
+        let cat = ServiceCategory::Other("Arts & Crafts!".to_string());
+        let key = cat.anchor_key();
+        assert_eq!(key, "other_arts_&_crafts!");
+    }
+
+    #[test]
+    fn complete_exchange_input_same_offer_request_hash_roundtrip() {
+        // Both hashes same -- serde should still work (business logic validates separately)
+        let hash = fake_action_hash();
+        let input = CompleteExchangeInput {
+            offer_id: hash.clone(),
+            request_id: hash.clone(),
+            provider: fake_agent(),
+            recipient: fake_agent_b(),
+            hours: 1.0,
+            category: ServiceCategory::Childcare,
+            notes: "Same hash test".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CompleteExchangeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.offer_id, decoded.request_id);
+    }
 }

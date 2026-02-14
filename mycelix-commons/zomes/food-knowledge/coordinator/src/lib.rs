@@ -406,4 +406,149 @@ mod tests {
         assert_eq!(decoded.name, seed.name);
         assert_eq!(decoded.origin, seed.origin);
     }
+
+    // ── Additional edge-case and boundary tests ─────────────────────────
+
+    #[test]
+    fn seed_variety_zero_maturity_serde_roundtrip() {
+        // Zero maturity is invalid for validation but serde must still roundtrip
+        let seed = SeedVariety {
+            name: "Test".to_string(),
+            species: "Test species".to_string(),
+            origin: None,
+            days_to_maturity: 0,
+            companion_plants: vec![],
+            avoid_plants: vec![],
+            seed_saving_notes: None,
+        };
+        let json = serde_json::to_string(&seed).unwrap();
+        let decoded: SeedVariety = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.days_to_maturity, 0);
+    }
+
+    #[test]
+    fn seed_variety_many_companion_and_avoid_plants() {
+        let seed = SeedVariety {
+            name: "Social Tomato".to_string(),
+            species: "Solanum lycopersicum".to_string(),
+            origin: Some("Community garden".to_string()),
+            days_to_maturity: 90,
+            companion_plants: (0..50).map(|i| format!("companion-{}", i)).collect(),
+            avoid_plants: (0..30).map(|i| format!("avoid-{}", i)).collect(),
+            seed_saving_notes: Some("Lots of companions".to_string()),
+        };
+        let json = serde_json::to_string(&seed).unwrap();
+        let decoded: SeedVariety = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.companion_plants.len(), 50);
+        assert_eq!(decoded.avoid_plants.len(), 30);
+    }
+
+    #[test]
+    fn traditional_practice_all_categories_roundtrip() {
+        for cat in [
+            PracticeCategory::Planting,
+            PracticeCategory::Harvest,
+            PracticeCategory::Soil,
+            PracticeCategory::Pest,
+            PracticeCategory::Water,
+        ] {
+            let practice = TraditionalPractice {
+                name: format!("Practice for {:?}", cat),
+                description: "Test description.".to_string(),
+                region: Some("Global".to_string()),
+                season: Some("All year".to_string()),
+                category: cat.clone(),
+            };
+            let json = serde_json::to_string(&practice).unwrap();
+            let decoded: TraditionalPractice = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.category, cat);
+        }
+    }
+
+    #[test]
+    fn recipe_zero_servings_serde_roundtrip() {
+        // Zero servings is invalid for validation but serde must still roundtrip
+        let recipe = Recipe {
+            name: "Nothing Soup".to_string(),
+            ingredients: vec!["Air".to_string()],
+            instructions: "Just wait".to_string(),
+            servings: 0,
+            prep_time_min: 0,
+            tags: vec![],
+            source_attribution: None,
+        };
+        let json = serde_json::to_string(&recipe).unwrap();
+        let decoded: Recipe = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.servings, 0);
+        assert_eq!(decoded.prep_time_min, 0);
+    }
+
+    #[test]
+    fn recipe_max_servings_and_prep_time() {
+        let recipe = Recipe {
+            name: "Marathon Feast".to_string(),
+            ingredients: vec!["Everything".to_string()],
+            instructions: "Cook for a very long time".to_string(),
+            servings: u32::MAX,
+            prep_time_min: u32::MAX,
+            tags: vec!["extreme".to_string()],
+            source_attribution: Some("Legend".to_string()),
+        };
+        let json = serde_json::to_string(&recipe).unwrap();
+        let decoded: Recipe = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.servings, u32::MAX);
+        assert_eq!(decoded.prep_time_min, u32::MAX);
+    }
+
+    #[test]
+    fn recipe_unicode_name_and_tags_roundtrip() {
+        let recipe = Recipe {
+            name: "\u{5473}\u{564c}\u{6c41}".to_string(), // Miso soup in Japanese
+            ingredients: vec!["\u{8c46}\u{8150}".to_string(), "\u{308f}\u{304b}\u{3081}".to_string()],
+            instructions: "\u{716e}\u{308b}".to_string(),
+            servings: 2,
+            prep_time_min: 15,
+            tags: vec!["\u{548c}\u{98df}".to_string(), "\u{6c41}\u{7269}".to_string()],
+            source_attribution: Some("\u{304a}\u{3070}\u{3042}\u{3061}\u{3083}\u{3093}".to_string()),
+        };
+        let json = serde_json::to_string(&recipe).unwrap();
+        let decoded: Recipe = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, recipe.name);
+        assert_eq!(decoded.tags.len(), 2);
+        assert_eq!(decoded.source_attribution, recipe.source_attribution);
+    }
+
+    #[test]
+    fn seed_variety_one_day_maturity_roundtrip() {
+        let seed = SeedVariety {
+            name: "Quick Sprout".to_string(),
+            species: "Lepidium sativum".to_string(),
+            origin: None,
+            days_to_maturity: 1,
+            companion_plants: vec![],
+            avoid_plants: vec![],
+            seed_saving_notes: None,
+        };
+        let json = serde_json::to_string(&seed).unwrap();
+        let decoded: SeedVariety = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.days_to_maturity, 1);
+    }
+
+    #[test]
+    fn recipe_single_ingredient_no_tags_roundtrip() {
+        let recipe = Recipe {
+            name: "Water".to_string(),
+            ingredients: vec!["H2O".to_string()],
+            instructions: "Pour.".to_string(),
+            servings: 1,
+            prep_time_min: 1,
+            tags: vec![],
+            source_attribution: None,
+        };
+        let json = serde_json::to_string(&recipe).unwrap();
+        let decoded: Recipe = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.ingredients.len(), 1);
+        assert!(decoded.tags.is_empty());
+        assert_eq!(decoded.source_attribution, None);
+    }
 }

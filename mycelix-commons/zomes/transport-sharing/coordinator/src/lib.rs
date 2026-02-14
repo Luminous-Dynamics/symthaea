@@ -478,4 +478,146 @@ mod tests {
         assert_eq!(decoded.price_per_kg, 0.0);
         assert_eq!(decoded.capacity_kg, 100.0);
     }
+
+    // ── Additional edge-case and boundary tests ─────────────────────────
+
+    #[test]
+    fn update_match_status_input_serde_all_statuses() {
+        for status in [
+            MatchStatus::Pending,
+            MatchStatus::Confirmed,
+            MatchStatus::InProgress,
+            MatchStatus::Completed,
+            MatchStatus::Cancelled,
+        ] {
+            let input = UpdateMatchStatusInput {
+                match_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+                new_status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdateMatchStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.new_status, status);
+        }
+    }
+
+    #[test]
+    fn ride_offer_max_seats_roundtrip() {
+        let offer = RideOffer {
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            route_hash: Some(ActionHash::from_raw_36(vec![0xcd; 36])),
+            driver: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            departure_time: u64::MAX,
+            seats_available: u32::MAX,
+            price_per_seat: 0.0,
+            status: OfferStatus::Open,
+        };
+        let json = serde_json::to_string(&offer).unwrap();
+        let decoded: RideOffer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.seats_available, u32::MAX);
+        assert_eq!(decoded.departure_time, u64::MAX);
+    }
+
+    #[test]
+    fn ride_request_extreme_coordinates_roundtrip() {
+        let request = RideRequest {
+            requester: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            origin_lat: -90.0,
+            origin_lon: -180.0,
+            destination_lat: 90.0,
+            destination_lon: 180.0,
+            requested_time: 0,
+            passengers: 1,
+            status: RequestStatus::Open,
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let decoded: RideRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.origin_lat, -90.0);
+        assert_eq!(decoded.origin_lon, -180.0);
+        assert_eq!(decoded.destination_lat, 90.0);
+        assert_eq!(decoded.destination_lon, 180.0);
+        assert_eq!(decoded.requested_time, 0);
+    }
+
+    #[test]
+    fn ride_request_max_passengers_roundtrip() {
+        let request = RideRequest {
+            requester: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            origin_lat: 0.0,
+            origin_lon: 0.0,
+            destination_lat: 1.0,
+            destination_lon: 1.0,
+            requested_time: 1700000000,
+            passengers: u32::MAX,
+            status: RequestStatus::Cancelled,
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let decoded: RideRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.passengers, u32::MAX);
+        assert_eq!(decoded.status, RequestStatus::Cancelled);
+    }
+
+    #[test]
+    fn ride_match_confirmed_at_max_u64_roundtrip() {
+        let ride_match = RideMatch {
+            offer_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            request_hash: ActionHash::from_raw_36(vec![0xcd; 36]),
+            confirmed_at: Some(u64::MAX),
+            status: MatchStatus::Completed,
+        };
+        let json = serde_json::to_string(&ride_match).unwrap();
+        let decoded: RideMatch = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.confirmed_at, Some(u64::MAX));
+        assert_eq!(decoded.status, MatchStatus::Completed);
+    }
+
+    #[test]
+    fn cargo_offer_extreme_coordinates_roundtrip() {
+        let cargo = CargoOffer {
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            origin_lat: -90.0,
+            origin_lon: -180.0,
+            destination_lat: 90.0,
+            destination_lon: 180.0,
+            capacity_kg: 0.001,
+            price_per_kg: 99999.99,
+            departure_time: u64::MAX,
+        };
+        let json = serde_json::to_string(&cargo).unwrap();
+        let decoded: CargoOffer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.origin_lat, -90.0);
+        assert_eq!(decoded.destination_lon, 180.0);
+        assert!((decoded.capacity_kg - 0.001).abs() < 1e-9);
+        assert!((decoded.price_per_kg - 99999.99).abs() < 0.01);
+    }
+
+    #[test]
+    fn cargo_offer_large_capacity_roundtrip() {
+        let cargo = CargoOffer {
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            origin_lat: 32.95,
+            origin_lon: -96.73,
+            destination_lat: 33.45,
+            destination_lon: -96.50,
+            capacity_kg: 999_999_999.99,
+            price_per_kg: 0.0,
+            departure_time: 1700000000,
+        };
+        let json = serde_json::to_string(&cargo).unwrap();
+        let decoded: CargoOffer = serde_json::from_str(&json).unwrap();
+        assert!((decoded.capacity_kg - 999_999_999.99).abs() < 0.01);
+    }
+
+    #[test]
+    fn ride_match_same_offer_request_hash_roundtrip() {
+        let hash = ActionHash::from_raw_36(vec![0xdb; 36]);
+        let ride_match = RideMatch {
+            offer_hash: hash.clone(),
+            request_hash: hash.clone(),
+            confirmed_at: None,
+            status: MatchStatus::Pending,
+        };
+        let json = serde_json::to_string(&ride_match).unwrap();
+        let decoded: RideMatch = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.offer_hash, decoded.request_hash);
+    }
 }

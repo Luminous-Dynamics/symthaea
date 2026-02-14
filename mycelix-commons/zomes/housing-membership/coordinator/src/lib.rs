@@ -650,4 +650,101 @@ mod tests {
             assert_eq!(decoded.new_status, status);
         }
     }
+
+    // ── Boundary condition tests ──────────────────────────────────────
+
+    #[test]
+    fn create_rent_to_own_input_zero_equity_percent_serde() {
+        let input = CreateRentToOwnInput {
+            member: fake_agent(),
+            unit_hash: fake_action_hash(),
+            total_purchase_price_cents: 20000000,
+            monthly_rent_cents: 100000,
+            equity_portion_percent: 0,
+            target_completion: Timestamp::from_micros(2_000_000_000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateRentToOwnInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.equity_portion_percent, 0);
+    }
+
+    #[test]
+    fn create_rent_to_own_input_full_equity_percent_serde() {
+        let input = CreateRentToOwnInput {
+            member: fake_agent(),
+            unit_hash: fake_action_hash(),
+            total_purchase_price_cents: 20000000,
+            monthly_rent_cents: 100000,
+            equity_portion_percent: 100,
+            target_completion: Timestamp::from_micros(2_000_000_000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateRentToOwnInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.equity_portion_percent, 100);
+    }
+
+    #[test]
+    fn record_rent_payment_input_zero_payment_serde() {
+        let input = RecordRentPaymentInput {
+            agreement_hash: fake_action_hash(),
+            payment_amount_cents: 0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RecordRentPaymentInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.payment_amount_cents, 0);
+    }
+
+    #[test]
+    fn member_application_max_household_size_serde() {
+        let app = MemberApplication {
+            applicant: fake_agent(),
+            requested_unit: None,
+            membership_type_requested: MembershipType::Renter,
+            applied_at: Timestamp::from_micros(5000),
+            household_size: u8::MAX,
+            income_verified: false,
+            references: vec![],
+            status: ApplicationStatus::Pending,
+        };
+        let json = serde_json::to_string(&app).unwrap();
+        let decoded: MemberApplication = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.household_size, u8::MAX);
+        assert_eq!(decoded, app);
+    }
+
+    #[test]
+    fn waitlist_entry_max_position_serde() {
+        let entry = WaitListEntry {
+            application_hash: fake_action_hash(),
+            position: u32::MAX,
+            unit_type_preference: None,
+            added_at: Timestamp::from_micros(9000),
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        let decoded: WaitListEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.position, u32::MAX);
+        assert_eq!(decoded, entry);
+    }
+
+    #[test]
+    fn approve_member_input_all_membership_types_serde() {
+        for mt in [
+            MembershipType::FullShare,
+            MembershipType::LimitedEquity,
+            MembershipType::RentToOwn,
+            MembershipType::Renter,
+            MembershipType::Associate,
+        ] {
+            let input = ApproveMemberInput {
+                application_hash: fake_action_hash(),
+                unit_hash: None,
+                membership_type: mt.clone(),
+                share_equity_cents: 0,
+                monthly_charge_cents: 0,
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: ApproveMemberInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.membership_type, mt);
+        }
+    }
 }

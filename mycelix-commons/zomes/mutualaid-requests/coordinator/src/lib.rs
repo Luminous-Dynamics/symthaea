@@ -778,4 +778,317 @@ mod tests {
             assert_eq!(&decoded, variant);
         }
     }
+
+    // ── AidRequest serde roundtrip ───────────────────────────────────────
+
+    #[test]
+    fn aid_request_full_serde_roundtrip() {
+        let request = AidRequest {
+            id: "req_001".to_string(),
+            requester_did: "did:mycelix:alice".to_string(),
+            request_type: RequestType::Housing,
+            description: "Need temporary housing for 2 weeks".to_string(),
+            urgency: Urgency::Critical,
+            location: Some("Portland, OR".to_string()),
+            amount_needed: Some(3000),
+            fulfilled_amount: 500,
+            status: RequestStatus::PartiallyFulfilled,
+            created_at: Timestamp::from_micros(1000000),
+            updated_at: Timestamp::from_micros(2000000),
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let decoded: AidRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, request);
+    }
+
+    #[test]
+    fn aid_request_no_optionals_serde_roundtrip() {
+        let request = AidRequest {
+            id: "req_002".to_string(),
+            requester_did: "did:mycelix:bob".to_string(),
+            request_type: RequestType::Food,
+            description: "Groceries needed".to_string(),
+            urgency: Urgency::Low,
+            location: None,
+            amount_needed: None,
+            fulfilled_amount: 0,
+            status: RequestStatus::Open,
+            created_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let decoded: AidRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.location, None);
+        assert_eq!(decoded.amount_needed, None);
+        assert_eq!(decoded.fulfilled_amount, 0);
+    }
+
+    // ── AidOffer serde roundtrip ─────────────────────────────────────────
+
+    #[test]
+    fn aid_offer_full_serde_roundtrip() {
+        let offer = AidOffer {
+            id: "off_001".to_string(),
+            request_id: "req_001".to_string(),
+            offerer_did: "did:mycelix:donor".to_string(),
+            amount: Some(250),
+            message: "I can cover part of it".to_string(),
+            status: OfferStatus::Accepted,
+            created_at: Timestamp::from_micros(1500000),
+            updated_at: Timestamp::from_micros(2500000),
+        };
+        let json = serde_json::to_string(&offer).unwrap();
+        let decoded: AidOffer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, offer);
+    }
+
+    #[test]
+    fn aid_offer_no_amount_serde_roundtrip() {
+        let offer = AidOffer {
+            id: "off_002".to_string(),
+            request_id: "req_003".to_string(),
+            offerer_did: "did:mycelix:volunteer".to_string(),
+            amount: None,
+            message: "I can provide the service directly".to_string(),
+            status: OfferStatus::Pending,
+            created_at: Timestamp::from_micros(0),
+            updated_at: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&offer).unwrap();
+        let decoded: AidOffer = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.amount, None);
+        assert_eq!(decoded.status, OfferStatus::Pending);
+    }
+
+    // ── RequestWithHash serde roundtrip ──────────────────────────────────
+
+    #[test]
+    fn request_with_hash_serde_roundtrip() {
+        let rwh = RequestWithHash {
+            hash: ActionHash::from_raw_36(vec![0xDD; 36]),
+            request: AidRequest {
+                id: "req_rwh".to_string(),
+                requester_did: "did:mycelix:test".to_string(),
+                request_type: RequestType::Medical,
+                description: "Prescription costs".to_string(),
+                urgency: Urgency::High,
+                location: None,
+                amount_needed: Some(500),
+                fulfilled_amount: 0,
+                status: RequestStatus::Open,
+                created_at: Timestamp::from_micros(0),
+                updated_at: Timestamp::from_micros(0),
+            },
+        };
+        let json = serde_json::to_string(&rwh).unwrap();
+        let decoded: RequestWithHash = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.hash, rwh.hash);
+        assert_eq!(decoded.request.id, "req_rwh");
+    }
+
+    // ── OfferWithHash serde roundtrip ────────────────────────────────────
+
+    #[test]
+    fn offer_with_hash_serde_roundtrip() {
+        let owh = OfferWithHash {
+            hash: ActionHash::from_raw_36(vec![0xEE; 36]),
+            offer: AidOffer {
+                id: "off_owh".to_string(),
+                request_id: "req_001".to_string(),
+                offerer_did: "did:mycelix:helper".to_string(),
+                amount: Some(100),
+                message: "Small contribution".to_string(),
+                status: OfferStatus::Completed,
+                created_at: Timestamp::from_micros(0),
+                updated_at: Timestamp::from_micros(0),
+            },
+        };
+        let json = serde_json::to_string(&owh).unwrap();
+        let decoded: OfferWithHash = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.hash, owh.hash);
+        assert_eq!(decoded.offer.status, OfferStatus::Completed);
+    }
+
+    // ── Status transition patterns ───────────────────────────────────────
+
+    #[test]
+    fn request_status_open_to_partially_fulfilled_serde() {
+        let input = UpdateRequestStatusInput {
+            request_hash: ActionHash::from_raw_36(vec![0xAA; 36]),
+            status: RequestStatus::PartiallyFulfilled,
+            fulfilled_amount: Some(200),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateRequestStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, RequestStatus::PartiallyFulfilled);
+        assert_eq!(decoded.fulfilled_amount, Some(200));
+    }
+
+    #[test]
+    fn request_status_partially_fulfilled_to_fulfilled_serde() {
+        let input = UpdateRequestStatusInput {
+            request_hash: ActionHash::from_raw_36(vec![0xAA; 36]),
+            status: RequestStatus::Fulfilled,
+            fulfilled_amount: Some(1000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateRequestStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, RequestStatus::Fulfilled);
+        assert_eq!(decoded.fulfilled_amount, Some(1000));
+    }
+
+    #[test]
+    fn request_status_open_to_cancelled_serde() {
+        let input = UpdateRequestStatusInput {
+            request_hash: ActionHash::from_raw_36(vec![0xAA; 36]),
+            status: RequestStatus::Cancelled,
+            fulfilled_amount: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateRequestStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, RequestStatus::Cancelled);
+        assert!(decoded.fulfilled_amount.is_none());
+    }
+
+    // ── Offer status transitions ─────────────────────────────────────────
+
+    #[test]
+    fn offer_status_pending_to_accepted_serde() {
+        let input = UpdateOfferStatusInput {
+            offer_hash: ActionHash::from_raw_36(vec![0xCC; 36]),
+            status: OfferStatus::Accepted,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateOfferStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, OfferStatus::Accepted);
+    }
+
+    #[test]
+    fn offer_status_accepted_to_completed_serde() {
+        let input = UpdateOfferStatusInput {
+            offer_hash: ActionHash::from_raw_36(vec![0xCC; 36]),
+            status: OfferStatus::Completed,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateOfferStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, OfferStatus::Completed);
+    }
+
+    #[test]
+    fn offer_status_pending_to_withdrawn_serde() {
+        let input = UpdateOfferStatusInput {
+            offer_hash: ActionHash::from_raw_36(vec![0xCC; 36]),
+            status: OfferStatus::Withdrawn,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateOfferStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, OfferStatus::Withdrawn);
+    }
+
+    // ── Urgency levels in CreateRequestInput ─────────────────────────────
+
+    #[test]
+    fn create_request_input_all_urgency_levels() {
+        for urgency in [Urgency::Critical, Urgency::High, Urgency::Medium, Urgency::Low] {
+            let input = CreateRequestInput {
+                requester_did: "did:mycelix:test".to_string(),
+                request_type: RequestType::Financial,
+                description: "Urgency test".to_string(),
+                urgency: urgency.clone(),
+                location: None,
+                amount_needed: None,
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: CreateRequestInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.urgency, urgency);
+        }
+    }
+
+    // ── All RequestType variants in CreateRequestInput ────────────────────
+
+    #[test]
+    fn create_request_input_all_request_types() {
+        let types = vec![
+            RequestType::Financial,
+            RequestType::Housing,
+            RequestType::Food,
+            RequestType::Medical,
+            RequestType::Childcare,
+            RequestType::Transportation,
+            RequestType::Legal,
+            RequestType::Other("Tutoring".to_string()),
+        ];
+        for rt in types {
+            let input = CreateRequestInput {
+                requester_did: "did:mycelix:types".to_string(),
+                request_type: rt.clone(),
+                description: "Type test".to_string(),
+                urgency: Urgency::Medium,
+                location: None,
+                amount_needed: None,
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: CreateRequestInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.request_type, rt);
+        }
+    }
+
+    // ── Fulfilled amount boundary values ─────────────────────────────────
+
+    #[test]
+    fn update_request_status_zero_fulfilled_amount() {
+        let input = UpdateRequestStatusInput {
+            request_hash: ActionHash::from_raw_36(vec![0xAA; 36]),
+            status: RequestStatus::Open,
+            fulfilled_amount: Some(0),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateRequestStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.fulfilled_amount, Some(0));
+    }
+
+    #[test]
+    fn update_request_status_large_fulfilled_amount() {
+        let input = UpdateRequestStatusInput {
+            request_hash: ActionHash::from_raw_36(vec![0xAA; 36]),
+            status: RequestStatus::Fulfilled,
+            fulfilled_amount: Some(u64::MAX),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateRequestStatusInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.fulfilled_amount, Some(u64::MAX));
+    }
+
+    // ── QueryRequestsInput combinations ──────────────────────────────────
+
+    #[test]
+    fn query_requests_input_single_filter() {
+        let input = QueryRequestsInput {
+            request_type: Some(RequestType::Legal),
+            status: None,
+            urgency: None,
+            requester_did: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: QueryRequestsInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.request_type, Some(RequestType::Legal));
+        assert!(decoded.status.is_none());
+        assert!(decoded.urgency.is_none());
+        assert!(decoded.requester_did.is_none());
+    }
+
+    #[test]
+    fn query_requests_input_status_and_urgency_only() {
+        let input = QueryRequestsInput {
+            request_type: None,
+            status: Some(RequestStatus::Fulfilled),
+            urgency: Some(Urgency::Low),
+            requester_did: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: QueryRequestsInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.request_type.is_none());
+        assert_eq!(decoded.status, Some(RequestStatus::Fulfilled));
+        assert_eq!(decoded.urgency, Some(Urgency::Low));
+    }
 }
