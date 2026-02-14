@@ -12,6 +12,16 @@
 use hdk::prelude::*;
 use trust_credential_integrity::*;
 
+/// API version for cross-zome compatibility detection.
+/// Increment when making breaking changes to extern signatures or types.
+const API_VERSION: u16 = 1;
+
+/// Returns the API version of this coordinator zome.
+#[hdk_extern]
+pub fn get_api_version(_: ()) -> ExternResult<u16> {
+    Ok(API_VERSION)
+}
+
 /// Helper to get an anchor entry hash using cryptographic hashing
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let hash = holo_hash::blake2b_256(anchor_str.as_bytes());
@@ -64,6 +74,7 @@ pub fn issue_trust_credential(input: IssueTrustCredentialInput) -> ExternResult<
         expires_at: input.expires_at,
         revoked: false,
         revocation_reason: None,
+        revoked_at: None,
         supersedes: input.supersedes,
     };
 
@@ -222,8 +233,10 @@ pub fn revoke_credential(input: RevokeCredentialInput) -> ExternResult<Record> {
     }
 
     // Update credential as revoked
+    let now = sys_time()?;
     credential.revoked = true;
     credential.revocation_reason = Some(input.reason);
+    credential.revoked_at = Some(now);
 
     let action_hash = update_entry(original_hash, &EntryTypes::TrustCredential(credential))?;
 

@@ -7,6 +7,16 @@ use hdk::prelude::*;
 use did_registry_integrity::*;
 use mycelix_crypto::{AlgorithmId, TaggedPublicKey, CryptoError};
 
+/// API version for cross-zome compatibility detection.
+/// Increment when making breaking changes to extern signatures or types.
+const API_VERSION: u16 = 1;
+
+/// Returns the API version of this coordinator zome.
+#[hdk_extern]
+pub fn get_api_version(_: ()) -> ExternResult<u16> {
+    Ok(API_VERSION)
+}
+
 /// Validate a multibase-encoded public key and return its detected algorithm.
 ///
 /// Per the W3C DID specification and multibase encoding:

@@ -35,6 +35,16 @@ impl TryFrom<SerializedBytes> for SchemaMirror {
 const W3C_CREDENTIALS_V2: &str = "https://www.w3.org/ns/credentials/v2";
 const W3C_DATA_INTEGRITY: &str = "https://w3id.org/security/data-integrity/v2";
 
+/// API version for cross-zome compatibility detection.
+/// Increment when making breaking changes to extern signatures or types.
+const API_VERSION: u16 = 1;
+
+/// Returns the API version of this coordinator zome.
+#[hdk_extern]
+pub fn get_api_version(_: ()) -> ExternResult<u16> {
+    Ok(API_VERSION)
+}
+
 /// Create a deterministic entry hash from a string identifier
 fn string_to_entry_hash(s: &str) -> EntryHash {
     EntryHash::from_raw_36(
@@ -201,12 +211,29 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
             debug!("Schema validation passed for schema '{}'", schema_name);
         }
         SchemaValidationStatus::SchemaZomeUnavailable => {
+            if input.strict_schema {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "strict_schema: credential_schema zome is unavailable; cannot validate schema".to_string()
+                )));
+            }
             warn!("Schema validation skipped: credential_schema zome unavailable");
         }
         SchemaValidationStatus::SchemaNotFound => {
+            if input.strict_schema {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "strict_schema: schema '{}' not found in registry",
+                    input.schema_id
+                ))));
+            }
             debug!("Schema validation skipped: schema '{}' not found (may be external)", input.schema_id);
         }
-        SchemaValidationStatus::NoSchema => {}
+        SchemaValidationStatus::NoSchema => {
+            if input.strict_schema {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "strict_schema: no schema_id provided but strict_schema is enabled".to_string()
+                )));
+            }
+        }
     }
 
     // Build credential ID
@@ -314,6 +341,11 @@ pub struct IssueCredentialInput {
     pub expiration_days: Option<u32>,
     /// Whether to enable revocation
     pub enable_revocation: bool,
+    /// When true, schema validation is mandatory: if the credential_schema zome
+    /// is unavailable or the schema is not found, issuance fails instead of
+    /// silently skipping validation. Default: false (backward-compatible).
+    #[serde(default)]
+    pub strict_schema: bool,
 }
 
 /// Verify a credential
@@ -687,8 +719,13 @@ pub fn verify_presentation(input: VerifyPresentationInput) -> ExternResult<Prese
         errors.push("Invalid holder DID format".to_string());
     }
 
-    // 3. Verify each contained credential
-    for cred in &vp.verifiable_credential {
+    // 3. Batch-check revocation for all credentials in one cross-zome call
+    //    (eliminates N+1 query pattern — single call instead of per-credential)
+    let cred_ids: Vec<String> = vp.verifiable_credential.iter().map(|c| c.id.clone()).collect();
+    let revocation_statuses = batch_check_credential_revocation_status(&cred_ids)?;
+
+    // 4. Verify each contained credential
+    for (i, cred) in vp.verifiable_credential.iter().enumerate() {
         let mut cred_errors = Vec::new();
 
         // Verify credential signature
@@ -698,8 +735,8 @@ pub fn verify_presentation(input: VerifyPresentationInput) -> ExternResult<Prese
             Err(e) => cred_errors.push(format!("Signature error: {:?}", e)),
         }
 
-        // Check revocation
-        let revocation = check_credential_revocation_status(&cred.id)?;
+        // Check revocation (from batch result)
+        let revocation = &revocation_statuses[i];
         match revocation {
             CredentialRevocationStatus::Revoked(reason) => {
                 cred_errors.push(format!("Revoked: {}", reason));
@@ -2516,6 +2553,59 @@ fn check_credential_revocation_status(credential_id: &str) -> ExternResult<Crede
         ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Network error calling revocation zome: {}",
             err
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(
+            WasmErrorInner::Guest(format!("Countersigning error: {}", err))
+        )),
+    }
+}
+
+/// Batch check revocation status for multiple credentials in a single cross-zome call.
+///
+/// Falls back to individual checks if the revocation zome doesn't support batch.
+fn batch_check_credential_revocation_status(
+    credential_ids: &[String],
+) -> ExternResult<Vec<CredentialRevocationStatus>> {
+    if credential_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("revocation"),
+        FunctionName::new("batch_check_revocation"),
+        None,
+        credential_ids.to_vec(),
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(result) => {
+            let checks: Vec<RevocationCheckResult> = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode batch revocation response: {:?}", e
+                )))
+            })?;
+            Ok(checks
+                .into_iter()
+                .map(|check| match check.status {
+                    RevocationStatusMirror::Active => CredentialRevocationStatus::Active,
+                    RevocationStatusMirror::Revoked => CredentialRevocationStatus::Revoked(
+                        check.reason.unwrap_or_else(|| "No reason provided".to_string()),
+                    ),
+                    RevocationStatusMirror::Suspended => CredentialRevocationStatus::Suspended(
+                        check.reason.unwrap_or_else(|| "No reason provided".to_string()),
+                        check.checked_at.to_string(),
+                    ),
+                })
+                .collect())
+        }
+        ZomeCallResponse::Unauthorized(_, _, _, _)
+        | ZomeCallResponse::AuthenticationFailed(_, _) => {
+            // Revocation zome not accessible — return Unknown for all
+            Ok(credential_ids.iter().map(|_| CredentialRevocationStatus::Unknown).collect())
+        }
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling batch revocation: {}", err
         )))),
         ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(
             WasmErrorInner::Guest(format!("Countersigning error: {}", err))

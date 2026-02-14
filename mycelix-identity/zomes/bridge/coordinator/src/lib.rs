@@ -59,6 +59,12 @@ const IDENTITY_HAPP_ID: &str = "mycelix-identity";
 const REGISTERED_HAPPS_ANCHOR: &str = "registered_happs";
 const RECENT_EVENTS_ANCHOR: &str = "recent_events";
 
+/// API version for this coordinator zome.
+/// Callers can probe this via `get_api_version` to detect schema mismatches
+/// before deserializing cross-zome responses.
+/// Increment when making breaking changes to extern function signatures or types.
+const API_VERSION: u16 = 1;
+
 // MFA weight in combined MATL score (40% MFA, 60% reputation)
 const MFA_WEIGHT: f64 = 0.4;
 const REPUTATION_WEIGHT: f64 = 0.6;
@@ -218,6 +224,19 @@ fn has_mfa_enrolled(did: &str) -> ExternResult<bool> {
     }
 }
 
+// ==================== API VERSION ====================
+
+/// Returns the API version of this coordinator zome.
+///
+/// Callers should probe this before making cross-zome calls to detect
+/// incompatible schema changes. If the returned version is higher than
+/// the caller's expected version, the caller should log a warning or
+/// fail gracefully rather than risk silent deserialization failures.
+#[hdk_extern]
+pub fn get_api_version(_: ()) -> ExternResult<u16> {
+    Ok(API_VERSION)
+}
+
 // ==================== HAPP REGISTRATION ====================
 
 /// Register a hApp with the identity bridge
@@ -286,28 +305,45 @@ pub fn get_registered_happs(_: ()) -> ExternResult<Vec<Record>> {
 
 // ==================== IDENTITY QUERIES ====================
 
+/// Minimum interval between audit trail entries for the same DID query (60 seconds).
+const QUERY_RATE_LIMIT_MICROS: i64 = 60 * 1_000_000;
+
 /// Query a DID from another hApp (cross-hApp identity lookup)
 #[hdk_extern]
 pub fn query_identity(input: QueryIdentityInput) -> ExternResult<IdentityVerificationResult> {
     let now = sys_time()?;
 
-    // Create query record for audit trail
-    let query = IdentityQuery {
-        id: format!("query:{}:{}", input.did, now.as_micros()),
-        did: input.did.clone(),
-        source_happ: input.source_happ.clone(),
-        requested_fields: input.requested_fields.clone(),
-        queried_at: now,
-    };
-    let query_hash = create_entry(&EntryTypes::IdentityQuery(query))?;
-
-    // Link query to DID for tracking
-    create_link(
-        string_to_entry_hash(&input.did),
-        query_hash,
-        LinkTypes::DidToQueries,
-        (),
+    // Rate-limit audit trail entries: skip if the same DID was queried
+    // within QUERY_RATE_LIMIT_MICROS to prevent DHT bloat from rapid
+    // repeated lookups (e.g., enumeration attacks or polling loops).
+    let did_hash = string_to_entry_hash(&input.did);
+    let recent_queries = get_links(
+        LinkQuery::try_new(did_hash.clone(), LinkTypes::DidToQueries)?,
+        GetStrategy::default(),
     )?;
+
+    let should_audit = !recent_queries.iter().any(|link| {
+        let age = now.as_micros() as i64 - link.timestamp.as_micros() as i64;
+        age >= 0 && age < QUERY_RATE_LIMIT_MICROS
+    });
+
+    if should_audit {
+        let query = IdentityQuery {
+            id: format!("query:{}:{}", input.did, now.as_micros()),
+            did: input.did.clone(),
+            source_happ: input.source_happ.clone(),
+            requested_fields: input.requested_fields.clone(),
+            queried_at: now,
+        };
+        let query_hash = create_entry(&EntryTypes::IdentityQuery(query))?;
+
+        create_link(
+            did_hash,
+            query_hash,
+            LinkTypes::DidToQueries,
+            (),
+        )?;
+    }
 
     // Get DID details from did_registry (includes creation timestamp)
     let did_details = get_did_details(&input.did)?;
@@ -650,7 +686,16 @@ pub fn get_reputation(did: String) -> ExternResult<AggregatedReputation> {
     })
 }
 
-/// Internal function to compute aggregated reputation
+/// Exponential decay half-life for reputation scores (30 days in microseconds).
+/// After 30 days, a reputation entry's weight is halved.
+const REPUTATION_HALF_LIFE_MICROS: f64 = 30.0 * 24.0 * 3600.0 * 1_000_000.0;
+
+/// Internal function to compute aggregated reputation with exponential decay.
+///
+/// Recent reputation entries are weighted more heavily than old ones. Each
+/// entry's interaction count is multiplied by `2^(-age / half_life)` so
+/// entries older than 30 days contribute roughly half as much, 60 days
+/// contributes a quarter, etc.
 fn get_aggregated_reputation(did: &str) -> ExternResult<f64> {
     let did_hash = string_to_entry_hash(did);
     let links = get_links(
@@ -662,7 +707,10 @@ fn get_aggregated_reputation(did: &str) -> ExternResult<f64> {
         return Ok(0.5); // Default for unknown agents
     }
 
-    let mut total_weight = 0u64;
+    let now = sys_time()?;
+    let now_micros = now.as_micros() as f64;
+
+    let mut total_weight = 0.0f64;
     let mut weighted_sum = 0.0f64;
 
     for link in links {
@@ -676,16 +724,21 @@ fn get_aggregated_reputation(did: &str) -> ExternResult<f64> {
                 .ok()
                 .flatten()
             {
-                weighted_sum += rep.score * rep.interactions as f64;
-                total_weight += rep.interactions;
+                // Exponential decay: weight = interactions * 2^(-age/half_life)
+                let age_micros = (now_micros - rep.last_updated.as_micros() as f64).max(0.0);
+                let decay = (-age_micros / REPUTATION_HALF_LIFE_MICROS * core::f64::consts::LN_2).exp();
+                let effective_weight = rep.interactions as f64 * decay;
+
+                weighted_sum += rep.score * effective_weight;
+                total_weight += effective_weight;
             }
         }
     }
 
-    if total_weight == 0 {
+    if total_weight < f64::EPSILON {
         Ok(0.5)
     } else {
-        Ok(weighted_sum / total_weight as f64)
+        Ok(weighted_sum / total_weight)
     }
 }
 

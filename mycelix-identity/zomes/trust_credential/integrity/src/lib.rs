@@ -45,6 +45,9 @@ pub struct TrustCredential {
     pub revoked: bool,
     /// Revocation reason if revoked
     pub revocation_reason: Option<String>,
+    /// When the credential was revoked (for audit trails)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revoked_at: Option<Timestamp>,
     /// Previous credential this supersedes (for updates)
     pub supersedes: Option<String>,
 }
@@ -372,6 +375,13 @@ fn validate_create_credential(
         ));
     }
 
+    // New credentials must not have a revocation timestamp
+    if cred.revoked_at.is_some() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "New credentials cannot have a revocation timestamp".into(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -428,6 +438,30 @@ fn validate_update_credential(
         return Ok(ValidateCallbackResult::Invalid(
             "Trust credential revocation is irreversible".into(),
         ));
+    }
+
+    // If being revoked, revoked_at must be set
+    if cred.revoked && cred.revoked_at.is_none() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Revoked credentials must have a revoked_at timestamp".into(),
+        ));
+    }
+
+    // revoked_at is immutable once set
+    if let Some(original_ts) = &original.revoked_at {
+        match &cred.revoked_at {
+            Some(new_ts) if new_ts != original_ts => {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Revocation timestamp cannot be changed once set".into(),
+                ));
+            }
+            None => {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Revocation timestamp cannot be removed".into(),
+                ));
+            }
+            _ => {}
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
