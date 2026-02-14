@@ -112,7 +112,7 @@ impl HdcSemanticEncoder {
             let mut hasher = Hasher::new();
             hasher.update(word.as_bytes());
             let hash = hasher.finalize();
-            let word_seed = u64::from_le_bytes(hash.as_bytes()[0..8].try_into().unwrap());
+            let word_seed = u64::from_le_bytes(hash.as_bytes()[0..8].try_into().expect("8-byte slice fits [u8; 8]"));
 
             // Generate word vector (deterministic from seed)
             let word_hv = ContinuousHV::random(self.dimension, word_seed);
@@ -295,7 +295,7 @@ impl EncryptedEmbedding {
 
         let floats: Vec<f32> = plaintext.chunks_exact(4)
             .map(|chunk| {
-                let arr: [u8; 4] = chunk.try_into().unwrap();
+                let arr: [u8; 4] = chunk.try_into().expect("chunks_exact(4) guarantees 4-byte slices");
                 f32::from_le_bytes(arr)
             })
             .collect();

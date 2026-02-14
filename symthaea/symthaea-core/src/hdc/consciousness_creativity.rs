@@ -767,9 +767,18 @@ mod tests {
         system.set_mode(CreativeMode::Divergent);
 
         // May or may not generate based on distance
-        let _ = system.generate_combination();
+        let combination = system.generate_combination();
         // The attempt should increase step
         system.step();
+
+        // If a combination was generated, it should have valid fields
+        if let Some(combo) = combination {
+            assert!(!combo.id.is_empty(), "Combination id should be non-empty");
+            assert!(combo.novelty.is_finite(), "Combination novelty should be finite");
+            assert!(combo.novelty >= 0.0 && combo.novelty <= 1.0,
+                    "Novelty should be in [0, 1]");
+            assert!(combo.sources.len() >= 2, "Should combine at least 2 concepts");
+        }
     }
 
     #[test]

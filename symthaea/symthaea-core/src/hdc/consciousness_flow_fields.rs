@@ -792,8 +792,11 @@ mod tests {
 
         let assessment = flow.analyze();
 
-        // Might detect attractor (probabilistic due to HV randomness)
-        // Presence check is implicit; no-op assertion removed.
+        // Assessment fields should be finite
+        assert!(assessment.avg_flow_magnitude.is_finite(),
+                "Flow magnitude should be finite");
+        assert!(assessment.avg_flow_magnitude >= 0.0,
+                "Flow magnitude should be non-negative");
     }
 
     #[test]

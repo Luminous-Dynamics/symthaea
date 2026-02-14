@@ -951,6 +951,14 @@ mod tests {
 
         let result = discovery.discover(&x, &y);
         println!("P(X→Y): {:.3}, Confidence: {:.3}", result.p_forward, result.confidence);
+
+        // Probabilities should be finite and in [0, 1]
+        assert!(result.p_forward.is_finite(), "P(X→Y) should be finite");
+        assert!(result.p_forward >= 0.0 && result.p_forward <= 1.0,
+                "P(X→Y) should be in [0, 1], got {}", result.p_forward);
+        assert!(result.confidence.is_finite(), "Confidence should be finite");
+        assert!(result.confidence >= 0.0 && result.confidence <= 1.0,
+                "Confidence should be in [0, 1], got {}", result.confidence);
     }
 
     #[test]

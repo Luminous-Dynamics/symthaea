@@ -1205,6 +1205,11 @@ mod tests {
         // Check if integrated
         let is_integrated = phi_calc.is_integrated();
         println!("Is integrated (threshold 0.3): {}", is_integrated);
+
+        // Phi value should be finite and non-negative
+        let phi_val = phi_calc.compute_phi(&low);
+        assert!(phi_val.is_finite(), "Φ should be finite");
+        assert!(phi_val >= 0.0, "Φ should be non-negative");
     }
 
     #[test]

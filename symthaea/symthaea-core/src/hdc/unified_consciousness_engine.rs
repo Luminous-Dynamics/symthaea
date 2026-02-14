@@ -587,6 +587,7 @@ mod tests {
         let mut engine = UnifiedConsciousnessEngine::new(config);
 
         println!("\nMode transition test:");
+        let mut phi_values = Vec::new();
         for mode in &[
             CognitiveMode::Focused,
             CognitiveMode::Balanced,
@@ -599,7 +600,19 @@ mod tests {
 
             println!("  {:?}: Φ={:.4}, bridges={:.1}%",
                      mode, update.phi, update.bridge_ratio * 100.0);
+
+            assert!(update.phi.is_finite(), "{:?} Φ should be finite", mode);
+            assert!(update.phi >= 0.0, "{:?} Φ should be non-negative", mode);
+            assert!(update.bridge_ratio.is_finite(),
+                    "{:?} bridge_ratio should be finite", mode);
+            assert!(update.bridge_ratio >= 0.0 && update.bridge_ratio <= 1.0,
+                    "{:?} bridge_ratio should be in [0, 1]", mode);
+
+            phi_values.push(update.phi);
         }
+
+        // All modes should produce valid phi values (4 modes processed)
+        assert_eq!(phi_values.len(), 4, "Should have processed all 4 modes");
     }
 
     #[test]

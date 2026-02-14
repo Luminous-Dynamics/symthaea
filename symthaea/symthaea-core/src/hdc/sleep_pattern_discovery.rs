@@ -705,6 +705,12 @@ mod tests {
         // Should find few or no patterns (random vectors unlikely to cluster)
         // With high threshold, random vectors shouldn't cluster
         println!("Found {} patterns from random data", patterns.len());
+
+        // With min_occurrences=3 and similarity_threshold=0.8,
+        // 10 random vectors should yield very few (likely 0) patterns
+        assert!(patterns.len() <= 5,
+                "Random vectors with high threshold should produce few patterns, got {}",
+                patterns.len());
     }
 
     #[test]
@@ -764,6 +770,12 @@ mod tests {
         // Query with the base vector should find matching patterns
         let matches = engine.find_matching_patterns(&base, 0.3);
         println!("Found {} matching patterns for query", matches.len());
+
+        // Each match should have a valid similarity score
+        for m in &matches {
+            assert!(m.similarity.is_finite(), "Match similarity should be finite");
+            assert!(m.similarity >= 0.0, "Match similarity should be non-negative");
+        }
     }
 
     #[test]
@@ -788,5 +800,11 @@ mod tests {
         // Check that some memories got consolidated
         let stats = engine.stats();
         println!("Memories consolidated: {}", stats.memories_consolidated);
+
+        // After discover_patterns with auto_consolidate, stats should be valid
+        assert_eq!(stats.cycles_processed, 1,
+                   "Should have processed exactly 1 discovery cycle");
+        assert!(stats.memories_consolidated <= 4,
+                "Cannot consolidate more memories than were added");
     }
 }

@@ -291,7 +291,7 @@ impl ConsciousnessEventEmitter {
             self.next_sub_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         );
 
-        let mut subs = self.subscribers.write().unwrap();
+        let mut subs = self.subscribers.write().expect("subscribers RwLock poisoned");
         subs.entry(event_type)
             .or_default()
             .push((sub_id, Box::new(callback)));
@@ -308,7 +308,7 @@ impl ConsciousnessEventEmitter {
             self.next_sub_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         );
 
-        let mut subs = self.global_subscribers.write().unwrap();
+        let mut subs = self.global_subscribers.write().expect("global_subscribers RwLock poisoned");
         subs.push((sub_id, Box::new(callback)));
 
         sub_id
@@ -317,13 +317,13 @@ impl ConsciousnessEventEmitter {
     /// Unsubscribe by ID
     pub fn unsubscribe(&self, sub_id: SubscriptionId) {
         // Remove from typed subscribers
-        let mut subs = self.subscribers.write().unwrap();
+        let mut subs = self.subscribers.write().expect("subscribers RwLock poisoned");
         for (_, vec) in subs.iter_mut() {
             vec.retain(|(id, _)| *id != sub_id);
         }
 
         // Remove from global subscribers
-        let mut global = self.global_subscribers.write().unwrap();
+        let mut global = self.global_subscribers.write().expect("global_subscribers RwLock poisoned");
         global.retain(|(id, _)| *id != sub_id);
     }
 
@@ -331,7 +331,7 @@ impl ConsciousnessEventEmitter {
     pub fn emit(&self, event: ConsciousnessEvent) {
         // Add to history
         {
-            let mut history = self.history.write().unwrap();
+            let mut history = self.history.write().expect("history RwLock poisoned");
             history.push_back(event.clone());
             while history.len() > self.max_history {
                 history.pop_front();
@@ -340,7 +340,7 @@ impl ConsciousnessEventEmitter {
 
         // Notify typed subscribers
         {
-            let subs = self.subscribers.read().unwrap();
+            let subs = self.subscribers.read().expect("subscribers RwLock poisoned");
             if let Some(callbacks) = subs.get(&event.event_type) {
                 for (_, callback) in callbacks {
                     callback(&event);
@@ -350,7 +350,7 @@ impl ConsciousnessEventEmitter {
 
         // Notify global subscribers
         {
-            let global = self.global_subscribers.read().unwrap();
+            let global = self.global_subscribers.read().expect("global_subscribers RwLock poisoned");
             for (_, callback) in global.iter() {
                 callback(&event);
             }
@@ -359,7 +359,7 @@ impl ConsciousnessEventEmitter {
 
     /// Get recent events (for new subscriber catchup)
     pub fn get_history(&self, limit: usize) -> Vec<ConsciousnessEvent> {
-        let history = self.history.read().unwrap();
+        let history = self.history.read().expect("history RwLock poisoned");
         history.iter().rev().take(limit).cloned().collect()
     }
 }

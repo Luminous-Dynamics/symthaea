@@ -411,6 +411,90 @@ pub trait ConsciousnessDatabase: Send + Sync {
     /// println!("Records: {}, Size: {} bytes", stats.total_records, stats.database_size_bytes);
     /// ```
     async fn stats(&self) -> DbResult<DatabaseStats>;
+
+    /// Search with optional filter predicate (e.g., memory_type, timestamp range).
+    ///
+    /// The `filter` string is backend-specific:
+    /// - **LanceDB**: Lance SQL expression applied before loading (predicate pushdown)
+    /// - **SQLite**: Ignored (falls back to unfiltered search)
+    ///
+    /// Default implementation ignores the filter and delegates to [`search_similar`].
+    async fn search_similar_filtered(
+        &self,
+        query: &BinaryHV,
+        top_k: usize,
+        _filter: Option<&str>,
+    ) -> DbResult<Vec<SearchResult>> {
+        self.search_similar(query, top_k).await
+    }
+
+    /// List all records in the database (for migration/export).
+    ///
+    /// Default implementation returns an empty vec. Backends should override
+    /// this to provide a full scan without similarity computation.
+    async fn list_all(&self) -> DbResult<Vec<MemoryRecord>> {
+        Ok(Vec::new())
+    }
+}
+
+// ============================================================================
+// Runtime Backend Selection
+// ============================================================================
+
+/// Which database backend to use for persistent consciousness memory.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum DatabaseBackend {
+    /// SQLite — battle-tested, single-file, always available.
+    Sqlite,
+    /// LanceDB — columnar Arrow storage, async-native.
+    /// Requires the `lancedb-backend` feature flag.
+    #[cfg(feature = "lancedb-backend")]
+    Lance,
+}
+
+impl Default for DatabaseBackend {
+    fn default() -> Self {
+        Self::Sqlite
+    }
+}
+
+/// Configuration for the consciousness database layer.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DatabaseConfig {
+    /// Which backend to use.
+    pub backend: DatabaseBackend,
+    /// Path for persistent storage. If None, uses in-memory.
+    pub path: Option<String>,
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            backend: DatabaseBackend::default(),
+            path: None,
+        }
+    }
+}
+
+/// Create a database instance from configuration.
+pub async fn create_database(config: &DatabaseConfig) -> DbResult<Box<dyn ConsciousnessDatabase>> {
+    match &config.backend {
+        DatabaseBackend::Sqlite => {
+            let db = match &config.path {
+                Some(p) => SqliteMemory::new(p)?,
+                None => SqliteMemory::in_memory()?,
+            };
+            Ok(Box::new(db))
+        }
+        #[cfg(feature = "lancedb-backend")]
+        DatabaseBackend::Lance => {
+            let db = match &config.path {
+                Some(p) => LanceMemory::new(p).await?,
+                None => LanceMemory::in_memory().await?,
+            };
+            Ok(Box::new(db))
+        }
+    }
 }
 
 // Re-exports

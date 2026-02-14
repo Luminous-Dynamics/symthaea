@@ -648,7 +648,7 @@ impl TwoTrackProcessor {
             vec![0.0; self.config.cfc_hidden_dim]
         };
 
-        let bridge = self.bridge.as_ref().unwrap();
+        let bridge = self.bridge.as_ref().expect("bridge confirmed Some by is_none() check above");
         let bridge_encoded = bridge.encode_with_temporal_context(&semantic_hv, &current_temporal_state);
 
         // Pad bridge output to match CfC input_dim if needed

@@ -461,7 +461,7 @@ impl IncrementalBind {
 
         // Return cached results in order
         (0..self.queries.len())
-            .map(|idx| *self.cached_results.get(&idx).unwrap())
+            .map(|idx| *self.cached_results.get(&idx).expect("all query indices populated in loop above"))
             .collect()
     }
 

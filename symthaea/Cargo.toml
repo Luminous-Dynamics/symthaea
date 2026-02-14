@@ -78,9 +78,6 @@ ndarray = { workspace = true }
 # Linear algebra (pure Rust, validated eigenvalue calculations)
 nalgebra = { workspace = true }
 
-# Burn ML Framework (pure Rust) - for semantic encoding
-burn = { version = "0.20", features = ["ndarray"], optional = true }
-burn-ndarray = { version = "0.20", optional = true }
 # ndarray-linalg = "0.16"  # Removed to avoid external BLAS dependency during tests
 
 # Graph structures (for autopoietic consciousness)
@@ -97,9 +94,7 @@ candle-transformers = { version = "0.8", optional = true }
 # half removed: referenced in neural-bridge feature but never imported in source
 
 # Phase 11: Database Trinity (Deferred to Week 11+)
-# - lancedb: available via `lancedb-backend` feature (xz2 conflict resolved in 0.23+; avoid combining with semantic-burn)
 # - cozo: graph_builder 0.4.1 rayon compat
-# - qdrant: lzma conflict with burn-ndarray
 # DuckDB is the active database backend (unconditional dep below)
 
 # Phase 11: Swarm Intelligence - Hybrid Iroh + Holochain Architecture
@@ -109,15 +104,10 @@ candle-transformers = { version = "0.8", optional = true }
 iroh = { version = "0.96", optional = true }
 
 # LanceDB: Columnar vector storage backend (optional)
-# BLOCKED: lancedb → datafusion → xz2 (links="lzma") conflicts with
-#   burn-ndarray → cubecl-cpu → liblzma-sys (links="lzma").
-#   Cargo enforces links uniqueness across ALL optional deps during resolution.
-#   Re-enable when lancedb or burn drops xz2/liblzma-sys, or when
-#   lancedb switches to liblzma-sys (unifying the dep).
-#   Implementation ready in src/databases/lance_client.rs.
-# lancedb = { version = "0.23", optional = true }
-arrow-array = { version = "54", optional = true }
-arrow-schema = { version = "54", optional = true }
+# Implementation: src/databases/lance_client.rs
+lancedb = { version = "0.23", optional = true }
+arrow-array = { version = "56", optional = true }
+arrow-schema = { version = "56", optional = true }
 futures = { version = "0.3", optional = true }
 
 # Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
@@ -263,7 +253,6 @@ embeddings = ["tokenizers", "ort", "hf-hub"]          # Qwen3/BGE text embedding
 vision = ["ort", "hf-hub"]                            # SigLIP image embeddings via ONNX
 perception = ["embeddings", "vision"]                 # Full multimodal perception stack
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
-semantic-burn = ["burn", "burn-ndarray"]              # Pure Rust semantic encoder via Burn
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
@@ -275,8 +264,7 @@ mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
 network = []                                # Mycelix network client (real HTTP fetching)
 
 # ── GPU ─────────────────────────────────────────────────────────────
-gpu = ["burn", "burn-ndarray"]              # GPU acceleration via Burn/WGPU for CfC networks
-cuda = ["gpu"]                              # CUDA backend (requires CUDA toolkit)
+cuda = []                                   # CUDA backend gate (reserved for future use)
 
 # ── Desktop & System Integration ────────────────────────────────────
 notifications = ["zbus"]                    # D-Bus desktop notifications
@@ -287,12 +275,9 @@ nix-daemon = ["symthaea-nix", "symthaea-nix/daemon"]
 identity = []                               # Ed25519 signatures, capability gating
 
 # ── Database backends ───────────────────────────────────────────────
-# DuckDB is an unconditional dep. Others deferred due to link conflicts:
-# - qdrant: lzma conflict with burn-ndarray
+# DuckDB is an unconditional dep. Others deferred:
 # - cozo: graph_builder 0.4.1 rayon compat
-# lancedb-backend: BLOCKED by links="lzma" conflict (see LanceDB dep comment above).
-# Uncomment when lancedb dep is re-enabled:
-# lancedb-backend = ["dep:lancedb", "dep:arrow-array", "dep:arrow-schema", "dep:futures"]
+lancedb-backend = ["dep:lancedb", "dep:arrow-array", "dep:arrow-schema", "dep:futures"]
 hdf5 = []                                  # Requires system HDF5 library (gates cmod_adapter.rs)
 databases_module = []                       # Database backends in experience module
 

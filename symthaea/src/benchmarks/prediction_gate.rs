@@ -391,8 +391,8 @@ impl PredictionGate {
 
         // Calculate learning rate (slope of test_loss decrease)
         let learning_rate = if episodes.len() >= 2 {
-            let first = episodes.first().unwrap().test_loss;
-            let last = episodes.last().unwrap().test_loss;
+            let first = episodes.first().expect("episodes.len() >= 2").test_loss;
+            let last = episodes.last().expect("episodes.len() >= 2").test_loss;
             (first - last) / episodes.len() as f32
         } else {
             0.0

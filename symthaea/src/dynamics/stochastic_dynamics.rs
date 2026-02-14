@@ -365,7 +365,7 @@ pub fn monte_carlo(
             shared_times = result.times;
         }
         // Each solve returns exactly one trajectory
-        all_trajectories.push(result.trajectories.into_iter().next().unwrap());
+        all_trajectories.push(result.trajectories.into_iter().next().expect("solve always returns at least one trajectory"));
     }
 
     let statistics = compute_ensemble_statistics(&all_trajectories);

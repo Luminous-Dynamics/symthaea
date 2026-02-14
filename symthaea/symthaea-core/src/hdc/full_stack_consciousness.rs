@@ -157,16 +157,16 @@ impl ActiveInferenceAdapter {
 
         // 1. Semantic coherence prediction
         let semantic_obs = understanding.confidence as f32;
-        let semantic_pred = *self.predictions.get(&InferenceDomain::SemanticCoherence).unwrap();
-        let semantic_prec = *self.precisions.get(&InferenceDomain::SemanticCoherence).unwrap();
+        let semantic_pred = *self.predictions.get(&InferenceDomain::SemanticCoherence).expect("SemanticCoherence initialized in new()");
+        let semantic_prec = *self.precisions.get(&InferenceDomain::SemanticCoherence).expect("SemanticCoherence initialized in new()");
         errors.push(UnderstandingPredictionError::new(
             semantic_pred, semantic_obs, semantic_prec, InferenceDomain::SemanticCoherence
         ));
 
         // 2. Emotional state prediction
         let emotion_obs = (understanding.grounded.embodied.valence + 1.0) / 2.0; // Normalize to 0-1
-        let emotion_pred = *self.predictions.get(&InferenceDomain::EmotionalState).unwrap();
-        let emotion_prec = *self.precisions.get(&InferenceDomain::EmotionalState).unwrap();
+        let emotion_pred = *self.predictions.get(&InferenceDomain::EmotionalState).expect("EmotionalState initialized in new()");
+        let emotion_prec = *self.precisions.get(&InferenceDomain::EmotionalState).expect("EmotionalState initialized in new()");
         errors.push(UnderstandingPredictionError::new(
             emotion_pred, emotion_obs, emotion_prec, InferenceDomain::EmotionalState
         ));
@@ -177,32 +177,32 @@ impl ActiveInferenceAdapter {
         } else {
             understanding.speaker_model.intentions[0].confidence
         };
-        let social_pred = *self.predictions.get(&InferenceDomain::SocialDynamics).unwrap();
-        let social_prec = *self.precisions.get(&InferenceDomain::SocialDynamics).unwrap();
+        let social_pred = *self.predictions.get(&InferenceDomain::SocialDynamics).expect("SocialDynamics initialized in new()");
+        let social_prec = *self.precisions.get(&InferenceDomain::SocialDynamics).expect("SocialDynamics initialized in new()");
         errors.push(UnderstandingPredictionError::new(
             social_pred, social_obs, social_prec, InferenceDomain::SocialDynamics
         ));
 
         // 4. Narrative continuity
         let narrative_obs = understanding.narrative.identity_coherence as f32;
-        let narrative_pred = *self.predictions.get(&InferenceDomain::NarrativeContinuity).unwrap();
-        let narrative_prec = *self.precisions.get(&InferenceDomain::NarrativeContinuity).unwrap();
+        let narrative_pred = *self.predictions.get(&InferenceDomain::NarrativeContinuity).expect("NarrativeContinuity initialized in new()");
+        let narrative_prec = *self.precisions.get(&InferenceDomain::NarrativeContinuity).expect("NarrativeContinuity initialized in new()");
         errors.push(UnderstandingPredictionError::new(
             narrative_pred, narrative_obs, narrative_prec, InferenceDomain::NarrativeContinuity
         ));
 
         // 5. Causal reasoning (was causation detected as expected?)
         let causal_obs = if understanding.grounded.causal_structure.is_some() { 1.0 } else { 0.0 };
-        let causal_pred = *self.predictions.get(&InferenceDomain::CausalReasoning).unwrap();
-        let causal_prec = *self.precisions.get(&InferenceDomain::CausalReasoning).unwrap();
+        let causal_pred = *self.predictions.get(&InferenceDomain::CausalReasoning).expect("CausalReasoning initialized in new()");
+        let causal_prec = *self.precisions.get(&InferenceDomain::CausalReasoning).expect("CausalReasoning initialized in new()");
         errors.push(UnderstandingPredictionError::new(
             causal_pred, causal_obs, causal_prec, InferenceDomain::CausalReasoning
         ));
 
         // 6. Temporal flow (surprise in predictive processing)
         let temporal_obs = 1.0 - understanding.predictive.surprise; // Low surprise = expected
-        let temporal_pred = *self.predictions.get(&InferenceDomain::TemporalFlow).unwrap();
-        let temporal_prec = *self.precisions.get(&InferenceDomain::TemporalFlow).unwrap();
+        let temporal_pred = *self.predictions.get(&InferenceDomain::TemporalFlow).expect("TemporalFlow initialized in new()");
+        let temporal_prec = *self.precisions.get(&InferenceDomain::TemporalFlow).expect("TemporalFlow initialized in new()");
         errors.push(UnderstandingPredictionError::new(
             temporal_pred, temporal_obs, temporal_prec, InferenceDomain::TemporalFlow
         ));

@@ -1060,9 +1060,11 @@ mod tests {
         println!("Random topology Phi: {:.6}", random_phi);
         println!("Star topology Phi: {:.6}", star_phi);
 
-        // Star should generally have higher integration
-        // (hub provides global integration)
-        // Note: This may not always hold due to the specific IIT formulation
+        // Both phi values should be finite and non-negative
+        assert!(random_phi.is_finite(), "Random Phi should be finite");
+        assert!(star_phi.is_finite(), "Star Phi should be finite");
+        assert!(random_phi >= 0.0, "Random Phi should be non-negative");
+        assert!(star_phi >= 0.0, "Star Phi should be non-negative");
     }
 
     #[test]
@@ -1079,6 +1081,15 @@ mod tests {
 
         println!("Early gradient norm: {:.6}", early_grad);
         println!("Late gradient norm: {:.6}", late_grad);
+
+        // Gradient norms should be finite and non-negative
+        assert!(early_grad.is_finite(), "Early gradient norm should be finite");
+        assert!(late_grad.is_finite(), "Late gradient norm should be finite");
+        assert!(early_grad >= 0.0, "Early gradient norm should be non-negative");
+        assert!(late_grad >= 0.0, "Late gradient norm should be non-negative");
+
+        // Optimization history should have 30 entries
+        assert_eq!(history.len(), 30, "Should have 30 optimization steps");
     }
 
     #[test]

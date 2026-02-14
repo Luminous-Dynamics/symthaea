@@ -662,6 +662,12 @@ mod tests {
             let ratio = adaptive.bridge_ratio();
 
             println!("{:20?}: Φ={:.4}, ratio={:.1}%", mode, phi, ratio * 100.0);
+
+            assert!(phi.is_finite(), "{:?} Φ should be finite", mode);
+            assert!(phi >= 0.0, "{:?} Φ should be non-negative", mode);
+            assert!(ratio.is_finite(), "{:?} bridge ratio should be finite", mode);
+            assert!(ratio >= 0.0 && ratio <= 1.0,
+                    "{:?} bridge ratio should be in [0, 1]", mode);
         }
     }
 }

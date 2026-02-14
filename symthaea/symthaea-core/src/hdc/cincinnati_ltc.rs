@@ -1025,9 +1025,21 @@ mod tests {
             engine.pog.update_energy(1.0, t as f64);
         }
 
+        // All 50 outputs should be finite-valued
+        assert_eq!(outputs.len(), 50);
+        for (i, output) in outputs.iter().enumerate() {
+            for v in output.values() {
+                assert!(v.is_finite(), "Output {} should have finite values", i);
+            }
+        }
+
         // Check budding
         let events = engine.process_budding(&inputs, 50.0);
         println!("Budding events: {}", events.len());
         println!("Final node count: {}", engine.node_count());
+
+        // Node count should be at least the initial 5
+        assert!(engine.node_count() >= 5,
+                "Node count should be at least initial count");
     }
 }

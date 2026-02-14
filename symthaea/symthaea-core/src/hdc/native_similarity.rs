@@ -255,7 +255,7 @@ impl NativeSimilarityIndex {
         }
 
         let packed = PackedBipolar::from_bipolar(pattern);
-        let mut patterns = self.patterns.write().unwrap();
+        let mut patterns = self.patterns.write().expect("patterns RwLock poisoned");
         patterns.insert(id.to_string(), packed);
 
         Ok(())
@@ -271,7 +271,7 @@ impl NativeSimilarityIndex {
             ));
         }
 
-        let mut patterns = self.patterns.write().unwrap();
+        let mut patterns = self.patterns.write().expect("patterns RwLock poisoned");
         patterns.insert(id.to_string(), pattern);
 
         Ok(())
@@ -287,7 +287,7 @@ impl NativeSimilarityIndex {
 
     /// Query with packed pattern
     pub fn query_packed(&self, query: &PackedBipolar, limit: usize) -> Vec<(String, f32)> {
-        let patterns = self.patterns.read().unwrap();
+        let patterns = self.patterns.read().expect("patterns RwLock poisoned");
 
         let mut matches: Vec<(String, f32)> = patterns.iter()
             .map(|(id, stored)| {
@@ -307,7 +307,7 @@ impl NativeSimilarityIndex {
     /// Find exact match (similarity > 0.99)
     pub fn find_exact(&self, pattern: &[i8]) -> Option<String> {
         let query_packed = PackedBipolar::from_bipolar(pattern);
-        let patterns = self.patterns.read().unwrap();
+        let patterns = self.patterns.read().expect("patterns RwLock poisoned");
 
         for (id, stored) in patterns.iter() {
             if query_packed.xor_similarity(stored) > 0.99 {
@@ -320,25 +320,25 @@ impl NativeSimilarityIndex {
 
     /// Retrieve pattern by ID
     pub fn get(&self, id: &str) -> Option<Vec<i8>> {
-        let patterns = self.patterns.read().unwrap();
+        let patterns = self.patterns.read().expect("patterns RwLock poisoned");
         patterns.get(id).map(|p| p.to_bipolar())
     }
 
     /// Get packed pattern by ID
     pub fn get_packed(&self, id: &str) -> Option<PackedBipolar> {
-        let patterns = self.patterns.read().unwrap();
+        let patterns = self.patterns.read().expect("patterns RwLock poisoned");
         patterns.get(id).cloned()
     }
 
     /// Remove pattern by ID
     pub fn remove(&self, id: &str) -> bool {
-        let mut patterns = self.patterns.write().unwrap();
+        let mut patterns = self.patterns.write().expect("patterns RwLock poisoned");
         patterns.remove(id).is_some()
     }
 
     /// Number of stored patterns
     pub fn len(&self) -> usize {
-        self.patterns.read().unwrap().len()
+        self.patterns.read().expect("patterns RwLock poisoned").len()
     }
 
     /// Check if index is empty
@@ -348,7 +348,7 @@ impl NativeSimilarityIndex {
 
     /// Total memory usage in bytes
     pub fn memory_bytes(&self) -> usize {
-        let patterns = self.patterns.read().unwrap();
+        let patterns = self.patterns.read().expect("patterns RwLock poisoned");
         patterns.values().map(|p| p.memory_bytes()).sum::<usize>()
             + patterns.keys().map(|k| k.len()).sum::<usize>()
     }

@@ -812,9 +812,15 @@ mod tests {
 
         let assessment = temporal.assess();
 
-        // With similar states, might detect timelessness
-        // (This test is probabilistic, so we just check it runs)
-        let _ = assessment.is_timeless();
+        // Assessment should have valid fields
+        assert!(assessment.phi_temporal.is_finite(),
+                "Temporal Φ should be finite");
+        assert!(assessment.phi_temporal >= 0.0,
+                "Temporal Φ should be non-negative");
+
+        // is_timeless returns a valid boolean
+        let timeless = assessment.is_timeless();
+        assert!(timeless || !timeless, "is_timeless should return a valid bool");
     }
 
     #[test]

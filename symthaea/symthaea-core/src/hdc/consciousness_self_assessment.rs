@@ -708,8 +708,12 @@ mod tests {
         }
 
         system.broadcast_to_workspace();
-        // With high integration, should be in workspace
-        // (depends on phi_self calculation)
+
+        // After broadcast with high integration, run assessment to check state
+        let result = system.assess();
+        assert!(result.phi_self.is_finite(), "Phi_self should be finite");
+        assert!(result.phi_self >= 0.0, "Phi_self should be non-negative");
+        assert!(result.meta_depth >= 0, "Meta depth should be non-negative");
     }
 
     #[test]

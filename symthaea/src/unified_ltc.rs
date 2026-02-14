@@ -1110,7 +1110,11 @@ mod tests {
         ltc.reset();
         let loss2 = ltc.train_step(&input, &target).unwrap();
 
-        // Loss should generally decrease
+        // Both losses should be finite and non-negative
+        assert!(loss1.is_finite(), "Loss 1 should be finite");
+        assert!(loss2.is_finite(), "Loss 2 should be finite");
+        assert!(loss1 >= 0.0, "Loss 1 should be non-negative");
+        assert!(loss2 >= 0.0, "Loss 2 should be non-negative");
         println!("Loss 1: {}, Loss 2: {}", loss1, loss2);
     }
 

@@ -598,8 +598,13 @@ mod tests {
         let final_ratio = topology.bridge_ratio();
         println!("Final bridge ratio: {:.1}%", final_ratio * 100.0);
 
-        // Bridge ratio should change during learning
-        // (exact direction depends on gradient)
+        // Bridge ratios should be valid (finite and in [0, 1])
+        assert!(initial_ratio.is_finite(), "Initial bridge ratio should be finite");
+        assert!(final_ratio.is_finite(), "Final bridge ratio should be finite");
+        assert!(initial_ratio >= 0.0 && initial_ratio <= 1.0,
+                "Initial bridge ratio should be in [0, 1]");
+        assert!(final_ratio >= 0.0 && final_ratio <= 1.0,
+                "Final bridge ratio should be in [0, 1]");
     }
 
     #[test]

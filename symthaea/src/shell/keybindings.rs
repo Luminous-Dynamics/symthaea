@@ -269,7 +269,7 @@ impl KeybindingManager {
         // Handle count prefix
         if let KeyEvent::Char(c) = &key {
             if c.is_ascii_digit() && (*c != '0' || self.count_prefix.is_some()) {
-                let digit = c.to_digit(10).unwrap() as usize;
+                let digit = c.to_digit(10).expect("c verified as ascii digit above") as usize;
                 self.count_prefix = Some(self.count_prefix.unwrap_or(0) * 10 + digit);
                 return EditAction::Noop;
             }

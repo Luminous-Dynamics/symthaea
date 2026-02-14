@@ -673,6 +673,12 @@ mod tests {
         println!("Momentum optimizer:");
         println!("  Initial Φ: {:.4}", initial.phi);
         println!("  Final Φ: {:.4}", final_result.phi);
+
+        // Both phi values should be finite and non-negative
+        assert!(initial.phi.is_finite(), "Initial Φ should be finite");
+        assert!(final_result.phi.is_finite(), "Final Φ should be finite");
+        assert!(initial.phi >= 0.0, "Initial Φ should be non-negative");
+        assert!(final_result.phi >= 0.0, "Final Φ should be non-negative");
     }
 
     #[test]

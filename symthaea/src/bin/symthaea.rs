@@ -787,7 +787,7 @@ impl ServiceState {
             Request::Ping => Response::Pong {
                 timestamp: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_secs(),
             },
 
@@ -1107,7 +1107,7 @@ impl ServiceState {
                     safety_checks: self.requests_processed,
                     timestamp_ms: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
+                        .unwrap_or_default()
                         .as_millis() as u64,
                 }
             }

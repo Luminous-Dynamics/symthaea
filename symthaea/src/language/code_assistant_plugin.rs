@@ -36,7 +36,7 @@ impl DomainPlugin for CodeAssistantPlugin {
         }
 
         // Extract function/method names (word followed by parentheses)
-        let re_func = regex::Regex::new(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(").unwrap();
+        let re_func = regex::Regex::new(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(").expect("valid regex literal");
         for cap in re_func.captures_iter(text) {
             if let Some(m) = cap.get(1) {
                 let name = m.as_str();
@@ -53,7 +53,7 @@ impl DomainPlugin for CodeAssistantPlugin {
         // Extract error patterns
         if lower.contains("error") || lower.contains("exception") || lower.contains("panic") {
             // Try to extract error type (e.g., "TypeError: ..." or "error[E0308]")
-            let re_err = regex::Regex::new(r"(?i)((?:error|exception|panic|TypeError|ValueError|RuntimeError)\S*)").unwrap();
+            let re_err = regex::Regex::new(r"(?i)((?:error|exception|panic|TypeError|ValueError|RuntimeError)\S*)").expect("valid regex literal");
             for cap in re_err.captures_iter(text) {
                 if let Some(m) = cap.get(1) {
                     entities.push(
@@ -65,7 +65,7 @@ impl DomainPlugin for CodeAssistantPlugin {
         }
 
         // Extract file paths
-        let re_path = regex::Regex::new(r"(?:^|\s)((?:[a-zA-Z_./][a-zA-Z0-9_./\-]*)?\.(?:rs|py|js|ts|go|java|cpp|c|h|rb|swift|kt|hs|nix|sh|sql))").unwrap();
+        let re_path = regex::Regex::new(r"(?:^|\s)((?:[a-zA-Z_./][a-zA-Z0-9_./\-]*)?\.(?:rs|py|js|ts|go|java|cpp|c|h|rb|swift|kt|hs|nix|sh|sql))").expect("valid regex literal");
         for cap in re_path.captures_iter(text) {
             if let Some(m) = cap.get(1) {
                 entities.push(
@@ -76,7 +76,7 @@ impl DomainPlugin for CodeAssistantPlugin {
         }
 
         // Extract line numbers (e.g., "line 42", "L42", ":42:")
-        let re_line = regex::Regex::new(r"(?:line\s+|:)(\d+)").unwrap();
+        let re_line = regex::Regex::new(r"(?:line\s+|:)(\d+)").expect("valid regex literal");
         for cap in re_line.captures_iter(text) {
             if let Some(m) = cap.get(1) {
                 entities.push(

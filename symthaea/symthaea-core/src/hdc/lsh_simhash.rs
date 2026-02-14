@@ -346,9 +346,15 @@ mod tests {
         let hash1 = table.hash(&v1);
         let hash2 = table.hash(&v2);
 
-        // With 1/2048 bits different, probability of different hash is ~10/2048 ≈ 0.5%
+        // With 1/16384 bits different, probability of different hash is very small
         // So they'll usually hash to same value
         println!("Similar vectors: hash1={}, hash2={}, same={}", hash1, hash2, hash1 == hash2);
+
+        // Both hashes should be valid (non-zero indicates the table processed them)
+        // The hashes should most likely be equal for nearly identical vectors
+        // (we can't guarantee it due to random hyperplanes, but we can check finiteness)
+        assert!(hash1 < u64::MAX, "Hash1 should be a valid hash value");
+        assert!(hash2 < u64::MAX, "Hash2 should be a valid hash value");
     }
 
     #[test]

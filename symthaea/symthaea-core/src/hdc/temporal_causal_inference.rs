@@ -805,7 +805,12 @@ mod tests {
         let te_yx = tci.transfer_entropy(&y, &x, 1, 1, 8);
 
         println!("Symmetric TE: X→Y={:.4}, Y→X={:.4}", te_xy, te_yx);
-        // Should be roughly similar for correlated series
+
+        // Both transfer entropy values should be finite and non-negative
+        assert!(te_xy.is_finite(), "TE X→Y should be finite");
+        assert!(te_yx.is_finite(), "TE Y→X should be finite");
+        assert!(te_xy >= 0.0, "TE X→Y should be non-negative");
+        assert!(te_yx >= 0.0, "TE Y→X should be non-negative");
     }
 
     #[test]
@@ -861,6 +866,11 @@ mod tests {
         let (is_bidirectional, strength) = tci.detect_feedback(&x, &y);
 
         println!("Feedback: bidirectional={}, strength={:.3}", is_bidirectional, strength);
+
+        // Bidirectional causality should be detected for mutually coupled signals
+        assert!(is_bidirectional, "Mutually coupled X↔Y should be detected as bidirectional");
+        assert!(strength.is_finite(), "Feedback strength should be finite");
+        assert!(strength >= 0.0, "Feedback strength should be non-negative");
     }
 
     #[test]
@@ -877,7 +887,12 @@ mod tests {
         let net_flow = tci.net_information_flow(&x, &y);
 
         println!("Net information flow X→Y: {:.4}", net_flow);
-        // Should be positive (more flow X→Y than Y→X)
+
+        // Net flow should be finite
+        assert!(net_flow.is_finite(), "Net information flow should be finite");
+        // X strongly drives Y (0.9 coefficient), so net flow should be positive
+        assert!(net_flow > 0.0,
+                "Net flow should be positive when X strongly drives Y, got {}", net_flow);
     }
 
     #[test]

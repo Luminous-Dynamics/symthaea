@@ -179,7 +179,7 @@ impl SensorimotorGrounding {
         for command in self.motor_repertoire.values() {
             let similarity = goal.similarity(&command.encoding);
             if similarity > threshold
-                && (best_action.is_none() || similarity > best_action.unwrap().0) {
+                && best_action.map_or(true, |(s, _)| similarity > s) {
                     best_action = Some((similarity, command));
                 }
         }

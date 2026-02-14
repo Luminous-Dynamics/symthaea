@@ -735,6 +735,15 @@ mod tests {
 
             println!("Scales={}: nodes={}, edges={}, Φ_combined={:.4}",
                      n_scales, metrics.total_nodes, metrics.total_edges, metrics.combined_phi);
+
+            assert!(metrics.combined_phi.is_finite(),
+                    "Φ should be finite for {} scales", n_scales);
+            assert!(metrics.combined_phi >= 0.0,
+                    "Φ should be non-negative for {} scales", n_scales);
+            assert!(metrics.total_nodes > 0,
+                    "Should have at least 1 node for {} scales", n_scales);
+            assert!(metrics.total_edges > 0,
+                    "Should have at least 1 edge for {} scales", n_scales);
         }
     }
 }

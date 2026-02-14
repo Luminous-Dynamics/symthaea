@@ -240,8 +240,8 @@ impl CModShot {
         if self.samples.is_empty() {
             return 0.0;
         }
-        let first = self.samples.first().unwrap().time_ms;
-        let last = self.samples.last().unwrap().time_ms;
+        let first = self.samples.first().expect("samples checked non-empty above").time_ms;
+        let last = self.samples.last().expect("samples checked non-empty above").time_ms;
         last - first
     }
 
@@ -257,7 +257,7 @@ impl CModShot {
     /// Sort samples by time
     pub fn sort_by_time(&mut self) {
         self.samples
-            .sort_by(|a, b| a.time_ms.partial_cmp(&b.time_ms).unwrap());
+            .sort_by(|a, b| a.time_ms.total_cmp(&b.time_ms));
     }
 
     /// Get sample count

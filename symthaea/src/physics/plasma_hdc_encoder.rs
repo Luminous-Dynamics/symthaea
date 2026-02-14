@@ -914,8 +914,8 @@ impl PlasmaPhiMonitor {
             return 0.0;
         }
 
-        let first = recent.last().unwrap();
-        let last = recent.first().unwrap();
+        let first = recent.last().expect("recent has at least 2 elements (checked above)");
+        let last = recent.first().expect("recent has at least 2 elements (checked above)");
         let dt = last.0 - first.0;
 
         if dt.abs() < 1e-6 {

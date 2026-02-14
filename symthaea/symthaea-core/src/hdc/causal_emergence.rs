@@ -498,9 +498,14 @@ mod tests {
         println!("Scale emergence:");
         for (scale, emergence) in &multi.scale_emergence {
             println!("  {} partitions: {:.4}", scale, emergence);
+            assert!(emergence.is_finite(), "Emergence at scale {} should be finite", scale);
         }
         println!("Optimal scale: {}", multi.optimal_scale);
         println!("Max emergence: {:.4}", multi.max_emergence);
+
+        assert!(!multi.scale_emergence.is_empty(), "Should have at least one scale");
+        assert!(multi.max_emergence.is_finite(), "Max emergence should be finite");
+        assert!(multi.optimal_scale > 0, "Optimal scale should be positive");
     }
 
     #[test]
@@ -526,5 +531,9 @@ mod tests {
 
         // Small topology should still work
         println!("Small topology Φ: {:.4}", result.phi_macro);
+
+        assert!(result.phi_macro.is_finite(), "Phi_macro should be finite");
+        assert!(result.phi_macro >= 0.0, "Phi_macro should be non-negative");
+        assert!(result.emergence_ratio.is_finite(), "Emergence ratio should be finite");
     }
 }

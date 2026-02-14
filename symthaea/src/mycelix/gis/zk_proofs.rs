@@ -51,7 +51,7 @@ impl FieldElement {
         let mut hasher = Hasher::new();
         hasher.update(bytes);
         let hash = hasher.finalize();
-        let arr: [u8; 16] = hash.as_bytes()[0..16].try_into().unwrap();
+        let arr: [u8; 16] = hash.as_bytes()[0..16].try_into().expect("16-byte slice fits [u8; 16]");
         Self::new(u128::from_le_bytes(arr))
     }
 
@@ -457,7 +457,7 @@ impl SchnorrProof {
                 .as_nanos();
             hasher.update(&now.to_le_bytes());
             let hash = hasher.finalize();
-            u64::from_le_bytes(hash.as_bytes()[0..8].try_into().unwrap())
+            u64::from_le_bytes(hash.as_bytes()[0..8].try_into().expect("8-byte slice fits [u8; 8]"))
         };
         let r = FieldElement::random(r_seed);
 
@@ -659,7 +659,7 @@ impl TopicValidityProof {
         hasher.update(&(topic.chars().filter(|c| c.is_alphabetic()).count() as u64).to_le_bytes());
 
         let hash = hasher.finalize();
-        hash.as_bytes()[0..32].try_into().unwrap()
+        hash.as_bytes()[0..32].try_into().expect("32-byte slice fits [u8; 32]")
     }
 
     /// Get proof size

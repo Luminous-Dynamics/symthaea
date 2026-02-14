@@ -645,7 +645,7 @@ impl CausalLTCBridge {
 
         // Sort by absolute strength (descending)
         flow.sort_by(|a: &(usize, usize, f64), b: &(usize, usize, f64)| {
-            b.2.abs().partial_cmp(&a.2.abs()).unwrap()
+            b.2.abs().total_cmp(&a.2.abs())
         });
         flow
     }
@@ -1256,10 +1256,18 @@ mod tests {
         let (is_indep, p_val) = hsic.test_independence(&x, &y, 0.05);
         println!("Independent test: is_indep={}, p_value={}", is_indep, p_val);
 
+        // p-value should be valid
+        assert!(p_val.is_finite(), "P-value should be finite");
+        assert!(p_val >= 0.0, "P-value should be non-negative");
+
         // Dependent variables
         let y_dep: Vec<f64> = x.iter().map(|&xi| 2.0 * xi + 0.1).collect();
         let (is_indep2, p_val2) = hsic.test_independence(&x, &y_dep, 0.05);
         println!("Dependent test: is_indep={}, p_value={}", is_indep2, p_val2);
+
+        assert!(p_val2.is_finite(), "P-value for dependent test should be finite");
+        // Dependent variables should NOT be detected as independent
+        assert!(!is_indep2, "Perfectly correlated variables should not be independent");
     }
 
     #[test]
@@ -1274,8 +1282,13 @@ mod tests {
         let variables = vec![x, y, z];
         let weights = attention.compute_attention(&variables);
 
-        println!("Causal attention weights:");
+        // Should produce a 3x3 attention matrix
+        assert_eq!(weights.len(), 3, "Should have 3 rows in attention matrix");
         for (i, row) in weights.iter().enumerate() {
+            assert_eq!(row.len(), 3, "Row {} should have 3 columns", i);
+            for &w in row {
+                assert!(w.is_finite(), "Attention weight should be finite");
+            }
             println!("  Var {}: {:?}", i, row);
         }
     }
@@ -1291,11 +1304,17 @@ mod tests {
         let result = cc.analyze(&x, &y);
         println!("Causal analysis result: {:?}", result);
 
+        // Result should have a valid confidence
+        assert!(result.confidence.is_finite(), "Confidence should be finite");
+        assert!(result.confidence >= 0.0 && result.confidence <= 1.0,
+                "Confidence should be in [0, 1]");
+
         // Provide feedback
         cc.learn(&x, &y, CausalDirection::Forward);
 
         let stats = cc.get_stats();
         println!("System stats: {:?}", stats);
+        assert!(stats.accuracy.is_finite(), "Accuracy should be finite");
     }
 
     #[test]
