@@ -1,0 +1,13 @@
+[package]
+name = "privacy"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+getrandom_03.workspace = true
+privacy_integrity = { path = "../integrity" }

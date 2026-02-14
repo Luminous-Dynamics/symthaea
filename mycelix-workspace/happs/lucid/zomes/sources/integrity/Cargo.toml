@@ -1,0 +1,16 @@
+[package]
+name = "sources_integrity"
+version = "0.1.0"
+edition = "2021"
+description = "LUCID - Source Provenance Integrity Zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdi.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+sha2.workspace = true
+holochain_serialized_bytes.workspace = true

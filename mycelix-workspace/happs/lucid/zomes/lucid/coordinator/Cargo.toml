@@ -1,0 +1,15 @@
+[package]
+name = "lucid"
+version = "0.1.0"
+edition = "2021"
+description = "LUCID - Personal Knowledge Graph Coordinator Zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+getrandom_03.workspace = true
+lucid_integrity = { path = "../integrity" }

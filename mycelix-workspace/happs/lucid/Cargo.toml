@@ -1,0 +1,62 @@
+[workspace]
+resolver = "2"
+members = [
+    # Core - Thoughts, Claims, Notes
+    "zomes/lucid/integrity",
+    "zomes/lucid/coordinator",
+    # Sources - Provenance tracking
+    "zomes/sources/integrity",
+    "zomes/sources/coordinator",
+    # Temporal - Belief versioning & history
+    "zomes/temporal/integrity",
+    "zomes/temporal/coordinator",
+    # Temporal Consciousness - Belief trajectories & evolution
+    "zomes/temporal-consciousness/integrity",
+    "zomes/temporal-consciousness/coordinator",
+    # Privacy - Selective sharing & ZK proofs
+    "zomes/privacy/integrity",
+    "zomes/privacy/coordinator",
+    # Reasoning - Coherence, contradictions, inference
+    "zomes/reasoning/integrity",
+    "zomes/reasoning/coordinator",
+    # Bridge - Cross-hApp integration
+    "zomes/bridge/integrity",
+    "zomes/bridge/coordinator",
+    # Collective - Distributed sensemaking
+    "zomes/collective/integrity",
+    "zomes/collective/coordinator",
+]
+
+[workspace.dependencies]
+# Holochain 0.6 compatible (per official compatibility table)
+hdk = "0.6.0"
+hdi = "0.7.0"
+holochain_integrity_types = "0.6.0"
+holochain_serialized_bytes = "0.0.56"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Utilities
+thiserror = "1.0"
+derive_more = "0.99"
+
+# WASM compatibility - getrandom 0.3 with custom backend (HDK provides __getrandom_v03_custom)
+# NOTE: Do NOT use features = ["js"] or ["wasm_js"] - they pull in wasm-bindgen
+# which is incompatible with Holochain's WASM runtime.
+getrandom_03 = { package = "getrandom", version = "0.3" }
+
+# SHA-256 for content hashing
+sha2 = "0.10"
+
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false
