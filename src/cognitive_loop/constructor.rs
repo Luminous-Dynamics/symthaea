@@ -28,7 +28,7 @@ use crate::hdc::moral_parser::MoralParser;
 use crate::perception::NeuralBridge;
 
 use super::{
-    CognitiveLoopService, Experience,
+    CognitiveLoopService,
     CognitiveLoopConfig, TemporalBackend, LoopStats, AdaptiveBehavior,
     FlowState, EmotionContagion, CuriosityDrive, SelfReflection,
     ThalamicRouter, CognitiveDepth, ActiveInferenceBridge, ClosedLearningLoop,

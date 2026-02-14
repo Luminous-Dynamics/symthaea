@@ -366,6 +366,12 @@ mod proptest_hdc;
 mod proptest_math;
 #[cfg(test)]
 mod proptest_continuous;
+#[cfg(test)]
+mod proptest_binary;
+#[cfg(test)]
+mod proptest_unified;
+#[cfg(test)]
+mod proptest_resonator;
 
 // Track 6: Consciousness integration for awakening module
 pub mod substrate_independence;            // Substrate type definitions

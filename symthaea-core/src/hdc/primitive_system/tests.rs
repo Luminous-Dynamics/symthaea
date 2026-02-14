@@ -839,7 +839,7 @@ fn test_encode_sequence_longer() {
 
     let result = result.unwrap();
     assert_eq!(result.source_primitives, vec!["BEFORE", "DURING", "AFTER"]);
-    assert!(result.operation.contains("\u{2192}"));
+    assert!(result.operation.contains("->"));
 }
 
 #[test]
