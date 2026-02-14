@@ -100,7 +100,10 @@ pub use llm_backend::{
     create_backend_from_env, default_backend, simulated_backend, GenerationParams, LLMBackend,
     OllamaBackend, SimulatedBackend,
 };
-pub use narrative_compiler::{NarrativeCompiler, NarrativeThought, NARRATIVE_SYSTEM_PROMPT};
+pub use narrative_compiler::{
+    generate_narrative, NarrativeCompiler, NarrativeOutput, NarrativeThought,
+    NARRATIVE_SYSTEM_PROMPT,
+};
 pub use openai_backend::OpenAiBackend;
 pub use research_plugin::ResearchPlugin;
 
@@ -1205,7 +1208,8 @@ mod tests {
     #[test]
     fn diagnose_classifies_missing_attribute() {
         let diagnoser = NixErrorDiagnoser::new();
-        let diagnosis = diagnoser.diagnose("error: attribute 'foo' missing at /etc/nixos/configuration.nix:42:5");
+        let diagnosis = diagnoser
+            .diagnose("error: attribute 'foo' missing at /etc/nixos/configuration.nix:42:5");
         assert_eq!(diagnosis.category, NixErrorCategory::Evaluation);
         assert!(diagnosis.confidence > 0.0 && diagnosis.confidence.is_finite());
         assert!(!diagnosis.explanation.is_empty());
@@ -1226,7 +1230,8 @@ mod tests {
     #[test]
     fn diagnose_classifies_build_failure() {
         let diagnoser = NixErrorDiagnoser::new();
-        let diagnosis = diagnoser.diagnose("builder for '/nix/store/abc-pkg.drv' failed with exit code 1");
+        let diagnosis =
+            diagnoser.diagnose("builder for '/nix/store/abc-pkg.drv' failed with exit code 1");
         assert_eq!(diagnosis.category, NixErrorCategory::Build);
     }
 
@@ -1265,7 +1270,10 @@ mod tests {
         assert_eq!(core.consciousness_state(), ConsciousnessStateLevel::Active);
 
         core.set_consciousness_state(ConsciousnessStateLevel::Reflective);
-        assert_eq!(core.consciousness_state(), ConsciousnessStateLevel::Reflective);
+        assert_eq!(
+            core.consciousness_state(),
+            ConsciousnessStateLevel::Reflective
+        );
 
         core.set_consciousness_state(ConsciousnessStateLevel::Dormant);
         assert_eq!(core.consciousness_state(), ConsciousnessStateLevel::Dormant);
@@ -1336,8 +1344,8 @@ mod tests {
         assert!(fb.original_input.contains("build my flake"));
 
         // Also test failure case
-        let feedback_err = core
-            .create_feedback_from_execution(false, 0.3, Some("boom".to_string()), true);
+        let feedback_err =
+            core.create_feedback_from_execution(false, 0.3, Some("boom".to_string()), true);
         let fb_err = feedback_err.unwrap();
         assert!(!fb_err.action_succeeded);
         assert!(fb_err.was_dry_run);

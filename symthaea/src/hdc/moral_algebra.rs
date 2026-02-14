@@ -358,13 +358,19 @@ impl MoralAlgebra {
 
     /// Encode intent at a specific level
     pub fn encode_intent(&self, intent: MoralIntent) -> ContinuousHV {
-        let level_hv = self.intent_hvs.get(&intent).expect("map covers all variants");
+        let level_hv = self
+            .intent_hvs
+            .get(&intent)
+            .expect("map covers all variants");
         self.primitives.intent.bind(level_hv)
     }
 
     /// Encode consent state
     pub fn encode_consent(&self, state: ConsentState) -> ContinuousHV {
-        let state_hv = self.consent_hvs.get(&state).expect("map covers all variants");
+        let state_hv = self
+            .consent_hvs
+            .get(&state)
+            .expect("map covers all variants");
         self.primitives.consent.bind(state_hv)
     }
 
@@ -376,7 +382,10 @@ impl MoralAlgebra {
 
     /// Encode magnitude at a specific level
     pub fn encode_magnitude(&self, level: Magnitude) -> ContinuousHV {
-        let level_hv = self.magnitude_hvs.get(&level).expect("map covers all variants");
+        let level_hv = self
+            .magnitude_hvs
+            .get(&level)
+            .expect("map covers all variants");
         self.primitives.magnitude.bind(level_hv)
     }
 

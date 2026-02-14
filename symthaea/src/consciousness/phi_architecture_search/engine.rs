@@ -1132,7 +1132,10 @@ mod tests {
         assert!(result.best_phi.is_finite(), "best_phi must be finite");
         assert!(result.best_phi >= 0.0, "best_phi must be non-negative");
         assert_eq!(result.strategy, SearchStrategy::Random);
-        assert!(result.evaluations >= 8, "should have evaluated at least random_samples");
+        assert!(
+            result.evaluations >= 8,
+            "should have evaluated at least random_samples"
+        );
         assert!(!result.phi_history.is_empty());
     }
 
@@ -1190,10 +1193,7 @@ mod tests {
                 result.strategy, strategy,
                 "{label}: returned strategy must match requested"
             );
-            assert!(
-                result.evaluations > 0,
-                "{label}: evaluations must be > 0"
-            );
+            assert!(result.evaluations > 0, "{label}: evaluations must be > 0");
         }
     }
 

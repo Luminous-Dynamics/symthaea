@@ -699,7 +699,10 @@ impl BgeM3 {
     /// * `Result<Vec<f32>>` - 1024-dimensional embedding
     pub fn encode(&self, text: &str) -> Result<Vec<f32>> {
         let embeddings = self.encode_batch(&[text])?;
-        Ok(embeddings.into_iter().next().expect("embeddings must not be empty"))
+        Ok(embeddings
+            .into_iter()
+            .next()
+            .expect("embeddings must not be empty"))
     }
 
     /// Encode multiple texts in a batch.
@@ -826,7 +829,10 @@ impl BgeM3Client {
         if self.model.is_none() {
             self.model = Some(BgeM3::load_from_hub(&self.model_id)?);
         }
-        self.model.as_ref().expect("model must be loaded").encode(text)
+        self.model
+            .as_ref()
+            .expect("model must be loaded")
+            .encode(text)
     }
 
     /// Encode batch, loading the model if needed.
@@ -834,7 +840,10 @@ impl BgeM3Client {
         if self.model.is_none() {
             self.model = Some(BgeM3::load_from_hub(&self.model_id)?);
         }
-        self.model.as_ref().expect("model must be loaded").encode_batch(texts)
+        self.model
+            .as_ref()
+            .expect("model must be loaded")
+            .encode_batch(texts)
     }
 
     /// Check if model is loaded.

@@ -98,7 +98,10 @@ impl CognitiveResources {
         resource: CognitiveResourceType,
         amount: f64,
     ) -> bool {
-        let available = self.available.get_mut(&resource).expect("resource must be registered");
+        let available = self
+            .available
+            .get_mut(&resource)
+            .expect("resource must be registered");
         if *available >= amount {
             *available -= amount;
             let subsystem_alloc = self.allocations.entry(subsystem).or_default();
@@ -120,7 +123,10 @@ impl CognitiveResources {
             if let Some(allocated) = subsystem_alloc.get_mut(&resource) {
                 let to_release = amount.min(*allocated);
                 *allocated -= to_release;
-                *self.available.get_mut(&resource).expect("resource must be registered") += to_release;
+                *self
+                    .available
+                    .get_mut(&resource)
+                    .expect("resource must be registered") += to_release;
             }
         }
     }
@@ -129,7 +135,10 @@ impl CognitiveResources {
     pub fn release_all(&mut self, subsystem: SubsystemId) {
         if let Some(allocs) = self.allocations.remove(&subsystem) {
             for (resource, amount) in allocs {
-                *self.available.get_mut(&resource).expect("resource must be registered") += amount;
+                *self
+                    .available
+                    .get_mut(&resource)
+                    .expect("resource must be registered") += amount;
             }
         }
     }
@@ -137,9 +146,18 @@ impl CognitiveResources {
     /// Regenerate resources over time
     pub fn regenerate(&mut self) {
         for &resource in CognitiveResourceType::all() {
-            let available = self.available.get_mut(&resource).expect("resource must be registered");
-            let max = *self.max_capacity.get(&resource).expect("resource must be registered");
-            let rate = *self.regen_rates.get(&resource).expect("resource must be registered");
+            let available = self
+                .available
+                .get_mut(&resource)
+                .expect("resource must be registered");
+            let max = *self
+                .max_capacity
+                .get(&resource)
+                .expect("resource must be registered");
+            let rate = *self
+                .regen_rates
+                .get(&resource)
+                .expect("resource must be registered");
 
             *available = (*available + rate * max).min(max);
         }

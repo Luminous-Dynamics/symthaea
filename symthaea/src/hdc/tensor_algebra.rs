@@ -1054,14 +1054,20 @@ impl TensorNetwork {
 
             if from_id == to_id {
                 // Both endpoints are in the same tensor: do a trace contraction
-                let t = tensors[from_id].take().expect("tensor node must not be consumed twice");
+                let t = tensors[from_id]
+                    .take()
+                    .expect("tensor node must not be consumed twice");
                 let result = t.contract((edge.from.1, edge.to.1));
                 tensors[from_id] = Some(result);
                 continue;
             }
 
-            let t_from = tensors[from_id].take().expect("tensor node must not be consumed twice");
-            let t_to = tensors[to_id].take().expect("tensor node must not be consumed twice");
+            let t_from = tensors[from_id]
+                .take()
+                .expect("tensor node must not be consumed twice");
+            let t_to = tensors[to_id]
+                .take()
+                .expect("tensor node must not be consumed twice");
 
             // Compute the tensor product, then contract the appropriate axes
             let product = t_from.tensor_product(&t_to);

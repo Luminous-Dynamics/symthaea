@@ -834,7 +834,10 @@ impl ResilienceManager {
 
     /// Get current capabilities snapshot
     pub fn capabilities(&self) -> PerceptionCapabilities {
-        self.capabilities.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.capabilities
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     /// Check if a specific capability is usable
@@ -854,7 +857,10 @@ impl ResilienceManager {
 
     /// Check coherence and record result
     pub fn check_coherence(&self, coherence: f32) -> bool {
-        let mut gate = self.coherence_gate.write().unwrap_or_else(|e| e.into_inner());
+        let mut gate = self
+            .coherence_gate
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         let passed = gate.check(coherence);
         if !passed {
             let mut stats = self.stats.write().unwrap_or_else(|e| e.into_inner());
