@@ -142,8 +142,8 @@ describe('Justice Integration', () => {
           'ContractDispute'
         );
 
-        service.submitEvidence(caseRecord.id, 'did:mycelix:c', 'document', 'Doc 1', 'Desc', 'h1');
-        service.submitEvidence(caseRecord.id, 'did:mycelix:r', 'testimony', 'Statement', 'Desc', 'h2');
+        service.submitEvidence(caseRecord.id, 'did:mycelix:c', 'Document', 'Doc 1', 'Desc', 'h1');
+        service.submitEvidence(caseRecord.id, 'did:mycelix:r', 'Testimony', 'Statement', 'Desc', 'h2');
 
         const updated = service.getCase(caseRecord.id);
         expect(updated!.evidence.length).toBe(2);

@@ -381,7 +381,8 @@ export class MycelixJusticeClient {
    */
   getPhaseDescription(phase: CasePhase): string {
     const descriptions: Record<CasePhase, string> = {
-      Filing: 'Case has been filed and is awaiting response',
+      Filed: 'Case has been filed and is awaiting response',
+      Negotiation: 'Parties are in direct negotiation',
       Mediation: 'Case is in mediation with a neutral mediator',
       Arbitration: 'Case is being heard by arbitrators',
       Appeal: 'Decision is being appealed',
@@ -399,8 +400,12 @@ export class MycelixJusticeClient {
    */
   getStatusDescription(status: CaseStatus): string {
     const descriptions: Record<CaseStatus, string> = {
-      Open: 'Case is open and active',
-      InProgress: 'Case proceedings are underway',
+      Active: 'Case is open and active',
+      OnHold: 'Case is on hold pending further action',
+      AwaitingResponse: 'Awaiting response from respondent',
+      InDeliberation: 'Case is under deliberation',
+      DecisionRendered: 'A decision has been rendered',
+      Enforcing: 'Decision is being enforced',
       Resolved: 'Case has been resolved',
       Dismissed: 'Case was dismissed',
       Withdrawn: 'Case was withdrawn by complainant',
@@ -416,9 +421,9 @@ export class MycelixJusticeClient {
    */
   getOutcomeDescription(outcome: DecisionOutcome): string {
     const descriptions: Record<DecisionOutcome, string> = {
-      ComplainantFavor: 'Decision favors the complainant',
-      RespondentFavor: 'Decision favors the respondent',
-      Split: 'Decision assigns responsibility to both parties',
+      ForComplainant: 'Decision favors the complainant',
+      ForRespondent: 'Decision favors the respondent',
+      SplitDecision: 'Decision assigns responsibility to both parties',
       Dismissed: 'Case was dismissed',
       Settled: 'Parties reached a settlement',
     };

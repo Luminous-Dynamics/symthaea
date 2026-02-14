@@ -308,7 +308,7 @@ describe('Cross-hApp Workflows', () => {
         'property'
       );
 
-      expect(disputeCase.status).toBe('open');
+      expect(disputeCase.status).toBe('Active');
 
       // Submit evidence
       justice.submitEvidence(
@@ -321,11 +321,11 @@ describe('Cross-hApp Workflows', () => {
       );
 
       // Register mediator and initiate mediation
-      justice.registerMediator('did:mycelix:mediator-32-char-valid', ['property']);
+      justice.registerMediator('did:mycelix:mediator-32-char-valid', ['PropertyDispute']);
       justice.initiateMediation(disputeCase.id, 'did:mycelix:mediator-32-char-valid');
 
       const updatedCase = justice.getCase(disputeCase.id);
-      expect(updatedCase?.phase).toBe('mediation');
+      expect(updatedCase?.phase).toBe('Mediation');
     });
   });
 

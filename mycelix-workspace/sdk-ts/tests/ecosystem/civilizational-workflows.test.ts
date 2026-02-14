@@ -343,12 +343,12 @@ describe('Civilizational OS Workflows', () => {
       );
 
       // Register mediator
-      justice.registerMediator('ip-mediator-did', ['property']);
+      justice.registerMediator('ip-mediator-did', ['PropertyDispute']);
       justice.initiateMediation(copyrightCase.id, 'ip-mediator-did');
 
       const mediatedCase = justice.getCase(copyrightCase.id);
-      expect(mediatedCase?.phase).toBe('mediation');
-      expect(mediatedCase?.status).toBe('in_progress');
+      expect(mediatedCase?.phase).toBe('Mediation');
+      expect(mediatedCase?.status).toBe('Active');
     });
   });
 
