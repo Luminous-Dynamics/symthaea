@@ -14,9 +14,9 @@
 //!
 //! ## Key Concepts
 //!
-//! - **Partition Function**: Z = Σ exp(-βE_i)
-//! - **Boltzmann Distribution**: P_i = exp(-βE_i)/Z
-//! - **Equipartition**: <E> = ½kT per quadratic degree
+//! - **Partition Function**: `Z = Σ exp(-βE_i)`
+//! - **Boltzmann Distribution**: `P_i = exp(-βE_i)/Z`
+//! - **Equipartition**: `<E> = ½kT` per quadratic degree
 //!
 //! ## Models
 //!

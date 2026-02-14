@@ -186,8 +186,8 @@ impl CfCNetwork {
     /// Inject external input (direct stimulation)
     pub fn inject(&mut self, input: &[f32]) -> Result<()> {
         let n = input.len().min(self.num_neurons);
-        for i in 0..n {
-            self.state[i] += input[i] * 0.1;
+        for (i, &val) in input.iter().enumerate().take(n) {
+            self.state[i] += val * 0.1;
         }
         Ok(())
     }

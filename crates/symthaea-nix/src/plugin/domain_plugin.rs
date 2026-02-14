@@ -251,31 +251,32 @@ impl DomainPlugin for NixOsPlugin {
     }
 
     fn intent_prototypes(&self) -> IntentPrototypes {
-        let mut prototypes = IntentPrototypes::default();
-
-        prototypes.command = vec![
-            "install",
-            "remove",
-            "uninstall",
-            "update",
-            "upgrade",
-            "rebuild",
-            "switch",
-            "rollback",
-            "configure",
-            "enable",
-            "disable",
-            "search",
-            "build",
-            "develop",
-            "shell",
-            "collect-garbage",
-            "optimize-store",
-            "channel",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
+        let mut prototypes = IntentPrototypes {
+            command: vec![
+                "install",
+                "remove",
+                "uninstall",
+                "update",
+                "upgrade",
+                "rebuild",
+                "switch",
+                "rollback",
+                "configure",
+                "enable",
+                "disable",
+                "search",
+                "build",
+                "develop",
+                "shell",
+                "collect-garbage",
+                "optimize-store",
+                "channel",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            ..Default::default()
+        };
 
         prototypes.question.extend(vec![
             "what package".to_string(),

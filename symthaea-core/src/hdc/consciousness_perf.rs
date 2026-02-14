@@ -29,7 +29,7 @@ use super::unified_hv::ContinuousHV;
 
 /// Compute pairwise similarity matrix for a slice of BinaryHVs.
 ///
-/// Returns a flat Vec<f32> of length N*(N-1)/2 in upper-triangle order:
+/// Returns a flat `Vec<f32>` of length N*(N-1)/2 in upper-triangle order:
 /// `[(0,1), (0,2), ..., (0,N-1), (1,2), (1,3), ..., (N-2,N-1)]`
 ///
 /// Uses the SIMD-accelerated `BinaryHV::similarity()` internally.

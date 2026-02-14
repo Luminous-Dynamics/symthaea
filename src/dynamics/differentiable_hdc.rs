@@ -347,7 +347,7 @@ pub enum HDCEncoder {
     /// Fixed hash-based encoder (no learning)
     Fixed { seed: u64 },
     /// Learnable encoder with STE
-    Learnable(DifferentiableHDCEncoder),
+    Learnable(Box<DifferentiableHDCEncoder>),
 }
 
 impl HDCEncoder {

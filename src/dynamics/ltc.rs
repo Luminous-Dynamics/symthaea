@@ -164,7 +164,7 @@ impl CsrMatrix {
 
         let mut result = vec![0.0f32; self.rows];
 
-        for row in 0..self.rows {
+        for (row, result_val) in result.iter_mut().enumerate().take(self.rows) {
             let start = self.row_ptrs[row];
             let end = self.row_ptrs[row + 1];
 
@@ -174,7 +174,7 @@ impl CsrMatrix {
                 // This inner loop is SIMD-friendly
                 sum += self.values[idx] * x[self.col_indices[idx]];
             }
-            result[row] = sum;
+            *result_val = sum;
         }
 
         result
@@ -434,8 +434,8 @@ impl LiquidNetwork {
         // Add input to first N neurons
         let n = input.len().min(self.num_neurons);
 
-        for i in 0..n {
-            self.state[i] += input[i] * 0.1; // Scaled input
+        for (i, &val) in input.iter().enumerate().take(n) {
+            self.state[i] += val * 0.1; // Scaled input
         }
 
         Ok(())
@@ -471,8 +471,8 @@ impl LiquidNetwork {
                 // Integrate: x += dx
                 // Clip to [0, 1] range
                 // All in one pass for cache efficiency
-                for i in 0..self.num_neurons {
-                    let dx = (sigmoid_output[i] - self.state[i] / self.tau[i]) * self.dt;
+                for (i, &sig_val) in sigmoid_output.iter().enumerate().take(self.num_neurons) {
+                    let dx = (sig_val - self.state[i] / self.tau[i]) * self.dt;
                     self.state[i] = (self.state[i] + dx).clamp(0.0, 1.0);
                 }
             }

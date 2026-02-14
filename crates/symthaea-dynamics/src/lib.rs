@@ -1,3 +1,6 @@
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::large_enum_variant)]
+
 pub mod cfc;
 pub mod crystallization;
 pub mod differentiable_hdc;

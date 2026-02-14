@@ -301,6 +301,72 @@ Your job is to make it sound beautiful.
 "#;
 
 // ============================================================================
+// LLM Integration
+// ============================================================================
+
+/// Output from narrative generation.
+pub struct NarrativeOutput {
+    /// The generated prose (or compiled prompt if no backend).
+    pub prose: String,
+    /// The compiled prompt sent to the LLM.
+    pub prompt: String,
+    /// Name of the backend used, if any.
+    pub backend_used: Option<String>,
+}
+
+impl NarrativeOutput {
+    /// Whether an LLM backend was actually used for generation.
+    pub fn used_llm(&self) -> bool {
+        self.backend_used.is_some()
+    }
+}
+
+/// Generate narrative prose from a `NarrativeThought`.
+///
+/// If a backend is provided and generation succeeds, returns LLM-generated prose.
+/// Otherwise returns the compiled prompt as-is (useful for offline/testing).
+pub async fn generate_narrative(
+    thought: &NarrativeThought,
+    backend: Option<&dyn super::llm_backend::LLMBackend>,
+) -> NarrativeOutput {
+    let prompt = NarrativeCompiler::compile(thought);
+
+    let Some(backend) = backend else {
+        return NarrativeOutput {
+            prose: prompt.clone(),
+            prompt,
+            backend_used: None,
+        };
+    };
+
+    let max_tokens = match thought.target_length {
+        TargetLength::Sentence => 60,
+        TargetLength::Paragraph => 200,
+        TargetLength::Scene => 800,
+        TargetLength::Chapter => 3000,
+    };
+
+    let params = super::llm_backend::GenerationParams {
+        temperature: 0.4,
+        max_tokens,
+        system_prompt: Some(NARRATIVE_SYSTEM_PROMPT.to_string()),
+    };
+
+    match backend.generate(&prompt, &params).await {
+        Ok(prose) => NarrativeOutput {
+            prose,
+            prompt,
+            backend_used: Some(backend.name().to_string()),
+        },
+        Err(_) => NarrativeOutput {
+            prose: prompt.clone(),
+            prompt,
+            backend_used: None,
+        },
+    }
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -435,5 +501,53 @@ mod tests {
                 }
             }
         }
+    }
+
+    // === generate_narrative tests ===
+
+    #[tokio::test]
+    async fn test_generate_narrative_no_backend() {
+        let signal = make_signal(0.5, 0.3, 0.1, 0.4, 0.0);
+        let thought = make_thought(signal);
+        let output = generate_narrative(&thought, None).await;
+
+        assert!(!output.used_llm());
+        assert!(output.backend_used.is_none());
+        // Without a backend, prose == prompt
+        assert_eq!(output.prose, output.prompt);
+        assert!(output.prompt.contains("=== NARRATIVE SCENE ==="));
+    }
+
+    #[tokio::test]
+    async fn test_generate_narrative_with_simulated() {
+        use crate::language::llm_backend::SimulatedBackend;
+
+        let signal = make_signal(0.5, 0.3, 0.1, 0.4, 0.0);
+        let thought = make_thought(signal);
+        let backend = SimulatedBackend;
+
+        let output = generate_narrative(&thought, Some(&backend)).await;
+
+        assert!(output.used_llm());
+        assert_eq!(output.backend_used.as_deref(), Some("Simulated"));
+        // Simulated backend produces different text than the prompt
+        assert!(!output.prose.is_empty());
+    }
+
+    #[test]
+    fn test_narrative_output_struct() {
+        let output_with = NarrativeOutput {
+            prose: "Once upon a time...".to_string(),
+            prompt: "=== NARRATIVE SCENE ===".to_string(),
+            backend_used: Some("Ollama".to_string()),
+        };
+        assert!(output_with.used_llm());
+
+        let output_without = NarrativeOutput {
+            prose: "prompt text".to_string(),
+            prompt: "prompt text".to_string(),
+            backend_used: None,
+        };
+        assert!(!output_without.used_llm());
     }
 }

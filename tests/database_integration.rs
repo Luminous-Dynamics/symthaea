@@ -406,3 +406,82 @@ async fn test_concurrent_reads() {
         assert!(result.unwrap().is_some(), "Memory {} should exist", i);
     }
 }
+
+// ============================================================================
+// LIST ALL TESTS
+// ============================================================================
+
+#[tokio::test]
+async fn test_sqlite_list_all() {
+    let db = SqliteMemory::in_memory().expect("Should create database");
+
+    let batch = create_memory_batch("list-all", 200, 50, MemoryType::Semantic);
+    for record in &batch {
+        db.store(record.clone()).await.expect("Should store memory");
+    }
+
+    let all = db.list_all().await.expect("list_all should succeed");
+    assert_eq!(all.len(), 50, "Should return all 50 records");
+
+    // Verify ascending timestamp order
+    for i in 1..all.len() {
+        assert!(
+            all[i].timestamp_ms >= all[i - 1].timestamp_ms,
+            "list_all should return records in ascending timestamp order"
+        );
+    }
+}
+
+// ============================================================================
+// DEFAULT CONFIG TESTS
+// ============================================================================
+
+#[tokio::test]
+async fn test_default_config_creates_sqlite() {
+    use symthaea::databases::{create_database, DatabaseConfig};
+
+    let db = create_database(&DatabaseConfig::default())
+        .await
+        .expect("Default config should create a database");
+
+    assert!(db.health_check().await.unwrap(), "Health check should pass");
+    assert_eq!(db.count().await.unwrap(), 0, "Fresh database should be empty");
+}
+
+// ============================================================================
+// SEARCH SIMILAR FILTERED (SQLITE — IGNORES FILTER)
+// ============================================================================
+
+#[tokio::test]
+async fn test_sqlite_search_similar_filtered_ignores_filter() {
+    let db = SqliteMemory::in_memory().expect("Should create database");
+
+    // Store episodic and semantic records
+    for i in 0..5 {
+        db.store(create_test_memory(
+            &format!("ep-filter-{}", i),
+            100 + i,
+            MemoryType::Episodic,
+        ))
+        .await
+        .unwrap();
+        db.store(create_test_memory(
+            &format!("sem-filter-{}", i),
+            200 + i,
+            MemoryType::Semantic,
+        ))
+        .await
+        .unwrap();
+    }
+
+    let query = BinaryHV::random(150);
+    // SQLite's default search_similar_filtered returns same as search_similar
+    // (filter is a no-op for SQLite — documented behavior)
+    let results = db
+        .search_similar_filtered(&query, 5, "memory_type = 'episodic'")
+        .await
+        .expect("Filtered search should succeed");
+
+    assert_eq!(results.len(), 5, "Should return 5 results");
+    // SQLite ignores the filter — results may include both types
+}

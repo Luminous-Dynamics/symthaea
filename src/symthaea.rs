@@ -12,7 +12,12 @@
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use symthaea_core::hdc::ContinuousHV;
+
+use crate::databases::{
+    ConsciousnessDatabase, DatabaseConfig, MemoryRecord, MemoryType, create_database,
+};
 
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridgeV2;
@@ -137,6 +142,8 @@ pub struct Symthaea {
     /// When available, replaces hash-based encoding with true semantic understanding.
     #[cfg(feature = "neural-bridge")]
     neural_bridge: Option<NeuralBridgeV2>,
+    /// Optional persistent database for long-term memory storage.
+    database: Option<Arc<dyn ConsciousnessDatabase>>,
 }
 
 impl Symthaea {
@@ -249,7 +256,36 @@ impl Symthaea {
             calibration: BrierScoreTracker::with_defaults(),
             #[cfg(feature = "neural-bridge")]
             neural_bridge,
+            database: None,
         })
+    }
+
+    /// Create a Symthaea instance with persistent database storage.
+    pub async fn with_database(
+        hdc_dim: usize,
+        ltc_neurons: usize,
+        db_config: DatabaseConfig,
+    ) -> Result<Self> {
+        let mut instance = Self::new(hdc_dim, ltc_neurons).await?;
+        let db = create_database(&db_config)
+            .await
+            .map_err(|e| anyhow::anyhow!("Database initialization failed: {e}"))?;
+        instance.database = Some(Arc::from(db));
+        Ok(instance)
+    }
+
+    /// Attach a consciousness database to an existing instance.
+    pub async fn attach_database(&mut self, config: DatabaseConfig) -> Result<()> {
+        let db = create_database(&config)
+            .await
+            .map_err(|e| anyhow::anyhow!("Database initialization failed: {e}"))?;
+        self.database = Some(Arc::from(db));
+        Ok(())
+    }
+
+    /// Get a reference to the consciousness database (if configured).
+    pub fn database(&self) -> Option<&dyn ConsciousnessDatabase> {
+        self.database.as_ref().map(|d| d.as_ref())
     }
 
     /// Resume from a saved state file.
@@ -363,6 +399,7 @@ impl Symthaea {
             calibration: BrierScoreTracker::with_defaults(),
             #[cfg(feature = "neural-bridge")]
             neural_bridge,
+            database: None,
         })
     }
 
@@ -428,10 +465,39 @@ impl Symthaea {
         // Drain evicted working memory items for graduation tracking
         let evicted = self.mind.take_evicted();
         if !evicted.is_empty() {
-            tracing::trace!(
-                evicted_count = evicted.len(),
-                "Working memory items evicted during tick"
-            );
+            tracing::trace!(evicted_count = evicted.len(), "Working memory items evicted during tick");
+
+            if let Some(ref db) = self.database {
+                let db = Arc::clone(db);
+                let timestamp_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                let current_phi = self.mind.snapshot().consciousness_level;
+                let interaction_count = self.interactions;
+
+                tokio::spawn(async move {
+                    for (i, hv) in evicted.iter().enumerate() {
+                        let record = MemoryRecord {
+                            id: format!("wm-{}-{}", timestamp_ms, i),
+                            memory_type: MemoryType::Working,
+                            encoding: hv.to_binary(0.0),
+                            content: format!("Working memory eviction at step {}", interaction_count),
+                            timestamp_ms,
+                            valence: 0.0,
+                            arousal: 0.0,
+                            phi: current_phi,
+                            topics: vec![],
+                            metadata: "{}".to_string(),
+                            consolidation_strength: 0.0,
+                            retrieval_count: 0,
+                        };
+                        if let Err(e) = db.store(record).await {
+                            tracing::warn!(target: "symthaea::database", error = %e, "Failed to persist evicted item");
+                        }
+                    }
+                });
+            }
         }
 
         let phase2_duration = phase2_start.elapsed();
@@ -876,6 +942,7 @@ impl Symthaea {
             partner: self.partner.clone(),
             trajectory: self.trajectory.clone(),
             recent_ai_states: self.recent_ai_states.clone(),
+            database_path: None,
         };
 
         let json = serde_json::to_string_pretty(&state).context("Failed to serialize state")?;
@@ -1266,6 +1333,9 @@ struct PersistedState {
     partner: HumanPartnerModel,
     trajectory: RelationshipTrajectory,
     recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
+    /// Path to the consciousness database (if configured).
+    #[serde(default)]
+    database_path: Option<String>,
 }
 
 /// Summary of partnership state for external consumers.

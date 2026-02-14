@@ -1,26 +1,17 @@
-//! # GPU-Accelerated Closed-form Continuous-time (CfC) Neural Networks
+//! # CfC Neural Networks with Backend Selection
 //!
-//! This module provides GPU-accelerated versions of CfC networks using the Burn ML framework.
-//! When GPU is available, operations are 10-50x faster than CPU; otherwise, falls back
-//! to CPU execution transparently.
-//!
-//! ## Features
-//!
-//! - **Feature-gated GPU support**: Enable with `cuda` or `gpu` feature flags
-//! - **Automatic fallback**: Uses CPU backend when GPU unavailable
-//! - **API compatibility**: Mirrors `CfCNetwork` API for drop-in replacement
-//! - **Batch operations**: Optimized for batch processing on GPU
+//! CPU-based Closed-form Continuous-time (CfC) networks using ndarray for matrix
+//! operations. A `Wgpu` backend variant exists as a placeholder for future WebGPU
+//! acceleration but currently resolves to CPU.
 //!
 //! ## Usage
 //!
 //! ```rust,ignore
 //! use symthaea::dynamics::cfc_gpu::{GpuCfcNetwork, GpuCfcConfig, GpuBackend};
 //!
-//! // Auto-select best backend (GPU if available, else CPU)
 //! let config = GpuCfcConfig::default();
-//! let mut network = GpuCfcNetwork::new(config, GpuBackend::Auto)?;
+//! let mut network = GpuCfcNetwork::new(config, GpuBackend::Cpu)?;
 //!
-//! // Forward pass
 //! let input = vec![0.1; 64];
 //! let output = network.forward(&input, 0.1)?;
 //! ```
@@ -36,19 +27,15 @@ use super::cfc::{ActivationType, CfCNetworkConfig};
 // GPU BACKEND SELECTION
 // =============================================================================
 
-/// Available GPU backends for CfC acceleration
+/// Available backends for CfC acceleration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum GpuBackend {
-    /// Automatic selection (CUDA > WebGPU > CPU)
+    /// Automatic selection (currently resolves to CPU).
     #[default]
     Auto,
-    /// NVIDIA CUDA backend (requires CUDA toolkit)
-    #[cfg(feature = "cuda")]
-    Cuda,
-    /// WebGPU backend (cross-platform, works on most GPUs)
-    /// Note: Always defined but only functional with "gpu" feature
+    /// WebGPU backend (placeholder — not yet functional).
     Wgpu,
-    /// CPU backend (always available, used as fallback)
+    /// CPU backend (always available, used as fallback).
     Cpu,
 }
 
@@ -58,33 +45,19 @@ impl GpuBackend {
         false
     }
 
-    /// Get a human-readable description of the backend
+    /// Get a human-readable description of the backend.
     pub fn description(&self) -> &'static str {
         match self {
-            GpuBackend::Auto => {
-                if Self::is_gpu_available() {
-                    "Auto (GPU detected)"
-                } else {
-                    "Auto (CPU fallback)"
-                }
-            }
-            #[cfg(feature = "cuda")]
-            GpuBackend::Cuda => "NVIDIA CUDA",
-            GpuBackend::Wgpu => "WebGPU (requires 'gpu' feature)",
+            GpuBackend::Auto => "Auto (CPU fallback)",
+            GpuBackend::Wgpu => "WebGPU (placeholder)",
             GpuBackend::Cpu => "CPU (ndarray)",
         }
     }
 
-    /// Resolve Auto to a concrete backend
+    /// Resolve Auto to a concrete backend.
     pub fn resolve(self) -> Self {
         match self {
-            GpuBackend::Auto => {
-                #[cfg(feature = "cuda")]
-                if std::env::var("CUDA_VISIBLE_DEVICES").is_ok() {
-                    return GpuBackend::Cuda;
-                }
-                GpuBackend::Cpu
-            }
+            GpuBackend::Auto => GpuBackend::Cpu,
             other => other,
         }
     }
@@ -405,18 +378,9 @@ impl GpuCfcNetwork {
         self.backend
     }
 
-    /// Check if using GPU acceleration
+    /// Check if using GPU acceleration.
     pub fn is_gpu_accelerated(&self) -> bool {
-        matches!(self.backend, GpuBackend::Wgpu) || {
-            #[cfg(feature = "cuda")]
-            {
-                matches!(self.backend, GpuBackend::Cuda)
-            }
-            #[cfg(not(feature = "cuda"))]
-            {
-                false
-            }
-        }
+        matches!(self.backend, GpuBackend::Wgpu)
     }
 
     /// Reset all layer states
@@ -734,19 +698,8 @@ mod tests {
             backend.description()
         );
 
-        // Should always resolve to something
-        assert!(
-            matches!(backend, GpuBackend::Cpu | GpuBackend::Wgpu) || {
-                #[cfg(feature = "cuda")]
-                {
-                    matches!(backend, GpuBackend::Cuda)
-                }
-                #[cfg(not(feature = "cuda"))]
-                {
-                    false
-                }
-            }
-        );
+        // Auto always resolves to Cpu
+        assert!(matches!(backend, GpuBackend::Cpu));
     }
 
     #[test]

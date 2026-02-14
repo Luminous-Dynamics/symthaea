@@ -2,7 +2,7 @@
 Week 17 Day 1: Temporal Encoding for Chrono-Semantic Cognition
 
 Encodes time as circular HDC vectors that can be bound with semantic vectors
-for time-aware consciousness. Adapted to use Vec<f32> for compatibility with
+for time-aware consciousness. Adapted to use `Vec<f32>` for compatibility with
 existing semantic HDC infrastructure.
 
 Revolutionary Features:
@@ -40,7 +40,7 @@ pub const DEFAULT_TIME_SCALE_SECS: u64 = 24 * 60 * 60;
 /// - **Circular encoding**: Time wraps around (midnight = next midnight)
 /// - **Multi-scale**: Multiple frequencies capture different time resolutions
 /// - **Smooth gradients**: Similarity decreases smoothly with time distance
-/// - **Binding-ready**: Vec<f32> format compatible with semantic HDC
+/// - **Binding-ready**: `Vec<f32>` format compatible with semantic HDC
 #[derive(Debug, Clone)]
 pub struct TemporalEncoder {
     /// HDC vector dimensionality (must match semantic space)

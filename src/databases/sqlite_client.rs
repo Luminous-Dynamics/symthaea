@@ -616,7 +616,7 @@ impl ConsciousnessDatabase for SqliteMemory {
                 .collect();
 
             // Sort by similarity descending
-            results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity).reverse());
+            results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
             results.truncate(top_k);
 
             Ok(results)

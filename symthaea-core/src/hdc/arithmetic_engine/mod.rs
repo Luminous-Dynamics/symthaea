@@ -6,15 +6,15 @@
 //!
 //! | Module | Description |
 //! |--------|-------------|
-//! | [`verification`] | Adaptive HDC similarity thresholds for result verification |
-//! | [`core_number`] | `HdcNumber` — Peano-constructed numbers encoded as `BinaryHV` |
-//! | [`engine`] | `ArithmeticEngine` — add, multiply, subtract, power, factorial via Peano axioms |
-//! | [`theorems`] | `TheoremProver` — proves commutativity, associativity, distributivity |
-//! | [`hybrid`] | `HybridArithmeticEngine` — deep (Peano) + fast (direct) path dispatcher |
-//! | [`discovery`] | `MathDiscovery` — Phi-guided proof exploration and conjecture generation |
-//! | [`reasoning_bridge`] | `MathReasoningBridge` — bridges arithmetic proofs to logical inference |
-//! | [`symbolic`] | Symbolic algebra: expressions, polynomials, simplification, equation solving |
-//! | [`multi_path`] | `MultiPathVerifier` — multiple independent proof strategies with Phi ranking |
+//! | `verification` | Adaptive HDC similarity thresholds for result verification |
+//! | `core_number` | `HdcNumber` — Peano-constructed numbers encoded as `BinaryHV` |
+//! | `engine` | `ArithmeticEngine` — add, multiply, subtract, power, factorial via Peano axioms |
+//! | `theorems` | `TheoremProver` — proves commutativity, associativity, distributivity |
+//! | `hybrid` | `HybridArithmeticEngine` — deep (Peano) + fast (direct) path dispatcher |
+//! | `discovery` | `MathDiscovery` — Phi-guided proof exploration and conjecture generation |
+//! | `reasoning_bridge` | `MathReasoningBridge` — bridges arithmetic proofs to logical inference |
+//! | `symbolic` | Symbolic algebra: expressions, polynomials, simplification, equation solving |
+//! | `multi_path` | `MultiPathVerifier` — multiple independent proof strategies with Phi ranking |
 
 mod core_number;
 mod discovery;

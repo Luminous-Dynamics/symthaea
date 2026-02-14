@@ -112,7 +112,7 @@ impl PhysicsSimulator {
     /// * `dt` - Integration time step
     ///
     /// # Returns
-    /// A tuple of (SimulationResult, Vec<ContinuousHV>) where each HV corresponds
+    /// A tuple of `(SimulationResult, Vec<ContinuousHV>)` where each HV corresponds
     /// to the state at the matching index in the result
     pub fn simulate_with_hdc(&self, t_end: f64, dt: f64) -> (SimulationResult, Vec<ContinuousHV>) {
         let result = self.simulate(t_end, dt);
