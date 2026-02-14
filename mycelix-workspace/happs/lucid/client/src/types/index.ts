@@ -103,6 +103,14 @@ export interface Thought {
   created_at: Timestamp;
   updated_at: Timestamp;
   version: number;
+  /** 16,384D HDC embedding from Symthaea */
+  embedding: number[] | null;
+  /** Version of thought when embedding was computed */
+  embedding_version: number | null;
+  /** Coherence score from Symthaea analysis (0.0-1.0) */
+  coherence_score: number | null;
+  /** Phi integration score from Symthaea analysis */
+  phi_score: number | null;
 }
 
 /** Input for creating a thought */
@@ -115,6 +123,8 @@ export interface CreateThoughtInput {
   domain?: string;
   related_thoughts?: string[];
   parent_thought?: string;
+  /** Optional pre-computed embedding from Symthaea (16,384D) */
+  embedding?: number[];
 }
 
 /** Input for updating a thought */
@@ -877,4 +887,101 @@ export interface CollectiveStats {
   total_belief_shares: number;
   total_patterns: number;
   active_validators: number;
+}
+
+// ============================================================================
+// SYMTHAEA INTEGRATION - EMBEDDINGS & COHERENCE
+// ============================================================================
+
+/** Input for updating a thought's embedding */
+export interface UpdateEmbeddingInput {
+  thought_id: string;
+  /** 16,384-dimensional HDC embedding from Symthaea */
+  embedding: number[];
+}
+
+/** Input for updating coherence/phi scores */
+export interface UpdateCoherenceInput {
+  thought_id: string;
+  coherence_score: number;
+  phi_score?: number;
+}
+
+/** Input for semantic search */
+export interface SemanticSearchInput {
+  /** Query embedding (16,384 dimensions) */
+  query_embedding: number[];
+  /** Minimum similarity threshold (0.0-1.0) */
+  threshold: number;
+  /** Maximum number of results */
+  limit?: number;
+}
+
+/** Result of semantic search */
+export interface SemanticSearchResult {
+  thought_id: string;
+  action_hash: ActionHash;
+  similarity: number;
+  content_preview: string;
+}
+
+/** Input for coherence range query */
+export interface CoherenceRangeInput {
+  min_coherence: number;
+  max_coherence: number;
+}
+
+// ============================================================================
+// EPISTEMIC GARDEN
+// ============================================================================
+
+/** Input for exploring the epistemic garden */
+export interface ExploreGardenInput {
+  max_clusters: number;
+  min_cluster_size: number;
+  domain_filter?: string;
+}
+
+/** A cluster of semantically related thoughts */
+export interface ThoughtCluster {
+  cluster_id: number;
+  centroid_thought_id: string;
+  thought_ids: string[];
+  avg_confidence: number;
+  avg_coherence: number | null;
+  dominant_domain: string | null;
+  dominant_tags: string[];
+}
+
+/** Input for suggesting connections */
+export interface SuggestConnectionsInput {
+  thought_id: string;
+  max_suggestions: number;
+  min_similarity: number;
+}
+
+/** A suggestion for connecting two unlinked thoughts */
+export interface ConnectionSuggestion {
+  thought_a_id: string;
+  thought_b_id: string;
+  similarity: number;
+  shared_tags: string[];
+}
+
+/** A knowledge gap in a domain */
+export interface KnowledgeGap {
+  domain: string;
+  thought_count: number;
+  avg_confidence: number;
+  low_confidence_count: number;
+  missing_embeddings: number;
+  sparse: boolean;
+}
+
+/** A discovered pattern in the knowledge graph */
+export interface DiscoveredPattern {
+  pattern_type: string;
+  description: string;
+  involved_thought_ids: string[];
+  confidence: number;
 }

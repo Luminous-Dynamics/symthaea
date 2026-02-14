@@ -18,6 +18,17 @@ import type {
   CreateRelationshipInput,
   KnowledgeGraphStats,
   ThoughtType,
+  UpdateEmbeddingInput,
+  UpdateCoherenceInput,
+  SemanticSearchInput,
+  SemanticSearchResult,
+  CoherenceRangeInput,
+  ExploreGardenInput,
+  ThoughtCluster,
+  SuggestConnectionsInput,
+  ConnectionSuggestion,
+  KnowledgeGap,
+  DiscoveredPattern,
 } from '../types';
 import { decodeRecord, decodeRecords } from '../utils';
 
@@ -168,5 +179,68 @@ export class LucidZomeClient {
   /** Get statistics about the knowledge graph */
   async getStats(): Promise<KnowledgeGraphStats> {
     return this.callZome<KnowledgeGraphStats>('get_stats', null);
+  }
+
+  // ============================================================================
+  // SYMTHAEA INTEGRATION - EMBEDDINGS & COHERENCE
+  // ============================================================================
+
+  /** Update a thought with its Symthaea HDC embedding */
+  async updateThoughtEmbedding(input: UpdateEmbeddingInput): Promise<Thought> {
+    const record = await this.callZome<HolochainRecord>('update_thought_embedding', input);
+    return decodeRecord<Thought>(record);
+  }
+
+  /** Update a thought with coherence analysis results */
+  async updateThoughtCoherence(input: UpdateCoherenceInput): Promise<Thought> {
+    const record = await this.callZome<HolochainRecord>('update_thought_coherence', input);
+    return decodeRecord<Thought>(record);
+  }
+
+  /** Perform semantic search using cosine similarity on embeddings */
+  async semanticSearch(input: SemanticSearchInput): Promise<SemanticSearchResult[]> {
+    return this.callZome<SemanticSearchResult[]>('semantic_search', input);
+  }
+
+  /** Get thoughts that need embeddings computed */
+  async getThoughtsNeedingEmbeddings(): Promise<Thought[]> {
+    const records = await this.callZome<HolochainRecord[]>('get_thoughts_needing_embeddings', null);
+    return decodeRecords<Thought>(records);
+  }
+
+  /** Find thoughts with low coherence */
+  async getLowCoherenceThoughts(threshold: number): Promise<Thought[]> {
+    const records = await this.callZome<HolochainRecord[]>('get_low_coherence_thoughts', threshold);
+    return decodeRecords<Thought>(records);
+  }
+
+  /** Get thoughts by coherence score range */
+  async getThoughtsByCoherence(input: CoherenceRangeInput): Promise<Thought[]> {
+    const records = await this.callZome<HolochainRecord[]>('get_thoughts_by_coherence', input);
+    return decodeRecords<Thought>(records);
+  }
+
+  // ============================================================================
+  // EPISTEMIC GARDEN
+  // ============================================================================
+
+  /** Explore the epistemic garden — cluster thoughts by semantic similarity */
+  async exploreGarden(input: ExploreGardenInput): Promise<ThoughtCluster[]> {
+    return this.callZome<ThoughtCluster[]>('explore_garden', input);
+  }
+
+  /** Suggest unlinked thoughts that are semantically similar */
+  async suggestConnections(input: SuggestConnectionsInput): Promise<ConnectionSuggestion[]> {
+    return this.callZome<ConnectionSuggestion[]>('suggest_connections', input);
+  }
+
+  /** Find knowledge gaps — domains with sparse or low-confidence coverage */
+  async findKnowledgeGaps(): Promise<KnowledgeGap[]> {
+    return this.callZome<KnowledgeGap[]>('find_knowledge_gaps', null);
+  }
+
+  /** Discover patterns — find recurring themes, contradictions, and evolution */
+  async discoverPatterns(): Promise<DiscoveredPattern[]> {
+    return this.callZome<DiscoveredPattern[]>('discover_patterns', null);
   }
 }
