@@ -324,7 +324,7 @@ const CASES_ZOME = 'justice_cases';
  * const myCase = await cases.fileCase({
  *   title: 'Contract Breach',
  *   description: 'Vendor failed to deliver...',
- *   category: 'ContractBreach',
+ *   category: 'ContractDispute',
  *   respondent: 'did:mycelix:vendor123',
  * });
  * ```
