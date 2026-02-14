@@ -1102,14 +1102,14 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore] // Requires model loading
+    #[ignore = "requires neural-bridge feature and model files on disk"]
     fn test_detector_creation() {
         let detector = PhenomenalDetector::new();
         assert!(detector.is_ok());
     }
 
     #[test]
-    #[ignore] // Requires model loading
+    #[ignore = "requires neural-bridge feature and model files on disk"]
     fn test_phenomenal_scoring() {
         let detector = PhenomenalDetector::new().unwrap();
 
@@ -1153,7 +1153,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Requires model loading
+    #[ignore = "requires neural-bridge feature and model files on disk"]
     fn test_context_aware_scoring() {
         let detector = PhenomenalDetector::new().unwrap();
 
@@ -1170,7 +1170,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Requires model loading
+    #[ignore = "requires neural-bridge feature and model files on disk"]
     fn test_negation_preserves_topic() {
         let detector = PhenomenalDetector::new().unwrap();
 

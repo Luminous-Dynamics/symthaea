@@ -458,7 +458,7 @@ impl ResonatorNetwork {
 
         // Initialize resonator states for introspection
         self.states = unknowns.iter().map(|&name| {
-            let est = estimates.get(name).unwrap().clone();
+            let est = estimates.get(name).expect("estimates map must contain all unknowns").clone();
             ResonatorState {
                 estimate: est.clone(),
                 previous: est,
@@ -497,8 +497,8 @@ impl ResonatorNetwork {
                 // Update the unknown being solved for
                 if let Factor::Unknown(name) = &constraint.unknown {
                     let unbind_update = unbind(&left, &right);
-                    let update = updates.get_mut(name).unwrap();
-                    let weight = weights.get_mut(name).unwrap();
+                    let update = updates.get_mut(name).expect("updates map must contain all unknowns");
+                    let weight = weights.get_mut(name).expect("weights map must contain all unknowns");
 
                     for i in 0..self.dimension {
                         update[i] += constraint.weight * unbind_update[i];
@@ -512,8 +512,8 @@ impl ResonatorNetwork {
 
             for name in unknowns {
                 let name = name.to_string();
-                let update = updates.get(&name).unwrap();
-                let weight = *weights.get(&name).unwrap();
+                let update = updates.get(&name).expect("updates map must contain all unknowns");
+                let weight = *weights.get(&name).expect("weights map must contain all unknowns");
 
                 if weight > 0.0 {
                     let mut normalized_update: Vec<f32> = update.iter()
@@ -526,8 +526,8 @@ impl ResonatorNetwork {
                     }
 
                     // Apply momentum
-                    let estimate = estimates.get_mut(&name).unwrap();
-                    let velocity = velocities.get_mut(&name).unwrap();
+                    let estimate = estimates.get_mut(&name).expect("estimates map must contain all unknowns");
+                    let velocity = velocities.get_mut(&name).expect("velocities map must contain all unknowns");
                     let previous = estimate.clone();
 
                     for i in 0..self.dimension {
@@ -588,7 +588,7 @@ impl ResonatorNetwork {
         let solutions = unknowns
             .iter()
             .map(|&name| {
-                let estimate = estimates.remove(name).unwrap();
+                let estimate = estimates.remove(name).expect("estimates map must contain all unknowns");
                 (name.to_string(), self.create_solution(estimate, max_iterations, true))
             })
             .collect();
@@ -666,7 +666,7 @@ impl ResonatorNetwork {
                 .enumerate()
                 .map(|(i, entry)| (i, cosine_similarity(&estimate, &entry.vector)))
                 .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                .unwrap();
+                .expect("codebook is non-empty, iterator must yield at least one element");
 
             (Some(self.codebook[idx].name.clone()), sim)
         };

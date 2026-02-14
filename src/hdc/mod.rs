@@ -384,6 +384,17 @@ pub mod moral_text_encoder;
 pub mod moral_prototypes;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// LOCAL MODULES - Narrative Reasoning
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Compositional narrative reasoning in hyperdimensional space.
+///
+/// Primitives (protagonist, setting, conflict, ...) and operators (causes,
+/// transforms_into, escalates, ...) compose into scene-level hypervectors
+/// that can be compared for coherence and fed into `StoryArcDynamics`.
+pub mod narrative_algebra;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL MODULES - Testing
 // ═══════════════════════════════════════════════════════════════════════════════
 #[cfg(test)]

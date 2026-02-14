@@ -225,7 +225,7 @@ fn test_generation_params_with_system_prompt() {
 // ============================================================================
 
 #[tokio::test]
-#[ignore]
+#[ignore = "requires OPENAI_API_KEY environment variable"]
 async fn test_openai_real_api() {
     let backend = match OpenAiBackend::from_env() {
         Some(b) => b,
@@ -254,7 +254,7 @@ async fn test_openai_real_api() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "requires ANTHROPIC_API_KEY environment variable"]
 async fn test_anthropic_real_api() {
     let backend = match AnthropicBackend::from_env() {
         Some(b) => b,
@@ -283,7 +283,7 @@ async fn test_anthropic_real_api() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "requires OPENAI_API_KEY environment variable"]
 async fn test_openai_streaming_real_api() {
     let backend = match OpenAiBackend::from_env() {
         Some(b) => b,
@@ -324,7 +324,7 @@ async fn test_openai_streaming_real_api() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "requires ANTHROPIC_API_KEY environment variable"]
 async fn test_anthropic_streaming_real_api() {
     let backend = match AnthropicBackend::from_env() {
         Some(b) => b,

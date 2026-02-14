@@ -97,7 +97,9 @@ candle-transformers = { version = "0.8", optional = true }
 # half removed: referenced in neural-bridge feature but never imported in source
 
 # Phase 11: Database Trinity (Deferred to Week 11+)
-# Blocked deps (link conflicts): lancedb (xz2), cozo (graph_builder rayon), qdrant (lzma)
+# - lancedb: available via `lancedb-backend` feature (xz2 conflict resolved in 0.23+; avoid combining with semantic-burn)
+# - cozo: graph_builder 0.4.1 rayon compat
+# - qdrant: lzma conflict with burn-ndarray
 # DuckDB is the active database backend (unconditional dep below)
 
 # Phase 11: Swarm Intelligence - Hybrid Iroh + Holochain Architecture
@@ -105,6 +107,18 @@ candle-transformers = { version = "0.8", optional = true }
 # Architecture: Cortex (Holochain) for trust + Synapse (Iroh) for real-time
 # Iroh 0.95+ has unified the crates - iroh-net is deprecated
 iroh = { version = "0.96", optional = true }
+
+# LanceDB: Columnar vector storage backend (optional)
+# BLOCKED: lancedb → datafusion → xz2 (links="lzma") conflicts with
+#   burn-ndarray → cubecl-cpu → liblzma-sys (links="lzma").
+#   Cargo enforces links uniqueness across ALL optional deps during resolution.
+#   Re-enable when lancedb or burn drops xz2/liblzma-sys, or when
+#   lancedb switches to liblzma-sys (unifying the dep).
+#   Implementation ready in src/databases/lance_client.rs.
+# lancedb = { version = "0.23", optional = true }
+arrow-array = { version = "54", optional = true }
+arrow-schema = { version = "54", optional = true }
+futures = { version = "0.3", optional = true }
 
 # Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
 uuid = { workspace = true }  # Week 3: Enabled for Goal IDs
@@ -274,8 +288,11 @@ identity = []                               # Ed25519 signatures, capability gat
 
 # ── Database backends ───────────────────────────────────────────────
 # DuckDB is an unconditional dep. Others deferred due to link conflicts:
-# - qdrant/lancedb: lzma/xz2 conflict with burn-ndarray
+# - qdrant: lzma conflict with burn-ndarray
 # - cozo: graph_builder 0.4.1 rayon compat
+# lancedb-backend: BLOCKED by links="lzma" conflict (see LanceDB dep comment above).
+# Uncomment when lancedb dep is re-enabled:
+# lancedb-backend = ["dep:lancedb", "dep:arrow-array", "dep:arrow-schema", "dep:futures"]
 hdf5 = []                                  # Requires system HDF5 library (gates cmod_adapter.rs)
 databases_module = []                       # Database backends in experience module
 

@@ -1201,7 +1201,7 @@ fn test_multipath_large_numbers() {
 }
 
 #[test]
-#[ignore] // 47s: MultiPathVerifier with full Φ measurement. Run with --ignored.
+#[ignore = "slow ~47s: MultiPathVerifier with full Phi measurement"]
 fn test_multipath_phi_measurement() {
     let mut verifier = MultiPathVerifier::new();
     let result = verifier.verify_distributive(3, 4, 5);

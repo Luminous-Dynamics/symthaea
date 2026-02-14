@@ -1,7 +1,7 @@
 //! Performance comparison: CfC vs HDC-LTC Bridge, with and without genesis seeding.
 //!
 //! Run with:
-//!   CARGO_TARGET_DIR=/tmp/symthaea-target cargo test --test performance_comparison -- --ignored --nocapture
+//!   cargo test --release --test performance_comparison -- --ignored --nocapture
 
 use std::time::Instant;
 
@@ -85,7 +85,7 @@ fn bench_forward<F: FnMut(&Array1<f32>)>(
 }
 
 #[test]
-#[ignore]
+#[ignore = "benchmark: ~60s CfC vs HDC-LTC forward-pass comparison, run in release mode"]
 fn performance_comparison_cfc_vs_hdc_ltc() {
     let input = Array1::from_vec(vec![0.5f32; INPUT_DIM]);
     let genesis = GenesisSeed::from_phrase("benchmark-seed-2026");

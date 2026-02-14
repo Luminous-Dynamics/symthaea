@@ -53,7 +53,7 @@ fn generate_samples(n: usize) -> (Vec<Array1<f32>>, Vec<Array1<f32>>, Vec<f32>) 
 }
 
 #[test]
-#[ignore]
+#[ignore = "benchmark: ~10s CfC forward + BPTT training throughput"]
 fn bptt_throughput_random_init() {
     let config = make_config();
     let mut net = CfCNetwork::new(config.clone());
@@ -110,7 +110,7 @@ fn bptt_throughput_random_init() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "benchmark: ~10s original vs optimized BPTT comparison"]
 fn bptt_throughput_optimized_vs_original() {
     let config = make_config();
     let genesis = GenesisSeed::from_phrase("benchmark-comparison-2026");
@@ -189,7 +189,7 @@ fn bptt_throughput_optimized_vs_original() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "benchmark: ~10s CfC BPTT throughput with genesis seeding"]
 fn bptt_throughput_genesis_init() {
     let config = make_config();
     let genesis = GenesisSeed::from_phrase("benchmark-seed-2026");

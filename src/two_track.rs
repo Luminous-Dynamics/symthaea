@@ -1201,7 +1201,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains HDC-LTC bridge networks"]
     fn test_bridge_training() {
         let config = TwoTrackConfig {
             enable_bridge: true,

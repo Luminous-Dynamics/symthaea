@@ -292,7 +292,7 @@ fn test_streaming_throughput_under_load() {
 // =============================================================================
 
 #[test]
-#[ignore] // Performance test — run in release mode: cargo test --test scaling --release -- --ignored
+#[ignore = "benchmark: encodes 10K strings, run in release mode for meaningful results"]
 fn test_hdc_encoding_throughput() {
     let mut encoder = SemanticEncoder::default();
     let texts: Vec<String> = (0..10_000)

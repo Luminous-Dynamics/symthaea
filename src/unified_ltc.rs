@@ -663,7 +663,7 @@ impl UnifiedLTC {
         let dt = self.config.dt;
 
         // Gradient for output weights
-        let final_state = hidden_states.last().unwrap();
+        let final_state = hidden_states.last().ok_or_else(|| anyhow::anyhow!("hidden_states is empty; cannot compute output gradient"))?;
         let mut grad_w_out = vec![0.0f32; output_dim * n];
         for i in 0..output_dim {
             for j in 0..n {

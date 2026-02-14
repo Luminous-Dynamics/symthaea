@@ -1003,7 +1003,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Requires model loading
+    #[ignore = "requires embedding model files (BGE-M3 etc.) on disk"]
     fn test_unified_embedder_creation() {
         let embedder = UnifiedEmbedder::auto();
         assert!(embedder.is_ok());
