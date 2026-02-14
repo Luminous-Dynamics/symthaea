@@ -1,3 +1,9 @@
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::new_without_default)]
+#![allow(clippy::derivable_impls)]
+#![allow(clippy::manual_is_multiple_of)]
+#![allow(clippy::unwrap_or_default)]
+
 //! Week 12: Perception & Tool Creation - Giving Sophia Senses
 //!
 //! This module provides sensory capabilities for Sophia:
