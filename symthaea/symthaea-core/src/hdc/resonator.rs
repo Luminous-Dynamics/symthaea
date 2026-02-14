@@ -600,7 +600,7 @@ impl ResonatorNetwork {
     ///
     /// Uses softmax-weighted sum for smooth cleanup:
     /// cleanup(x) = Σ_i softmax(sim(x, c_i) / T) * c_i
-    fn cleanup(&self, vector: &[f32]) -> Vec<f32> {
+    pub fn cleanup(&self, vector: &[f32]) -> Vec<f32> {
         if self.codebook.is_empty() {
             return vector.to_vec();
         }

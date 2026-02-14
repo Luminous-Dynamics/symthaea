@@ -1,9 +1,8 @@
 //! Tests for CfC cell, network, numerical stability, and phi-gated attention.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use ndarray::Array1;
+use super::*;
+use super::phi_gated::weighted_array_bundle;
+use ndarray::Array1;
 
     #[test]
     fn test_cfc_cell_creation() {
@@ -559,4 +558,3 @@ mod tests {
         assert!(diag.max_eigenvalue_real.is_finite(),
             "Max eigenvalue should be finite: {}", diag.max_eigenvalue_real);
     }
-}

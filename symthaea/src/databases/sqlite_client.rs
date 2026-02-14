@@ -76,6 +76,22 @@ use std::sync::{Arc, Mutex};
 use std::path::Path;
 use crate::infrastructure::lock_guard::ResilientMutex;
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// LSH CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Number of LSH bands. Each band produces one hash bucket.
+/// More bands = higher recall (fewer false negatives) but more candidates.
+const LSH_NUM_BANDS: usize = 6;
+
+/// Number of bit positions sampled per band (rows per band).
+/// Higher = more selective per band (fewer false positives per band).
+const LSH_ROWS_PER_BAND: usize = 32;
+
+/// Minimum record count before LSH filtering kicks in.
+/// Below this threshold, brute-force is fast enough.
+const LSH_MIN_RECORDS: usize = 500;
+
 /// SQLite-backed persistent memory database.
 ///
 /// Provides durable storage for consciousness memories using an embedded SQLite
@@ -233,6 +249,36 @@ impl SqliteMemory {
             ALTER TABLE memories ADD COLUMN retrieval_count INTEGER NOT NULL DEFAULT 0;
         "#);
 
+        // Migration: create LSH index table for approximate nearest-neighbor search
+        conn.execute_batch(r#"
+            CREATE TABLE IF NOT EXISTS vector_lsh (
+                memory_id TEXT NOT NULL,
+                band_idx INTEGER NOT NULL,
+                band_hash INTEGER NOT NULL,
+                PRIMARY KEY (memory_id, band_idx),
+                FOREIGN KEY (memory_id) REFERENCES memories(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_lsh_band_hash ON vector_lsh(band_idx, band_hash);
+        "#).map_err(|e| {
+            DatabaseError::QueryFailed(format!("LSH schema creation failed: {}", e))
+        })?;
+
+        // Backfill LSH index for any existing records
+        let record_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM memories", [], |row| row.get(0)
+        ).unwrap_or(0);
+
+        if record_count > 0 {
+            let lsh_count: i64 = conn.query_row(
+                "SELECT COUNT(DISTINCT memory_id) FROM vector_lsh", [], |row| row.get(0)
+            ).unwrap_or(0);
+
+            if lsh_count < record_count {
+                Self::backfill_lsh_index(&conn)?;
+            }
+        }
+
         Ok(())
     }
 
@@ -290,6 +336,191 @@ impl SqliteMemory {
             _ => MemoryType::Episodic,
         }
     }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // LSH (Locality-Sensitive Hashing) for approximate nearest-neighbor
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /// Compute LSH band hashes for a BinaryHV.
+    ///
+    /// Uses deterministic bit sampling: band `b` samples bit positions
+    /// derived from a seed that mixes the band index. Each band produces
+    /// a 32-bit hash from `LSH_ROWS_PER_BAND` sampled bits.
+    fn lsh_band_hashes(hv: &BinaryHV) -> [i64; LSH_NUM_BANDS] {
+        let mut hashes = [0i64; LSH_NUM_BANDS];
+        for band in 0..LSH_NUM_BANDS {
+            let mut hash: u32 = 0;
+            for row in 0..LSH_ROWS_PER_BAND {
+                // Deterministic bit position from band + row
+                // Use golden-ratio hashing for good distribution across 16384 bits
+                let bit_pos = ((band * LSH_ROWS_PER_BAND + row).wrapping_mul(0x9E3779B9))
+                    % (BinaryHV::BYTES * 8);
+                let byte_idx = bit_pos / 8;
+                let bit_idx = bit_pos % 8;
+                if (hv.0[byte_idx] >> bit_idx) & 1 == 1 {
+                    hash |= 1u32 << (row % 32);
+                }
+            }
+            hashes[band] = hash as i64;
+        }
+        hashes
+    }
+
+    /// Insert LSH index entries for a memory record.
+    fn insert_lsh_entries(conn: &Connection, id: &str, hv: &BinaryHV) -> DbResult<()> {
+        let hashes = Self::lsh_band_hashes(hv);
+        let mut stmt = conn.prepare_cached(
+            "INSERT OR REPLACE INTO vector_lsh (memory_id, band_idx, band_hash) VALUES (?1, ?2, ?3)"
+        ).map_err(|e| DatabaseError::InsertFailed(format!("LSH prepare failed: {}", e)))?;
+
+        for (band, &hash) in hashes.iter().enumerate() {
+            stmt.execute(params![id, band as i64, hash])
+                .map_err(|e| DatabaseError::InsertFailed(format!("LSH insert failed: {}", e)))?;
+        }
+        Ok(())
+    }
+
+    /// Delete LSH index entries for a memory record.
+    fn delete_lsh_entries(conn: &Connection, id: &str) -> DbResult<()> {
+        conn.execute("DELETE FROM vector_lsh WHERE memory_id = ?1", [id])
+            .map_err(|e| DatabaseError::QueryFailed(format!("LSH delete failed: {}", e)))?;
+        Ok(())
+    }
+
+    /// Query candidate memory IDs that share at least one LSH band hash with the query.
+    fn lsh_candidates(conn: &Connection, query: &BinaryHV) -> DbResult<Vec<String>> {
+        let hashes = Self::lsh_band_hashes(query);
+
+        // Build query: match any band where band_idx = ? AND band_hash = ?
+        // Using UNION for each band is cleaner than OR chains
+        let mut candidates = std::collections::HashSet::new();
+        let mut stmt = conn.prepare_cached(
+            "SELECT DISTINCT memory_id FROM vector_lsh WHERE band_idx = ?1 AND band_hash = ?2"
+        ).map_err(|e| DatabaseError::QueryFailed(format!("LSH query prepare failed: {}", e)))?;
+
+        for (band, &hash) in hashes.iter().enumerate() {
+            let rows = stmt.query_map(params![band as i64, hash], |row| {
+                row.get::<_, String>(0)
+            }).map_err(|e| DatabaseError::QueryFailed(format!("LSH query failed: {}", e)))?;
+
+            for row in rows {
+                if let Ok(id) = row {
+                    candidates.insert(id);
+                }
+            }
+        }
+
+        Ok(candidates.into_iter().collect())
+    }
+
+    /// Parse a row into a MemoryRecord.
+    fn row_to_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<MemoryRecord> {
+        let encoding_bytes: Vec<u8> = row.get(1)?;
+        let topics_json: String = row.get(8)?;
+        let topics: Vec<String> = match serde_json::from_str(&topics_json) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!("Failed to deserialize topics: {}. Using empty array.", e);
+                Vec::new()
+            }
+        };
+
+        Ok(MemoryRecord {
+            id: row.get(0)?,
+            encoding: Self::bytes_to_hv(&encoding_bytes),
+            timestamp_ms: {
+                let ts = row.get::<_, i64>(2)?;
+                if ts < 0 {
+                    tracing::warn!("Negative timestamp {} found, using 0", ts);
+                    0u64
+                } else {
+                    ts as u64
+                }
+            },
+            memory_type: Self::str_to_memory_type(&row.get::<_, String>(3)?),
+            content: row.get(4)?,
+            valence: row.get::<_, f64>(5)? as f32,
+            arousal: row.get::<_, f64>(6)? as f32,
+            phi: row.get::<_, f64>(7)?,
+            topics,
+            metadata: row.get(9)?,
+            consolidation_strength: row.get::<_, f64>(10).unwrap_or(0.0),
+            retrieval_count: row.get::<_, i64>(11).unwrap_or(0) as u32,
+        })
+    }
+
+    /// Fetch all records (brute-force path), limited to `limit` most recent.
+    fn fetch_all_records(conn: &Connection, limit: usize) -> DbResult<Vec<MemoryRecord>> {
+        let mut stmt = conn.prepare(
+            "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
+             FROM memories ORDER BY timestamp_ms DESC LIMIT ?1"
+        ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
+
+        let rows = stmt.query_map([limit as i64], Self::row_to_record)
+            .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
+
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// Fetch records by a set of IDs (LSH-filtered path).
+    fn fetch_records_by_ids(conn: &Connection, ids: &[String]) -> DbResult<Vec<MemoryRecord>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Use batched queries to avoid SQLite variable limit (999)
+        let mut records = Vec::with_capacity(ids.len());
+        for chunk in ids.chunks(500) {
+            let placeholders: String = chunk.iter().enumerate()
+                .map(|(i, _)| format!("?{}", i + 1))
+                .collect::<Vec<_>>()
+                .join(",");
+
+            let sql = format!(
+                "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
+                 FROM memories WHERE id IN ({})", placeholders
+            );
+
+            let mut stmt = conn.prepare(&sql)
+                .map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
+
+            let params: Vec<&dyn rusqlite::types::ToSql> = chunk.iter()
+                .map(|id| id as &dyn rusqlite::types::ToSql)
+                .collect();
+
+            let rows = stmt.query_map(params.as_slice(), Self::row_to_record)
+                .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
+
+            records.extend(rows.filter_map(|r| r.ok()));
+        }
+
+        Ok(records)
+    }
+
+    /// Backfill LSH index for all existing records that aren't yet indexed.
+    fn backfill_lsh_index(conn: &Connection) -> DbResult<usize> {
+        // Find records not yet in the LSH index
+        let mut stmt = conn.prepare(
+            "SELECT id, encoding FROM memories WHERE id NOT IN (SELECT DISTINCT memory_id FROM vector_lsh)"
+        ).map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill query failed: {}", e)))?;
+
+        let rows: Vec<(String, Vec<u8>)> = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+        }).map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill failed: {}", e)))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+        let count = rows.len();
+        for (id, encoding_bytes) in rows {
+            let hv = Self::bytes_to_hv(&encoding_bytes);
+            Self::insert_lsh_entries(conn, &id, &hv)?;
+        }
+
+        if count > 0 {
+            tracing::info!(records = count, "LSH index backfilled");
+        }
+        Ok(count)
+    }
 }
 
 #[async_trait]
@@ -326,6 +557,9 @@ impl ConsciousnessDatabase for SqliteMemory {
                 ],
             ).map_err(|e| DatabaseError::InsertFailed(format!("Insert failed: {}", e)))?;
 
+            // Update LSH index for this record
+            Self::insert_lsh_entries(conn, &record.id, &record.encoding)?;
+
             Ok(())
         })
         .await
@@ -334,49 +568,28 @@ impl ConsciousnessDatabase for SqliteMemory {
     async fn search_similar(&self, query: &BinaryHV, top_k: usize) -> DbResult<Vec<SearchResult>> {
         let query = *query;
         self.with_connection(move |conn| {
-            let mut stmt = conn.prepare(
-                "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
-                 FROM memories ORDER BY timestamp_ms DESC LIMIT 1000"
-            ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
+            // Check total record count to decide LSH vs brute-force
+            let total: i64 = conn.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))
+                .unwrap_or(0);
 
-            let rows = stmt.query_map([], |row| {
-                let encoding_bytes: Vec<u8> = row.get(1)?;
-                let topics_json: String = row.get(8)?;
-                let topics: Vec<String> = match serde_json::from_str(&topics_json) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        tracing::warn!("Failed to deserialize topics: {}. Using empty array.", e);
-                        Vec::new()
-                    }
-                };
+            let records: Vec<MemoryRecord> = if total as usize >= LSH_MIN_RECORDS {
+                // LSH-accelerated path: get candidates first, then fetch only those
+                let candidates = Self::lsh_candidates(conn, &query)?;
 
-                Ok(MemoryRecord {
-                    id: row.get(0)?,
-                    encoding: Self::bytes_to_hv(&encoding_bytes),
-                    timestamp_ms: {
-                        let ts = row.get::<_, i64>(2)?;
-                        if ts < 0 {
-                            tracing::warn!("Negative timestamp {} found, using 0", ts);
-                            0u64
-                        } else {
-                            ts as u64
-                        }
-                    },
-                    memory_type: Self::str_to_memory_type(&row.get::<_, String>(3)?),
-                    content: row.get(4)?,
-                    valence: row.get::<_, f64>(5)? as f32,
-                    arousal: row.get::<_, f64>(6)? as f32,
-                    phi: row.get::<_, f64>(7)?,
-                    topics,
-                    metadata: row.get(9)?,
-                    consolidation_strength: row.get::<_, f64>(10).unwrap_or(0.0),
-                    retrieval_count: row.get::<_, i64>(11).unwrap_or(0) as u32,
-                })
-            }).map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
+                if candidates.is_empty() {
+                    // No LSH matches — fall back to brute-force on recent records
+                    Self::fetch_all_records(conn, 1000)?
+                } else {
+                    Self::fetch_records_by_ids(conn, &candidates)?
+                }
+            } else {
+                // Small dataset — brute-force is fine
+                Self::fetch_all_records(conn, 1000)?
+            };
 
             // Compute similarities and sort
-            let mut results: Vec<SearchResult> = rows
-                .filter_map(|r| r.ok())
+            let mut results: Vec<SearchResult> = records
+                .into_iter()
                 .map(|record| {
                     let similarity = query.similarity(&record.encoding);
                     SearchResult { record, similarity }
@@ -384,7 +597,7 @@ impl ConsciousnessDatabase for SqliteMemory {
                 .collect();
 
             // Sort by similarity descending
-            results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+            results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity).reverse());
             results.truncate(top_k);
 
             Ok(results)
@@ -400,40 +613,7 @@ impl ConsciousnessDatabase for SqliteMemory {
                  FROM memories WHERE id = ?1"
             ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
 
-            let result = stmt.query_row([id], |row| {
-                let encoding_bytes: Vec<u8> = row.get(1)?;
-                let topics_json: String = row.get(8)?;
-                let topics: Vec<String> = match serde_json::from_str(&topics_json) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        tracing::warn!("Failed to deserialize topics: {}. Using empty array.", e);
-                        Vec::new()
-                    }
-                };
-
-                Ok(MemoryRecord {
-                    id: row.get(0)?,
-                    encoding: Self::bytes_to_hv(&encoding_bytes),
-                    timestamp_ms: {
-                        let ts = row.get::<_, i64>(2)?;
-                        if ts < 0 {
-                            tracing::warn!("Negative timestamp {} found, using 0", ts);
-                            0u64
-                        } else {
-                            ts as u64
-                        }
-                    },
-                    memory_type: Self::str_to_memory_type(&row.get::<_, String>(3)?),
-                    content: row.get(4)?,
-                    valence: row.get::<_, f64>(5)? as f32,
-                    arousal: row.get::<_, f64>(6)? as f32,
-                    phi: row.get::<_, f64>(7)?,
-                    topics,
-                    metadata: row.get(9)?,
-                    consolidation_strength: row.get::<_, f64>(10).unwrap_or(0.0),
-                    retrieval_count: row.get::<_, i64>(11).unwrap_or(0) as u32,
-                })
-            });
+            let result = stmt.query_row([id], Self::row_to_record);
 
             match result {
                 Ok(record) => Ok(Some(record)),
@@ -447,7 +627,10 @@ impl ConsciousnessDatabase for SqliteMemory {
     async fn delete(&self, id: &str) -> DbResult<bool> {
         let id = id.to_string();
         self.with_connection(move |conn| {
-            let affected = conn.execute("DELETE FROM memories WHERE id = ?1", [id])
+            // Clean up LSH index entries (CASCADE may not be enabled in all SQLite builds)
+            Self::delete_lsh_entries(conn, &id)?;
+
+            let affected = conn.execute("DELETE FROM memories WHERE id = ?1", [&id])
                 .map_err(|e| DatabaseError::QueryFailed(format!("Delete failed: {}", e)))?;
 
             Ok(affected > 0)
@@ -471,6 +654,21 @@ impl ConsciousnessDatabase for SqliteMemory {
                 .map_err(|e| DatabaseError::QueryFailed(format!("Health check failed: {}", e)))?;
 
             Ok(true)
+        })
+        .await
+    }
+
+    async fn list_all(&self) -> DbResult<Vec<MemoryRecord>> {
+        self.with_connection(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
+                 FROM memories ORDER BY timestamp_ms ASC"
+            ).map_err(|e| DatabaseError::QueryFailed(format!("list_all prepare failed: {}", e)))?;
+
+            let rows = stmt.query_map([], Self::row_to_record)
+                .map_err(|e| DatabaseError::QueryFailed(format!("list_all query failed: {}", e)))?;
+
+            Ok(rows.filter_map(|r| r.ok()).collect())
         })
         .await
     }
@@ -679,6 +877,175 @@ mod tests {
 
         // Clean up
         let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_lsh_band_hashes_deterministic() {
+        let hv = BinaryHV::random(42);
+        let h1 = SqliteMemory::lsh_band_hashes(&hv);
+        let h2 = SqliteMemory::lsh_band_hashes(&hv);
+        assert_eq!(h1, h2, "Same vector should produce same hashes");
+    }
+
+    #[test]
+    fn test_lsh_band_hashes_different_vectors() {
+        let hv1 = BinaryHV::random(1);
+        let hv2 = BinaryHV::random(2);
+        let h1 = SqliteMemory::lsh_band_hashes(&hv1);
+        let h2 = SqliteMemory::lsh_band_hashes(&hv2);
+        // Random BinaryHVs should differ in at least some bands
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_lsh_similar_vectors_share_bands() {
+        // Create a vector and a close neighbor (flip only a few bits)
+        let hv1 = BinaryHV::random(42);
+        let mut hv2 = hv1;
+        // Flip 50 out of 16384 bits (99.7% similar)
+        for i in 0..50 {
+            let byte_idx = i * 3 % BinaryHV::BYTES;
+            hv2.0[byte_idx] ^= 1;
+        }
+        let h1 = SqliteMemory::lsh_band_hashes(&hv1);
+        let h2 = SqliteMemory::lsh_band_hashes(&hv2);
+
+        // Very similar vectors should share most LSH bands
+        let matching_bands = h1.iter().zip(h2.iter()).filter(|(a, b)| a == b).count();
+        assert!(matching_bands >= 3, "Very similar vectors should share at least 3 of 6 bands, got {}", matching_bands);
+    }
+
+    #[tokio::test]
+    async fn test_lsh_index_populated_on_store() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let record = MemoryRecord {
+            id: "lsh-test-1".to_string(),
+            encoding: BinaryHV::random(42),
+            timestamp_ms: 1234567890,
+            memory_type: MemoryType::Episodic,
+            content: "LSH test".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(record).await.unwrap();
+
+        // Check that LSH entries were created
+        let conn = db.conn.lock().unwrap();
+        let lsh_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM vector_lsh WHERE memory_id = 'lsh-test-1'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(lsh_count, LSH_NUM_BANDS as i64);
+    }
+
+    #[tokio::test]
+    async fn test_lsh_entries_deleted_on_delete() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let record = MemoryRecord {
+            id: "lsh-del-1".to_string(),
+            encoding: BinaryHV::random(42),
+            timestamp_ms: 1234567890,
+            memory_type: MemoryType::Episodic,
+            content: "Will be deleted".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(record).await.unwrap();
+        db.delete("lsh-del-1").await.unwrap();
+
+        let conn = db.conn.lock().unwrap();
+        let lsh_count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM vector_lsh WHERE memory_id = 'lsh-del-1'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(lsh_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_search_similar_finds_exact_match_via_lsh() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let target_hv = BinaryHV::random(42);
+
+        // Store 600 records to trigger LSH path (>= LSH_MIN_RECORDS)
+        for i in 0..600 {
+            let record = MemoryRecord {
+                id: format!("lsh-search-{}", i),
+                encoding: BinaryHV::random(i + 100),
+                timestamp_ms: 1000000 + i as u64,
+                memory_type: MemoryType::Episodic,
+                content: format!("Record {}", i),
+                valence: 0.5,
+                arousal: 0.5,
+                phi: 0.5,
+                topics: vec![],
+                metadata: "{}".to_string(),
+                consolidation_strength: 0.0,
+                retrieval_count: 0,
+            };
+            db.store(record).await.unwrap();
+        }
+
+        // Store the target
+        let target_record = MemoryRecord {
+            id: "target".to_string(),
+            encoding: target_hv,
+            timestamp_ms: 2000000,
+            memory_type: MemoryType::Episodic,
+            content: "Target record".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(target_record).await.unwrap();
+
+        // Search for the target — should find it via LSH
+        let results = db.search_similar(&target_hv, 5).await.unwrap();
+        assert!(!results.is_empty());
+        assert_eq!(results[0].record.id, "target");
+        assert!(results[0].similarity > 0.99);
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_list_all() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        for i in 0..5u64 {
+            let record = MemoryRecord {
+                id: format!("list-all-{}", i),
+                encoding: BinaryHV::random(i),
+                timestamp_ms: 1000000 + i,
+                memory_type: MemoryType::Episodic,
+                content: format!("Record {}", i),
+                valence: 0.5,
+                arousal: 0.5,
+                phi: 0.5,
+                topics: vec![],
+                metadata: "{}".to_string(),
+                consolidation_strength: 0.0,
+                retrieval_count: 0,
+            };
+            db.store(record).await.unwrap();
+        }
+
+        let all = db.list_all().await.unwrap();
+        assert_eq!(all.len(), 5);
+        // Should be ordered by timestamp ascending
+        assert_eq!(all[0].id, "list-all-0");
+        assert_eq!(all[4].id, "list-all-4");
     }
 
     #[tokio::test]

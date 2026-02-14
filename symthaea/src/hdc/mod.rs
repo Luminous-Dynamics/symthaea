@@ -399,3 +399,5 @@ pub mod narrative_algebra;
 // ═══════════════════════════════════════════════════════════════════════════════
 #[cfg(test)]
 pub mod proptest_hdc;
+#[cfg(test)]
+mod proptest_moral_algebra;

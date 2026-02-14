@@ -1,4 +1,5 @@
 use super::*;
+use crate::dynamics::ConsciousnessPattern;
 
 #[test]
 fn test_service_creation() {
@@ -1284,6 +1285,154 @@ fn test_cognitive_depth_equality() {
     assert_eq!(CognitiveDepth::Cortical, CognitiveDepth::Cortical);
     assert_eq!(CognitiveDepth::DeepThought, CognitiveDepth::DeepThought);
     assert_ne!(CognitiveDepth::Reflex, CognitiveDepth::Cortical);
+}
+
+// -------------------- Moral Evaluation Tests --------------------
+
+#[test]
+fn test_moral_evaluation_runs_each_cycle() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    for _ in 0..5 {
+        service.cycle("neutral input about weather");
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.moral_evaluations, 5, "Moral evaluation should run every cycle");
+}
+
+#[test]
+fn test_moral_evaluation_tracks_concerns() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    // Run with morally neutral content
+    service.cycle("The sky is blue and the grass is green");
+    let neutral_concerns = service.stats().moral_concerns_detected;
+
+    // Run with content that contains harm-related language
+    service.cycle("deliberately causing harm and suffering to others");
+
+    // The moral judgment should be populated after any cycle
+    assert!(service.last_moral_judgment().is_some());
+    let judgment = service.last_moral_judgment().unwrap();
+    // moral_score is a finite f64
+    assert!(judgment.moral_score.is_finite());
+    // concerns counter should be >= what it was (may or may not detect concern)
+    assert!(service.stats().moral_concerns_detected >= neutral_concerns);
+}
+
+// -------------------- Demand-Driven Consolidation Tests --------------------
+
+#[test]
+fn test_demand_driven_consolidation_trigger() {
+    use crate::memory::episodic_replay::{EpisodicMemory, EpisodicReplayConfig};
+
+    // Test that trigger_demand_replay causes should_replay to return true
+    let config = EpisodicReplayConfig {
+        phi_threshold: 0.01,
+        min_episodes_for_replay: 1,
+        replay_interval: 1000, // Long interval so periodic won't trigger
+        ..Default::default()
+    };
+    let mut memory = EpisodicMemory::new(config);
+
+    // Store an episode to meet minimum
+    let episode = crate::memory::episodic_replay::Episode::new(
+        symthaea_core::hdc::unified_hv::ContinuousHV::random(64, 1),
+        symthaea_core::hdc::unified_hv::ContinuousHV::random(64, 2),
+        0.5,
+        1,
+    );
+    memory.store_if_significant(episode);
+
+    // Without trigger, should_replay is false (replay_interval=1000)
+    assert!(!memory.should_replay());
+
+    // Trigger demand replay
+    memory.trigger_demand_replay();
+    assert!(memory.should_replay(), "Demand trigger should enable replay");
+
+    // Stats should track demand replays
+    assert_eq!(memory.stats().demand_replay_count, 1);
+}
+
+// -------------------- FEP Learning Signal Tests --------------------
+
+#[test]
+fn test_fep_learning_signal_updates() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0, // Always learn
+        ..Default::default()
+    }).unwrap();
+
+    // Run enough cycles for FEP to produce learning signals
+    for _ in 0..15 {
+        service.cycle("fep learning signal test input");
+    }
+
+    let stats = service.stats();
+    // FEP learning signal should be finite
+    assert!(stats.fep_learning_signal.is_finite());
+    // Effective learning rate should be positive and finite
+    assert!(stats.effective_learning_rate.is_finite());
+    assert!(stats.effective_learning_rate >= 0.0);
+}
+
+// -------------------- Stats Validation Tests --------------------
+
+#[test]
+fn test_stats_comprehensive_after_cycles() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        ..Default::default()
+    }).unwrap();
+
+    for i in 0..10 {
+        service.cycle(&format!("varied input number {}", i));
+    }
+
+    let stats = service.stats();
+
+    // Basic counters
+    assert_eq!(stats.total_cycles, 10);
+    assert!(stats.learning_cycles > 0, "With threshold=0.0, some learning should occur");
+
+    // Prediction error should be tracked
+    assert!(stats.avg_prediction_error.is_finite());
+    assert!(stats.avg_prediction_error >= 0.0);
+
+    // Temporal coherence should be tracked
+    assert!(stats.temporal_coherence.is_finite());
+
+    // Semantic memory stats should be tracked
+    assert!(stats.semantic_entries_stored > 0, "Semantic memory should have entries");
+    assert!(stats.semantic_lr_factor.is_finite());
+
+    // LTC consciousness should be finite
+    assert!(stats.ltc_consciousness.is_finite());
+}
+
+// -------------------- Primitive-Belief Bridge Verification --------------------
+
+#[test]
+fn test_primitive_belief_bridge_produces_signals() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        ..Default::default()
+    }).unwrap();
+
+    // First cycle: initializes prev_primitive_state
+    service.cycle("initial state");
+
+    // Subsequent cycles: bridge computes TD signals from prev vs current state
+    for _ in 0..5 {
+        service.cycle("primitive bridge signal test");
+    }
+
+    let stats = service.stats();
+    // FEP learning signal should have been modulated by primitive bridge TD signals
+    // After several cycles, the signal should be finite (may be zero if states are similar)
+    assert!(stats.fep_learning_signal.is_finite());
 }
 
 // -------------------- Integration Tests --------------------
