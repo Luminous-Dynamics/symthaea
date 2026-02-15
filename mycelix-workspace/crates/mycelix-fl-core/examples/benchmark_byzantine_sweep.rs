@@ -267,7 +267,16 @@ fn main() {
     println!("{:-<109}", "");
     println!(
         "| {:>5} | {:>6} | {:>12} {:>6} | {:>12} {:>6} | {:>12} {:>6} | {:>12} {:>6} |",
-        "Byz%", "Nodes", "EqualRep", "Conv?", "LowRepByz", "Conv?", "Krum", "Conv?", "Conscious", "Conv?"
+        "Byz%",
+        "Nodes",
+        "EqualRep",
+        "Conv?",
+        "LowRepByz",
+        "Conv?",
+        "Krum",
+        "Conv?",
+        "Conscious",
+        "Conv?"
     );
     println!("{:-<109}", "");
 
