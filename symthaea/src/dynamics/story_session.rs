@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 
 use ndarray::Array1;
+use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::dynamics::narrative_dynamics::{NarrativeSignal, StoryArcConfig, StoryArcDynamics};
@@ -16,6 +17,7 @@ use crate::hdc::narrative_algebra::{ArcPhase, NarrativeAlgebra, NarrativeMood};
 // ============================================================================
 
 /// A logged scene with its signal and HDC representation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SceneRecord {
     pub index: usize,
     pub title: String,
@@ -28,10 +30,22 @@ pub struct SceneRecord {
 }
 
 /// A tracked conflict within the story.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConflictEntry {
     pub description: String,
     pub introduced_at: usize,
     pub resolved_at: Option<usize>,
+}
+
+/// Per-character arc tracking data.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CharacterArc {
+    /// Scene indices where this character appears
+    pub scene_indices: Vec<usize>,
+    /// Ghost Signal at each appearance
+    pub signals: Vec<NarrativeSignal>,
+    /// Running-average presence HV (weighted bundle of scene HVs)
+    pub presence_hv: ContinuousHV,
 }
 
 /// Snapshot of the story's current state.
@@ -54,6 +68,7 @@ pub struct StorySession {
     algebra: NarrativeAlgebra,
     dynamics: StoryArcDynamics,
     characters: HashMap<String, ContinuousHV>,
+    character_arcs: HashMap<String, CharacterArc>,
     conflicts: Vec<ConflictEntry>,
     themes: Vec<String>,
     scene_log: Vec<SceneRecord>,
@@ -69,6 +84,7 @@ impl StorySession {
             algebra: NarrativeAlgebra::default_dim(),
             dynamics: StoryArcDynamics::new(config),
             characters: HashMap::new(),
+            character_arcs: HashMap::new(),
             conflicts: Vec::new(),
             themes: Vec::new(),
             scene_log: Vec::new(),
@@ -83,6 +99,7 @@ impl StorySession {
             algebra: NarrativeAlgebra::default_dim(),
             dynamics: StoryArcDynamics::new(config),
             characters: HashMap::new(),
+            character_arcs: HashMap::new(),
             conflicts: Vec::new(),
             themes: Vec::new(),
             scene_log: Vec::new(),
@@ -98,6 +115,14 @@ impl StorySession {
     ) -> ContinuousHV {
         let hv = self.algebra.encode_character(name, role_primitive);
         self.characters.insert(name.to_string(), hv.clone());
+        self.character_arcs.insert(
+            name.to_string(),
+            CharacterArc {
+                scene_indices: Vec::new(),
+                signals: Vec::new(),
+                presence_hv: hv.clone(),
+            },
+        );
         hv
     }
 
@@ -109,6 +134,10 @@ impl StorySession {
     /// Add a scene to the story, advancing CfC dynamics.
     ///
     /// Returns the resulting `NarrativeSignal` (Ghost Signal).
+    ///
+    /// Uses hybrid HDC+CfC signal extraction and scene-to-scene transition
+    /// operators to modulate the CfC input based on narrative escalation
+    /// and transformation between consecutive scenes.
     pub fn add_scene(
         &mut self,
         title: &str,
@@ -129,10 +158,32 @@ impl StorySession {
             .encode_scene(setting, &char_hvs, conflict, mood);
 
         // Project 4096-D HV → input_dim-D for CfC
-        let projected = self.project_hv(&scene_hv);
+        let mut projected = self.project_hv(&scene_hv);
 
-        // Advance dynamics
-        let signal = self.dynamics.step(&projected, 0.1);
+        // Scene-to-scene transition modulation (Improvement #4)
+        if let Some(prev_record) = self.scene_log.last() {
+            let prev_hv = &prev_record.scene_hv;
+            // Compute escalation and transformation similarity
+            let escalation_hv = self.algebra.escalates(prev_hv, &scene_hv);
+            let escalation_sim = escalation_hv.similarity(&scene_hv).abs();
+
+            let transform_hv = self.algebra.transforms_into(prev_hv, &scene_hv);
+            let transform_sim = transform_hv.similarity(&scene_hv).abs();
+
+            // Amplify first half by escalation factor, second half by transform factor
+            let half = projected.len() / 2;
+            let esc_factor = 1.0 + escalation_sim;
+            let trans_factor = 1.0 + transform_sim;
+            for i in 0..half {
+                projected[i] *= esc_factor;
+            }
+            for i in half..projected.len() {
+                projected[i] *= trans_factor;
+            }
+        }
+
+        // Advance dynamics using hybrid HDC+CfC signal
+        let signal = self.dynamics.step_hybrid(&projected, &scene_hv, 0.1);
 
         let index = self.scene_log.len();
         self.scene_log.push(SceneRecord {
@@ -143,8 +194,24 @@ impl StorySession {
             mood,
             characters: character_names.iter().map(|s| s.to_string()).collect(),
             signal: signal.clone(),
-            scene_hv,
+            scene_hv: scene_hv.clone(),
         });
+
+        // Update character arcs for each participating character
+        for name in character_names {
+            if let Some(arc) = self.character_arcs.get_mut(*name) {
+                arc.scene_indices.push(index);
+                arc.signals.push(signal.clone());
+                // Running-average presence HV via weighted bundle
+                let count = arc.scene_indices.len() as f32;
+                let old_weight = (count - 1.0) / count;
+                let new_weight = 1.0 / count;
+                arc.presence_hv = ContinuousHV::weighted_bundle(
+                    &[&arc.presence_hv, &scene_hv],
+                    &[old_weight, new_weight],
+                );
+            }
+        }
 
         signal
     }
@@ -213,10 +280,27 @@ impl StorySession {
         &self.algebra
     }
 
+    /// Get a character's arc tracking data.
+    pub fn get_character_arc(&self, name: &str) -> Option<&CharacterArc> {
+        self.character_arcs.get(name)
+    }
+
+    /// Get the tension curve for a character: `(scene_index, tension)` pairs.
+    pub fn character_tension_curve(&self, name: &str) -> Option<Vec<(usize, f32)>> {
+        self.character_arcs.get(name).map(|arc| {
+            arc.scene_indices
+                .iter()
+                .zip(arc.signals.iter())
+                .map(|(&idx, sig)| (idx, sig.tension))
+                .collect()
+        })
+    }
+
     /// Reset the session to start a new story.
     pub fn reset(&mut self) {
         self.dynamics.reset();
         self.characters.clear();
+        self.character_arcs.clear();
         self.conflicts.clear();
         self.themes.clear();
         self.scene_log.clear();
@@ -226,18 +310,135 @@ impl StorySession {
     // Internal
     // ========================================================================
 
-    /// Project a 4096-D HV down to `input_dim`-D by stride sampling.
+    /// Project a high-D HV down to `input_dim`-D via chunk-mean pooling
+    /// with variance-preserving scaling.
     ///
-    /// Takes every `(dim / input_dim)`-th element to produce a compact
-    /// representation suitable for the CfC input layer.
+    /// Each output element is the mean of a contiguous chunk of the input HV.
+    /// The result is then rescaled so the projected vector preserves the
+    /// energy-per-dimension of the original, preventing the near-zero inputs
+    /// that cause CfC sigmoid to collapse to 0.5.
     fn project_hv(&self, hv: &ContinuousHV) -> Array1<f32> {
         let data = hv.as_slice();
-        let stride = data.len() / self.input_dim;
-        let stride = stride.max(1);
-        let projected: Vec<f32> = (0..self.input_dim)
-            .map(|i| data.get(i * stride).copied().unwrap_or(0.0))
+        let chunk_size = (data.len() / self.input_dim).max(1);
+        let mut projected = Vec::with_capacity(self.input_dim);
+        for i in 0..self.input_dim {
+            let start = i * chunk_size;
+            let end = (start + chunk_size).min(data.len());
+            let mean = data[start..end].iter().sum::<f32>() / (end - start) as f32;
+            projected.push(mean);
+        }
+        // Variance-preserving scale: match energy-per-dim of original
+        let input_l2: f32 = data.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let output_l2: f32 = projected.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let scale = if output_l2 > 1e-8 {
+            (input_l2 / (data.len() as f32).sqrt()) / output_l2
+        } else {
+            1.0
+        };
+        Array1::from_vec(projected.iter().map(|x| x * scale).collect())
+    }
+}
+
+// ============================================================================
+// Persistence — StorySessionSnapshot
+// ============================================================================
+
+/// Current snapshot version for forward compatibility.
+const SNAPSHOT_VERSION: u32 = 1;
+
+/// A serializable snapshot of a `StorySession`.
+///
+/// On save, characters are stored as (name, HV data) pairs and the scene log
+/// is stored verbatim. On load, the algebra and dynamics are reconstructed
+/// from deterministic defaults (same seeds → identical objects).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorySessionSnapshot {
+    pub version: u32,
+    pub characters: Vec<(String, ContinuousHV)>,
+    pub conflicts: Vec<ConflictEntry>,
+    pub themes: Vec<String>,
+    pub scene_log: Vec<SceneRecord>,
+}
+
+impl StorySession {
+    /// Serialize the session state to a JSON snapshot.
+    pub fn save(&self) -> Result<String, serde_json::Error> {
+        let snapshot = StorySessionSnapshot {
+            version: SNAPSHOT_VERSION,
+            characters: self
+                .characters
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+            conflicts: self.conflicts.clone(),
+            themes: self.themes.clone(),
+            scene_log: self.scene_log.clone(),
+        };
+        serde_json::to_string_pretty(&snapshot)
+    }
+
+    /// Restore a session from a JSON snapshot.
+    ///
+    /// Algebra and dynamics are reconstructed from defaults (deterministic seeds).
+    /// Character HVs, conflicts, themes, and the scene log are restored directly.
+    /// Character arcs are rebuilt from the scene log.
+    pub fn load(json: &str) -> Result<Self, serde_json::Error> {
+        let snapshot: StorySessionSnapshot = serde_json::from_str(json)?;
+        let config = StoryArcConfig::default();
+        let input_dim = config.input_dim;
+
+        // Rebuild character_arcs from character list
+        let characters: HashMap<String, ContinuousHV> =
+            snapshot.characters.into_iter().collect();
+        let mut character_arcs: HashMap<String, CharacterArc> = characters
+            .iter()
+            .map(|(name, hv)| {
+                (
+                    name.clone(),
+                    CharacterArc {
+                        scene_indices: Vec::new(),
+                        signals: Vec::new(),
+                        presence_hv: hv.clone(),
+                    },
+                )
+            })
             .collect();
-        Array1::from_vec(projected)
+
+        // Rebuild arcs from scene log
+        for record in &snapshot.scene_log {
+            for char_name in &record.characters {
+                if let Some(arc) = character_arcs.get_mut(char_name) {
+                    arc.scene_indices.push(record.index);
+                    arc.signals.push(record.signal.clone());
+                    let count = arc.scene_indices.len() as f32;
+                    let old_weight = (count - 1.0) / count;
+                    let new_weight = 1.0 / count;
+                    arc.presence_hv = ContinuousHV::weighted_bundle(
+                        &[&arc.presence_hv, &record.scene_hv],
+                        &[old_weight, new_weight],
+                    );
+                }
+            }
+        }
+
+        let mut session = Self {
+            algebra: NarrativeAlgebra::default_dim(),
+            dynamics: StoryArcDynamics::new(config),
+            characters,
+            character_arcs,
+            conflicts: snapshot.conflicts,
+            themes: snapshot.themes,
+            scene_log: snapshot.scene_log,
+            input_dim,
+        };
+        // Replay dynamics state by re-stepping through the scene log
+        for record in &session.scene_log {
+            let projected = session.project_hv(&record.scene_hv);
+            session
+                .dynamics
+                .step_hybrid(&projected, &record.scene_hv, 0.1);
+        }
+        Ok(session)
     }
 }
 
@@ -338,6 +539,37 @@ mod tests {
     }
 
     #[test]
+    fn test_project_hv_dimension_correct() {
+        let session = StorySession::new();
+        let hv = ContinuousHV::random(4096, 42);
+        let projected = session.project_hv(&hv);
+        assert_eq!(projected.len(), session.input_dim);
+    }
+
+    #[test]
+    fn test_project_hv_variance_preserved() {
+        let session = StorySession::new();
+        let hv = ContinuousHV::random(4096, 42);
+        let projected = session.project_hv(&hv);
+
+        // Projected vector should have non-trivial magnitude (not near-zero)
+        let l2: f32 = projected.iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!(
+            l2 > 0.1,
+            "Projected vector should have meaningful magnitude, got L2={}",
+            l2
+        );
+
+        // Energy per dimension should be in a reasonable range
+        let energy_per_dim = l2 / (projected.len() as f32).sqrt();
+        assert!(
+            energy_per_dim > 0.01,
+            "Energy per dimension too low: {}",
+            energy_per_dim
+        );
+    }
+
+    #[test]
     fn test_scene_similarity() {
         let mut session = StorySession::new();
         let _hero =
@@ -382,5 +614,221 @@ mod tests {
 
         // Out-of-bounds returns None
         assert!(session.scene_similarity(0, 99).is_none());
+    }
+
+    #[test]
+    fn test_save_load_roundtrip() {
+        let mut session = StorySession::new();
+        let _hero =
+            session.register_character("Kael", &session.algebra().primitives.protagonist.clone());
+        session.add_theme("Redemption");
+        session.introduce_conflict("The dark rises");
+
+        session.add_scene(
+            "Opening",
+            "village",
+            &["Kael"],
+            "restless dreams",
+            NarrativeMood::Peaceful,
+        );
+        session.add_scene(
+            "Crisis",
+            "mountain",
+            &["Kael"],
+            "facing the beast",
+            NarrativeMood::Tense,
+        );
+
+        let json = session.save().expect("save should succeed");
+        let restored = StorySession::load(&json).expect("load should succeed");
+
+        assert_eq!(restored.scene_log().len(), 2);
+        assert_eq!(restored.get_story_state().character_count, 1);
+        assert_eq!(restored.get_story_state().themes, vec!["Redemption"]);
+        assert_eq!(restored.get_story_state().total_conflicts, 1);
+    }
+
+    #[test]
+    fn test_snapshot_version() {
+        let session = StorySession::new();
+        let json = session.save().expect("save should succeed");
+        let snapshot: super::StorySessionSnapshot =
+            serde_json::from_str(&json).expect("parse snapshot");
+        assert_eq!(snapshot.version, super::SNAPSHOT_VERSION);
+    }
+
+    #[test]
+    fn test_transition_escalation_amplifies() {
+        let mut session = StorySession::new();
+        let _hero =
+            session.register_character("Kael", &session.algebra().primitives.protagonist.clone());
+
+        // First scene (no transition modulation)
+        let sig1 = session.add_scene(
+            "Calm Start",
+            "quiet village",
+            &["Kael"],
+            "nothing happening",
+            NarrativeMood::Peaceful,
+        );
+
+        // Second scene — transition operators will modulate the projected input
+        let sig2 = session.add_scene(
+            "Sudden Crisis",
+            "burning city",
+            &["Kael"],
+            "invasion begins",
+            NarrativeMood::Tense,
+        );
+
+        // The signals should differ (transition modulation + different HDC similarity)
+        let differs = (sig1.energy - sig2.energy).abs() > 0.001
+            || (sig1.tension - sig2.tension).abs() > 0.001;
+        assert!(
+            differs,
+            "Transition from calm to crisis should produce different signals"
+        );
+    }
+
+    #[test]
+    fn test_transition_ordering_matters() {
+        // Scene A→B should produce different dynamics than scene B→A
+        let mut session_ab = StorySession::new();
+        let prot = session_ab
+            .algebra()
+            .primitives
+            .protagonist
+            .clone();
+        session_ab.register_character("Hero", &prot);
+
+        session_ab.add_scene("A", "forest", &["Hero"], "lost", NarrativeMood::Mysterious);
+        let sig_ab = session_ab.add_scene(
+            "B",
+            "castle",
+            &["Hero"],
+            "battle",
+            NarrativeMood::Tense,
+        );
+
+        let mut session_ba = StorySession::new();
+        let prot2 = session_ba
+            .algebra()
+            .primitives
+            .protagonist
+            .clone();
+        session_ba.register_character("Hero", &prot2);
+
+        session_ba.add_scene(
+            "B",
+            "castle",
+            &["Hero"],
+            "battle",
+            NarrativeMood::Tense,
+        );
+        let sig_ba = session_ba.add_scene(
+            "A",
+            "forest",
+            &["Hero"],
+            "lost",
+            NarrativeMood::Mysterious,
+        );
+
+        // Different ordering should produce different second-scene signals
+        let differs = (sig_ab.energy - sig_ba.energy).abs() > 0.001
+            || (sig_ab.tension - sig_ba.tension).abs() > 0.001
+            || (sig_ab.surprise - sig_ba.surprise).abs() > 0.001;
+        assert!(
+            differs,
+            "Scene ordering should affect Ghost Signal via transition operators"
+        );
+    }
+
+    #[test]
+    fn test_character_arc_tracking() {
+        let mut session = StorySession::new();
+        let _hero =
+            session.register_character("Kael", &session.algebra().primitives.protagonist.clone());
+        let _villain =
+            session.register_character("Thira", &session.algebra().primitives.antagonist.clone());
+
+        session.add_scene(
+            "Scene 1",
+            "village",
+            &["Kael"],
+            "restless dreams",
+            NarrativeMood::Peaceful,
+        );
+        session.add_scene(
+            "Scene 2",
+            "forest",
+            &["Kael", "Thira"],
+            "confrontation",
+            NarrativeMood::Tense,
+        );
+        session.add_scene(
+            "Scene 3",
+            "mountain",
+            &["Kael"],
+            "final test",
+            NarrativeMood::Tense,
+        );
+
+        let kael_arc = session.get_character_arc("Kael").expect("Kael registered");
+        assert_eq!(kael_arc.scene_indices.len(), 3, "Kael in all 3 scenes");
+        assert_eq!(kael_arc.signals.len(), 3);
+
+        let thira_arc = session.get_character_arc("Thira").expect("Thira registered");
+        assert_eq!(thira_arc.scene_indices.len(), 1, "Thira in 1 scene");
+        assert_eq!(thira_arc.scene_indices[0], 1);
+
+        // Tension curve
+        let kael_tension = session
+            .character_tension_curve("Kael")
+            .expect("Kael registered");
+        assert_eq!(kael_tension.len(), 3);
+        for (idx, tension) in &kael_tension {
+            assert!(*idx < 3);
+            assert!((0.0..=1.0).contains(tension));
+        }
+    }
+
+    #[test]
+    fn test_character_arc_presence_hv() {
+        let mut session = StorySession::new();
+        let _hero =
+            session.register_character("Kael", &session.algebra().primitives.protagonist.clone());
+
+        session.add_scene(
+            "S1",
+            "village",
+            &["Kael"],
+            "peace",
+            NarrativeMood::Peaceful,
+        );
+        session.add_scene(
+            "S2",
+            "forest",
+            &["Kael"],
+            "danger",
+            NarrativeMood::Tense,
+        );
+
+        let arc = session.get_character_arc("Kael").unwrap();
+        // Presence HV should have nonzero norm (it's a weighted bundle of scene HVs)
+        let norm: f32 = arc
+            .presence_hv
+            .as_slice()
+            .iter()
+            .map(|x| x * x)
+            .sum::<f32>()
+            .sqrt();
+        assert!(norm > 0.01, "Presence HV should have non-trivial norm");
+    }
+
+    #[test]
+    fn test_character_arc_not_registered() {
+        let session = StorySession::new();
+        assert!(session.get_character_arc("Unknown").is_none());
+        assert!(session.character_tension_curve("Unknown").is_none());
     }
 }

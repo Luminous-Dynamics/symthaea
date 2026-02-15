@@ -32,6 +32,9 @@ use crate::language::{
 use crate::mind::structured_thought::{ETier, EpistemicCube, NTier};
 #[cfg(feature = "magi_loop")]
 use crate::mind::SemanticIntent;
+use crate::memory::{
+    CoordinatorConfig, EpisodicMemory, EpisodicReplayConfig, GraduationEvent, MemoryCoordinator,
+};
 use crate::mind::{
     ConstraintType, ContinuousMind, DomainContext, EpistemicStatus, MindConfig, StructuredThought,
 };
@@ -144,6 +147,10 @@ pub struct Symthaea {
     neural_bridge: Option<NeuralBridgeV2>,
     /// Optional persistent database for long-term memory storage.
     database: Option<Arc<dyn ConsciousnessDatabase>>,
+    /// Memory coordinator: graduation pipeline + cross-tier signals.
+    memory_coordinator: MemoryCoordinator,
+    /// Episodic memory: Phi-weighted priority queue for significant moments.
+    episodic_memory: EpisodicMemory,
 }
 
 impl Symthaea {
@@ -257,6 +264,8 @@ impl Symthaea {
             #[cfg(feature = "neural-bridge")]
             neural_bridge,
             database: None,
+            memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
+            episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
         })
     }
 
@@ -294,7 +303,7 @@ impl Symthaea {
     /// Reconstructs the mind and language systems fresh (stateless between sessions).
     pub fn resume(path: &str) -> Result<Self> {
         let data = std::fs::read_to_string(path)
-            .with_context(|| format!("Failed to read state file: {}", path))?;
+            .with_context(|| format!("Failed to read state file: {path}"))?;
         let state: PersistedState =
             serde_json::from_str(&data).with_context(|| "Failed to parse state file")?;
 
@@ -400,6 +409,8 @@ impl Symthaea {
             #[cfg(feature = "neural-bridge")]
             neural_bridge,
             database: None,
+            memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
+            episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
         })
     }
 
@@ -462,32 +473,64 @@ impl Symthaea {
         let phase2_start = Instant::now();
         self.mind.tick();
 
-        // Drain evicted working memory items for graduation tracking
+        // Update coordinator signals with current consciousness state
+        let snapshot = self.mind.snapshot();
+        self.memory_coordinator
+            .update_signals(snapshot.consciousness_level, snapshot.meta_awareness);
+
+        // Drain evicted working memory items for graduation + persistence
         let evicted = self.mind.take_evicted();
         if !evicted.is_empty() {
+            let current_phi = snapshot.consciousness_level;
+            let current_coherence = snapshot.meta_awareness;
+            let interaction_count = self.interactions;
+
             tracing::trace!(
                 evicted_count = evicted.len(),
                 "Working memory items evicted during tick"
             );
 
+            // Queue graduations for episodic consolidation
+            for hv in &evicted {
+                self.memory_coordinator.queue_graduation(GraduationEvent {
+                    content: hv.clone(),
+                    label: format!("wm_eviction_step_{interaction_count}"),
+                    steps_survived: interaction_count.min(10), // approximate
+                    final_activation: 0.5,                     // default activation
+                    phi_at_graduation: current_phi,
+                    coherence_at_graduation: current_coherence,
+                });
+            }
+
+            // Process graduations into episodic memory
+            let graduated = self
+                .memory_coordinator
+                .process_graduations(&mut self.episodic_memory);
+            if graduated > 0 {
+                tracing::debug!(
+                    target: "symthaea::memory",
+                    graduated,
+                    episodic_count = self.episodic_memory.len(),
+                    "Items graduated to episodic memory"
+                );
+            }
+
+            // Persist evicted items to database asynchronously
             if let Some(ref db) = self.database {
                 let db = Arc::clone(db);
                 let timestamp_ms = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_millis() as u64;
-                let current_phi = self.mind.snapshot().consciousness_level;
-                let interaction_count = self.interactions;
 
                 tokio::spawn(async move {
                     for (i, hv) in evicted.iter().enumerate() {
                         let record = MemoryRecord {
-                            id: format!("wm-{}-{}", timestamp_ms, i),
+                            id: format!("wm-{timestamp_ms}-{i}"),
                             memory_type: MemoryType::Working,
                             encoding: hv.to_binary(0.0),
                             content: format!(
-                                "Working memory eviction at step {}",
-                                interaction_count
+                                "Working memory eviction at step {interaction_count}"
                             ),
                             timestamp_ms,
                             valence: 0.0,
@@ -503,6 +546,32 @@ impl Symthaea {
                         }
                     }
                 });
+            }
+        }
+
+        // ── DATABASE RECALL: Query persistent memory for contextual priming ──
+        // Retrieve similar past experiences to enrich the current cognitive cycle.
+        if let Some(ref db) = self.database {
+            let query_hv = input_embedding.to_binary(0.0);
+            match db.search_similar(&query_hv, 3).await {
+                Ok(results) if !results.is_empty() => {
+                    tracing::trace!(
+                        target: "symthaea::memory",
+                        recalled = results.len(),
+                        top_similarity = results[0].similarity,
+                        "Database recall: found similar past experiences"
+                    );
+                    // Record retrievals for reconsolidation tracking
+                    for result in &results {
+                        let hash =
+                            crate::memory::content_hash(&result.record.encoding.to_continuous());
+                        self.memory_coordinator.record_retrieval(hash);
+                    }
+                }
+                Ok(_) => {} // No similar memories found — normal for early interactions
+                Err(e) => {
+                    tracing::debug!(target: "symthaea::memory", error = %e, "Database recall skipped");
+                }
             }
         }
 
@@ -953,7 +1022,7 @@ impl Symthaea {
 
         let json = serde_json::to_string_pretty(&state).context("Failed to serialize state")?;
         std::fs::write(path, json)
-            .with_context(|| format!("Failed to write state file: {}", path))?;
+            .with_context(|| format!("Failed to write state file: {path}"))?;
         Ok(())
     }
 

@@ -163,12 +163,12 @@ impl SqliteMemory {
         // Ensure parent directory exists
         if let Some(parent) = path.as_ref().parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                DatabaseError::ConnectionFailed(format!("Failed to create directory: {}", e))
+                DatabaseError::ConnectionFailed(format!("Failed to create directory: {e}"))
             })?;
         }
 
         let conn = Connection::open(&path)
-            .map_err(|e| DatabaseError::ConnectionFailed(format!("SQLite open failed: {}", e)))?;
+            .map_err(|e| DatabaseError::ConnectionFailed(format!("SQLite open failed: {e}")))?;
 
         let db = Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -204,7 +204,7 @@ impl SqliteMemory {
     /// ```
     pub fn in_memory() -> DbResult<Self> {
         let conn = Connection::open_in_memory().map_err(|e| {
-            DatabaseError::ConnectionFailed(format!("SQLite in-memory failed: {}", e))
+            DatabaseError::ConnectionFailed(format!("SQLite in-memory failed: {e}"))
         })?;
 
         let db = Self {
@@ -244,7 +244,7 @@ impl SqliteMemory {
             CREATE INDEX IF NOT EXISTS idx_memories_phi ON memories(phi);
         "#,
         )
-        .map_err(|e| DatabaseError::QueryFailed(format!("Schema creation failed: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("Schema creation failed: {e}")))?;
 
         // Migration: add reconsolidation columns to existing databases
         let _ = conn.execute_batch(
@@ -268,7 +268,7 @@ impl SqliteMemory {
             CREATE INDEX IF NOT EXISTS idx_lsh_band_hash ON vector_lsh(band_idx, band_hash);
         "#,
         )
-        .map_err(|e| DatabaseError::QueryFailed(format!("LSH schema creation failed: {}", e)))?;
+        .map_err(|e| DatabaseError::QueryFailed(format!("LSH schema creation failed: {e}")))?;
 
         // Backfill LSH index for any existing records
         let record_count: i64 = conn
@@ -303,7 +303,7 @@ impl SqliteMemory {
             f(&conn)
         })
         .await
-        .map_err(|e| DatabaseError::Other(format!("Blocking task failed: {}", e)))?
+        .map_err(|e| DatabaseError::Other(format!("Blocking task failed: {e}")))?
     }
 
     /// Serialize BinaryHV to bytes (2048 bytes = 16,384 bits).
@@ -381,11 +381,11 @@ impl SqliteMemory {
         let hashes = Self::lsh_band_hashes(hv);
         let mut stmt = conn.prepare_cached(
             "INSERT OR REPLACE INTO vector_lsh (memory_id, band_idx, band_hash) VALUES (?1, ?2, ?3)"
-        ).map_err(|e| DatabaseError::InsertFailed(format!("LSH prepare failed: {}", e)))?;
+        ).map_err(|e| DatabaseError::InsertFailed(format!("LSH prepare failed: {e}")))?;
 
         for (band, &hash) in hashes.iter().enumerate() {
             stmt.execute(params![id, band as i64, hash])
-                .map_err(|e| DatabaseError::InsertFailed(format!("LSH insert failed: {}", e)))?;
+                .map_err(|e| DatabaseError::InsertFailed(format!("LSH insert failed: {e}")))?;
         }
         Ok(())
     }
@@ -393,7 +393,7 @@ impl SqliteMemory {
     /// Delete LSH index entries for a memory record.
     fn delete_lsh_entries(conn: &Connection, id: &str) -> DbResult<()> {
         conn.execute("DELETE FROM vector_lsh WHERE memory_id = ?1", [id])
-            .map_err(|e| DatabaseError::QueryFailed(format!("LSH delete failed: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("LSH delete failed: {e}")))?;
         Ok(())
     }
 
@@ -408,12 +408,12 @@ impl SqliteMemory {
             .prepare_cached(
                 "SELECT DISTINCT memory_id FROM vector_lsh WHERE band_idx = ?1 AND band_hash = ?2",
             )
-            .map_err(|e| DatabaseError::QueryFailed(format!("LSH query prepare failed: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("LSH query prepare failed: {e}")))?;
 
         for (band, &hash) in hashes.iter().enumerate() {
             let rows = stmt
                 .query_map(params![band as i64, hash], |row| row.get::<_, String>(0))
-                .map_err(|e| DatabaseError::QueryFailed(format!("LSH query failed: {}", e)))?;
+                .map_err(|e| DatabaseError::QueryFailed(format!("LSH query failed: {e}")))?;
 
             for id in rows.flatten() {
                 candidates.insert(id);
@@ -464,11 +464,11 @@ impl SqliteMemory {
         let mut stmt = conn.prepare(
             "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
              FROM memories ORDER BY timestamp_ms DESC LIMIT ?1"
-        ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
+        ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {e}")))?;
 
         let rows = stmt
             .query_map([limit as i64], Self::row_to_record)
-            .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
+            .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {e}")))?;
 
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
@@ -491,12 +491,12 @@ impl SqliteMemory {
 
             let sql = format!(
                 "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
-                 FROM memories WHERE id IN ({})", placeholders
+                 FROM memories WHERE id IN ({placeholders})"
             );
 
             let mut stmt = conn
                 .prepare(&sql)
-                .map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
+                .map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {e}")))?;
 
             let params: Vec<&dyn rusqlite::types::ToSql> = chunk
                 .iter()
@@ -505,7 +505,7 @@ impl SqliteMemory {
 
             let rows = stmt
                 .query_map(params.as_slice(), Self::row_to_record)
-                .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
+                .map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {e}")))?;
 
             records.extend(rows.filter_map(|r| r.ok()));
         }
@@ -518,13 +518,13 @@ impl SqliteMemory {
         // Find records not yet in the LSH index
         let mut stmt = conn.prepare(
             "SELECT id, encoding FROM memories WHERE id NOT IN (SELECT DISTINCT memory_id FROM vector_lsh)"
-        ).map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill query failed: {}", e)))?;
+        ).map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill query failed: {e}")))?;
 
         let rows: Vec<(String, Vec<u8>)> = stmt
             .query_map([], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
             })
-            .map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill failed: {}", e)))?
+            .map_err(|e| DatabaseError::QueryFailed(format!("LSH backfill failed: {e}")))?
             .filter_map(|r| r.ok())
             .collect();
 
@@ -573,7 +573,7 @@ impl ConsciousnessDatabase for SqliteMemory {
                     record.consolidation_strength,
                     record.retrieval_count,
                 ],
-            ).map_err(|e| DatabaseError::InsertFailed(format!("Insert failed: {}", e)))?;
+            ).map_err(|e| DatabaseError::InsertFailed(format!("Insert failed: {e}")))?;
 
             // Update LSH index for this record
             Self::insert_lsh_entries(conn, &record.id, &record.encoding)?;
@@ -619,6 +619,27 @@ impl ConsciousnessDatabase for SqliteMemory {
             results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
             results.truncate(top_k);
 
+            // Reconsolidate: bump retrieval stats on returned results
+            if !results.is_empty() {
+                let ids: Vec<&str> = results.iter().map(|r| r.record.id.as_str()).collect();
+                for chunk in ids.chunks(500) {
+                    let placeholders: String = chunk
+                        .iter()
+                        .enumerate()
+                        .map(|(i, _)| format!("?{}", i + 1))
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    let sql = format!(
+                        "UPDATE memories SET retrieval_count = retrieval_count + 1, \
+                         consolidation_strength = MIN(consolidation_strength + 0.05, 1.0) \
+                         WHERE id IN ({placeholders})"
+                    );
+                    let params: Vec<&dyn rusqlite::types::ToSql> =
+                        chunk.iter().map(|id| id as &dyn rusqlite::types::ToSql).collect();
+                    let _ = conn.execute(&sql, params.as_slice());
+                }
+            }
+
             Ok(results)
         })
         .await
@@ -630,14 +651,14 @@ impl ConsciousnessDatabase for SqliteMemory {
             let mut stmt = conn.prepare(
                 "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
                  FROM memories WHERE id = ?1"
-            ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
+            ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {e}")))?;
 
             let result = stmt.query_row([id], Self::row_to_record);
 
             match result {
                 Ok(record) => Ok(Some(record)),
                 Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-                Err(e) => Err(DatabaseError::QueryFailed(format!("Get failed: {}", e))),
+                Err(e) => Err(DatabaseError::QueryFailed(format!("Get failed: {e}"))),
             }
         })
         .await
@@ -651,7 +672,7 @@ impl ConsciousnessDatabase for SqliteMemory {
 
             let affected = conn
                 .execute("DELETE FROM memories WHERE id = ?1", [&id])
-                .map_err(|e| DatabaseError::QueryFailed(format!("Delete failed: {}", e)))?;
+                .map_err(|e| DatabaseError::QueryFailed(format!("Delete failed: {e}")))?;
 
             Ok(affected > 0)
         })
@@ -662,7 +683,7 @@ impl ConsciousnessDatabase for SqliteMemory {
         self.with_connection(|conn| {
             let count: i64 = conn
                 .query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))
-                .map_err(|e| DatabaseError::QueryFailed(format!("Count failed: {}", e)))?;
+                .map_err(|e| DatabaseError::QueryFailed(format!("Count failed: {e}")))?;
 
             Ok(count as usize)
         })
@@ -672,7 +693,7 @@ impl ConsciousnessDatabase for SqliteMemory {
     async fn health_check(&self) -> DbResult<bool> {
         self.with_connection(|conn| {
             conn.execute_batch("SELECT 1")
-                .map_err(|e| DatabaseError::QueryFailed(format!("Health check failed: {}", e)))?;
+                .map_err(|e| DatabaseError::QueryFailed(format!("Health check failed: {e}")))?;
 
             Ok(true)
         })
@@ -684,10 +705,10 @@ impl ConsciousnessDatabase for SqliteMemory {
             let mut stmt = conn.prepare(
                 "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
                  FROM memories ORDER BY timestamp_ms ASC"
-            ).map_err(|e| DatabaseError::QueryFailed(format!("list_all prepare failed: {}", e)))?;
+            ).map_err(|e| DatabaseError::QueryFailed(format!("list_all prepare failed: {e}")))?;
 
             let rows = stmt.query_map([], Self::row_to_record)
-                .map_err(|e| DatabaseError::QueryFailed(format!("list_all query failed: {}", e)))?;
+                .map_err(|e| DatabaseError::QueryFailed(format!("list_all query failed: {e}")))?;
 
             Ok(rows.filter_map(|r| r.ok()).collect())
         })
@@ -702,7 +723,7 @@ impl ConsciousnessDatabase for SqliteMemory {
                 "SELECT COUNT(*) FROM memories",
                 [],
                 |row| row.get(0)
-            ).map_err(|e| DatabaseError::QueryFailed(format!("Count query failed: {}", e)))?;
+            ).map_err(|e| DatabaseError::QueryFailed(format!("Count query failed: {e}")))?;
 
             // Get SQLite pragma values for database metrics
             let page_size: i64 = conn.query_row(
@@ -747,7 +768,7 @@ impl ConsciousnessDatabase for SqliteMemory {
             // Get memory type distribution
             let mut type_counts_stmt = conn.prepare(
                 "SELECT memory_type, COUNT(*) as cnt FROM memories GROUP BY memory_type ORDER BY cnt DESC"
-            ).map_err(|e| DatabaseError::QueryFailed(format!("Type counts query failed: {}", e)))?;
+            ).map_err(|e| DatabaseError::QueryFailed(format!("Type counts query failed: {e}")))?;
 
             let memory_type_counts: Vec<(String, usize)> = type_counts_stmt
                 .query_map([], |row| {
@@ -755,7 +776,7 @@ impl ConsciousnessDatabase for SqliteMemory {
                     let cnt: i64 = row.get(1)?;
                     Ok((mt, cnt as usize))
                 })
-                .map_err(|e| DatabaseError::QueryFailed(format!("Type counts failed: {}", e)))?
+                .map_err(|e| DatabaseError::QueryFailed(format!("Type counts failed: {e}")))?
                 .filter_map(|r| r.ok())
                 .collect();
 
@@ -793,7 +814,7 @@ impl ConsciousnessDatabase for SqliteMemory {
             let backend_status = if path == ":memory:" {
                 "in_memory".to_string()
             } else {
-                format!("file:{}", journal_mode)
+                format!("file:{journal_mode}")
             };
 
             Ok(DatabaseStats {
@@ -1077,6 +1098,595 @@ mod tests {
         // Should be ordered by timestamp ascending
         assert_eq!(all[0].id, "list-all-0");
         assert_eq!(all[4].id, "list-all-4");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DATABASE EVICTION PIPELINE INTEGRATION TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Helper: create a MemoryRecord with minimal boilerplate
+    fn make_record(id: &str, seed: u64, memory_type: MemoryType) -> MemoryRecord {
+        MemoryRecord {
+            id: id.to_string(),
+            encoding: BinaryHV::random(seed),
+            timestamp_ms: 1_700_000_000_000 + seed,
+            memory_type,
+            content: format!("Record {}", id),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_database_store_and_retrieve_by_key() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let hv = BinaryHV::random(77);
+        let record = MemoryRecord {
+            id: "retrieve-key-1".to_string(),
+            encoding: hv,
+            timestamp_ms: 1_700_000_000_000,
+            memory_type: MemoryType::Episodic,
+            content: "Test store-and-retrieve".to_string(),
+            valence: 0.9,
+            arousal: 0.3,
+            phi: 0.85,
+            topics: vec!["test".to_string(), "retrieval".to_string()],
+            metadata: r#"{"session":"abc"}"#.to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+
+        db.store(record).await.unwrap();
+
+        // Retrieve by ID and verify all fields round-trip correctly
+        let retrieved = db.get("retrieve-key-1").await.unwrap().unwrap();
+        assert_eq!(retrieved.id, "retrieve-key-1");
+        assert_eq!(retrieved.content, "Test store-and-retrieve");
+        assert_eq!(retrieved.memory_type, MemoryType::Episodic);
+        assert!((retrieved.valence - 0.9).abs() < 0.01);
+        assert!((retrieved.arousal - 0.3).abs() < 0.01);
+        assert!((retrieved.phi - 0.85).abs() < 0.001);
+        assert_eq!(retrieved.topics, vec!["test".to_string(), "retrieval".to_string()]);
+        assert_eq!(retrieved.metadata, r#"{"session":"abc"}"#);
+        assert_eq!(retrieved.consolidation_strength, 0.0);
+        assert_eq!(retrieved.retrieval_count, 0);
+
+        // Verify the encoding bytes survived the round-trip
+        assert!(
+            hv.similarity(&retrieved.encoding) > 0.99,
+            "Encoding should survive store/retrieve round-trip"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_database_get_nonexistent_returns_none() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let result = db.get("does-not-exist").await.unwrap();
+        assert!(result.is_none(), "Getting a missing key should return None");
+    }
+
+    #[tokio::test]
+    async fn test_database_store_overwrites_existing() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let record_v1 = MemoryRecord {
+            id: "overwrite-1".to_string(),
+            encoding: BinaryHV::random(10),
+            timestamp_ms: 1_000,
+            memory_type: MemoryType::Working,
+            content: "version 1".to_string(),
+            valence: 0.1,
+            arousal: 0.1,
+            phi: 0.1,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(record_v1).await.unwrap();
+
+        // Store again with same ID but different content
+        let record_v2 = MemoryRecord {
+            id: "overwrite-1".to_string(),
+            encoding: BinaryHV::random(20),
+            timestamp_ms: 2_000,
+            memory_type: MemoryType::Semantic,
+            content: "version 2".to_string(),
+            valence: 0.9,
+            arousal: 0.9,
+            phi: 0.9,
+            topics: vec!["updated".to_string()],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.5,
+            retrieval_count: 3,
+        };
+        db.store(record_v2).await.unwrap();
+
+        // Should still be one record, with v2 content
+        assert_eq!(db.count().await.unwrap(), 1);
+        let retrieved = db.get("overwrite-1").await.unwrap().unwrap();
+        assert_eq!(retrieved.content, "version 2");
+        assert_eq!(retrieved.memory_type, MemoryType::Semantic);
+        assert_eq!(retrieved.retrieval_count, 3);
+    }
+
+    #[tokio::test]
+    async fn test_database_search_similar_ordering() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        // Create a base vector and a near-neighbor
+        let base = BinaryHV::random(42);
+        let mut near = base;
+        // Flip 100 bits out of 16384 (~99.4% similar)
+        for i in 0..100 {
+            let byte_idx = (i * 7) % BinaryHV::BYTES;
+            near.0[byte_idx] ^= 0x01;
+        }
+
+        // Store a far vector, the near vector, and the exact match
+        db.store(make_record("far", 999, MemoryType::Episodic)).await.unwrap();
+
+        let near_record = MemoryRecord {
+            id: "near".to_string(),
+            encoding: near,
+            timestamp_ms: 1_700_000_000_002,
+            memory_type: MemoryType::Episodic,
+            content: "Near neighbor".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(near_record).await.unwrap();
+
+        let exact_record = MemoryRecord {
+            id: "exact".to_string(),
+            encoding: base,
+            timestamp_ms: 1_700_000_000_003,
+            memory_type: MemoryType::Episodic,
+            content: "Exact match".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(exact_record).await.unwrap();
+
+        // Search with the base vector
+        let results = db.search_similar(&base, 3).await.unwrap();
+        assert_eq!(results.len(), 3);
+
+        // First result should be the exact match (similarity ~1.0)
+        assert_eq!(results[0].record.id, "exact");
+        assert!(results[0].similarity > 0.99);
+
+        // Second result should be the near neighbor
+        assert_eq!(results[1].record.id, "near");
+        assert!(results[1].similarity > 0.90);
+
+        // Results should be in descending similarity order
+        for pair in results.windows(2) {
+            assert!(
+                pair[0].similarity >= pair[1].similarity,
+                "Results must be sorted by similarity descending"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_database_search_similar_top_k_limit() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        // Store 10 records
+        for i in 0..10u64 {
+            db.store(make_record(&format!("topk-{}", i), i + 100, MemoryType::Episodic))
+                .await
+                .unwrap();
+        }
+
+        // Request top_k=3 — should return at most 3
+        let results = db.search_similar(&BinaryHV::random(100), 3).await.unwrap();
+        assert_eq!(results.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_database_lsh_cache_kicks_in_at_threshold() {
+        // Verify that with < LSH_MIN_RECORDS the brute-force path works,
+        // and with >= LSH_MIN_RECORDS the LSH path is used (both produce correct results).
+        let db = SqliteMemory::in_memory().unwrap();
+        let target_hv = BinaryHV::random(42);
+
+        // Store the target record first
+        let target_record = MemoryRecord {
+            id: "lsh-threshold-target".to_string(),
+            encoding: target_hv,
+            timestamp_ms: 9_999_999,
+            memory_type: MemoryType::Episodic,
+            content: "Target for LSH threshold test".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(target_record).await.unwrap();
+
+        // Below threshold: brute-force should find the target
+        let results_below = db.search_similar(&target_hv, 1).await.unwrap();
+        assert_eq!(results_below.len(), 1);
+        assert_eq!(results_below[0].record.id, "lsh-threshold-target");
+        assert!(results_below[0].similarity > 0.99);
+
+        // Fill to LSH_MIN_RECORDS (500) total. We already have 1.
+        for i in 0..(LSH_MIN_RECORDS - 1) {
+            db.store(make_record(
+                &format!("lsh-fill-{}", i),
+                i as u64 + 1000,
+                MemoryType::Working,
+            ))
+            .await
+            .unwrap();
+        }
+        assert_eq!(db.count().await.unwrap(), LSH_MIN_RECORDS);
+
+        // Above threshold: LSH-accelerated path should still find the target
+        let results_above = db.search_similar(&target_hv, 1).await.unwrap();
+        assert!(!results_above.is_empty(), "LSH path should find at least one result");
+        assert_eq!(
+            results_above[0].record.id, "lsh-threshold-target",
+            "LSH path should find the exact-match target as top result"
+        );
+        assert!(results_above[0].similarity > 0.99);
+    }
+
+    #[tokio::test]
+    async fn test_database_lsh_invalidated_on_write() {
+        // Verify that storing a new record updates the LSH index,
+        // allowing subsequent searches to find the newly-stored record.
+        let db = SqliteMemory::in_memory().unwrap();
+
+        // Fill to LSH threshold so LSH path is active
+        for i in 0..LSH_MIN_RECORDS {
+            db.store(make_record(
+                &format!("lsh-inv-{}", i),
+                i as u64 + 2000,
+                MemoryType::Episodic,
+            ))
+            .await
+            .unwrap();
+        }
+
+        // Now store a new record with a distinct vector AFTER the index was populated
+        let new_hv = BinaryHV::random(7777);
+        let new_record = MemoryRecord {
+            id: "lsh-inv-new".to_string(),
+            encoding: new_hv,
+            timestamp_ms: 99_999_999,
+            memory_type: MemoryType::Episodic,
+            content: "Newly written after LSH populated".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(new_record).await.unwrap();
+
+        // Verify the new record's LSH entries exist in the index
+        let conn = db.conn.lock().unwrap();
+        let lsh_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM vector_lsh WHERE memory_id = 'lsh-inv-new'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            lsh_count, LSH_NUM_BANDS as i64,
+            "New record should have LSH entries for all bands"
+        );
+        drop(conn);
+
+        // Search should find it
+        let results = db.search_similar(&new_hv, 1).await.unwrap();
+        assert!(!results.is_empty());
+        assert_eq!(results[0].record.id, "lsh-inv-new");
+        assert!(results[0].similarity > 0.99);
+    }
+
+    #[tokio::test]
+    async fn test_database_reconsolidation_bumps_retrieval_count() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let hv = BinaryHV::random(42);
+        let record = MemoryRecord {
+            id: "recon-1".to_string(),
+            encoding: hv,
+            timestamp_ms: 1_000_000,
+            memory_type: MemoryType::Episodic,
+            content: "Reconsolidation test".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.7,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        };
+        db.store(record).await.unwrap();
+
+        // Verify initial state
+        let before = db.get("recon-1").await.unwrap().unwrap();
+        assert_eq!(before.retrieval_count, 0);
+        assert!((before.consolidation_strength - 0.0).abs() < 1e-6);
+
+        // First search triggers reconsolidation
+        let results = db.search_similar(&hv, 1).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].record.id, "recon-1");
+
+        // Read the record again to see updated retrieval stats
+        let after_first = db.get("recon-1").await.unwrap().unwrap();
+        assert_eq!(
+            after_first.retrieval_count, 1,
+            "retrieval_count should increment by 1 after search"
+        );
+        assert!(
+            after_first.consolidation_strength > 0.0,
+            "consolidation_strength should increase after search"
+        );
+        assert!(
+            (after_first.consolidation_strength - 0.05).abs() < 0.001,
+            "First retrieval should add 0.05 consolidation strength, got {}",
+            after_first.consolidation_strength
+        );
+
+        // Second search should bump again
+        let _ = db.search_similar(&hv, 1).await.unwrap();
+        let after_second = db.get("recon-1").await.unwrap().unwrap();
+        assert_eq!(after_second.retrieval_count, 2);
+        assert!(
+            (after_second.consolidation_strength - 0.10).abs() < 0.001,
+            "Second retrieval should bring consolidation_strength to 0.10, got {}",
+            after_second.consolidation_strength
+        );
+    }
+
+    #[tokio::test]
+    async fn test_database_reconsolidation_capped_at_one() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let hv = BinaryHV::random(99);
+        let record = MemoryRecord {
+            id: "recon-cap".to_string(),
+            encoding: hv,
+            timestamp_ms: 1_000_000,
+            memory_type: MemoryType::Semantic,
+            content: "Cap test".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.95, // Start near cap
+            retrieval_count: 19,
+        };
+        db.store(record).await.unwrap();
+
+        // Search should bump consolidation_strength but cap at 1.0
+        let _ = db.search_similar(&hv, 1).await.unwrap();
+        let after = db.get("recon-cap").await.unwrap().unwrap();
+        assert_eq!(after.retrieval_count, 20);
+        assert!(
+            after.consolidation_strength <= 1.0,
+            "consolidation_strength should be capped at 1.0, got {}",
+            after.consolidation_strength
+        );
+        assert!(
+            (after.consolidation_strength - 1.0).abs() < 0.001,
+            "0.95 + 0.05 should clamp to 1.0, got {}",
+            after.consolidation_strength
+        );
+    }
+
+    #[tokio::test]
+    async fn test_database_reconsolidation_only_affects_returned_results() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let hv_target = BinaryHV::random(42);
+        let hv_other = BinaryHV::random(9999); // Unrelated vector
+
+        db.store(MemoryRecord {
+            id: "recon-target".to_string(),
+            encoding: hv_target,
+            timestamp_ms: 1_000_000,
+            memory_type: MemoryType::Episodic,
+            content: "Target".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        })
+        .await
+        .unwrap();
+
+        db.store(MemoryRecord {
+            id: "recon-bystander".to_string(),
+            encoding: hv_other,
+            timestamp_ms: 1_000_001,
+            memory_type: MemoryType::Episodic,
+            content: "Bystander".to_string(),
+            valence: 0.5,
+            arousal: 0.5,
+            phi: 0.5,
+            topics: vec![],
+            metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
+        })
+        .await
+        .unwrap();
+
+        // Search for top_k=1 with target vector — only target should be reconsolidated
+        let results = db.search_similar(&hv_target, 1).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].record.id, "recon-target");
+
+        // Target should be bumped
+        let target_after = db.get("recon-target").await.unwrap().unwrap();
+        assert_eq!(target_after.retrieval_count, 1);
+
+        // Bystander should NOT be bumped (it was not in the top_k results)
+        let bystander_after = db.get("recon-bystander").await.unwrap().unwrap();
+        assert_eq!(
+            bystander_after.retrieval_count, 0,
+            "Bystander record should not be reconsolidated"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_database_eviction_pipeline_end_to_end() {
+        // Simulate the eviction pipeline from symthaea.rs:
+        // 1. Working memory items are "evicted" as ContinuousHV vectors
+        // 2. They get queued as GraduationEvents in MemoryCoordinator
+        // 3. MemoryCoordinator processes graduations into EpisodicMemory
+        // 4. The evicted items are also persisted to the database as Working type records
+        // 5. Subsequent searches find the persisted items and trigger reconsolidation
+
+        use crate::memory::memory_coordinator::{
+            CoordinatorConfig, GraduationEvent, MemoryCoordinator,
+        };
+        use crate::memory::episodic_replay::{EpisodicMemory, EpisodicReplayConfig};
+        use symthaea_core::hdc::unified_hv::ContinuousHV;
+
+        let db = SqliteMemory::in_memory().unwrap();
+
+        // Step 1-2: Simulate evicted items becoming graduation events
+        let mut coordinator = MemoryCoordinator::new(CoordinatorConfig {
+            min_wm_steps_for_graduation: 3,
+            ..CoordinatorConfig::default()
+        });
+        coordinator.update_signals(0.7, 0.8);
+
+        let evicted_hvs: Vec<ContinuousHV> = (0..4)
+            .map(|i| ContinuousHV::random(1024, i + 10))
+            .collect();
+
+        for (i, hv) in evicted_hvs.iter().enumerate() {
+            coordinator.queue_graduation(GraduationEvent {
+                content: hv.clone(),
+                label: format!("wm_eviction_step_{}", i),
+                steps_survived: if i < 2 { 1 } else { 5 }, // First two are too short
+                final_activation: 0.4,
+                phi_at_graduation: 0.7,
+                coherence_at_graduation: 0.8,
+            });
+        }
+
+        // Step 3: Process graduations into episodic memory
+        let episodic_config = EpisodicReplayConfig {
+            phi_threshold: 0.1,
+            ..Default::default()
+        };
+        let mut episodic = EpisodicMemory::new(episodic_config);
+        let graduated = coordinator.process_graduations(&mut episodic);
+
+        assert_eq!(coordinator.stats.graduations_rejected, 2, "Two items should be rejected (too few steps)");
+        assert_eq!(coordinator.stats.graduations_processed, 2, "Two items should be processed");
+        assert_eq!(graduated, 2, "Two items should be stored in episodic memory");
+
+        // Step 4: Persist all evicted items to the database (mimicking symthaea.rs tick())
+        let timestamp_ms = 1_700_000_000_000u64;
+        for (i, hv) in evicted_hvs.iter().enumerate() {
+            let record = MemoryRecord {
+                id: format!("wm-{}-{}", timestamp_ms, i),
+                memory_type: MemoryType::Working,
+                encoding: hv.to_binary(0.0),
+                content: format!("Working memory eviction at step {}", i),
+                timestamp_ms,
+                valence: 0.0,
+                arousal: 0.0,
+                phi: 0.7,
+                topics: vec![],
+                metadata: "{}".to_string(),
+                consolidation_strength: 0.0,
+                retrieval_count: 0,
+            };
+            db.store(record).await.unwrap();
+        }
+        assert_eq!(db.count().await.unwrap(), 4);
+
+        // Step 5: Search for one of the evicted items by its encoding
+        let query_hv = evicted_hvs[2].to_binary(0.0);
+        let results = db.search_similar(&query_hv, 2).await.unwrap();
+        assert!(!results.is_empty(), "Should find persisted evicted items");
+
+        // The matching record should have its retrieval_count bumped
+        let top_id = &results[0].record.id;
+        let bumped = db.get(top_id).await.unwrap().unwrap();
+        assert_eq!(bumped.retrieval_count, 1, "Retrieval count should be bumped after search");
+        assert!(bumped.consolidation_strength > 0.0, "Consolidation strength should increase");
+    }
+
+    #[tokio::test]
+    async fn test_database_all_memory_types_stored_and_filtered() {
+        let db = SqliteMemory::in_memory().unwrap();
+
+        let types = [
+            ("ep-1", MemoryType::Episodic),
+            ("sem-1", MemoryType::Semantic),
+            ("proc-1", MemoryType::Procedural),
+            ("wk-1", MemoryType::Working),
+        ];
+
+        for (id, mt) in &types {
+            db.store(make_record(id, 100, *mt)).await.unwrap();
+        }
+
+        assert_eq!(db.count().await.unwrap(), 4);
+
+        // Verify each type round-trips correctly
+        for (id, expected_type) in &types {
+            let record = db.get(id).await.unwrap().unwrap();
+            assert_eq!(record.memory_type, *expected_type, "Memory type should round-trip for {}", id);
+        }
+
+        // Stats should show the distribution
+        let stats = db.stats().await.unwrap();
+        assert_eq!(stats.total_records, 4);
+        assert_eq!(stats.memory_type_counts.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_database_health_check() {
+        let db = SqliteMemory::in_memory().unwrap();
+        assert!(db.health_check().await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_database_delete_nonexistent_returns_false() {
+        let db = SqliteMemory::in_memory().unwrap();
+        let deleted = db.delete("ghost-id").await.unwrap();
+        assert!(!deleted, "Deleting a nonexistent record should return false");
     }
 
     #[tokio::test]
