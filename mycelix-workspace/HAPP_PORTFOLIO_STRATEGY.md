@@ -5,6 +5,28 @@
 
 ---
 
+## Tier Classification
+
+| Tier | hApps | Status | Action |
+|------|-------|--------|--------|
+| **Core** | Identity (90%), Core FL (100%), LUCID (85%), Governance (85%) | Active development | Push to production |
+| **Cluster** | Commons (35 zomes, 4,126 tests), Civic (16 zomes, 2,030 tests) | Maintained | Bug fixes, integrity hardening |
+| **Production** | Mail (12 zomes), DeSci (141 tests), Space | Stable | Community maintenance |
+| **Beta** | Marketplace, SupplyChain, Observatory, EduNet | Various | Accept contributions |
+| **Scaffold** | Knowledge, Finance, Energy, Health | CRUD only | Partner opportunity |
+| **Dormant** | Climate, Music | Archived | No active work |
+
+### Remaining Gaps by Core hApp
+
+| hApp | Gap | Effort |
+|------|-----|--------|
+| Identity | External bridge events consumer guide | Done (docs/BRIDGE_EVENTS_CONSUMER.md) |
+| Core FL | All items complete | - |
+| LUCID | Sweettest not in CI, UI coherence feedback | 1-2 weeks |
+| Governance | DKG crypto verification stubbed | 4-6 weeks (needs Feldman-VSS crate) |
+
+---
+
 ## Core Four - Production Priority
 
 These four hApps form the foundation. All other hApps depend on at least one.
@@ -176,6 +198,8 @@ DeSci is a REST API service (Actix-web, 141 tests, 400K claims/sec), not a Holoc
 
 ## Next Actions
 
-1. **LUCID integration tests** — Requires GTK dev deps via `nix develop` for full Tauri build
-2. **FL coordinator modularization** — include_str! blocker RESOLVED (concat!() across all files). config.rs wired in. 14 modules remain (require `nix develop` for WASM verification)
-3. **Merge feature/space-phase5 to main** — All improvements ready for mainline
+1. **LUCID sweettests in CI** — 27 tests exist but marked `#[ignore]`. Need conductor in CI to enable.
+2. **Governance DKG completion** — Feldman-VSS crate integration for real threshold crypto verification
+3. **FL coordinator modularization** — include_str! blocker RESOLVED (concat!() across all files). config.rs wired in. 14 modules remain (require `nix develop` for WASM verification)
+4. **Merge feature/space-phase5 to main** — All improvements ready for mainline
+5. **Climate + Energy merger** — Proceed when either reaches beta quality with real users

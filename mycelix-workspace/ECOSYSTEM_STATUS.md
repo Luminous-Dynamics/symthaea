@@ -1,6 +1,6 @@
 # Mycelix Ecosystem Status
 
-**Last verified**: 2026-02-08
+**Last verified**: 2026-02-15
 **Holochain**: 0.6.0 | **HDK**: 0.6.0 | **HDI**: 0.7.0
 
 ## hApp Bundle Status
@@ -19,7 +19,7 @@
 | fabrication | ✅ 7.4M | 6 | v0 | Built |
 | supplychain | ✅ 1.9M | 8 | v0 | Built (submodule: holochain/) |
 | edunet | ✅ 948K | 10 | v0 | Built (submodule: happ/) |
-| health | ✅ 8.4M | 22 | v0 | ✅ Scaffolded |
+| health | ✅ 8.4M | 7 (MVP) | v0/v1 | ✅ MVP Core (22 zomes archived 2026-02-15) |
 | energy | ✅ | 11 | v0 | ✅ Scaffolded |
 | climate | ⏳ | 6 | v0 | ✅ Scaffolded (workdir/) |
 | mutualaid | ⏳ | 6 | v0 | ✅ Scaffolded (workdir/) |
@@ -79,7 +79,7 @@ All 10 scaffolded hApps (health, energy, climate, mutualaid, property, media, co
 |------|-------|-------|-------|
 | **Marketplace** | 8 | Partial | Multiple build scripts need consolidation. Arbitration zome incomplete. |
 | **Supply Chain** | 8 | Partial | Provenance tracking. Submodule. |
-| **Observatory** | N/A (SvelteKit) | None | Dashboard runs in **demo mode with mock data**. No live conductor connection. |
+| **Observatory** | N/A (SvelteKit) | None | Dashboard with demo mode. Deploy-ready via `./deploy.sh`. Custom domain: observatory.mycelix.net |
 | **Epistemic Markets** | Native workspace | Compiles | Heavy documentation (manifesto, rituals, personas), light implementation. Core zome logic exists. |
 | **Fabrication** | 6 (bridge, designs, materials, printers, prints, verification) | Compiles | Native workspace hApp. |
 | **EduNet** | 10 | Restored | Restored from archive. Needs verification. |
@@ -97,10 +97,10 @@ All 10 scaffolded hApps (health, energy, climate, mutualaid, property, media, co
 | **Property** | Types + structure | |
 | **Energy** | Types + structure | |
 | **Media** | Types + structure | 13 subdirectories. |
-| **Health** | Types + structure | 17 subdirectories. Scope is very large (was claimed 40 zomes). |
+| **Health** | MVP (7 zomes) | Reduced from 37 to 7 core zomes (patient, provider, records, prescriptions, consent, bridge, shared). 22 archived to `_archive-2026-02-15/`. |
 | **Space** | Types + structure | 12 subdirectories. |
 | **Care** | New scaffold | Restored/created recently. |
-| **Emergency** | New scaffold | Restored/created recently. |
+| **Emergency** | Complete (6 zomes, ~12,700 LOC) | 6 zomes in civic cluster: incidents, triage, resources, coordination, shelters, comms. Cross-domain bridges validated. 2,030 civic tests pass. |
 | **Water** | New scaffold | Restored/created recently. |
 | **Housing** | New scaffold | Restored/created recently. |
 | **Food** | New scaffold | 4 zomes (production, distribution, preservation, knowledge). Part of Commons cluster. |
@@ -166,6 +166,9 @@ academic, climate, consensus, desci, edunet, energy, epistemic-markets, fabricat
 7. **SDK-TS bundle size**: 29 integration modules, unclear how many are functional.
 8. **Cross-hApp bridges**: Claimed in architecture docs, not tested in integration.
 9. **WASM builds pending**: 6 hApps (climate, mutualaid, consensus, music, food, transport) need `nix develop` + WASM compilation.
+10. ~~**FL consciousness integration**~~: `ConsciousnessAwareByzantinePlugin` added 2026-02-15. Uses Phi scores for weight adjustment (boost/dampen/veto). 110 tests pass.
+11. ~~**Emergency domain status**~~: Promoted from "stub" to "complete". 6 zomes, ~12,700 LOC, cross-domain bridges validated.
+12. ~~**Health scope**~~: Reduced from 37 to 7 MVP zomes. 22 archived. 9 deferred (commented out).
 
 ---
 

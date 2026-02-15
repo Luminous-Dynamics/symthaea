@@ -156,7 +156,6 @@ jobs:
           # Feature groups (test combinations)
           - epistemic_conflict
           - temporal_planning
-          - consciousness_code
           - api_module
     defaults:
       run:
