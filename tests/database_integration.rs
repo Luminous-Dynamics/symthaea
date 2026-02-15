@@ -482,10 +482,61 @@ async fn test_sqlite_search_similar_filtered_ignores_filter() {
     // SQLite's default search_similar_filtered returns same as search_similar
     // (filter is a no-op for SQLite — documented behavior)
     let results = db
-        .search_similar_filtered(&query, 5, "memory_type = 'episodic'")
+        .search_similar_filtered(&query, 5, Some("memory_type = 'episodic'"))
         .await
         .expect("Filtered search should succeed");
 
     assert_eq!(results.len(), 5, "Should return 5 results");
     // SQLite ignores the filter — results may include both types
+}
+
+// ============================================================================
+// RECONSOLIDATION TRACKING TESTS
+// ============================================================================
+
+#[tokio::test]
+async fn test_sqlite_reconsolidation_tracking() {
+    let db = SqliteMemory::in_memory().expect("Should create database");
+
+    // Store a record
+    let encoding = BinaryHV::random(7777);
+    let record = MemoryRecord {
+        id: "recon-test".to_string(),
+        memory_type: MemoryType::Semantic,
+        encoding,
+        content: "Reconsolidation test".to_string(),
+        timestamp_ms: 1704067200000,
+        valence: 0.5,
+        arousal: 0.5,
+        phi: 0.5,
+        topics: vec![],
+        metadata: "{}".to_string(),
+        consolidation_strength: 0.0,
+        retrieval_count: 0,
+    };
+    db.store(record).await.expect("Should store memory");
+
+    // Search triggers reconsolidation
+    let results = db.search_similar(&encoding, 5).await.expect("Search should succeed");
+    assert!(!results.is_empty(), "Should find the record");
+    assert_eq!(results[0].record.id, "recon-test");
+
+    // Verify retrieval_count was bumped
+    let retrieved = db.get("recon-test").await.unwrap().unwrap();
+    assert_eq!(
+        retrieved.retrieval_count, 1,
+        "retrieval_count should be bumped after search"
+    );
+    assert!(
+        retrieved.consolidation_strength > 0.0,
+        "consolidation_strength should increase after search"
+    );
+
+    // Search again — should bump further
+    let _ = db.search_similar(&encoding, 5).await.unwrap();
+    let retrieved2 = db.get("recon-test").await.unwrap().unwrap();
+    assert_eq!(
+        retrieved2.retrieval_count, 2,
+        "retrieval_count should increment on each search"
+    );
 }
