@@ -142,15 +142,57 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
         } => match link_type {
-            LinkTypes::AllTrusts => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::TrustToLease => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::LeaseholderToLease => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::LeaseToResaleCalc => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::TrustToReport => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::UnitToLease => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AllTrusts => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllTrusts link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TrustToLease => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TrustToLease link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::LeaseholderToLease => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "LeaseholderToLease link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::LeaseToResaleCalc => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "LeaseToResaleCalc link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TrustToReport => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TrustToReport link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::UnitToLease => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "UnitToLease link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         },
         FlatOp::RegisterDeleteLink {
             link_type: _,
@@ -158,12 +200,30 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             base_address: _,
             target_address: _,
             tag: _,
-            action: _,
-        } => Ok(ValidateCallbackResult::Valid),
+            action,
+        } => {
+            let original_action = must_get_action(action.link_add_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this link".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(OpDelete { action, .. }) => {
+            let original_action = must_get_action(action.deletes_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this entry".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -1749,5 +1809,66 @@ mod tests {
             validate_affordability_report(fake_create(), r),
             "Total units must be greater than 0",
         );
+    }
+
+    // ============================================================================
+    // Link Tag Validation Tests
+    // ============================================================================
+
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AllTrusts | LinkTypes::TrustToLease |
+            LinkTypes::LeaseholderToLease | LinkTypes::LeaseToResaleCalc |
+            LinkTypes::TrustToReport | LinkTypes::UnitToLease => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        format!("{:?} link tag too long (max 256 bytes)", link_type),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn link_tag_all_trusts_at_limit() {
+        assert_valid(validate_create_link_tag(LinkTypes::AllTrusts, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn link_tag_all_trusts_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::AllTrusts, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn link_tag_trust_to_lease_at_limit() {
+        assert_valid(validate_create_link_tag(LinkTypes::TrustToLease, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn link_tag_trust_to_lease_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::TrustToLease, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn link_tag_unit_to_lease_at_limit() {
+        assert_valid(validate_create_link_tag(LinkTypes::UnitToLease, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn link_tag_unit_to_lease_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::UnitToLease, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn link_tag_empty_tag_valid() {
+        assert_valid(validate_create_link_tag(LinkTypes::AllTrusts, vec![]));
     }
 }

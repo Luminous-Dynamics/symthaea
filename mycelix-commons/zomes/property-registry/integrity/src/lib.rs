@@ -195,7 +195,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
             }
         }
-        FlatOp::RegisterDeleteLink { link_type, original_action: _, base_address: _, target_address: _, tag, action: _ } => {
+        FlatOp::RegisterDeleteLink { link_type, original_action: _, base_address: _, target_address: _, tag, action } => {
+            let original_action = must_get_action(action.link_add_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this link".into(),
+                ));
+            }
             match link_type {
                 LinkTypes::OwnerToProperties => {
                     if tag.0.len() > 256 {
@@ -234,7 +241,16 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(OpDelete { action, .. }) => {
+            let original_action = must_get_action(action.deletes_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this entry".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 

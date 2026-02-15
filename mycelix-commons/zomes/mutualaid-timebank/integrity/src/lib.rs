@@ -288,19 +288,89 @@ fn validate_create_link(
     link_type: LinkTypes,
     _base_address: AnyLinkableHash,
     _target_address: AnyLinkableHash,
-    _tag: LinkTag,
+    tag: LinkTag,
 ) -> ExternResult<ValidateCallbackResult> {
     match link_type {
-        LinkTypes::AgentToOffers => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::AgentToRequests => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::AgentToExchanges => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::CategoryToOffers => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::CategoryToRequests => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::OfferToExchange => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::RequestToExchange => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::AllOffers => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::AllRequests => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::AgentToCredits => Ok(ValidateCallbackResult::Valid),
+        LinkTypes::AgentToOffers => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "AgentToOffers link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::AgentToRequests => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "AgentToRequests link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::AgentToExchanges => {
+            if tag.0.len() > 512 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "AgentToExchanges link tag too long (max 512 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::CategoryToOffers => {
+            if tag.0.len() > 512 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "CategoryToOffers link tag too long (max 512 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::CategoryToRequests => {
+            if tag.0.len() > 512 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "CategoryToRequests link tag too long (max 512 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::OfferToExchange => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "OfferToExchange link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::RequestToExchange => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "RequestToExchange link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::AllOffers => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "AllOffers link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::AllRequests => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "AllRequests link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::AgentToCredits => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "AgentToCredits link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -1773,5 +1843,169 @@ mod tests {
         c.hours = 0.0;
         c.debtor = agent_a();
         assert_invalid_contains(&validate_time_credit(c), "Credit hours must be positive");
+    }
+
+    // =========================================================================
+    // LINK TAG LENGTH VALIDATION TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_link_agent_to_offers_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_valid(&validate_create_link(LinkTypes::AgentToOffers, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_agent_to_offers_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_invalid(&validate_create_link(LinkTypes::AgentToOffers, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_agent_to_requests_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_valid(&validate_create_link(LinkTypes::AgentToRequests, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_agent_to_requests_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_invalid(&validate_create_link(LinkTypes::AgentToRequests, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_agent_to_exchanges_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 512]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_valid(&validate_create_link(LinkTypes::AgentToExchanges, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_agent_to_exchanges_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 513]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_invalid(&validate_create_link(LinkTypes::AgentToExchanges, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_category_to_offers_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 512]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_valid(&validate_create_link(LinkTypes::CategoryToOffers, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_category_to_offers_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 513]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_invalid(&validate_create_link(LinkTypes::CategoryToOffers, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_category_to_requests_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 512]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_valid(&validate_create_link(LinkTypes::CategoryToRequests, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_category_to_requests_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 513]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_invalid(&validate_create_link(LinkTypes::CategoryToRequests, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_offer_to_exchange_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_valid(&validate_create_link(LinkTypes::OfferToExchange, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_offer_to_exchange_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_invalid(&validate_create_link(LinkTypes::OfferToExchange, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_request_to_exchange_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_valid(&validate_create_link(LinkTypes::RequestToExchange, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_request_to_exchange_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_invalid(&validate_create_link(LinkTypes::RequestToExchange, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_all_offers_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_valid(&validate_create_link(LinkTypes::AllOffers, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_all_offers_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_invalid(&validate_create_link(LinkTypes::AllOffers, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_all_requests_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_valid(&validate_create_link(LinkTypes::AllRequests, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_all_requests_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_invalid(&validate_create_link(LinkTypes::AllRequests, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_agent_to_credits_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_valid(&validate_create_link(LinkTypes::AgentToCredits, base, target, tag)));
+    }
+
+    #[test]
+    fn test_link_agent_to_credits_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        assert!(is_invalid(&validate_create_link(LinkTypes::AgentToCredits, base, target, tag)));
     }
 }

@@ -143,24 +143,91 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink {
-            link_type: _,
+            link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => Ok(ValidateCallbackResult::Valid),
+        } => match link_type {
+            LinkTypes::AllPlans => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllPlans link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TypeToPlans => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TypeToPlans link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::RecipientToPlans => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "RecipientToPlans link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CaregiverToPlans => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CaregiverToPlans link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PlanToSessions => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PlanToSessions link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CaregiverToSessions => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CaregiverToSessions link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink {
             link_type: _,
             original_action: _,
             base_address: _,
             target_address: _,
             tag: _,
-            action: _,
-        } => Ok(ValidateCallbackResult::Valid),
+            action,
+        } => {
+            let original_action = must_get_action(action.link_add_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this link".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(OpDelete { action, .. }) => {
+            let original_action = must_get_action(action.deletes_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this entry".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -1037,6 +1104,116 @@ mod tests {
         };
         let result = validate_create_plan(mock_create_action(), plan);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // ============================================================================
+    // Link Tag Validation Tests
+    // ============================================================================
+
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AllPlans => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllPlans link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TypeToPlans => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TypeToPlans link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::RecipientToPlans => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "RecipientToPlans link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CaregiverToPlans => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CaregiverToPlans link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PlanToSessions => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PlanToSessions link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CaregiverToSessions => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CaregiverToSessions link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn test_link_tag_all_plans_at_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::AllPlans, vec![0u8; 256]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_all_plans_over_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::AllPlans, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_type_to_plans_at_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::TypeToPlans, vec![0u8; 512]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_type_to_plans_over_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::TypeToPlans, vec![0u8; 513]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_caregiver_to_sessions_at_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::CaregiverToSessions, vec![0u8; 256]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_caregiver_to_sessions_over_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::CaregiverToSessions, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_empty_tag_valid() {
+        let result =
+            validate_create_link_tag(LinkTypes::AllPlans, vec![]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]

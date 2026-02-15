@@ -313,17 +313,73 @@ fn validate_create_link(
     link_type: LinkTypes,
     _base_address: AnyLinkableHash,
     _target_address: AnyLinkableHash,
-    _tag: LinkTag,
+    tag: LinkTag,
 ) -> ExternResult<ValidateCallbackResult> {
     match link_type {
-        LinkTypes::OwnerToResources => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::TypeToResources => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::ResourceToBookings => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::BookerToBookings => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::ResourceToUsage => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::ResourceToMaintenance => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::AllResources => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::AvailableResources => Ok(ValidateCallbackResult::Valid),
+        LinkTypes::OwnerToResources => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "OwnerToResources link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::TypeToResources => {
+            if tag.0.len() > 512 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "TypeToResources link tag too long (max 512 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::ResourceToBookings => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "ResourceToBookings link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::BookerToBookings => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "BookerToBookings link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::ResourceToUsage => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "ResourceToUsage link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::ResourceToMaintenance => {
+            if tag.0.len() > 512 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "ResourceToMaintenance link tag too long (max 512 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::AllResources => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "AllResources link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::AvailableResources => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "AvailableResources link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -1205,6 +1261,154 @@ mod tests {
         let mut maintenance = valid_maintenance();
         maintenance.parts_used = vec!["valid part".to_string(), "x".repeat(257)];
         let result = validate_maintenance(maintenance);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // =============================================================================
+    // LINK TAG VALIDATION TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_link_owner_to_resources_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::OwnerToResources, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_owner_to_resources_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::OwnerToResources, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_type_to_resources_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 512]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::TypeToResources, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_type_to_resources_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 513]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::TypeToResources, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_resource_to_bookings_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::ResourceToBookings, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_resource_to_bookings_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::ResourceToBookings, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_booker_to_bookings_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::BookerToBookings, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_booker_to_bookings_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::BookerToBookings, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_resource_to_usage_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::ResourceToUsage, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_resource_to_usage_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::ResourceToUsage, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_resource_to_maintenance_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 512]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::ResourceToMaintenance, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_resource_to_maintenance_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 513]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::ResourceToMaintenance, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_all_resources_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::AllResources, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_all_resources_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::AllResources, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_available_resources_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::AvailableResources, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_available_resources_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::AvailableResources, base, target, tag);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }

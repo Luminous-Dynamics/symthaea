@@ -139,19 +139,56 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => {
+        FlatOp::RegisterCreateLink {
+            link_type,
+            base_address: _,
+            target_address: _,
+            tag,
+            action: _,
+        } => {
+            let tag_len = tag.0.len();
             match link_type {
-                LinkTypes::AuthorToPublications => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::TagToPublications => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::PublicationToBlocks => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::PublicationToVersions => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::AuthorToPublications
+                | LinkTypes::TagToPublications
+                | LinkTypes::PublicationToBlocks
+                | LinkTypes::PublicationToVersions => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
-        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDeleteLink { action, tag, .. } => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Delete link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            let original_action = must_get_action(action.link_add_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this link".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(OpDelete { action, .. }) => {
+            let original_action = must_get_action(action.deletes_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this entry".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -895,5 +932,116 @@ mod tests {
             pub_data,
         );
         assert!(is_valid(result));
+    }
+
+    // ========================================================================
+    // LINK TAG VALIDATION TESTS
+    // ========================================================================
+
+    fn validate_create_link_tag(link_type: &LinkTypes, tag: &LinkTag) -> ValidateCallbackResult {
+        let tag_len = tag.0.len();
+        match link_type {
+            LinkTypes::AuthorToPublications
+            | LinkTypes::TagToPublications
+            | LinkTypes::PublicationToBlocks
+            | LinkTypes::PublicationToVersions => {
+                if tag_len > 256 {
+                    ValidateCallbackResult::Invalid("Link tag too long (max 256 bytes)".into())
+                } else {
+                    ValidateCallbackResult::Valid
+                }
+            }
+        }
+    }
+
+    fn validate_delete_link_tag(tag: &LinkTag) -> ValidateCallbackResult {
+        if tag.0.len() > 256 {
+            ValidateCallbackResult::Invalid("Delete link tag too long (max 256 bytes)".into())
+        } else {
+            ValidateCallbackResult::Valid
+        }
+    }
+
+    // -- AuthorToPublications (256-byte limit) boundary tests --
+
+    #[test]
+    fn link_tag_author_to_publications_empty_valid() {
+        let tag = LinkTag::new(vec![]);
+        let result = validate_create_link_tag(&LinkTypes::AuthorToPublications, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_author_to_publications_at_limit_valid() {
+        let tag = LinkTag::new(vec![0u8; 256]);
+        let result = validate_create_link_tag(&LinkTypes::AuthorToPublications, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_author_to_publications_over_limit_invalid() {
+        let tag = LinkTag::new(vec![0u8; 257]);
+        let result = validate_create_link_tag(&LinkTypes::AuthorToPublications, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- PublicationToVersions (256-byte limit) boundary tests --
+
+    #[test]
+    fn link_tag_pub_to_versions_at_limit_valid() {
+        let tag = LinkTag::new(vec![0xEE; 256]);
+        let result = validate_create_link_tag(&LinkTypes::PublicationToVersions, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_pub_to_versions_over_limit_invalid() {
+        let tag = LinkTag::new(vec![0xEE; 257]);
+        let result = validate_create_link_tag(&LinkTypes::PublicationToVersions, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- DoS prevention: massive tags rejected for all link types --
+
+    #[test]
+    fn link_tag_dos_prevention_all_types() {
+        let massive_tag = LinkTag::new(vec![0xFF; 10_000]);
+        let all_types = [
+            LinkTypes::AuthorToPublications,
+            LinkTypes::TagToPublications,
+            LinkTypes::PublicationToBlocks,
+            LinkTypes::PublicationToVersions,
+        ];
+        for lt in &all_types {
+            let result = validate_create_link_tag(lt, &massive_tag);
+            assert!(
+                matches!(result, ValidateCallbackResult::Invalid(_)),
+                "Massive tag should be rejected for {:?}",
+                lt
+            );
+        }
+    }
+
+    // -- Delete link tag tests --
+
+    #[test]
+    fn delete_link_tag_empty_valid() {
+        let tag = LinkTag::new(vec![]);
+        let result = validate_delete_link_tag(&tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn delete_link_tag_at_limit_valid() {
+        let tag = LinkTag::new(vec![0u8; 256]);
+        let result = validate_delete_link_tag(&tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn delete_link_tag_over_limit_invalid() {
+        let tag = LinkTag::new(vec![0u8; 257]);
+        let result = validate_delete_link_tag(&tag);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

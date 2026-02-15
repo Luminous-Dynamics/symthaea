@@ -142,15 +142,57 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
         } => match link_type {
-            LinkTypes::MemberToCharge => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::ChargeToPayment => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::MemberToPayment => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AllReserveFunds => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::YearToBudget => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::PeriodToCharge => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::MemberToCharge => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MemberToCharge link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ChargeToPayment => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ChargeToPayment link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::MemberToPayment => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MemberToPayment link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllReserveFunds => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllReserveFunds link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::YearToBudget => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "YearToBudget link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PeriodToCharge => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PeriodToCharge link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         },
         FlatOp::RegisterDeleteLink {
             link_type: _,
@@ -1700,5 +1742,78 @@ mod tests {
         fund.balance_cents = 0;
         let result = validate_update_fund(fund);
         assert!(is_valid(&result));
+    }
+
+    // ============================================================================
+    // Link Tag Validation Tests
+    // ============================================================================
+
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::MemberToCharge | LinkTypes::ChargeToPayment |
+            LinkTypes::MemberToPayment | LinkTypes::AllReserveFunds |
+            LinkTypes::YearToBudget => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        format!("{:?} link tag too long (max 256 bytes)", link_type),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PeriodToCharge => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PeriodToCharge link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn link_tag_member_to_charge_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::MemberToCharge, vec![0u8; 256]).unwrap();
+        assert!(is_valid(&Ok(result)));
+    }
+
+    #[test]
+    fn link_tag_member_to_charge_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::MemberToCharge, vec![0u8; 257]).unwrap();
+        assert!(is_invalid(&Ok(result)));
+    }
+
+    #[test]
+    fn link_tag_period_to_charge_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::PeriodToCharge, vec![0u8; 512]).unwrap();
+        assert!(is_valid(&Ok(result)));
+    }
+
+    #[test]
+    fn link_tag_period_to_charge_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::PeriodToCharge, vec![0u8; 513]).unwrap();
+        assert!(is_invalid(&Ok(result)));
+    }
+
+    #[test]
+    fn link_tag_year_to_budget_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::YearToBudget, vec![0u8; 256]).unwrap();
+        assert!(is_valid(&Ok(result)));
+    }
+
+    #[test]
+    fn link_tag_year_to_budget_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::YearToBudget, vec![0u8; 257]).unwrap();
+        assert!(is_invalid(&Ok(result)));
+    }
+
+    #[test]
+    fn link_tag_empty_tag_valid() {
+        let result = validate_create_link_tag(LinkTypes::MemberToCharge, vec![]).unwrap();
+        assert!(is_valid(&Ok(result)));
     }
 }

@@ -126,12 +126,40 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => {
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
             match link_type {
-                LinkTypes::PropertyToDisputes => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::ClaimantToDisputes => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::PropertyToClaims => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::DisputeToJustice => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::PropertyToDisputes => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PropertyToDisputes link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::ClaimantToDisputes => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "ClaimantToDisputes link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::PropertyToClaims => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PropertyToClaims link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::DisputeToJustice => {
+                    if tag.0.len() > 512 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "DisputeToJustice link tag too long (max 512 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),

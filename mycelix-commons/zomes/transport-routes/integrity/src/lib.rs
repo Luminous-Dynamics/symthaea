@@ -136,7 +136,55 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            match link_type {
+                LinkTypes::AllVehicles => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllVehicles link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AllRoutes => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllRoutes link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::OwnerToVehicle => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "OwnerToVehicle link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::RouteToStop => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "RouteToStop link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::VehicleToRoute => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "VehicleToRoute link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
+        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
     }
 }
 
@@ -722,5 +770,92 @@ mod tests {
         let json = serde_json::to_string(&a).unwrap();
         let back: Anchor = serde_json::from_str(&json).unwrap();
         assert_eq!(back, a);
+    }
+
+    // ── Link tag length validation tests ────────────────────────────────
+
+    fn validate_link_tag(link_type: &LinkTypes, tag_len: usize) -> ValidateCallbackResult {
+        let tag = LinkTag(vec![0u8; tag_len]);
+        let max = match link_type {
+            LinkTypes::AllVehicles
+            | LinkTypes::AllRoutes
+            | LinkTypes::OwnerToVehicle
+            | LinkTypes::RouteToStop
+            | LinkTypes::VehicleToRoute => 256,
+        };
+        let name = match link_type {
+            LinkTypes::AllVehicles => "AllVehicles",
+            LinkTypes::AllRoutes => "AllRoutes",
+            LinkTypes::OwnerToVehicle => "OwnerToVehicle",
+            LinkTypes::RouteToStop => "RouteToStop",
+            LinkTypes::VehicleToRoute => "VehicleToRoute",
+        };
+        if tag.0.len() > max {
+            ValidateCallbackResult::Invalid(
+                format!("{} link tag too long (max {} bytes)", name, max),
+            )
+        } else {
+            ValidateCallbackResult::Valid
+        }
+    }
+
+    #[test]
+    fn test_link_all_vehicles_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllVehicles, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_vehicles_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllVehicles, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_all_routes_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllRoutes, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_routes_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllRoutes, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_owner_to_vehicle_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::OwnerToVehicle, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_owner_to_vehicle_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::OwnerToVehicle, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_route_to_stop_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::RouteToStop, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_route_to_stop_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::RouteToStop, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_vehicle_to_route_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::VehicleToRoute, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_vehicle_to_route_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::VehicleToRoute, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

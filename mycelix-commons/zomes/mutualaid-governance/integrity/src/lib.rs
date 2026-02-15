@@ -44,6 +44,42 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            match link_type {
+                LinkTypes::AllProposals => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllProposals link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::ProposalToVotes => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "ProposalToVotes link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AllRules => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllRules link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AllMembers => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllMembers link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -1297,5 +1333,95 @@ mod tests {
         let mut v = make_valid_vote();
         v.reasoning = Some("r".repeat(4097));
         assert!(matches!(validate_vote(v), Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    // ========================================================================
+    // LINK TAG VALIDATION TESTS
+    // ========================================================================
+
+    fn validate_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AllProposals => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllProposals link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ProposalToVotes => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ProposalToVotes link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllRules => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllRules link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllMembers => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllMembers link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn test_link_all_proposals_tag_at_limit() {
+        let result = validate_link_tag(LinkTypes::AllProposals, vec![0u8; 256]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_all_proposals_tag_too_long() {
+        let result = validate_link_tag(LinkTypes::AllProposals, vec![0u8; 257]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_proposal_to_votes_tag_at_limit() {
+        let result = validate_link_tag(LinkTypes::ProposalToVotes, vec![0u8; 256]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_proposal_to_votes_tag_too_long() {
+        let result = validate_link_tag(LinkTypes::ProposalToVotes, vec![0u8; 257]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_all_rules_tag_at_limit() {
+        let result = validate_link_tag(LinkTypes::AllRules, vec![0u8; 256]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_all_rules_tag_too_long() {
+        let result = validate_link_tag(LinkTypes::AllRules, vec![0u8; 257]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_all_members_tag_at_limit() {
+        let result = validate_link_tag(LinkTypes::AllMembers, vec![0u8; 256]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_all_members_tag_too_long() {
+        let result = validate_link_tag(LinkTypes::AllMembers, vec![0u8; 257]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }

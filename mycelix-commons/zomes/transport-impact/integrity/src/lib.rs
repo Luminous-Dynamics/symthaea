@@ -96,7 +96,47 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            match link_type {
+                LinkTypes::AllTrips => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllTrips link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AgentToTrip => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AgentToTrip link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AgentToCredit => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AgentToCredit link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::VehicleToTrip => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "VehicleToTrip link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
+        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
     }
 }
 
@@ -486,5 +526,78 @@ mod tests {
         let mut c = valid_carbon_credit();
         c.credits_kg_co2 = -5.0;
         assert_invalid(validate_credit(c), "Credits must be positive");
+    }
+
+    // ── Link tag length validation tests ────────────────────────────────
+
+    fn validate_link_tag(link_type: &LinkTypes, tag_len: usize) -> ValidateCallbackResult {
+        let tag = LinkTag(vec![0u8; tag_len]);
+        let max = match link_type {
+            LinkTypes::AllTrips
+            | LinkTypes::AgentToTrip
+            | LinkTypes::AgentToCredit
+            | LinkTypes::VehicleToTrip => 256,
+        };
+        let name = match link_type {
+            LinkTypes::AllTrips => "AllTrips",
+            LinkTypes::AgentToTrip => "AgentToTrip",
+            LinkTypes::AgentToCredit => "AgentToCredit",
+            LinkTypes::VehicleToTrip => "VehicleToTrip",
+        };
+        if tag.0.len() > max {
+            ValidateCallbackResult::Invalid(
+                format!("{} link tag too long (max {} bytes)", name, max),
+            )
+        } else {
+            ValidateCallbackResult::Valid
+        }
+    }
+
+    #[test]
+    fn test_link_all_trips_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllTrips, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_trips_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllTrips, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_agent_to_trip_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AgentToTrip, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_agent_to_trip_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AgentToTrip, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_agent_to_credit_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AgentToCredit, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_agent_to_credit_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AgentToCredit, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_vehicle_to_trip_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::VehicleToTrip, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_vehicle_to_trip_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::VehicleToTrip, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

@@ -131,14 +131,49 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
         } => match link_type {
-            LinkTypes::AllBuildings => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::BuildingToUnit => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AvailableUnits => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::OccupantToUnit => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::BuildingTypeToBuilding => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AllBuildings => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllBuildings link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::BuildingToUnit => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "BuildingToUnit link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AvailableUnits => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AvailableUnits link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::OccupantToUnit => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OccupantToUnit link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::BuildingTypeToBuilding => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "BuildingTypeToBuilding link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         },
         FlatOp::RegisterDeleteLink {
             link_type,
@@ -239,7 +274,6 @@ fn validate_update_unit(unit: Unit) -> ExternResult<ValidateCallbackResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hdi::prelude::*;
 
     // ========== Factory Functions ==========
 
@@ -275,7 +309,7 @@ mod tests {
     fn mock_create_action() -> Create {
         Create {
             author: AgentPubKey::from_raw_36(vec![0u8; 36]),
-            timestamp: Timestamp::now(),
+            timestamp: Timestamp::from_micros(1_000_000),
             action_seq: 0,
             prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
             entry_type: EntryType::App(AppEntryDef {
@@ -969,5 +1003,77 @@ mod tests {
         let result = validate_create_unit(mock_create_action(), unit);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    // ============================================================================
+    // Link Tag Validation Tests
+    // ============================================================================
+
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AllBuildings | LinkTypes::BuildingToUnit |
+            LinkTypes::AvailableUnits | LinkTypes::OccupantToUnit => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        format!("{:?} link tag too long (max 256 bytes)", link_type),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::BuildingTypeToBuilding => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "BuildingTypeToBuilding link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn test_link_tag_all_buildings_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::AllBuildings, vec![0u8; 256]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_all_buildings_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::AllBuildings, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_building_type_to_building_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::BuildingTypeToBuilding, vec![0u8; 512]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_building_type_to_building_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::BuildingTypeToBuilding, vec![0u8; 513]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_occupant_to_unit_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::OccupantToUnit, vec![0u8; 256]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_occupant_to_unit_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::OccupantToUnit, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_empty_tag_valid() {
+        let result = validate_create_link_tag(LinkTypes::AllBuildings, vec![]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
     }
 }

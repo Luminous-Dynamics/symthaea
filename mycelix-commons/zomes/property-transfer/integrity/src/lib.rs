@@ -127,12 +127,40 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => {
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
             match link_type {
-                LinkTypes::PropertyToTransfers => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::SellerToTransfers => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::BuyerToTransfers => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::TransferToEscrow => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::PropertyToTransfers => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PropertyToTransfers link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::SellerToTransfers => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "SellerToTransfers link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::BuyerToTransfers => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "BuyerToTransfers link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::TransferToEscrow => {
+                    if tag.0.len() > 512 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "TransferToEscrow link tag too long (max 512 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),

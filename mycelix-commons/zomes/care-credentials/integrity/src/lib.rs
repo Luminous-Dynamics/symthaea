@@ -127,12 +127,53 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink {
-            link_type: _,
+            link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => Ok(ValidateCallbackResult::Valid),
+        } => match link_type {
+            LinkTypes::AgentToCredential => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToCredential link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TypeToCredential => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TypeToCredential link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToReference => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToReference link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentGivenReferences => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentGivenReferences link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllVerifiedCredentials => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllVerifiedCredentials link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink {
             link_type: _,
             original_action: _,
@@ -819,6 +860,108 @@ mod tests {
         let anchor = Anchor("test_anchor".to_string());
         let cloned = anchor.clone();
         assert_eq!(anchor, cloned);
+    }
+
+    // ============================================================================
+    // Link Tag Validation Tests
+    // ============================================================================
+
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AgentToCredential => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToCredential link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TypeToCredential => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TypeToCredential link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToReference => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToReference link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentGivenReferences => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentGivenReferences link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllVerifiedCredentials => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllVerifiedCredentials link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn test_link_tag_agent_to_credential_at_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::AgentToCredential, vec![0u8; 256]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_agent_to_credential_over_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::AgentToCredential, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_type_to_credential_at_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::TypeToCredential, vec![0u8; 512]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_type_to_credential_over_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::TypeToCredential, vec![0u8; 513]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_all_verified_credentials_at_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::AllVerifiedCredentials, vec![0u8; 256]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_all_verified_credentials_over_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::AllVerifiedCredentials, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_empty_tag_valid() {
+        let result =
+            validate_create_link_tag(LinkTypes::AgentToCredential, vec![]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]

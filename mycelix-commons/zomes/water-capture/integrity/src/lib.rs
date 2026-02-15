@@ -228,18 +228,81 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
         } => match link_type {
-            LinkTypes::AllSystems => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::OwnerToSystem => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SystemTypeToSystem => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AllTanks => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::OwnerToTank => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SystemToHarvestRecord => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToHarvestRecord => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SystemToTank => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AllRechargeProjects => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AllSystems => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllSystems link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::OwnerToSystem => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OwnerToSystem link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::SystemTypeToSystem => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "SystemTypeToSystem link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllTanks => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllTanks link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::OwnerToTank => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OwnerToTank link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::SystemToHarvestRecord => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "SystemToHarvestRecord link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToHarvestRecord => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToHarvestRecord link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::SystemToTank => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "SystemToTank link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllRechargeProjects => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllRechargeProjects link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         },
         FlatOp::RegisterDeleteLink {
             link_type: _,
@@ -1588,5 +1651,151 @@ mod tests {
             invalid_msg(&result),
             "Aquifer ID must be 64 characters or fewer"
         );
+    }
+
+    // ========================================================================
+    // LINK TAG LENGTH VALIDATION TESTS
+    // ========================================================================
+
+    fn validate_link_tag_for(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AllSystems
+            | LinkTypes::OwnerToSystem
+            | LinkTypes::AllTanks
+            | LinkTypes::OwnerToTank
+            | LinkTypes::SystemToHarvestRecord
+            | LinkTypes::AgentToHarvestRecord
+            | LinkTypes::SystemToTank
+            | LinkTypes::AllRechargeProjects => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 256 bytes)",
+                        link_type
+                    )));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::SystemTypeToSystem => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 512 bytes)",
+                        link_type
+                    )));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn link_all_systems_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::AllSystems, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_all_systems_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::AllSystems, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_owner_to_system_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::OwnerToSystem, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_owner_to_system_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::OwnerToSystem, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_system_type_to_system_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::SystemTypeToSystem, vec![0u8; 512]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_system_type_to_system_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::SystemTypeToSystem, vec![0u8; 513]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_all_tanks_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::AllTanks, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_all_tanks_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::AllTanks, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_owner_to_tank_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::OwnerToTank, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_owner_to_tank_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::OwnerToTank, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_system_to_harvest_record_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::SystemToHarvestRecord, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_system_to_harvest_record_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::SystemToHarvestRecord, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_harvest_record_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::AgentToHarvestRecord, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_harvest_record_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::AgentToHarvestRecord, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_system_to_tank_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::SystemToTank, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_system_to_tank_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::SystemToTank, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_all_recharge_projects_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::AllRechargeProjects, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_all_recharge_projects_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::AllRechargeProjects, vec![0u8; 257]);
+        assert!(is_invalid(&result));
     }
 }

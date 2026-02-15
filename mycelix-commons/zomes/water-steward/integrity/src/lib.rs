@@ -269,16 +269,65 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
         } => match link_type {
-            LinkTypes::AllWatersheds => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::WatershedToRight => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::HolderToRight => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::RightToTransfer => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::WatershedToDispute => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToDispute => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::StewardshipTypeToWatershed => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AllWatersheds => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllWatersheds link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::WatershedToRight => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "WatershedToRight link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::HolderToRight => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "HolderToRight link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::RightToTransfer => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "RightToTransfer link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::WatershedToDispute => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "WatershedToDispute link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToDispute => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToDispute link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::StewardshipTypeToWatershed => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "StewardshipTypeToWatershed link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         },
         FlatOp::RegisterDeleteLink {
             link_type: _,
@@ -1525,6 +1574,126 @@ mod tests {
         dispute.resolution = Some("".into());
         let result = validate_create_water_dispute(fake_create(), dispute);
         assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // LINK TAG LENGTH VALIDATION TESTS
+    // ========================================================================
+
+    fn validate_link_tag_for(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AllWatersheds
+            | LinkTypes::WatershedToRight
+            | LinkTypes::HolderToRight
+            | LinkTypes::WatershedToDispute
+            | LinkTypes::AgentToDispute => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 256 bytes)",
+                        link_type
+                    )));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::RightToTransfer
+            | LinkTypes::StewardshipTypeToWatershed => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 512 bytes)",
+                        link_type
+                    )));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn link_all_watersheds_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::AllWatersheds, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_all_watersheds_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::AllWatersheds, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_watershed_to_right_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::WatershedToRight, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_watershed_to_right_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::WatershedToRight, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_holder_to_right_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::HolderToRight, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_holder_to_right_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::HolderToRight, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_right_to_transfer_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::RightToTransfer, vec![0u8; 512]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_right_to_transfer_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::RightToTransfer, vec![0u8; 513]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_watershed_to_dispute_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::WatershedToDispute, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_watershed_to_dispute_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::WatershedToDispute, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_dispute_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::AgentToDispute, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_dispute_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::AgentToDispute, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_stewardship_type_to_watershed_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::StewardshipTypeToWatershed, vec![0u8; 512]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_stewardship_type_to_watershed_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::StewardshipTypeToWatershed, vec![0u8; 513]);
+        assert!(is_invalid(&result));
     }
 
     // ========================================================================

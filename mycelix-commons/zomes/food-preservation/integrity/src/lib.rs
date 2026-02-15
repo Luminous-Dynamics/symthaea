@@ -120,7 +120,63 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            match link_type {
+                LinkTypes::AllBatches => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllBatches link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AllMethods => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllMethods link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AllStorage => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllStorage link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::MethodToBatch => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "MethodToBatch link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::StorageToBatch => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "StorageToBatch link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AgentToBatch => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AgentToBatch link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
+        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
     }
 }
 
@@ -596,5 +652,106 @@ mod tests {
         let json = serde_json::to_string(&a).unwrap();
         let back: Anchor = serde_json::from_str(&json).unwrap();
         assert_eq!(back, a);
+    }
+
+    // ── Link tag length validation tests ────────────────────────────────
+
+    fn validate_link_tag(link_type: &LinkTypes, tag_len: usize) -> ValidateCallbackResult {
+        let tag = LinkTag(vec![0u8; tag_len]);
+        let max = match link_type {
+            LinkTypes::AllBatches
+            | LinkTypes::AllMethods
+            | LinkTypes::AllStorage
+            | LinkTypes::MethodToBatch
+            | LinkTypes::StorageToBatch
+            | LinkTypes::AgentToBatch => 256,
+        };
+        let name = match link_type {
+            LinkTypes::AllBatches => "AllBatches",
+            LinkTypes::AllMethods => "AllMethods",
+            LinkTypes::AllStorage => "AllStorage",
+            LinkTypes::MethodToBatch => "MethodToBatch",
+            LinkTypes::StorageToBatch => "StorageToBatch",
+            LinkTypes::AgentToBatch => "AgentToBatch",
+        };
+        if tag.0.len() > max {
+            ValidateCallbackResult::Invalid(
+                format!("{} link tag too long (max {} bytes)", name, max),
+            )
+        } else {
+            ValidateCallbackResult::Valid
+        }
+    }
+
+    #[test]
+    fn test_link_all_batches_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllBatches, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_batches_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllBatches, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_all_methods_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllMethods, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_methods_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllMethods, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_all_storage_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllStorage, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_storage_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllStorage, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_method_to_batch_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::MethodToBatch, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_method_to_batch_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::MethodToBatch, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_storage_to_batch_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::StorageToBatch, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_storage_to_batch_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::StorageToBatch, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_agent_to_batch_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AgentToBatch, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_agent_to_batch_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AgentToBatch, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

@@ -503,30 +503,104 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
-            LinkTypes::AnchorToPool
-            | LinkTypes::PoolToContribution
-            | LinkTypes::PoolToDisbursement
-            | LinkTypes::PoolToMembership
-            | LinkTypes::MemberToMembership
-            | LinkTypes::MemberToContribution
-            | LinkTypes::MemberToDisbursement
-            | LinkTypes::PoolToPendingDisbursement => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::AnchorToPool => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AnchorToPool link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PoolToContribution => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PoolToContribution link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PoolToDisbursement => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PoolToDisbursement link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PoolToMembership => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PoolToMembership link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::MemberToMembership => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MemberToMembership link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::MemberToContribution => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MemberToContribution link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::MemberToDisbursement => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MemberToDisbursement link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PoolToPendingDisbursement => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PoolToPendingDisbursement link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         },
-        FlatOp::RegisterDeleteLink { link_type, .. } => match link_type {
-            LinkTypes::AnchorToPool
-            | LinkTypes::PoolToContribution
-            | LinkTypes::PoolToDisbursement
-            | LinkTypes::PoolToMembership
-            | LinkTypes::MemberToMembership
-            | LinkTypes::MemberToContribution
-            | LinkTypes::MemberToDisbursement
-            | LinkTypes::PoolToPendingDisbursement => Ok(ValidateCallbackResult::Valid),
-        },
+        FlatOp::RegisterDeleteLink { link_type, action, .. } => {
+            let original_action = must_get_action(action.link_add_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this link".into(),
+                ));
+            }
+            match link_type {
+                LinkTypes::AnchorToPool
+                | LinkTypes::PoolToContribution
+                | LinkTypes::PoolToDisbursement
+                | LinkTypes::PoolToMembership
+                | LinkTypes::MemberToMembership
+                | LinkTypes::MemberToContribution
+                | LinkTypes::MemberToDisbursement
+                | LinkTypes::PoolToPendingDisbursement => Ok(ValidateCallbackResult::Valid),
+            }
+        }
         FlatOp::StoreRecord(_)
         | FlatOp::RegisterAgentActivity(_)
-        | FlatOp::RegisterUpdate(_)
-        | FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        | FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(OpDelete { action, .. }) => {
+            let original_action = must_get_action(action.deletes_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this entry".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -1591,6 +1665,136 @@ mod tests {
         assert_invalid(
             validate_pool_membership(&mem),
             "Pool ID must be 64 characters or fewer",
+        );
+    }
+
+    // ── Link tag validation tests ──────────────────────────────────────
+
+    fn validate_link_tag_for(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AnchorToPool | LinkTypes::PoolToContribution | LinkTypes::PoolToDisbursement
+            | LinkTypes::PoolToMembership | LinkTypes::MemberToMembership
+            | LinkTypes::MemberToContribution | LinkTypes::MemberToDisbursement => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 256 bytes)", link_type
+                    )));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PoolToPendingDisbursement => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PoolToPendingDisbursement link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn test_link_anchor_to_pool_tag_at_limit() {
+        assert_valid(validate_link_tag_for(LinkTypes::AnchorToPool, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_anchor_to_pool_tag_too_long() {
+        assert_invalid(
+            validate_link_tag_for(LinkTypes::AnchorToPool, vec![0u8; 257]),
+            "link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_link_pool_to_pending_disbursement_tag_at_limit() {
+        assert_valid(validate_link_tag_for(LinkTypes::PoolToPendingDisbursement, vec![0u8; 512]));
+    }
+
+    #[test]
+    fn test_link_pool_to_pending_disbursement_tag_too_long() {
+        assert_invalid(
+            validate_link_tag_for(LinkTypes::PoolToPendingDisbursement, vec![0u8; 513]),
+            "link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_link_member_to_membership_tag_at_limit() {
+        assert_valid(validate_link_tag_for(LinkTypes::MemberToMembership, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_member_to_membership_tag_too_long() {
+        assert_invalid(
+            validate_link_tag_for(LinkTypes::MemberToMembership, vec![0u8; 257]),
+            "link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_link_pool_to_contribution_tag_at_limit() {
+        assert_valid(validate_link_tag_for(LinkTypes::PoolToContribution, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_pool_to_contribution_tag_too_long() {
+        assert_invalid(
+            validate_link_tag_for(LinkTypes::PoolToContribution, vec![0u8; 257]),
+            "link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_link_pool_to_disbursement_tag_at_limit() {
+        assert_valid(validate_link_tag_for(LinkTypes::PoolToDisbursement, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_pool_to_disbursement_tag_too_long() {
+        assert_invalid(
+            validate_link_tag_for(LinkTypes::PoolToDisbursement, vec![0u8; 257]),
+            "link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_link_pool_to_membership_tag_at_limit() {
+        assert_valid(validate_link_tag_for(LinkTypes::PoolToMembership, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_pool_to_membership_tag_too_long() {
+        assert_invalid(
+            validate_link_tag_for(LinkTypes::PoolToMembership, vec![0u8; 257]),
+            "link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_link_member_to_contribution_tag_at_limit() {
+        assert_valid(validate_link_tag_for(LinkTypes::MemberToContribution, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_member_to_contribution_tag_too_long() {
+        assert_invalid(
+            validate_link_tag_for(LinkTypes::MemberToContribution, vec![0u8; 257]),
+            "link tag too long",
+        );
+    }
+
+    #[test]
+    fn test_link_member_to_disbursement_tag_at_limit() {
+        assert_valid(validate_link_tag_for(LinkTypes::MemberToDisbursement, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn test_link_member_to_disbursement_tag_too_long() {
+        assert_invalid(
+            validate_link_tag_for(LinkTypes::MemberToDisbursement, vec![0u8; 257]),
+            "link tag too long",
         );
     }
 }

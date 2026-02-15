@@ -234,19 +234,89 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
         } => match link_type {
-            LinkTypes::AgentToOffer => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToRequest => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::CategoryToOffer => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::CategoryToRequest => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AllActiveOffers => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AllOpenRequests => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToExchange => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToCredit => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::OfferToExchange => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::RequestToExchange => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AgentToOffer => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToOffer link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToRequest => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToRequest link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CategoryToOffer => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CategoryToOffer link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CategoryToRequest => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CategoryToRequest link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllActiveOffers => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllActiveOffers link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllOpenRequests => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllOpenRequests link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToExchange => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToExchange link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToCredit => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToCredit link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::OfferToExchange => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OfferToExchange link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::RequestToExchange => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "RequestToExchange link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         },
         FlatOp::RegisterDeleteLink {
             link_type: _,
@@ -1778,5 +1848,75 @@ mod tests {
             validate_update_exchange(e),
             "Notes must be 4096 characters or fewer",
         );
+    }
+
+    // ============================================================================
+    // Link Tag Validation Tests
+    // ============================================================================
+
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AgentToOffer | LinkTypes::AgentToRequest |
+            LinkTypes::AllActiveOffers | LinkTypes::AllOpenRequests |
+            LinkTypes::AgentToExchange | LinkTypes::AgentToCredit |
+            LinkTypes::OfferToExchange | LinkTypes::RequestToExchange => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        format!("{:?} link tag too long (max 256 bytes)", link_type),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CategoryToOffer | LinkTypes::CategoryToRequest => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        format!("{:?} link tag too long (max 512 bytes)", link_type),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn link_tag_agent_to_offer_at_limit() {
+        assert_valid(validate_create_link_tag(LinkTypes::AgentToOffer, vec![0u8; 256]));
+    }
+
+    #[test]
+    fn link_tag_agent_to_offer_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::AgentToOffer, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn link_tag_category_to_offer_at_limit() {
+        assert_valid(validate_create_link_tag(LinkTypes::CategoryToOffer, vec![0u8; 512]));
+    }
+
+    #[test]
+    fn link_tag_category_to_offer_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::CategoryToOffer, vec![0u8; 513]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn link_tag_category_to_request_at_limit() {
+        assert_valid(validate_create_link_tag(LinkTypes::CategoryToRequest, vec![0u8; 512]));
+    }
+
+    #[test]
+    fn link_tag_category_to_request_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::CategoryToRequest, vec![0u8; 513]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn link_tag_empty_tag_valid() {
+        assert_valid(validate_create_link_tag(LinkTypes::AgentToOffer, vec![]));
     }
 }

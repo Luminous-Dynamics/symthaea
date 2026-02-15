@@ -876,7 +876,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
             }
         }
-        FlatOp::RegisterDeleteLink { link_type, tag, .. } => {
+        FlatOp::RegisterDeleteLink { link_type, tag, action, .. } => {
+            let original_action = must_get_action(action.link_add_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this link".into(),
+                ));
+            }
             let tag_len = tag.0.len();
             // All delete link tags get the same 256-byte limit
             if tag_len > 256 {
@@ -887,6 +894,16 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             match link_type {
                 _ => Ok(ValidateCallbackResult::Valid),
             }
+        }
+        FlatOp::RegisterDelete(OpDelete { action, .. }) => {
+            let original_action = must_get_action(action.deletes_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this entry".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
         }
         _ => Ok(ValidateCallbackResult::Valid),
     }

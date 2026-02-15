@@ -120,7 +120,55 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            match link_type {
+                LinkTypes::AllMarkets => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllMarkets link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::MarketToListing => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "MarketToListing link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::ProducerToListing => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "ProducerToListing link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::BuyerToOrder => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "BuyerToOrder link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::ListingToOrder => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "ListingToOrder link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
+        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
     }
 }
 
@@ -607,5 +655,92 @@ mod tests {
         let json = serde_json::to_string(&a).unwrap();
         let back: Anchor = serde_json::from_str(&json).unwrap();
         assert_eq!(back, a);
+    }
+
+    // ── Link tag length validation tests ────────────────────────────────
+
+    fn validate_link_tag(link_type: &LinkTypes, tag_len: usize) -> ValidateCallbackResult {
+        let tag = LinkTag(vec![0u8; tag_len]);
+        let max = match link_type {
+            LinkTypes::AllMarkets
+            | LinkTypes::MarketToListing
+            | LinkTypes::ProducerToListing
+            | LinkTypes::BuyerToOrder
+            | LinkTypes::ListingToOrder => 256,
+        };
+        let name = match link_type {
+            LinkTypes::AllMarkets => "AllMarkets",
+            LinkTypes::MarketToListing => "MarketToListing",
+            LinkTypes::ProducerToListing => "ProducerToListing",
+            LinkTypes::BuyerToOrder => "BuyerToOrder",
+            LinkTypes::ListingToOrder => "ListingToOrder",
+        };
+        if tag.0.len() > max {
+            ValidateCallbackResult::Invalid(
+                format!("{} link tag too long (max {} bytes)", name, max),
+            )
+        } else {
+            ValidateCallbackResult::Valid
+        }
+    }
+
+    #[test]
+    fn test_link_all_markets_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllMarkets, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_markets_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllMarkets, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_market_to_listing_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::MarketToListing, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_market_to_listing_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::MarketToListing, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_producer_to_listing_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::ProducerToListing, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_producer_to_listing_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::ProducerToListing, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_buyer_to_order_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::BuyerToOrder, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_buyer_to_order_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::BuyerToOrder, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_listing_to_order_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::ListingToOrder, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_listing_to_order_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::ListingToOrder, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

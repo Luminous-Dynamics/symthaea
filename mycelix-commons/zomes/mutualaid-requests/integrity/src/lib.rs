@@ -250,14 +250,63 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
-            LinkTypes::AnchorToRequest
-            | LinkTypes::TypeToRequest
-            | LinkTypes::StatusToRequest
-            | LinkTypes::UrgencyToRequest
-            | LinkTypes::RequestToOffer
-            | LinkTypes::RequesterToRequest
-            | LinkTypes::OffererToOffer => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::AnchorToRequest => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AnchorToRequest link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TypeToRequest => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TypeToRequest link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::StatusToRequest => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "StatusToRequest link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::UrgencyToRequest => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "UrgencyToRequest link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::RequestToOffer => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "RequestToOffer link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::RequesterToRequest => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "RequesterToRequest link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::OffererToOffer => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OffererToOffer link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         },
         FlatOp::RegisterDeleteLink { link_type, .. } => match link_type {
             LinkTypes::AnchorToRequest
@@ -907,5 +956,109 @@ mod tests {
         let result = validate_aid_request(&request);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    // ── Link tag validation tests ──────────────────────────────────────
+
+    fn check_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::TypeToRequest => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid("TypeToRequest link tag too long (max 512 bytes)".into()));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            _ => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid("link tag too long (max 256 bytes)".into()));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn test_link_anchor_to_request_tag_at_limit() {
+        let result = check_link_tag(LinkTypes::AnchorToRequest, vec![0u8; 256]);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_anchor_to_request_tag_too_long() {
+        let result = check_link_tag(LinkTypes::AnchorToRequest, vec![0u8; 257]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_type_to_request_tag_at_limit() {
+        let result = check_link_tag(LinkTypes::TypeToRequest, vec![0u8; 512]);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_type_to_request_tag_too_long() {
+        let result = check_link_tag(LinkTypes::TypeToRequest, vec![0u8; 513]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_status_to_request_tag_at_limit() {
+        let result = check_link_tag(LinkTypes::StatusToRequest, vec![0u8; 256]);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_status_to_request_tag_too_long() {
+        let result = check_link_tag(LinkTypes::StatusToRequest, vec![0u8; 257]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_urgency_to_request_tag_at_limit() {
+        let result = check_link_tag(LinkTypes::UrgencyToRequest, vec![0u8; 256]);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_urgency_to_request_tag_too_long() {
+        let result = check_link_tag(LinkTypes::UrgencyToRequest, vec![0u8; 257]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_request_to_offer_tag_at_limit() {
+        let result = check_link_tag(LinkTypes::RequestToOffer, vec![0u8; 256]);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_request_to_offer_tag_too_long() {
+        let result = check_link_tag(LinkTypes::RequestToOffer, vec![0u8; 257]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_requester_to_request_tag_at_limit() {
+        let result = check_link_tag(LinkTypes::RequesterToRequest, vec![0u8; 256]);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_requester_to_request_tag_too_long() {
+        let result = check_link_tag(LinkTypes::RequesterToRequest, vec![0u8; 257]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_offerer_to_offer_tag_at_limit() {
+        let result = check_link_tag(LinkTypes::OffererToOffer, vec![0u8; 256]);
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_offerer_to_offer_tag_too_long() {
+        let result = check_link_tag(LinkTypes::OffererToOffer, vec![0u8; 257]);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }

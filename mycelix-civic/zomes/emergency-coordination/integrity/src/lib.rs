@@ -176,29 +176,85 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => match link_type {
-            LinkTypes::AllTeams => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::ActiveTeams => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::TeamToAssignment => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::TeamToSitrep => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::ZoneToTeam => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToCheckpoint => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToTeam => Ok(ValidateCallbackResult::Valid),
-        },
+        } => {
+            let tag_len = tag.0.len();
+            match link_type {
+                LinkTypes::AllTeams => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::ActiveTeams => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::TeamToAssignment => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::TeamToSitrep => {
+                    // SITREP links may carry condition metadata in tags
+                    if tag_len > 512 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 512 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::ZoneToTeam => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AgentToCheckpoint => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AgentToTeam => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
         FlatOp::RegisterDeleteLink {
-            link_type,
+            link_type: _,
             original_action: _,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => match link_type {
-            LinkTypes::ActiveTeams => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::ZoneToTeam => Ok(ValidateCallbackResult::Valid),
-            _ => Ok(ValidateCallbackResult::Valid),
-        },
+        } => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Delete link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
@@ -1315,5 +1371,128 @@ mod tests {
         sitrep.synced = false;
         let result = validate_create_sitrep(fake_create(), sitrep);
         assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // LINK TAG VALIDATION TESTS
+    // ========================================================================
+
+    fn validate_create_link_tag(link_type: LinkTypes, tag: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        let tag_len = tag.len();
+        match link_type {
+            LinkTypes::TeamToSitrep => {
+                if tag_len > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            _ => {
+                if tag_len > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    fn validate_delete_link_tag(tag: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+        if tag.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Delete link tag too long (max 256 bytes)".into(),
+            ));
+        }
+        Ok(ValidateCallbackResult::Valid)
+    }
+
+    // -- AllTeams (256 limit) --
+
+    #[test]
+    fn all_teams_link_tag_valid() {
+        let result = validate_create_link_tag(LinkTypes::AllTeams, vec![0u8; 100]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn all_teams_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::AllTeams, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn all_teams_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::AllTeams, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- TeamToSitrep (512 limit) --
+
+    #[test]
+    fn team_to_sitrep_link_tag_valid() {
+        let result = validate_create_link_tag(LinkTypes::TeamToSitrep, vec![0u8; 400]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn team_to_sitrep_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::TeamToSitrep, vec![0u8; 512]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn team_to_sitrep_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::TeamToSitrep, vec![0u8; 513]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- AgentToCheckpoint (256 limit) --
+
+    #[test]
+    fn agent_to_checkpoint_link_tag_at_limit() {
+        let result = validate_create_link_tag(LinkTypes::AgentToCheckpoint, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn agent_to_checkpoint_link_tag_over_limit() {
+        let result = validate_create_link_tag(LinkTypes::AgentToCheckpoint, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    // -- Large tag DoS prevention --
+
+    #[test]
+    fn massive_link_tag_rejected_all_types() {
+        let huge_tag = vec![0xFFu8; 10_000];
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::AllTeams, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::ActiveTeams, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::TeamToAssignment, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::TeamToSitrep, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::ZoneToTeam, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::AgentToCheckpoint, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(LinkTypes::AgentToTeam, huge_tag.clone())));
+    }
+
+    // -- Delete link tag tests --
+
+    #[test]
+    fn delete_link_tag_valid() {
+        let result = validate_delete_link_tag(vec![0u8; 128]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn delete_link_tag_at_limit() {
+        let result = validate_delete_link_tag(vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn delete_link_tag_over_limit() {
+        let result = validate_delete_link_tag(vec![0u8; 257]);
+        assert!(is_invalid(&result));
     }
 }

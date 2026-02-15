@@ -108,7 +108,71 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            match link_type {
+                LinkTypes::AllSeeds => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllSeeds link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AllPractices => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllPractices link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AllRecipes => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllRecipes link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::SpeciesToSeed => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "SpeciesToSeed link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::CategoryToPractice => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "CategoryToPractice link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::TagToRecipe => {
+                    if tag.0.len() > 512 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "TagToRecipe link tag too long (max 512 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AgentToRecipe => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AgentToRecipe link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
+        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
     }
 }
 
@@ -701,5 +765,120 @@ mod tests {
         let mut r = valid_recipe();
         r.servings = 0;
         assert_invalid(validate_recipe(r), "Servings must be positive");
+    }
+
+    // ── Link tag length validation tests ────────────────────────────────
+
+    fn validate_link_tag(link_type: &LinkTypes, tag_len: usize) -> ValidateCallbackResult {
+        let tag = LinkTag(vec![0u8; tag_len]);
+        let max = match link_type {
+            LinkTypes::AllSeeds
+            | LinkTypes::AllPractices
+            | LinkTypes::AllRecipes
+            | LinkTypes::SpeciesToSeed
+            | LinkTypes::CategoryToPractice
+            | LinkTypes::AgentToRecipe => 256,
+            LinkTypes::TagToRecipe => 512,
+        };
+        let name = match link_type {
+            LinkTypes::AllSeeds => "AllSeeds",
+            LinkTypes::AllPractices => "AllPractices",
+            LinkTypes::AllRecipes => "AllRecipes",
+            LinkTypes::SpeciesToSeed => "SpeciesToSeed",
+            LinkTypes::CategoryToPractice => "CategoryToPractice",
+            LinkTypes::TagToRecipe => "TagToRecipe",
+            LinkTypes::AgentToRecipe => "AgentToRecipe",
+        };
+        if tag.0.len() > max {
+            ValidateCallbackResult::Invalid(
+                format!("{} link tag too long (max {} bytes)", name, max),
+            )
+        } else {
+            ValidateCallbackResult::Valid
+        }
+    }
+
+    #[test]
+    fn test_link_all_seeds_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllSeeds, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_seeds_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllSeeds, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_all_practices_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllPractices, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_practices_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllPractices, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_all_recipes_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllRecipes, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_recipes_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllRecipes, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_species_to_seed_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::SpeciesToSeed, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_species_to_seed_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::SpeciesToSeed, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_category_to_practice_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::CategoryToPractice, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_category_to_practice_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::CategoryToPractice, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_to_recipe_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::TagToRecipe, 512);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_to_recipe_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::TagToRecipe, 513);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_agent_to_recipe_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AgentToRecipe, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_agent_to_recipe_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AgentToRecipe, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

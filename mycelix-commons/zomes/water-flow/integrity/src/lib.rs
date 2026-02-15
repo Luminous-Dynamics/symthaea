@@ -265,19 +265,89 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
         } => match link_type {
-            LinkTypes::AllSources => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SourceTypeToSource => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::StewardToSource => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SourceToShare => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::HolderToShare => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToCredit => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToTransactionSent => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToTransactionReceived => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SourceToUsage => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToUsage => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AllSources => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllSources link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::SourceTypeToSource => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "SourceTypeToSource link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::StewardToSource => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "StewardToSource link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::SourceToShare => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "SourceToShare link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::HolderToShare => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "HolderToShare link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToCredit => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToCredit link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToTransactionSent => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToTransactionSent link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToTransactionReceived => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToTransactionReceived link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::SourceToUsage => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "SourceToUsage link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToUsage => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToUsage link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
         },
         FlatOp::RegisterDeleteLink {
             link_type: _,
@@ -285,12 +355,30 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             base_address: _,
             target_address: _,
             tag: _,
-            action: _,
-        } => Ok(ValidateCallbackResult::Valid),
+            action,
+        } => {
+            let original_action = must_get_action(action.link_add_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this link".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(OpDelete { action, .. }) => {
+            let original_action = must_get_action(action.deletes_address.clone())?;
+            let original_author = original_action.action().author().clone();
+            if action.author != original_author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this entry".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -1126,4 +1214,163 @@ mod tests {
     // call must_get_valid_record() which requires a live Holochain conductor.
     // These are tested via sweettest integration tests, not unit tests.
     // ========================================================================
+
+    // ========================================================================
+    // LINK TAG LENGTH VALIDATION TESTS
+    // ========================================================================
+
+    fn validate_link_tag_for(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::AllSources
+            | LinkTypes::StewardToSource
+            | LinkTypes::SourceToShare
+            | LinkTypes::HolderToShare
+            | LinkTypes::AgentToCredit
+            | LinkTypes::SourceToUsage
+            | LinkTypes::AgentToUsage => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 256 bytes)",
+                        link_type
+                    )));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::SourceTypeToSource
+            | LinkTypes::AgentToTransactionSent
+            | LinkTypes::AgentToTransactionReceived => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 512 bytes)",
+                        link_type
+                    )));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn link_all_sources_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::AllSources, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_all_sources_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::AllSources, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_source_type_to_source_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::SourceTypeToSource, vec![0u8; 512]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_source_type_to_source_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::SourceTypeToSource, vec![0u8; 513]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_steward_to_source_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::StewardToSource, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_steward_to_source_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::StewardToSource, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_source_to_share_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::SourceToShare, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_source_to_share_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::SourceToShare, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_holder_to_share_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::HolderToShare, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_holder_to_share_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::HolderToShare, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_credit_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::AgentToCredit, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_credit_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::AgentToCredit, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_transaction_sent_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::AgentToTransactionSent, vec![0u8; 512]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_transaction_sent_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::AgentToTransactionSent, vec![0u8; 513]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_transaction_received_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::AgentToTransactionReceived, vec![0u8; 512]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_transaction_received_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::AgentToTransactionReceived, vec![0u8; 513]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_source_to_usage_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::SourceToUsage, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_source_to_usage_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::SourceToUsage, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_usage_tag_at_limit() {
+        let result = validate_link_tag_for(LinkTypes::AgentToUsage, vec![0u8; 256]);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn link_agent_to_usage_tag_too_long() {
+        let result = validate_link_tag_for(LinkTypes::AgentToUsage, vec![0u8; 257]);
+        assert!(is_invalid(&result));
+    }
 }

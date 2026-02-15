@@ -100,12 +100,53 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink {
-            link_type: _,
+            link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => Ok(ValidateCallbackResult::Valid),
+        } => match link_type {
+            LinkTypes::RequestToMatch => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "RequestToMatch link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::OfferToMatch => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OfferToMatch link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentProviderMatches => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentProviderMatches link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentRequesterMatches => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentRequesterMatches link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllPendingMatches => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllPendingMatches link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink {
             link_type: _,
             original_action: _,
@@ -742,6 +783,108 @@ mod tests {
         let factors = valid_factors();
         let cloned = factors.clone();
         assert_eq!(factors, cloned);
+    }
+
+    // ============================================================================
+    // Link Tag Validation Tests
+    // ============================================================================
+
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
+        let tag = LinkTag(tag_bytes);
+        match link_type {
+            LinkTypes::RequestToMatch => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "RequestToMatch link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::OfferToMatch => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OfferToMatch link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentProviderMatches => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentProviderMatches link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentRequesterMatches => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentRequesterMatches link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllPendingMatches => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllPendingMatches link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        }
+    }
+
+    #[test]
+    fn test_link_tag_request_to_match_at_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::RequestToMatch, vec![0u8; 256]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_request_to_match_over_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::RequestToMatch, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_agent_provider_matches_at_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::AgentProviderMatches, vec![0u8; 256]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_agent_provider_matches_over_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::AgentProviderMatches, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_all_pending_matches_at_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::AllPendingMatches, vec![0u8; 256]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_tag_all_pending_matches_over_limit() {
+        let result =
+            validate_create_link_tag(LinkTypes::AllPendingMatches, vec![0u8; 257]).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_tag_empty_tag_valid() {
+        let result =
+            validate_create_link_tag(LinkTypes::RequestToMatch, vec![]).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]

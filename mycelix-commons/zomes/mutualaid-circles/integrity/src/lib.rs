@@ -241,16 +241,66 @@ fn validate_create_link(
     link_type: LinkTypes,
     _base_address: AnyLinkableHash,
     _target_address: AnyLinkableHash,
-    _tag: LinkTag,
+    tag: LinkTag,
 ) -> ExternResult<ValidateCallbackResult> {
     match link_type {
-        LinkTypes::CircleToMembers => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::MemberToCircles => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::MemberToCreditLines => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::CircleToTransactions => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::MemberToTransactions => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::AllCircles => Ok(ValidateCallbackResult::Valid),
-        LinkTypes::CircleToBalances => Ok(ValidateCallbackResult::Valid),
+        LinkTypes::CircleToMembers => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "CircleToMembers link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::MemberToCircles => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "MemberToCircles link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::MemberToCreditLines => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "MemberToCreditLines link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::CircleToTransactions => {
+            // Transactions may carry metadata in tags
+            if tag.0.len() > 512 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "CircleToTransactions link tag too long (max 512 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::MemberToTransactions => {
+            if tag.0.len() > 512 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "MemberToTransactions link tag too long (max 512 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::AllCircles => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "AllCircles link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        LinkTypes::CircleToBalances => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "CircleToBalances link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -888,5 +938,135 @@ mod tests {
         // Small negative
         balance.credit_available = -1;
         assert!(matches!(validate_balance(balance).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    // =============================================================================
+    // LINK TAG VALIDATION TESTS
+    // =============================================================================
+
+    #[test]
+    fn test_link_circle_to_members_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::CircleToMembers, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_circle_to_members_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::CircleToMembers, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_circle_to_transactions_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 512]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::CircleToTransactions, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_circle_to_transactions_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 513]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::CircleToTransactions, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_all_circles_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::AllCircles, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_all_circles_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::AllCircles, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_member_to_circles_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::MemberToCircles, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_member_to_circles_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::MemberToCircles, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_member_to_credit_lines_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::MemberToCreditLines, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_member_to_credit_lines_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::MemberToCreditLines, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_member_to_transactions_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 512]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::MemberToTransactions, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_member_to_transactions_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 513]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::MemberToTransactions, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_link_circle_to_balances_tag_at_limit() {
+        let tag = LinkTag(vec![0u8; 256]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::CircleToBalances, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_link_circle_to_balances_tag_too_long() {
+        let tag = LinkTag(vec![0u8; 257]);
+        let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
+        let result = validate_create_link(LinkTypes::CircleToBalances, base, target, tag);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }

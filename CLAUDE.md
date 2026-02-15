@@ -44,7 +44,7 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Full roadmap**: @THE_SUBSTRATE_ROADMAP.md (load when needed)
 
 ### Mycelix Cluster Architecture
-10 domain hApps consolidated into 2 cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
+12 domain hApps consolidated into 2 cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
 
 | Cluster | Path | Domains | Zomes |
 |---------|------|---------|-------|
@@ -55,7 +55,7 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Cross-cluster bridge**: Commons↔Civic via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`)
 - **SDK TS clients**: `mycelix-workspace/sdk-ts/src/integrations/{commons,civic}/` (includes cross-cluster methods)
 - **Build**: `just build-commons` / `just build-civic` (or `cargo build --release --target wasm32-unknown-unknown`)
-- **Tests**: 33 SDK TS cluster tests + 285 Rust unit tests (127 commons + 144 civic + 14 bridge-common)
+- **Tests**: 33 SDK TS cluster tests + 5,991 Rust unit tests (3,910 commons + 2,026 civic + 55 bridge-common)
 
 ---
 

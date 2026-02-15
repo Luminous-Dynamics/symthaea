@@ -161,7 +161,63 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            match link_type {
+                LinkTypes::AllPlots => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllPlots link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::StewardToPlot => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "StewardToPlot link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::PlotToCrop => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PlotToCrop link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::CropToYield => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "CropToYield link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::PlotToSeasonPlan => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PlotToSeasonPlan link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AgentToYield => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AgentToYield link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
+        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
     }
 }
 
@@ -998,5 +1054,106 @@ mod tests {
             "Another valid".to_string(),
         ];
         assert_invalid(validate_season_plan(sp), "Each planned crop name must be 256 characters or fewer");
+    }
+
+    // ── Link tag length validation tests ────────────────────────────────
+
+    fn validate_link_tag(link_type: &LinkTypes, tag_len: usize) -> ValidateCallbackResult {
+        let tag = LinkTag(vec![0u8; tag_len]);
+        let max = match link_type {
+            LinkTypes::AllPlots
+            | LinkTypes::StewardToPlot
+            | LinkTypes::PlotToCrop
+            | LinkTypes::CropToYield
+            | LinkTypes::PlotToSeasonPlan
+            | LinkTypes::AgentToYield => 256,
+        };
+        let name = match link_type {
+            LinkTypes::AllPlots => "AllPlots",
+            LinkTypes::StewardToPlot => "StewardToPlot",
+            LinkTypes::PlotToCrop => "PlotToCrop",
+            LinkTypes::CropToYield => "CropToYield",
+            LinkTypes::PlotToSeasonPlan => "PlotToSeasonPlan",
+            LinkTypes::AgentToYield => "AgentToYield",
+        };
+        if tag.0.len() > max {
+            ValidateCallbackResult::Invalid(
+                format!("{} link tag too long (max {} bytes)", name, max),
+            )
+        } else {
+            ValidateCallbackResult::Valid
+        }
+    }
+
+    #[test]
+    fn test_link_all_plots_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllPlots, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_plots_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllPlots, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_steward_to_plot_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::StewardToPlot, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_steward_to_plot_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::StewardToPlot, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_plot_to_crop_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::PlotToCrop, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_plot_to_crop_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::PlotToCrop, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_crop_to_yield_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::CropToYield, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_crop_to_yield_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::CropToYield, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_plot_to_season_plan_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::PlotToSeasonPlan, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_plot_to_season_plan_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::PlotToSeasonPlan, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_agent_to_yield_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AgentToYield, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_agent_to_yield_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AgentToYield, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

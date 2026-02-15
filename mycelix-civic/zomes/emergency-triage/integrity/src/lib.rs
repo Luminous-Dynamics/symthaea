@@ -86,25 +86,61 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => match link_type {
-            LinkTypes::DisasterToTriage => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::CategoryToTriage => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::PatientToTriage => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToTriage => Ok(ValidateCallbackResult::Valid),
-        },
+        } => {
+            let tag_len = tag.0.len();
+            match link_type {
+                LinkTypes::DisasterToTriage => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::CategoryToTriage => {
+                    // Category links may store serialized category metadata
+                    if tag_len > 512 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 512 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::PatientToTriage => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AgentToTriage => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
         FlatOp::RegisterDeleteLink {
-            link_type,
+            link_type: _,
             original_action: _,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => match link_type {
-            LinkTypes::CategoryToTriage => Ok(ValidateCallbackResult::Valid),
-            _ => Ok(ValidateCallbackResult::Valid),
-        },
+        } => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Delete link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
@@ -871,5 +907,145 @@ mod tests {
                 );
             }
         }
+    }
+
+    // ========================================================================
+    // LINK TAG VALIDATION TESTS
+    // ========================================================================
+
+    fn validate_create_link_tag(link_type: &LinkTypes, tag: &LinkTag) -> ValidateCallbackResult {
+        let tag_len = tag.0.len();
+        match link_type {
+            LinkTypes::DisasterToTriage
+            | LinkTypes::PatientToTriage
+            | LinkTypes::AgentToTriage => {
+                if tag_len > 256 {
+                    ValidateCallbackResult::Invalid("Link tag too long (max 256 bytes)".into())
+                } else {
+                    ValidateCallbackResult::Valid
+                }
+            }
+            LinkTypes::CategoryToTriage => {
+                if tag_len > 512 {
+                    ValidateCallbackResult::Invalid("Link tag too long (max 512 bytes)".into())
+                } else {
+                    ValidateCallbackResult::Valid
+                }
+            }
+        }
+    }
+
+    fn validate_delete_link_tag(tag: &LinkTag) -> ValidateCallbackResult {
+        if tag.0.len() > 256 {
+            ValidateCallbackResult::Invalid("Delete link tag too long (max 256 bytes)".into())
+        } else {
+            ValidateCallbackResult::Valid
+        }
+    }
+
+    // -- DisasterToTriage (256-byte limit) boundary tests --
+
+    #[test]
+    fn link_tag_disaster_to_triage_empty_valid() {
+        let tag = LinkTag::new(vec![]);
+        let result = validate_create_link_tag(&LinkTypes::DisasterToTriage, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_disaster_to_triage_at_limit_valid() {
+        let tag = LinkTag::new(vec![0u8; 256]);
+        let result = validate_create_link_tag(&LinkTypes::DisasterToTriage, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_disaster_to_triage_over_limit_invalid() {
+        let tag = LinkTag::new(vec![0u8; 257]);
+        let result = validate_create_link_tag(&LinkTypes::DisasterToTriage, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- CategoryToTriage (512-byte limit) boundary tests --
+
+    #[test]
+    fn link_tag_category_to_triage_empty_valid() {
+        let tag = LinkTag::new(vec![]);
+        let result = validate_create_link_tag(&LinkTypes::CategoryToTriage, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_category_to_triage_at_limit_valid() {
+        let tag = LinkTag::new(vec![0u8; 512]);
+        let result = validate_create_link_tag(&LinkTypes::CategoryToTriage, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_category_to_triage_over_limit_invalid() {
+        let tag = LinkTag::new(vec![0u8; 513]);
+        let result = validate_create_link_tag(&LinkTypes::CategoryToTriage, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- PatientToTriage (256-byte limit) boundary tests --
+
+    #[test]
+    fn link_tag_patient_to_triage_at_limit_valid() {
+        let tag = LinkTag::new(vec![0xCC; 256]);
+        let result = validate_create_link_tag(&LinkTypes::PatientToTriage, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_patient_to_triage_over_limit_invalid() {
+        let tag = LinkTag::new(vec![0xCC; 257]);
+        let result = validate_create_link_tag(&LinkTypes::PatientToTriage, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- DoS prevention: massive tags rejected for all link types --
+
+    #[test]
+    fn link_tag_dos_prevention_all_types() {
+        let massive_tag = LinkTag::new(vec![0xFF; 10_000]);
+        let all_types = [
+            LinkTypes::DisasterToTriage,
+            LinkTypes::CategoryToTriage,
+            LinkTypes::PatientToTriage,
+            LinkTypes::AgentToTriage,
+        ];
+        for lt in &all_types {
+            let result = validate_create_link_tag(lt, &massive_tag);
+            assert!(
+                matches!(result, ValidateCallbackResult::Invalid(_)),
+                "Massive tag should be rejected for {:?}",
+                lt
+            );
+        }
+    }
+
+    // -- Delete link tag tests --
+
+    #[test]
+    fn delete_link_tag_empty_valid() {
+        let tag = LinkTag::new(vec![]);
+        let result = validate_delete_link_tag(&tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn delete_link_tag_at_limit_valid() {
+        let tag = LinkTag::new(vec![0u8; 256]);
+        let result = validate_delete_link_tag(&tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn delete_link_tag_over_limit_invalid() {
+        let tag = LinkTag::new(vec![0u8; 257]);
+        let result = validate_delete_link_tag(&tag);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

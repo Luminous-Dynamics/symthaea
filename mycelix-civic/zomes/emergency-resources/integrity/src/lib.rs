@@ -127,27 +127,77 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             link_type,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => match link_type {
-            LinkTypes::AllResources => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AvailableResources => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::ResourceByType => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::DisasterToRequest => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToResource => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::RequestToResource => Ok(ValidateCallbackResult::Valid),
-        },
+        } => {
+            let tag_len = tag.0.len();
+            match link_type {
+                LinkTypes::AllResources => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AvailableResources => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::ResourceByType => {
+                    // Type links may store serialized type metadata
+                    if tag_len > 512 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 512 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::DisasterToRequest => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AgentToResource => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::RequestToResource => {
+                    if tag_len > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        }
         FlatOp::RegisterDeleteLink {
-            link_type,
+            link_type: _,
             original_action: _,
             base_address: _,
             target_address: _,
-            tag: _,
+            tag,
             action: _,
-        } => match link_type {
-            LinkTypes::AvailableResources => Ok(ValidateCallbackResult::Valid),
-            _ => Ok(ValidateCallbackResult::Valid),
-        },
+        } => {
+            if tag.0.len() > 256 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Delete link tag too long (max 256 bytes)".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
@@ -966,5 +1016,149 @@ mod tests {
         req.location = "A".into();
         let result = validate_create_request(fake_create(), req);
         assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // LINK TAG VALIDATION TESTS
+    // ========================================================================
+
+    fn validate_create_link_tag(link_type: &LinkTypes, tag: &LinkTag) -> ValidateCallbackResult {
+        let tag_len = tag.0.len();
+        match link_type {
+            LinkTypes::AllResources
+            | LinkTypes::AvailableResources
+            | LinkTypes::DisasterToRequest
+            | LinkTypes::AgentToResource
+            | LinkTypes::RequestToResource => {
+                if tag_len > 256 {
+                    ValidateCallbackResult::Invalid("Link tag too long (max 256 bytes)".into())
+                } else {
+                    ValidateCallbackResult::Valid
+                }
+            }
+            LinkTypes::ResourceByType => {
+                if tag_len > 512 {
+                    ValidateCallbackResult::Invalid("Link tag too long (max 512 bytes)".into())
+                } else {
+                    ValidateCallbackResult::Valid
+                }
+            }
+        }
+    }
+
+    fn validate_delete_link_tag(tag: &LinkTag) -> ValidateCallbackResult {
+        if tag.0.len() > 256 {
+            ValidateCallbackResult::Invalid("Delete link tag too long (max 256 bytes)".into())
+        } else {
+            ValidateCallbackResult::Valid
+        }
+    }
+
+    // -- AllResources (256-byte limit) boundary tests --
+
+    #[test]
+    fn link_tag_all_resources_empty_valid() {
+        let tag = LinkTag::new(vec![]);
+        let result = validate_create_link_tag(&LinkTypes::AllResources, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_all_resources_at_limit_valid() {
+        let tag = LinkTag::new(vec![0u8; 256]);
+        let result = validate_create_link_tag(&LinkTypes::AllResources, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_all_resources_over_limit_invalid() {
+        let tag = LinkTag::new(vec![0u8; 257]);
+        let result = validate_create_link_tag(&LinkTypes::AllResources, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- ResourceByType (512-byte limit) boundary tests --
+
+    #[test]
+    fn link_tag_resource_by_type_empty_valid() {
+        let tag = LinkTag::new(vec![]);
+        let result = validate_create_link_tag(&LinkTypes::ResourceByType, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_resource_by_type_at_limit_valid() {
+        let tag = LinkTag::new(vec![0u8; 512]);
+        let result = validate_create_link_tag(&LinkTypes::ResourceByType, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_resource_by_type_over_limit_invalid() {
+        let tag = LinkTag::new(vec![0u8; 513]);
+        let result = validate_create_link_tag(&LinkTypes::ResourceByType, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- AgentToResource (256-byte limit) boundary tests --
+
+    #[test]
+    fn link_tag_agent_to_resource_at_limit_valid() {
+        let tag = LinkTag::new(vec![0xAB; 256]);
+        let result = validate_create_link_tag(&LinkTypes::AgentToResource, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn link_tag_agent_to_resource_over_limit_invalid() {
+        let tag = LinkTag::new(vec![0xAB; 257]);
+        let result = validate_create_link_tag(&LinkTypes::AgentToResource, &tag);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- DoS prevention: massive tags rejected for all link types --
+
+    #[test]
+    fn link_tag_dos_prevention_all_types() {
+        let massive_tag = LinkTag::new(vec![0xFF; 10_000]);
+        let all_types = [
+            LinkTypes::AllResources,
+            LinkTypes::AvailableResources,
+            LinkTypes::ResourceByType,
+            LinkTypes::DisasterToRequest,
+            LinkTypes::AgentToResource,
+            LinkTypes::RequestToResource,
+        ];
+        for lt in &all_types {
+            let result = validate_create_link_tag(lt, &massive_tag);
+            assert!(
+                matches!(result, ValidateCallbackResult::Invalid(_)),
+                "Massive tag should be rejected for {:?}",
+                lt
+            );
+        }
+    }
+
+    // -- Delete link tag tests --
+
+    #[test]
+    fn delete_link_tag_empty_valid() {
+        let tag = LinkTag::new(vec![]);
+        let result = validate_delete_link_tag(&tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn delete_link_tag_at_limit_valid() {
+        let tag = LinkTag::new(vec![0u8; 256]);
+        let result = validate_delete_link_tag(&tag);
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn delete_link_tag_over_limit_invalid() {
+        let tag = LinkTag::new(vec![0u8; 257]);
+        let result = validate_delete_link_tag(&tag);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }
