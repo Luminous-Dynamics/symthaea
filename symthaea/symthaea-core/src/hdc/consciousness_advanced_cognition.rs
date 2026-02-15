@@ -739,7 +739,7 @@ impl ImaginationEngine {
 
         let construct = ImaginaryConstruct {
             content: combined,
-            description: format!("Imagined via {:?}", method),
+            description: format!("Imagined via {method:?}"),
             sources: concepts.to_vec(),
             novelty,
             coherence,

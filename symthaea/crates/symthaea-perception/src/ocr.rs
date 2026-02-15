@@ -221,7 +221,7 @@ impl TesseractEngine {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let _ = std::fs::remove_file(out_base.with_extension("tsv"));
-            anyhow::bail!("Tesseract failed: {}", stderr);
+            anyhow::bail!("Tesseract failed: {stderr}");
         }
 
         // Read TSV output

@@ -647,7 +647,7 @@ impl ConsciousnessPipeline {
                     self.state.conscious_contents.push(WorkspaceItem {
                         content: *hv,
                         activation: priority,
-                        source: format!("input_{}", i),
+                        source: format!("input_{i}"),
                         is_broadcasting: true,
                         duration_ms: 100,
                     });
@@ -1024,7 +1024,7 @@ impl ConsciousnessPipeline {
             }
 
             // Remove duplicates
-            active_modalities.sort_by_key(|m| format!("{:?}", m));
+            active_modalities.sort_by_key(|m| format!("{m:?}"));
             active_modalities.dedup();
 
             self.state.active_modalities = active_modalities.clone();

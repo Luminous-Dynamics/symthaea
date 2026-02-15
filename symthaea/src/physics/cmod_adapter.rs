@@ -611,26 +611,26 @@ pub fn load_csv(path: &Path) -> Result<Vec<CModShot>> {
         .has_headers(true)
         .flexible(true)
         .from_path(path)
-        .map_err(|e| anyhow!("Failed to open CSV file: {}", e))?;
+        .map_err(|e| anyhow!("Failed to open CSV file: {e}"))?;
 
     // Group samples by shot_id
     let mut shots_map: HashMap<u32, CModShot> = HashMap::new();
 
     for result in reader.records() {
-        let record = result.map_err(|e| anyhow!("CSV parse error: {}", e))?;
+        let record = result.map_err(|e| anyhow!("CSV parse error: {e}"))?;
 
         // Parse required fields
         let shot_id: u32 = record
             .get(0)
             .ok_or_else(|| anyhow!("Missing shot_id"))?
             .parse()
-            .map_err(|e| anyhow!("Invalid shot_id: {}", e))?;
+            .map_err(|e| anyhow!("Invalid shot_id: {e}"))?;
 
         let time_ms: f64 = record
             .get(1)
             .ok_or_else(|| anyhow!("Missing time_ms"))?
             .parse()
-            .map_err(|e| anyhow!("Invalid time_ms: {}", e))?;
+            .map_err(|e| anyhow!("Invalid time_ms: {e}"))?;
 
         // Parse sensor values (allow NaN for missing)
         let parse_f32 = |idx: usize| -> f32 {

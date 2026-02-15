@@ -1293,13 +1293,13 @@ impl EnsembleJudgment {
 
         // HDC signal
         if let Some(conf) = self.hdc_confidence {
-            parts.push(format!("HDC: {:+.3}", conf));
+            parts.push(format!("HDC: {conf:+.3}"));
         }
 
         // Learned prototype signal
         if let Some(lv) = self.learned_verdict {
             let conf = self.learned_confidence.unwrap_or(0.0);
-            parts.push(format!("Learned: {:?} ({:.3})", lv, conf));
+            parts.push(format!("Learned: {lv:?} ({conf:.3})"));
         }
 
         format!(
@@ -1507,7 +1507,7 @@ impl MoralAlgebra {
         let explanation = if is_tragic {
             "Tragic dilemma: no action avoids moral wrong".to_string()
         } else if let Some(ref winner) = resolution {
-            format!("Resolution: {} takes priority", winner)
+            format!("Resolution: {winner} takes priority")
         } else {
             "Unresolved conflict".to_string()
         };

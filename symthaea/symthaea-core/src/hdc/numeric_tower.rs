@@ -176,15 +176,15 @@ impl Number {
 impl std::fmt::Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Number::Natural(n) => write!(f, "{}", n),
-            Number::Integer(n) => write!(f, "{}", n),
+            Number::Natural(n) => write!(f, "{n}"),
+            Number::Integer(n) => write!(f, "{n}"),
             Number::Rational {
                 numerator,
                 denominator,
             } => {
-                write!(f, "{}/{}", numerator, denominator)
+                write!(f, "{numerator}/{denominator}")
             }
-            Number::Real(x) => write!(f, "{:.10}", x),
+            Number::Real(x) => write!(f, "{x:.10}"),
         }
     }
 }
@@ -378,7 +378,7 @@ impl NumericTower {
             encoding
         } else {
             // Deterministic seed for large naturals
-            BinaryHV::random(seed_from_name(&format!("NAT_{}", n)))
+            BinaryHV::random(seed_from_name(&format!("NAT_{n}")))
         }
     }
 
@@ -415,7 +415,7 @@ impl NumericTower {
     fn encode_real(&self, x: f64) -> BinaryHV {
         // Use the float bits as a deterministic seed
         let bits = x.to_bits();
-        BinaryHV::random(seed_from_name(&format!("REAL_{}", bits)))
+        BinaryHV::random(seed_from_name(&format!("REAL_{bits}")))
     }
 
     // ========================================================================
@@ -502,21 +502,21 @@ impl NumericTower {
             // ℕ + ℕ → ℕ (always closed)
             (Number::Natural(x), Number::Natural(y)) => {
                 let sum = x.wrapping_add(*y);
-                proof_trace.push(format!("Natural addition: {} + {} = {}", x, y, sum));
+                proof_trace.push(format!("Natural addition: {x} + {y} = {sum}"));
                 Number::Natural(sum)
             }
 
             // ℤ + ℤ → ℤ (or ℕ if non-negative)
             (Number::Integer(x), Number::Integer(y)) => {
                 let sum = x.wrapping_add(*y);
-                proof_trace.push(format!("Integer addition: {} + {} = {}", x, y, sum));
+                proof_trace.push(format!("Integer addition: {x} + {y} = {sum}"));
                 Self::from_i64(sum)
             }
 
             // Mixed ℕ/ℤ: lift to ℤ
             (Number::Natural(x), Number::Integer(y)) | (Number::Integer(y), Number::Natural(x)) => {
                 let sum = (*x as i64).wrapping_add(*y);
-                proof_trace.push(format!("Lift to Z: {} + {} = {}", x, y, sum));
+                proof_trace.push(format!("Lift to Z: {x} + {y} = {sum}"));
                 Self::from_i64(sum)
             }
 
@@ -534,8 +534,7 @@ impl NumericTower {
                 let num = an.wrapping_mul(*bd).wrapping_add(bn.wrapping_mul(*ad));
                 let den = ad.wrapping_mul(*bd);
                 proof_trace.push(format!(
-                    "Rational addition: ({} x {} + {} x {}) / ({} x {}) = {}/{}",
-                    an, bd, bn, ad, ad, bd, num, den
+                    "Rational addition: ({an} x {bd} + {bn} x {ad}) / ({ad} x {bd}) = {num}/{den}"
                 ));
                 Self::from_rational(num, den)
             }
@@ -558,7 +557,7 @@ impl NumericTower {
                 let (on, od) = self.to_rational(other);
                 let num = rn.wrapping_mul(od).wrapping_add(on.wrapping_mul(*rd));
                 let den = rd.wrapping_mul(od);
-                proof_trace.push(format!("Lift to Q then add: {}/{} + {}/{}", rn, rd, on, od));
+                proof_trace.push(format!("Lift to Q then add: {rn}/{rd} + {on}/{od}"));
                 Self::from_rational(num, den)
             }
 
@@ -591,15 +590,13 @@ impl NumericTower {
                 if *x >= *y {
                     let diff = x - y;
                     proof_trace.push(format!(
-                        "Natural subtraction: {} - {} = {} (stays in N)",
-                        x, y, diff
+                        "Natural subtraction: {x} - {y} = {diff} (stays in N)"
                     ));
                     Number::Natural(diff)
                 } else {
                     let diff = (*x as i64).wrapping_sub(*y as i64);
                     proof_trace.push(format!(
-                        "Promotion N -> Z: {} - {} = {} (negative result)",
-                        x, y, diff
+                        "Promotion N -> Z: {x} - {y} = {diff} (negative result)"
                     ));
                     Number::Integer(diff)
                 }
@@ -608,19 +605,19 @@ impl NumericTower {
             // ℤ - ℤ → ℤ (or ℕ)
             (Number::Integer(x), Number::Integer(y)) => {
                 let diff = x.wrapping_sub(*y);
-                proof_trace.push(format!("Integer subtraction: {} - {} = {}", x, y, diff));
+                proof_trace.push(format!("Integer subtraction: {x} - {y} = {diff}"));
                 Self::from_i64(diff)
             }
 
             // Mixed ℕ/ℤ
             (Number::Natural(x), Number::Integer(y)) => {
                 let diff = (*x as i64).wrapping_sub(*y);
-                proof_trace.push(format!("Lift to Z: {} - {} = {}", x, y, diff));
+                proof_trace.push(format!("Lift to Z: {x} - {y} = {diff}"));
                 Self::from_i64(diff)
             }
             (Number::Integer(x), Number::Natural(y)) => {
                 let diff = x.wrapping_sub(*y as i64);
-                proof_trace.push(format!("Lift to Z: {} - {} = {}", x, y, diff));
+                proof_trace.push(format!("Lift to Z: {x} - {y} = {diff}"));
                 Self::from_i64(diff)
             }
 
@@ -638,8 +635,7 @@ impl NumericTower {
                 let num = an.wrapping_mul(*bd).wrapping_sub(bn.wrapping_mul(*ad));
                 let den = ad.wrapping_mul(*bd);
                 proof_trace.push(format!(
-                    "Rational subtraction: ({} x {} - {} x {}) / ({} x {})",
-                    an, bd, bn, ad, ad, bd
+                    "Rational subtraction: ({an} x {bd} - {bn} x {ad}) / ({ad} x {bd})"
                 ));
                 Self::from_rational(num, den)
             }
@@ -655,7 +651,7 @@ impl NumericTower {
                 let (on, od) = self.to_rational(other);
                 let num = rn.wrapping_mul(od).wrapping_sub(on.wrapping_mul(*rd));
                 let den = rd.wrapping_mul(od);
-                proof_trace.push(format!("Lift to Q: {}/{} - {}/{}", rn, rd, on, od));
+                proof_trace.push(format!("Lift to Q: {rn}/{rd} - {on}/{od}"));
                 Self::from_rational(num, den)
             }
             (
@@ -668,7 +664,7 @@ impl NumericTower {
                 let (on, od) = self.to_rational(other);
                 let num = on.wrapping_mul(*rd).wrapping_sub(rn.wrapping_mul(od));
                 let den = od.wrapping_mul(*rd);
-                proof_trace.push(format!("Lift to Q: {}/{} - {}/{}", on, od, rn, rd));
+                proof_trace.push(format!("Lift to Q: {on}/{od} - {rn}/{rd}"));
                 Self::from_rational(num, den)
             }
 
@@ -709,21 +705,21 @@ impl NumericTower {
             // ℕ * ℕ → ℕ
             (Number::Natural(x), Number::Natural(y)) => {
                 let prod = x.wrapping_mul(*y);
-                proof_trace.push(format!("Natural multiplication: {} * {} = {}", x, y, prod));
+                proof_trace.push(format!("Natural multiplication: {x} * {y} = {prod}"));
                 Number::Natural(prod)
             }
 
             // ℤ * ℤ → ℤ (or ℕ)
             (Number::Integer(x), Number::Integer(y)) => {
                 let prod = x.wrapping_mul(*y);
-                proof_trace.push(format!("Integer multiplication: {} * {} = {}", x, y, prod));
+                proof_trace.push(format!("Integer multiplication: {x} * {y} = {prod}"));
                 Self::from_i64(prod)
             }
 
             // Mixed ℕ/ℤ
             (Number::Natural(x), Number::Integer(y)) | (Number::Integer(y), Number::Natural(x)) => {
                 let prod = (*x as i64).wrapping_mul(*y);
-                proof_trace.push(format!("Lift to Z: {} * {} = {}", x, y, prod));
+                proof_trace.push(format!("Lift to Z: {x} * {y} = {prod}"));
                 Self::from_i64(prod)
             }
 
@@ -741,8 +737,7 @@ impl NumericTower {
                 let num = an.wrapping_mul(*bn);
                 let den = ad.wrapping_mul(*bd);
                 proof_trace.push(format!(
-                    "Rational multiplication: ({} * {}) / ({} * {})",
-                    an, bn, ad, bd
+                    "Rational multiplication: ({an} * {bn}) / ({ad} * {bd})"
                 ));
                 Self::from_rational(num, den)
             }
@@ -765,7 +760,7 @@ impl NumericTower {
                 let (on, od) = self.to_rational(other);
                 let num = rn.wrapping_mul(on);
                 let den = rd.wrapping_mul(od);
-                proof_trace.push(format!("Lift to Q: ({}/{}) * ({}/{})", rn, rd, on, od));
+                proof_trace.push(format!("Lift to Q: ({rn}/{rd}) * ({on}/{od})"));
                 Self::from_rational(num, den)
             }
 
@@ -803,15 +798,13 @@ impl NumericTower {
                 if *y != 0 && *x % *y == 0 {
                     let quot = x / y;
                     proof_trace.push(format!(
-                        "Exact natural division: {} / {} = {} (stays in N)",
-                        x, y, quot
+                        "Exact natural division: {x} / {y} = {quot} (stays in N)"
                     ));
                     Number::Natural(quot)
                 } else {
                     let (num, den) = normalize_rational(*x as i64, *y as i64);
                     proof_trace.push(format!(
-                        "Promotion N -> Q: {} / {} = {}/{} (not exact)",
-                        x, y, num, den
+                        "Promotion N -> Q: {x} / {y} = {num}/{den} (not exact)"
                     ));
                     Self::from_rational(num, den)
                 }
@@ -822,12 +815,11 @@ impl NumericTower {
                 if *y != 0 && *x % *y == 0 {
                     let quot = x / y;
                     proof_trace.push(format!(
-                        "Exact integer division: {} / {} = {} (stays in Z)",
-                        x, y, quot
+                        "Exact integer division: {x} / {y} = {quot} (stays in Z)"
                     ));
                     Self::from_i64(quot)
                 } else {
-                    proof_trace.push(format!("Promotion Z -> Q: {} / {} (not exact)", x, y));
+                    proof_trace.push(format!("Promotion Z -> Q: {x} / {y} (not exact)"));
                     Self::from_rational(*x, *y)
                 }
             }
@@ -838,12 +830,11 @@ impl NumericTower {
                 if *y != 0 && xi % *y == 0 {
                     let quot = xi / *y;
                     proof_trace.push(format!(
-                        "Exact division after lift: {} / {} = {}",
-                        x, y, quot
+                        "Exact division after lift: {x} / {y} = {quot}"
                     ));
                     Self::from_i64(quot)
                 } else {
-                    proof_trace.push(format!("Promotion to Q: {} / {}", x, y));
+                    proof_trace.push(format!("Promotion to Q: {x} / {y}"));
                     Self::from_rational(xi, *y)
                 }
             }
@@ -852,12 +843,11 @@ impl NumericTower {
                 if yi != 0 && *x % yi == 0 {
                     let quot = *x / yi;
                     proof_trace.push(format!(
-                        "Exact division after lift: {} / {} = {}",
-                        x, y, quot
+                        "Exact division after lift: {x} / {y} = {quot}"
                     ));
                     Self::from_i64(quot)
                 } else {
-                    proof_trace.push(format!("Promotion to Q: {} / {}", x, y));
+                    proof_trace.push(format!("Promotion to Q: {x} / {y}"));
                     Self::from_rational(*x, yi)
                 }
             }
@@ -877,8 +867,7 @@ impl NumericTower {
                 let num = an.wrapping_mul(*bd);
                 let den = ad.wrapping_mul(*bn);
                 proof_trace.push(format!(
-                    "Rational division: ({}/{}) / ({}/{}) = ({} * {}) / ({} * {})",
-                    an, ad, bn, bd, an, bd, ad, bn
+                    "Rational division: ({an}/{ad}) / ({bn}/{bd}) = ({an} * {bd}) / ({ad} * {bn})"
                 ));
                 Self::from_rational(num, den)
             }
@@ -895,7 +884,7 @@ impl NumericTower {
                 // (rn/rd) / (on/od) = (rn * od) / (rd * on)
                 let num = rn.wrapping_mul(od);
                 let den = rd.wrapping_mul(on);
-                proof_trace.push(format!("Lift to Q: ({}/{}) / ({}/{})", rn, rd, on, od));
+                proof_trace.push(format!("Lift to Q: ({rn}/{rd}) / ({on}/{od})"));
                 Self::from_rational(num, den)
             }
             (
@@ -909,7 +898,7 @@ impl NumericTower {
                 // (on/od) / (rn/rd) = (on * rd) / (od * rn)
                 let num = on.wrapping_mul(*rd);
                 let den = od.wrapping_mul(*rn);
-                proof_trace.push(format!("Lift to Q: ({}/{}) / ({}/{})", on, od, rn, rd));
+                proof_trace.push(format!("Lift to Q: ({on}/{od}) / ({rn}/{rd})"));
                 Self::from_rational(num, den)
             }
 
@@ -957,7 +946,7 @@ impl NumericTower {
                 let b = base.to_f64();
                 let e = exponent.to_f64();
                 let result = b.powf(e);
-                proof_trace.push(format!("Real exponentiation: {}^{} = {}", b, e, result));
+                proof_trace.push(format!("Real exponentiation: {b}^{e} = {result}"));
                 Number::Real(result)
             }
         };
@@ -978,10 +967,10 @@ impl NumericTower {
                 Number::Natural(b) => {
                     let result = (*b as u128).pow(exp as u32);
                     if result <= u64::MAX as u128 {
-                        proof_trace.push(format!("Natural power: {}^{} = {}", b, exp, result));
+                        proof_trace.push(format!("Natural power: {b}^{exp} = {result}"));
                         Number::Natural(result as u64)
                     } else {
-                        proof_trace.push(format!("Overflow to Real: {}^{}", b, exp));
+                        proof_trace.push(format!("Overflow to Real: {b}^{exp}"));
                         Number::Real((*b as f64).powi(exp as i32))
                     }
                 }
@@ -995,10 +984,10 @@ impl NumericTower {
                         } else {
                             abs_result as i64
                         };
-                        proof_trace.push(format!("Integer power: {}^{} = {}", b, exp, val));
+                        proof_trace.push(format!("Integer power: {b}^{exp} = {val}"));
                         Self::from_i64(val)
                     } else {
-                        proof_trace.push(format!("Overflow to Real: {}^{}", b, exp));
+                        proof_trace.push(format!("Overflow to Real: {b}^{exp}"));
                         Number::Real((*b as f64).powi(exp as i32))
                     }
                 }
@@ -1010,21 +999,19 @@ impl NumericTower {
                     let den_pow = (*denominator as i128).pow(exp as u32);
                     if num_pow.unsigned_abs() <= i64::MAX as u128 && den_pow <= i64::MAX as i128 {
                         proof_trace.push(format!(
-                            "Rational power: ({}/{})^{} = {}/{}",
-                            numerator, denominator, exp, num_pow, den_pow
+                            "Rational power: ({numerator}/{denominator})^{exp} = {num_pow}/{den_pow}"
                         ));
                         Self::from_rational(num_pow as i64, den_pow as i64)
                     } else {
                         proof_trace.push(format!(
-                            "Overflow to Real: ({}/{})^{}",
-                            numerator, denominator, exp
+                            "Overflow to Real: ({numerator}/{denominator})^{exp}"
                         ));
                         Number::Real((base.to_f64()).powi(exp as i32))
                     }
                 }
                 Number::Real(x) => {
                     let result = x.powi(exp as i32);
-                    proof_trace.push(format!("Real power: {}^{} = {}", x, exp, result));
+                    proof_trace.push(format!("Real power: {x}^{exp} = {result}"));
                     Number::Real(result)
                 }
             }
@@ -1059,12 +1046,12 @@ impl NumericTower {
             }
             Number::Natural(n) => {
                 let neg = -(*n as i64);
-                proof_trace.push(format!("Promotion N -> Z: -({}) = {}", n, neg));
+                proof_trace.push(format!("Promotion N -> Z: -({n}) = {neg}"));
                 Number::Integer(neg)
             }
             Number::Integer(n) => {
                 let neg = n.wrapping_neg();
-                proof_trace.push(format!("Integer negation: -({}) = {}", n, neg));
+                proof_trace.push(format!("Integer negation: -({n}) = {neg}"));
                 Self::from_i64(neg)
             }
             Number::Rational {
@@ -1073,14 +1060,13 @@ impl NumericTower {
             } => {
                 let neg_num = numerator.wrapping_neg();
                 proof_trace.push(format!(
-                    "Rational negation: -({}/{}) = {}/{}",
-                    numerator, denominator, neg_num, denominator
+                    "Rational negation: -({numerator}/{denominator}) = {neg_num}/{denominator}"
                 ));
                 Self::from_rational(neg_num, *denominator)
             }
             Number::Real(x) => {
                 let neg = -x;
-                proof_trace.push(format!("Real negation: -({}) = {}", x, neg));
+                proof_trace.push(format!("Real negation: -({x}) = {neg}"));
                 Number::Real(neg)
             }
         };
@@ -1095,12 +1081,12 @@ impl NumericTower {
 
         let result = match a {
             Number::Natural(n) => {
-                proof_trace.push(format!("Already non-negative: |{}| = {}", n, n));
+                proof_trace.push(format!("Already non-negative: |{n}| = {n}"));
                 Number::Natural(*n)
             }
             Number::Integer(n) => {
                 let abs_val = n.checked_abs().unwrap_or(i64::MAX);
-                proof_trace.push(format!("Integer absolute value: |{}| = {}", n, abs_val));
+                proof_trace.push(format!("Integer absolute value: |{n}| = {abs_val}"));
                 Number::Natural(abs_val as u64)
             }
             Number::Rational {
@@ -1109,14 +1095,13 @@ impl NumericTower {
             } => {
                 let abs_num = numerator.checked_abs().unwrap_or(i64::MAX);
                 proof_trace.push(format!(
-                    "Rational absolute value: |{}/{}| = {}/{}",
-                    numerator, denominator, abs_num, denominator
+                    "Rational absolute value: |{numerator}/{denominator}| = {abs_num}/{denominator}"
                 ));
                 Self::from_rational(abs_num, *denominator)
             }
             Number::Real(x) => {
                 let abs_val = x.abs();
-                proof_trace.push(format!("Real absolute value: |{}| = {}", x, abs_val));
+                proof_trace.push(format!("Real absolute value: |{x}| = {abs_val}"));
                 Self::from_f64(abs_val)
             }
         };
@@ -1142,15 +1127,13 @@ impl NumericTower {
                 let isqrt = (*n as f64).sqrt().round() as u64;
                 if isqrt.wrapping_mul(isqrt) == *n {
                     proof_trace.push(format!(
-                        "Perfect square: sqrt({}) = {} (stays in N)",
-                        n, isqrt
+                        "Perfect square: sqrt({n}) = {isqrt} (stays in N)"
                     ));
                     Number::Natural(isqrt)
                 } else {
                     let root = (*n as f64).sqrt();
                     proof_trace.push(format!(
-                        "Promotion N -> R: sqrt({}) = {} (irrational)",
-                        n, root
+                        "Promotion N -> R: sqrt({n}) = {root} (irrational)"
                     ));
                     Number::Real(root)
                 }
@@ -1163,15 +1146,13 @@ impl NumericTower {
                 let isqrt = (un as f64).sqrt().round() as u64;
                 if isqrt.wrapping_mul(isqrt) == un {
                     proof_trace.push(format!(
-                        "Perfect square: sqrt({}) = {} (narrows to N)",
-                        n, isqrt
+                        "Perfect square: sqrt({n}) = {isqrt} (narrows to N)"
                     ));
                     Number::Natural(isqrt)
                 } else {
                     let root = (un as f64).sqrt();
                     proof_trace.push(format!(
-                        "Promotion Z -> R: sqrt({}) = {} (irrational)",
-                        n, root
+                        "Promotion Z -> R: sqrt({n}) = {root} (irrational)"
                     ));
                     Number::Real(root)
                 }
@@ -1192,21 +1173,19 @@ impl NumericTower {
                     && sqrt_den.wrapping_mul(sqrt_den) == *denominator
                 {
                     proof_trace.push(format!(
-                        "Rational sqrt: sqrt({}/{}) = {}/{} (stays in Q)",
-                        numerator, denominator, sqrt_num, sqrt_den
+                        "Rational sqrt: sqrt({numerator}/{denominator}) = {sqrt_num}/{sqrt_den} (stays in Q)"
                     ));
                     Self::from_rational(sqrt_num, sqrt_den)
                 } else {
                     proof_trace.push(format!(
-                        "Promotion Q -> R: sqrt({}/{}) = {} (irrational)",
-                        numerator, denominator, root
+                        "Promotion Q -> R: sqrt({numerator}/{denominator}) = {root} (irrational)"
                     ));
                     Number::Real(root)
                 }
             }
             Number::Real(x) => {
                 let root = x.sqrt();
-                proof_trace.push(format!("Real sqrt: sqrt({}) = {}", x, root));
+                proof_trace.push(format!("Real sqrt: sqrt({x}) = {root}"));
                 Number::Real(root)
             }
         };

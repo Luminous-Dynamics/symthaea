@@ -210,7 +210,7 @@ impl HdcWorldModel {
                 .collect(),
         };
         let json = serde_json::to_string_pretty(&snapshot)
-            .map_err(|e| format!("Failed to serialize world model: {}", e))?;
+            .map_err(|e| format!("Failed to serialize world model: {e}"))?;
         std::fs::write(path, json)
             .map_err(|e| format!("Failed to write world model to {}: {}", path.display(), e))
     }
@@ -222,7 +222,7 @@ impl HdcWorldModel {
         let json = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read world model from {}: {}", path.display(), e))?;
         let snapshot: WorldModelSnapshot = serde_json::from_str(&json)
-            .map_err(|e| format!("Failed to deserialize world model: {}", e))?;
+            .map_err(|e| format!("Failed to deserialize world model: {e}"))?;
 
         if snapshot.dim != self.dim {
             return Err(format!(

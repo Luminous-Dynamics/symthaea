@@ -458,7 +458,7 @@ impl EmotionalCore {
             .unwrap_or(&"");
 
         let text = if !modifier.is_empty() && intensity > 0.5 {
-            format!("{}, {}", modifier, base_text)
+            format!("{modifier}, {base_text}")
         } else {
             base_text.to_string()
         };

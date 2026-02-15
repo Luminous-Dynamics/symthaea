@@ -648,7 +648,7 @@ impl PrimitiveReasoner {
                     chain.push(ReasoningStep {
                         operation: ReasoningOperation::Binding,
                         inputs: vec![prev.to_string(), curr.to_string()],
-                        output: format!("{}→{}", prev, curr),
+                        output: format!("{prev}→{curr}"),
                         confidence: rel_strength,
                     });
                     confidence *= rel_strength;

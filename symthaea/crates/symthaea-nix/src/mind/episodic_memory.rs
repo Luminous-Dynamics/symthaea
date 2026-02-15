@@ -110,7 +110,7 @@ impl NixEpisodicMemory {
 
         let episode = SystemEpisode {
             state_before,
-            action: format!("{:?}", action),
+            action: format!("{action:?}"),
             state_after,
             outcome,
             phi_at_encoding: phi,

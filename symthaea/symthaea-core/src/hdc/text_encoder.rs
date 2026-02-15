@@ -137,7 +137,7 @@ impl TextEncoder {
     /// Generate deterministic position vectors
     fn generate_position_vectors(dimension: usize, max_length: usize) -> Vec<Vec<i8>> {
         (0..max_length)
-            .map(|pos| Self::hash_to_bipolar(&format!("__POS_{}__", pos), dimension))
+            .map(|pos| Self::hash_to_bipolar(&format!("__POS_{pos}__"), dimension))
             .collect()
     }
 

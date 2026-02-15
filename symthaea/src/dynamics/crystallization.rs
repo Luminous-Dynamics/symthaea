@@ -280,7 +280,7 @@ impl ConceptCrystallizer {
 
     /// Add an existing concept to the codebook
     pub fn add_concept(&mut self, name: &str, hypervector: Vec<f32>) {
-        let uid = format!("Known_{}", name);
+        let uid = format!("Known_{name}");
         self.concepts.insert(
             uid.clone(),
             CrystalizedConcept {
@@ -416,7 +416,7 @@ impl ConceptCrystallizer {
 
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Concept {} not found", uid))
+            Err(anyhow::anyhow!("Concept {uid} not found"))
         }
     }
 

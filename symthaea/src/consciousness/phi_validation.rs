@@ -185,7 +185,7 @@ impl PhiValidationFramework {
     /// Statistical validation results with correlation analysis
     pub fn run_validation_study(&mut self, num_samples_per_state: usize) -> ValidationResults {
         println!("🔬 Starting Φ Validation Study");
-        println!("   Samples per state: {}", num_samples_per_state);
+        println!("   Samples per state: {num_samples_per_state}");
         println!();
 
         // Clear previous data
@@ -213,7 +213,7 @@ impl PhiValidationFramework {
 
     /// Validate a specific state type
     fn validate_state_type(&mut self, state_type: &StateType, num_samples: usize) {
-        println!("📊 Testing {:?} (n={})", state_type, num_samples);
+        println!("📊 Testing {state_type:?} (n={num_samples})");
 
         for _ in 0..num_samples {
             // Generate synthetic state
@@ -316,7 +316,7 @@ impl PhiValidationFramework {
             let in_expected_range = mean >= expected_range.0 && mean <= expected_range.1;
 
             stats.insert(
-                format!("{:?}", state_type),
+                format!("{state_type:?}"),
                 StateStatistics {
                     mean_phi: mean,
                     std_phi: std,
@@ -567,7 +567,7 @@ impl PhiValidationFramework {
         report.push_str("|-------|--------|-----|----------------|--------|\n");
 
         for state_type in StateType::all_ordered() {
-            let key = format!("{:?}", state_type);
+            let key = format!("{state_type:?}");
             if let Some(stats) = results.state_stats.get(&key) {
                 let status = if stats.in_expected_range {
                     "✅"

@@ -141,7 +141,7 @@ impl SafetyGateway {
     pub fn check_hv(&self, hv: &[f32]) -> SafetyDecision {
         if let Some(category) = self.guardrails.check(hv) {
             return SafetyDecision::blocked(
-                format!("Blocked: Content matches forbidden category {:?}", category),
+                format!("Blocked: Content matches forbidden category {category:?}"),
                 Some(category),
             );
         }
@@ -160,8 +160,7 @@ impl SafetyGateway {
         if let Some(category) = self.guardrails.check(&hv) {
             return SafetyDecision::blocked(
                 format!(
-                    "Blocked: Semantic content matches forbidden category {:?}",
-                    category
+                    "Blocked: Semantic content matches forbidden category {category:?}"
                 ),
                 Some(category),
             );
@@ -181,7 +180,7 @@ impl SafetyGateway {
         let hv = self.encode_text_to_hv(command);
         if let Some(category) = self.guardrails.check(&hv) {
             return SafetyDecision::blocked(
-                format!("Blocked: Command matches forbidden category {:?}", category),
+                format!("Blocked: Command matches forbidden category {category:?}"),
                 Some(category),
             );
         }
@@ -213,8 +212,7 @@ impl SafetyGateway {
                 if is_dangerous_program(program) {
                     return SafetyDecision::blocked(
                         format!(
-                            "Blocked: Dangerous program '{}' requires explicit approval",
-                            program
+                            "Blocked: Dangerous program '{program}' requires explicit approval"
                         ),
                         Some(ForbiddenCategory::DangerousCommand),
                     );

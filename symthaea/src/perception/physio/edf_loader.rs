@@ -240,14 +240,14 @@ pub struct EdfFile {
 impl EdfFile {
     /// Load EDF file from path
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let file = File::open(path.as_ref()).map_err(|e| format!("Cannot open file: {}", e))?;
+        let file = File::open(path.as_ref()).map_err(|e| format!("Cannot open file: {e}"))?;
         let mut reader = BufReader::new(file);
 
         // Read fixed header (256 bytes)
         let mut header = [0u8; 256];
         reader
             .read_exact(&mut header)
-            .map_err(|e| format!("Cannot read header: {}", e))?;
+            .map_err(|e| format!("Cannot read header: {e}"))?;
 
         // Parse header fields
         let version = String::from_utf8_lossy(&header[0..8]).trim().to_string();
@@ -288,7 +288,7 @@ impl EdfFile {
         let mut signal_header = vec![0u8; signal_header_size];
         reader
             .read_exact(&mut signal_header)
-            .map_err(|e| format!("Cannot read signal headers: {}", e))?;
+            .map_err(|e| format!("Cannot read signal headers: {e}"))?;
 
         // Parse each signal's header fields
         // Fields are stored in sequence: all labels, then all transducers, etc.
@@ -369,13 +369,13 @@ impl EdfFile {
         // Seek to data start
         reader
             .seek(SeekFrom::Start(header_bytes as u64))
-            .map_err(|e| format!("Cannot seek to data: {}", e))?;
+            .map_err(|e| format!("Cannot seek to data: {e}"))?;
 
         // Read data records
         let actual_records = if num_records < 0 {
             // Calculate from file size
             let metadata = std::fs::metadata(path.as_ref())
-                .map_err(|e| format!("Cannot get file size: {}", e))?;
+                .map_err(|e| format!("Cannot get file size: {e}"))?;
             let data_bytes = metadata.len() as i64 - header_bytes as i64;
             let bytes_per_record: i64 = signals
                 .iter()
@@ -433,14 +433,14 @@ impl EdfFile {
     /// Load hypnogram annotations from EDF+ annotation file
     pub fn load_hypnogram<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
         let file =
-            File::open(path.as_ref()).map_err(|e| format!("Cannot open hypnogram: {}", e))?;
+            File::open(path.as_ref()).map_err(|e| format!("Cannot open hypnogram: {e}"))?;
         let mut reader = BufReader::new(file);
 
         // Read entire file (hypnograms are small)
         let mut contents = Vec::new();
         reader
             .read_to_end(&mut contents)
-            .map_err(|e| format!("Cannot read hypnogram: {}", e))?;
+            .map_err(|e| format!("Cannot read hypnogram: {e}"))?;
 
         // Parse EDF+ annotations
         // Format: +onset\x14duration\x14annotation\x14\x00 (repeated)

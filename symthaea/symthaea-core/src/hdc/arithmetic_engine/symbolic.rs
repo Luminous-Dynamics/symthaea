@@ -590,7 +590,7 @@ impl std::fmt::Display for Polynomial {
                 continue;
             }
             let term = if i == 0 {
-                format!("{}", coeff)
+                format!("{coeff}")
             } else if i == 1 {
                 if coeff == 1 {
                     self.variable.clone()
@@ -724,7 +724,7 @@ impl SymbolicAlgebra {
             TermType::Function { name, arg } => {
                 let simplified_arg = self.simplify_recursive(arg, primitives);
                 // Build a SymbolicExpr for the function with simplified argument
-                let encoding = BinaryHV::random(seed_from_name(&format!("FN_{}", name)));
+                let encoding = BinaryHV::random(seed_from_name(&format!("FN_{name}")));
                 let display = format!("{}({})", name, simplified_arg.display);
                 SymbolicExpr {
                     term_type: TermType::Function {
@@ -983,7 +983,7 @@ impl SymbolicAlgebra {
 
             TermType::Function { name, arg } => {
                 let expanded_arg = self.expand_recursive(arg, primitives);
-                let encoding = BinaryHV::random(seed_from_name(&format!("FN_{}", name)));
+                let encoding = BinaryHV::random(seed_from_name(&format!("FN_{name}")));
                 let display = format!("{}({})", name, expanded_arg.display);
                 SymbolicExpr {
                     term_type: TermType::Function {

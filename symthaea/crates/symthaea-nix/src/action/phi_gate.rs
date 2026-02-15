@@ -13,7 +13,7 @@ pub fn get_nixos_rollback(command: &str) -> Option<String> {
         Some("nixos-rebuild switch --rollback".to_string())
     } else if cmd.contains("nix-env -i") || cmd.contains("nix profile install") {
         let pkg = cmd.split_whitespace().last().unwrap_or("package");
-        Some(format!("nix-env -e {} || nix profile remove {}", pkg, pkg))
+        Some(format!("nix-env -e {pkg} || nix profile remove {pkg}"))
     } else if cmd.starts_with("nix build")
         || cmd.starts_with("nix develop")
         || cmd.starts_with("nix shell")
@@ -21,7 +21,7 @@ pub fn get_nixos_rollback(command: &str) -> Option<String> {
         Some("exit".to_string()) // nix environments are ephemeral
     } else if cmd.starts_with("systemctl restart") || cmd.starts_with("systemctl stop") {
         let svc = cmd.split_whitespace().last().unwrap_or("service");
-        Some(format!("systemctl start {}", svc))
+        Some(format!("systemctl start {svc}"))
     } else {
         None
     }

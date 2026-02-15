@@ -81,8 +81,8 @@ impl GenerationObserver {
     /// Diff two generations by running `nix store diff-closures` on their
     /// profile paths.
     pub fn diff_generations(from: u64, to: u64) -> Result<GenerationDiff, std::io::Error> {
-        let from_path = format!("/nix/var/nix/profiles/system-{}-link", from);
-        let to_path = format!("/nix/var/nix/profiles/system-{}-link", to);
+        let from_path = format!("/nix/var/nix/profiles/system-{from}-link");
+        let to_path = format!("/nix/var/nix/profiles/system-{to}-link");
 
         let output = Command::new("nix")
             .args(["store", "diff-closures", &from_path, &to_path])

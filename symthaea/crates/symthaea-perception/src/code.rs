@@ -107,7 +107,7 @@ impl CodePerceptionCortex {
     /// Analyze project structure by walking directory tree
     pub fn analyze_project(&self, path: &Path) -> Result<ProjectStructure> {
         if !path.exists() {
-            anyhow::bail!("Path does not exist: {:?}", path);
+            anyhow::bail!("Path does not exist: {path:?}");
         }
 
         let mut files_by_type: HashMap<String, Vec<PathBuf>> = HashMap::new();
@@ -204,10 +204,10 @@ impl CodePerceptionCortex {
     /// Understand Rust code using syn parser
     pub fn understand_rust_code(&self, path: &Path) -> Result<RustCodeSemantics> {
         let content = std::fs::read_to_string(path)
-            .with_context(|| format!("Failed to read Rust file: {:?}", path))?;
+            .with_context(|| format!("Failed to read Rust file: {path:?}"))?;
 
         let syntax_tree = syn::parse_file(&content)
-            .with_context(|| format!("Failed to parse Rust file: {:?}", path))?;
+            .with_context(|| format!("Failed to parse Rust file: {path:?}"))?;
 
         let mut visitor = RustVisitor::default();
         visitor.visit_file(&syntax_tree);
@@ -219,7 +219,7 @@ impl CodePerceptionCortex {
     /// Analyze code quality (basic heuristics)
     pub fn analyze_code_quality(&self, path: &Path) -> Result<CodeQualityAnalysis> {
         let content = std::fs::read_to_string(path)
-            .with_context(|| format!("Failed to read file: {:?}", path))?;
+            .with_context(|| format!("Failed to read file: {path:?}"))?;
 
         let lines: Vec<&str> = content.lines().collect();
         let total_lines = lines.len();

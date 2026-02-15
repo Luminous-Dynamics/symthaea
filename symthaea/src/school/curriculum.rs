@@ -980,12 +980,11 @@ impl std::fmt::Display for CurriculumError {
             } => {
                 write!(
                     f,
-                    "Objective '{}' requires missing prerequisite '{}'",
-                    objective, prerequisite
+                    "Objective '{objective}' requires missing prerequisite '{prerequisite}'"
                 )
             }
             CurriculumError::CyclicDependency { objective } => {
-                write!(f, "Cyclic dependency detected at objective '{}'", objective)
+                write!(f, "Cyclic dependency detected at objective '{objective}'")
             }
         }
     }

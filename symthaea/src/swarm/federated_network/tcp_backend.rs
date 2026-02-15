@@ -89,8 +89,7 @@ async fn read_framed(
     if len > TCP_MAX_MESSAGE_SIZE {
         return Err(NetworkError::ReceiveFailed {
             reason: format!(
-                "Incoming message too large ({} bytes, max {} bytes)",
-                len, TCP_MAX_MESSAGE_SIZE
+                "Incoming message too large ({len} bytes, max {TCP_MAX_MESSAGE_SIZE} bytes)"
             ),
         });
     }
@@ -172,11 +171,11 @@ impl TcpBackend {
         let listener = tokio::net::TcpListener::bind(bind_addr)
             .await
             .map_err(|e| NetworkError::Internal {
-                reason: format!("Failed to bind TCP listener on {}: {}", bind_addr, e),
+                reason: format!("Failed to bind TCP listener on {bind_addr}: {e}"),
             })?;
 
         let local_addr = listener.local_addr().map_err(|e| NetworkError::Internal {
-            reason: format!("Failed to get local address: {}", e),
+            reason: format!("Failed to get local address: {e}"),
         })?;
 
         let (incoming_tx, incoming_rx) = mpsc::channel(4096);
@@ -315,7 +314,7 @@ impl TcpBackend {
         match target {
             NodeAddress::Socket(addr) => Ok(*addr),
             other => Err(NetworkError::SendFailed {
-                reason: format!("TcpBackend requires Socket addresses, got {}", other),
+                reason: format!("TcpBackend requires Socket addresses, got {other}"),
             }),
         }
     }

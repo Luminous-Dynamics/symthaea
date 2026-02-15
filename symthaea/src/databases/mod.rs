@@ -133,11 +133,11 @@ pub enum DatabaseError {
 impl std::fmt::Display for DatabaseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ConnectionFailed(msg) => write!(f, "Connection failed: {}", msg),
-            Self::QueryFailed(msg) => write!(f, "Query failed: {}", msg),
-            Self::InsertFailed(msg) => write!(f, "Insert failed: {}", msg),
-            Self::NotFound(msg) => write!(f, "Not found: {}", msg),
-            Self::Other(msg) => write!(f, "Database error: {}", msg),
+            Self::ConnectionFailed(msg) => write!(f, "Connection failed: {msg}"),
+            Self::QueryFailed(msg) => write!(f, "Query failed: {msg}"),
+            Self::InsertFailed(msg) => write!(f, "Insert failed: {msg}"),
+            Self::NotFound(msg) => write!(f, "Not found: {msg}"),
+            Self::Other(msg) => write!(f, "Database error: {msg}"),
         }
     }
 }

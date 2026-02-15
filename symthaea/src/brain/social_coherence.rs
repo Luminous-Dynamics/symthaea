@@ -413,8 +413,8 @@ impl SocialCoherence {
             "Agent {} has {} confidence model",
             agent_id, model.confidence
         ));
-        reasoning.push(format!("Action-intention alignment: {:.2}", alignment));
-        reasoning.push(format!("Trust level: {:.2}", trust));
+        reasoning.push(format!("Action-intention alignment: {alignment:.2}"));
+        reasoning.push(format!("Trust level: {trust:.2}"));
 
         let risk = if alignment < 0.0 {
             (-alignment * 0.5).min(1.0)
@@ -432,7 +432,7 @@ impl SocialCoherence {
                 "Proceed with {} caution",
                 if risk > 0.5 { "high" } else { "low" }
             ),
-            predicted_response: format!("{} response expected", predicted_valence),
+            predicted_response: format!("{predicted_valence} response expected"),
             confidence,
             risk,
             potential_reward,

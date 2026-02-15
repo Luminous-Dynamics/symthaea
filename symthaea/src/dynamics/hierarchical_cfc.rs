@@ -592,6 +592,17 @@ impl HierarchicalCfC {
     pub fn time_constants(&self) -> &[f32] {
         &self.config.time_constants
     }
+
+    /// Set the output bias for a specific layer.
+    ///
+    /// This allows narrative-specific initialization (e.g. non-zero resting
+    /// energy/tension) without changing the CfC weights themselves.
+    pub fn set_output_bias(&mut self, layer_idx: usize, bias: Array1<f32>) {
+        if layer_idx < self.output_biases.len() && bias.len() == self.output_biases[layer_idx].len()
+        {
+            self.output_biases[layer_idx] = bias;
+        }
+    }
 }
 
 /// Mean squared error between two arrays (helper function)
@@ -918,6 +929,33 @@ mod tests {
             params > 32 * 32 + 24 * 24 + 16 * 16,
             "Should have substantial parameters, got {}",
             params
+        );
+    }
+
+    #[test]
+    fn test_set_output_bias_method() {
+        let config = HierarchicalCfCConfig {
+            input_dim: 16,
+            output_dim: 8,
+            time_constants: vec![0.01, 0.1, 1.0],
+            hidden_dims: vec![16, 16, 16],
+            ..Default::default()
+        };
+        let mut hcfc = HierarchicalCfC::new(config);
+
+        // Set a non-zero bias on layer 0
+        let mut bias = Array1::zeros(8);
+        bias[0] = 0.5;
+        hcfc.set_output_bias(0, bias);
+
+        // Forward with zero input — output should reflect the bias
+        let input = Array1::zeros(16);
+        let output = hcfc.forward_hierarchical(&input, 0.1);
+        // Layer 0's output should have a non-zero first element due to bias
+        assert!(
+            output.scale_outputs[0][0].abs() > 0.01,
+            "Bias should affect output: got {}",
+            output.scale_outputs[0][0]
         );
     }
 

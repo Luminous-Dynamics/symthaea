@@ -808,7 +808,7 @@ impl PrimitiveToText {
         let mut result = template.template.clone();
 
         for (i, name) in names.iter().enumerate() {
-            let placeholder = format!("{{{}}}", i);
+            let placeholder = format!("{{{i}}}");
             let replacement = self
                 .name_map
                 .get(name)

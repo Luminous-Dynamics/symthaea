@@ -183,8 +183,7 @@ impl NixActiveInference {
             -(pragmatic + self.curiosity_weight * epistemic + self.episodic_weight * episodic);
 
         let rationale = format!(
-            "{:?}: pragmatic={:.3}, epistemic={:.3}, episodic={:.3} → EFE={:.3}",
-            action, pragmatic, epistemic, episodic, efe
+            "{action:?}: pragmatic={pragmatic:.3}, epistemic={epistemic:.3}, episodic={episodic:.3} → EFE={efe:.3}"
         );
 
         ScoredAction {
@@ -241,7 +240,7 @@ impl NixActiveInference {
                 operation: crate::action::executor::ChannelOperation::Update { channel: None },
             },
             _ => NixOSCommand::Custom {
-                command: format!("{:?}", action),
+                command: format!("{action:?}"),
                 args: vec![],
                 safety_level: crate::action::executor::SafetyLevel::ReadOnly,
             },

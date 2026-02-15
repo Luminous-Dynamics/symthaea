@@ -180,11 +180,11 @@ impl CfCNetwork {
                 hidden_dim: config.hidden_dim,
                 ..config.cell_config.clone()
             };
-            let cell_label = format!("{}::cell_{}", label, i);
+            let cell_label = format!("{label}::cell_{i}");
             cells.push(CfCCell::from_genesis(cell_config, genesis, &cell_label));
         }
 
-        let mut rng = genesis.domain(&format!("{}::output", label));
+        let mut rng = genesis.domain(&format!("{label}::output"));
         let scale = (2.0 / (config.hidden_dim + config.output_dim) as f32).sqrt();
         let output_weights = Array2::from_shape_fn((config.output_dim, config.hidden_dim), |_| {
             (rng.gen::<f32>() - 0.5) * 2.0 * scale

@@ -403,7 +403,7 @@ impl ThermalTransport {
         // Check for excessive gradients (can cause thermal shock)
         let max_gradient = (profile.t_max - profile.t_min) / 0.01; // K/m estimate
         if max_gradient > 1e6 {
-            warnings.push(format!("High thermal gradient: {:.2e} K/m", max_gradient));
+            warnings.push(format!("High thermal gradient: {max_gradient:.2e} K/m"));
         }
 
         let is_safe = violations.is_empty();

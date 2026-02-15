@@ -237,7 +237,7 @@ impl HdcTranslator {
         ];
 
         for (term, description) in terms {
-            let hv = self.encode_text(&format!("{} {}", term, description));
+            let hv = self.encode_text(&format!("{term} {description}"));
             self.vocabulary.insert(term.to_string(), hv);
         }
     }

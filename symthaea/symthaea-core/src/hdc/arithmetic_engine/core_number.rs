@@ -72,7 +72,7 @@ impl HdcNumber {
                 let step_phi = Self::measure_step_phi(&encoding, &new_encoding);
                 total_phi += step_phi;
                 encoding = new_encoding;
-                construction.push(format!("S({})", i));
+                construction.push(format!("S({i})"));
             }
 
             return Self {
@@ -90,13 +90,13 @@ impl HdcNumber {
 
         for bit_pos in 0..64 {
             if n & (1u64 << bit_pos) != 0 {
-                let bit_basis = BinaryHV::random(seed_from_name(&format!("NUM_BIT_{}", bit_pos)));
+                let bit_basis = BinaryHV::random(seed_from_name(&format!("NUM_BIT_{bit_pos}")));
                 if let Some(last) = components.last() {
                     let step_phi = Self::measure_step_phi(last, &bit_basis);
                     total_phi += step_phi;
                 }
                 components.push(bit_basis);
-                construction.push(format!("bit_{}", bit_pos));
+                construction.push(format!("bit_{bit_pos}"));
             }
         }
 

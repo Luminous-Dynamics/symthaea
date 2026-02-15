@@ -116,7 +116,7 @@ impl NetworkBackend for LocalChannelBackend {
                 tx.send(envelope)
                     .await
                     .map_err(|_| NetworkError::ChannelClosed {
-                        reason: format!("Channel to {} closed", target_id),
+                        reason: format!("Channel to {target_id} closed"),
                     })?;
 
                 Ok(())

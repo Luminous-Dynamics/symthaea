@@ -678,7 +678,7 @@ impl EmotionalEncoder {
     /// Encode a compound emotion
     pub fn encode_compound(&self, compound: CompoundEmotion) -> EmotionalBlend {
         let components = compound.components();
-        let name = format!("{:?}", compound);
+        let name = format!("{compound:?}");
         EmotionalBlend::new(&name, components, self)
     }
 

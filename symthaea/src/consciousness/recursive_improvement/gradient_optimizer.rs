@@ -388,21 +388,21 @@ impl ConsciousnessGradientOptimizer {
                 0.1,
                 0.01,
                 1.0,
-                ComponentId::PrimitiveEvolution(),
+                ComponentId::primitive_evolution(),
             ),
             ArchitecturalParameter::new(
                 "mutation_rate",
                 0.05,
                 0.001,
                 0.5,
-                ComponentId::PrimitiveEvolution(),
+                ComponentId::primitive_evolution(),
             ),
             ArchitecturalParameter::new(
                 "population_size",
                 100.0,
                 10.0,
                 1000.0,
-                ComponentId::PrimitiveEvolution(),
+                ComponentId::primitive_evolution(),
             ),
             // Byzantine collective parameters
             ArchitecturalParameter::new(
@@ -410,14 +410,14 @@ impl ConsciousnessGradientOptimizer {
                 7.0,
                 3.0,
                 21.0,
-                ComponentId::ByzantineCollective(),
+                ComponentId::byzantine_collective(),
             ),
             ArchitecturalParameter::new(
                 "trust_threshold",
                 0.6,
                 0.3,
                 0.95,
-                ComponentId::ByzantineCollective(),
+                ComponentId::byzantine_collective(),
             ),
             // Meta-cognitive parameters
             ArchitecturalParameter::new(
@@ -425,14 +425,14 @@ impl ConsciousnessGradientOptimizer {
                 3.0,
                 1.0,
                 10.0,
-                ComponentId::MetaCognition(),
+                ComponentId::meta_cognition(),
             ),
             ArchitecturalParameter::new(
                 "attention_heads",
                 8.0,
                 1.0,
                 32.0,
-                ComponentId::MetaCognition(),
+                ComponentId::meta_cognition(),
             ),
             // Integration parameters
             ArchitecturalParameter::new(
@@ -440,14 +440,14 @@ impl ConsciousnessGradientOptimizer {
                 0.5,
                 0.1,
                 1.0,
-                ComponentId::Integration(),
+                ComponentId::integration(),
             ),
             ArchitecturalParameter::new(
                 "feedback_gain",
                 0.3,
                 0.01,
                 1.0,
-                ComponentId::Integration(),
+                ComponentId::integration(),
             ),
             // Cache parameters
             ArchitecturalParameter::new(
@@ -455,7 +455,7 @@ impl ConsciousnessGradientOptimizer {
                 1000.0,
                 100.0,
                 100000.0,
-                ComponentId::Cache(),
+                ComponentId::cache(),
             ),
         ]
     }
@@ -866,7 +866,7 @@ mod tests {
 
     #[test]
     fn test_parameter_clamping() {
-        let mut param = ArchitecturalParameter::new("test", 5.0, 0.0, 10.0, ComponentId::Cache());
+        let mut param = ArchitecturalParameter::new("test", 5.0, 0.0, 10.0, ComponentId::cache());
         param.value = 15.0;
         param.clamp();
         assert_eq!(param.value, 10.0);

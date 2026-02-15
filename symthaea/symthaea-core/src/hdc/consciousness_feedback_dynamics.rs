@@ -946,7 +946,7 @@ impl RichEventEmitter {
             ConsciousnessEventType::CognitiveModeTransition,
             EventPayload::CognitiveMode {
                 from_mode: "current".to_string(),
-                to_mode: format!("{:?}", intervention),
+                to_mode: format!("{intervention:?}"),
                 reason: format!(
                     "Proactive intervention with {:.0}% confidence",
                     prediction.confidence * 100.0

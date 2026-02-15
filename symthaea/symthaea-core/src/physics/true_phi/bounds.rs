@@ -131,7 +131,7 @@ impl BoundsCheckingCalculator {
         // Check component entropies
         for (i, &h) in result.component_entropies.iter().enumerate() {
             if !self.bounds.is_valid_entropy(h, true) {
-                violations.push(format!("Component {} entropy out of bounds: {:.6}", i, h));
+                violations.push(format!("Component {i} entropy out of bounds: {h:.6}"));
             }
         }
 
@@ -143,8 +143,7 @@ impl BoundsCheckingCalculator {
                 let mi_ji = result.mutual_information_matrix[j][i];
                 if (mi_ij - mi_ji).abs() > 1e-10 {
                     violations.push(format!(
-                        "MI matrix not symmetric: [{},{}]={:.6}, [{},{}]={:.6}",
-                        i, j, mi_ij, j, i, mi_ji
+                        "MI matrix not symmetric: [{i},{j}]={mi_ij:.6}, [{j},{i}]={mi_ji:.6}"
                     ));
                 }
             }

@@ -458,10 +458,10 @@ impl SparkEngineSpec {
         s.push_str("  TRIGGER:\n\n");
         s.push_str(&format!("    Method:    {:?}\n", self.trigger.method));
         if let Some(wl) = self.trigger.wavelength_nm {
-            s.push_str(&format!("    Wavelength: {:.2} nm\n", wl));
+            s.push_str(&format!("    Wavelength: {wl:.2} nm\n"));
         }
         if let Some(ref pulse) = self.trigger.pulse_duration {
-            s.push_str(&format!("    Pulse:     {}\n", pulse));
+            s.push_str(&format!("    Pulse:     {pulse}\n"));
         }
         s.push('\n');
 
@@ -487,7 +487,7 @@ impl SparkEngineSpec {
 
         s.push_str("  NOTES:\n");
         for note in &self.notes {
-            s.push_str(&format!("    • {}\n", note));
+            s.push_str(&format!("    • {note}\n"));
         }
 
         s.push_str(&format!("\n{}\n", "═".repeat(60)));

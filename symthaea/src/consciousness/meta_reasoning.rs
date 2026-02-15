@@ -657,16 +657,16 @@ impl MetaLearningEngine {
         let fitness = result.tradeoff_point.weighted_fitness(&result.weights);
         if fitness > 0.7 {
             let dominant = result.weights.dominant_objective();
-            let pattern_key = format!("effective_weight_{}", dominant);
+            let pattern_key = format!("effective_weight_{dominant}");
 
             let insight = self
                 .patterns
                 .entry(pattern_key.clone())
                 .or_insert(MetaLearningInsight {
-                    pattern: format!("Emphasizing {} yields good results", dominant),
+                    pattern: format!("Emphasizing {dominant} yields good results"),
                     reliability: 0.5,
                     evidence_count: 0,
-                    application: format!("For similar contexts, prioritize {}", dominant),
+                    application: format!("For similar contexts, prioritize {dominant}"),
                 });
 
             insight.evidence_count += 1;

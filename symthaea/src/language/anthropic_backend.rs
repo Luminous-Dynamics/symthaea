@@ -113,18 +113,18 @@ impl LLMBackend for AnthropicBackend {
             .json(&body)
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("Anthropic request failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Anthropic request failed: {e}"))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Anthropic returned {}: {}", status, text);
+            anyhow::bail!("Anthropic returned {status}: {text}");
         }
 
         let msg_resp: MessagesResponse = response
             .json()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to parse Anthropic response: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to parse Anthropic response: {e}"))?;
 
         let text = msg_resp
             .content
@@ -168,12 +168,12 @@ impl LLMBackend for AnthropicBackend {
             .json(&body)
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("Anthropic streaming request failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Anthropic streaming request failed: {e}"))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Anthropic returned {}: {}", status, text);
+            anyhow::bail!("Anthropic returned {status}: {text}");
         }
 
         let mut full_response = String::new();
@@ -183,7 +183,7 @@ impl LLMBackend for AnthropicBackend {
         while let Some(chunk) = stream
             .chunk()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to read Anthropic stream: {}", e))?
+            .map_err(|e| anyhow::anyhow!("Failed to read Anthropic stream: {e}"))?
         {
             buffer.extend_from_slice(&chunk);
 

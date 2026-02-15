@@ -32,11 +32,11 @@ mod tests {
         let ps = PrimitiveSystem::global();
         let diagnostics = ps.validate_derivation_chain();
         // Every derived primitive should have all parents registered
-        if !diagnostics.is_empty() {
-            let orphans: Vec<_> = diagnostics
-                .iter()
-                .filter(|(_, resolved, _)| !resolved)
-                .collect();
+        let orphans: Vec<_> = diagnostics
+            .iter()
+            .filter(|(_, resolved, _)| !resolved)
+            .collect();
+        if !orphans.is_empty() {
             // Report but don't fail hard — some physics-layer derived prims
             // may reference experimental parents
             eprintln!(
@@ -50,6 +50,17 @@ mod tests {
         }
         // The math-layer primitives we added should all resolve
         // (GRADIENT, WAVE, etc. depend on Tier 2 which loads before derived)
+
+        // Report derivation chain resolution stats
+        let resolved_count = diagnostics.iter().filter(|(_, resolved, _)| *resolved).count();
+        let total = diagnostics.len();
+        if total > 0 {
+            let resolved_ratio = resolved_count as f64 / total as f64;
+            eprintln!(
+                "Derivation chain resolution: {}/{} = {:.1}%",
+                resolved_count, total, resolved_ratio * 100.0
+            );
+        }
     }
 
     #[test]
@@ -94,15 +105,35 @@ mod tests {
             .count();
         eprintln!("Unresolved derivations: {}", unresolved);
 
-        // Average domain similarity
-        if !domain_diags.is_empty() {
-            let avg_sim: f32 =
-                domain_diags.iter().map(|(_, _, s)| s).sum::<f32>() / domain_diags.len() as f32;
-            eprintln!(
-                "Average inter-domain similarity: {:.4} (ideal: ~0.5)",
-                avg_sim
-            );
-        }
+        // validate_all should return non-empty results for a populated system
+        assert!(
+            !domain_diags.is_empty(),
+            "Domain diagnostics should be non-empty for a populated primitive system"
+        );
+
+        // Average domain similarity should be near 0.5 (random baseline)
+        let avg_sim: f32 =
+            domain_diags.iter().map(|(_, _, s)| s).sum::<f32>() / domain_diags.len() as f32;
+        eprintln!(
+            "Average inter-domain similarity: {:.4} (ideal: ~0.5)",
+            avg_sim
+        );
+
+        assert!(
+            avg_sim.is_finite(),
+            "Average domain similarity should be finite"
+        );
+        assert!(
+            avg_sim >= 0.0 && avg_sim <= 1.0,
+            "Average domain similarity should be in [0, 1]: {:.4}",
+            avg_sim
+        );
+        // Average similarity should be near random baseline (0.5 +/- 0.15)
+        assert!(
+            (avg_sim - 0.5).abs() < 0.15,
+            "Average inter-domain similarity should be near 0.5: {:.4}",
+            avg_sim
+        );
     }
 
     // ========================================================================

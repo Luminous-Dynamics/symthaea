@@ -548,23 +548,22 @@ impl StructuredThought {
                 StructuredData::List(items) => {
                     prompt.push_str("DATA_LIST:\n");
                     for item in items {
-                        prompt.push_str(&format!("  - {}\n", item));
+                        prompt.push_str(&format!("  - {item}\n"));
                     }
                 }
                 StructuredData::KeyValue(pairs) => {
                     prompt.push_str("DATA_KV:\n");
                     for (k, v) in pairs {
-                        prompt.push_str(&format!("  {}: {}\n", k, v));
+                        prompt.push_str(&format!("  {k}: {v}\n"));
                     }
                 }
                 StructuredData::Numeric { value, unit } => {
                     let unit_str = unit.as_deref().unwrap_or("");
-                    prompt.push_str(&format!("DATA_NUMERIC: {}{}\n", value, unit_str));
+                    prompt.push_str(&format!("DATA_NUMERIC: {value}{unit_str}\n"));
                 }
                 StructuredData::Code { language, content } => {
                     prompt.push_str(&format!(
-                        "DATA_CODE ({}):\n```\n{}\n```\n",
-                        language, content
+                        "DATA_CODE ({language}):\n```\n{content}\n```\n"
                     ));
                 }
                 StructuredData::None => {}
@@ -579,11 +578,11 @@ impl StructuredThought {
             if !ctx.entities.is_empty() {
                 prompt.push_str("ENTITIES:\n");
                 for (etype, value, confidence) in &ctx.entities {
-                    prompt.push_str(&format!("  {} = {} ({:.2})\n", etype, value, confidence));
+                    prompt.push_str(&format!("  {etype} = {value} ({confidence:.2})\n"));
                 }
             }
             if let Some(ref answer) = ctx.computed_answer {
-                prompt.push_str(&format!("COMPUTED_ANSWER: {}\n", answer));
+                prompt.push_str(&format!("COMPUTED_ANSWER: {answer}\n"));
             }
             if let Some(ref cube) = ctx.cube {
                 prompt.push_str(&format!(
@@ -604,18 +603,18 @@ impl StructuredThought {
                 ));
             }
             if let Some(phi) = ctx.phi_score {
-                prompt.push_str(&format!("CODE_PHI: {:.3}\n", phi));
+                prompt.push_str(&format!("CODE_PHI: {phi:.3}\n"));
             }
             if let Some(sim) = ctx.intent_similarity {
-                prompt.push_str(&format!("CODE_INTENT_SIMILARITY: {:.3}\n", sim));
+                prompt.push_str(&format!("CODE_INTENT_SIMILARITY: {sim:.3}\n"));
             }
             if let Some(valid) = ctx.syntactically_valid {
-                prompt.push_str(&format!("CODE_VALID: {}\n", valid));
+                prompt.push_str(&format!("CODE_VALID: {valid}\n"));
             }
             if !ctx.notes.is_empty() {
                 prompt.push_str("CODE_NOTES:\n");
                 for note in &ctx.notes {
-                    prompt.push_str(&format!("  - {}\n", note));
+                    prompt.push_str(&format!("  - {note}\n"));
                 }
             }
         }
@@ -630,7 +629,7 @@ impl StructuredThought {
 
         // Original input
         if let Some(ref input) = self.original_input {
-            prompt.push_str(&format!("\nORIGINAL_INPUT: {}\n", input));
+            prompt.push_str(&format!("\nORIGINAL_INPUT: {input}\n"));
         }
 
         prompt

@@ -263,8 +263,7 @@ impl HybridArithmeticEngine {
                     "ADDITION".to_string(),
                 ],
                 abstract_description: format!(
-                    "Addition of {} and {} via {} applications of SUCCESSOR",
-                    a, b, b
+                    "Addition of {a} and {b} via {b} applications of SUCCESSOR"
                 ),
                 estimated_peano_steps: b + 1, // b successor applications + initial
                 axiom_references: vec![
@@ -280,8 +279,7 @@ impl HybridArithmeticEngine {
                     "MULTIPLICATION".to_string(),
                 ],
                 abstract_description: format!(
-                    "Multiplication of {} × {} via {} additions of {}",
-                    a, b, a, b
+                    "Multiplication of {a} × {b} via {a} additions of {b}"
                 ),
                 estimated_peano_steps: a * b + a, // a additions, each with b steps
                 axiom_references: vec![
@@ -296,8 +294,7 @@ impl HybridArithmeticEngine {
                     "PREDECESSOR".to_string(),
                 ],
                 abstract_description: format!(
-                    "Subtraction {} - {} via {} predecessor applications",
-                    a, b, b
+                    "Subtraction {a} - {b} via {b} predecessor applications"
                 ),
                 estimated_peano_steps: b + 1,
                 axiom_references: vec![
@@ -313,8 +310,7 @@ impl HybridArithmeticEngine {
                     "MULTIPLICATION".to_string(),
                 ],
                 abstract_description: format!(
-                    "Exponentiation {}^{} via {} multiplications by {}",
-                    a, b, b, a
+                    "Exponentiation {a}^{b} via {b} multiplications by {a}"
                 ),
                 estimated_peano_steps: a.saturating_pow(b as u32),
                 axiom_references: vec![
@@ -354,13 +350,13 @@ impl HybridArithmeticEngine {
     ) -> AbstractProof {
         match op {
             ArithmeticOp::Add => AbstractProof {
-                theorem: format!("{} + {} = {}", a, b, result),
+                theorem: format!("{a} + {b} = {result}"),
                 base_cases: vec![
                     format!("Proven: a + 0 = a (verified for a ∈ [0..10])"),
                     format!("Proven: 0 + b = b (verified for b ∈ [0..10])"),
                 ],
                 inductive_step: if b == 0 {
-                    format!("Base case: {} + 0 = {} (by axiom a + 0 = a)", a, a)
+                    format!("Base case: {a} + 0 = {a} (by axiom a + 0 = a)")
                 } else {
                     format!(
                         "By induction on b: {} + {} = {} + S({}) = S({} + {}) = S({}) = {}",
@@ -381,13 +377,13 @@ impl HybridArithmeticEngine {
                 is_sound: true,
             },
             ArithmeticOp::Multiply => AbstractProof {
-                theorem: format!("{} × {} = {}", a, b, result),
+                theorem: format!("{a} × {b} = {result}"),
                 base_cases: vec![
                     format!("Proven: a × 0 = 0 (verified for a ∈ [0..10])"),
                     format!("Proven: a × 1 = a (verified for a ∈ [0..10])"),
                 ],
                 inductive_step: if b == 0 {
-                    format!("Base case: {} × 0 = 0 (by axiom a × 0 = 0)", a)
+                    format!("Base case: {a} × 0 = 0 (by axiom a × 0 = 0)")
                 } else {
                     format!(
                         "By induction on b: {} × {} = {} × S({}) = {} × {} + {} = {} + {} = {}",
@@ -411,12 +407,12 @@ impl HybridArithmeticEngine {
                 is_sound: true,
             },
             ArithmeticOp::Subtract => AbstractProof {
-                theorem: format!("{} - {} = {}", a, b, result),
+                theorem: format!("{a} - {b} = {result}"),
                 base_cases: vec![format!("Proven: a - 0 = a (verified for a ∈ [0..10])")],
                 inductive_step: if b == 0 {
-                    format!("Base case: {} - 0 = {} (by axiom a - 0 = a)", a, a)
+                    format!("Base case: {a} - 0 = {a} (by axiom a - 0 = a)")
                 } else if a == 0 {
-                    format!("Edge case: 0 - {} = 0 (truncated subtraction)", b)
+                    format!("Edge case: 0 - {b} = 0 (truncated subtraction)")
                 } else {
                     format!(
                         "By induction: {} - {} = P({}) - {} = {} - {} = {}",
@@ -436,13 +432,13 @@ impl HybridArithmeticEngine {
                 is_sound: a >= b,
             },
             ArithmeticOp::Power => AbstractProof {
-                theorem: format!("{}^{} = {}", a, b, result),
+                theorem: format!("{a}^{b} = {result}"),
                 base_cases: vec![
                     format!("Proven: a^0 = 1 (verified for a ∈ [0..10])"),
                     format!("Proven: a^1 = a (verified for a ∈ [0..10])"),
                 ],
                 inductive_step: if b == 0 {
-                    format!("Base case: {}^0 = 1 (by axiom a^0 = 1)", a)
+                    format!("Base case: {a}^0 = 1 (by axiom a^0 = 1)")
                 } else {
                     format!(
                         "By induction on exponent: {}^{} = {}^{} × {} = {} × {} = {}",
@@ -463,7 +459,7 @@ impl HybridArithmeticEngine {
                 is_sound: true,
             },
             ArithmeticOp::Factorial => AbstractProof {
-                theorem: format!("{}! = {}", a, result),
+                theorem: format!("{a}! = {result}"),
                 base_cases: vec!["Proven: 0! = 1".to_string(), "Proven: 1! = 1".to_string()],
                 inductive_step: format!(
                     "By induction: {}! = {} × ({}-1)! = {} × {} = {}",
@@ -875,8 +871,7 @@ impl HybridArithmeticEngine {
                 "DIVISION".to_string(),
             ],
             abstract_description: format!(
-                "Division {} ÷ {} = {} (finding q such that q × {} ≤ {} < (q+1) × {})",
-                a, b, quotient, b, a, b
+                "Division {a} ÷ {b} = {quotient} (finding q such that q × {b} ≤ {a} < (q+1) × {b})"
             ),
             estimated_peano_steps: quotient * b, // Verification steps
             axiom_references: vec![
@@ -915,14 +910,13 @@ impl HybridArithmeticEngine {
                     computation_path: ComputationPath::Fast,
                     full_proof: None,
                     abstract_proof: Some(AbstractProof {
-                        theorem: format!("{} ÷ {} = {}", a, b, quotient),
+                        theorem: format!("{a} ÷ {b} = {quotient}"),
                         base_cases: vec![
                             "Proven: a ÷ 1 = a".to_string(),
                             "Proven: 0 ÷ b = 0 for b ≠ 0".to_string(),
                         ],
                         inductive_step: format!(
-                            "Find largest q where q × {} ≤ {}: q = {}",
-                            b, a, quotient
+                            "Find largest q where q × {b} ≤ {a}: q = {quotient}"
                         ),
                         justification: vec![
                             format!("Verify: {} × {} = {} ≤ {}", quotient, b, quotient * b, a),
@@ -962,8 +956,7 @@ impl HybridArithmeticEngine {
                 "MULTIPLICATION".to_string(),
             ],
             abstract_description: format!(
-                "Modulo {} mod {} = {} (remainder when {} = {} × {} + r)",
-                a, b, remainder, a, quotient, b
+                "Modulo {a} mod {b} = {remainder} (remainder when {a} = {quotient} × {b} + r)"
             ),
             estimated_peano_steps: remainder + quotient * b,
             axiom_references: vec![
@@ -1007,14 +1000,13 @@ impl HybridArithmeticEngine {
                     computation_path: ComputationPath::Fast,
                     full_proof: None,
                     abstract_proof: Some(AbstractProof {
-                        theorem: format!("{} mod {} = {}", a, b, remainder),
+                        theorem: format!("{a} mod {b} = {remainder}"),
                         base_cases: vec![
                             "Proven: a mod 1 = 0 for all a".to_string(),
                             "Proven: 0 mod b = 0 for b ≠ 0".to_string(),
                         ],
                         inductive_step: format!(
-                            "{} = {} × {} + {}, so {} mod {} = {}",
-                            a, quotient, b, remainder, a, b, remainder
+                            "{a} = {quotient} × {b} + {remainder}, so {a} mod {b} = {remainder}"
                         ),
                         justification: vec![
                             format!("Verify: {} × {} + {} = {}", quotient, b, remainder, a),
@@ -1044,7 +1036,7 @@ impl HybridArithmeticEngine {
                 computation_path: ComputationPath::Fast,
                 full_proof: None,
                 abstract_proof: Some(AbstractProof {
-                    theorem: format!("gcd({}, 0) = {}", a, a),
+                    theorem: format!("gcd({a}, 0) = {a}"),
                     base_cases: vec!["gcd(a, 0) = a by definition".to_string()],
                     inductive_step: "Base case reached".to_string(),
                     justification: vec!["Any number divides 0, so gcd(a, 0) = a".to_string()],
@@ -1052,7 +1044,7 @@ impl HybridArithmeticEngine {
                 }),
                 semantics: SemanticAnnotation {
                     primitives_involved: vec!["GCD".to_string()],
-                    abstract_description: format!("gcd({}, 0) = {} (base case)", a, a),
+                    abstract_description: format!("gcd({a}, 0) = {a} (base case)"),
                     estimated_peano_steps: 1,
                     axiom_references: vec!["Euclidean Algorithm: gcd(a, 0) = a".to_string()],
                 },
@@ -1071,8 +1063,7 @@ impl HybridArithmeticEngine {
         while y != 0 {
             let remainder = x % y;
             steps.push(format!(
-                "gcd({}, {}) = gcd({}, {}) [since {} mod {} = {}]",
-                x, y, y, remainder, x, y, remainder
+                "gcd({x}, {y}) = gcd({y}, {remainder}) [since {x} mod {y} = {remainder}]"
             ));
             total_phi += self.config.phi_scale_factor;
             x = y;
@@ -1089,7 +1080,7 @@ impl HybridArithmeticEngine {
             computation_path: ComputationPath::Hybrid, // Mixed: algorithmic with proof
             full_proof: None,
             abstract_proof: Some(AbstractProof {
-                theorem: format!("gcd({}, {}) = {}", a, b, result),
+                theorem: format!("gcd({a}, {b}) = {result}"),
                 base_cases: vec!["gcd(a, 0) = a".to_string(), "gcd(a, a) = a".to_string()],
                 inductive_step: steps.join("\n→ "),
                 justification: vec![
@@ -1139,7 +1130,7 @@ impl HybridArithmeticEngine {
             return self.primality_result(n, true, "2 is the smallest prime");
         }
         if n.is_multiple_of(2) {
-            return self.primality_result(n, false, &format!("{} is even (divisible by 2)", n));
+            return self.primality_result(n, false, &format!("{n} is even (divisible by 2)"));
         }
 
         // Trial division up to sqrt(n)
@@ -1160,7 +1151,7 @@ impl HybridArithmeticEngine {
             None => self.primality_result(
                 n,
                 true,
-                &format!("No divisors found up to √{} ≈ {}", n, sqrt_n),
+                &format!("No divisors found up to √{n} ≈ {sqrt_n}"),
             ),
         }
     }
@@ -1194,7 +1185,7 @@ impl HybridArithmeticEngine {
                     "DIVISIBILITY".to_string(),
                     "MODULO".to_string(),
                 ],
-                abstract_description: format!("Primality test for {}: {}", n, reason),
+                abstract_description: format!("Primality test for {n}: {reason}"),
                 estimated_peano_steps: (n as f64).sqrt() as u64,
                 axiom_references: vec![
                     "Definition: p is prime iff p > 1 and only divisors are 1 and p".to_string(),

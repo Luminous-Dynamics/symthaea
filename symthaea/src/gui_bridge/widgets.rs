@@ -189,20 +189,20 @@ impl ModuleBrowser {
             "#,
             ])
             .output()
-            .map_err(|e| format!("Failed to run nix-instantiate: {}", e))?;
+            .map_err(|e| format!("Failed to run nix-instantiate: {e}"))?;
 
         self.is_loading = false;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            self.error = Some(format!("nix-instantiate failed: {}", stderr));
+            self.error = Some(format!("nix-instantiate failed: {stderr}"));
             return Err(self.error.clone().expect("error was just set above"));
         }
 
         // Parse JSON output
         let stdout = String::from_utf8_lossy(&output.stdout);
         let parsed: Vec<serde_json::Value> =
-            serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse options: {}", e))?;
+            serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse options: {e}"))?;
 
         self.options = parsed
             .into_iter()
@@ -356,13 +356,13 @@ impl GenerationTimeline {
         let output = Command::new("nixos-rebuild")
             .args(["list-generations"])
             .output()
-            .map_err(|e| format!("Failed to list generations: {}", e))?;
+            .map_err(|e| format!("Failed to list generations: {e}"))?;
 
         self.is_loading = false;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            self.error = Some(format!("Failed to list generations: {}", stderr));
+            self.error = Some(format!("Failed to list generations: {stderr}"));
             return Err(self.error.clone().expect("error was just set above"));
         }
 
@@ -429,11 +429,11 @@ impl GenerationTimeline {
             .args([
                 "store",
                 "diff-closures",
-                &format!("/nix/var/nix/profiles/system-{}-link", gen1),
-                &format!("/nix/var/nix/profiles/system-{}-link", gen2),
+                &format!("/nix/var/nix/profiles/system-{gen1}-link"),
+                &format!("/nix/var/nix/profiles/system-{gen2}-link"),
             ])
             .output()
-            .map_err(|e| format!("Failed to diff generations: {}", e))?;
+            .map_err(|e| format!("Failed to diff generations: {e}"))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -475,11 +475,11 @@ impl GenerationTimeline {
         let output = Command::new("sudo")
             .args(["nixos-rebuild", "switch", "--rollback"])
             .output()
-            .map_err(|e| format!("Failed to rollback: {}", e))?;
+            .map_err(|e| format!("Failed to rollback: {e}"))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Rollback failed: {}", stderr));
+            return Err(format!("Rollback failed: {stderr}"));
         }
 
         Ok(())
@@ -560,7 +560,7 @@ impl LiveConfigDiff {
     pub fn load_original(&mut self, path: &str) -> Result<(), String> {
         self.file_path = path.to_string();
         self.original =
-            std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {}", path, e))?;
+            std::fs::read_to_string(path).map_err(|e| format!("Failed to read {path}: {e}"))?;
         self.compute_diff();
         Ok(())
     }
@@ -916,14 +916,14 @@ impl ServiceDashboard {
                 "--plain",
             ])
             .output()
-            .map_err(|e| format!("Failed to list units: {}", e))?;
+            .map_err(|e| format!("Failed to list units: {e}"))?;
 
         self.is_loading = false;
         self.last_refresh = Utc::now();
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            self.error = Some(format!("systemctl failed: {}", stderr));
+            self.error = Some(format!("systemctl failed: {stderr}"));
             return Err(self.error.clone().expect("error was just set above"));
         }
 
@@ -974,7 +974,7 @@ impl ServiceDashboard {
         let output = Command::new("systemctl")
             .args(["show", name, "--no-pager"])
             .output()
-            .map_err(|e| format!("Failed to get unit details: {}", e))?;
+            .map_err(|e| format!("Failed to get unit details: {e}"))?;
 
         if !output.status.success() {
             return Err("Failed to get unit details".to_string());
@@ -1105,11 +1105,11 @@ impl ServiceDashboard {
         let output = Command::new("sudo")
             .args(["systemctl", action_str, name])
             .output()
-            .map_err(|e| format!("Failed to {} service: {}", action_str, e))?;
+            .map_err(|e| format!("Failed to {action_str} service: {e}"))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Failed to {} {}: {}", action_str, name, stderr));
+            return Err(format!("Failed to {action_str} {name}: {stderr}"));
         }
 
         Ok(())

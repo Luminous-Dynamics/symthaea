@@ -221,9 +221,9 @@ impl QuantumState {
                 let mag = cnorm(amp);
                 let phase = carg(amp);
                 if phase.abs() < 1e-10 {
-                    parts.push(format!("{:.4}|{}>", mag, label));
+                    parts.push(format!("{mag:.4}|{label}>"));
                 } else {
-                    parts.push(format!("{:.4}*e^(i*{:.4})|{}>", mag, phase, label));
+                    parts.push(format!("{mag:.4}*e^(i*{phase:.4})|{label}>"));
                 }
             }
         }
@@ -384,9 +384,7 @@ fn apply_single_qubit_gate(state: &mut QuantumState, target: usize, matrix: &Mat
     let n = state.num_qubits;
     assert!(
         target < n,
-        "Target qubit {} out of range (num_qubits={})",
-        target,
-        n
+        "Target qubit {target} out of range (num_qubits={n})"
     );
 
     let dim = state.dimension();
@@ -415,10 +413,7 @@ fn apply_cnot(state: &mut QuantumState, control: usize, target: usize) {
     let n = state.num_qubits;
     assert!(
         control < n && target < n && control != target,
-        "Invalid CNOT qubits: control={}, target={}, num_qubits={}",
-        control,
-        target,
-        n
+        "Invalid CNOT qubits: control={control}, target={target}, num_qubits={n}"
     );
 
     let dim = state.dimension();
@@ -439,10 +434,7 @@ fn apply_swap(state: &mut QuantumState, qubit_a: usize, qubit_b: usize) {
     let n = state.num_qubits;
     assert!(
         qubit_a < n && qubit_b < n && qubit_a != qubit_b,
-        "Invalid SWAP qubits: a={}, b={}, num_qubits={}",
-        qubit_a,
-        qubit_b,
-        n
+        "Invalid SWAP qubits: a={qubit_a}, b={qubit_b}, num_qubits={n}"
     );
 
     let dim = state.dimension();
@@ -525,8 +517,7 @@ impl QuantumCircuit {
     pub fn new(num_qubits: usize) -> Self {
         assert!(
             num_qubits > 0 && num_qubits <= 20,
-            "Qubit count must be in 1..=20 (got {})",
-            num_qubits
+            "Qubit count must be in 1..=20 (got {num_qubits})"
         );
         Self {
             num_qubits,
@@ -718,7 +709,7 @@ pub fn measure_qubit(
     seed: Option<u64>,
 ) -> (bool, QuantumState) {
     let n = state.num_qubits;
-    assert!(target < n, "Target qubit {} out of range", target);
+    assert!(target < n, "Target qubit {target} out of range");
 
     let target_bit = 1 << (n - 1 - target);
 
@@ -804,7 +795,7 @@ pub fn encode_state(state: &QuantumState) -> BinaryHV {
         let phase = carg(amp);
 
         // Basis vector for state |i>
-        let basis_name = format!("quantum_basis_{}", i);
+        let basis_name = format!("quantum_basis_{i}");
         let basis_hv = BinaryHV::random(seed_from_name(&basis_name));
 
         // Encode magnitude using thermometer-style encoding
@@ -855,7 +846,7 @@ pub fn encode_state_with_system(state: &QuantumState, system: &PrimitiveSystem) 
         }
         let phase = carg(amp);
 
-        let basis_name = format!("quantum_basis_{}", i);
+        let basis_name = format!("quantum_basis_{i}");
         let basis_hv = BinaryHV::random(seed_from_name(&basis_name));
         let mag_hv = encode_f64_as_hv(mag, "quantum_magnitude");
         let phase_hv = encode_f64_as_hv(phase, "quantum_phase");

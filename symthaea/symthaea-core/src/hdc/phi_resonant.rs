@@ -803,9 +803,19 @@ mod tests {
             phi_random.phi, phi_random.iterations, phi_random.convergence_time_ms
         );
 
-        // Star should have higher Φ (or at least competitive)
-        // Note: Resonant Φ may have different absolute scale, but ordering should match
-        println!("Star > Random: {}", phi_star.phi > phi_random.phi);
+        // Both results should have finite, non-negative phi
+        assert!(phi_star.phi.is_finite(), "Star Φ should be finite");
+        assert!(phi_random.phi.is_finite(), "Random Φ should be finite");
+        assert!(phi_star.phi >= 0.0, "Star Φ should be non-negative");
+        assert!(phi_random.phi >= 0.0, "Random Φ should be non-negative");
+
+        // Both should converge within iteration bounds
+        assert!(phi_star.iterations > 0, "Star should take at least 1 iteration");
+        assert!(phi_random.iterations > 0, "Random should take at least 1 iteration");
+
+        // Convergence time should be finite
+        assert!(phi_star.convergence_time_ms.is_finite(), "Star convergence time should be finite");
+        assert!(phi_random.convergence_time_ms.is_finite(), "Random convergence time should be finite");
     }
 
     #[test]

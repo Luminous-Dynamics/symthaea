@@ -179,7 +179,7 @@ impl StructuralCausalModel {
         };
 
         InterventionResult {
-            intervention: format!("do({} = {})", variable, value),
+            intervention: format!("do({variable} = {value})"),
             target_value,
             causal_effect,
             confidence,
@@ -230,7 +230,7 @@ impl StructuralCausalModel {
         };
 
         CounterfactualResult {
-            query: format!("What if {} = {} instead?", intervention, new_value),
+            query: format!("What if {intervention} = {new_value} instead?"),
             factual: factual_value,
             counterfactual: counterfactual_value,
             probability_necessity: prob_necessity,

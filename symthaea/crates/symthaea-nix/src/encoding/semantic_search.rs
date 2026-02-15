@@ -44,7 +44,7 @@ pub fn search_options(
             OptionMatch {
                 path: path.to_string(),
                 similarity: sim,
-                match_reason: format!("HDC similarity: {:.3}", sim),
+                match_reason: format!("HDC similarity: {sim:.3}"),
             }
         })
         .collect();
@@ -59,7 +59,7 @@ pub fn search_options(
                     // Boost the similarity if a token match reinforces it
                     if *sim > 0.1 {
                         existing.similarity = (existing.similarity + sim * 0.3).min(1.0);
-                        existing.match_reason = format!("HDC + token '{}' match", token);
+                        existing.match_reason = format!("HDC + token '{token}' match");
                     }
                 }
             }
@@ -91,7 +91,7 @@ pub fn search_options_by_vector(
             OptionMatch {
                 path: path.to_string(),
                 similarity: sim,
-                match_reason: format!("Vector similarity: {:.3}", sim),
+                match_reason: format!("Vector similarity: {sim:.3}"),
             }
         })
         .collect();

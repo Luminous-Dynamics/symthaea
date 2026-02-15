@@ -135,7 +135,7 @@ impl std::fmt::Display for OptimizationRecommendation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{}] {}", self.system, self.message)?;
         if let Some(action) = &self.suggested_action {
-            write!(f, " -> {}", action)?;
+            write!(f, " -> {action}")?;
         }
         Ok(())
     }

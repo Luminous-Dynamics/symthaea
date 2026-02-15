@@ -440,9 +440,9 @@ impl ImprovementGenerator {
         }
 
         let optimizations = [
-            (ComponentId::HRM(), "batch-processing"),
-            (ComponentId::PrimitiveEvolution(), "diversity-pressure"),
-            (ComponentId::MetaCognition(), "attention-focusing"),
+            (ComponentId::hrm(), "batch-processing"),
+            (ComponentId::primitive_evolution(), "diversity-pressure"),
+            (ComponentId::meta_cognition(), "attention-focusing"),
         ];
 
         let idx = (exploration_factor as usize) % optimizations.len();
@@ -471,7 +471,7 @@ impl ImprovementGenerator {
                 to: 5000,
             }),
             s if s.starts_with("parallel") => Some(ImprovementType::Parallelize {
-                component: ComponentId::HRM(),
+                component: ComponentId::hrm(),
                 threads: 4,
             }),
             s if s.starts_with("evolve") => Some(ImprovementType::IncreaseEvolutionRate),
@@ -600,13 +600,18 @@ mod tests {
         let generator = ImprovementGenerator::new(GeneratorConfig::default());
 
         let bottleneck = Bottleneck {
-            id: "test_bottleneck".to_string(),
-            component: ComponentId::Cache,
+            id: ComponentId::cache(),
+            component: ComponentId::cache(),
+            component_id: ComponentId::cache(),
             bottleneck_type: BottleneckType::Latency,
             severity: 0.8,
             description: "High cache latency".to_string(),
-            suggested_fix: None,
-            detected_at: Instant::now(),
+            suggestions: Vec::new(),
+            detected_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64,
+            evidence: std::collections::HashMap::new(),
         };
 
         let improvement = generator.create_rule_based_improvement(&bottleneck, None, 0.5);

@@ -671,8 +671,7 @@ impl ConsciousnessTopology {
 
         // Overall
         parts.push(format!(
-            "Unity: {:.3}, Circularity: {:.3}, Completeness: {:.3}",
-            unity, circularity, completeness
+            "Unity: {unity:.3}, Circularity: {circularity:.3}, Completeness: {completeness:.3}"
         ));
 
         parts.join(". ")

@@ -747,11 +747,11 @@ impl ResonatorNetwork {
             Factor::Symbol(name) => self
                 .get_symbol(name)
                 .cloned()
-                .ok_or_else(|| anyhow::anyhow!("Unknown symbol: {}", name)),
+                .ok_or_else(|| anyhow::anyhow!("Unknown symbol: {name}")),
             Factor::Unknown(name) => estimates
                 .get(name)
                 .cloned()
-                .ok_or_else(|| anyhow::anyhow!("Unknown variable: {}", name)),
+                .ok_or_else(|| anyhow::anyhow!("Unknown variable: {name}")),
         }
     }
 

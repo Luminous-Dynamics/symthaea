@@ -216,9 +216,9 @@ pub enum NetworkError {
 impl std::fmt::Display for NetworkError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::RequestFailed(msg) => write!(f, "Request failed: {}", msg),
-            Self::ParseError(msg) => write!(f, "Parse error: {}", msg),
-            Self::ApiError(msg) => write!(f, "API error: {}", msg),
+            Self::RequestFailed(msg) => write!(f, "Request failed: {msg}"),
+            Self::ParseError(msg) => write!(f, "Parse error: {msg}"),
+            Self::ApiError(msg) => write!(f, "API error: {msg}"),
             Self::Unavailable => write!(f, "Network unavailable"),
         }
     }

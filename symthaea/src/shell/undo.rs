@@ -185,7 +185,7 @@ impl UndoAction {
     ) -> Self {
         let path = path.into();
         Self::new(
-            format!("Change {}", path),
+            format!("Change {path}"),
             ActionType::Option,
             ActionData::NixChange {
                 path,
@@ -199,7 +199,7 @@ impl UndoAction {
     pub fn package_add(package: impl Into<String>) -> Self {
         let pkg = package.into();
         Self::new(
-            format!("Add package {}", pkg),
+            format!("Add package {pkg}"),
             ActionType::Package,
             ActionData::PackageChange {
                 package: pkg,
@@ -212,7 +212,7 @@ impl UndoAction {
     pub fn package_remove(package: impl Into<String>) -> Self {
         let pkg = package.into();
         Self::new(
-            format!("Remove package {}", pkg),
+            format!("Remove package {pkg}"),
             ActionType::Package,
             ActionData::PackageChange {
                 package: pkg,
@@ -225,7 +225,7 @@ impl UndoAction {
     pub fn service_enable(service: impl Into<String>) -> Self {
         let svc = service.into();
         Self::new(
-            format!("Enable service {}", svc),
+            format!("Enable service {svc}"),
             ActionType::Service,
             ActionData::ServiceChange {
                 service: svc,

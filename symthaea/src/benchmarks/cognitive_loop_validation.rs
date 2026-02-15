@@ -373,12 +373,8 @@ impl CognitiveLoopValidation {
             && structured_learning >= 2;
 
         let reasoning = format!(
-            "Sequential learning: {}, Random unstable (correct): {}, \
-             Attention emerged: {}, Structured tasks with learning: {}/4 (need 2)",
-            sequential_passed,
-            random_correctly_unstable,
-            any_attention_emergence,
-            structured_learning
+            "Sequential learning: {sequential_passed}, Random unstable (correct): {random_correctly_unstable}, \
+             Attention emerged: {any_attention_emergence}, Structured tasks with learning: {structured_learning}/4 (need 2)"
         );
 
         Ok(CognitiveLoopValidationResults {
@@ -416,7 +412,7 @@ pub fn print_cognitive_loop_validation_summary(results: &CognitiveLoopValidation
             "│ Converged: {:>5} | Cycles to converge: {:>4}                │",
             if exp.converged { "YES" } else { "NO" },
             exp.cycles_to_convergence
-                .map(|c| format!("{}", c))
+                .map(|c| format!("{c}"))
                 .unwrap_or("N/A".to_string())
         );
         println!(

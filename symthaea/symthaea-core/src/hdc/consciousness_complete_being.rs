@@ -903,9 +903,9 @@ impl IntrospectionAPI {
                     .agents
                     .get(&agent_id)
                     .map(|a| format!("Agent {} trust: {:.2}", agent_id, a.trust_level))
-                    .unwrap_or_else(|| format!("Unknown agent: {}", agent_id));
+                    .unwrap_or_else(|| format!("Unknown agent: {agent_id}"));
                 (
-                    format!("What do I think {} believes?", agent_id),
+                    format!("What do I think {agent_id} believes?"),
                     belief,
                     0.6,
                     Vec::new(),

@@ -140,7 +140,7 @@ impl PhysicsSimulator {
         let system = HarmonicOscillator::simple(omega);
         Self::new(
             Box::new(system),
-            format!("HarmonicOscillator(omega={:.3})", omega),
+            format!("HarmonicOscillator(omega={omega:.3})"),
             vec![x0, v0],
         )
     }
@@ -190,7 +190,7 @@ impl PhysicsSimulator {
 
         Self::new(
             Box::new(system),
-            format!("TwoBody(m1={:.2}, m2={:.2}, sep={:.2})", m1, m2, separation),
+            format!("TwoBody(m1={m1:.2}, m2={m2:.2}, sep={separation:.2})"),
             initial_state,
         )
     }
@@ -237,7 +237,7 @@ impl PhysicsSimulator {
         let system = ChargedParticle::new(qm, e_field, b_field);
         Self::new(
             Box::new(system),
-            format!("ChargedParticle(qm={:.3})", qm),
+            format!("ChargedParticle(qm={qm:.3})"),
             initial.to_vec(),
         )
     }
@@ -268,8 +268,7 @@ impl PhysicsSimulator {
         Self::new(
             Box::new(system),
             format!(
-                "HeatDiffusion(alpha={:.4}, n={}, T_L={:.1}, T_R={:.1})",
-                alpha, n_points, t_left, t_right
+                "HeatDiffusion(alpha={alpha:.4}, n={n_points}, T_L={t_left:.1}, T_R={t_right:.1})"
             ),
             initial_state,
         )

@@ -291,9 +291,7 @@ impl TemporalInterval {
         let id_str = id.into();
         if end <= start {
             return Err(anyhow!(
-                "Interval end ({}) must be after start ({})",
-                end,
-                start
+                "Interval end ({end}) must be after start ({start})"
             ));
         }
 
@@ -795,12 +793,12 @@ impl TemporalReasoner {
         let a = self
             .intervals
             .get(id_a)
-            .ok_or_else(|| anyhow!("Interval not found: {}", id_a))?
+            .ok_or_else(|| anyhow!("Interval not found: {id_a}"))?
             .clone();
         let b = self
             .intervals
             .get(id_b)
-            .ok_or_else(|| anyhow!("Interval not found: {}", id_b))?
+            .ok_or_else(|| anyhow!("Interval not found: {id_b}"))?
             .clone();
 
         let relation = self.compute_relation(&a, &b);

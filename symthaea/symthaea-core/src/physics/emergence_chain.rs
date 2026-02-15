@@ -308,7 +308,7 @@ impl EmergenceChain {
         // Use positional encoding for sequence
         let mut result = ContinuousHV::zero(PHYSICS_DIM);
         for (i, unit) in units.iter().enumerate() {
-            let pos = self.genesis.hv(&format!("position::{}", i), PHYSICS_DIM);
+            let pos = self.genesis.hv(&format!("position::{i}"), PHYSICS_DIM);
             let positioned = (*unit).bind(&pos);
             result = ContinuousHV::bundle(&[&result, &positioned]);
         }

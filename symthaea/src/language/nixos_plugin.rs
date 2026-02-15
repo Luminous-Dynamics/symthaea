@@ -386,8 +386,7 @@ impl DomainPlugin for NixOsPlugin {
         let close_braces = input.matches('}').count();
         if open_braces != close_braces {
             errors.push(format!(
-                "Mismatched braces: {} opening vs {} closing",
-                open_braces, close_braces
+                "Mismatched braces: {open_braces} opening vs {close_braces} closing"
             ));
         }
 
@@ -395,8 +394,7 @@ impl DomainPlugin for NixOsPlugin {
         let close_brackets = input.matches(']').count();
         if open_brackets != close_brackets {
             errors.push(format!(
-                "Mismatched brackets: {} opening vs {} closing",
-                open_brackets, close_brackets
+                "Mismatched brackets: {open_brackets} opening vs {close_brackets} closing"
             ));
         }
 

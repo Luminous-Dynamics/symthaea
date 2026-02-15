@@ -357,7 +357,7 @@ impl UnifiedEmotionalState {
     pub fn describe(&self) -> String {
         let emotion_word = self
             .discrete_emotion
-            .map(|e| format!("{:?}", e).to_lowercase())
+            .map(|e| format!("{e:?}").to_lowercase())
             .unwrap_or_else(|| "neutral".to_string());
 
         let intensity_word = if self.intensity() > 0.7 {
@@ -399,7 +399,7 @@ impl UnifiedEmotionalState {
             ""
         };
 
-        format!("{} feeling {}{}", intensity_word, emotion_word, trend)
+        format!("{intensity_word} feeling {emotion_word}{trend}")
     }
 }
 
@@ -714,8 +714,7 @@ impl UnifiedCausalReasoning {
                 // Would use Pearl's do-calculus
                 (
                     format!(
-                        "If {} had been {}, the outcome would differ",
-                        actual, hypothetical
+                        "If {actual} had been {hypothetical}, the outcome would differ"
                     ),
                     0.8,
                     CausalSources {
@@ -733,7 +732,7 @@ impl UnifiedCausalReasoning {
             ) => {
                 // Would use CausalMind embedding
                 (
-                    format!("Intervening on {} would affect {}", intervention, target),
+                    format!("Intervening on {intervention} would affect {target}"),
                     0.6,
                     CausalSources {
                         used_causal_mind: true,
@@ -744,7 +743,7 @@ impl UnifiedCausalReasoning {
             (CausalQuery::WhyDid { event }, _) => {
                 // Would use UCE semantic binding
                 (
-                    format!("The event '{}' occurred due to preceding conditions", event),
+                    format!("The event '{event}' occurred due to preceding conditions"),
                     0.7,
                     CausalSources {
                         used_uce: true,
@@ -993,7 +992,7 @@ impl ConsciousDialoguePipeline {
                 )
             }
             DialogueDepth::Reactive => {
-                format!("Processing: {}", input)
+                format!("Processing: {input}")
             }
         };
 

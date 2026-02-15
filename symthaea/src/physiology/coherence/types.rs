@@ -132,8 +132,7 @@ impl std::fmt::Display for CoherenceError {
             } => {
                 write!(
                     f,
-                    "Insufficient coherence: {:.2} < {:.2} required. {}",
-                    current, required, message
+                    "Insufficient coherence: {current:.2} < {required:.2} required. {message}"
                 )
             }
         }

@@ -505,7 +505,7 @@ impl PluginRegistry {
             self.default_plugin = name.to_string();
             Ok(())
         } else {
-            Err(format!("Plugin '{}' not found", name))
+            Err(format!("Plugin '{name}' not found"))
         }
     }
 

@@ -23,38 +23,35 @@ impl ComponentId {
     }
 
     // Well-known component identifiers used across the system
-    pub const fn _const(_s: &'static str) -> Self {
-        Self(String::new())
-    } // placeholder for const context
 
-    pub fn PrimitiveEvolution() -> Self {
+    pub fn primitive_evolution() -> Self {
         Self("PrimitiveEvolution".into())
     }
-    pub fn HRM() -> Self {
+    pub fn hrm() -> Self {
         Self("HRM".into())
     }
-    pub fn MetaCognition() -> Self {
+    pub fn meta_cognition() -> Self {
         Self("MetaCognition".into())
     }
-    pub fn ByzantineCollective() -> Self {
+    pub fn byzantine_collective() -> Self {
         Self("ByzantineCollective".into())
     }
-    pub fn MetaLearning() -> Self {
+    pub fn meta_learning() -> Self {
         Self("MetaLearning".into())
     }
-    pub fn CausalDefense() -> Self {
+    pub fn causal_defense() -> Self {
         Self("CausalDefense".into())
     }
-    pub fn UnifiedIntelligence() -> Self {
+    pub fn unified_intelligence() -> Self {
         Self("UnifiedIntelligence".into())
     }
-    pub fn CollectiveSharing() -> Self {
+    pub fn collective_sharing() -> Self {
         Self("CollectiveSharing".into())
     }
-    pub fn Cache() -> Self {
+    pub fn cache() -> Self {
         Self("Cache".into())
     }
-    pub fn Integration() -> Self {
+    pub fn integration() -> Self {
         Self("Integration".into())
     }
 }

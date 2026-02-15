@@ -8,6 +8,7 @@ members = [
     "crates/symthaea-sentinel",
     "crates/symthaea-dynamics",
     "crates/symthaea-perception",
+    "crates/symthaea-causal-reasoning",
 ]
 
 
@@ -56,6 +57,9 @@ categories = ["science", "algorithms", "data-structures"]
 [dependencies]
 # Symthaea Core - HDC, Φ engine, and minimal consciousness pipeline
 symthaea-core = { path = "symthaea-core" }
+
+# Symthaea Causal Reasoning - Pearl's do-calculus, counterfactual reasoning, causal emergence
+symthaea-causal-reasoning = { path = "crates/symthaea-causal-reasoning", default-features = false }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
 mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }
@@ -286,14 +290,13 @@ magi_loop = []                              # MAGI Loop world-grounded predictio
 epistemic_conflict = []                     # Epistemic conflict detection + reliability + Φ_eff
 conscious_tool_gate = ["epistemic_conflict"]
 temporal_planning = ["epistemic_conflict", "magi_loop"]
-counterfactual = ["epistemic_conflict"]
+counterfactual = ["epistemic_conflict", "symthaea-causal-reasoning/counterfactual"]
 reasoning_engine = ["epistemic_conflict", "conscious_tool_gate", "temporal_planning", "counterfactual"]
 recursive_improvement_advanced = ["full_consciousness"]
 
 # ── Code Understanding & Generation ─────────────────────────────────
 code_understanding = ["tree-sitter-rust", "tree-sitter-python"]
 code_generation = ["code_understanding"]
-consciousness_code = ["code_generation", "reasoning_engine", "epistemic_conflict"]
 
 # ── Example build gates ─────────────────────────────────────────────
 # These exist solely as required-features for [[example]] entries.
@@ -356,6 +359,10 @@ required-features = ["demo"]
 name = "symthaea-repl"
 path = "src/bin/symthaea-repl.rs"
 required-features = ["demo"]
+
+[[bin]]
+name = "symthaea-story"
+path = "src/bin/symthaea-story.rs"
 
 # Examples
 # Examples that need cfg-gated modules are marked with required-features

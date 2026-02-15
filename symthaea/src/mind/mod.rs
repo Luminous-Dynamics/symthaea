@@ -622,7 +622,7 @@ impl ContinuousMind {
                         format!("{}:{}", label.category, label.name)
                     } else {
                         // Fall back to generic if confidence too low
-                        format!("unknown:concept_{}", i)
+                        format!("unknown:concept_{i}")
                     },
                     activation,
                     relevance: label.similarity.max(0.0) * activation,

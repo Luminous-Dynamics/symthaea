@@ -808,7 +808,7 @@ impl AttentionSchema {
             .current_state
             .active_channels
             .iter()
-            .map(|c| format!("{:?}", c))
+            .map(|c| format!("{c:?}"))
             .collect();
 
         format!(
@@ -844,7 +844,7 @@ impl AttentionSchema {
 
         for channel in all_channels.iter() {
             if !self.current_state.active_channels.contains(channel) {
-                gaps.push(format!("{:?} channel not monitored", channel));
+                gaps.push(format!("{channel:?} channel not monitored"));
             }
         }
 

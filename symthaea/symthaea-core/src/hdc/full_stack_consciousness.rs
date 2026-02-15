@@ -433,7 +433,7 @@ impl EpisodicMemoryAdapter {
 
         // Add emotion as tag
         let emotion = MemoryEmotion::from_valence(understanding.grounded.embodied.valence);
-        tags.push(format!("{:?}", emotion));
+        tags.push(format!("{emotion:?}"));
 
         let trace = UnderstandingMemoryTrace {
             id,
@@ -945,7 +945,7 @@ impl CounterfactualEngine {
         };
 
         Counterfactual {
-            intervention: format!("Negation of '{}'", event),
+            intervention: format!("Negation of '{event}'"),
             changed_variable: event.to_string(),
             original_value: "occurred".to_string(),
             counterfactual_value: "did not occur".to_string(),
@@ -974,13 +974,13 @@ impl CounterfactualEngine {
 
         let outcome = CounterfactualOutcome {
             valence_delta,
-            narrative_impact: format!("Substituting '{}' with '{}'", variable, new_value),
+            narrative_impact: format!("Substituting '{variable}' with '{new_value}'"),
             affected_entities: vec![variable.to_string()],
             expected_free_energy_delta: -valence_delta.abs() * 0.3,
         };
 
         Counterfactual {
-            intervention: format!("Replace '{}' with '{}'", variable, new_value),
+            intervention: format!("Replace '{variable}' with '{new_value}'"),
             changed_variable: variable.to_string(),
             original_value: variable.to_string(),
             counterfactual_value: new_value.to_string(),
@@ -1007,7 +1007,7 @@ impl CounterfactualEngine {
         };
 
         Counterfactual {
-            intervention: format!("Hypothetical: {}", scenario),
+            intervention: format!("Hypothetical: {scenario}"),
             changed_variable: "future".to_string(),
             original_value: "current state".to_string(),
             counterfactual_value: scenario.to_string(),
@@ -1033,19 +1033,19 @@ impl CounterfactualEngine {
         } else {
             causes
                 .iter()
-                .map(|(c, s)| format!("'{}' (strength: {:.2}) → '{}'", c, s, effect))
+                .map(|(c, s)| format!("'{c}' (strength: {s:.2}) → '{effect}'"))
                 .collect()
         };
 
         let outcome = CounterfactualOutcome {
             valence_delta: 0.0,
-            narrative_impact: format!("Causal explanation for '{}'", effect),
+            narrative_impact: format!("Causal explanation for '{effect}'"),
             affected_entities: causes.iter().map(|(c, _)| c.clone()).collect(),
             expected_free_energy_delta: 0.0,
         };
 
         Counterfactual {
-            intervention: format!("Explain: Why '{}'?", effect),
+            intervention: format!("Explain: Why '{effect}'?"),
             changed_variable: effect.to_string(),
             original_value: "effect".to_string(),
             counterfactual_value: "cause".to_string(),
@@ -1081,20 +1081,19 @@ impl CounterfactualEngine {
             let estimated_valence = self.estimate_valence(action);
             total_valence = estimated_valence;
             causal_path.push(format!(
-                "  → Estimated outcome valence: {:+.2}",
-                estimated_valence
+                "  → Estimated outcome valence: {estimated_valence:+.2}"
             ));
         }
 
         let outcome = CounterfactualOutcome {
             valence_delta: total_valence,
-            narrative_impact: format!("Action '{}' simulation", action),
+            narrative_impact: format!("Action '{action}' simulation"),
             affected_entities: effects.iter().map(|e| e.effect.clone()).collect(),
             expected_free_energy_delta: if total_valence > 0.0 { -0.3 } else { 0.1 },
         };
 
         Counterfactual {
-            intervention: format!("Simulate action: {}", action),
+            intervention: format!("Simulate action: {action}"),
             changed_variable: "action".to_string(),
             original_value: "no action".to_string(),
             counterfactual_value: action.to_string(),

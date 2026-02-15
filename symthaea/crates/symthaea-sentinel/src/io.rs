@@ -231,7 +231,7 @@ impl FileAudioPump {
     pub fn new<P: AsRef<Path>>(path: P, config: FileAudioConfig) -> Result<Self, String> {
         let path_str = path.as_ref().to_string_lossy().to_string();
 
-        let file = File::open(&path).map_err(|e| format!("Failed to open {}: {}", path_str, e))?;
+        let file = File::open(&path).map_err(|e| format!("Failed to open {path_str}: {e}"))?;
 
         let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
@@ -245,7 +245,7 @@ impl FileAudioPump {
 
         let probed = symphonia::default::get_probe()
             .format(&hint, mss, &format_opts, &metadata_opts)
-            .map_err(|e| format!("Failed to probe {}: {}", path_str, e))?;
+            .map_err(|e| format!("Failed to probe {path_str}: {e}"))?;
 
         let mut format = probed.format;
 
@@ -253,7 +253,7 @@ impl FileAudioPump {
             .tracks()
             .iter()
             .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
-            .ok_or_else(|| format!("No audio track found in {}", path_str))?;
+            .ok_or_else(|| format!("No audio track found in {path_str}"))?;
 
         let track_id = track.id;
 
@@ -267,7 +267,7 @@ impl FileAudioPump {
         let dec_opts = DecoderOptions::default();
         let mut decoder = symphonia::default::get_codecs()
             .make(&track.codec_params, &dec_opts)
-            .map_err(|e| format!("Failed to create decoder: {}", e))?;
+            .map_err(|e| format!("Failed to create decoder: {e}"))?;
 
         let mut all_samples: Vec<f32> = Vec::new();
 
@@ -280,7 +280,7 @@ impl FileAudioPump {
                     break
                 }
                 Err(e) => {
-                    eprintln!("    Warning: decode error: {}", e);
+                    eprintln!("    Warning: decode error: {e}");
                     continue;
                 }
             };
@@ -292,7 +292,7 @@ impl FileAudioPump {
             let decoded = match decoder.decode(&packet) {
                 Ok(d) => d,
                 Err(e) => {
-                    eprintln!("    Warning: decode error: {}", e);
+                    eprintln!("    Warning: decode error: {e}");
                     continue;
                 }
             };
@@ -302,7 +302,7 @@ impl FileAudioPump {
         }
 
         if all_samples.is_empty() {
-            return Err(format!("No audio data decoded from {}", path_str));
+            return Err(format!("No audio data decoded from {path_str}"));
         }
 
         let duration_secs = all_samples.len() as f32 / sample_rate;
@@ -517,7 +517,7 @@ impl DatasetProcessor {
         let mut files = Vec::new();
 
         for entry in WalkDir::new(&dir) {
-            let entry = entry.map_err(|e| format!("Walk error: {}", e))?;
+            let entry = entry.map_err(|e| format!("Walk error: {e}"))?;
             let path = entry.path();
 
             if path.is_file() {
@@ -864,9 +864,9 @@ impl FileProcessingResult {
                 print!(", ");
             }
             if v > 0.05 {
-                print!("\x1b[33m{:.3}\x1b[0m", v);
+                print!("\x1b[33m{v:.3}\x1b[0m");
             } else {
-                print!("{:.3}", v);
+                print!("{v:.3}");
             }
         }
         println!("]");

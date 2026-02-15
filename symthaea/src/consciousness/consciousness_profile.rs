@@ -319,7 +319,7 @@ impl ProfileWeights {
         let sum = self.phi + self.gradient + self.entropy + self.complexity + self.coherence;
 
         if (sum - 1.0).abs() > 0.001 {
-            anyhow::bail!("Profile weights must sum to 1.0, got {:.3}", sum);
+            anyhow::bail!("Profile weights must sum to 1.0, got {sum:.3}");
         }
 
         Ok(())

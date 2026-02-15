@@ -601,7 +601,7 @@ impl ConsciousnessEquationV2 {
 
         // Core components
         for (component, value) in &state.core_values {
-            let name = format!("{:?}", component).to_lowercase();
+            let name = format!("{component:?}").to_lowercase();
             let weight = self.weights.get(&name).cloned().unwrap_or(1.0);
             let coherence = state.get_coherence(&name);
 

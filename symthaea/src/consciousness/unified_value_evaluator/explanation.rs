@@ -68,24 +68,19 @@ impl ConfidenceScore {
 
         let explanation = match level {
             ConfidenceLevel::VeryLow => format!(
-                "Very low confidence: only {} data points. Results may vary significantly.",
-                data_points
+                "Very low confidence: only {data_points} data points. Results may vary significantly."
             ),
             ConfidenceLevel::Low => format!(
-                "Low confidence: {} data points. More feedback will improve accuracy.",
-                data_points
+                "Low confidence: {data_points} data points. More feedback will improve accuracy."
             ),
             ConfidenceLevel::Moderate => format!(
-                "Moderate confidence: {} data points. System is learning patterns.",
-                data_points
+                "Moderate confidence: {data_points} data points. System is learning patterns."
             ),
             ConfidenceLevel::High => format!(
-                "High confidence: {} data points. Decisions are well-calibrated.",
-                data_points
+                "High confidence: {data_points} data points. Decisions are well-calibrated."
             ),
             ConfidenceLevel::VeryHigh => format!(
-                "Very high confidence: {} data points. System is highly trained.",
-                data_points
+                "Very high confidence: {data_points} data points. System is highly trained."
             ),
         };
 
@@ -213,9 +208,8 @@ impl HarmonyTension {
         };
 
         format!(
-            "This action aligns with {} but conflicts with {}. \
-             These harmonies may require different approaches to balance.",
-            positive, negative
+            "This action aligns with {positive} but conflicts with {negative}. \
+             These harmonies may require different approaches to balance."
         )
     }
 
@@ -247,9 +241,8 @@ impl HarmonyTension {
             }
             _ => {
                 format!(
-                    "Seek a synthesis that honors both {} and {}. \
-                     Often apparent tensions reveal opportunities for deeper integration.",
-                    harmony_a, harmony_b
+                    "Seek a synthesis that honors both {harmony_a} and {harmony_b}. \
+                     Often apparent tensions reveal opportunities for deeper integration."
                 )
             }
         }

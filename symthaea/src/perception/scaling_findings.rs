@@ -342,8 +342,7 @@ impl ScalingMetrics {
         if let Some(iso) = self.isotropy {
             if iso > 0.03 {
                 recs.push(format!(
-                    "High isotropy ({:.4}) suggests representations are becoming too uniform. This is typical of larger models.",
-                    iso
+                    "High isotropy ({iso:.4}) suggests representations are becoming too uniform. This is typical of larger models."
                 ));
             }
         }

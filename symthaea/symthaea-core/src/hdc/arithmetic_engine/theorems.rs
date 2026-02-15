@@ -43,7 +43,7 @@ impl TheoremProver {
 
         Theorem {
             name: "Addition Commutativity".to_string(),
-            statement: format!("{} + {} = {} + {}", a, b, b, a),
+            statement: format!("{a} + {b} = {b} + {a}"),
             proof_steps: vec![result1, result2],
             total_phi,
             verified,
@@ -63,7 +63,7 @@ impl TheoremProver {
 
         Theorem {
             name: "Addition Associativity".to_string(),
-            statement: format!("({} + {}) + {} = {} + ({} + {})", a, b, c, a, b, c),
+            statement: format!("({a} + {b}) + {c} = {a} + ({b} + {c})"),
             proof_steps: vec![ab, ab_c, bc, a_bc],
             total_phi,
             verified,
@@ -90,7 +90,7 @@ impl TheoremProver {
 
         Theorem {
             name: "Distributive Law".to_string(),
-            statement: format!("{} × ({} + {}) = {} × {} + {} × {}", a, b, c, a, b, a, c),
+            statement: format!("{a} × ({b} + {c}) = {a} × {b} + {a} × {c}"),
             proof_steps: vec![bc, a_times_bc, ab, ac, ab_plus_ac],
             total_phi,
             verified,

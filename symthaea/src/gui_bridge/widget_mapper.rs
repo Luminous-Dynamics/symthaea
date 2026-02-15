@@ -79,7 +79,7 @@ impl WidgetValue {
             Self::Bool(b) => if *b { "true" } else { "false" }.to_string(),
             Self::String(s) => format!("\"{}\"", s.replace('\"', "\\\"")),
             Self::Int(i) => i.to_string(),
-            Self::Float(f) => format!("{:.6}", f),
+            Self::Float(f) => format!("{f:.6}"),
             Self::Selection(i) => i.to_string(),
             Self::MultiSelect(indices) => {
                 let items: Vec<String> = indices.iter().map(|i| i.to_string()).collect();
@@ -200,7 +200,7 @@ impl ValueTransformer {
                             if p.starts_with("pkgs.") {
                                 p.clone()
                             } else {
-                                format!("pkgs.{}", p)
+                                format!("pkgs.{p}")
                             }
                         })
                         .collect();
@@ -226,7 +226,7 @@ impl ValueTransformer {
                     WidgetValue::String(path) => {
                         // Validate path doesn't contain dangerous characters
                         let sanitized = path.replace(['\'', '"', '\\', '$', '`'], "");
-                        format!("\"{}\"", sanitized)
+                        format!("\"{sanitized}\"")
                     }
                     _ => "\"/tmp\"".to_string(),
                 }

@@ -302,8 +302,7 @@ impl SocraticDefense {
                     confidence: 0.9,
                     pattern: GaslightingPattern::HistoryDenial,
                     response: format!(
-                        "I have records indicating this was indeed discussed. The exchange included: '{}'",
-                        alleged_prior
+                        "I have records indicating this was indeed discussed. The exchange included: '{alleged_prior}'"
                     ),
                     protective_questions: vec![
                         "Would you like me to reference the specific interaction?".to_string(),

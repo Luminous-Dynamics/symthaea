@@ -194,7 +194,7 @@ impl RoutingResult {
             .attention_weights
             .iter()
             .filter(|(_, w)| **w > 0.1)
-            .map(|(m, w)| format!("{:?}: {:.2}", m, w))
+            .map(|(m, w)| format!("{m:?}: {w:.2}"))
             .collect();
 
         format!(

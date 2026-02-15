@@ -367,7 +367,7 @@ impl MorphogeneticField {
     pub fn create_attractor_from(&mut self, label: &str, attractor_label: String) -> Result<()> {
         let vector = self
             .get_vector(label)
-            .ok_or_else(|| anyhow::anyhow!("Vector '{}' not found", label))?
+            .ok_or_else(|| anyhow::anyhow!("Vector '{label}' not found"))?
             .clone();
 
         self.attractors
@@ -773,7 +773,7 @@ impl MorphogeneticField {
         let encoding = self
             .position_encodings
             .get(index)
-            .ok_or_else(|| anyhow::anyhow!("Index {} not found", index))?;
+            .ok_or_else(|| anyhow::anyhow!("Index {index} not found"))?;
 
         if encoding.neighbor_indices.is_empty() {
             anyhow::bail!("Cannot regenerate vector with no neighbors");

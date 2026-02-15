@@ -57,12 +57,12 @@ pub enum PersistenceError {
 impl std::fmt::Display for PersistenceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Connection(msg) => write!(f, "Connection error: {}", msg),
-            Self::Query(msg) => write!(f, "Query error: {}", msg),
-            Self::Serialization(msg) => write!(f, "Serialization error: {}", msg),
-            Self::Deserialization(msg) => write!(f, "Deserialization error: {}", msg),
-            Self::NotFound(id) => write!(f, "Record not found: {}", id),
-            Self::ConstraintViolation(msg) => write!(f, "Constraint violation: {}", msg),
+            Self::Connection(msg) => write!(f, "Connection error: {msg}"),
+            Self::Query(msg) => write!(f, "Query error: {msg}"),
+            Self::Serialization(msg) => write!(f, "Serialization error: {msg}"),
+            Self::Deserialization(msg) => write!(f, "Deserialization error: {msg}"),
+            Self::NotFound(id) => write!(f, "Record not found: {id}"),
+            Self::ConstraintViolation(msg) => write!(f, "Constraint violation: {msg}"),
         }
     }
 }
@@ -117,8 +117,7 @@ impl StoredIgnoranceRecord {
                 .unwrap_or_default()
                 .as_secs();
             format!(
-                "{}|{}|{}|{}|{}",
-                method, answer, confidence, source, resolved_at
+                "{method}|{answer}|{confidence}|{source}|{resolved_at}"
             )
         });
 
@@ -204,8 +203,7 @@ impl StoredIgnoranceRecord {
             "Unknown" => Ok(IgnoranceType::Unknown),
             "Impossible" => Ok(IgnoranceType::Impossible),
             _ => Err(PersistenceError::Deserialization(format!(
-                "Unknown ignorance type: {}",
-                s
+                "Unknown ignorance type: {s}"
             ))),
         }
     }
@@ -219,8 +217,7 @@ impl StoredIgnoranceRecord {
             "General" => Ok(Domain::General),
             "Undefined" => Ok(Domain::Undefined),
             _ => Err(PersistenceError::Deserialization(format!(
-                "Unknown domain: {}",
-                s
+                "Unknown domain: {s}"
             ))),
         }
     }
@@ -232,8 +229,7 @@ impl StoredIgnoranceRecord {
             "Resolved" => Ok(IgnoranceStatus::Resolved),
             "Expired" => Ok(IgnoranceStatus::Expired),
             _ => Err(PersistenceError::Deserialization(format!(
-                "Unknown status: {}",
-                s
+                "Unknown status: {s}"
             ))),
         }
     }
@@ -247,8 +243,7 @@ impl StoredIgnoranceRecord {
             "UserProvided" => Ok(ResolutionMethod::UserProvided),
             "Reframed" => Ok(ResolutionMethod::Reframed),
             _ => Err(PersistenceError::Deserialization(format!(
-                "Unknown resolution method: {}",
-                s
+                "Unknown resolution method: {s}"
             ))),
         }
     }

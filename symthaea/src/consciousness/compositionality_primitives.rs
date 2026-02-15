@@ -312,7 +312,7 @@ impl CompositionalityEngine {
     /// The output of g becomes the input to f.
     /// HDC encoding: bind(op_seq, bind(encode_f, encode_g))
     pub fn compose_sequential(&mut self, f_id: &str, g_id: &str) -> Result<ComposedPrimitive> {
-        let id = format!("seq_{}_{}", f_id, g_id);
+        let id = format!("seq_{f_id}_{g_id}");
 
         // Check cache
         if let Some(cached) = self.composed_primitives.get(&id) {
@@ -341,7 +341,7 @@ impl CompositionalityEngine {
 
         let composed = ComposedPrimitive {
             id: id.clone(),
-            name: format!("{} ∘ {}", f_id, g_id),
+            name: format!("{f_id} ∘ {g_id}"),
             composition_type: CompositionType::Sequential,
             operand_a: f_id.to_string(),
             operand_b: Some(g_id.to_string()),
@@ -351,7 +351,7 @@ impl CompositionalityEngine {
                 depth: f_depth.max(g_depth) + 1,
                 base_count: f_base + g_base,
                 expected_phi_contribution: 0.05 + 0.02 * (f_base + g_base) as f32,
-                description: format!("Apply {} then {}", g_id, f_id),
+                description: format!("Apply {g_id} then {f_id}"),
                 tags: vec!["sequential".to_string(), "composition".to_string()],
             },
         };
@@ -365,7 +365,7 @@ impl CompositionalityEngine {
     /// Both primitives are applied to the same input, results bundled.
     /// HDC encoding: bind(op_par, bundle([encode_f, encode_g]))
     pub fn compose_parallel(&mut self, f_id: &str, g_id: &str) -> Result<ComposedPrimitive> {
-        let id = format!("par_{}_{}", f_id, g_id);
+        let id = format!("par_{f_id}_{g_id}");
 
         // Check cache
         if let Some(cached) = self.composed_primitives.get(&id) {
@@ -390,7 +390,7 @@ impl CompositionalityEngine {
 
         let composed = ComposedPrimitive {
             id: id.clone(),
-            name: format!("{} || {}", f_id, g_id),
+            name: format!("{f_id} || {g_id}"),
             composition_type: CompositionType::Parallel,
             operand_a: f_id.to_string(),
             operand_b: Some(g_id.to_string()),
@@ -400,7 +400,7 @@ impl CompositionalityEngine {
                 depth: f_depth.max(g_depth) + 1,
                 base_count: f_base + g_base,
                 expected_phi_contribution: 0.08 + 0.03 * (f_base + g_base) as f32, // Higher Φ from integration
-                description: format!("Apply {} and {} in parallel", f_id, g_id),
+                description: format!("Apply {f_id} and {g_id} in parallel"),
                 tags: vec!["parallel".to_string(), "composition".to_string()],
             },
         };
@@ -446,7 +446,7 @@ impl CompositionalityEngine {
 
         let composed = ComposedPrimitive {
             id: id.clone(),
-            name: format!("{} ? {} (on {})", f_id, g_id, pattern),
+            name: format!("{f_id} ? {g_id} (on {pattern})"),
             composition_type: CompositionType::Conditional {
                 pattern: pattern.to_string(),
                 threshold: (threshold * 1000.0) as u32,
@@ -460,8 +460,7 @@ impl CompositionalityEngine {
                 base_count: self.get_base_count(f_id) + self.get_base_count(g_id),
                 expected_phi_contribution: 0.04,
                 description: format!(
-                    "If input matches '{}', use {}, else {}",
-                    pattern, f_id, g_id
+                    "If input matches '{pattern}', use {f_id}, else {g_id}"
                 ),
                 tags: vec!["conditional".to_string(), "branching".to_string()],
             },
@@ -482,7 +481,7 @@ impl CompositionalityEngine {
     ) -> Result<ComposedPrimitive> {
         let max_iter = max_iterations.unwrap_or(self.config.default_fixed_point_iterations);
         let threshold = convergence_threshold.unwrap_or(self.config.default_convergence_threshold);
-        let id = format!("fix_{}_i{}", f_id, max_iter);
+        let id = format!("fix_{f_id}_i{max_iter}");
 
         if let Some(cached) = self.composed_primitives.get(&id) {
             return Ok(cached.clone());
@@ -508,7 +507,7 @@ impl CompositionalityEngine {
 
         let composed = ComposedPrimitive {
             id: id.clone(),
-            name: format!("μ{}", f_id),
+            name: format!("μ{f_id}"),
             composition_type: CompositionType::FixedPoint {
                 max_iterations: max_iter,
                 convergence_threshold: (threshold * 1000.0) as u32,
@@ -522,8 +521,7 @@ impl CompositionalityEngine {
                 base_count: self.get_base_count(f_id),
                 expected_phi_contribution: 0.10, // High Φ from recursive integration
                 description: format!(
-                    "Apply {} repeatedly until convergence (max {} iterations)",
-                    f_id, max_iter
+                    "Apply {f_id} repeatedly until convergence (max {max_iter} iterations)"
                 ),
                 tags: vec![
                     "fixed-point".to_string(),
@@ -545,7 +543,7 @@ impl CompositionalityEngine {
         transformer_id: &str,
         target_id: &str,
     ) -> Result<ComposedPrimitive> {
-        let id = format!("ho_{}_{}", transformer_id, target_id);
+        let id = format!("ho_{transformer_id}_{target_id}");
 
         if let Some(cached) = self.composed_primitives.get(&id) {
             return Ok(cached.clone());
@@ -565,7 +563,7 @@ impl CompositionalityEngine {
 
         let composed = ComposedPrimitive {
             id: id.clone(),
-            name: format!("↑{}({})", transformer_id, target_id),
+            name: format!("↑{transformer_id}({target_id})"),
             composition_type: CompositionType::HigherOrder,
             operand_a: transformer_id.to_string(),
             operand_b: Some(target_id.to_string()),
@@ -575,7 +573,7 @@ impl CompositionalityEngine {
                 depth: self.get_depth(transformer_id) + self.get_depth(target_id) + 2,
                 base_count: self.get_base_count(transformer_id) + self.get_base_count(target_id),
                 expected_phi_contribution: 0.15, // Highest Φ from meta-cognition
-                description: format!("{} transforms how {} operates", transformer_id, target_id),
+                description: format!("{transformer_id} transforms how {target_id} operates"),
                 tags: vec![
                     "higher-order".to_string(),
                     "meta".to_string(),
@@ -595,7 +593,7 @@ impl CompositionalityEngine {
         fallback_id: &str,
         confidence_threshold: f32,
     ) -> Result<ComposedPrimitive> {
-        let id = format!("fall_{}_{}", primary_id, fallback_id);
+        let id = format!("fall_{primary_id}_{fallback_id}");
 
         if let Some(cached) = self.composed_primitives.get(&id) {
             return Ok(cached.clone());
@@ -617,7 +615,7 @@ impl CompositionalityEngine {
 
         let composed = ComposedPrimitive {
             id: id.clone(),
-            name: format!("{} ; {}", primary_id, fallback_id),
+            name: format!("{primary_id} ; {fallback_id}"),
             composition_type: CompositionType::Fallback {
                 confidence_threshold: (confidence_threshold * 1000.0) as u32,
             },
@@ -630,8 +628,7 @@ impl CompositionalityEngine {
                 base_count: self.get_base_count(primary_id) + self.get_base_count(fallback_id),
                 expected_phi_contribution: 0.03,
                 description: format!(
-                    "Try {} (threshold={}), fallback to {}",
-                    primary_id, confidence_threshold, fallback_id
+                    "Try {primary_id} (threshold={confidence_threshold}), fallback to {fallback_id}"
                 ),
                 tags: vec!["fallback".to_string(), "robust".to_string()],
             },
@@ -667,7 +664,7 @@ impl CompositionalityEngine {
         let composed = self
             .composed_primitives
             .get(composition_id)
-            .context(format!("Unknown composition: {}", composition_id))?;
+            .context(format!("Unknown composition: {composition_id}"))?;
 
         match &composed.composition_type {
             CompositionType::Sequential => {
@@ -727,7 +724,7 @@ impl CompositionalityEngine {
                 let mut result = self.execute(chosen_id, input)?;
                 result
                     .execution_path
-                    .insert(0, format!("cond(sim={:.3})", similarity));
+                    .insert(0, format!("cond(sim={similarity:.3})"));
                 Ok(result)
             }
 
@@ -823,7 +820,7 @@ impl CompositionalityEngine {
             return Ok(base.encoding);
         }
 
-        anyhow::bail!("Unknown primitive: {}", id)
+        anyhow::bail!("Unknown primitive: {id}")
     }
 
     /// Get base primitive by ID
@@ -835,7 +832,7 @@ impl CompositionalityEngine {
             tier: PrimitiveTier::NSM,
             domain: "compositionality".to_string(),
             encoding: text_to_hv16(id),
-            definition: format!("Base primitive: {}", id),
+            definition: format!("Base primitive: {id}"),
             is_base: true,
             derivation: None,
         })

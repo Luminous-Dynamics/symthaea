@@ -314,8 +314,7 @@ impl PrimitiveLearningGate {
         let passed = accuracy_improvement > 20.0 && final_accuracy > 40.0;
 
         let reasoning = format!(
-            "Initial: {:.1}% → Final: {:.1}% (Δ = {:.1}%)",
-            initial_accuracy, final_accuracy, accuracy_improvement
+            "Initial: {initial_accuracy:.1}% → Final: {final_accuracy:.1}% (Δ = {accuracy_improvement:.1}%)"
         );
 
         Ok(PrimitiveLearningResults {

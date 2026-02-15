@@ -203,7 +203,7 @@ impl ErrorExplainer {
         let location_hint = diagnosis
             .location
             .as_ref()
-            .map(|l| format!(" at {}", l))
+            .map(|l| format!(" at {l}"))
             .unwrap_or_default();
 
         format!(
@@ -252,14 +252,14 @@ impl ErrorExplainer {
                 ));
 
                 if let Some(ref cmd) = fix.command {
-                    lines.push(format!("      → {}", cmd));
+                    lines.push(format!("      → {cmd}"));
                 }
             }
         }
 
         // Location
         if let Some(ref loc) = explanation.location {
-            lines.push(format!("   Location: {}", loc));
+            lines.push(format!("   Location: {loc}"));
         }
 
         // Affected paths

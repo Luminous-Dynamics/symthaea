@@ -937,15 +937,25 @@ mod tests {
         let analyzer = CElegansAnalyzer::new(256);
         let comparison = analyzer.compare_to_topologies(&connectome);
 
-        println!("\n=== TOPOLOGY COMPARISON (n={}) ===", comparison.n_nodes);
-        for (name, phi) in comparison.ranking() {
-            let marker = if name == "C. elegans" {
-                " <-- BIOLOGICAL"
-            } else {
-                ""
-            };
-            println!("  {}: Φ = {:.4}{}", name, phi, marker);
+        // Comparison should have a valid node count
+        assert!(comparison.n_nodes > 0, "Should have positive node count");
+
+        // Ranking should be non-empty and contain C. elegans
+        let ranking = comparison.ranking();
+        assert!(!ranking.is_empty(), "Ranking should not be empty");
+
+        let has_celegans = ranking.iter().any(|(name, _)| *name == "C. elegans");
+        assert!(has_celegans, "Ranking should contain C. elegans");
+
+        // All phi values in ranking should be finite and non-negative
+        for (name, phi) in &ranking {
+            assert!(phi.is_finite(), "Φ for {} should be finite", name);
+            assert!(*phi >= 0.0, "Φ for {} should be non-negative", name);
         }
-        println!("\nC. elegans rank: #{}", comparison.celegans_rank());
+
+        // C. elegans rank should be a valid position
+        let rank = comparison.celegans_rank();
+        assert!(rank >= 1, "Rank should be at least 1");
+        assert!(rank <= ranking.len(), "Rank should not exceed number of topologies");
     }
 }

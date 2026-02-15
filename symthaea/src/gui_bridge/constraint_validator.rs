@@ -108,8 +108,8 @@ impl Constraint {
     pub fn type_of(expected: NixType) -> Self {
         Self {
             kind: ConstraintKind::Type(expected),
-            description: format!("Must be of type {:?}", expected),
-            error_message: format!("Expected type {:?}", expected),
+            description: format!("Must be of type {expected:?}"),
+            error_message: format!("Expected type {expected:?}"),
             is_fatal: true,
         }
     }
@@ -119,8 +119,8 @@ impl Constraint {
         let path = path.into();
         Self {
             kind: ConstraintKind::Requires(NixPath::new(&path)),
-            description: format!("Requires {} to be enabled", path),
-            error_message: format!("Dependency {} is not enabled", path),
+            description: format!("Requires {path} to be enabled"),
+            error_message: format!("Dependency {path} is not enabled"),
             is_fatal: true,
         }
     }
@@ -130,8 +130,8 @@ impl Constraint {
         let path = path.into();
         Self {
             kind: ConstraintKind::ConflictsWith(NixPath::new(&path)),
-            description: format!("Conflicts with {}", path),
-            error_message: format!("Cannot be used with {}", path),
+            description: format!("Conflicts with {path}"),
+            error_message: format!("Cannot be used with {path}"),
             is_fatal: true,
         }
     }
@@ -139,9 +139,9 @@ impl Constraint {
     /// Create a range constraint
     pub fn range(min: Option<i64>, max: Option<i64>) -> Self {
         let desc = match (min, max) {
-            (Some(min), Some(max)) => format!("Must be between {} and {}", min, max),
-            (Some(min), None) => format!("Must be at least {}", min),
-            (None, Some(max)) => format!("Must be at most {}", max),
+            (Some(min), Some(max)) => format!("Must be between {min} and {max}"),
+            (Some(min), None) => format!("Must be at least {min}"),
+            (None, Some(max)) => format!("Must be at most {max}"),
             (None, None) => "Unconstrained".to_string(),
         };
         Self {
@@ -300,7 +300,7 @@ impl ConstraintValidator {
     /// Add constraint for paths matching a pattern
     fn add_constraint_pattern(&mut self, pattern: &str, constraint: Constraint) {
         // Store pattern-based constraints with wildcard prefix
-        let key = format!("*{}", pattern);
+        let key = format!("*{pattern}");
         self.constraints.entry(key).or_default().push(constraint);
     }
 
@@ -469,7 +469,7 @@ impl ConstraintValidator {
                 let valid = options.iter().any(|opt| opt == trimmed);
                 let suggestion = if !valid {
                     Some(Suggestion {
-                        message: format!("Must be one of: {:?}", options),
+                        message: format!("Must be one of: {options:?}"),
                         suggested_value: options.first().cloned(),
                         related_path: None,
                     })

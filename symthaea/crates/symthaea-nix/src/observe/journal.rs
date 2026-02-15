@@ -76,7 +76,7 @@ impl JournalObserver {
     ///
     /// The `duration` parameter is a systemd time span, e.g. "1h", "30min", "2d".
     pub fn errors_since(duration: &str) -> Result<Vec<JournalEntry>, std::io::Error> {
-        let since = format!("-{}", duration);
+        let since = format!("-{duration}");
         let output = Command::new("journalctl")
             .args(["--since", &since, "-p", "err", "--no-pager", "-o", "short"])
             .output()?;

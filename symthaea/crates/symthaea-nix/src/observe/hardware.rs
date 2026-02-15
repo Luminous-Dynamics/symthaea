@@ -156,7 +156,7 @@ impl HardwareObserver {
         } else {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("unexpected meminfo line format: {}", line),
+                format!("unexpected meminfo line format: {line}"),
             ))
         }
     }

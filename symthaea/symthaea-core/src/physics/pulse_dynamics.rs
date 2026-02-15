@@ -386,8 +386,7 @@ impl PulseDynamics {
                         .push("Sustainable operation - indefinite lifetime possible".to_string());
                 } else {
                     recommendations.push(format!(
-                        "Finite lifetime: {:.1} years - schedule maintenance",
-                        lifetime
+                        "Finite lifetime: {lifetime:.1} years - schedule maintenance"
                     ));
                 }
                 if thermal.fatigue_safety < 5.0 {

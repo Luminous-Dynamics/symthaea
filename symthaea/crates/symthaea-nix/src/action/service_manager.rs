@@ -135,7 +135,7 @@ impl ServiceManager {
         if service.contains('.') {
             service.to_string()
         } else {
-            format!("{}.service", service)
+            format!("{service}.service")
         }
     }
 }

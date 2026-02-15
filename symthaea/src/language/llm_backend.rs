@@ -178,18 +178,18 @@ impl LLMBackend for OllamaBackend {
             .json(&request_body)
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("Ollama request failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Ollama request failed: {e}"))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("Ollama returned {}: {}", status, body);
+            anyhow::bail!("Ollama returned {status}: {body}");
         }
 
         let ollama_response: OllamaResponse = response
             .json()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to parse Ollama response: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to parse Ollama response: {e}"))?;
 
         Ok(ollama_response.response)
     }
@@ -219,12 +219,12 @@ impl LLMBackend for OllamaBackend {
             .json(&request_body)
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("Ollama streaming request failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Ollama streaming request failed: {e}"))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("Ollama returned {}: {}", status, body);
+            anyhow::bail!("Ollama returned {status}: {body}");
         }
 
         // Read chunks as they arrive from the network and process line by line.
@@ -236,7 +236,7 @@ impl LLMBackend for OllamaBackend {
         while let Some(chunk) = stream
             .chunk()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to read Ollama stream chunk: {}", e))?
+            .map_err(|e| anyhow::anyhow!("Failed to read Ollama stream chunk: {e}"))?
         {
             buffer.extend_from_slice(&chunk);
 

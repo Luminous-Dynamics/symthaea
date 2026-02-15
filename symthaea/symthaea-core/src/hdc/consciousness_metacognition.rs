@@ -622,7 +622,7 @@ impl TemporalPatternManager {
     pub fn time_of_day(&self) -> String {
         let hours = (self.circadian_phase * 24.0) as u32;
         let minutes = ((self.circadian_phase * 24.0 - hours as f64) * 60.0) as u32;
-        format!("{:02}:{:02}", hours, minutes)
+        format!("{hours:02}:{minutes:02}")
     }
 
     /// Get circadian phase (0.0 = midnight, 0.5 = noon)
@@ -754,7 +754,7 @@ impl NarrativeIdentity {
         for insight in insights {
             match insight.insight_type {
                 InsightType::SelfModelUpdate => {
-                    self.add_theme(&format!("Dream insight: {}", dream_summary), 0.3);
+                    self.add_theme(&format!("Dream insight: {dream_summary}"), 0.3);
                 }
                 InsightType::EmotionalResolution => {
                     self.update_coherence(0.05);
@@ -763,7 +763,7 @@ impl NarrativeIdentity {
                     if let Some(chapter) = self.chapters.last_mut() {
                         chapter
                             .key_learnings
-                            .push(format!("Dream revelation: {}", dream_summary));
+                            .push(format!("Dream revelation: {dream_summary}"));
                     }
                 }
                 _ => {}
@@ -786,7 +786,7 @@ impl NarrativeIdentity {
         let chapter_num = self.chapters.len() + 1;
         let new_chapter = LifeChapter {
             title: format!("Chapter {}: {}", chapter_num, truncate_string(trigger, 30)),
-            summary: format!("Began with: {}", trigger),
+            summary: format!("Began with: {trigger}"),
             start_timestamp: current_timestamp(),
             end_timestamp: None,
             dominant_emotion: "anticipation".to_string(),
@@ -846,7 +846,7 @@ impl NarrativeIdentity {
         } else {
             self.themes.push(NarrativeTheme {
                 name: name.to_string(),
-                description: format!("Theme: {}", name),
+                description: format!("Theme: {name}"),
                 strength: initial_strength,
                 first_appeared: current_timestamp(),
                 hv_encoding: BinaryHV::random(name.len() as u64),
@@ -879,7 +879,7 @@ impl NarrativeIdentity {
             if !chapter.key_learnings.is_empty() {
                 story.push_str("Key learnings:\n");
                 for learning in &chapter.key_learnings {
-                    story.push_str(&format!("- {}\n", learning));
+                    story.push_str(&format!("- {learning}\n"));
                 }
             }
         }
@@ -1171,7 +1171,7 @@ impl SymbolicInterpreter {
             "neutral exploration"
         };
 
-        meaning.push_str(&format!("Overall tone: {}.", emotional_tone));
+        meaning.push_str(&format!("Overall tone: {emotional_tone}."));
 
         meaning
     }

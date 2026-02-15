@@ -178,7 +178,7 @@ impl IntegratedConsciousnessDemo {
 
             let insight = if UnifiedConsciousBeing::dream_provided_insight(&dream) {
                 UnifiedConsciousBeing::get_dream_insight(&dream)
-                    .map(|s| format!(" Insight: {}", s))
+                    .map(|s| format!(" Insight: {s}"))
                     .unwrap_or_default()
             } else {
                 String::new()

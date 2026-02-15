@@ -1380,7 +1380,7 @@ impl ConsciousnessPipeline {
                     suggested_action: assessment
                         .recommended_mode
                         .as_ref()
-                        .map(|m| format!("Switch to {:?} mode", m)),
+                        .map(|m| format!("Switch to {m:?} mode")),
                 });
             }
         }

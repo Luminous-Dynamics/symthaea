@@ -572,7 +572,7 @@ pub async fn create_test_network(
 
     // Create backends first
     let backends: Vec<Arc<LocalChannelBackend>> = (0..num_nodes)
-        .map(|i| Arc::new(LocalChannelBackend::with_id(format!("node-{}", i))))
+        .map(|i| Arc::new(LocalChannelBackend::with_id(format!("node-{i}"))))
         .collect();
 
     // Cross-register all backends
@@ -602,7 +602,7 @@ pub async fn create_test_network(
             if i != j {
                 let peer_node = FederatedNode::new(
                     coordinators[j].local_node_id(),
-                    NodeAddress::Channel(format!("node-{}", j)),
+                    NodeAddress::Channel(format!("node-{j}")),
                 );
                 coordinators[i].register_peer(peer_node).await;
             }

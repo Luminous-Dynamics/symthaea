@@ -168,7 +168,7 @@ impl NarrativeOperators {
 // ============================================================================
 
 /// Phase of a narrative arc (five-act structure)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ArcPhase {
     /// Exposition / world-building
     Setup,
@@ -183,7 +183,7 @@ pub enum ArcPhase {
 }
 
 /// Tension level within a scene or beat
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TensionLevel {
     /// Peaceful, no conflict
     Calm,
@@ -198,7 +198,7 @@ pub enum TensionLevel {
 }
 
 /// Emotional mood / atmosphere of a scene
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum NarrativeMood {
     /// Optimistic, light
     Hopeful,

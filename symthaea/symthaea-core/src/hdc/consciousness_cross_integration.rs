@@ -584,7 +584,7 @@ impl<'a> SelfImprovementEventEmitter<'a> {
             ConsciousnessEventType::CognitiveModeTransition,
             EventPayload::CognitiveMode {
                 from_mode: "previous".to_string(),
-                to_mode: format!("{:?}", improvement_type),
+                to_mode: format!("{improvement_type:?}"),
                 reason: format!(
                     "Applied improvement. Current Φ: {:.3}, Trend: {:+.4}",
                     system.current_phi(),
@@ -610,7 +610,7 @@ impl<'a> SelfImprovementEventEmitter<'a> {
             ConsciousnessEventType::CausalInsight,
             EventPayload::Causal {
                 cause: "Improvement Applied".to_string(),
-                effect: format!("Φ change: {:+.4} ({})", effectiveness, result),
+                effect: format!("Φ change: {effectiveness:+.4} ({result})"),
                 strength: effectiveness.abs().min(1.0),
             },
         );

@@ -71,14 +71,14 @@ impl DaemonSnapshot {
     pub fn write_to(&self, path: &Path) -> Result<(), String> {
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {}", e))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {e}"))?;
         }
 
-        let json = serde_json::to_string_pretty(self).map_err(|e| format!("serialize: {}", e))?;
+        let json = serde_json::to_string_pretty(self).map_err(|e| format!("serialize: {e}"))?;
 
         let tmp_path = path.with_extension("tmp");
-        std::fs::write(&tmp_path, json.as_bytes()).map_err(|e| format!("write tmp: {}", e))?;
-        std::fs::rename(&tmp_path, path).map_err(|e| format!("rename: {}", e))?;
+        std::fs::write(&tmp_path, json.as_bytes()).map_err(|e| format!("write tmp: {e}"))?;
+        std::fs::rename(&tmp_path, path).map_err(|e| format!("rename: {e}"))?;
         Ok(())
     }
 
@@ -189,10 +189,10 @@ impl DaemonConfig {
     /// Save config to a JSON file.
     pub fn save(&self, path: &Path) -> Result<(), String> {
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {}", e))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {e}"))?;
         }
-        let json = serde_json::to_string_pretty(self).map_err(|e| format!("serialize: {}", e))?;
-        std::fs::write(path, json).map_err(|e| format!("write: {}", e))
+        let json = serde_json::to_string_pretty(self).map_err(|e| format!("serialize: {e}"))?;
+        std::fs::write(path, json).map_err(|e| format!("write: {e}"))
     }
 }
 

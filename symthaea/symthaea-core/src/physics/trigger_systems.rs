@@ -948,9 +948,8 @@ pub fn estimate_fusion_yield(
         q_factor,
         confidence,
         notes: format!(
-            "Estimated for {:.1}g Pd at D/Pd={:.2}. \
-             Affected volume: {:.2e} cm³, pairs: {:.2e}, prob/pair: {:.2e}",
-            target_mass_g, d_loading_ratio, trigger_volume, affected_pairs, fusion_prob
+            "Estimated for {target_mass_g:.1}g Pd at D/Pd={d_loading_ratio:.2}. \
+             Affected volume: {trigger_volume:.2e} cm³, pairs: {affected_pairs:.2e}, prob/pair: {fusion_prob:.2e}"
         ),
     }
 }

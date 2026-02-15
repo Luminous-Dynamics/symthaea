@@ -1080,7 +1080,7 @@ pub fn demo_phi_evolution(seed: u64) -> PhiEvolutionTracker {
         tracker.record(
             measurement,
             (i + 1) as f64 * 0.1,
-            &format!("Random input {}", i),
+            &format!("Random input {i}"),
         );
     }
 
@@ -1096,7 +1096,7 @@ pub fn demo_phi_evolution(seed: u64) -> PhiEvolutionTracker {
         tracker.record(
             measurement,
             1.0 + (i + 1) as f64 * 0.1,
-            &format!("Learning step {}", i),
+            &format!("Learning step {i}"),
         );
     }
 
@@ -1109,7 +1109,7 @@ pub fn demo_phi_evolution(seed: u64) -> PhiEvolutionTracker {
         tracker.record(
             measurement,
             3.0 + (i + 1) as f64 * 0.1,
-            &format!("Equilibrium {}", i),
+            &format!("Equilibrium {i}"),
         );
     }
 

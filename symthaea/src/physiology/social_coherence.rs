@@ -379,7 +379,7 @@ impl CollectiveLearning {
 
     /// Contribute a threshold observation
     pub fn contribute_threshold(&mut self, task: TaskComplexity, coherence: f32, success: bool) {
-        let key = format!("{:?}", task);
+        let key = format!("{task:?}");
         self.threshold_observations
             .entry(key)
             .or_default()
@@ -388,7 +388,7 @@ impl CollectiveLearning {
 
     /// Query average threshold for a task
     pub fn query_threshold_average(&self, task: TaskComplexity) -> Option<f32> {
-        let key = format!("{:?}", task);
+        let key = format!("{task:?}");
         let observations = self.threshold_observations.get(&key)?;
 
         if observations.is_empty() {

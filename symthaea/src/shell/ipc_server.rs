@@ -377,9 +377,7 @@ async fn handle_client(
                         if let IpcRequest::Hello { version } = request {
                             if version != IPC_PROTOCOL_VERSION {
                                 let response = IpcResponse::Error(format!(
-                                    "Protocol version mismatch (client {}, server {})",
-                                    version,
-                                    IPC_PROTOCOL_VERSION
+                                    "Protocol version mismatch (client {version}, server {IPC_PROTOCOL_VERSION})"
                                 ));
                                 let data = rmp_serde::to_vec(&response)?;
                                 let len = (data.len() as u32).to_le_bytes();
@@ -550,7 +548,7 @@ async fn read_frame(
 
     let len = u32::from_le_bytes(len_buf) as usize;
     if len == 0 || len > max_size {
-        anyhow::bail!("Invalid IPC frame size: {}", len);
+        anyhow::bail!("Invalid IPC frame size: {len}");
     }
 
     let mut buf = vec![0u8; len];
@@ -661,14 +659,14 @@ impl CommandExecutor for StubCommandExecutor {
                     output: String::new(),
                     phi_at_execution: phi,
                     vetoed: true,
-                    veto_reason: Some(format!("Phi {:.2} below required {:.2}", phi, required)),
+                    veto_reason: Some(format!("Phi {phi:.2} below required {required:.2}")),
                 };
             }
         }
 
         ExecutionResult {
             success: true,
-            output: format!("[stub] Would execute: {}", command),
+            output: format!("[stub] Would execute: {command}"),
             phi_at_execution: phi,
             vetoed: false,
             veto_reason: None,
@@ -686,7 +684,7 @@ impl CommandExecutor for StubCommandExecutor {
                 "Safe"
             }
             .to_string(),
-            preview: Some(format!("Would execute: {}", command)),
+            preview: Some(format!("Would execute: {command}")),
             warnings: if is_destructive {
                 vec!["This command may be destructive".to_string()]
             } else {

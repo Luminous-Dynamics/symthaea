@@ -220,12 +220,12 @@ impl CachedSemanticEncoder {
     /// Load embeddings from a JSON file
     pub fn load_from_json<P: AsRef<Path>>(&self, path: P) -> Result<usize, String> {
         let content = std::fs::read_to_string(path.as_ref())
-            .map_err(|e| format!("Failed to read embeddings: {}", e))?;
+            .map_err(|e| format!("Failed to read embeddings: {e}"))?;
 
         let entries: Vec<EmbeddingEntry> = serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse embeddings: {}", e))?;
+            .map_err(|e| format!("Failed to parse embeddings: {e}"))?;
 
-        let mut cache = self.cache.write().unwrap();
+        let mut cache = self.cache.write().unwrap_or_else(|e| e.into_inner());
         let count = entries.len();
 
         for entry in entries {
@@ -238,7 +238,7 @@ impl CachedSemanticEncoder {
     /// Add a single embedding to the cache
     pub fn add_embedding(&self, text: &str, embedding: Vec<f32>) {
         let hash = Self::hash_text(text);
-        let mut cache = self.cache.write().unwrap();
+        let mut cache = self.cache.write().unwrap_or_else(|e| e.into_inner());
         cache.insert(hash, embedding);
     }
 
@@ -256,12 +256,12 @@ impl CachedSemanticEncoder {
     /// Check if text is in cache
     pub fn is_cached(&self, text: &str) -> bool {
         let hash = Self::hash_text(text);
-        self.cache.read().unwrap().contains_key(&hash)
+        self.cache.read().unwrap_or_else(|e| e.into_inner()).contains_key(&hash)
     }
 
     /// Get cache statistics
     pub fn cache_stats(&self) -> (usize, usize) {
-        let cache = self.cache.read().unwrap();
+        let cache = self.cache.read().unwrap_or_else(|e| e.into_inner());
         (cache.len(), self.embedding_dim)
     }
 }
@@ -271,7 +271,7 @@ impl SemanticEncoder for CachedSemanticEncoder {
         let hash = Self::hash_text(text);
 
         // Try cache first
-        if let Some(embedding) = self.cache.read().unwrap().get(&hash) {
+        if let Some(embedding) = self.cache.read().unwrap_or_else(|e| e.into_inner()).get(&hash) {
             // Project from embedding space to HDC space
             let projected = self.projection.project(embedding);
             return ContinuousHV::from_values(projected).normalize();
@@ -326,13 +326,13 @@ impl WordEmbeddingEncoder {
         use std::io::{BufRead, BufReader};
 
         let file = std::fs::File::open(path.as_ref())
-            .map_err(|e| format!("Failed to open word vectors: {}", e))?;
+            .map_err(|e| format!("Failed to open word vectors: {e}"))?;
 
         let reader = BufReader::new(file);
         let mut count = 0;
 
         for line in reader.lines().take(max_words) {
-            let line = line.map_err(|e| format!("Read error: {}", e))?;
+            let line = line.map_err(|e| format!("Read error: {e}"))?;
             let parts: Vec<&str> = line.split_whitespace().collect();
 
             if parts.len() < self.word_dim + 1 {
@@ -763,7 +763,7 @@ impl MoralSemanticEncoder {
     /// Get the base vector for a word's category
     fn word_to_category_hv(&self, word: &str) -> Option<(&'static str, f32, ContinuousHV)> {
         self.moral_vocabulary.get(word).map(|(cat, valence)| {
-            let base = self.category_bases.get(cat).unwrap().clone();
+            let base = self.category_bases.get(cat).expect("category base must exist for known moral vocabulary category").clone();
             (*cat, *valence, base)
         })
     }

@@ -228,7 +228,7 @@ impl DiscoveryStats {
     /// Record a new discovery
     pub fn record_discovery(&mut self, source: DiscoverySource, phi: f64) {
         self.total_discovered += 1;
-        let source_key = format!("{:?}", source);
+        let source_key = format!("{source:?}");
         *self.by_source.entry(source_key).or_insert(0) += 1;
         if phi > self.best_phi {
             self.best_phi = phi;

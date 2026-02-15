@@ -436,14 +436,14 @@ impl SevenHarmonies {
         for word in positive {
             if text.contains(word) {
                 pos_count += 1;
-                evidence.push(format!("Contains '{}' (positive)", word));
+                evidence.push(format!("Contains '{word}' (positive)"));
             }
         }
 
         for word in negative {
             if text.contains(word) {
                 neg_count += 1;
-                evidence.push(format!("Contains '{}' (negative)", word));
+                evidence.push(format!("Contains '{word}' (negative)"));
             }
         }
 

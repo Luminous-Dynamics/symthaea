@@ -648,6 +648,7 @@ mod tests {
     use super::super::meta_reasoning::MetaReasoningConfig;
     use super::*;
     use crate::hdc::primitive_system::PrimitiveTier;
+    use symthaea_core::hdc::BinaryHV;
 
     #[test]
     fn test_trust_score_updates() {
@@ -688,13 +689,15 @@ mod tests {
             ByzantineResistantCollective::new("test".to_string(), evolution_config, meta_config);
 
         // Normal primitive
-        let normal = CandidatePrimitive::new(
-            "normal".to_string(),
-            PrimitiveTier::Physical,
-            "test",
-            "valid description",
-            0,
-        );
+        let normal = CandidatePrimitive {
+            name: "normal".to_string(),
+            tier: PrimitiveTier::Physical,
+            definition: "valid description".to_string(),
+            fitness: 0.0,
+            encoding: BinaryHV::random(0),
+            epistemic_coordinate: Default::default(),
+            harmonic_alignment: 0.5,
+        };
         let anomalies = collective.detect_primitive_anomalies(&normal);
         assert!(anomalies.is_empty());
 

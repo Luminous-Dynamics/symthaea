@@ -223,13 +223,22 @@ fn test_bound_vs_bundle_different_phi() {
     let bound_components = vec![bound.clone(), c.clone()];
     let phi_bound = calc.compute_true_phi(&bound_components);
 
+    // Both Φ values should be finite and non-negative
+    assert!(phi_bundled.phi.is_finite(), "Bundled Φ should be finite");
+    assert!(phi_bound.phi.is_finite(), "Bound Φ should be finite");
+    assert!(phi_bundled.phi >= 0.0, "Bundled Φ should be non-negative");
+    assert!(phi_bound.phi >= 0.0, "Bound Φ should be non-negative");
+
+    // System EI values should be finite
+    assert!(phi_bundled.system_ei.is_finite(), "Bundled system EI should be finite");
+    assert!(phi_bound.system_ei.is_finite(), "Bound system EI should be finite");
+
     // They should have different Φ values (bind creates orthogonal structure)
     // This test verifies that our entropy measure is sensitive to structural differences
     println!(
         "\u{03a6}(bundled) = {:.4}, \u{03a6}(bound) = {:.4}",
         phi_bundled.phi, phi_bound.phi
     );
-    // Note: We don't assert specific relationship, just that they're computed correctly
 }
 
 #[test]

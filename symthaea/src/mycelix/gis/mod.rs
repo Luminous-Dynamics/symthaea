@@ -461,15 +461,15 @@ pub enum GISError {
 impl std::fmt::Display for GISError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotFound(id) => write!(f, "Ignorance record not found: {}", id),
+            Self::NotFound(id) => write!(f, "Ignorance record not found: {id}"),
             Self::EIGBelowThreshold { actual, required } => {
-                write!(f, "EIG {} below threshold {}", actual, required)
+                write!(f, "EIG {actual} below threshold {required}")
             }
             Self::InvalidStatus { current, required } => {
-                write!(f, "Invalid status: {:?}, required: {:?}", current, required)
+                write!(f, "Invalid status: {current:?}, required: {required:?}")
             }
-            Self::DHTError(msg) => write!(f, "DHT error: {}", msg),
-            Self::CryptoError(msg) => write!(f, "Crypto error: {}", msg),
+            Self::DHTError(msg) => write!(f, "DHT error: {msg}"),
+            Self::CryptoError(msg) => write!(f, "Crypto error: {msg}"),
         }
     }
 }

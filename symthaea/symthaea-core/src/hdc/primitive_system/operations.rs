@@ -257,13 +257,13 @@ impl PrimitiveSystem {
         ] {
             let count = self.count_tier(*tier);
             if count > 0 {
-                report.push_str(&format!("- **{:?}**: {} primitives\n", tier, count));
+                report.push_str(&format!("- **{tier:?}**: {count} primitives\n"));
             }
         }
 
         report.push_str("\n## Domain Manifolds\n\n");
         for (name, domain) in &self.domains {
-            report.push_str(&format!("### {}\n", name));
+            report.push_str(&format!("### {name}\n"));
             report.push_str(&format!("- **Tier**: {:?}\n", domain.tier));
             report.push_str(&format!("- **Purpose**: {}\n\n", domain.purpose));
         }
@@ -562,7 +562,7 @@ impl PrimitiveSystem {
         let encoding = prim_a.encoding.bind(&prim_b.encoding);
         Ok(PrimitiveResult {
             encoding,
-            operation: format!("bind({}, {})", a, b),
+            operation: format!("bind({a}, {b})"),
             source_primitives: vec![a.to_string(), b.to_string()],
         })
     }
@@ -652,7 +652,7 @@ impl PrimitiveSystem {
                 "bundle_weighted({})",
                 weighted
                     .iter()
-                    .map(|(n, w)| format!("{}:{:.2}", n, w))
+                    .map(|(n, w)| format!("{n}:{w:.2}"))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
@@ -684,7 +684,7 @@ impl PrimitiveSystem {
 
         Ok(PrimitiveResult {
             encoding,
-            operation: format!("analogy({}:{} :: {}:?)", a, b, c),
+            operation: format!("analogy({a}:{b} :: {c}:?)"),
             source_primitives: vec![a.to_string(), b.to_string(), c.to_string()],
         })
     }
@@ -706,7 +706,7 @@ impl PrimitiveSystem {
 
         Ok(PrimitiveResult {
             encoding,
-            operation: format!("permute({}, {})", name, steps),
+            operation: format!("permute({name}, {steps})"),
             source_primitives: vec![name.to_string()],
         })
     }

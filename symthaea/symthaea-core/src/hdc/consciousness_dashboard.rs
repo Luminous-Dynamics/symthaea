@@ -400,7 +400,7 @@ impl ConsciousnessDashboard {
             ConsciousnessTrend::Stable => "➡️ Stable",
             ConsciousnessTrend::Unknown => "❓ Unknown",
         };
-        output.push_str(&format!("║ Trend: {:<58} ║\n", trend_icon));
+        output.push_str(&format!("║ Trend: {trend_icon:<58} ║\n"));
 
         // Key metrics from current eval
         if let Some(ref eval) = self.current_eval {

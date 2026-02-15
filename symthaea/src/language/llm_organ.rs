@@ -358,7 +358,7 @@ impl LLMOrgan {
                 Err(e) => {
                     // Fall through to simulation
                     self.stats.errors += 1;
-                    eprintln!("LLM backend error, falling back to simulation: {}", e);
+                    eprintln!("LLM backend error, falling back to simulation: {e}");
                 }
             }
         }
@@ -431,7 +431,7 @@ impl LLMOrgan {
                 }
                 Err(e) => {
                     self.stats.errors += 1;
-                    eprintln!("LLM streaming error, falling back to simulation: {}", e);
+                    eprintln!("LLM streaming error, falling back to simulation: {e}");
                 }
             }
         }
@@ -501,7 +501,7 @@ impl LLMOrgan {
 
     /// Simulate QA response
     fn simulate_qa(&self, question: &str) -> String {
-        format!("Based on my understanding, here is the answer to '{}': This would require connection to an actual LLM for accurate responses.", question)
+        format!("Based on my understanding, here is the answer to '{question}': This would require connection to an actual LLM for accurate responses.")
     }
 
     /// Simulate summarization
@@ -518,12 +518,12 @@ impl LLMOrgan {
 
     /// Simulate code generation
     fn simulate_code(&self, prompt: &str) -> String {
-        format!("// Generated code for: {}\n// Note: Actual code generation requires LLM connection\nfn example() {{\n    // Implementation here\n}}", prompt)
+        format!("// Generated code for: {prompt}\n// Note: Actual code generation requires LLM connection\nfn example() {{\n    // Implementation here\n}}")
     }
 
     /// Simulate general generation
     fn simulate_generation(&self, prompt: &str) -> String {
-        format!("Continuing from '{}': This is a simulated response. Connect to an actual LLM for real generation capabilities.", prompt)
+        format!("Continuing from '{prompt}': This is a simulated response. Connect to an actual LLM for real generation capabilities.")
     }
 
     /// Convert text to embedding

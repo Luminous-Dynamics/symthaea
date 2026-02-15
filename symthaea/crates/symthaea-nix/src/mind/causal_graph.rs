@@ -360,7 +360,7 @@ impl NixCausalGraph {
             observations: self.observations.clone(),
         };
         let json = serde_json::to_string_pretty(&snapshot)
-            .map_err(|e| format!("Failed to serialize causal graph: {}", e))?;
+            .map_err(|e| format!("Failed to serialize causal graph: {e}"))?;
         std::fs::write(path, json)
             .map_err(|e| format!("Failed to write causal graph to {}: {}", path.display(), e))
     }
@@ -373,7 +373,7 @@ impl NixCausalGraph {
         let json = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read causal graph from {}: {}", path.display(), e))?;
         let snapshot: CausalGraphSnapshot = serde_json::from_str(&json)
-            .map_err(|e| format!("Failed to deserialize causal graph: {}", e))?;
+            .map_err(|e| format!("Failed to deserialize causal graph: {e}"))?;
 
         let mut loaded = 0;
         for edge in snapshot.edges {
@@ -444,7 +444,7 @@ impl NixCausalGraph {
             // Service options that reference firewall need firewall ports
             if schema.name.contains("openFirewall") {
                 let parent = parts[..2.min(parts.len())].join(".");
-                self.add_structural_edge(&format!("{}.enable", parent), &schema.name, 0.9);
+                self.add_structural_edge(&format!("{parent}.enable"), &schema.name, 0.9);
                 self.add_structural_edge(&schema.name, "networking.firewall.allowedTCPPorts", 0.7);
             }
         }

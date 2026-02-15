@@ -59,7 +59,7 @@ impl GcAnalysis {
         } else if bytes >= KIB {
             format!("{:.1} KiB", bytes as f64 / KIB as f64)
         } else {
-            format!("{} B", bytes)
+            format!("{bytes} B")
         }
     }
 }

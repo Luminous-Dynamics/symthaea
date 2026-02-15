@@ -126,7 +126,7 @@ impl NarrativeCompiler {
         let chars: Vec<String> = thought
             .characters
             .iter()
-            .map(|(name, role)| format!("{} ({})", name, role))
+            .map(|(name, role)| format!("{name} ({role})"))
             .collect();
         out.push_str(&chars.join(", "));
         out.push('\n');

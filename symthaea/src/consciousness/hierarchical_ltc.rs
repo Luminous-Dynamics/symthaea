@@ -550,7 +550,7 @@ impl HierarchicalLTC {
     /// Inject input into specific circuit
     pub fn inject_circuit(&mut self, circuit_id: usize, input: &[f32]) -> Result<()> {
         if circuit_id >= self.circuits.len() {
-            anyhow::bail!("Circuit {} does not exist", circuit_id);
+            anyhow::bail!("Circuit {circuit_id} does not exist");
         }
         self.circuits[circuit_id].inject(input);
         Ok(())

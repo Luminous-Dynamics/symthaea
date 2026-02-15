@@ -49,8 +49,8 @@ impl fmt::Display for ModelStatus {
             Self::NotAttempted => write!(f, "Not attempted"),
             Self::Loading => write!(f, "Loading..."),
             Self::Loaded(p) => write!(f, "Loaded ({})", p.display()),
-            Self::Unavailable(reason) => write!(f, "Unavailable: {}", reason),
-            Self::Degraded(reason) => write!(f, "Degraded: {}", reason),
+            Self::Unavailable(reason) => write!(f, "Unavailable: {reason}"),
+            Self::Degraded(reason) => write!(f, "Degraded: {reason}"),
         }
     }
 }
@@ -75,12 +75,12 @@ pub enum ModelLoadError {
 impl fmt::Display for ModelLoadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::FileNotFound(p) => write!(f, "Model file not found: {}", p),
-            Self::CorruptModel(r) => write!(f, "Corrupt model: {}", r),
-            Self::DependencyMissing(d) => write!(f, "Missing dependency: {}", d),
-            Self::FeatureDisabled(feat) => write!(f, "Feature '{}' not enabled", feat),
-            Self::NetworkError(e) => write!(f, "Network error: {}", e),
-            Self::Other(e) => write!(f, "Model load error: {}", e),
+            Self::FileNotFound(p) => write!(f, "Model file not found: {p}"),
+            Self::CorruptModel(r) => write!(f, "Corrupt model: {r}"),
+            Self::DependencyMissing(d) => write!(f, "Missing dependency: {d}"),
+            Self::FeatureDisabled(feat) => write!(f, "Feature '{feat}' not enabled"),
+            Self::NetworkError(e) => write!(f, "Network error: {e}"),
+            Self::Other(e) => write!(f, "Model load error: {e}"),
         }
     }
 }
@@ -161,7 +161,7 @@ impl ModelRegistry {
         entries.sort_by_key(|(name, _)| (*name).clone());
 
         for (name, status) in entries {
-            lines.push(format!("  - {}: {}", name, status));
+            lines.push(format!("  - {name}: {status}"));
         }
 
         lines.join("\n")

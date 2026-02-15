@@ -85,7 +85,7 @@ impl AttentionSnapshot {
     ) -> Self {
         let n = result.weights.len();
         Self {
-            input_names: (0..n).map(|i| format!("input_{}", i)).collect(),
+            input_names: (0..n).map(|i| format!("input_{i}")).collect(),
             input_indices: (0..n).collect(),
             phi_values: phi_values.to_vec(),
             attention_weights: result.weights.clone(),
@@ -151,7 +151,7 @@ impl AttentionSnapshot {
                     .input_names
                     .get(i)
                     .cloned()
-                    .unwrap_or_else(|| format!("input_{}", i));
+                    .unwrap_or_else(|| format!("input_{i}"));
                 (i, name, w)
             })
             .collect()
@@ -234,7 +234,7 @@ impl AttentionSnapshot {
                 .input_names
                 .get(i)
                 .cloned()
-                .unwrap_or_else(|| format!("input_{}", i));
+                .unwrap_or_else(|| format!("input_{i}"));
             let phi = self.phi_values.get(i).copied().unwrap_or(0.0);
             let weight = self.attention_weights[i];
 
@@ -243,12 +243,7 @@ impl AttentionSnapshot {
             let bar = "#".repeat(bar_len);
 
             lines.push(format!(
-                "{:>width$} | Phi={:.3} | W={:.4} |{}",
-                name,
-                phi,
-                weight,
-                bar,
-                width = max_name_len
+                "{name:>max_name_len$} | Phi={phi:.3} | W={weight:.4} |{bar}"
             ));
         }
 
@@ -343,7 +338,7 @@ impl AttentionHistory {
                     .input_names
                     .get(i)
                     .cloned()
-                    .unwrap_or_else(|| format!("input_{}", i));
+                    .unwrap_or_else(|| format!("input_{i}"));
                 let entry = weight_sums.entry(name).or_insert((0.0, 0));
                 entry.0 += weight;
                 entry.1 += 1;
@@ -440,7 +435,7 @@ impl AttentionHistory {
                 row.push(blocks[block_idx]);
             }
 
-            lines.push(format!("{:>width$} | {}", name, row, width = max_name_len));
+            lines.push(format!("{name:>max_name_len$} | {row}"));
         }
 
         // Footer with statistics
@@ -471,7 +466,7 @@ impl AttentionHistory {
                     .input_names
                     .get(i)
                     .cloned()
-                    .unwrap_or_else(|| format!("input_{}", i));
+                    .unwrap_or_else(|| format!("input_{i}"));
                 series
                     .entry(name)
                     .or_default()
@@ -550,7 +545,7 @@ impl AttentionFlowGraph {
             .iter()
             .enumerate()
             .map(|(i, name)| AttentionFlowNode {
-                id: format!("input_{}", i),
+                id: format!("input_{i}"),
                 label: name.clone(),
                 node_type: "input".to_string(),
                 value: snapshot.phi_values.get(i).copied().unwrap_or(0.0),
@@ -574,7 +569,7 @@ impl AttentionFlowGraph {
                     .input_names
                     .get(i)
                     .cloned()
-                    .unwrap_or_else(|| format!("input_{}", i)),
+                    .unwrap_or_else(|| format!("input_{i}")),
                 target: output_name.to_string(),
                 weight,
                 source_phi: snapshot.phi_values.get(i).copied().unwrap_or(0.0),

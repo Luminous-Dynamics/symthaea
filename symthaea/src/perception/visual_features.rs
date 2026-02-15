@@ -51,7 +51,7 @@ impl VisualCortex {
 
     /// Load an image from a file path
     pub fn load_image(&self, path: &Path) -> Result<DynamicImage> {
-        image::open(path).with_context(|| format!("Failed to load image from {:?}", path))
+        image::open(path).with_context(|| format!("Failed to load image from {path:?}"))
     }
 
     /// Process an image and extract semantic features

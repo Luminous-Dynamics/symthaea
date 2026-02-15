@@ -140,7 +140,7 @@ impl ConsciousDialogueGenerator {
 
         // Determine response style based on context
         let style = self.determine_style(&context.understanding, &context.metacognition);
-        reasoning.push(format!("Selected style: {:?}", style));
+        reasoning.push(format!("Selected style: {style:?}"));
 
         // Build response based on understanding
         let mut response_parts = Vec::new();
@@ -279,7 +279,7 @@ impl ConsciousDialogueGenerator {
             .primes
             .iter()
             .take(3)
-            .map(|p| format!("{:?}", p))
+            .map(|p| format!("{p:?}"))
             .collect();
 
         match depth {
@@ -317,18 +317,15 @@ impl ConsciousDialogueGenerator {
 
         if valence > 0.3 {
             format!(
-                "That sense of {} comes through clearly. It's meaningful.",
-                emotion
+                "That sense of {emotion} comes through clearly. It's meaningful."
             )
         } else if valence < -0.3 {
             format!(
-                "I can feel the weight of that {}. I'm here with you in this.",
-                emotion
+                "I can feel the weight of that {emotion}. I'm here with you in this."
             )
         } else {
             format!(
-                "I notice the {} you're experiencing. Tell me more.",
-                emotion
+                "I notice the {emotion} you're experiencing. Tell me more."
             )
         }
     }
@@ -384,7 +381,7 @@ impl ConsciousDialogueGenerator {
                 .grounded
                 .primes
                 .first()
-                .map(|p| format!("{:?}", p).to_lowercase())
+                .map(|p| format!("{p:?}").to_lowercase())
                 .unwrap_or_else(|| "something".to_string())
         )
     }
@@ -396,8 +393,7 @@ impl ConsciousDialogueGenerator {
         let mem = &memories[0];
         let truncated = if mem.len() > 40 { &mem[..40] } else { mem };
         Some(format!(
-            "This reminds me of when you mentioned \"{}...\"",
-            truncated
+            "This reminds me of when you mentioned \"{truncated}...\""
         ))
     }
 

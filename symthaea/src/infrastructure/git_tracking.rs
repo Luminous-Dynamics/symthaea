@@ -167,20 +167,20 @@ impl GitTracker {
 
         if !changes.services_enabled.is_empty() {
             for svc in &changes.services_enabled {
-                parts.push(format!("Enable service: {}", svc));
+                parts.push(format!("Enable service: {svc}"));
             }
         }
 
         if !changes.services_disabled.is_empty() {
             for svc in &changes.services_disabled {
-                parts.push(format!("Disable service: {}", svc));
+                parts.push(format!("Disable service: {svc}"));
             }
         }
 
         if !changes.options_changed.is_empty() {
             if changes.options_changed.len() <= 3 {
                 for opt in &changes.options_changed {
-                    parts.push(format!("Update {}", opt));
+                    parts.push(format!("Update {opt}"));
                 }
             } else {
                 parts.push(format!("Update {} options", changes.options_changed.len()));
@@ -195,7 +195,7 @@ impl GitTracker {
         } else {
             let summary = &parts[0];
             let details = parts[1..].join("\n- ");
-            format!("{}\n\n- {}", summary, details)
+            format!("{summary}\n\n- {details}")
         }
     }
 
@@ -241,7 +241,7 @@ impl GitTracker {
     /// Get commit history
     pub fn log(&self, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
         let output =
-            self.run_git(&["log", &format!("-{}", limit), "--format=%H|%an|%ae|%at|%s"])?;
+            self.run_git(&["log", &format!("-{limit}"), "--format=%H|%an|%ae|%at|%s"])?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut commits = Vec::new();
@@ -371,7 +371,7 @@ impl CommitInfo {
         } else if days > 30 {
             format!("{} months ago", days / 30)
         } else if days > 0 {
-            format!("{} days ago", days)
+            format!("{days} days ago")
         } else if hours > 0 {
             format!("{} hours ago", hours % 24)
         } else if mins > 0 {
@@ -451,8 +451,8 @@ pub enum GitError {
 impl std::fmt::Display for GitError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::CommandFailed(msg) => write!(f, "Git command failed: {}", msg),
-            Self::IoError(msg) => write!(f, "IO error: {}", msg),
+            Self::CommandFailed(msg) => write!(f, "Git command failed: {msg}"),
+            Self::IoError(msg) => write!(f, "IO error: {msg}"),
             Self::NothingToCommit => write!(f, "Nothing to commit"),
             Self::NoCommits => write!(f, "No commits in repository"),
             Self::NotARepo => write!(f, "Not a git repository"),

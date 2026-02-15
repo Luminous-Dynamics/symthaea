@@ -438,7 +438,7 @@ impl PatternDiscoveryEngine {
 
         // Add cluster vectors as symbols (attractors)
         for (i, vec) in vectors.iter().enumerate() {
-            let name = format!("mem_{}", i);
+            let name = format!("mem_{i}");
             let _ = resonator.add_symbol(&name, vec.values.clone());
         }
 
@@ -452,7 +452,7 @@ impl PatternDiscoveryEngine {
             .enumerate()
             .map(|(i, vec)| {
                 Constraint::named(
-                    &format!("similar_to_mem_{}", i),
+                    &format!("similar_to_mem_{i}"),
                     centroid.values.clone(),
                     vec.values.clone(),
                 )

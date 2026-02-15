@@ -441,7 +441,7 @@ impl ElectronShell {
         // s, p, d, f orbitals for shells 1-7
         let mut shell_vectors = Vec::new();
         for n in 1..=7u8 {
-            let shell = genesis.hv(&format!("electron::shell_{}", n), PHYSICS_DIM);
+            let shell = genesis.hv(&format!("electron::shell_{n}"), PHYSICS_DIM);
             shell_vectors.push(shell);
         }
         Self { shell_vectors }

@@ -687,7 +687,7 @@ impl SpacetimeEncoder {
     pub fn encode_spacetime_type(&self, metric_type: &str) -> ContinuousHV {
         let type_hv = self
             .genesis
-            .hv(&format!("metric::{}", metric_type), PHYSICS_DIM);
+            .hv(&format!("metric::{metric_type}"), PHYSICS_DIM);
         self.curved.bind(&type_hv)
     }
 }

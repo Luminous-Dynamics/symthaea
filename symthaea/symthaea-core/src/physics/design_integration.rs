@@ -634,5 +634,21 @@ mod tests {
             infeasible_integration.len()
         );
         println!("========================================\n");
+
+        // At least some designs should be feasible at low power
+        assert!(
+            !feasible_integration.is_empty(),
+            "Should have at least one feasible design"
+        );
+
+        // All integration values should be finite and non-negative
+        for val in feasible_integration.iter().chain(infeasible_integration.iter()) {
+            assert!(val.is_finite(), "Integration value should be finite");
+            assert!(*val >= 0.0, "Integration value should be non-negative");
+        }
+
+        // Mean values should be finite and non-negative
+        assert!(feasible_mean.is_finite(), "Feasible mean should be finite");
+        assert!(feasible_mean >= 0.0, "Feasible mean should be non-negative");
     }
 }

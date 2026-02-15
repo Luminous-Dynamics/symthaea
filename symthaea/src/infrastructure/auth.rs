@@ -481,8 +481,8 @@ impl std::fmt::Display for AuthError {
             Self::TokenExpired => write!(f, "Token has expired"),
             Self::Disabled => write!(f, "Authentication is disabled"),
             Self::LocalAuthDisabled => write!(f, "Local authentication not allowed"),
-            Self::InsufficientPermissions(p) => write!(f, "Missing permission: {:?}", p),
-            Self::IoError(e) => write!(f, "IO error: {}", e),
+            Self::InsufficientPermissions(p) => write!(f, "Missing permission: {p:?}"),
+            Self::IoError(e) => write!(f, "IO error: {e}"),
         }
     }
 }
@@ -496,8 +496,8 @@ fn generate_token() -> String {
     use rand::RngCore;
     let mut bytes = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut bytes);
-    let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
-    format!("sym_{}", hex)
+    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    format!("sym_{hex}")
 }
 
 /// Generate a cryptographically random token ID.
@@ -505,8 +505,8 @@ fn generate_token_id() -> String {
     use rand::RngCore;
     let mut bytes = [0u8; 16];
     rand::rngs::OsRng.fill_bytes(&mut bytes);
-    let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
-    format!("tok_{}", hex)
+    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    format!("tok_{hex}")
 }
 
 /// Hash a token using BLAKE3 for secure, non-reversible storage.

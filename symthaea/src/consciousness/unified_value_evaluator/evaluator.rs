@@ -514,8 +514,7 @@ impl UnifiedValueEvaluator {
             return Decision::Veto(VetoReason::NegativeAffectDominant { rage, fear });
         } else if rage > 0.4 || fear > 0.5 {
             warnings.push(format!(
-                "Elevated negative affect (rage: {:.2}, fear: {:.2})",
-                rage, fear
+                "Elevated negative affect (rage: {rage:.2}, fear: {fear:.2})"
             ));
         }
 
@@ -760,7 +759,7 @@ impl UnifiedValueEvaluator {
             Decision::Veto(reason) => {
                 factors.push(ExplanationFactor {
                     factor_type: FactorType::VetoReason,
-                    description: format!("{:?}", reason),
+                    description: format!("{reason:?}"),
                     impact: -1.0,
                 });
             }

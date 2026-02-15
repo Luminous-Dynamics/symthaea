@@ -228,7 +228,7 @@ impl OutputBridge for StdoutBridge {
         if self.closed {
             return Ok(());
         }
-        print!("{}", output);
+        print!("{output}");
         Ok(())
     }
 
@@ -236,7 +236,7 @@ impl OutputBridge for StdoutBridge {
         if self.closed {
             return Ok(());
         }
-        println!("{}", output);
+        println!("{output}");
         Ok(())
     }
 
@@ -250,7 +250,7 @@ impl OutputBridge for StdoutBridge {
         if self.closed {
             return Ok(());
         }
-        eprintln!("Error: {}", error);
+        eprintln!("Error: {error}");
         Ok(())
     }
 
@@ -291,7 +291,7 @@ impl OutputBridge for ChannelOutputBridge {
     }
 
     fn writeln(&mut self, output: &str) -> Result<()> {
-        let _ = self.sender.send(IOEvent::Output(format!("{}\n", output)));
+        let _ = self.sender.send(IOEvent::Output(format!("{output}\n")));
         Ok(())
     }
 

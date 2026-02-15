@@ -589,8 +589,7 @@ pub fn print_prediction_gate_summary(results: &[PredictionGateResults]) {
         pass_rate
     );
     println!(
-        "║ Average Prediction Error Reduction: {:.1}%                    ║",
-        avg_per
+        "║ Average Prediction Error Reduction: {avg_per:.1}%                    ║"
     );
 
     if passed_count >= (results.len() as f32 * 0.6) as usize {

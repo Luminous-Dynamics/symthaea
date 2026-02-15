@@ -77,7 +77,7 @@ impl FrameSlot {
     pub fn required(name: impl Into<String>, description: impl Into<String>) -> Self {
         let name_str = name.into();
         Self {
-            role_marker: BinaryHV::random(seed_from_name(&format!("SLOT_{}", name_str))),
+            role_marker: BinaryHV::random(seed_from_name(&format!("SLOT_{name_str}"))),
             name: name_str,
             description: description.into(),
             required: true,
@@ -89,7 +89,7 @@ impl FrameSlot {
     pub fn optional(name: impl Into<String>, description: impl Into<String>) -> Self {
         let name_str = name.into();
         Self {
-            role_marker: BinaryHV::random(seed_from_name(&format!("SLOT_{}", name_str))),
+            role_marker: BinaryHV::random(seed_from_name(&format!("SLOT_{name_str}"))),
             name: name_str,
             description: description.into(),
             required: false,
@@ -140,7 +140,7 @@ impl CrossDomainFrame {
     ) -> Self {
         let name_str = name.into();
         Self {
-            frame_encoding: BinaryHV::random(seed_from_name(&format!("FRAME_{}", name_str))),
+            frame_encoding: BinaryHV::random(seed_from_name(&format!("FRAME_{name_str}"))),
             name: name_str,
             description: description.into(),
             slots: Vec::new(),
@@ -542,10 +542,10 @@ impl UCLFrameSystem {
         let frame = self
             .frames
             .get(frame_name)
-            .ok_or_else(|| format!("Unknown frame: {}", frame_name))?;
+            .ok_or_else(|| format!("Unknown frame: {frame_name}"))?;
 
         FrameInstance::bind(frame, bindings)
-            .map_err(|missing| format!("Missing required slots: {:?}", missing))
+            .map_err(|missing| format!("Missing required slots: {missing:?}"))
     }
 
     /// Check if an encoding matches a frame (approximate frame detection)
