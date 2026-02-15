@@ -21,6 +21,7 @@
 
 pub mod aggregation;
 pub mod byzantine;
+pub mod consciousness_plugin;
 pub mod convert;
 pub mod hybrid_bft;
 pub mod meta_learning;
@@ -34,6 +35,7 @@ pub mod holochain_bridge;
 
 pub use aggregation::*;
 pub use byzantine::*;
+pub use consciousness_plugin::*;
 pub use convert::*;
 pub use hybrid_bft::*;
 pub use pipeline::*;

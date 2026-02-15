@@ -8,6 +8,8 @@
 //!
 //! Produces an ASCII table and phase diagram showing convergence boundaries.
 
+use mycelix_fl_core::consciousness_plugin::ConsciousnessAwareByzantinePlugin;
+use mycelix_fl_core::plugins::{ByzantinePlugin, PipelinePlugins};
 use mycelix_fl_core::{krum, GradientUpdate, PipelineConfig, UnifiedPipeline};
 use std::collections::HashMap;
 
@@ -180,6 +182,62 @@ fn run_krum_trial(updates: &[GradientUpdate], byz_pct: usize) -> TrialResult {
     }
 }
 
+/// Run consciousness-aware pipeline (honest=high phi, byz=low phi, multi-signal OFF).
+fn run_consciousness_trial(
+    updates: &[GradientUpdate],
+    byz_pct: usize,
+    num_byzantine: usize,
+) -> TrialResult {
+    let mut config = PipelineConfig::default();
+    config.multi_signal_detection = false;
+    config.trim_fraction = 0.2;
+
+    let mut pipeline = UnifiedPipeline::new(config);
+
+    let reputations: HashMap<String, f32> = updates
+        .iter()
+        .map(|u| (u.participant_id.clone(), 0.8))
+        .collect();
+
+    let mut consciousness_plugin = ConsciousnessAwareByzantinePlugin::new();
+    let mut phi_scores = HashMap::new();
+    for u in updates {
+        let phi = if u.participant_id.starts_with("honest") {
+            0.7
+        } else {
+            0.08 // Below veto threshold (0.1)
+        };
+        phi_scores.insert(u.participant_id.clone(), phi);
+    }
+    consciousness_plugin.set_phi_scores(phi_scores);
+
+    let mut plugins = PipelinePlugins {
+        compression: None,
+        byzantine: vec![&mut consciousness_plugin],
+        verification: None,
+    };
+
+    match pipeline.aggregate_with_plugins(updates, &reputations, &mut plugins) {
+        Ok(result) => {
+            let mse = compute_mse(&result.result.aggregated.gradients);
+            TrialResult {
+                _byz_pct: byz_pct,
+                mse,
+                converged: mse < CONVERGENCE_THRESHOLD,
+                _method: "Conscious",
+                error_msg: None,
+            }
+        }
+        Err(e) => TrialResult {
+            _byz_pct: byz_pct,
+            mse: f64::INFINITY,
+            converged: false,
+            _method: "Conscious",
+            error_msg: Some(format!("{}", e)),
+        },
+    }
+}
+
 fn main() {
     println!("=============================================================");
     println!("  Byzantine Tolerance Phase Diagram Benchmark");
@@ -193,6 +251,7 @@ fn main() {
     let mut equal_rep_results: Vec<TrialResult> = Vec::new();
     let mut low_rep_results: Vec<TrialResult> = Vec::new();
     let mut krum_results: Vec<TrialResult> = Vec::new();
+    let mut consciousness_results: Vec<TrialResult> = Vec::new();
 
     for &byz_pct in BYZANTINE_PERCENTAGES {
         let num_byzantine = (TOTAL_NODES * byz_pct + 50) / 100; // round to nearest
@@ -201,15 +260,16 @@ fn main() {
         equal_rep_results.push(run_equal_rep_trial(&updates, byz_pct));
         low_rep_results.push(run_low_rep_trial(&updates, byz_pct));
         krum_results.push(run_krum_trial(&updates, byz_pct));
+        consciousness_results.push(run_consciousness_trial(&updates, byz_pct, num_byzantine));
     }
 
     // ── ASCII Table ──────────────────────────────────────────────────────
-    println!("{:-<89}", "");
+    println!("{:-<109}", "");
     println!(
-        "| {:>5} | {:>6} | {:>12} {:>6} | {:>12} {:>6} | {:>12} {:>6} |",
-        "Byz%", "Nodes", "EqualRep", "Conv?", "LowRepByz", "Conv?", "Krum", "Conv?"
+        "| {:>5} | {:>6} | {:>12} {:>6} | {:>12} {:>6} | {:>12} {:>6} | {:>12} {:>6} |",
+        "Byz%", "Nodes", "EqualRep", "Conv?", "LowRepByz", "Conv?", "Krum", "Conv?", "Conscious", "Conv?"
     );
-    println!("{:-<89}", "");
+    println!("{:-<109}", "");
 
     for i in 0..BYZANTINE_PERCENTAGES.len() {
         let byz_pct = BYZANTINE_PERCENTAGES[i];
@@ -218,6 +278,7 @@ fn main() {
         let eq = &equal_rep_results[i];
         let lr = &low_rep_results[i];
         let kr = &krum_results[i];
+        let cs = &consciousness_results[i];
 
         let fmt_mse = |r: &TrialResult| -> String {
             if let Some(ref e) = r.error_msg {
@@ -240,7 +301,7 @@ fn main() {
         };
 
         println!(
-            "| {:>4}% | {:>2}/{:>2} | {} {:>6} | {} {:>6} | {} {:>6} |",
+            "| {:>4}% | {:>2}/{:>2} | {} {:>6} | {} {:>6} | {} {:>6} | {} {:>6} |",
             byz_pct,
             num_byz,
             TOTAL_NODES,
@@ -250,9 +311,11 @@ fn main() {
             fmt_conv(lr),
             fmt_mse(kr),
             fmt_conv(kr),
+            fmt_mse(cs),
+            fmt_conv(cs),
         );
     }
-    println!("{:-<89}", "");
+    println!("{:-<109}", "");
 
     // ── ASCII Phase Diagram ──────────────────────────────────────────────
     println!("\n  Phase Diagram (PASS = converged, FAIL = diverged, ERR = pipeline error)");
@@ -277,6 +340,7 @@ fn main() {
         ("EqualRep", &equal_rep_results),
         ("LowRepByz", &low_rep_results),
         ("Krum", &krum_results),
+        ("Conscious", &consciousness_results),
     ];
 
     for (name, results) in methods_display {
@@ -320,11 +384,13 @@ fn main() {
     let eq_boundary = find_boundary(&equal_rep_results);
     let lr_boundary = find_boundary(&low_rep_results);
     let kr_boundary = find_boundary(&krum_results);
+    let cs_boundary = find_boundary(&consciousness_results);
 
     println!("  Safety Boundaries (last converging %):");
-    println!("    EqualRep:  {}%", eq_boundary);
-    println!("    LowRepByz: {}%", lr_boundary);
-    println!("    Krum:      {}%", kr_boundary);
+    println!("    EqualRep:   {}%", eq_boundary);
+    println!("    LowRepByz:  {}%", lr_boundary);
+    println!("    Krum:        {}%", kr_boundary);
+    println!("    Conscious:   {}%", cs_boundary);
     println!();
 
     // ── Verification Tests ───────────────────────────────────────────────

@@ -12,6 +12,7 @@
 
 use std::collections::HashMap;
 
+use mycelix_fl_core::consciousness_plugin::ConsciousnessAwareByzantinePlugin;
 use mycelix_fl_core::meta_learning::MetaLearningByzantinePlugin;
 use mycelix_fl_core::pipeline::{ExternalWeightMap, ParticipantWeightAdjustment};
 use mycelix_fl_core::plugins::{ByzantinePlugin, PipelinePlugins};
@@ -368,6 +369,138 @@ fn test_e2e_with_meta_learning_plugin() {
         honest_profile.is_some(),
         "Should have tracked honest participant"
     );
+}
+
+#[test]
+fn test_e2e_with_consciousness_plugin() {
+    let dim = 15;
+    let mut consciousness_plugin = ConsciousnessAwareByzantinePlugin::new();
+
+    // Set phi scores: honest nodes have high phi, Byzantine have very low
+    let mut phi_scores = HashMap::new();
+    for i in 0..8 {
+        phi_scores.insert(format!("h{}", i), 0.7);
+    }
+    for i in 0..2 {
+        phi_scores.insert(format!("byz{}", i), 0.05); // Below veto threshold
+    }
+    consciousness_plugin.set_phi_scores(phi_scores);
+
+    let config = PipelineConfig::adaptive();
+    let mut pipeline = UnifiedPipeline::new(config);
+
+    let mut updates = Vec::new();
+    let mut reps = HashMap::new();
+
+    // 8 honest
+    for i in 0..8 {
+        updates.push(GradientUpdate::new(
+            format!("h{}", i),
+            1,
+            vec![0.5; dim],
+            100,
+            0.5,
+        ));
+        reps.insert(format!("h{}", i), 0.9);
+    }
+
+    // 2 Byzantine (extreme gradients)
+    for i in 0..2 {
+        updates.push(GradientUpdate::new(
+            format!("byz{}", i),
+            1,
+            vec![if i == 0 { 100.0 } else { -100.0 }; dim],
+            100,
+            0.5,
+        ));
+        reps.insert(format!("byz{}", i), 0.5); // Medium reputation — consciousness gating must catch them
+    }
+
+    let mut plugins = PipelinePlugins {
+        compression: None,
+        byzantine: vec![&mut consciousness_plugin],
+        verification: None,
+    };
+
+    let result = pipeline
+        .aggregate_with_plugins(&updates, &reps, &mut plugins)
+        .expect("Pipeline should succeed with consciousness plugin");
+
+    // Byzantine nodes should be vetoed (phi=0.05 < veto_threshold=0.1)
+    for val in &result.result.aggregated.gradients {
+        assert!(
+            (*val - 0.5).abs() < 1.0,
+            "Byzantine influence should be suppressed: {}",
+            val
+        );
+    }
+}
+
+#[test]
+fn test_e2e_meta_learning_plus_consciousness() {
+    let dim = 15;
+    let mut meta_plugin = MetaLearningByzantinePlugin::new();
+    let mut consciousness_plugin = ConsciousnessAwareByzantinePlugin::new();
+
+    // Set phi scores
+    let mut phi_scores = HashMap::new();
+    for i in 0..6 {
+        phi_scores.insert(format!("h{}", i), 0.8);
+    }
+    for i in 0..2 {
+        phi_scores.insert(format!("byz{}", i), 0.15); // Low but above veto
+    }
+    consciousness_plugin.set_phi_scores(phi_scores);
+
+    let config = PipelineConfig::adaptive();
+    let mut pipeline = UnifiedPipeline::new(config);
+
+    let mut updates = Vec::new();
+    let mut reps = HashMap::new();
+
+    // 6 honest
+    for i in 0..6 {
+        updates.push(GradientUpdate::new(
+            format!("h{}", i),
+            1,
+            vec![0.5; dim],
+            100,
+            0.5,
+        ));
+        reps.insert(format!("h{}", i), 0.9);
+    }
+
+    // 2 Byzantine
+    for i in 0..2 {
+        updates.push(GradientUpdate::new(
+            format!("byz{}", i),
+            1,
+            vec![if i == 0 { 50.0 } else { -50.0 }; dim],
+            100,
+            0.5,
+        ));
+        reps.insert(format!("byz{}", i), 0.5);
+    }
+
+    // Compose both plugins
+    let mut plugins = PipelinePlugins {
+        compression: None,
+        byzantine: vec![&mut meta_plugin, &mut consciousness_plugin],
+        verification: None,
+    };
+
+    let result = pipeline
+        .aggregate_with_plugins(&updates, &reps, &mut plugins)
+        .expect("Pipeline should succeed with composed plugins");
+
+    // With both plugins active, Byzantine influence should be suppressed
+    for val in &result.result.aggregated.gradients {
+        assert!(
+            (*val - 0.5).abs() < 5.0,
+            "Composed plugins should suppress Byzantine influence: {}",
+            val
+        );
+    }
 }
 
 #[cfg(feature = "holochain")]
