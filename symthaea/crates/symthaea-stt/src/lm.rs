@@ -510,7 +510,7 @@ impl BeamDecoder {
                 let token = if i < self.vocab.len() {
                     self.vocab[i].clone()
                 } else {
-                    format!("T{}", i)
+                    format!("T{i}")
                 };
 
                 // Get LM score

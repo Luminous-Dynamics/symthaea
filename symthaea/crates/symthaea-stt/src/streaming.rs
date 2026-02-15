@@ -512,7 +512,7 @@ impl StreamSession {
             result.push_str(&self.phonemes[last_boundary..].join(" "));
         }
 
-        format!("/{}/", result)
+        format!("/{result}/")
     }
 
     /// Is session active

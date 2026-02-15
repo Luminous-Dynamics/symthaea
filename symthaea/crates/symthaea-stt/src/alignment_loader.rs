@@ -56,10 +56,10 @@ pub fn load_alignments<P: AsRef<Path>>(
     path: P,
 ) -> Result<HashMap<String, UtteranceAlignment>, String> {
     let file =
-        File::open(path.as_ref()).map_err(|e| format!("Failed to open parquet file: {}", e))?;
+        File::open(path.as_ref()).map_err(|e| format!("Failed to open parquet file: {e}"))?;
 
     let builder = ParquetRecordBatchReaderBuilder::try_new(file)
-        .map_err(|e| format!("Failed to create parquet reader: {}", e))?;
+        .map_err(|e| format!("Failed to create parquet reader: {e}"))?;
 
     // Print schema for debugging
     let schema = builder.schema();
@@ -70,12 +70,12 @@ pub fn load_alignments<P: AsRef<Path>>(
 
     let reader = builder
         .build()
-        .map_err(|e| format!("Failed to build reader: {}", e))?;
+        .map_err(|e| format!("Failed to build reader: {e}"))?;
 
     let mut alignments = HashMap::new();
 
     for batch_result in reader {
-        let batch = batch_result.map_err(|e| format!("Failed to read batch: {}", e))?;
+        let batch = batch_result.map_err(|e| format!("Failed to read batch: {e}"))?;
 
         // Get the ID column
         let id_col = batch.column_by_name("id").ok_or("Missing 'id' column")?;
@@ -308,7 +308,7 @@ pub fn id_to_audio_path(id: &str, base_dir: &Path) -> Option<std::path::PathBuf>
         base_dir
             .join(speaker)
             .join(chapter)
-            .join(format!("{}.flac", id)),
+            .join(format!("{id}.flac")),
     )
 }
 

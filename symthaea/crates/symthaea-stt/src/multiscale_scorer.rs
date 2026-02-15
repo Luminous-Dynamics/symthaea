@@ -74,20 +74,20 @@ impl MultiScaleScorer {
         ];
 
         for phoneme in phonemes.iter() {
-            let seed = format!("multiscale_basis_{}", phoneme);
+            let seed = format!("multiscale_basis_{phoneme}");
             phoneme_basis.insert(phoneme.to_string(), HV16::random(&seed));
         }
 
         // Initialize all memory levels
-        let l1_memories = std::array::from_fn(|m| HV16::random(&format!("l1_memory_{}", m)));
+        let l1_memories = std::array::from_fn(|m| HV16::random(&format!("l1_memory_{m}")));
 
         let l2_memories = std::array::from_fn(|m| {
-            std::array::from_fn(|p| HV16::random(&format!("l2_memory_{}_{}", m, p)))
+            std::array::from_fn(|p| HV16::random(&format!("l2_memory_{m}_{p}")))
         });
 
         let l3_memories = std::array::from_fn(|m| {
             std::array::from_fn(|p| {
-                std::array::from_fn(|v| HV16::random(&format!("l3_memory_{}_{}_{}", m, p, v)))
+                std::array::from_fn(|v| HV16::random(&format!("l3_memory_{m}_{p}_{v}")))
             })
         });
 
@@ -192,7 +192,12 @@ impl MultiScaleScorer {
         self.phoneme_basis
             .get(phoneme)
             .copied()
-            .unwrap_or_else(|| *self.phoneme_basis.get("UNK").unwrap())
+            .unwrap_or_else(|| {
+                self.phoneme_basis
+                    .get("UNK")
+                    .copied()
+                    .unwrap_or_else(HV16::zero)
+            })
     }
 
     /// Get articulatory features

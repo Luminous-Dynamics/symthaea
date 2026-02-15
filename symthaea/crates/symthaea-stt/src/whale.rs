@@ -364,7 +364,7 @@ impl WhaleSentinel {
             "VARIABLE" // Complex rhythm
         };
 
-        format!("CODA_{}_{}", n_clicks, rhythm_type)
+        format!("CODA_{n_clicks}_{rhythm_type}")
     }
 
     /// Get current prototype statistics

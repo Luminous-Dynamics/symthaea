@@ -235,11 +235,11 @@ impl ModelPackage {
         s.push_str(&format!("Prototypes: {}\n", self.num_prototypes()));
 
         if let Some(order) = self.metadata.lm_order {
-            s.push_str(&format!("Language Model: {}-gram\n", order));
+            s.push_str(&format!("Language Model: {order}-gram\n"));
         }
 
         if let Some(ref info) = self.metadata.training_info {
-            s.push_str(&format!("Training: {}\n", info));
+            s.push_str(&format!("Training: {info}\n"));
         }
 
         s
@@ -452,8 +452,7 @@ fn chrono_lite_now() -> String {
     let seconds = secs_today % 60;
 
     format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        year, month, day, hours, minutes, seconds
+        "{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z"
     )
 }
 

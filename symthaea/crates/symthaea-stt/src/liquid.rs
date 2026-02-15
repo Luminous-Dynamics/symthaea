@@ -323,12 +323,12 @@ impl TimeAwareBinder {
     pub fn new(n_duration_bins: usize, n_intensity_bins: usize) -> Self {
         // Generate orthogonal basis vectors for duration
         let duration_basis: Vec<HV16> = (0..n_duration_bins)
-            .map(|i| HV16::random(&format!("duration_bin_{}", i)))
+            .map(|i| HV16::random(&format!("duration_bin_{i}")))
             .collect();
 
         // Generate orthogonal basis vectors for intensity
         let intensity_basis: Vec<HV16> = (0..n_intensity_bins)
-            .map(|i| HV16::random(&format!("intensity_bin_{}", i)))
+            .map(|i| HV16::random(&format!("intensity_bin_{i}")))
             .collect();
 
         Self {

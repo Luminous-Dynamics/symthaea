@@ -102,7 +102,7 @@ impl CetaceanUnit {
             CetaceanPlace::Downsweep => "D",
             CetaceanPlace::Flat => "F",
         };
-        format!("{}{}", m, p)
+        format!("{m}{p}")
     }
 }
 

@@ -87,7 +87,7 @@ impl EdfFile {
     /// Open and parse an EDF file
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, String> {
         let file =
-            File::open(path.as_ref()).map_err(|e| format!("Failed to open EDF file: {}", e))?;
+            File::open(path.as_ref()).map_err(|e| format!("Failed to open EDF file: {e}"))?;
         let mut reader = BufReader::new(file);
 
         // Parse main header (256 bytes)
@@ -128,7 +128,7 @@ impl EdfFile {
         let mut buf = [0u8; 256];
         reader
             .read_exact(&mut buf)
-            .map_err(|e| format!("Failed to read EDF header: {}", e))?;
+            .map_err(|e| format!("Failed to read EDF header: {e}"))?;
 
         Ok(EdfHeader {
             version: String::from_utf8_lossy(&buf[0..8]).trim().to_string(),
@@ -168,7 +168,7 @@ impl EdfFile {
                 let mut buf = vec![0u8; width * n];
                 reader
                     .read_exact(&mut buf)
-                    .map_err(|e| format!("Failed to read signal header field: {}", e))?;
+                    .map_err(|e| format!("Failed to read signal header field: {e}"))?;
                 Ok((0..n)
                     .map(|i| {
                         String::from_utf8_lossy(&buf[i * width..(i + 1) * width])
@@ -217,7 +217,7 @@ impl EdfFile {
         // Seek to data section
         reader
             .seek(SeekFrom::Start(data_start as u64))
-            .map_err(|e| format!("Failed to seek to data: {}", e))?;
+            .map_err(|e| format!("Failed to seek to data: {e}"))?;
 
         let _num_signals = signal_headers.len();
         let num_records = header.num_records;
